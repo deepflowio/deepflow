@@ -36,9 +36,9 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	return updater
 }
 
-func (v *ChVTap) generateNewData() (map[IDKey]mysql.ChVTap, bool) {
+func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChVTap, bool) {
 	var vTaps []mysql.VTap
-	err := mysql.Db.Unscoped().Find(&vTaps).Error
+	err := db.Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
 		return nil, false
@@ -47,9 +47,10 @@ func (v *ChVTap) generateNewData() (map[IDKey]mysql.ChVTap, bool) {
 	keyToItem := make(map[IDKey]mysql.ChVTap)
 	for _, vTap := range vTaps {
 		keyToItem[IDKey{ID: vTap.ID}] = mysql.ChVTap{
-			ID:   vTap.ID,
-			Name: vTap.Name,
-			Type: vTap.Type,
+			ID:     vTap.ID,
+			Name:   vTap.Name,
+			Type:   vTap.Type,
+			TeamID: vTap.TeamID,
 		}
 	}
 	return keyToItem, true

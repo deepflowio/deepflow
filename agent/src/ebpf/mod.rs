@@ -59,6 +59,8 @@ pub const SOCK_DATA_SOFARPC: u16 = 43;
 #[allow(dead_code)]
 pub const SOCK_DATA_FASTCGI: u16 = 44;
 #[allow(dead_code)]
+pub const SOCK_DATA_BRPC: u16 = 45;
+#[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
 pub const SOCK_DATA_POSTGRESQL: u16 = 61;
@@ -231,9 +233,7 @@ pub struct SK_BPF_DATA {
     /*
      * 说明：
      *
-     * 当syscall读写数据过大时，eBPF并不会读取所有数据而是有一个最大读取数据大小的限制，
-     * 这个长度限制是512字节。
-     *
+     * 当syscall读写数据过大时，eBPF并不会读取所有数据而是有一个最大读取数据大小的限制
      */
     pub syscall_len: u64,      // 本次系统调用读、写数据的总长度
     pub cap_len: u32,          // 返回的cap_data长度

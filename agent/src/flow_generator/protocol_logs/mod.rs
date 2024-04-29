@@ -36,8 +36,8 @@ pub use mq::{
 use num_enum::TryFromPrimitive;
 pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
-    decode_new_rpc_trace_context_with_type, DubboInfo, DubboLog, SofaRpcInfo, SofaRpcLog,
-    SOFA_NEW_RPC_TRACE_CTX_KEY,
+    decode_new_rpc_trace_context_with_type, BrpcInfo, BrpcLog, DubboInfo, DubboLog, SofaRpcInfo,
+    SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
     MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, OracleInfo, OracleLog, PostgreInfo,
@@ -78,11 +78,10 @@ const FLOW_LOG_VERSION: u32 = 20220128;
 #[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
-    Ok,
-    Error, // deprecate
-    NotExist,
-    ServerError,
-    ClientError,
+    Ok = 0,
+    NotExist = 2,
+    ServerError = 3,
+    ClientError = 4,
 }
 
 impl Default for L7ResponseStatus {
@@ -492,4 +491,39 @@ macro_rules! swap_if {
     };
 }
 
+macro_rules! set_captured_byte {
+    ($this:expr, $param:expr) => {
+        match $this.msg_type {
+            LogMessageType::Request => $this.captured_request_byte = $param.captured_byte as u32,
+            LogMessageType::Response => $this.captured_response_byte = $param.captured_byte as u32,
+            LogMessageType::Session => {
+                match LogMessageType::from($param.direction) {
+                    LogMessageType::Request => {
+                        $this.captured_request_byte = $param.captured_byte as u32
+                    }
+                    LogMessageType::Response => {
+                        $this.captured_response_byte = $param.captured_byte as u32
+                    }
+                    _ => unimplemented!(),
+                };
+            }
+            _ => unimplemented!(),
+        }
+    };
+}
+
+pub(crate) use set_captured_byte;
 pub(crate) use swap_if;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_l7_response_status_as_uint() {
+        assert_eq!(L7ResponseStatus::Ok as u32, 0);
+        assert_eq!(L7ResponseStatus::NotExist as u32, 2);
+        assert_eq!(L7ResponseStatus::ServerError as u32, 3);
+        assert_eq!(L7ResponseStatus::ClientError as u32, 4);
+    }
+}

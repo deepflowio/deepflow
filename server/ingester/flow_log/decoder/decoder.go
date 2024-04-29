@@ -28,8 +28,10 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
+	exportcommon "github.com/deepflowio/deepflow/server/ingester/exporters/common"
+	exportconfig "github.com/deepflowio/deepflow/server/ingester/exporters/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
-	"github.com/deepflowio/deepflow/server/ingester/flow_log/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -75,6 +77,7 @@ type Counter struct {
 type Decoder struct {
 	index         int
 	msgType       datatype.MessageType
+	dataSourceID  uint32
 	platformData  *grpc.PlatformInfoTable
 	inQueue       queue.QueueReader
 	throttler     *throttler.ThrottlingQueue
@@ -102,6 +105,7 @@ func NewDecoder(
 	return &Decoder{
 		index:          index,
 		msgType:        msgType,
+		dataSourceID:   exportconfig.FlowLogMessageToDataSourceID(msgType),
 		platformData:   platformData,
 		inQueue:        inQueue,
 		throttler:      throttler,
@@ -254,7 +258,6 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
-			d.export(l)
 		}
 		l.Release()
 	}
@@ -288,17 +291,22 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	l := log_data.TaggedFlowToL4FlowLog(flow, d.platformData)
 
 	if l.HitPcapPolicy() {
+		d.export(l)
 		d.throttler.SendWithoutThrottling(l)
 	} else {
+		l.AddReferenceCount()
 		if !d.throttler.SendWithThrottling(l) {
 			d.counter.DropCount++
+		} else {
+			d.export(l)
 		}
+		l.Release()
 	}
 }
 
-func (d *Decoder) export(l *log_data.L7FlowLog) {
+func (d *Decoder) export(l exportcommon.ExportItem) {
 	if d.exporters != nil {
-		d.exporters.Put(l, d.index)
+		d.exporters.Put(d.dataSourceID, d.index, l)
 	}
 }
 

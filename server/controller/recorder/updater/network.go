@@ -57,7 +57,7 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 		](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			wholeCache,
-			db.NewNetwork().SetORG(wholeCache.GetORG()),
+			db.NewNetwork().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.Networks,
 			cloudData,
 		),
@@ -74,7 +74,7 @@ func (n *Network) getDiffBaseByCloudItem(cloudItem *cloudmodel.Network) (diffBas
 func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Network, bool) {
 	vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(n.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(n.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
 		)))
@@ -89,7 +89,7 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Net
 		Shared:         cloudItem.Shared,
 		NetType:        cloudItem.NetType,
 		SubDomain:      cloudItem.SubDomainLcuuid,
-		Domain:         n.cache.DomainLcuuid,
+		Domain:         n.metadata.Domain.Lcuuid,
 		Region:         cloudItem.RegionLcuuid,
 		AZ:             cloudItem.AZLcuuid,
 		VPCID:          vpcID,
@@ -104,7 +104,7 @@ func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *clou
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(n.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(n.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
 			)))

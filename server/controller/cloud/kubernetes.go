@@ -46,6 +46,13 @@ func (c *Cloud) getKubernetesData() model.Resource {
 		}
 	}
 
+	if len(kubernetesGatherResource.PodNodes) == 0 {
+		return model.Resource{
+			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+			ErrorMessage: "invalid pod node count (0)",
+		}
+	}
+
 	// 合并网络
 	networks := []model.Network{}
 	networks = append(
@@ -105,13 +112,6 @@ func (c *Cloud) getKubernetesData() model.Resource {
 			VMLcuuid:      vmLcuuid,
 			PodNodeLcuuid: node.Lcuuid,
 		})
-	}
-
-	if len(vms) == 0 {
-		return model.Resource{
-			ErrorState:   kubernetesGatherResource.ErrorState,
-			ErrorMessage: "invalid vm count (0). " + kubernetesGatherResource.ErrorMessage,
-		}
 	}
 
 	if kubernetesGatherResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {

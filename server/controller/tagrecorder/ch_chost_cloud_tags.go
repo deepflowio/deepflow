@@ -39,7 +39,7 @@ func NewChChostCloudTags() *ChChostCloudTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate) {
+func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.CloudTags.IsDifferent() {
 		bytes, err := json.Marshal(fieldsUpdate.CloudTags.GetNew())
@@ -51,20 +51,21 @@ func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChChostCloudTags
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]CloudTagsKey{{ID: sourceID}},
 				[]mysql.ChChostCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, CloudTagsKey{ID: sourceID}, db)
 		}
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) sourceToTarget(item *mysql.VM) (keys []CloudTagsKey, targets []mysql.ChChostCloudTags) {
+func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, item *mysql.VM) (keys []CloudTagsKey, targets []mysql.ChChostCloudTags) {
 	if len(item.CloudTags) == 0 {
 		return
 	}
@@ -73,10 +74,10 @@ func (c *ChChostCloudTags) sourceToTarget(item *mysql.VM) (keys []CloudTagsKey, 
 		log.Error(err)
 		return
 	}
-	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChChostCloudTags{{ID: item.ID, CloudTags: string(bytes)}}
+	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChChostCloudTags{{ID: item.ID, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) softDeletedTargetsUpdated(targets []mysql.ChChostCloudTags) {
+func (c *ChChostCloudTags) softDeletedTargetsUpdated(targets []mysql.ChChostCloudTags, db *mysql.DB) {
 
 }

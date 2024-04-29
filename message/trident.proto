@@ -21,6 +21,8 @@ service Synchronizer {
     rpc GetPrometheusLabelIDs(PrometheusLabelRequest) returns (PrometheusLabelResponse) {}
     rpc GetPrometheusTargets(PrometheusTargetRequest) returns (PrometheusTargetResponse) {}
     rpc GetUniversalTagNameMaps(UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
+    // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
+    rpc RemoteExecute(stream RemoteExecResponse) returns (stream RemoteExecRequest) {}
 }
 
 // debug service
@@ -89,6 +91,7 @@ message SyncRequest {
     optional uint64 version_platform_data = 9 [default = 0]; /* only platform data */
     optional uint64 version_acls = 10 [default = 0];
     optional uint64 version_groups = 11 [default = 0];
+    optional string current_k8s_image = 12;
 
     optional string ctrl_ip = 21;
     optional string host = 22;      // 表示hostname，操作系统的原始主机名，注册和信息同步使用
@@ -601,6 +604,7 @@ message UpgradeResponse {
     optional string md5 = 3;        // 文件MD5
     optional uint64 total_len = 4;  // 数据总长
     optional uint32 pkt_count = 5;  // 包总个数
+    optional string k8s_image = 6;  // When k8s_image is not empty, ignore content
 }
 
 message NtpRequest {
@@ -841,6 +845,7 @@ message GPIDSyncRequest {
 message ShareGPIDSyncRequests {
     optional string server_ip = 1;
     repeated GPIDSyncRequest sync_requests = 2;
+    optional uint32 org_id = 3;
 }
 
 message GPIDSyncResponse {
@@ -938,6 +943,8 @@ message MetricLabelRequest {
     optional uint32 pod_cluster_id = 2;
     optional uint32 epc_id = 3;
     repeated LabelRequest labels = 4;  // must contain instance and job label
+
+    optional uint32 org_id = 11;
 }
 
 message MetricLabelResponse {
@@ -946,6 +953,8 @@ message MetricLabelResponse {
     optional uint32 pod_cluster_id = 3;
     optional uint32 epc_id = 4;
     repeated LabelResponse label_ids = 5;
+
+    optional uint32 org_id = 11;
 }
 
 message TargetRequest {
@@ -953,6 +962,8 @@ message TargetRequest {
     optional string instance = 2;
     optional uint32 pod_cluster_id = 3;
     optional uint32 epc_id = 4;
+
+    optional uint32 org_id = 11;
 }
 
 message TargetResponse {
@@ -965,6 +976,8 @@ message TargetResponse {
     optional uint32 target_id = 7;              // when the Controller cannot determine the target_id, fill in 0
     repeated uint32 metric_ids = 8;             // when requesting all prometheus information, you need to carry the metric list related to the target
     repeated uint32 target_label_name_ids = 9;  // when the target labels change, it needs to be synchronized to Ingester regularly
+
+    optional uint32 org_id = 11;
 }
 
 // when the request content is empty, it means requesting all metric label and target information
@@ -1022,4 +1035,76 @@ message UniversalTagNameMapsResponse {
     repeated IdNameMap subnet_map = 12;
     repeated IdNameMap gprocess_map = 13;
     repeated IdNameMap vtap_map = 14;
+}
+
+message AgentId {
+    optional string ip = 1;
+    optional string mac = 2;
+    optional string team_id = 3;
+}
+
+enum OutputFormat {
+    TEXT = 0;
+    BINARY = 1;
+}
+
+enum CommandType {
+    LINUX = 0;
+    KUBERNETES = 1;
+}
+
+message RemoteCommand {
+    optional uint32 id = 1;
+    optional string cmd = 2;
+    repeated string param_names = 3;
+    optional OutputFormat output_format = 4;
+    optional CommandType cmd_type = 5;
+}
+
+message LinuxNamespace {
+    optional uint64 id = 1;
+    optional string ns_type = 2;
+    optional string user = 3;
+    optional uint32 pid = 4;
+    optional string cmd = 5;
+}
+
+message CommandResult {
+    optional int32 errno = 1;
+    optional string errmsg = 2; // error message in command execution
+    optional bytes content = 3;
+    // will only be populated in the last segment
+    // also used as end of result
+    optional string md5 = 4;
+    optional uint64 total_len = 5;
+    optional uint32 pkt_count = 6;
+}
+
+enum ExecutionType {
+    LIST_COMMAND = 0;
+    LIST_NAMESPACE = 1;
+    RUN_COMMAND = 2;
+}
+
+message Parameter {
+    optional string key = 1;
+    optional string value = 2; // accepts [A-Za-z0-9-_]
+}
+
+// message from server to agent
+message RemoteExecRequest {
+    optional ExecutionType exec_type = 1;
+    optional uint32 command_id = 2;
+    repeated Parameter params = 3; // parameters to use in commands
+    optional uint32 linux_ns_pid = 4; // execute command in agent namespace if null
+    optional uint32 batch_len = 5 [default = 1048576]; // batch len of command execution results, min 1024
+}
+
+// message from agent to server
+message RemoteExecResponse {
+    optional AgentId agent_id = 1;
+
+    repeated RemoteCommand commands = 2;
+    repeated LinuxNamespace linux_namespaces = 3;
+    optional CommandResult command_result = 4;
 }

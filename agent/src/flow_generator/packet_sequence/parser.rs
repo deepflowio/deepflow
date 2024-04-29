@@ -72,10 +72,8 @@ impl PacketSequenceParser {
                         Ok(_) => {
                             batch.reserve(blocks.len());
                             batch.extend(blocks.drain(..).map(|f| BoxedPacketSequenceBlock(f)));
-                            if let Err(_) = output_queue.send_all(&mut batch) {
-                                warn!(
-                                    "packet sequence block to queue failed maybe queue have terminated"
-                                );
+                            if let Err(e) = output_queue.send_all(&mut batch) {
+                                warn!("packet sequence block to queue failed, because {:?}", e);
                                 batch.clear();
                             }
                         }
@@ -88,5 +86,20 @@ impl PacketSequenceParser {
             .unwrap();
         self.thread.lock().unwrap().replace(thread);
         info!("packet sequence parser (id={}) started", self.id);
+    }
+
+    pub fn stop(&mut self) {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            warn!(
+                "packet sequence parser id: {} already stopped, do nothing.",
+                self.id
+            );
+            return;
+        }
+        info!("stopping packet sequence parser: {}", self.id);
+        if let Some(t) = self.thread.lock().unwrap().take() {
+            let _ = t.join();
+        }
+        info!("stopped packet sequence parser: {}", self.id);
     }
 }

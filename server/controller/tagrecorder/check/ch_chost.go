@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChost struct {
@@ -39,12 +40,12 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 		chosts []mysql.VM
 		hosts  []mysql.Host
 	)
-	err := mysql.Db.Unscoped().Find(&chosts).Error
+	err := p.db.Unscoped().Find(&chosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Select("id", "ip").Find(&hosts).Error
+	err = p.db.Unscoped().Select("id", "ip").Find(&hosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -59,17 +60,25 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 	for _, chost := range chosts {
 		if chost.DeletedAt.Valid {
 			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:      chost.ID,
-				Name:    chost.Name + " (deleted)",
-				L3EPCID: chost.VPCID,
-				HostID:  ipToHostID[chost.LaunchServer],
+				ID:       chost.ID,
+				Name:     chost.Name + " (deleted)",
+				L3EPCID:  chost.VPCID,
+				HostID:   ipToHostID[chost.LaunchServer],
+				Hostname: chost.Hostname,
+				IP:       chost.IP,
+				TeamID:   tagrecorder.DomainToTeamID[chost.Domain],
+				DomainID: tagrecorder.DomainToDomainID[chost.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: chost.ID}] = mysql.ChChost{
-				ID:      chost.ID,
-				Name:    chost.Name,
-				L3EPCID: chost.VPCID,
-				HostID:  ipToHostID[chost.LaunchServer],
+				ID:       chost.ID,
+				Name:     chost.Name,
+				L3EPCID:  chost.VPCID,
+				HostID:   ipToHostID[chost.LaunchServer],
+				Hostname: chost.Hostname,
+				IP:       chost.IP,
+				TeamID:   tagrecorder.DomainToTeamID[chost.Domain],
+				DomainID: tagrecorder.DomainToDomainID[chost.Domain],
 			}
 		}
 	}

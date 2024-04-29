@@ -37,15 +37,15 @@ func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 	return updater
 }
 
-func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
+func (l *ChLbListener) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChLBListener, bool) {
 	var lbListeners []mysql.LBListener
 	var lbTargetServers []mysql.LBTargetServer
-	err := mysql.Db.Unscoped().Find(&lbListeners).Error
+	err := db.Unscoped().Find(&lbListeners).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&lbTargetServers).Error
+	err = db.Unscoped().Find(&lbTargetServers).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false
@@ -55,7 +55,6 @@ func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
 	for _, lbTargetServer := range lbTargetServers {
 		lbTargetSertverMap[lbTargetServer.LBListenerID] += 1
 	}
-
 	keyToItem := make(map[IDKey]mysql.ChLBListener)
 	for _, lbListener := range lbListeners {
 		if lbTargetSertverMap[lbListener.ID] == 0 {
@@ -63,13 +62,15 @@ func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
 		}
 		if lbListener.DeletedAt.Valid {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
-				ID:   lbListener.ID,
-				Name: lbListener.Name + " (deleted)",
+				ID:     lbListener.ID,
+				Name:   lbListener.Name + " (deleted)",
+				TeamID: DomainToTeamID[lbListener.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
-				ID:   lbListener.ID,
-				Name: lbListener.Name,
+				ID:     lbListener.ID,
+				Name:   lbListener.Name,
+				TeamID: DomainToTeamID[lbListener.Domain],
 			}
 		}
 	}

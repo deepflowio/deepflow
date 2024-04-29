@@ -41,7 +41,7 @@ func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodNamespace) sourceToTarget(source *mysql.PodNamespace) (keys []IDKey, targets []mysql.ChPodNamespace) {
+func (c *ChPodNamespace) sourceToTarget(md *message.Metadata, source *mysql.PodNamespace) (keys []IDKey, targets []mysql.ChPodNamespace) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_POD_NAMESPACE,
 	}]
@@ -56,32 +56,32 @@ func (c *ChPodNamespace) sourceToTarget(source *mysql.PodNamespace) (keys []IDKe
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
 		IconID:       iconID,
+		TeamID:       md.TeamID,
+		DomainID:     md.DomainID,
 	})
 	return
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNamespace) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate) {
+func (c *ChPodNamespace) onResourceUpdated(sourceID int, fieldsUpdate *message.PodNamespaceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if fieldsUpdate.PodClusterID.IsDifferent() {
 		updateInfo["pod_cluster_id"] = fieldsUpdate.PodClusterID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodNamespace
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNamespace) softDeletedTargetsUpdated(targets []mysql.ChPodNamespace) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodNamespace) softDeletedTargetsUpdated(targets []mysql.ChPodNamespace, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

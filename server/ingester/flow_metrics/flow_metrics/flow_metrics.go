@@ -24,6 +24,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/unmarshaller"
@@ -40,10 +41,11 @@ var log = logging.MustGetLogger("flow_metrics")
 type FlowMetrics struct {
 	unmarshallers []*unmarshaller.Unmarshaller
 	platformDatas []*grpc.PlatformInfoTable
-	dbwriters     []dbwriter.DbWriter
+	dbwriter      dbwriter.DbWriter
+	exporters     *exporters.Exporters
 }
 
-func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*FlowMetrics, error) {
+func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*FlowMetrics, error) {
 	flowMetrics := FlowMetrics{}
 
 	manager := queue.NewManager(ingesterctl.INGESTERCTL_FLOW_METRICS_QUEUE)
@@ -57,21 +59,15 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 	recv.RegistHandler(datatype.MESSAGE_TYPE_METRICS, unmarshallQueues, unmarshallQueueCount)
 
 	var err error
-	var writers []dbwriter.DbWriter
 	ckWriter, err := dbwriter.NewCkDbWriter(cfg.Base.CKDB.ActualAddrs, cfg.Base.CKDBAuth.Username, cfg.Base.CKDBAuth.Password, cfg.Base.CKDB.ClusterName, cfg.Base.CKDB.StoragePolicy, cfg.Base.CKDB.TimeZone,
-		cfg.CKWriterConfig, cfg.FlowMetricsTTL, cfg.Base.GetCKDBColdStorages())
+		cfg.CKWriterConfig, cfg.FlowMetricsTTL, cfg.Base.GetCKDBColdStorages(), cfg.Base.CKDB.Watcher)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	writers = append(writers, ckWriter)
 
-	if cfg.PromWriterConfig.Enabled {
-		writer := dbwriter.NewPromWriter(cfg.PromWriterConfig)
-		writers = append(writers, writer)
-	}
-
-	flowMetrics.dbwriters = writers
+	flowMetrics.dbwriter = ckWriter
+	flowMetrics.exporters = exporters
 	flowMetrics.unmarshallers = make([]*unmarshaller.Unmarshaller, unmarshallQueueCount)
 	flowMetrics.platformDatas = make([]*grpc.PlatformInfoTable, unmarshallQueueCount)
 	for i := 0; i < unmarshallQueueCount; i++ {
@@ -85,7 +81,7 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 		if err != nil {
 			return nil, err
 		}
-		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriters)
+		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriter, exporters)
 	}
 
 	return &flowMetrics, nil
@@ -102,8 +98,6 @@ func (r *FlowMetrics) Close() error {
 	for i := 0; i < len(r.unmarshallers); i++ {
 		r.platformDatas[i].ClosePlatformInfoTable()
 	}
-	for i := 0; i < len(r.dbwriters); i++ {
-		r.dbwriters[i].Close()
-	}
+	r.dbwriter.Close()
 	return nil
 }

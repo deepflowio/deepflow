@@ -31,7 +31,7 @@ use public::{
     sender::{SendMessageType, Sendable},
 };
 
-use super::stats;
+use super::stats::{self, QueueStats};
 use crate::{
     config::handler::{LogAccess, LogConfig, SenderAccess},
     exception::ExceptionHandler,
@@ -109,12 +109,11 @@ impl RemoteLogWriter {
         let module = "remote_logger";
         let (sender, receiver, counter) = queue::bounded(Self::INNER_QUEUE_SIZE);
         stats_collector.register_countable(
-            "queue",
+            &QueueStats {
+                module,
+                ..Default::default()
+            },
             stats::Countable::Owned(Box::new(counter)),
-            vec![
-                stats::StatsOption::Tag("module", module.to_owned()),
-                stats::StatsOption::Tag("index", "0".to_owned()),
-            ],
         );
         let mut uniform_sender = UniformSenderThread::new(
             module,

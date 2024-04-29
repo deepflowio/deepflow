@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodGroup struct {
@@ -38,7 +39,7 @@ func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 
 func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 	var podGroups []mysql.PodGroup
-	err := mysql.Db.Unscoped().Find(&podGroups).Error
+	err := p.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -54,6 +55,8 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 				PodClusterID: podGroup.PodClusterID,
 				PodNsID:      podGroup.PodNamespaceID,
+				TeamID:       tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[podGroup.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
@@ -63,6 +66,8 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 				PodClusterID: podGroup.PodClusterID,
 				PodNsID:      podGroup.PodNamespaceID,
+				TeamID:       tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:     tagrecorder.DomainToDomainID[podGroup.Domain],
 			}
 		}
 	}

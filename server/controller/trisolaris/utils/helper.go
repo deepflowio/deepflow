@@ -31,6 +31,12 @@ import (
 
 type ctxKeyWaitGroup struct{}
 
+const ORG_ID_INDEX_MAX = common.ORG_ID_MAX + 1 // 0 index not used
+
+func CheckOrgID(orgID int) bool {
+	return orgID <= common.ORG_ID_MAX
+}
+
 func GetWaitGroupInCtx(ctx context.Context) *sync.WaitGroup {
 	if wg, ok := ctx.Value(ctxKeyWaitGroup{}).(*sync.WaitGroup); ok {
 		return wg
@@ -135,4 +141,43 @@ func IsVMofBMHtype(htype int) bool {
 		return true
 	}
 	return false
+}
+
+func Concat[S ~[]E, E any](slices ...S) S {
+	size := 0
+	for _, s := range slices {
+		size += len(s)
+		if size < 0 {
+			panic("len out of range")
+		}
+	}
+	newslice := Grow[S](nil, size)
+	for _, s := range slices {
+		newslice = append(newslice, s...)
+	}
+	return newslice
+}
+
+func Grow[S ~[]E, E any](s S, n int) S {
+	if n < 0 {
+		panic("cannot be negative")
+	}
+	if n -= cap(s) - len(s); n > 0 {
+		s = append(s[:cap(s)], make([]E, n)...)[:len(s)]
+	}
+	return s
+}
+
+type ORGID int
+
+func (o ORGID) Logf(format string, args ...interface{}) string {
+	return fmt.Sprintf("ORGID-%d: %s", o, fmt.Sprintf(format, args...))
+}
+
+func (o ORGID) Log(logStr string) string {
+	return fmt.Sprintf("ORGID-%d: %s", o, logStr)
+}
+
+func (o ORGID) GetORGID() int {
+	return int(o)
 }

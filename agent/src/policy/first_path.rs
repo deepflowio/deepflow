@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::net::IpAddr;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, RwLock,
@@ -247,7 +248,6 @@ pub struct FirstPath {
     fast: FastPath,
 
     fast_disable: bool,
-    queue_count: usize,
 
     memory_limit: AtomicU64,
 }
@@ -280,14 +280,9 @@ impl FirstPath {
             current_level: level,
 
             fast: FastPath::new(queue_count, map_size),
-            queue_count,
             fast_disable,
             memory_limit: AtomicU64::new(0),
         }
-    }
-
-    pub fn update_map_size(&mut self, map_size: usize) {
-        self.fast.update_map_size(map_size)
     }
 
     pub fn update_interfaces(&mut self, ifaces: &Vec<Arc<PlatformData>>) {
@@ -375,8 +370,15 @@ impl FirstPath {
             return true;
         };
         let memory_limit = self.memory_limit.load(Ordering::Relaxed);
+        if memory_limit == 0 {
+            return true;
+        }
+        if current >= memory_limit {
+            warn!("The current memory usage is greater than the memory threshold, Please reconfigure the memory threshold.");
+            return false;
+        }
 
-        memory_limit == 0 || current + size < memory_limit
+        current + size < memory_limit
     }
 
     fn generate_acl_bits(&mut self, acls: &mut Vec<Acl>) -> PResult<u64> {
@@ -694,6 +696,33 @@ impl FirstPath {
         return Some((forward_policy, forward_endpoints));
     }
 
+    pub fn ebpf_fast_get(
+        &mut self,
+        ip_src: IpAddr,
+        ip_dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+    ) -> Option<Arc<EndpointData>> {
+        if self.fast_disable {
+            return None;
+        }
+
+        self.fast
+            .ebpf_get_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst)
+    }
+
+    pub fn ebpf_fast_add(
+        &mut self,
+        ip_src: IpAddr,
+        ip_dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+        endpoints: EndpointData,
+    ) -> Arc<EndpointData> {
+        self.fast
+            .ebpf_add_endpoints(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, endpoints)
+    }
+
     pub fn fast_get(
         &mut self,
         key: &mut LookupKey,
@@ -720,6 +749,10 @@ impl FirstPath {
 
     pub fn set_memory_limit(&self, limit: u64) {
         self.memory_limit.store(limit, Ordering::Relaxed);
+    }
+
+    pub fn reset_queue_size(&mut self, queue_count: usize) {
+        self.fast.reset_queue_size(queue_count);
     }
 }
 

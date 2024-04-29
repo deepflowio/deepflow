@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChOSAppTag struct {
@@ -38,7 +39,7 @@ func NewChOSAppTag() *ChOSAppTag {
 }
 
 func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) {
-	processes, err := query.FindInBatches[mysql.Process](mysql.Db.Unscoped())
+	processes, err := query.FindInBatches[mysql.Process](o.db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
 		return nil, false
@@ -55,9 +56,11 @@ func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) 
 					Key: strings.Trim(splitSingleTag[0], " "),
 				}
 				keyToItem[key] = mysql.ChOSAppTag{
-					PID:   process.ID,
-					Key:   strings.Trim(splitSingleTag[0], " "),
-					Value: strings.Trim(splitSingleTag[1], " "),
+					PID:      process.ID,
+					Key:      strings.Trim(splitSingleTag[0], " "),
+					Value:    strings.Trim(splitSingleTag[1], " "),
+					TeamID:   tagrecorder.DomainToTeamID[process.Domain],
+					DomainID: tagrecorder.DomainToDomainID[process.Domain],
 				}
 			}
 		}

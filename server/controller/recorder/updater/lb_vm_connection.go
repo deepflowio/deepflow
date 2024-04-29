@@ -57,7 +57,7 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			wholeCache,
-			db.NewLBVMConnection().SetORG(wholeCache.GetORG()),
+			db.NewLBVMConnection().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.LBVMConnections,
 			cloudData,
 		),
@@ -90,7 +90,7 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 	}
 
 	dbItem := &mysql.LBVMConnection{
-		Domain: c.cache.DomainLcuuid,
+		Domain: c.metadata.Domain.Lcuuid,
 		VMID:   vmID,
 		LBID:   lbID,
 	}

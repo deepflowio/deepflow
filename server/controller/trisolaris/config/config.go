@@ -58,6 +58,9 @@ type Config struct {
 	IngesterPort                   int
 	PodClusterInternalIPToIngester int
 	GrpcMaxMessageLength           int
+	ExportersEnabled               bool
+	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
+	NoTeamIDRefused                bool
 }
 
 func (c *Config) Convert() {
@@ -114,4 +117,20 @@ func (c *Config) SetGrpcMaxMessageLength(maxLen int) {
 
 func (c *Config) GetGrpcMaxMessageLength() int {
 	return c.GrpcMaxMessageLength
+}
+
+func (c *Config) SetExportersEnabled(exporterEnabled bool) {
+	c.ExportersEnabled = exporterEnabled
+}
+
+func (c *Config) GetExportersEnabled() bool {
+	return c.ExportersEnabled
+}
+
+func (c *Config) SetNoTeamIDRefused(refused bool) {
+	c.NoTeamIDRefused = refused
+}
+
+func (c *Config) GetNoTeamIDRefused() bool {
+	return c.NoTeamIDRefused
 }

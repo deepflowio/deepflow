@@ -22,7 +22,10 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
-    flow_generator::{protocol_logs::L7ResponseStatus, Error, Result},
+    flow_generator::{
+        protocol_logs::{set_captured_byte, L7ResponseStatus, LogMessageType},
+        Error, Result,
+    },
 };
 
 #[derive(Default)]
@@ -73,6 +76,7 @@ impl L7ProtocolParserInterface for WasmLog {
                     }
 
                     i.msg_type = param.direction.into();
+                    set_captured_byte!(i, param);
 
                     if i.need_merge() {
                         i.cal_rrt_for_multi_merge_log(param).map(|rrt| {

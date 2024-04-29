@@ -17,6 +17,8 @@
 package dbwriter
 
 import (
+	"fmt"
+
 	logging "github.com/op/go-logging"
 
 	baseconfig "github.com/deepflowio/deepflow/server/ingester/config"
@@ -69,7 +71,7 @@ func (w *EventWriter) WriteAlarmEvent(e *AlarmEventStore) {
 	w.ckWriter.Put(e)
 }
 
-func NewEventWriter(table string, decoderIndex int, config *config.Config) (*EventWriter, error) {
+func NewEventWriter(eventType common.EventType, decoderIndex int, config *config.Config) (*EventWriter, error) {
 	w := &EventWriter{
 		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
 		ckdbUsername:      config.Base.CKDBAuth.Username,
@@ -78,13 +80,20 @@ func NewEventWriter(table string, decoderIndex int, config *config.Config) (*Eve
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
 	}
-	if table == common.RESOURCE_EVENT.TableName() {
-		w.ttl = config.TTL
+	switch eventType {
+	case common.RESOURCE_EVENT:
+		w.ttl = config.EventTTL
 		w.writerConfig = config.CKWriterConfig
-	} else {
-		w.ttl = config.PerfTTL
+	case common.PERF_EVENT:
+		w.ttl = config.PerfEventTTL
 		w.writerConfig = config.PerfCKWriterConfig
+	case common.K8S_EVENT:
+		w.ttl = config.EventTTL
+		w.writerConfig = config.K8sCKWriterConfig
+	default:
+		return nil, fmt.Errorf("unsupport event %s", eventType)
 	}
+	table := eventType.TableName()
 	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, table, EVENT_DB, w.ttl, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
 	if err != nil {
 		return nil, err
@@ -94,7 +103,7 @@ func NewEventWriter(table string, decoderIndex int, config *config.Config) (*Eve
 	ckTable := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, table, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, table))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		table, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		table, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
 	if err != nil {
 		return nil, err
 	}

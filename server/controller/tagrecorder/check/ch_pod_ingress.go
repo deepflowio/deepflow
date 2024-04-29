@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodIngress struct {
@@ -39,7 +40,7 @@ func NewChPodIngress(resourceTypeToIconID map[IconKey]int) *ChPodIngress {
 
 func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 	var podIngresses []mysql.PodIngress
-	err := mysql.Db.Unscoped().Find(&podIngresses).Error
+	err := p.db.Unscoped().Find(&podIngresses).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -48,13 +49,17 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 	for _, podIngress := range podIngresses {
 		if podIngress.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:   podIngress.ID,
-				Name: podIngress.Name + " (deleted)",
+				ID:       podIngress.ID,
+				Name:     podIngress.Name + " (deleted)",
+				TeamID:   tagrecorder.DomainToTeamID[podIngress.Domain],
+				DomainID: tagrecorder.DomainToDomainID[podIngress.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:   podIngress.ID,
-				Name: podIngress.Name,
+				ID:       podIngress.ID,
+				Name:     podIngress.Name,
+				TeamID:   tagrecorder.DomainToTeamID[podIngress.Domain],
+				DomainID: tagrecorder.DomainToDomainID[podIngress.Domain],
 			}
 		}
 	}

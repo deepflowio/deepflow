@@ -21,13 +21,12 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPrometheusTargets() ([]model.PrometheusTarget, error) {
 	log.Debug("get prometheus target starting")
 	var prometheusTargets []model.PrometheusTarget
-	pTargets, err := genesis.GenesisService.GetPrometheusResponse(k.ClusterID)
+	pTargets, err := genesis.GenesisService.GetPrometheusResponse(k.orgID, k.ClusterID)
 	if err != nil {
 		log.Warning(err.Error())
 		return prometheusTargets, err
@@ -38,7 +37,7 @@ func (k *KubernetesGather) getPrometheusTargets() ([]model.PrometheusTarget, err
 			otherLabelsString = p.OtherLabels
 		}
 		prometheusTargets = append(prometheusTargets, cloudmodel.PrometheusTarget{
-			Lcuuid:           common.GetUUID(k.ClusterID+p.Instance+p.Job+otherLabelsString, uuid.Nil),
+			Lcuuid:           common.GetUUIDByOrgID(k.orgID, k.ClusterID+p.Instance+p.Job+otherLabelsString),
 			Job:              p.Job,
 			Instance:         p.Instance,
 			ScrapeURL:        p.ScrapeURL,

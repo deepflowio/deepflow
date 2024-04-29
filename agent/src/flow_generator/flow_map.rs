@@ -106,6 +106,46 @@ pub struct Config<'a> {
     pub ebpf: Option<&'a EbpfConfig>, // TODO: We only need its epc_id，epc_id is not only useful for ebpf, consider moving it to FlowConfig
 }
 
+struct PluginStats<'a> {
+    id: u32,
+    plugin_name: &'a str,
+    plugin_type: &'static str,
+    export_func: &'static str,
+}
+
+impl stats::Module for PluginStats<'_> {
+    fn name(&self) -> &'static str {
+        "plugin"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![
+            StatsOption::Tag("id", self.id.to_string()),
+            StatsOption::Tag("plugin_name", self.plugin_name.to_owned()),
+            StatsOption::Tag("plugin_type", self.plugin_type.to_owned()),
+            StatsOption::Tag("export_func", self.export_func.to_owned()),
+        ]
+    }
+}
+
+struct AllocatorStats {
+    id: u32,
+    obj_type: &'static str,
+}
+
+impl stats::Module for AllocatorStats {
+    fn name(&self) -> &'static str {
+        "allocator"
+    }
+
+    fn tags(&self) -> Vec<StatsOption> {
+        vec![
+            StatsOption::Tag("id", self.id.to_string()),
+            StatsOption::Tag("type", self.obj_type.to_owned()),
+        ]
+    }
+}
+
 // not thread-safe
 pub struct FlowMap {
     // The original std HashMap uses SipHash-1-3 and is slow.
@@ -189,15 +229,13 @@ impl FlowMap {
         };
 
         stats_collector.register_countable(
-            "flow-map",
+            &stats::SingleTagModule("flow-map", "id", id),
             Countable::Ref(Arc::downgrade(&stats_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("id", id.to_string())],
         );
 
         stats_collector.register_countable(
-            "flow-perf",
+            &stats::SingleTagModule("flow-perf", "id", id),
             Countable::Ref(Arc::downgrade(&flow_perf_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("id", format!("{}", id))],
         );
         let system_time = get_timestamp(ntp_diff.load(Ordering::Relaxed));
         let start_time = system_time - config.packet_delay - Duration::from_secs(1);
@@ -230,12 +268,11 @@ impl FlowMap {
                 let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<TaggedFlow>();
                 let allocator = Allocator::new(n.max(1));
                 stats_collector.register_countable(
-                    "allocator",
+                    &AllocatorStats {
+                        id,
+                        obj_type: "TaggedFlow",
+                    },
                     Countable::Ref(allocator.counter()),
-                    vec![
-                        StatsOption::Tag("type", "TaggedFlow".to_owned()),
-                        StatsOption::Tag("id", format!("{}", id)),
-                    ],
                 );
                 allocator
             },
@@ -243,12 +280,11 @@ impl FlowMap {
                 let n = (config.batched_buffer_size_limit - 1) / mem::size_of::<L7Stats>();
                 let allocator = Allocator::new(n.max(1));
                 stats_collector.register_countable(
-                    "allocator",
+                    &AllocatorStats {
+                        id,
+                        obj_type: "L7Stats",
+                    },
                     Countable::Ref(allocator.counter()),
-                    vec![
-                        StatsOption::Tag("type", "L7Stats".to_owned()),
-                        StatsOption::Tag("id", format!("{}", id)),
-                    ],
                 );
                 allocator
             },
@@ -308,18 +344,18 @@ impl FlowMap {
         // on counter registration and routine reports, it might be delayed because
         // FlowLog can hold these references
         if let Some(vm) = self.wasm_vm.take() {
+            let counters = vm
+                .counters()
+                .into_iter()
+                .map(|info| PluginStats {
+                    id: self.id,
+                    plugin_name: info.plugin_name,
+                    plugin_type: info.plugin_type,
+                    export_func: info.function_name,
+                })
+                .collect::<Vec<_>>();
             self.stats_collector
-                .deregister_countables(vm.counters().iter().map(|info| {
-                    (
-                        "plugin",
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", info.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", info.function_name.to_owned()),
-                        ],
-                    )
-                }));
+                .deregister_countables(counters.iter().map(|c| c as &dyn stats::Module));
         }
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if let Some(ps) = self.so_plugin.take() {
@@ -327,18 +363,17 @@ impl FlowMap {
             for p in ps.iter() {
                 p.counters_in(&mut counters);
             }
+            let counters = counters
+                .into_iter()
+                .map(|info| PluginStats {
+                    id: self.id,
+                    plugin_name: info.plugin_name,
+                    plugin_type: info.plugin_type,
+                    export_func: info.function_name,
+                })
+                .collect::<Vec<_>>();
             self.stats_collector
-                .deregister_countables(counters.iter().map(|info| {
-                    (
-                        "plugin",
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", info.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", info.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", info.function_name.to_owned()),
-                        ],
-                    )
-                }));
+                .deregister_countables(counters.iter().map(|c| c as &dyn stats::Module));
         }
 
         debug!("reload plugins");
@@ -352,14 +387,13 @@ impl FlowMap {
             } else {
                 for counter in vm.counters() {
                     self.stats_collector.register_countable(
-                        "plugin",
+                        &PluginStats {
+                            id: self.id,
+                            plugin_name: counter.plugin_name,
+                            plugin_type: counter.plugin_type,
+                            export_func: counter.function_name,
+                        },
                         counter.counter,
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", counter.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", counter.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", counter.function_name.to_owned()),
-                        ],
                     );
                 }
                 Some(vm)
@@ -390,14 +424,13 @@ impl FlowMap {
                 }
                 for counter in counters {
                     self.stats_collector.register_countable(
-                        "plugin",
+                        &PluginStats {
+                            id: self.id,
+                            plugin_name: counter.plugin_name,
+                            plugin_type: counter.plugin_type,
+                            export_func: counter.function_name,
+                        },
                         counter.counter,
-                        vec![
-                            StatsOption::Tag("id", self.id.to_string()),
-                            StatsOption::Tag("plugin_name", counter.plugin_name.to_owned()),
-                            StatsOption::Tag("plugin_type", counter.plugin_type.to_owned()),
-                            StatsOption::Tag("export_func", counter.function_name.to_owned()),
-                        ],
                     );
                 }
                 Some(plugins)
@@ -582,11 +615,9 @@ impl FlowMap {
                     if self.packet_sequence_enabled {
                         if let Some(block) = node.packet_sequence_block.take() {
                             // flush the packet_sequence_block at the regular time
-                            if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block)
+                            if let Err(e) = self.packet_sequence_queue.as_ref().unwrap().send(block)
                             {
-                                warn!(
-                                    "packet sequence block to queue failed maybe queue have terminated"
-                                );
+                                warn!("packet sequence block to queue failed, because {:?}", e);
                             }
                         }
                     }
@@ -776,13 +807,13 @@ impl FlowMap {
                 packet_sequence_start_time as u32,
             ) {
                 // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
-                if let Err(_) = self
+                if let Err(e) = self
                     .packet_sequence_queue
                     .as_ref()
                     .unwrap()
                     .send(node.packet_sequence_block.take().unwrap())
                 {
-                    warn!("packet sequence block to queue failed maybe queue have terminated");
+                    warn!("packet sequence block to queue failed, because {:?}", e);
                 }
 
                 node.packet_sequence_block = Some(Box::new(PacketSequenceBlock::new(
@@ -1531,7 +1562,7 @@ impl FlowMap {
         let last_biz_type = node.tagged_flow.flow.last_biz_type;
         // The original endpoint is inconsistent with new_endpoint
         if let Some(flow_perf_stats) = node.tagged_flow.flow.flow_perf_stats.as_mut() {
-            if node.tagged_flow.flow.last_endpoint.eq(&new_endpoint)
+            if node.tagged_flow.flow.last_endpoint.ne(&new_endpoint)
                 || last_biz_type.ne(&new_biz_type)
             {
                 let l7_timeout_count = self
@@ -1563,6 +1594,15 @@ impl FlowMap {
 
                 self.l7_stats_buffer
                     .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+                if self.l7_stats_buffer.len() >= QUEUE_BATCH_SIZE {
+                    if let Err(e) = self
+                        .l7_stats_output_queue
+                        .send_all(&mut self.l7_stats_buffer)
+                    {
+                        warn!("flow-map push l7 stats to queue failed, because {:?}", e);
+                        self.l7_stats_buffer.clear();
+                    }
+                }
             }
         }
         // FIXME: the endpoint may be None after parsed
@@ -1774,18 +1814,19 @@ impl FlowMap {
     fn flush_queue(&mut self, config: &FlowConfig, now: Duration) {
         if now > config.flush_interval + self.last_queue_flush {
             if self.l7_stats_buffer.len() > 0 {
-                if let Err(_) = self
+                if let Err(e) = self
                     .l7_stats_output_queue
                     .send_all(&mut self.l7_stats_buffer)
                 {
-                    warn!("flow-map push l7 stats to queue failed because queue have terminated");
+                    warn!("flow-map push l7 stats to queue failed, because {:?}", e);
                     self.l7_stats_buffer.clear();
                 }
             }
             if self.output_buffer.len() > 0 {
-                if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
+                if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
                     warn!(
-                        "flow-map push tagged flows to queue failed because queue have terminated"
+                        "flow-map push tagged flows to queue failed, because {:?}",
+                        e
                     );
                     self.output_buffer.clear();
                 }
@@ -1796,11 +1837,11 @@ impl FlowMap {
 
     fn push_to_flow_stats_queue(&mut self, tagged_flow: Arc<BatchedBox<TaggedFlow>>) {
         if self.l7_stats_buffer.len() >= QUEUE_BATCH_SIZE {
-            if let Err(_) = self
+            if let Err(e) = self
                 .l7_stats_output_queue
                 .send_all(&mut self.l7_stats_buffer)
             {
-                warn!("flow-map push l7 stats to queue failed because queue have terminated");
+                warn!("flow-map push l7 stats to queue failed, because {:?}", e);
                 self.l7_stats_buffer.clear();
             }
         }
@@ -1812,8 +1853,11 @@ impl FlowMap {
 
         self.output_buffer.push(tagged_flow);
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            if let Err(_) = self.output_queue.send_all(&mut self.output_buffer) {
-                warn!("flow-map push tagged flows to queue failed because queue have terminated");
+            if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
+                warn!(
+                    "flow-map push tagged flows to queue failed, because {:?}",
+                    e
+                );
                 self.output_buffer.clear();
             }
         }
@@ -1846,8 +1890,8 @@ impl FlowMap {
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled && flow.flow_key.proto == IpProtocol::TCP {
             if let Some(block) = node.packet_sequence_block.take() {
-                if let Err(_) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
-                    warn!("packet sequence block to queue failed maybe queue have terminated");
+                if let Err(e) = self.packet_sequence_queue.as_ref().unwrap().send(block) {
+                    warn!("packet sequence block to queue failed, because {:?}", e);
                 }
             }
         }
@@ -1989,6 +2033,9 @@ impl FlowMap {
                     );
                     self.protolog_buffer
                         .push(Box::new(AppProto::PseudoAppProto(app_proto)));
+                    if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
+                        self.flush_app_protolog();
+                    }
                 }
             }
             _ => {}
@@ -2002,9 +2049,6 @@ impl FlowMap {
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
     ) {
-        if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
-            self.flush_app_protolog();
-        }
         let domain = l7_info.get_request_domain();
         if !domain.is_empty() {
             node.tagged_flow.flow.request_domain = domain;
@@ -2020,14 +2064,20 @@ impl FlowMap {
             {
                 self.protolog_buffer
                     .push(Box::new(AppProto::MetaAppProto(app_proto)));
+                if self.protolog_buffer.len() >= QUEUE_BATCH_SIZE {
+                    self.flush_app_protolog();
+                }
             }
         }
     }
 
     fn flush_app_protolog(&mut self) {
         if self.protolog_buffer.len() > 0 {
-            if let Err(_) = self.out_log_queue.send_all(&mut self.protolog_buffer) {
-                warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
+            if let Err(e) = self.out_log_queue.send_all(&mut self.protolog_buffer) {
+                warn!(
+                    "flow-map push MetaAppProto to queue failed, because {:?}",
+                    e
+                );
                 self.protolog_buffer.clear();
             }
         }

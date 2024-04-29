@@ -30,6 +30,8 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
+	exporterscommon "github.com/deepflowio/deepflow/server/ingester/exporters/common"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
@@ -55,11 +57,13 @@ type Counter struct {
 }
 
 type Decoder struct {
+	index             int
 	eventType         common.EventType
 	resourceInfoTable *ResourceInfoTable
 	platformData      *grpc.PlatformInfoTable
 	inQueue           queue.QueueReader
 	eventWriter       *dbwriter.EventWriter
+	exporters         *exporters.Exporters
 	debugEnabled      bool
 	config            *config.Config
 
@@ -68,10 +72,12 @@ type Decoder struct {
 }
 
 func NewDecoder(
+	index int,
 	eventType common.EventType,
 	inQueue queue.QueueReader,
 	eventWriter *dbwriter.EventWriter,
 	platformData *grpc.PlatformInfoTable,
+	exporters *exporters.Exporters,
 	config *config.Config,
 ) *Decoder {
 	controllers := make([]net.IP, len(config.Base.ControllerIPs))
@@ -92,6 +98,7 @@ func NewDecoder(
 		inQueue:           inQueue,
 		debugEnabled:      log.IsEnabledFor(logging.DEBUG),
 		eventWriter:       eventWriter,
+		exporters:         exporters,
 		config:            config,
 		counter:           &Counter{},
 	}
@@ -116,6 +123,7 @@ func (d *Decoder) Run() {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
 			if buffer[i] == nil {
+				d.export(nil)
 				continue
 			}
 			d.counter.InCount++
@@ -129,21 +137,15 @@ func (d *Decoder) Run() {
 				d.handleResourceEvent(event)
 				event.Release()
 			case common.PERF_EVENT:
-				if buffer[i] == nil {
-					continue
-				}
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
-					log.Warning("get proc event decode queue data type wrong")
+					log.Warning("get perf event decode queue data type wrong")
 					continue
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
 				d.handlePerfEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			case common.ALARM_EVENT:
-				if buffer[i] == nil {
-					continue
-				}
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
 					log.Warning("get alarm event decode queue data type wrong")
@@ -151,6 +153,15 @@ func (d *Decoder) Run() {
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
 				d.handleAlarmEvent(decoder)
+				receiver.ReleaseRecvBuffer(recvBytes)
+			case common.K8S_EVENT:
+				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
+				if !ok {
+					log.Warning("get k8s event decode queue data type wrong")
+					continue
+				}
+				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+				d.handleK8sEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			}
 		}
@@ -173,7 +184,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.SignalSource = uint8(e.EventType)
 	}
 
-	s.GProcessID = d.platformData.QueryProcessInfo(uint32(vtapId), e.Pid)
+	s.GProcessID = d.platformData.QueryProcessInfo(vtapId, e.Pid)
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
@@ -184,7 +195,8 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
 	s.VTAPID = vtapId
-	s.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapId))
+	s.OrgId, s.TeamID = d.platformData.QueryVtapOrgAndTeamID(vtapId)
+	s.L3EpcID = d.platformData.QueryVtapEpc0(vtapId)
 
 	var info *grpc.Info
 	if e.PodId != 0 {
@@ -193,7 +205,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
 	if info == nil {
-		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapId))
+		vtapInfo := d.platformData.QueryVtapInfo(vtapId)
 		if vtapInfo != nil {
 			vtapIP := net.ParseIP(vtapInfo.Ip)
 			if vtapIP != nil {
@@ -243,7 +255,15 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	s.AppInstance = strconv.Itoa(int(e.Pid))
 
+	d.export(s)
 	d.eventWriter.Write(s)
+}
+
+func (d *Decoder) export(item exporterscommon.ExportItem) {
+	if d.exporters == nil {
+		return
+	}
+	d.exporters.Put(d.eventType.DataSource(), d.index, item)
 }
 
 func (d *Decoder) handlePerfEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
@@ -298,6 +318,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	s.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_RESOURCE)
 	s.EventType = event.Type
 	s.EventDescription = event.Description
+
+	s.OrgId = event.ORGID
+	s.TeamID = event.TeamID
 
 	s.GProcessID = event.GProcessID
 
@@ -447,6 +470,8 @@ func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s.PolicyThresholdCritical = event.GetPolicyThresholdCritical()
 	s.PolicyThresholdError = event.GetPolicyThresholdError()
 	s.PolicyThresholdWarning = event.GetPolicyThresholdWarning()
+	s.OrgId = uint16(event.GetOrgId())
+	s.TeamID = uint16(event.GetTeamId())
 
 	d.eventWriter.WriteAlarmEvent(s)
 }

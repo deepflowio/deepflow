@@ -19,7 +19,7 @@ package kubernetes_gather
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -43,7 +43,7 @@ func TestKubernetes(t *testing.T) {
 			Config:      fmt.Sprintf(`{"node_port_name_regex": "","pod_net_ipv4_cidr_max_mask": %v,"pod_net_ipv6_cidr_max_mask": %v,"region_uuid": "%s","vpc_uuid": ""}`, common.K8S_POD_IPV4_NETMASK, common.K8S_POD_IPV6_NETMASK, common.DEFAULT_REGION),
 		}
 
-		k8s := NewKubernetesGather(nil, &k8sConfig, cloudconfig.CloudConfig{}, false)
+		k8s := NewKubernetesGather(mysql.DefaultDB, nil, &k8sConfig, cloudconfig.CloudConfig{}, false)
 		type KResource struct {
 			Pod        []string `json:"*v1.Pod"`
 			Info       []string `json:"*version.Info"`
@@ -64,7 +64,7 @@ func TestKubernetes(t *testing.T) {
 			Resources KResource `json:"resources"`
 		}
 
-		kJsonData, _ := ioutil.ReadFile("./testfiles/kubernetes-info.json")
+		kJsonData, _ := os.ReadFile("./testfiles/kubernetes-info.json")
 		var kData KDataResp
 		json.Unmarshal(kJsonData, &kData)
 		k8sInfo := map[string][]string{}
@@ -84,10 +84,10 @@ func TestKubernetes(t *testing.T) {
 		defer k8sInfoPatch.Reset()
 
 		g := genesis.NewGenesis(&config.ControllerConfig{})
-		vJsonData, _ := ioutil.ReadFile("./testfiles/vinterfaces.json")
-		var vData genesis.GenesisSyncData
+		vJsonData, _ := os.ReadFile("./testfiles/vinterfaces.json")
+		var vData genesis.GenesisSyncDataResponse
 		json.Unmarshal(vJsonData, &vData)
-		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis) (genesis.GenesisSyncData, error) {
+		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis, _ int) (genesis.GenesisSyncDataResponse, error) {
 			return vData, nil
 		})
 		defer vinterfacesInfoPatch.Reset()

@@ -282,7 +282,7 @@ impl DispatcherListener {
                 l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
             }
             Self::Mirror(l) => {
-                l.on_vm_change(vm_mac_addrs);
+                l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
             }
             _ => {}
         }
@@ -1033,9 +1033,8 @@ impl DispatcherBuilder {
             queue_debugger: queue_debugger.clone(),
         };
         collector.register_countable(
-            "dispatcher",
+            &stats::SingleTagModule("dispatcher", "id", base.id),
             stats::Countable::Ref(Arc::downgrade(&stat_counter) as Weak<dyn stats::RefCountable>),
-            vec![stats::StatsOption::Tag("id", base.id.to_string())],
         );
         let mut dispatcher = match tap_mode {
             TapMode::Local => {

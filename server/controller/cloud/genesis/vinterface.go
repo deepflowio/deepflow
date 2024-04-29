@@ -21,8 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
@@ -39,7 +37,7 @@ func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 		}
 		vpcLcuuid := v.VPCLcuuid
 		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUID(g.defaultVpcName, uuid.Nil)
+			vpcLcuuid = common.GetUUIDByOrgID(g.orgID, g.defaultVpcName)
 			g.defaultVpc = true
 		}
 		vinterface := model.VInterface{

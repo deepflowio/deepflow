@@ -6,6 +6,7 @@ use pulsar_proto::{
     base_command::Type as CommandType, BaseCommand, BrokerEntryMetadata, MessageMetadata,
 };
 use serde::Serialize;
+use std::collections::HashMap;
 
 use crate::{
     common::{
@@ -19,7 +20,7 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::read_u32_be,
@@ -27,6 +28,58 @@ use crate::{
 
 // ProtocolVersion in PulsarApi.proto
 const MAX_PROTOCOL_VERSION: i32 = 21;
+
+struct TopicMap<K, V, const N: usize>
+where
+    K: Eq + std::hash::Hash,
+{
+    kv: HashMap<K, V>,
+    list: Vec<(K, V)>,
+    use_map: bool,
+}
+
+impl<K, V, const N: usize> TopicMap<K, V, N>
+where
+    K: Eq + std::hash::Hash,
+{
+    fn insert(&mut self, id: K, topic: V) {
+        if self.use_map {
+            self.kv.insert(id, topic);
+        } else {
+            for (k, v) in self.list.iter_mut() {
+                if *k == id {
+                    *v = topic;
+                    return;
+                }
+            }
+            if self.list.len() == N {
+                self.use_map = true;
+                self.kv = self.list.drain(..).collect();
+                self.kv.insert(id, topic);
+            } else {
+                self.list.push((id, topic));
+            }
+        }
+    }
+
+    fn get(&self, id: &K) -> Option<&V> {
+        if self.use_map {
+            self.kv.get(id)
+        } else {
+            self.list.iter().find(|(k, _)| k == id).map(|(_, v)| v)
+        }
+    }
+
+    fn new() -> Self {
+        Self {
+            kv: HashMap::new(),
+            list: Vec::new(),
+            use_map: false,
+        }
+    }
+}
+
+type PulsarTopicMap = TopicMap<u64, String, 16>;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct PulsarInfo {
@@ -36,9 +89,9 @@ pub struct PulsarInfo {
 
     rtt: u64,
 
-    command: BaseCommand,
+    command: Box<BaseCommand>,
     broker_entry_metadata: Option<BrokerEntryMetadata>,
-    message_metadata: Option<MessageMetadata>,
+    message_metadata: Box<Option<MessageMetadata>>,
 
     // min(CommandConnect.protocol_version, CommandConnected.protocol_version)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -71,14 +124,19 @@ pub struct PulsarInfo {
     resp_code: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     resp_exception: Option<String>,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 }
 
 pub struct PulsarLog {
     perf_stats: Option<L7PerfStats>,
 
     version: i32,
-    topic: Option<String>,
     domain: Option<String>,
+
+    producer_topic: PulsarTopicMap,
+    consumer_topic: PulsarTopicMap,
 }
 
 impl Default for PulsarLog {
@@ -86,10 +144,19 @@ impl Default for PulsarLog {
         Self {
             perf_stats: None,
             version: MAX_PROTOCOL_VERSION,
-            topic: None,
             domain: None,
+            producer_topic: PulsarTopicMap::new(),
+            consumer_topic: PulsarTopicMap::new(),
         }
     }
+}
+
+macro_rules! check_exists {
+    ($command:expr, $field:ident) => {
+        if $command.$field.is_none() {
+            return None;
+        }
+    };
 }
 
 macro_rules! check {
@@ -101,7 +168,130 @@ macro_rules! check {
     };
 }
 
+macro_rules! get_req {
+    ($command:expr, $x:ident) => {{
+        let obj = $command.$x.as_ref()?;
+        Some(obj.request_id as u64)
+    }};
+}
+
+macro_rules! get_msg_req {
+    ($command:expr, $x:ident) => {{
+        let obj = $command.$x.as_ref()?;
+        let producer_id = obj.producer_id as u16 as u64;
+        let sequence_id = obj.sequence_id as u16 as u64;
+        Some((producer_id << 16) | sequence_id)
+    }};
+}
+
+macro_rules! update_topic {
+    ($self:expr, $topic_map:expr, $id:ident, $x:ident) => {{
+        let id = $self.command.$x.as_ref()?.$id;
+        $self.topic = $topic_map.get(&id).cloned();
+    }};
+}
+
 impl PulsarInfo {
+    fn get_request_id(&self) -> Option<u64> {
+        let command = self.command.as_ref();
+        match command.r#type() {
+            CommandType::Ack => None,
+            CommandType::Flow => None,
+            CommandType::Message => None,
+            CommandType::RedeliverUnacknowledgedMessages => None,
+            CommandType::ReachedEndOfTopic => None,
+            CommandType::ActiveConsumerChange => None,
+            CommandType::AckResponse => None,
+            CommandType::WatchTopicList => None,
+            CommandType::WatchTopicListSuccess => None,
+            CommandType::WatchTopicUpdate => None,
+            CommandType::WatchTopicListClose => None,
+            CommandType::TopicMigrated => None,
+
+            CommandType::Connect => None,
+            CommandType::Connected => None,
+
+            CommandType::Producer => get_req!(command, producer),
+            CommandType::ProducerSuccess => get_req!(command, producer_success),
+
+            CommandType::Send => get_msg_req!(command, send),
+            CommandType::SendReceipt => get_msg_req!(command, send_receipt),
+            CommandType::SendError => get_msg_req!(command, send_error),
+
+            CommandType::Ping => None,
+            CommandType::Pong => None,
+
+            CommandType::Lookup => get_req!(command, lookup_topic),
+            CommandType::LookupResponse => get_req!(command, lookup_topic_response),
+
+            CommandType::PartitionedMetadata => get_req!(command, partition_metadata),
+            CommandType::PartitionedMetadataResponse => {
+                get_req!(command, partition_metadata_response)
+            }
+
+            CommandType::GetSchema => get_req!(command, get_schema),
+            CommandType::GetSchemaResponse => get_req!(command, get_schema_response),
+
+            CommandType::ConsumerStats => get_req!(command, consumer_stats),
+            CommandType::ConsumerStatsResponse => get_req!(command, consumer_stats_response),
+
+            CommandType::GetLastMessageId => get_req!(command, get_last_message_id),
+            CommandType::GetLastMessageIdResponse => {
+                get_req!(command, get_last_message_id_response)
+            }
+
+            CommandType::GetTopicsOfNamespace => get_req!(command, get_topics_of_namespace),
+            CommandType::GetTopicsOfNamespaceResponse => {
+                get_req!(command, get_topics_of_namespace_response)
+            }
+
+            CommandType::AuthChallenge => None,
+            CommandType::AuthResponse => None,
+
+            CommandType::GetOrCreateSchema => get_req!(command, get_or_create_schema),
+            CommandType::GetOrCreateSchemaResponse => {
+                get_req!(command, get_or_create_schema_response)
+            }
+
+            CommandType::NewTxn => get_req!(command, new_txn),
+            CommandType::NewTxnResponse => get_req!(command, new_txn_response),
+
+            CommandType::AddPartitionToTxn => get_req!(command, add_partition_to_txn),
+            CommandType::AddPartitionToTxnResponse => {
+                get_req!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::AddSubscriptionToTxn => get_req!(command, add_subscription_to_txn),
+            CommandType::AddSubscriptionToTxnResponse => {
+                get_req!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::EndTxn => get_req!(command, end_txn),
+            CommandType::EndTxnResponse => get_req!(command, end_txn_response),
+
+            CommandType::EndTxnOnPartition => get_req!(command, end_txn_on_partition),
+            CommandType::EndTxnOnPartitionResponse => {
+                get_req!(command, end_txn_on_partition_response)
+            }
+
+            CommandType::EndTxnOnSubscription => get_req!(command, end_txn_on_subscription),
+            CommandType::EndTxnOnSubscriptionResponse => {
+                get_req!(command, end_txn_on_subscription_response)
+            }
+
+            CommandType::TcClientConnectRequest => get_req!(command, tc_client_connect_request),
+            CommandType::TcClientConnectResponse => get_req!(command, tc_client_connect_response),
+
+            CommandType::Subscribe => get_req!(command, subscribe),
+            CommandType::Unsubscribe => get_req!(command, unsubscribe),
+            CommandType::CloseProducer => get_req!(command, close_producer),
+            CommandType::CloseConsumer => get_req!(command, close_consumer),
+            CommandType::Seek => get_req!(command, seek),
+            CommandType::Error => get_req!(command, error),
+            CommandType::Success => get_req!(command, success),
+        }
+    }
+
     fn parse_trace_span(&self, param: &ParseParam) -> (Option<String>, Option<String>) {
         let Some(config) = param.parse_config.map(|x| &x.l7_log_dynamic) else {
             return (None, None);
@@ -132,8 +322,8 @@ impl PulsarInfo {
         (trace_id, span_id)
     }
 
-    fn parse_request_id(&self) -> Option<u32> {
-        let metadata = self.message_metadata.as_ref()?;
+    fn parse_sequence_id(&self) -> Option<u32> {
+        let metadata = self.message_metadata.as_ref().as_ref()?;
         Some(metadata.sequence_id as u32)
     }
 
@@ -168,7 +358,7 @@ impl PulsarInfo {
         }
     }
 
-    fn parse_topic(&self) -> Option<String> {
+    fn get_topic(&self) -> Option<String> {
         let topic = if let Some(producer) = &self.command.producer {
             producer.topic.clone()
         } else if let Some(subscribe) = &self.command.subscribe {
@@ -177,6 +367,69 @@ impl PulsarInfo {
             return None;
         };
         topic.split('/').last().map(|x| x.to_string())
+    }
+
+    fn update_topic(
+        &mut self,
+        producer_topic: &mut PulsarTopicMap,
+        consumer_topic: &mut PulsarTopicMap,
+    ) -> Option<()> {
+        let command = self.command.as_ref();
+        match command.r#type() {
+            CommandType::Subscribe => {
+                let consumer_id = command.subscribe.as_ref()?.consumer_id;
+                let topic = self.get_topic()?;
+                consumer_topic.insert(consumer_id, topic.clone());
+                self.topic = Some(topic);
+            }
+            CommandType::Producer => {
+                let producer_id = command.producer.as_ref()?.producer_id;
+                let topic = self.get_topic()?;
+                producer_topic.insert(producer_id, topic.clone());
+                self.topic = Some(topic);
+            }
+
+            CommandType::Send => update_topic!(self, producer_topic, producer_id, send),
+            CommandType::SendReceipt => {
+                update_topic!(self, producer_topic, producer_id, send_receipt)
+            }
+            CommandType::SendError => update_topic!(self, producer_topic, producer_id, send_error),
+            CommandType::CloseProducer => {
+                update_topic!(self, producer_topic, producer_id, close_producer)
+            }
+
+            CommandType::Message => update_topic!(self, consumer_topic, consumer_id, message),
+            CommandType::Ack => update_topic!(self, consumer_topic, consumer_id, ack),
+            CommandType::AckResponse => {
+                update_topic!(self, consumer_topic, consumer_id, ack_response)
+            }
+            CommandType::ActiveConsumerChange => {
+                update_topic!(self, consumer_topic, consumer_id, active_consumer_change)
+            }
+            CommandType::Flow => update_topic!(self, consumer_topic, consumer_id, flow),
+            CommandType::Unsubscribe => {
+                update_topic!(self, consumer_topic, consumer_id, unsubscribe)
+            }
+            CommandType::Seek => update_topic!(self, consumer_topic, consumer_id, seek),
+            CommandType::ReachedEndOfTopic => {
+                update_topic!(self, consumer_topic, consumer_id, reached_end_of_topic)
+            }
+            CommandType::CloseConsumer => {
+                update_topic!(self, consumer_topic, consumer_id, close_consumer)
+            }
+            CommandType::RedeliverUnacknowledgedMessages => update_topic!(
+                self,
+                consumer_topic,
+                consumer_id,
+                redeliver_unacknowledged_messages
+            ),
+            CommandType::ConsumerStats => {
+                update_topic!(self, consumer_topic, consumer_id, consumer_stats)
+            }
+
+            _ => {}
+        }
+        Some(())
     }
 
     fn get_message_type(&self) -> LogMessageType {
@@ -319,7 +572,7 @@ impl PulsarInfo {
             self.resp_code = None;
             self.resp_exception = None;
         } else {
-            self.resp_status = Some(L7ResponseStatus::Error);
+            self.resp_status = Some(L7ResponseStatus::ServerError);
             self.resp_code = code;
             self.resp_exception = msg;
         }
@@ -333,7 +586,110 @@ impl PulsarInfo {
             return None;
         }
         let buf = payload.get(8..8 + command_size as usize)?;
-        info.command = BaseCommand::decode(buf).ok()?;
+        info.command = Box::new(BaseCommand::decode(buf).ok()?);
+        let command = &info.command;
+        match command.r#type() {
+            CommandType::Ack => check_exists!(command, ack),
+            CommandType::Flow => check_exists!(command, flow),
+            CommandType::Message => check_exists!(command, message),
+            CommandType::RedeliverUnacknowledgedMessages => {
+                check_exists!(command, redeliver_unacknowledged_messages)
+            }
+            CommandType::ReachedEndOfTopic => check_exists!(command, reached_end_of_topic),
+            CommandType::ActiveConsumerChange => check_exists!(command, active_consumer_change),
+            CommandType::AckResponse => check_exists!(command, ack_response),
+            CommandType::WatchTopicList => check_exists!(command, watch_topic_list),
+            CommandType::WatchTopicListSuccess => check_exists!(command, watch_topic_list_success),
+            CommandType::WatchTopicUpdate => check_exists!(command, watch_topic_update),
+            CommandType::WatchTopicListClose => check_exists!(command, watch_topic_list_close),
+            CommandType::TopicMigrated => check_exists!(command, topic_migrated),
+
+            CommandType::Connect => check_exists!(command, connect),
+            CommandType::Connected => check_exists!(command, connected),
+
+            CommandType::Producer => check_exists!(command, producer),
+            CommandType::ProducerSuccess => check_exists!(command, producer_success),
+
+            CommandType::Send => check_exists!(command, send),
+            CommandType::SendReceipt => check_exists!(command, send_receipt),
+            CommandType::SendError => check_exists!(command, send_error),
+
+            CommandType::Ping => check_exists!(command, ping),
+            CommandType::Pong => check_exists!(command, pong),
+
+            CommandType::Lookup => check_exists!(command, lookup_topic),
+            CommandType::LookupResponse => check_exists!(command, lookup_topic_response),
+
+            CommandType::PartitionedMetadata => check_exists!(command, partition_metadata),
+            CommandType::PartitionedMetadataResponse => {
+                check_exists!(command, partition_metadata_response)
+            }
+
+            CommandType::GetSchema => check_exists!(command, get_schema),
+            CommandType::GetSchemaResponse => check_exists!(command, get_schema_response),
+
+            CommandType::ConsumerStats => check_exists!(command, consumer_stats),
+            CommandType::ConsumerStatsResponse => check_exists!(command, consumer_stats_response),
+
+            CommandType::GetLastMessageId => check_exists!(command, get_last_message_id),
+            CommandType::GetLastMessageIdResponse => {
+                check_exists!(command, get_last_message_id_response)
+            }
+
+            CommandType::GetTopicsOfNamespace => check_exists!(command, get_topics_of_namespace),
+            CommandType::GetTopicsOfNamespaceResponse => {
+                check_exists!(command, get_topics_of_namespace_response)
+            }
+
+            CommandType::AuthChallenge => check_exists!(command, auth_challenge),
+            CommandType::AuthResponse => check_exists!(command, auth_response),
+
+            CommandType::GetOrCreateSchema => check_exists!(command, get_or_create_schema),
+            CommandType::GetOrCreateSchemaResponse => {
+                check_exists!(command, get_or_create_schema_response)
+            }
+
+            CommandType::NewTxn => check_exists!(command, new_txn),
+            CommandType::NewTxnResponse => check_exists!(command, new_txn_response),
+
+            CommandType::AddPartitionToTxn => check_exists!(command, add_partition_to_txn),
+            CommandType::AddPartitionToTxnResponse => {
+                check_exists!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::AddSubscriptionToTxn => check_exists!(command, add_subscription_to_txn),
+            CommandType::AddSubscriptionToTxnResponse => {
+                check_exists!(command, add_partition_to_txn_response)
+            }
+
+            CommandType::EndTxn => check_exists!(command, end_txn),
+            CommandType::EndTxnResponse => check_exists!(command, end_txn_response),
+
+            CommandType::EndTxnOnPartition => check_exists!(command, end_txn_on_partition),
+            CommandType::EndTxnOnPartitionResponse => {
+                check_exists!(command, end_txn_on_partition_response)
+            }
+
+            CommandType::EndTxnOnSubscription => check_exists!(command, end_txn_on_subscription),
+            CommandType::EndTxnOnSubscriptionResponse => {
+                check_exists!(command, end_txn_on_subscription_response)
+            }
+
+            CommandType::TcClientConnectRequest => {
+                check_exists!(command, tc_client_connect_request)
+            }
+            CommandType::TcClientConnectResponse => {
+                check_exists!(command, tc_client_connect_response)
+            }
+
+            CommandType::Subscribe => check_exists!(command, subscribe),
+            CommandType::Unsubscribe => check_exists!(command, unsubscribe),
+            CommandType::CloseProducer => check_exists!(command, close_producer),
+            CommandType::CloseConsumer => check_exists!(command, close_consumer),
+            CommandType::Seek => check_exists!(command, seek),
+            CommandType::Error => check_exists!(command, error),
+            CommandType::Success => check_exists!(command, success),
+        }
         let mut extra = payload.get(8 + command_size..4 + total_size)?;
         let payload = payload.get(4 + total_size..)?;
         if extra.len() > 0 {
@@ -351,15 +707,14 @@ impl PulsarInfo {
             let _checksum = read_u32_be(extra.get(2..6)?);
             let metadata_size = read_u32_be(extra.get(6..10)?) as usize;
             let buf = extra.get(10..10 + metadata_size)?;
-            info.message_metadata = Some(MessageMetadata::decode(buf).ok()?);
+            info.message_metadata = Box::new(Some(MessageMetadata::decode(buf).ok()?));
             let _payload = extra.get(10 + metadata_size..)?;
         }
         (info.trace_id, info.span_id) = info.parse_trace_span(param);
         info.x_request_id = info.parse_x_request_id();
-        info.request_id = info.parse_request_id();
+        info.request_id = info.get_request_id().map(|x| x as u32);
         info.domain = info.parse_domain();
         info.version = info.parse_version();
-        info.topic = info.parse_topic();
         info.msg_type = info.get_message_type();
         match info.msg_type {
             LogMessageType::Response => {
@@ -384,6 +739,8 @@ impl From<PulsarInfo> for L7ProtocolSendLog {
             version: info.version.map(|x| x.to_string()),
             req_len: info.req_len,
             resp_len: info.resp_len,
+            captured_request_byte: info.captured_request_byte,
+            captured_response_byte: info.captured_response_byte,
             req: L7Request {
                 req_type: info.command.r#type().as_str_name().to_string(),
                 domain: info.domain.unwrap_or_default(),
@@ -419,7 +776,7 @@ impl L7ProtocolInfoInterface for PulsarInfo {
     }
 
     fn session_id(&self) -> Option<u32> {
-        None
+        self.get_request_id().map(|x| x as u32)
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
@@ -430,6 +787,7 @@ impl L7ProtocolInfoInterface for PulsarInfo {
             if req.resp_exception.is_none() {
                 req.resp_exception = rsp.resp_exception.clone();
             }
+            req.captured_response_byte = rsp.captured_response_byte;
         }
         Ok(())
     }
@@ -478,10 +836,9 @@ impl L7ProtocolParserInterface for PulsarLog {
             self.version = self
                 .version
                 .min(info.version.unwrap_or(MAX_PROTOCOL_VERSION));
-            self.topic = info.topic.clone().or(self.topic.clone());
             self.domain = info.domain.clone().or(self.domain.clone());
+            info.update_topic(&mut self.producer_topic, &mut self.consumer_topic);
             info.version = Some(self.version);
-            info.topic = self.topic.clone();
             info.domain = self.domain.clone();
             vec.push(L7ProtocolInfo::PulsarInfo(info));
         }
@@ -496,7 +853,7 @@ impl L7ProtocolParserInterface for PulsarLog {
                 }
 
                 info.is_tls = param.is_tls();
-
+                set_captured_byte!(info, param);
                 match param.direction {
                     PacketDirection::ClientToServer => {
                         self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -529,15 +886,6 @@ impl L7ProtocolParserInterface for PulsarLog {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-
-    fn reset(&mut self) {
-        let mut s = Self::default();
-        s.perf_stats = self.perf_stats.take();
-        s.version = self.version;
-        s.topic = self.topic.take();
-        s.domain = self.domain.take();
-        *self = s;
     }
 }
 
@@ -592,6 +940,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let config = L7LogDynamicConfig::new(
                 "".to_owned(),
@@ -657,6 +1006,33 @@ mod tests {
                     output_path
                 );
             }
+        }
+    }
+
+    #[test]
+    fn check_topicmap() {
+        let mut map1: TopicMap<u64, u64, 16> = TopicMap::new();
+        let mut map2: HashMap<u64, u64> = HashMap::new();
+        for i in 0..5 {
+            map1.insert(i, i);
+            map2.insert(i, i);
+        }
+        for i in 0..32 {
+            assert_eq!(map1.get(&i), map2.get(&i));
+        }
+        for i in 0..11 {
+            map1.insert(i, i + 64);
+            map2.insert(i, i + 64);
+        }
+        for i in 0..32 {
+            assert_eq!(map1.get(&i), map2.get(&i));
+        }
+        for i in 0..32 {
+            map1.insert(i, i + 128);
+            map2.insert(i, i + 128);
+        }
+        for i in 0..32 {
+            assert_eq!(map1.get(&i), map2.get(&i));
         }
     }
 }

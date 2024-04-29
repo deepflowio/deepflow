@@ -621,6 +621,7 @@ type PodNodeFieldsUpdate struct {
 	Type         fieldDetail[int]
 	State        fieldDetail[int]
 	Hostname     fieldDetail[string]
+	IP           fieldDetail[string]
 	VCPUNum      fieldDetail[int]
 	MemTotal     fieldDetail[int]
 	AZLcuuid     fieldDetail[string]

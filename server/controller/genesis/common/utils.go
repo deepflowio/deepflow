@@ -35,11 +35,15 @@ import (
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
+	"github.com/op/go-logging"
 	"gopkg.in/yaml.v3"
 	"inet.af/netaddr"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
+
+var log = logging.MustGetLogger("genesis.common")
 
 type VifInfo struct {
 	MaskLen uint32
@@ -493,4 +497,29 @@ func RequestGet(url string, timeout int, queryStrings map[string]string) error {
 	}
 
 	return nil
+}
+
+func GetTeamIDToOrgID() (map[string]int, error) {
+	teamIDToOrgID := map[string]int{}
+	orgIDs, err := mysql.GetORGIDs()
+	if err != nil {
+		return teamIDToOrgID, err
+	}
+	for _, orgID := range orgIDs {
+		db, err := mysql.GetDB(orgID)
+		if err != nil {
+			log.Error(err.Error())
+			continue
+		}
+		var teams []mysql.Team
+		err = db.Find(&teams).Error
+		if err != nil {
+			log.Error(err.Error())
+			continue
+		}
+		for _, team := range teams {
+			teamIDToOrgID[team.ShortLcuuid] = orgID
+		}
+	}
+	return teamIDToOrgID, nil
 }

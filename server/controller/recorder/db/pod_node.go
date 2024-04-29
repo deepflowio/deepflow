@@ -43,27 +43,27 @@ func (a *PodNode) setDBItemID(dbItem *mysql.PodNode, id int) {
 
 func (n *PodNode) DeleteBatch(lcuuids []string) ([]*mysql.PodNode, bool) {
 	var vmPodNodeConns []*mysql.VMPodNodeConnection
-	err := n.org.DB.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN pod_node On vm_pod_node_connection.pod_node_id = pod_node.id").Where("pod_node.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
+	err := n.metadata.DB.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN pod_node On vm_pod_node_connection.pod_node_id = pod_node.id").Where("pod_node.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
 	if err != nil {
-		log.Error(n.org.LogPre("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err))
+		log.Error(n.metadata.LogPre("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err))
 		return nil, false
 	} else {
 		for _, con := range vmPodNodeConns {
-			err = n.org.DB.Delete(con).Error
+			err = n.metadata.DB.Delete(con).Error
 			if err != nil {
-				log.Error(n.org.LogPre("delete %s (info: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con, err))
+				log.Error(n.metadata.LogPre("delete %s (info: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con, err))
 				continue
 			}
-			log.Info(n.org.LogPre("delete %s (info: %+v) success", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con))
+			log.Info(n.metadata.LogPre("delete %s (info: %+v) success", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con))
 		}
 	}
 
 	var dbItems []*mysql.PodNode
-	err = n.org.DB.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
+	err = n.metadata.DB.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
-		log.Error(n.org.LogPre("delete %s (lcuuids: %v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err))
+		log.Error(n.metadata.LogPre("delete %s (lcuuids: %v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err))
 		return nil, false
 	}
-	log.Info(n.org.LogPre("delete %s (lcuuids: %v) success", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids))
+	log.Info(n.metadata.LogPre("delete %s (lcuuids: %v) success", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids))
 	return dbItems, true
 }

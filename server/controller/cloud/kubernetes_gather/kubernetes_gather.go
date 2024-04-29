@@ -17,12 +17,16 @@
 package kubernetes_gather
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	logging "github.com/op/go-logging"
+	"gorm.io/gorm"
+
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
@@ -30,17 +34,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
-	logging "github.com/op/go-logging"
 )
 
-const (
-	K8S_VPC_NAME       = "kubernetes_vpc"
-	K8S_VERSION_PREFIX = "Kubernetes"
-)
-
-var log = logging.MustGetLogger("cloud.kubernetes_gather")
+var log *logging.Logger
 
 type KubernetesGather struct {
+	orgID                        int
 	Name                         string
 	Lcuuid                       string
 	UuidGenerate                 string
@@ -54,6 +53,7 @@ type KubernetesGather struct {
 	isSubDomain                  bool
 	azLcuuid                     string
 	podClusterLcuuid             string
+	db                           *gorm.DB
 	labelRegex                   *regexp.Regexp
 	envRegex                     *regexp.Regexp
 	annotationRegex              *regexp.Regexp
@@ -80,7 +80,9 @@ type networkLcuuidCIDRs struct {
 	cidrs         []string
 }
 
-func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
+func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
+	log = logging.MustGetLogger(fmt.Sprintf("cloud.org:%d.kubernetes_gather", db.ORGID))
+
 	var name string
 	var displayName string
 	var clusterID string
@@ -176,6 +178,8 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 		Lcuuid:                lcuuid,
 		UuidGenerate:          displayName,
 		ClusterID:             clusterID,
+		orgID:                 db.ORGID,
+		db:                    db.DB,
 		RegionUUID:            configJson.Get("region_uuid").MustString(),
 		VPCUUID:               configJson.Get("vpc_uuid").MustString(),
 		PodNetIPv4CIDRMaxMask: podNetIPv4CIDRMaxMask,
@@ -208,7 +212,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, cfg c
 }
 
 func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
-	kData, err := genesis.GenesisService.GetKubernetesResponse(k.ClusterID)
+	kData, err := genesis.GenesisService.GetKubernetesResponse(k.orgID, k.ClusterID)
 	if err != nil {
 		return map[string][]string{}, err
 	}

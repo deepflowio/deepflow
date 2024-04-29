@@ -35,10 +35,10 @@ func NewChPrometheusMetricAPPLabelLayout() *ChPrometheusMetricAPPLabelLayout {
 	return updater
 }
 
-func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout, bool) {
+func (l *ChPrometheusMetricAPPLabelLayout) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout, bool) {
 	var prometheusMetricAPPLabelLayout []mysql.PrometheusMetricAPPLabelLayout
 
-	err := mysql.Db.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error
+	err := db.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false

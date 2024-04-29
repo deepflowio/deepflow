@@ -30,7 +30,7 @@ use crate::{
     common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT},
     exception::ExceptionHandler,
     trident::AgentId,
-    utils::stats::{self, AtomicTimeStats, StatsOption},
+    utils::stats::{self, AtomicTimeStats},
 };
 use grpc::dial as grpc_dial;
 use public::proto::trident::{self, Exception, Status};
@@ -197,12 +197,8 @@ impl Session {
 
         for (endpoint, counter) in counters.iter().enumerate() {
             stats_collector.register_countable(
-                "grpc_call",
+                &stats::SingleTagModule("grpc_call", "endpoint", GRPC_CALL_ENDPOINTS[endpoint]),
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag(
-                    "endpoint",
-                    GRPC_CALL_ENDPOINTS[endpoint].to_string(),
-                )],
             );
         }
 
@@ -256,7 +252,7 @@ impl Session {
         self.server_dispatcher.read().get_current_ip()
     }
 
-    async fn update_current_server(&self) -> bool {
+    pub async fn update_current_server(&self) -> bool {
         let changed = self.server_dispatcher.write().update_current_ip();
         if changed || self.get_client().is_none() {
             let (ip, port) = self.server_dispatcher.read().get_current_ip();

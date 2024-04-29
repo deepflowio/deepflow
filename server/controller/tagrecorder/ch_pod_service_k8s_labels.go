@@ -37,18 +37,17 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate) {
+func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	var labels string
 	if fieldsUpdate.Label.IsDifferent() {
-		labels = common.StrToJsonstr(fieldsUpdate.Label.GetNew())
+		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
 		if labels != "" {
 			updateInfo["labels"] = labels
 		}
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodServiceK8sLabels
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sLabelsKey{{ID: sourceID}},
@@ -56,25 +55,29 @@ func (c *ChPodServiceK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *me
 					ID:     sourceID,
 					Labels: updateInfo["labels"].(string),
 				}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID}, db)
 		}
 	}
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) sourceToTarget(item *mysql.PodService) (keys []K8sLabelsKey, targets []mysql.ChPodServiceK8sLabels) {
+func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, item *mysql.PodService) (keys []K8sLabelsKey, targets []mysql.ChPodServiceK8sLabels) {
 	if item.Label == "" {
 		return
 	}
+	labels, _ := common.StrToJsonAndMap(item.Label)
 	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sLabels{{
-		ID:     item.ID,
-		Labels: common.StrToJsonstr(item.Label),
+		ID:       item.ID,
+		Labels:   labels,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sLabels) {
+func (c *ChPodServiceK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sLabels, db *mysql.DB) {
 
 }

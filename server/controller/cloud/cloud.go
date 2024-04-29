@@ -45,6 +45,8 @@ import (
 var log = logging.MustGetLogger("cloud")
 
 type Cloud struct {
+	orgID                   int
+	db                      *mysql.DB
 	cfg                     config.CloudConfig
 	cCtx                    context.Context
 	cCancel                 context.CancelFunc
@@ -59,8 +61,14 @@ type Cloud struct {
 }
 
 // TODO 添加参数
-func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) *Cloud {
-	platform, err := platform.NewPlatform(domain, cfg)
+func NewCloud(orgID int, domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) *Cloud {
+	mysqlDB, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+
+	platform, err := platform.NewPlatform(domain, cfg, mysqlDB)
 	if err != nil {
 		log.Error(err)
 		return nil
@@ -70,6 +78,8 @@ func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) 
 
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
+		orgID: orgID,
+		db:    mysqlDB,
 		basicInfo: model.BasicInfo{
 			Lcuuid: domain.Lcuuid,
 			Name:   domain.Name,
@@ -108,6 +118,10 @@ func (c *Cloud) UpdateBasicInfoName(name string) {
 	c.basicInfo.Name = name
 }
 
+func (c *Cloud) GetOrgID() int {
+	return c.orgID
+}
+
 func (c *Cloud) GetBasicInfo() model.BasicInfo {
 	return c.basicInfo
 }
@@ -121,7 +135,7 @@ func (c *Cloud) GetSubDomainRefreshSignals() cmap.ConcurrentMap[string, *queue.O
 }
 
 func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource {
-	hostIPToHostName, vmLcuuidToHostName, err := cloudcommon.GetHostAndVmHostNameByDomain(c.basicInfo.Lcuuid)
+	hostIPToHostName, vmLcuuidToHostName, err := cloudcommon.GetHostAndVmHostNameByDomain(c.basicInfo.Lcuuid, c.db.DB)
 	if err != nil {
 		log.Errorf("cloud suffix operation get vtap info error : (%s)", err.Error())
 		return resource
@@ -179,21 +193,25 @@ func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource 
 
 func (c *Cloud) GetResource() model.Resource {
 	cResource := c.resource
-	if c.basicInfo.Type != common.KUBERNETES {
-		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS && cResource.Verified {
-			cResource.SubDomainResources = c.getSubDomainData(cResource)
-			cResource = c.appendResourceVIPs(cResource)
-		}
-	} else {
+	if c.basicInfo.Type == common.KUBERNETES {
 		cResource = c.getKubernetesData()
 	}
-
-	if cResource.Verified {
-		cResource = c.appendAddtionalResourcesData(cResource)
-		cResource = c.appendResourceProcess(cResource)
-		// don't move c.suffixResourceOperation, it need to always hold the last position
-		cResource = c.suffixResourceOperation(cResource)
+	if !cResource.Verified {
+		return model.Resource{
+			ErrorState:   cResource.ErrorState,
+			ErrorMessage: cResource.ErrorMessage,
+		}
 	}
+
+	if c.basicInfo.Type != common.KUBERNETES {
+		cResource.SubDomainResources = c.getSubDomainData(cResource)
+		cResource = c.appendResourceVIPs(cResource)
+	}
+
+	cResource = c.appendAddtionalResourcesData(cResource)
+	cResource = c.appendResourceProcess(cResource)
+	// don't move c.suffixResourceOperation, it need to always hold the last position
+	cResource = c.suffixResourceOperation(cResource)
 	return cResource
 }
 
@@ -208,8 +226,12 @@ func (c *Cloud) GetStatter() statsd.StatsdStatter {
 }
 
 func (c *Cloud) getCloudGatherInterval() int {
+	if (c.basicInfo.Type == common.QINGCLOUD || c.basicInfo.Type == common.QINGCLOUD_PRIVATE) && c.cfg.QingCloudConfig.DailyTriggerTime != "" {
+		log.Infof("qing and qing private daily trigger time is (%s), sync timer is default (%d)s", c.cfg.QingCloudConfig.DailyTriggerTime, cloudcommon.CLOUD_SYNC_TIMER_DEFAULT)
+		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
+	}
 	var domain mysql.Domain
-	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
+	err := c.db.DB.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Warningf("get cloud gather interval failed: (%s)", err.Error())
 		return cloudcommon.CLOUD_SYNC_TIMER_DEFAULT
@@ -244,28 +266,31 @@ func (c *Cloud) getCloudData() {
 				cResource.Verified = true
 				cResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 			}
+			if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
+				cResource = model.Resource{
+					ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+					ErrorMessage: "invalid vm count (0).",
+				}
+			}
 		} else {
 			if cResource.ErrorState == 0 {
 				cResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 			}
 			cResource = model.Resource{
+				ErrorState:   cResource.ErrorState,
 				ErrorMessage: err.Error(),
-				ErrorState:   cResource.ErrorState,
 			}
 		}
-		if len(cResource.VMs) == 0 && c.basicInfo.Type != common.FILEREADER {
-			cResource = model.Resource{
-				ErrorState:   cResource.ErrorState,
-				ErrorMessage: "invalid vm count (0). " + cResource.ErrorMessage,
-			}
-		}
-		cResource.SyncAt = time.Now()
-		if cResource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
+		if cResource.Verified {
+			cResource.SyncAt = time.Now()
+			c.resource = cResource
 			c.sendStatsd(cloudCost)
+		} else {
+			c.resource.ErrorState = cResource.ErrorState
+			c.resource.ErrorMessage = cResource.ErrorMessage
+			log.Warningf("get cloud (%s) data, verify is (false), error state (%d), error message (%s)", c.basicInfo.Name, cResource.ErrorState, cResource.ErrorMessage)
 		}
 	}
-
-	c.resource = cResource
 	// trigger recorder refresh domain resource
 	c.domainRefreshSignal.Put(struct{}{})
 }
@@ -316,7 +341,7 @@ func (c *Cloud) startKubernetesGatherTask() {
 
 func (c *Cloud) runKubernetesGatherTask() {
 	var domain mysql.Domain
-	err := mysql.Db.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
+	err := c.db.DB.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Error(err)
 		return
@@ -329,7 +354,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		if len(c.kubernetesGatherTaskMap) != 0 {
 			return
 		}
-		kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, nil, c.cfg, false)
+		kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, c.db, &domain, nil, c.cfg, false)
 		if kubernetesGatherTask == nil {
 			return
 		}
@@ -351,7 +376,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 			oldSubDomains.Add(lcuuid)
 		}
 
-		mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subDomains)
+		c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subDomains)
 		lcuuidToSubDomain := make(map[string]*mysql.SubDomain)
 		for index, subDomain := range subDomains {
 			lcuuidToSubDomain[subDomain.Lcuuid] = &subDomains[index]
@@ -377,7 +402,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		addSubDomains = newSubDomains.Difference(oldSubDomains)
 		for _, subDomain := range addSubDomains.ToSlice() {
 			lcuuid := subDomain.(string)
-			kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
+			kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, c.db, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
 			if kubernetesGatherTask == nil {
 				continue
 			}
@@ -401,7 +426,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 				log.Infof("oldSubDomainConfig: %s", oldSubDomain.SubDomainConfig)
 				log.Infof("newSubDomainConfig: %s", newSubDomain.Config)
 				c.kubernetesGatherTaskMap[lcuuid].Stop()
-				kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
+				kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, c.db, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
 				if kubernetesGatherTask == nil {
 					continue
 				}
@@ -422,7 +447,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 }
 
 func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Resource {
-	dbItem, err := getContentFromAdditionalResource(c.basicInfo.Lcuuid)
+	dbItem, err := getContentFromAdditionalResource(c.basicInfo.Lcuuid, c.db.DB)
 	if err != nil {
 		log.Errorf("domain (lcuuid: %s) get additional resources failed: %s", c.basicInfo.Lcuuid, err)
 		return resource
@@ -462,11 +487,11 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 // otherwise get the field compressed_content.
 // old content field: content
 // new centent field: compressed_content
-func getContentFromAdditionalResource(domainUUID string) (*mysql.DomainAdditionalResource, error) {
+func getContentFromAdditionalResource(domainUUID string, db *gorm.DB) (*mysql.DomainAdditionalResource, error) {
 	var dbItem mysql.DomainAdditionalResource
-	result := mysql.Db.Select("content").Where("domain = ? and content!=''", domainUUID).First(&dbItem)
+	result := db.Select("content").Where("domain = ? and content!=''", domainUUID).First(&dbItem)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		result = mysql.Db.Select("compressed_content").Where("domain = ?", domainUUID).First(&dbItem)
+		result = db.Select("compressed_content").Where("domain = ?", domainUUID).First(&dbItem)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -525,13 +550,13 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 		return resource
 	}
 
-	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse(c.orgID)
 	if err != nil {
 		log.Error(err.Error())
 		return resource
 	}
 
-	vtapIDToLcuuid, err := cloudcommon.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
+	vtapIDToLcuuid, err := cloudcommon.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid, c.db.DB)
 	if err != nil {
 		log.Errorf("domain (%s) add process failed: %s", c.basicInfo.Name, err.Error())
 		return resource
@@ -584,13 +609,13 @@ func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
 		return resource
 	}
 
-	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	genesisSyncData, err := genesis.GenesisService.GetGenesisSyncResponse(c.orgID)
 	if err != nil {
 		log.Error(err.Error())
 		return resource
 	}
 
-	vtapIDToLcuuid, err := cloudcommon.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid)
+	vtapIDToLcuuid, err := cloudcommon.GetVTapSubDomainMappingByDomain(c.basicInfo.Lcuuid, c.db.DB)
 	if err != nil {
 		log.Errorf("domain (%s) add vip failed: %s", c.basicInfo.Name, err.Error())
 		return resource

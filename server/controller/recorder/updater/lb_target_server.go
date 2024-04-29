@@ -57,7 +57,7 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			wholeCache,
-			db.NewLBTargetServer().SetORG(wholeCache.GetORG()),
+			db.NewLBTargetServer().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.LBTargetServers,
 			cloudData,
 		),
@@ -74,7 +74,7 @@ func (s *LBTargetServer) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBTargetSe
 func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServer) (*mysql.LBTargetServer, bool) {
 	lbID, exists := s.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
-		log.Error(s.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(s.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 		)))
@@ -82,7 +82,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	}
 	lbListenerID, exists := s.cache.ToolDataSet.GetLBListenerIDByLcuuid(cloudItem.LBListenerLcuuid)
 	if !exists {
-		log.Error(s.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(s.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.LBListenerLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 		)))
@@ -92,7 +92,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	if cloudItem.VMLcuuid != "" {
 		vmID, exists = s.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 		if !exists {
-			log.Error(s.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(s.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 			)))
@@ -101,7 +101,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	}
 	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(s.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(s.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 		)))
@@ -112,7 +112,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 		LBListenerID: lbListenerID,
 		VMID:         vmID,
 		VPCID:        vpcID,
-		Domain:       s.cache.DomainLcuuid,
+		Domain:       s.metadata.Domain.Lcuuid,
 		Type:         cloudItem.Type,
 		IP:           cloudItem.IP,
 		Port:         cloudItem.Port,

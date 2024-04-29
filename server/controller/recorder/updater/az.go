@@ -57,7 +57,7 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 		](
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,
-			db.NewAZ().SetORG(wholeCache.GetORG()),
+			db.NewAZ().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.AZs,
 			cloudData,
 		),
@@ -76,7 +76,7 @@ func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*mysql.AZ, bool) {
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
 		Region: cloudItem.RegionLcuuid,
-		Domain: z.cache.DomainLcuuid,
+		Domain: z.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

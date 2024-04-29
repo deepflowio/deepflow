@@ -17,6 +17,7 @@
 package common
 
 import (
+	exportconfig "github.com/deepflowio/deepflow/server/ingester/exporters/config"
 	logging "github.com/op/go-logging"
 )
 
@@ -28,11 +29,28 @@ const (
 	RESOURCE_EVENT EventType = iota
 	PERF_EVENT
 	ALARM_EVENT
+	K8S_EVENT
 )
 
 func (e EventType) String() string {
 	switch e {
 	case RESOURCE_EVENT:
+		return "resource_event"
+	case PERF_EVENT:
+		return "perf_event"
+	case ALARM_EVENT:
+		return "alarm_event"
+	case K8S_EVENT:
+		return "k8s_event"
+	default:
+		return "unknown_event"
+	}
+}
+
+func (e EventType) TableName() string {
+	switch e {
+	// both resource_event and k8s_event are stored in event table
+	case RESOURCE_EVENT, K8S_EVENT:
 		return "event"
 	case PERF_EVENT:
 		return "perf_event"
@@ -43,6 +61,11 @@ func (e EventType) String() string {
 	}
 }
 
-func (e EventType) TableName() string {
-	return e.String()
+func (e EventType) DataSource() uint32 {
+	switch e {
+	case PERF_EVENT:
+		return uint32(exportconfig.PERF_EVENT)
+	default:
+		return uint32(exportconfig.MAX_DATASOURCE_ID)
+	}
 }

@@ -52,7 +52,7 @@ use crate::config::NpbConfig;
 #[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
 use crate::exception::ExceptionHandler;
-use crate::utils::stats::{self, StatsOption};
+use crate::utils::stats;
 use npb_handler::{NpbHeader, NOT_SUPPORT};
 use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
 use public::proto::trident::{Exception, SocketType};
@@ -799,9 +799,8 @@ impl NpbConnectionPool {
     ) -> Self {
         let counter = Arc::new(NpbSenderCounter::default());
         stats_collector.register_countable(
-            "npb_packet_sender",
+            &stats::SingleTagModule("npb_packet_sender", "id", id),
             Countable::Owned(Box::new(StatsNpbSenderCounter(Arc::downgrade(&counter)))),
-            vec![StatsOption::Tag("id", id.to_string())],
         );
 
         #[cfg(windows)]

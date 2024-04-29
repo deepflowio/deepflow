@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "android")]
+use std::os::android::fs::MetadataExt;
+#[cfg(target_os = "linux")]
+use std::os::linux::fs::MetadataExt;
+
 use std::{
     collections::{HashMap, HashSet},
     ffi::OsString,
@@ -35,7 +40,7 @@ use public::{
     proto::trident::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
-use super::{get_all_pid_process_map, get_os_app_tag_by_exec, sym_uptime, RegExpAction};
+use super::linux_process::{get_all_pid_process_map, get_os_app_tag_by_exec, RegExpAction};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Role {
@@ -653,5 +658,18 @@ fn convert_addr_to_v4(addr: SocketAddr) -> Option<SocketAddr> {
                 ))
             }
         }
+    }
+}
+
+// return the (now_sec - sym_change_time) second
+pub(super) fn sym_uptime(now_sec: u64, path: &PathBuf) -> Result<u64, &'static str> {
+    // linux default not record the file birth time, use the change time instead of the birth time.
+    let s = std::fs::symlink_metadata(path)
+        .map_err(|_| "get symlink metadate fail")?
+        .st_ctime() as u64;
+    if now_sec >= s {
+        Ok(now_sec - s)
+    } else {
+        Err("sym up time after current")
     }
 }

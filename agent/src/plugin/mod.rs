@@ -73,6 +73,8 @@ pub struct CustomInfo {
 
     pub req_len: Option<u32>,
     pub resp_len: Option<u32>,
+    pub captured_request_byte: u32,
+    pub captured_response_byte: u32,
 
     pub request_id: Option<u32>,
 
@@ -131,6 +133,9 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
                 val:    $(len) bytes
 
             ) x 2
+
+        l7_protocol_str len: 2 bytes
+        l7_protocol_str:     $(l7_protocol_str len) bytes
 
         need_protocol_merge: 1 byte, the msb indicate is need protocol merge, the lsb indicate is end, such as 1 000000 1
 
@@ -286,6 +291,14 @@ impl TryFrom<(&[u8], PacketDirection)> for CustomInfo {
             }
         }
 
+        if let Some(proto_str) = read_wasm_str(buf, &mut off) {
+            info.proto_str = proto_str;
+        } else {
+            return Err(Error::WasmSerializeFail(
+                "buf len too short when parse l7_protocol_str".to_string(),
+            ));
+        }
+
         // need_protocol_merge
         if off + 1 > buf.len() {
             return Err(Error::WasmSerializeFail(
@@ -400,6 +413,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
             if w.is_req_end {
                 self.is_req_end = true;
             }
+            self.captured_request_byte += w.captured_request_byte;
 
             // resp merge
             if self.resp.status == L7ResponseStatus::default() {
@@ -420,6 +434,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
             if w.is_resp_end {
                 self.is_resp_end = true;
             }
+            self.captured_response_byte += w.captured_response_byte;
 
             // trace merge
             swap_if!(self.trace, trace_id, is_none, w.trace);
@@ -464,6 +479,8 @@ impl From<CustomInfo> for L7ProtocolSendLog {
         Self {
             req_len: w.req_len,
             resp_len: w.resp_len,
+            captured_request_byte: w.captured_request_byte,
+            captured_response_byte: w.captured_response_byte,
 
             req: L7Request {
                 req_type: w.req.req_type,

@@ -39,7 +39,7 @@ func NewChChost() *ChChost {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChChost) sourceToTarget(source *mysql.VM) (keys []IDKey, targets []mysql.ChChost) {
+func (c *ChChost) sourceToTarget(md *message.Metadata, source *mysql.VM) (keys []IDKey, targets []mysql.ChChost) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
@@ -53,12 +53,14 @@ func (c *ChChost) sourceToTarget(source *mysql.VM) (keys []IDKey, targets []mysq
 		HostID:   source.HostID,
 		Hostname: source.Hostname,
 		IP:       source.IP,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate) {
+func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
@@ -78,14 +80,14 @@ func (c *ChChost) onResourceUpdated(sourceID int, fieldsUpdate *message.VMFields
 
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChChost
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChChost) softDeletedTargetsUpdated(targets []mysql.ChChost) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChChost) softDeletedTargetsUpdated(targets []mysql.ChChost, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

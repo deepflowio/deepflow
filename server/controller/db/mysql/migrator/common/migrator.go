@@ -19,7 +19,7 @@ package common
 import (
 	"fmt"
 	"io/fs"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -28,71 +28,98 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration/script"
 )
 
 var log = logging.MustGetLogger("db.mysql.migrator.common")
 
-func DropDatabase(db *gorm.DB, database string) error {
-	log.Infof("drop database %s", database)
-	return db.Exec(fmt.Sprintf("DROP DATABASE %s", database)).Error
+type DBConfig struct {
+	DB     *gorm.DB
+	Config config.MySqlConfig
 }
 
-func CreateDatabase(db *gorm.DB, database string) error {
-	log.Infof("create database %s", database)
-	return db.Exec(fmt.Sprintf("CREATE DATABASE %s", database)).Error
+func NewDBConfig(db *gorm.DB, cfg config.MySqlConfig) *DBConfig {
+	return &DBConfig{
+		DB:     db,
+		Config: cfg,
+	}
 }
 
-func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
-	var datadbaseName string
-	db.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", database)).Scan(&datadbaseName)
-	if datadbaseName == database {
+func (dc *DBConfig) SetDB(db *gorm.DB) {
+	dc.DB = db
+}
+
+func (dc *DBConfig) SetConfig(c config.MySqlConfig) {
+	dc.Config = c
+}
+
+func LogDBName(databaseName string, format string, a ...any) string {
+	return fmt.Sprintf("db: %s, ", databaseName) + fmt.Sprintf(format, a...)
+}
+
+func DropDatabase(dc *DBConfig) error {
+	log.Infof(LogDBName(dc.Config.Database, "drop database"))
+	return dc.DB.Exec(fmt.Sprintf("DROP DATABASE %s", dc.Config.Database)).Error
+}
+
+func CreateDatabase(dc *DBConfig) error {
+	log.Infof(LogDBName(dc.Config.Database, "create database"))
+	log.Infof("%#v", dc.DB)
+	return dc.DB.Exec(fmt.Sprintf("CREATE DATABASE %s", dc.Config.Database)).Error
+}
+
+func CreateDatabaseIfNotExists(dc *DBConfig) (bool, error) {
+	var databaseName string
+	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
+	if databaseName == dc.Config.Database {
 		return true, nil
 	} else {
-		err := CreateDatabase(db, database)
+		err := CreateDatabase(dc)
 		return false, err
 	}
 }
 
-func InitEETables(db *gorm.DB) error {
-	log.Info("init CE tables start")
-	initSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
+func InitCETables(dc *DBConfig) error {
+	log.Info(LogDBName(dc.Config.Database, "initialize CE tables"))
+	log.Infof("%#v", dc.DB)
+	initSQL, err := os.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
 	if err != nil {
-		log.Errorf("read sql file failed: %v", err)
+		log.Error(LogDBName(dc.Config.Database, "failed to read sql file: %s", err.Error()))
 		return err
 	}
-	err = db.Exec(string(initSQL)).Error
+	err = dc.DB.Exec(string(initSQL)).Error
 	if err != nil {
-		log.Errorf("init db tables failed: %v", err)
+		log.Error(LogDBName(dc.Config.Database, "failed to initialize db tables: %s", err.Error()))
 		return err
 	}
-	log.Info("init CE tables success")
+	log.Info(LogDBName(dc.Config.Database, "initialized CE tables successfully"))
 	return err
 }
 
-func InitDBVersion(db *gorm.DB) error {
-	err := db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
+func InitDBVersion(dc *DBConfig) error {
+	err := dc.DB.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
 	if err != nil {
-		log.Errorf("init db version failed: %v", err)
+		log.Error(LogDBName(dc.Config.Database, "failed to initialize db version: %s", err.Error()))
 	}
 	return err
 }
 
-func ExecuteIssus(db *gorm.DB, curVersion string) error {
-	issus, err := ioutil.ReadDir(fmt.Sprintf("%s/issu", SQL_FILE_DIR))
+func ExecuteIssues(dc *DBConfig, curVersion string) error {
+	issus, err := os.ReadDir(fmt.Sprintf("%s/issu", SQL_FILE_DIR))
 	if err != nil {
-		log.Errorf("read sql dir faild: %v", err)
+		log.Error(LogDBName(dc.Config.Database, "failed to read sql dir: %s", err.Error()))
 		return err
 	}
 	nextVersions := getAscSortedNextVersions(issus, curVersion)
-	log.Infof("issus to be executed: %v", nextVersions)
+	log.Info(LogDBName(dc.Config.Database, "issues to be executed: %v", nextVersions))
 	for _, nv := range nextVersions {
-		err = executeIssu(db, nv)
+		err = executeIssue(dc, nv)
 		if err != nil {
 			return err
 		}
-		err = executeScript(db, nv)
+		err = executeScript(dc, nv)
 		if err != nil {
 			return err
 		}
@@ -100,37 +127,39 @@ func ExecuteIssus(db *gorm.DB, curVersion string) error {
 	return nil
 }
 
-func executeIssu(db *gorm.DB, nextVersion string) error {
-	issuSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
+func executeIssue(dc *DBConfig, nextVersion string) error {
+	byteSQL, err := os.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
 	if err != nil {
-		log.Errorf("read sql file (version: %s) failed: %v", nextVersion, err)
+		log.Error(LogDBName(dc.Config.Database, "failed to read sql file (version: %s): %s", nextVersion, err.Error()))
 		return err
 	}
-	if len(issuSQL) == 0 {
-		log.Infof("issu with no content (version: %s)", nextVersion)
+	if len(byteSQL) == 0 {
+		log.Warning(LogDBName(dc.Config.Database, "issue with no content (version: %s)", nextVersion))
 		return nil
 	}
-	err = db.Exec(string(issuSQL)).Error
+
+	strSQL := fmt.Sprintf("SET @tableSchema='%s';\n", dc.Config.Database) + string(byteSQL)
+	err = dc.DB.Exec(strSQL).Error
 	if err != nil {
-		log.Errorf("excute db issu (version: %s) failed: %v", nextVersion, err)
+		log.Error(LogDBName(dc.Config.Database, "failed to execute db issue (version: %s): %s", nextVersion, err.Error()))
 		return err
 	}
-	log.Infof("execute db issu (version: %s) success", nextVersion)
+	log.Info(LogDBName(dc.Config.Database, "executed db issue (version: %s) successfully", nextVersion))
 	return nil
 }
 
-func executeScript(db *gorm.DB, nextVersion string) error {
+func executeScript(dc *DBConfig, nextVersion string) error {
 	var err error
 	switch nextVersion {
 	case script.SCRIPT_UPDATE_CLOUD_TAG:
-		err = script.ScriptUpdateCloudTags(db)
+		err = script.ScriptUpdateCloudTags(dc.DB)
 	case script.SCRIPT_UPDATE_VM_PODNS_TAG:
-		err = script.ScriptUpdateVMPodNSTags(db)
+		err = script.ScriptUpdateVMPodNSTags(dc.DB)
 	}
 	return err
 }
 
-func getAscSortedNextVersions(files []fs.FileInfo, curVersion string) []string {
+func getAscSortedNextVersions(files []fs.DirEntry, curVersion string) []string {
 	vs := []string{}
 	for _, f := range files {
 		vs = append(vs, trimFilenameExt(f.Name()))

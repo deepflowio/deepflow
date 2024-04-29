@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChAZ struct {
@@ -41,7 +42,7 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 	log.Infof("generate data for %s", a.resourceTypeName)
 	var azs []mysql.AZ
-	err := mysql.Db.Unscoped().Find(&azs).Error
+	err := a.db.Unscoped().Find(&azs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(a.resourceTypeName, err))
 		return nil, false
@@ -59,15 +60,19 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 		}
 		if az.DeletedAt.Valid {
 			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
-				ID:     az.ID,
-				Name:   az.Name + " (deleted)",
-				IconID: iconID,
+				ID:       az.ID,
+				Name:     az.Name + " (deleted)",
+				IconID:   iconID,
+				TeamID:   tagrecorder.DomainToTeamID[az.Domain],
+				DomainID: tagrecorder.DomainToDomainID[az.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
-				ID:     az.ID,
-				Name:   az.Name,
-				IconID: iconID,
+				ID:       az.ID,
+				Name:     az.Name,
+				IconID:   iconID,
+				TeamID:   tagrecorder.DomainToTeamID[az.Domain],
+				DomainID: tagrecorder.DomainToDomainID[az.Domain],
 			}
 		}
 

@@ -37,34 +37,38 @@ func NewChPodK8sAnnotations() *ChPodK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate) {
+func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Annotation.IsDifferent() {
-		updateInfo["annotations"] = fieldsUpdate.Annotation.GetNew()
+		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		updateInfo["annotations"] = annotations
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodK8sAnnotations
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sAnnotationsKey{{ID: sourceID}},
 				[]mysql.ChPodK8sAnnotations{{ID: sourceID, Annotations: updateInfo["annotations"].(string)}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sAnnotationsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sAnnotationsKey{ID: sourceID}, db)
 		}
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) sourceToTarget(item *mysql.Pod) (keys []K8sAnnotationsKey, targets []mysql.ChPodK8sAnnotations) {
+func (c *ChPodK8sAnnotations) sourceToTarget(md *message.Metadata, item *mysql.Pod) (keys []K8sAnnotationsKey, targets []mysql.ChPodK8sAnnotations) {
 	if item.Annotation == "" {
 		return
 	}
-	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodK8sAnnotations{{ID: item.ID, Annotations: item.Annotation}}
+	annotations, _ := common.StrToJsonAndMap(item.Annotation)
+	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodK8sAnnotations{{ID: item.ID, Annotations: annotations, TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotations) softDeletedTargetsUpdated(targets []mysql.ChPodK8sAnnotations) {
+func (c *ChPodK8sAnnotations) softDeletedTargetsUpdated(targets []mysql.ChPodK8sAnnotations, db *mysql.DB) {
 
 }

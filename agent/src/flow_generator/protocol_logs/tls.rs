@@ -22,7 +22,7 @@ use serde::Serialize;
 use super::pb_adapter::{
     ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
 };
-use super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use super::{set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use crate::{
     common::{
         enums::IpProtocol,
@@ -252,6 +252,9 @@ pub struct TlsInfo {
     #[serde(skip)]
     pub client_cert_not_after: Timestamp,
 
+    captured_request_byte: u32,
+    captured_response_byte: u32,
+
     msg_type: LogMessageType,
     rrt: u64,
     tls_rtt: u64,
@@ -310,6 +313,7 @@ impl TlsInfo {
                     &mut self.client_cert_not_before,
                     &mut other.client_cert_not_before,
                 );
+                self.captured_request_byte = other.captured_request_byte;
             }
             LogMessageType::Response => {
                 self.status = other.status;
@@ -326,6 +330,7 @@ impl TlsInfo {
                     &mut self.server_cert_not_before,
                     &mut other.server_cert_not_before,
                 );
+                self.captured_response_byte = other.captured_response_byte;
             }
             _ => {}
         }
@@ -559,11 +564,8 @@ impl TlsLog {
                     }
 
                     if let Some(server_name) = h.domain_name() {
-                        info.request_domain = server_name;
-                    }
-
-                    if info.request_type.is_empty() || h.is_change_cipher_spec() {
-                        info.request_type = h.to_string();
+                        info.request_domain = server_name.clone();
+                        info.request_resource = server_name;
                     }
 
                     if let Some(v) = h.validity() {
@@ -574,7 +576,7 @@ impl TlsLog {
                     }
                 });
 
-                info.request_resource = tls_headers
+                info.request_type = tls_headers
                     .iter()
                     .map(|i| i.to_string())
                     .collect::<Vec<String>>()
@@ -631,6 +633,13 @@ impl TlsLog {
                     }
                 });
 
+                if let Version::Unknown(v) = info.version {
+                    return Err(Error::TlsLogParseFailed(format!(
+                        "Unknown tls version 0x{:x}",
+                        v
+                    )));
+                }
+
                 info.response_result = tls_headers
                     .iter()
                     .map(|i| i.to_string())
@@ -641,6 +650,7 @@ impl TlsLog {
                 self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
+        set_captured_byte!(info, param);
         Ok(())
     }
 }
@@ -683,7 +693,7 @@ mod tests {
                 None => continue,
             };
 
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -692,6 +702,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
             let is_tls = tls.check_payload(payload, param);
             tls.reset();
             let info = tls.parse_payload(payload, param);

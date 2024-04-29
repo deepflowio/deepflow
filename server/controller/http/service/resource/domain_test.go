@@ -192,7 +192,7 @@ func (t *SuiteTest) TestDeleteDomain() {
 	r = t.db.Create(&mysql.Pod{Base: mysql.Base{Lcuuid: uuid.NewString()}, Domain: domain.Lcuuid})
 	assert.Equal(t.T(), r.RowsAffected, int64(1))
 
-	DeleteDomainByNameOrUUID(domain.Lcuuid)
+	DeleteDomainByNameOrUUID(domain.Lcuuid, &mysql.DB{t.db, 1, ""})
 
 	var azs []mysql.AZ
 	t.db.Unscoped().Where("domain = ?", domain.Lcuuid).Find(&azs)
@@ -356,7 +356,7 @@ func (t *SuiteTest) TestDeleteSubDomain() {
 	r = t.db.Create(&mysql.Pod{Base: mysql.Base{Lcuuid: uuid.NewString()}, SubDomain: lcuuid})
 	assert.Equal(t.T(), r.RowsAffected, int64(1))
 
-	DeleteSubDomain(lcuuid)
+	DeleteSubDomain(lcuuid, &mysql.DB{t.db, 1, ""})
 
 	var networks []mysql.Network
 	t.db.Unscoped().Where("sub_domain = ?", lcuuid).Find(&networks)

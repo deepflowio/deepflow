@@ -275,16 +275,16 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 	}
 }
 
-static void reader_lost_cb_a(void *t, u64 lost)
+static void reader_lost_cb_a(void *cookie, u64 lost)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct bpf_tracer *tracer = profiler_tracer;
 	atomic64_add(&tracer->lost, lost);
 	perf_buf_lost_a_count++;
 }
 
-static void reader_lost_cb_b(void *t, u64 lost)
+static void reader_lost_cb_b(void *cookie, u64 lost)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct bpf_tracer *tracer = profiler_tracer;
 	atomic64_add(&tracer->lost, lost);
 	perf_buf_lost_b_count++;
 }
@@ -313,7 +313,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	atomic64_add(&tracer->recv, 1);
 }
 
-static int relase_profiler(struct bpf_tracer *tracer)
+static int release_profiler(struct bpf_tracer *tracer)
 {
 	tracer_reader_lock(tracer);
 
@@ -1160,7 +1160,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 	return ETR_OK;
 
 error:
-	relase_profiler(tracer);
+	release_profiler(tracer);
 	return ETR_INVAL;
 }
 

@@ -41,7 +41,7 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChVPC) sourceToTarget(source *mysql.VPC) (keys []IDKey, targets []mysql.ChVPC) {
+func (c *ChVPC) sourceToTarget(md *message.Metadata, source *mysql.VPC) (keys []IDKey, targets []mysql.ChVPC) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_VPC,
 	}]
@@ -52,36 +52,36 @@ func (c *ChVPC) sourceToTarget(source *mysql.VPC) (keys []IDKey, targets []mysql
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChVPC{
-		ID:     source.ID,
-		Name:   sourceName,
-		UID:    source.UID,
-		IconID: iconID,
+		ID:       source.ID,
+		Name:     sourceName,
+		UID:      source.UID,
+		IconID:   iconID,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVPC) onResourceUpdated(sourceID int, fieldsUpdate *message.VPCFieldsUpdate) {
+func (c *ChVPC) onResourceUpdated(sourceID int, fieldsUpdate *message.VPCFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if fieldsUpdate.UID.IsDifferent() {
 		updateInfo["uid"] = fieldsUpdate.UID.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChVPC
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChVPC) softDeletedTargetsUpdated(targets []mysql.ChVPC) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChVPC) softDeletedTargetsUpdated(targets []mysql.ChVPC, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

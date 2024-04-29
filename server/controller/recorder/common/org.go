@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,17 +17,13 @@
 package common
 
 import (
-	"github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
-
-var log = logging.MustGetLogger("recorder.common")
 
 type ORG struct {
 	ID     int       // org id
 	DB     *mysql.DB // org database connection
-	Logger *Logger   // org log controller
+	Logger *Logger   // log controller
 }
 
 func NewORG(id int) (*ORG, error) {
@@ -42,12 +38,4 @@ func NewORG(id int) (*ORG, error) {
 // LogPre adds org id, domain info, sub_domain info to logs
 func (o *ORG) LogPre(format string, a ...any) string {
 	return o.Logger.AddPre(format, a...)
-}
-
-func ReplaceORGLogger(o *ORG) *ORG {
-	return &ORG{
-		ID:     o.ID,
-		DB:     o.DB,
-		Logger: CopyLogger(o.Logger),
-	}
 }

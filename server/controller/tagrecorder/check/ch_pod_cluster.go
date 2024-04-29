@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodCluster struct {
@@ -38,7 +39,7 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 
 func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 	var podClusters []mysql.PodCluster
-	err := mysql.Db.Unscoped().Find(&podClusters).Error
+	err := p.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -48,15 +49,19 @@ func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 	for _, podCluster := range podClusters {
 		if podCluster.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
-				ID:     podCluster.ID,
-				Name:   podCluster.Name + " (deleted)",
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				ID:       podCluster.ID,
+				Name:     podCluster.Name + " (deleted)",
+				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:   tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID: tagrecorder.DomainToDomainID[podCluster.Domain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
-				ID:     podCluster.ID,
-				Name:   podCluster.Name,
-				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				ID:       podCluster.ID,
+				Name:     podCluster.Name,
+				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:   tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID: tagrecorder.DomainToDomainID[podCluster.Domain],
 			}
 		}
 	}

@@ -28,9 +28,11 @@ import (
 
 	logging "github.com/op/go-logging"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 var (
@@ -62,19 +64,30 @@ type TagRecorder struct {
 
 func (c *TagRecorder) Check() {
 	go func() {
-		log.Info("tagrecorder health check data run")
-		t := time.Now()
-		c.check()
-		log.Infof("tagrecorder health check data end, time since: %v", time.Since(t))
+		if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+			t := time.Now()
+			log.Infof("ORG(id=%d database=%s) tagrecorder health check data run", db.ORGID, db.Name)
+			tagrecorder.GetTeamInfo(db)
+			if err := c.check(db); err != nil {
+				log.Infof("ORG(id=%d database=%s) tagrecorder health check failed: %v", db.ORGID, db.Name, err.Error())
+			}
+			log.Infof("ORG(id=%d database=%s) tagrecorder health check data end, time since: %v", db.ORGID, db.Name, time.Since(t))
+			return nil
+		}); err != nil {
+			log.Error(err)
+		}
 	}()
 }
 
-func (c *TagRecorder) check() {
+func (c *TagRecorder) check(db *mysql.DB) error {
 	// 调用API获取资源对应的icon_id
-	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo()
-	for _, updater := range c.getUpdaters(domainToIconID, resourceToIconID) {
-		updater.Check()
+	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo(db)
+	for _, updater := range c.getUpdaters(db, domainToIconID, resourceToIconID) {
+		if err := updater.Check(); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (t *TagRecorder) Stop() {
@@ -84,14 +97,14 @@ func (t *TagRecorder) Stop() {
 	log.Info("tagrecorder stopped")
 }
 
-func (c *TagRecorder) getUpdaters(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) []ChResourceUpdater {
+func (c *TagRecorder) getUpdaters(db *mysql.DB, domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) []ChResourceUpdater {
 	// 生成各资源更新器，刷新ch数据
 	updaters := []ChResourceUpdater{
-		NewChRegion(domainLcuuidToIconID, resourceTypeToIconID),
+		// NewChRegion(domainLcuuidToIconID, resourceTypeToIconID),
 		NewChAZ(domainLcuuidToIconID, resourceTypeToIconID),
 		NewChVPC(resourceTypeToIconID),
 		NewChDevice(resourceTypeToIconID),
-		NewChIPRelation(),
+		// NewChIPRelation(),
 		NewChPodK8sLabel(),
 		NewChPodK8sLabels(),
 		NewChPodServiceK8sLabel(),
@@ -102,25 +115,25 @@ func (c *TagRecorder) getUpdaters(domainLcuuidToIconID map[string]int, resourceT
 		NewChPodNSCloudTags(),
 		NewChOSAppTag(),
 		NewChOSAppTags(),
-		NewChVTapPort(),
+		// NewChVTapPort(),
 		NewChStringEnum(),
 		NewChIntEnum(),
-		NewChNodeType(),
-		NewChAPPLabel(),
-		NewChTargetLabel(),
-		NewChPrometheusTargetLabelLayout(),
-		NewChPrometheusLabelName(),
-		NewChPrometheusMetricNames(),
-		NewChPrometheusMetricAPPLabelLayout(),
+		// NewChNodeType(),
+		// NewChAPPLabel(),
+		// NewChTargetLabel(),
+		// NewChPrometheusTargetLabelLayout(),
+		// NewChPrometheusLabelName(),
+		// NewChPrometheusMetricNames(),
+		// NewChPrometheusMetricAPPLabelLayout(),
 		NewChNetwork(resourceTypeToIconID),
-		NewChTapType(resourceTypeToIconID),
-		NewChVTap(resourceTypeToIconID),
+		// NewChTapType(resourceTypeToIconID),
+		// NewChVTap(resourceTypeToIconID),
 		NewChPod(resourceTypeToIconID),
 		NewChPodCluster(resourceTypeToIconID),
 		NewChPodGroup(resourceTypeToIconID),
 		NewChPodNamespace(resourceTypeToIconID),
 		NewChPodNode(resourceTypeToIconID),
-		NewChLbListener(resourceTypeToIconID),
+		// NewChLbListener(resourceTypeToIconID),
 		NewChPodIngress(resourceTypeToIconID),
 		NewChGProcess(resourceTypeToIconID),
 
@@ -133,14 +146,15 @@ func (c *TagRecorder) getUpdaters(domainLcuuidToIconID map[string]int, resourceT
 		NewChPodService(),
 		NewChChost(),
 
-		NewChPolicy(),
-		NewChNpbTunnel(),
+		// NewChPolicy(),
+		// NewChNpbTunnel(),
 	}
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
 	for _, updater := range updaters {
-		updater.SetConfig(c.cfg.TagRecorderCfg)
+		updater.SetConfig(c.cfg)
+		updater.SetDB(db)
 	}
 	return updaters
 }
@@ -161,10 +175,10 @@ func (b *UpdaterBase[MT, KT]) Check() error {
 		i++
 	}
 
-	return compareAndCheck(oldItems, newItems)
+	return compareAndCheck(b.db, oldItems, newItems)
 }
 
-func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
+func compareAndCheck[CT MySQLChModel](db *mysql.DB, oldItems, newItems []CT) error {
 	if len(newItems) == 0 && len(oldItems) == 0 {
 		return nil
 	}
@@ -174,13 +188,14 @@ func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
 		return err
 	}
 	var t CT
-	tableName := reflect.TypeOf(t)
-	log.Infof("check tagrecorder table(%v), old len(%v) hash(%v), new len(%v) hash(%v)", tableName, len(oldItems), oldHash, len(newItems), newHash)
+	tableName := reflect.TypeOf(t).String()
+	log.Infof("ORG(id=%d database=%s) check tagrecorder table(%v), old len(%v) hash(%v), new len(%v) hash(%v)",
+		db.ORGID, db.Name, tableName, len(oldItems), oldHash, len(newItems), newHash)
 	if oldHash == newHash {
 		return nil
 	}
 
-	err = mysql.Db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		m := new(CT)
 		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&m).Error; err != nil {
 			return fmt.Errorf("truncate table(%s) failed, %v", tableName, err)
@@ -191,14 +206,37 @@ func compareAndCheck[CT MySQLChModel](oldItems, newItems []CT) error {
 			addItems = append(addItems, item)
 		}
 		if len(addItems) > 0 {
-			if err := tx.Create(&addItems).Error; err != nil {
-				return fmt.Errorf("add data(len:%d) to table(%s) failed, %v", len(newItems), tableName, err)
+			if err := addBatch(tx, addItems, db.ORGID, db.Name, tableName); err != nil {
+				return fmt.Errorf("add data to table(%s) failed, %v", tableName, err)
 			}
 		}
 		return nil
 	})
-	log.Infof("truncate table(%v)", tableName)
+	log.Infof("ORG(id=%d database=%s) truncate table(%v)", db.ORGID, db.Name, tableName)
 	return err
+}
+
+func addBatch[CT MySQLChModel](tx *gorm.DB, toAdd []CT, orgID int, database, resourceType string) error {
+	count := len(toAdd)
+	offset := 1000
+	pages := count/offset + 1
+	if count%offset == 0 {
+		pages = count / offset
+	}
+	for i := 0; i < pages; i++ {
+		start := i * offset
+		end := (i + 1) * offset
+		if end > count {
+			end = count
+		}
+		oneP := toAdd[start:end]
+		err := tx.Clauses(clause.Returning{}).Create(&oneP).Error
+		if err != nil {
+			return err
+		}
+		log.Infof("ORG(id=%d database=%s) add %d %s[%d, %d] success", orgID, database, len(oneP), resourceType, start, end)
+	}
+	return nil
 }
 
 func genH64[CT MySQLChModel](oldItems, newItems []CT) (oldHash, newHash uint64, err error) {

@@ -148,15 +148,16 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 	ckwriter, err := ckwriter.NewCKWriter(
 		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		fmt.Sprintf("%s-%s-%d-%d", w.name, s.TableName(), w.decoderIndex, appLabelCount), w.ckdbTimeZone,
-		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, w.ckdbWatcher)
 	if err != nil {
 		return nil, err
 	}
-	currentCount, err := w.getCurrentAppLabelColumnCount()
+	orgDatabase := ckdb.OrgDatabasePrefix(s.OrgID()) + PROMETHEUS_DB
+	currentCount, err := w.getCurrentAppLabelColumnCount(orgDatabase)
 	if err != nil {
 		return nil, err
 	}
-	maxLabelColumnIndex, err := w.getMaxAppLabelColumnIndex()
+	maxLabelColumnIndex, err := w.getMaxAppLabelColumnIndex(orgDatabase)
 	if err != nil {
 		log.Warning(err)
 	}
@@ -168,15 +169,11 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 
 	if currentCount < appLabelCount {
 		startIndex, endIndex := currentCount+1, appLabelCount
-		if err := w.addAppLabelColumns(w.ckdbConn, startIndex, endIndex); err != nil {
+		if err := w.addAppLabelColumns(w.ckdbConn, startIndex, endIndex, orgDatabase); err != nil {
 			return nil, err
 		}
-
 		// 需要在cluseter其他节点也增加列
-		if err := w.createTableOnCluster(table); err != nil {
-			log.Warningf("other node failed when create table: %s", err)
-		}
-		if err := w.addAppLabelColumnsOnCluster(startIndex, endIndex); err != nil {
+		if err := w.addAppLabelColumnsOnCluster(startIndex, endIndex, orgDatabase); err != nil {
 			log.Warningf("other node failed when add app_value_id columns which index from %d to %d: %s", startIndex, endIndex, err)
 		}
 	}
@@ -188,27 +185,7 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 	return ckwriter, nil
 }
 
-func (w *PrometheusWriter) createTableOnCluster(table *ckdb.Table) error {
-	// in standalone mode, ckdbWatcher will be nil
-	if w.ckdbWatcher == nil {
-		return nil
-	}
-	endpoints, err := w.ckdbWatcher.GetClickhouseEndpointsWithoutMyself()
-	if err != nil {
-		return err
-	}
-	for _, endpoint := range endpoints {
-		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port), w.ckdbUsername, w.ckdbPassword, w.ckdbTimeZone, table)
-		if err != nil {
-			log.Warningf("node %s:%d init table failed. err: %s", endpoint.Host, endpoint.Port, err)
-		} else {
-			log.Infof("node %s:%d init table %s success", endpoint.Host, endpoint.Port, table.LocalName)
-		}
-	}
-	return nil
-}
-
-func (w *PrometheusWriter) addAppLabelColumnsOnCluster(startIndex, endIndex int) error {
+func (w *PrometheusWriter) addAppLabelColumnsOnCluster(startIndex, endIndex int, orgDatabase string) error {
 	// in standalone mode, ckdbWatcher will be nil
 	if w.ckdbWatcher == nil {
 		return nil
@@ -228,17 +205,17 @@ func (w *PrometheusWriter) addAppLabelColumnsOnCluster(startIndex, endIndex int)
 		return err
 	}
 	defer conn.Close()
-	return w.addAppLabelColumns(conn, startIndex, endIndex)
+	return w.addAppLabelColumns(conn, startIndex, endIndex, orgDatabase)
 }
 
-func (w *PrometheusWriter) addAppLabelColumns(conn common.DBs, startIndex, endIndex int) error {
+func (w *PrometheusWriter) addAppLabelColumns(conn common.DBs, startIndex, endIndex int, orgDatabase string) error {
 	for i := startIndex; i <= endIndex; i++ {
 		for _, table := range []string{PROMETHEUS_TABLE + "_local", PROMETHEUS_TABLE} {
 			_, err := conn.Exec(fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN app_label_value_id_%d %s",
-				PROMETHEUS_DB, table, i, ckdb.UInt32))
+				orgDatabase, table, i, ckdb.UInt32))
 			if err != nil {
 				if strings.Contains(err.Error(), "column with this name already exists") {
-					log.Infof("db: %s, table: %s error: %s", PROMETHEUS_DB, table, err)
+					log.Infof("db: %s, table: %s error: %s", orgDatabase, table, err)
 				} else {
 					return err
 				}
@@ -248,8 +225,8 @@ func (w *PrometheusWriter) addAppLabelColumns(conn common.DBs, startIndex, endIn
 	return nil
 }
 
-func (w *PrometheusWriter) getCurrentAppLabelColumnCount() (int, error) {
-	sql := fmt.Sprintf("SELECT count(0) FROM system.columns where database='%s' and table='%s' and name like '%%app_label_value%%'", PROMETHEUS_DB, PROMETHEUS_TABLE)
+func (w *PrometheusWriter) getCurrentAppLabelColumnCount(orgDatabase string) (int, error) {
+	sql := fmt.Sprintf("SELECT count(0) FROM system.columns where database='%s' and table='%s' and name like '%%app_label_value%%'", orgDatabase, PROMETHEUS_TABLE)
 	log.Info(sql)
 	rows, err := w.ckdbConn.Query(sql)
 	if err != nil {
@@ -266,9 +243,9 @@ func (w *PrometheusWriter) getCurrentAppLabelColumnCount() (int, error) {
 	return count, nil
 }
 
-func (w *PrometheusWriter) getMaxAppLabelColumnIndex() (int, error) {
+func (w *PrometheusWriter) getMaxAppLabelColumnIndex(orgDatabase string) (int, error) {
 	var name string
-	sql := fmt.Sprintf("WITH (SELECT max(length(name)) FROM system.columns where table='%s' and name like '%%app_label_value%%') as maxNameLength SELECT max(name) from system.columns where table='%s' and name like '%%app_label_value%%' and length(name)=maxNameLength", PROMETHEUS_TABLE, PROMETHEUS_TABLE)
+	sql := fmt.Sprintf("WITH (SELECT max(length(name)) FROM system.columns where database='%s' and  table='%s' and name like '%%app_label_value%%') as maxNameLength SELECT max(name) from system.columns where database='%s' and  table='%s' and name like '%%app_label_value%%' and length(name)=maxNameLength", orgDatabase, PROMETHEUS_TABLE, orgDatabase, PROMETHEUS_TABLE)
 	log.Info(sql)
 	rows, err := w.ckdbConn.Query(sql)
 	if err != nil {

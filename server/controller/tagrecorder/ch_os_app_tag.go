@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -39,7 +37,7 @@ func NewChOSAppTag() *ChOSAppTag {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate) {
+func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]OSAPPTagKey, 0)
 	targetsToAdd := make([]mysql.ChOSAppTag, 0)
 	keysToDelete := make([]OSAPPTagKey, 0)
@@ -47,26 +45,11 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 	var chItem mysql.ChOSAppTag
 	var updateKey OSAPPTagKey
 	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.OSAPPTags.IsDifferent() {
-		new := map[string]string{}
-		old := map[string]string{}
-		newStr := fieldsUpdate.OSAPPTags.GetNew()
-		oldStr := fieldsUpdate.OSAPPTags.GetOld()
-		splitNews := strings.Split(newStr, ", ")
-		splitOlds := strings.Split(oldStr, ", ")
 
-		for _, splitNew := range splitNews {
-			splitSingleTag := strings.Split(splitNew, ":")
-			if len(splitSingleTag) == 2 {
-				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
-		for _, splitOld := range splitOlds {
-			splitSingleTag := strings.Split(splitOld, ":")
-			if len(splitSingleTag) == 2 {
-				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
+	if fieldsUpdate.OSAPPTags.IsDifferent() {
+		_, new := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetNew())
+		_, old := common.StrToJsonAndMap(fieldsUpdate.OSAPPTags.GetOld())
+
 		for k, v := range new {
 			oldV, ok := old[k]
 			if !ok {
@@ -80,7 +63,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 				if oldV != v {
 					updateKey = OSAPPTagKey{PID: sourceID, Key: k}
 					updateInfo[k] = v
-					mysql.Db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
+					db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
 					if chItem.PID == 0 {
 						keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
 						targetsToAdd = append(targetsToAdd, mysql.ChOSAppTag{
@@ -89,7 +72,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 							Value: v,
 						})
 					} else if len(updateInfo) > 0 {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey)
+						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey, db)
 					}
 				}
 			}
@@ -105,36 +88,31 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 		}
 	}
 	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
 	}
 	if len(keysToDelete) > 0 {
-		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) sourceToTarget(source *mysql.Process) (keys []OSAPPTagKey, targets []mysql.ChOSAppTag) {
-	osAppTagsMap := map[string]string{}
-	splitTags := strings.Split(source.OSAPPTags, ", ")
+func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysql.Process) (keys []OSAPPTagKey, targets []mysql.ChOSAppTag) {
+	_, osAppTagsMap := common.StrToJsonAndMap(source.OSAPPTags)
 
-	for _, splitTag := range splitTags {
-		splitSingleTag := strings.Split(splitTag, ":")
-		if len(splitSingleTag) == 2 {
-			osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-		}
-	}
 	for k, v := range osAppTagsMap {
 		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
 		targets = append(targets, mysql.ChOSAppTag{
-			PID:   source.ID,
-			Key:   k,
-			Value: v,
+			PID:      source.ID,
+			Key:      k,
+			Value:    v,
+			TeamID:   md.TeamID,
+			DomainID: md.DomainID,
 		})
 	}
 	return
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) softDeletedTargetsUpdated(targets []mysql.ChOSAppTag) {
+func (c *ChOSAppTag) softDeletedTargetsUpdated(targets []mysql.ChOSAppTag, db *mysql.DB) {
 
 }

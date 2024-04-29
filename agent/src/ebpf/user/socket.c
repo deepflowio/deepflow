@@ -175,6 +175,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// process execute
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
 
 	// 周期性触发用于缓存的数据的超时检查
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
@@ -285,7 +286,15 @@ static int kernel_offset_infer_client(void)
 	      rcv_loop:
 		len = recv(cli_fd, buf, sizeof(buf), 0);
 		if (len > 0) {
+			/*
+			 * Another send action occurs here to avoid
+			 * failure to infer the value of 'write_seq'.
+			 * Troubleshoot the invalid kernel adaptation
+			 * mechanism in EulerOS 2.9 and EulerOS 2.10
+			 * (Linux 4.18).
+			 */
 			buf[len] = '\0';
+			send(cli_fd, buf, len, 0);
 			break;
 		} else if (len == 0) {
 			break;
@@ -933,9 +942,10 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	atomic64_add(&q->enqueue_nr, nr);
 }
 
-static void reader_lost_cb(void *t, uint64_t lost)
+static void reader_lost_cb(void *cookie, uint64_t lost)
 {
-	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
+	struct reader_forward_info *fwd_info = cookie;
+	struct bpf_tracer *tracer = fwd_info->tracer;
 	atomic64_add(&tracer->lost, lost);
 }
 
@@ -2229,10 +2239,11 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 static int update_offsets_table(struct bpf_tracer *t,
 				struct bpf_offset_param *offset)
 {
-	struct bpf_offset_param offs[MAX_CPU_NR];
+	int nr_cpus = get_num_possible_cpus();
+	struct bpf_offset_param offs[nr_cpus];
 	int i;
 	memset(&offs, 0, sizeof(offs));
-	for (i = 0; i < MAX_CPU_NR; i++) {
+	for (i = 0; i < nr_cpus; i++) {
 		offs[i] = *offset;
 	}
 

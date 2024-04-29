@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sAnnotations struct {
@@ -39,7 +40,7 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 
 func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations, bool) {
 	var podServices []mysql.PodService
-	err := mysql.Db.Unscoped().Find(&podServices).Error
+	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
@@ -69,6 +70,8 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 				Annotations: string(annotationStr),
 				L3EPCID:     podService.VPCID,
 				PodNsID:     podService.PodNamespaceID,
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
 			}
 		}
 	}

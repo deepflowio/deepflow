@@ -1,0 +1,70 @@
+ingester:
+  exporters:
+  - protocol: opentelemetry
+    enabled: true
+    endpoints: [127.0.0.1:4317, 1.1.1.1:4317]
+    data-sources:
+    - flow_log.l4_flow_log
+    - flow_log.l7_flow_log
+    queue-count: 4
+    queue-size: 100000
+    batch-size: 1024
+    flush-timeout: 10
+    tag-filters:
+    - field-name: signal_source
+      operator: "="
+      field-values: [3]
+    export-fields:
+    - $tag.flow_info
+    - $metrics.universal_tag
+    - ip_0
+    - $k8s.label
+    - $k8s.label.annotation.app
+    - ~$k8s.label.env.(a.*|abc)
+    - $merics
+    - $metrics.delay
+    - rtt
+    extra-headers:
+      key1: value1
+      key2: value2
+    tag-omitempty-disabled: true
+    metrics-omitempty: true
+    enum-to-string-disabled: true
+    universal-tag-to-string-disabled: true
+  - protocol: prometheus
+    enabled: true
+    endpoints: [http://1.2.3.4:9091/receive]
+    data-sources:
+    - flow_metrics.network.1s
+    queue-count: 4
+    queue-size: 100000
+    batch-size: 1024
+    flush-timeout: 10
+    tag-filter: ""
+    export-fields:
+    - $tag
+    - $metrics
+    extra-headers:
+      key1: value1
+      key2: value2
+  - protocol: kafka
+    enabled: true
+    endpoints: [http://1.2.3.4:9091/receive]
+    data-sources:
+    - flow_metrics.network.1m
+    - flow_metrics.network.1s
+    queue-count: 4
+    queue-size: 100000
+    batch-size: 1024
+    flush-timeout: 10
+    tag-filter: ""
+    export-fields:
+    - $tag
+    - $metrics
+    sasl:
+      enabled: false
+      security-protocol: SASL_SSL
+      sasl-mechanism: PLAIN
+      username: aaa
+      password: aaa
+    topic: abcd

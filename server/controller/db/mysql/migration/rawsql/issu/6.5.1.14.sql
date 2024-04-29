@@ -13,7 +13,8 @@ BEGIN
     SELECT COUNT(*)
     INTO column_count
     FROM information_schema.columns
-    WHERE table_name = tableName
+    WHERE TABLE_SCHEMA = @tableSchema
+    AND TABLE_NAME = tableName
     AND column_name = colName;
 
     -- 如果列不存在，则添加列

@@ -349,6 +349,7 @@ impl Default for OnCpuProfile {
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
+    pub global_ebpf_pps_threshold: u64,
     pub kprobe_whitelist: EbpfKprobePortlist,
     pub kprobe_blacklist: EbpfKprobePortlist,
     #[serde(rename = "uprobe-process-name-regexs")]
@@ -371,6 +372,7 @@ impl Default for EbpfYamlConfig {
         EbpfYamlConfig {
             disabled: false,
             log_file: String::new(),
+            global_ebpf_pps_threshold: 0,
             thread_num: 1,
             perf_pages_count: 128,
             ring_size: 65536,
@@ -508,6 +510,7 @@ pub struct YamlConfig {
     pub libpcap_enabled: bool,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
+    pub ignore_overlay_vlan: bool,
     pub collector_sender_queue_size: usize,
     pub collector_sender_queue_count: usize,
     pub toa_sender_queue_size: usize,
@@ -607,7 +610,7 @@ impl YamlConfig {
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?
         };
 
-        if c.pcap.queue_size < 1 << 16 {
+        if c.pcap.queue_size == 0 {
             c.pcap.queue_size = 1 << 16;
         }
         if c.pcap.flow_buffer_size <= 0 {
@@ -625,13 +628,13 @@ impl YamlConfig {
         {
             c.flow.flush_interval = Duration::from_secs(1);
         }
-        if c.flow_queue_size < 1 << 16 {
+        if c.flow_queue_size == 0 {
             c.flow_queue_size = 1 << 16;
         }
-        if c.quadruple_queue_size < 1 << 18 {
+        if c.quadruple_queue_size == 0 {
             c.quadruple_queue_size = 1 << 18;
         }
-        if c.analyzer_queue_size < 1 << 17 {
+        if c.analyzer_queue_size == 0 {
             c.analyzer_queue_size = 1 << 17;
         }
         if c.analyzer_raw_packet_block_size < 65536 {
@@ -896,6 +899,7 @@ impl Default for YamlConfig {
             libpcap_enabled: true,
             xflow_collector: Default::default(),
             vxlan_flags: 0xff,
+            ignore_overlay_vlan: false,
             // default size changes according to tap_mode
             collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,

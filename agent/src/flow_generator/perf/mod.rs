@@ -255,6 +255,7 @@ impl FlowLog {
             parse_param.set_counter(self.stats_counter.clone());
             parse_param.set_rrt_timeout(self.rrt_timeout);
             parse_param.set_buf_size(flow_config.l7_log_packet_size as usize);
+            parse_param.set_captured_byte(payload.len());
             parse_param.set_oracle_conf(flow_config.oracle_parse_conf);
 
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
@@ -348,6 +349,7 @@ impl FlowLog {
             param.set_counter(self.stats_counter.clone());
             param.set_rrt_timeout(self.rrt_timeout);
             param.set_buf_size(pkt_size);
+            param.set_captured_byte(payload.len());
             param.set_oracle_conf(flow_config.oracle_parse_conf);
 
             for protocol in checker.possible_protocols(

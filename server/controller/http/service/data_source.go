@@ -246,19 +246,25 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 		return model.DataSource{}, err
 	}
 
+	var errStrs []string
 	for _, analyzer := range analyzers {
-		if CallIngesterAPIAddRP(orgID, analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port) != nil {
-			errMsg := fmt.Sprintf(
-				"config analyzer (%s) add data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
+		if ingesterErr := CallIngesterAPIAddRP(orgID, analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port); ingesterErr != nil {
+			errStr := fmt.Sprintf(
+				"failed to config analyzer (name:%s, ip:%s) add data_source(%s), error: %s",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
 			)
-			log.Error(errMsg)
-			err = NewError(httpcommon.SERVER_ERROR, errMsg)
-			break
+			errStrs = append(errStrs, errStr)
+			continue
 		}
 		log.Infof(
 			"config analyzer (%s) add data_source (%s) complete",
 			analyzer.IP, dataSource.DisplayName,
 		)
+	}
+	if len(errStrs) > 0 {
+		errMsg := strings.Join(errStrs, ".") + "."
+		err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
+		log.Error(errMsg)
 	}
 
 	if err != nil {
@@ -293,29 +299,44 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 		)
 	}
 	oldRetentionTime := dataSource.RetentionTime
-	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
+	isUpdateName := false
 	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) {
 		dataSource.DisplayName = dataSourceUpdate.DisplayName
+		isUpdateName = true
 	}
 
-	// 调用ingester API配置clickhouse
+	// only update display name
+	if dataSource.RetentionTime == dataSourceUpdate.RetentionTime && isUpdateName {
+		err := mysql.Db.Save(&dataSource).Error
+		if err != nil {
+			return model.DataSource{}, err
+		}
+		response, _ := GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
+		return response[0], nil
+	}
+	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
+
+	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
 	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
 
-	var errAnalyzerIP string
+	var errs []error
 	for _, analyzer := range analyzers {
 		err = CallIngesterAPIModRP(orgID, analyzer.IP, dataSource, cfg.IngesterApi.Port)
 		if err != nil {
-			errAnalyzerIP = analyzer.IP
-			break
+			errs = append(errs, fmt.Errorf(
+				"failed to config analyzer (name: %s, ip:%s) update data_source (%s) error: %w",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, err,
+			))
+			continue
 		}
 		log.Infof("config analyzer (%s) mod data_source (%s) complete, retention time change: %ds -> %ds",
 			analyzer.IP, dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
 	}
 
-	if err == nil {
+	if len(errs) == 0 {
 		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
 		if err := db.Save(&dataSource).Error; err != nil {
 			return model.DataSource{}, err
@@ -323,20 +344,31 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
 			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
 	}
-	if errors.Is(err, httpcommon.ErrorFail) {
-		if err := db.Model(&dataSource).Updates(
-			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
-		).Error; err != nil {
-			return model.DataSource{}, err
-		}
-		errMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) failed", errAnalyzerIP, dataSource.DisplayName)
-		log.Error(errMsg)
-		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+	var errStrs []string
+	for _, e := range errs {
+		errStrs = append(errStrs, e.Error())
 	}
-	if errors.Is(err, httpcommon.ErrorPending) {
-		warnMsg := fmt.Sprintf("config analyzer (%s) mod data_source (%s) is pending", errAnalyzerIP, dataSource.DisplayName)
-		log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg))
-		err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
+	errMsg := strings.Join(errStrs, ".") + "."
+
+	for _, e := range errs {
+		if errors.Is(e, httpcommon.ErrorFail) {
+			if err := db.Model(&dataSource).Updates(
+				map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
+			).Error; err != nil {
+				return model.DataSource{}, err
+			}
+			err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
+			break
+		}
+	}
+
+	for _, e := range errs {
+		if errors.Is(e, httpcommon.ErrorPending) {
+			warnMsg := fmt.Sprintf("pending %s", e.Error())
+			log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg))
+			err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
+			break
+		}
 	}
 
 	response, _ := GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
@@ -383,14 +415,15 @@ func DeleteDataSource(orgID int, lcuuid string, cfg *config.ControllerConfig) (m
 		return nil, err
 	}
 
+	var errStrs []string
 	for _, analyzer := range analyzers {
-		if CallIngesterAPIDelRP(orgID, analyzer.IP, dataSource, cfg.IngesterApi.Port) != nil {
-			errMsg := fmt.Sprintf(
-				"config analyzer (%s) del data_source (%s) failed", analyzer.IP, dataSource.DisplayName,
+		if ingesterErr := CallIngesterAPIDelRP(orgID, analyzer.IP, dataSource, cfg.IngesterApi.Port); ingesterErr != nil {
+			errStr := fmt.Sprintf(
+				"failed to config analyzer (name: %s, ip:%s) delete data_source (%s) error(%s)",
+				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
 			)
-			log.Error(errMsg)
-			err = NewError(httpcommon.SERVER_ERROR, errMsg)
-			break
+			errStrs = append(errStrs, errStr)
+			continue
 		}
 		log.Infof(
 			"config analyzer (%s) del data_source (%s) complete",
@@ -398,15 +431,20 @@ func DeleteDataSource(orgID int, lcuuid string, cfg *config.ControllerConfig) (m
 		)
 	}
 
-	if err != nil {
+	if len(errStrs) > 0 {
 		if err := db.Model(&dataSource).Updates(
 			map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
 		).Error; err != nil {
 			return nil, err
 		}
 	}
-	if err := db.Delete(&dataSource).Error; err != nil {
-		return nil, err
+	if len(errStrs) > 0 {
+		errMsg := strings.Join(errStrs, ".") + "."
+		err = NewError(httpcommon.SERVER_ERROR, errMsg)
+		log.Error(errMsg)
+	}
+	if e := db.Delete(&dataSource).Error; e != nil {
+		return nil, e
 	}
 
 	return map[string]string{"LCUUID": lcuuid}, err
@@ -434,6 +472,9 @@ func CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql
 	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call add data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("POST", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
+	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
+	}
 	return err
 }
 
@@ -451,6 +492,9 @@ func CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource, ing
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call mod data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("PATCH", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
+	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
+	}
 	return err
 }
 
@@ -467,6 +511,9 @@ func CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql.DataSource, ing
 	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call del data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("DELETE", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
+	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
+	}
 	return err
 }
 

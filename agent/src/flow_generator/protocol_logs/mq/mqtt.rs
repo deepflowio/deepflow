@@ -38,7 +38,8 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-            value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
+            LogMessageType,
         },
     },
 };
@@ -71,6 +72,9 @@ pub struct MqttInfo {
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub code: Option<i32>, // connect_ack packet return code
     pub status: L7ResponseStatus,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 
     rrt: u64,
 }
@@ -136,6 +140,8 @@ impl Default for MqttInfo {
             msg_type: LogMessageType::Other,
             rrt: 0,
             is_tls: false,
+            captured_request_byte: 0,
+            captured_response_byte: 0,
         }
     }
 }
@@ -175,6 +181,7 @@ impl MqttInfo {
         if self.code.is_none() {
             self.code = other.code;
         }
+        self.captured_response_byte = other.captured_response_byte;
         match other.pkt_type {
             PacketKind::Publish { .. } => {
                 std::mem::swap(&mut self.publish_topic, &mut other.publish_topic);
@@ -207,6 +214,8 @@ impl From<MqttInfo> for L7ProtocolSendLog {
         };
 
         L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             version: version,
             req_len: f.req_msg_size,
             resp_len: f.res_msg_size,
@@ -264,7 +273,7 @@ impl L7ProtocolParserInterface for MqttLog {
 
                 info.msg_type = self.msg_type;
                 info.is_tls = param.is_tls();
-
+                set_captured_byte!(info, param);
                 match param.direction {
                     PacketDirection::ClientToServer => {
                         self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -491,10 +500,7 @@ impl MqttLog {
         }
         self.status = L7ResponseStatus::Ok;
 
-        self.parse_mqtt_info(payload, param.parse_log).map_err(|e| {
-            self.status = L7ResponseStatus::Error;
-            e
-        })
+        self.parse_mqtt_info(payload, param.parse_log)
     }
 
     fn parse_status_code(&mut self, code: u8) -> L7ResponseStatus {
@@ -872,7 +878,7 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let param = &ParseParam::new(
+            let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
                 Default::default(),
@@ -881,6 +887,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let infos = mqtt.parse(payload, param).unwrap();
             let is_mqtt = MqttLog::check_protocol(payload, param);

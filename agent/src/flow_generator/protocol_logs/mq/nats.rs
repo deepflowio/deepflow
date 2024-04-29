@@ -34,7 +34,7 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            AppProtoHead, LogMessageType,
+            set_captured_byte, AppProtoHead, LogMessageType,
         },
     },
     plugin::wasm::{wasm_plugin::NatsMessage as WasmNatsMessage, WasmData},
@@ -216,6 +216,11 @@ pub struct NatsInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    l7_protocol_str: Option<String>,
+
+    captured_request_byte: u32,
+    captured_response_byte: u32,
 }
 
 #[derive(Default)]
@@ -706,6 +711,8 @@ impl From<NatsInfo> for L7ProtocolSendLog {
             .unwrap_or_default();
         let endpoint = info.get_endpoint().unwrap_or_default();
         let log = L7ProtocolSendLog {
+            captured_request_byte: info.captured_request_byte,
+            captured_response_byte: info.captured_response_byte,
             flags,
             version: Some(info.version),
             req_len: info.req_len,
@@ -733,6 +740,7 @@ impl From<NatsInfo> for L7ProtocolSendLog {
                         Some(info.attributes)
                     }
                 },
+                protocol_str: info.l7_protocol_str,
                 ..Default::default()
             }),
             ..Default::default()
@@ -761,6 +769,7 @@ impl L7ProtocolInfoInterface for NatsInfo {
             if req.resp_len.is_none() {
                 req.resp_len = rsp.resp_len;
             }
+            req.captured_response_byte = rsp.captured_response_byte;
         }
         Ok(())
     }
@@ -823,6 +832,9 @@ impl NatsLog {
             if !custom.attributes.is_empty() {
                 info.attributes.extend(custom.attributes);
             }
+            if custom.proto_str.len() > 0 {
+                info.l7_protocol_str = Some(custom.proto_str);
+            }
         }
     }
 }
@@ -872,7 +884,7 @@ impl L7ProtocolParserInterface for NatsLog {
                 info.server_name = self.server_name.clone();
 
                 self.wasm_hook(param, payload, info);
-
+                set_captured_byte!(info, param);
                 match param.direction {
                     PacketDirection::ClientToServer => {
                         self.perf_stats.as_mut().map(|p| p.inc_req());
@@ -964,6 +976,7 @@ mod tests {
                 true,
                 true,
             );
+            param.set_captured_byte(payload.len());
 
             let config = L7LogDynamicConfig::new(
                 "".to_owned(),

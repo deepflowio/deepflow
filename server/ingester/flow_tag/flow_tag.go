@@ -17,6 +17,7 @@
 package flow_tag
 
 import (
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
@@ -68,6 +69,7 @@ type FlowTagInfo struct {
 	Table      string // Represents virtual_table_name in ext_metrics
 	FieldName  string
 	FieldValue string
+	VtapId     uint16
 
 	// IDs only for prometheus
 	TableId      uint32
@@ -77,6 +79,11 @@ type FlowTagInfo struct {
 	VpcId     int32 // XXX: can use int16
 	PodNsId   uint16
 	FieldType FieldType
+
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database 'flow_tag', otherwise stored in '<OrgId>_flow_tag'.
+	OrgId  uint16
+	TeamID uint16
 }
 
 type FlowTag struct {
@@ -100,10 +107,15 @@ func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 		t.FieldType.String(),
 		t.FieldName,
 		fieldValueType,
+		t.TeamID,
 	)
 	if t.TagType == TagFieldValue {
 		block.Write(t.FieldValue, uint64(1)) // count is 1
 	}
+}
+
+func (t *FlowTag) OrgID() uint16 {
+	return t.OrgId
 }
 
 func (t *FlowTag) Columns() []*ckdb.Column {
@@ -116,6 +128,7 @@ func (t *FlowTag) Columns() []*ckdb.Column {
 		ckdb.NewColumn("field_type", ckdb.LowCardinalityString).SetComment("value: tag, metrics"),
 		ckdb.NewColumn("field_name", ckdb.LowCardinalityString),
 		ckdb.NewColumn("field_value_type", ckdb.LowCardinalityString).SetComment("value: string, float"),
+		ckdb.NewColumn("team_id", ckdb.UInt16),
 	)
 	if t.TagType == TagFieldValue {
 		columns = append(columns,
@@ -138,6 +151,7 @@ func (t *FlowTag) GenCKTable(cluster, storagePolicy, tableName string, ttl int, 
 	}
 
 	return &ckdb.Table{
+		Version:         common.CK_VERSION,
 		Database:        FLOW_TAG_DB,
 		LocalName:       tableName + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      tableName,

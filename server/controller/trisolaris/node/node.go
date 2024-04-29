@@ -17,6 +17,7 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"sync/atomic"
@@ -36,81 +37,100 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 var log = logging.MustGetLogger("trisolaris/node")
 
 type NodeInfo struct {
-	tsdbCaches              *TSDBCacheMap // 数据节点缓存
-	tsdbRegion              map[string]uint32
-	tsdbToNATIP             map[string]string
-	tsdbToPodIP             map[string]string
-	tsdbToID                map[string]uint32
-	controllerToNATIP       map[string]string
-	controllerToPodIP       map[string]string
-	localServers            *atomic.Value // []*trident.DeepFlowServerInstanceInfo
-	platformData            *atomic.Value // *metaData.PlatformData
-	localRegion             *string
-	localAZs                []string
-	sysConfigurationToValue map[string]string
-	pcapDataRetention       uint32
-	metaData                *metadata.MetaData
-	tsdbRegister            *TSDBDiscovery
-	controllerRegister      *ControllerDiscovery
-	chRegister              chan struct{} // 数据节点注册通知channel
-	config                  *config.Config
-	chNodeInfo              chan struct{} // node变化通知channel
-	db                      *gorm.DB
+	tsdbCaches                *TSDBCacheMap // 数据节点缓存
+	tsdbRegion                map[string]uint32
+	tsdbToNATIP               map[string]string
+	tsdbToPodIP               map[string]string
+	tsdbToID                  map[string]uint32
+	controllerToNATIP         map[string]string
+	controllerToPodIP         map[string]string
+	localServers              *atomic.Value // []*trident.DeepFlowServerInstanceInfo
+	platformData              *atomic.Value // *metaData.PlatformData
+	localRegion               *string
+	localAZs                  []string
+	sysConfigurationToValue   map[string]string
+	pcapDataRetention         uint32
+	metaData                  *metadata.MetaData
+	tsdbRegister              *TSDBDiscovery
+	controllerRegister        *ControllerDiscovery
+	chRegister                chan struct{} // 数据节点注册通知channel
+	config                    *config.Config
+	chNodeInfo                chan struct{} // node变化通知channel
+	chBasePlatformDataChanged chan struct{}
+	platformDataVersion       uint64
+	db                        *gorm.DB
+	ctx                       context.Context
+	cancel                    context.CancelFunc
+
+	notifyPlatformDataChanged func() // send trisolarisManager ingester platformData changed
+
+	ORGID
 }
 
-func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *NodeInfo {
+func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, orgID int, pctx context.Context) *NodeInfo {
+	ctx, cancel := context.WithCancel(pctx)
 	localServers := &atomic.Value{}
 	localServers.Store([]*trident.DeepFlowServerInstanceInfo{})
 	platformData := &atomic.Value{}
 	platformData.Store(metadata.NewPlatformData("", "", 0, 0))
-	return &NodeInfo{
-		tsdbCaches:              newTSDBCacheMap(),
-		tsdbRegion:              make(map[string]uint32),
-		tsdbToNATIP:             make(map[string]string),
-		tsdbToPodIP:             make(map[string]string),
-		tsdbToID:                make(map[string]uint32),
-		controllerToNATIP:       make(map[string]string),
-		controllerToPodIP:       make(map[string]string),
-		localServers:            localServers,
-		platformData:            platformData,
-		sysConfigurationToValue: make(map[string]string),
-		metaData:                metaData,
-		tsdbRegister:            newTSDBDiscovery(),
-		controllerRegister:      newControllerDiscovery(cfg.NodeIP, cfg.NodeType, cfg.RegionDomainPrefix),
-		chRegister:              make(chan struct{}, 1),
-		config:                  cfg,
-		chNodeInfo:              make(chan struct{}, 1),
-		db:                      db,
+	nodeInfo := &NodeInfo{
+		tsdbCaches:                newTSDBCacheMap(),
+		tsdbRegion:                make(map[string]uint32),
+		tsdbToNATIP:               make(map[string]string),
+		tsdbToPodIP:               make(map[string]string),
+		tsdbToID:                  make(map[string]uint32),
+		controllerToNATIP:         make(map[string]string),
+		controllerToPodIP:         make(map[string]string),
+		localServers:              localServers,
+		platformData:              platformData,
+		sysConfigurationToValue:   make(map[string]string),
+		metaData:                  metaData,
+		tsdbRegister:              newTSDBDiscovery(),
+		controllerRegister:        newControllerDiscovery(cfg.NodeIP, cfg.NodeType, cfg.RegionDomainPrefix, metaData.ORGID),
+		chRegister:                make(chan struct{}, 1),
+		config:                    cfg,
+		chNodeInfo:                make(chan struct{}, 1),
+		chBasePlatformDataChanged: make(chan struct{}, 1),
+		db:                        db,
+		ctx:                       ctx,
+		cancel:                    cancel,
+		ORGID:                     ORGID(orgID),
+	}
+	return nodeInfo
+}
+
+func (n *NodeInfo) RegisteNotifyPlatformDataChanged(notify func()) {
+	n.notifyPlatformDataChanged = notify
+}
+
+func (n *NodeInfo) NotifyBasePlatformDataChanged() {
+	if n == nil {
+		return
+	}
+	select {
+	case n.chBasePlatformDataChanged <- struct{}{}:
+	default:
 	}
 }
 
 func (n *NodeInfo) GetTSDBCache(key string) *TSDBCache {
+	if n == nil {
+		return nil
+	}
 	return n.tsdbCaches.Get(key)
 }
 
-func (n *NodeInfo) GetPlatformDataVersion() uint64 {
-	return n.getPlatformData().GetPlatformDataVersion()
-}
-
-func (n *NodeInfo) GetPlatformDataStr() []byte {
-	return n.getPlatformData().GetPlatformDataStr()
-}
-
-func (n *NodeInfo) GetPodIPs() []*trident.PodIp {
-	return n.metaData.GetPlatformDataOP().GetPodIPs()
-}
-
 func (n *NodeInfo) updateTSDBSyncedToDB() {
-	log.Info("update tsdb info to db")
+	log.Info(n.Log("update tsdb info to db"))
 	dbTSDBs, err := dbmgr.DBMgr[models.Analyzer](n.db).Gets()
 	if err != nil || len(dbTSDBs) == 0 {
-		log.Error(err)
+		log.Error(n.Logf("get analyzer(count=%d) failed  err:%v", len(dbTSDBs), err))
 		return
 	}
 	keytoDB := make(map[string]*models.Analyzer)
@@ -190,7 +210,7 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 		mgr := dbmgr.DBMgr[models.Analyzer](n.db)
 		err := mgr.UpdateBulk(updateTSDB)
 		if err != nil {
-			log.Error(err)
+			log.Error(n.Log(err.Error()))
 		}
 	}
 }
@@ -199,11 +219,11 @@ func (n *NodeInfo) AddTSDBCache(tsdb *models.Analyzer) {
 	tsdbCache := newTSDBCache(tsdb)
 	n.tsdbCaches.Add(tsdbCache)
 
-	log.Infof("add tsdb cache %s", tsdb.IP)
+	log.Infof(n.Logf("add tsdb cache %s", tsdb.IP))
 }
 
 func (n *NodeInfo) DeleteTSDBCache(key string) {
-	log.Info("delete tsdb cache", key)
+	log.Info(n.Logf("delete tsdb cache %s", key))
 	n.tsdbCaches.Delete(key)
 }
 
@@ -229,7 +249,7 @@ func (n *NodeInfo) getLocalAZs() []string {
 func (n *NodeInfo) generateControllerInfo() {
 	dbControllers, err := dbmgr.DBMgr[models.Controller](n.db).Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 		return
 	}
 	if len(dbControllers) == 0 {
@@ -238,7 +258,7 @@ func (n *NodeInfo) generateControllerInfo() {
 	localIPs := make(map[string]struct{})
 	localConn, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetFromControllerIP(n.config.NodeIP)
 	if err != nil {
-		log.Errorf("find local controller(%s) region failed, err:%s", n.config.NodeIP, err)
+		log.Errorf(n.Logf("find local controller(%s) region failed, err:%s", n.config.NodeIP, err))
 	} else {
 		n.updateLocalRegion(localConn.Region)
 		azControllerconns, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetBatchFromRegion(localConn.Region)
@@ -249,7 +269,7 @@ func (n *NodeInfo) generateControllerInfo() {
 				}
 			}
 		} else {
-			log.Error(err)
+			log.Error(n.Log(err.Error()))
 		}
 	}
 
@@ -283,7 +303,7 @@ func (n *NodeInfo) generateControllerInfo() {
 		}
 		n.updateLocalAZs(localAZs)
 	} else {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 	}
 }
 
@@ -301,7 +321,7 @@ func (n *NodeInfo) initTSDBInfo() {
 	n.correctTSDBPodIP()
 	dbTSDBs, err := dbmgr.DBMgr[models.Analyzer](n.db).Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 		return
 	}
 	if len(dbTSDBs) == 0 {
@@ -464,8 +484,13 @@ func (n *NodeInfo) generateTSDBCache() {
 	n.updateTSDBSyncedToDB()
 }
 
-func (n *NodeInfo) generateNodeCache() {
+func (n *NodeInfo) generateDataForDefaultORG() {
 	n.generateTSDBCache()
+	n.generateControllerInfo()
+}
+
+func (n *NodeInfo) generateDataForNoDefaultORG() {
+	n.updateTSDBInfo()
 	n.generateControllerInfo()
 }
 
@@ -473,7 +498,7 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 	tsdbMgr := dbmgr.DBMgr[models.Analyzer](n.db)
 	tsdbs, err := tsdbMgr.Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 		return
 	}
 	var azConns []*models.AZAnalyzerConnection
@@ -508,12 +533,12 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 					log.Error(err)
 				}
 			} else {
-				log.Error(err)
+				log.Error(n.Log(err.Error()))
 			}
 		}
 		err = tsdbMgr.Insert(tsdb)
 		if err != nil {
-			log.Error(err)
+			log.Error(n.Log(err.Error()))
 			return
 		}
 		n.AddTSDBCache(tsdb)
@@ -521,7 +546,7 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 			for _, azConn := range azConns {
 				err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).Insert(azConn)
 				if err != nil {
-					log.Error(err)
+					log.Error(n.Log(err.Error()))
 				}
 			}
 		}
@@ -534,15 +559,15 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 		}
 
 		if err != nil {
-			log.Error(err)
+			log.Error(n.Log(err.Error()))
 		}
 	} else if err != nil {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 	}
 }
 
 func (n *NodeInfo) RegisterTSDB(request *trident.SyncRequest) {
-	log.Infof("register tsdb(%v)", request)
+	log.Infof(n.Logf("register tsdb(%v)", request))
 	n.tsdbRegister.register(request)
 	select {
 	case n.chRegister <- struct{}{}:
@@ -618,36 +643,21 @@ func (n *NodeInfo) isRegisterController() {
 	} else if errors.Is(err, gorm.ErrRecordNotFound) {
 		n.registerControllerToDB(data)
 	} else {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 	}
 }
 
-func (n *NodeInfo) GetGroups() []byte {
-	return n.metaData.GetDropletGroups()
-}
-
-func (n *NodeInfo) GetGroupsVersion() uint64 {
-	return n.metaData.GetDropletGroupsVersion()
-}
-
-func (n *NodeInfo) GetPolicy() []byte {
-	return n.metaData.GetDropletPolicyStr()
-}
-
-func (n *NodeInfo) GetPolicyVersion() uint64 {
-	return n.metaData.GetDropletPolicyVersion()
-}
-
 func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
-	log.Infof("resiter controller(%+v)", data)
+	log.Infof(n.Logf("resiter controller(%+v)", data))
 	controllerDBMgr := dbmgr.DBMgr[models.Controller](n.db)
 	controllers, err := controllerDBMgr.Gets()
 	if err != nil {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 		return
 	}
 	controllerCount := len(controllers)
 	var azConns []*models.AZControllerConnection
+
 	switch {
 	case controllerCount == 0 || data.CAMD5 == "":
 		azConn := &models.AZControllerConnection{
@@ -672,15 +682,15 @@ func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 					azConns = append(azConns, azConn)
 				}
 			} else {
-				log.Error(err)
+				log.Error(n.Log(err.Error()))
 			}
 		} else {
-			log.Error(err)
+			log.Error(n.Log(err.Error()))
 		}
 	}
 	err = controllerDBMgr.Insert(data)
 	if err != nil {
-		log.Error(err)
+		log.Error(n.Log(err.Error()))
 		return
 	}
 	if len(azConns) != 0 {
@@ -688,13 +698,23 @@ func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 		for _, azConn := range azConns {
 			err := connDBMgr.Insert(azConn)
 			if err != nil {
-				log.Error(err)
+				log.Error(n.Log(err.Error()))
 			}
 		}
 	}
 }
 
-func (n *NodeInfo) getPlatformData() *metadata.PlatformData {
+func (n *NodeInfo) getPlatformDataVersion() uint64 {
+	if n == nil {
+		return 0
+	}
+	return n.GetPlatformData().GetPlatformDataVersion()
+}
+
+func (n *NodeInfo) GetPlatformData() *metadata.PlatformData {
+	if n == nil {
+		return nil
+	}
 	return n.platformData.Load().(*metadata.PlatformData)
 }
 
@@ -710,7 +730,7 @@ func (n *NodeInfo) generatePlatformData() {
 	podClusterInternalIPToIngester := n.getPodClusterInternalIPToIngester()
 	localRegion := n.getLocalRegion()
 	localAZs := n.getLocalAZs()
-	log.Infof("generate ingester platform data (region=%s azs=%s podClusterInternalIPToIngester=%d)", n.getLocalRegion(), n.getLocalAZs(), podClusterInternalIPToIngester)
+	log.Infof(n.Logf("generate ingester platform data (region=%s azs=%s podClusterInternalIPToIngester=%d)", n.getLocalRegion(), n.getLocalAZs(), podClusterInternalIPToIngester))
 	switch podClusterInternalIPToIngester {
 	case ALL_K8S_CLUSTER:
 		n.updatePlatformData(n.metaData.GetPlatformDataOP().GetAllPlatformDataForIngester())
@@ -763,15 +783,22 @@ func (n *NodeInfo) generatePlatformData() {
 	default:
 		n.updatePlatformData(n.metaData.GetPlatformDataOP().GetAllPlatformDataForIngester())
 	}
+	newPlatformDataVersion := n.getPlatformDataVersion()
+	if n.platformDataVersion != newPlatformDataVersion {
+		n.platformDataVersion = newPlatformDataVersion
+		if n.notifyPlatformDataChanged != nil {
+			n.notifyPlatformDataChanged()
+		}
+	}
 }
 
 func (n *NodeInfo) registerTSDB() {
-	log.Info("start register rsdb")
+	log.Info(n.Log("start register rsdb"))
 	data := n.tsdbRegister.getRegisterData()
 	for _, tsdb := range data {
 		n.registerTSDBToDB(tsdb)
 	}
-	log.Info("end register tsdb")
+	log.Info(n.Log("end register tsdb"))
 }
 
 func (n *NodeInfo) PutChNodeInfo() {
@@ -781,37 +808,44 @@ func (n *NodeInfo) PutChNodeInfo() {
 	}
 }
 
-func (n *NodeInfo) startMonitoRegister() {
-	for {
-		select {
-		case <-n.chRegister:
-			n.registerTSDB()
-		}
-	}
-}
-
 func (n *NodeInfo) TimedRefreshNodeCache() {
 	n.initTSDBInfo()
 	n.generateControllerInfo()
-	n.isRegisterController()
 	n.generatePlatformData()
-	go n.startMonitoRegister()
+	if n.GetORGID() == DEFAULT_ORG_ID {
+		n.isRegisterController()
+	}
 	interval := time.Duration(n.config.NodeRefreshInterval)
 	ticker := time.NewTicker(interval * time.Second).C
 	for {
 		select {
 		case <-ticker:
-			log.Info("start generate node cache data from timed")
-			n.isRegisterController()
-			n.generateNodeCache()
+			log.Info(n.Log("start generate node cache data from timed"))
+			if n.GetORGID() == DEFAULT_ORG_ID {
+				n.isRegisterController()
+				n.generateDataForDefaultORG()
+			} else {
+				n.generateDataForNoDefaultORG()
+			}
 			n.generatePlatformData()
-			log.Info("end generate node cache data from timed")
+			log.Info(n.Log("end generate node cache data from timed"))
 		case <-n.chNodeInfo:
-			log.Info("start generate node cache data from rpc")
-			n.generateNodeCache()
+			log.Info(n.Log("start generate node cache data from rpc"))
+			if n.GetORGID() == DEFAULT_ORG_ID {
+				n.generateDataForDefaultORG()
+			} else {
+				n.generateDataForNoDefaultORG()
+			}
 			n.generatePlatformData()
-			pushmanager.Broadcast()
-			log.Info("end generate node cache data from rpc")
+			log.Info(n.Log("end generate node cache data from rpc"))
+		case <-n.chRegister:
+			n.registerTSDB()
+		case <-n.chBasePlatformDataChanged:
+			log.Info(n.Log("platformData changed generate ingester platformData"))
+			n.generatePlatformData()
+		case <-n.ctx.Done():
+			log.Info(n.Log("exit generate node data"))
+			return
 		}
 	}
 }

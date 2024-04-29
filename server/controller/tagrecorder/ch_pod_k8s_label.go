@@ -17,8 +17,6 @@
 package tagrecorder
 
 import (
-	"strings"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -39,7 +37,7 @@ func NewChPodK8sLabel() *ChPodK8sLabel {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate) {
+func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]K8sLabelKey, 0)
 	targetsToAdd := make([]mysql.ChPodK8sLabel, 0)
 	keysToDelete := make([]K8sLabelKey, 0)
@@ -47,26 +45,11 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 	var chItem mysql.ChPodK8sLabel
 	var updateKey K8sLabelKey
 	updateInfo := make(map[string]interface{})
-	if fieldsUpdate.Label.IsDifferent() {
-		new := map[string]string{}
-		old := map[string]string{}
-		newStr := fieldsUpdate.Label.GetNew()
-		oldStr := fieldsUpdate.Label.GetOld()
-		splitNews := strings.Split(newStr, ", ")
-		splitOlds := strings.Split(oldStr, ", ")
 
-		for _, splitNew := range splitNews {
-			splitSingleTag := strings.Split(splitNew, ":")
-			if len(splitSingleTag) == 2 {
-				new[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
-		for _, splitOld := range splitOlds {
-			splitSingleTag := strings.Split(splitOld, ":")
-			if len(splitSingleTag) == 2 {
-				old[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-			}
-		}
+	if fieldsUpdate.Label.IsDifferent() {
+		_, new := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		_, old := common.StrToJsonAndMap(fieldsUpdate.Label.GetOld())
+
 		for k, v := range new {
 			oldV, ok := old[k]
 			if !ok {
@@ -80,7 +63,7 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 				if oldV != v {
 					updateKey = K8sLabelKey{ID: sourceID, Key: k}
 					updateInfo[k] = v
-					mysql.Db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
+					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, K8sLabelKey{ID: sourceID, Key: k})
 						targetsToAdd = append(targetsToAdd, mysql.ChPodK8sLabel{
@@ -89,7 +72,7 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 							Value: v,
 						})
 					} else if len(updateInfo) > 0 {
-						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey)
+						c.SubscriberComponent.dbOperator.update(chItem, updateInfo, updateKey, db)
 					}
 				}
 			}
@@ -105,36 +88,30 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 		}
 	}
 	if len(keysToAdd) > 0 {
-		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd)
+		c.SubscriberComponent.dbOperator.add(keysToAdd, targetsToAdd, db)
 	}
 	if len(keysToDelete) > 0 {
-		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete)
+		c.SubscriberComponent.dbOperator.delete(keysToDelete, targetsToDelete, db)
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabel) sourceToTarget(source *mysql.Pod) (keys []K8sLabelKey, targets []mysql.ChPodK8sLabel) {
-	labelMap := map[string]string{}
-	splitTags := strings.Split(source.Label, ", ")
-
-	for _, splitTag := range splitTags {
-		splitSingleTag := strings.Split(splitTag, ":")
-		if len(splitSingleTag) == 2 {
-			labelMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
-		}
-	}
+func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []K8sLabelKey, targets []mysql.ChPodK8sLabel) {
+	_, labelMap := common.StrToJsonAndMap(source.Label)
 	for k, v := range labelMap {
 		keys = append(keys, K8sLabelKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sLabel{
-			ID:    source.ID,
-			Key:   k,
-			Value: v,
+			ID:       source.ID,
+			Key:      k,
+			Value:    v,
+			TeamID:   md.TeamID,
+			DomainID: md.DomainID,
 		})
 	}
 	return
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabel) softDeletedTargetsUpdated(targets []mysql.ChPodK8sLabel) {
+func (c *ChPodK8sLabel) softDeletedTargetsUpdated(targets []mysql.ChPodK8sLabel, db *mysql.DB) {
 
 }

@@ -15,7 +15,8 @@ BEGIN
     SELECT COUNT(*)
     INTO col_count
     FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_NAME = tableName
+    WHERE TABLE_SCHEMA = @tableSchema
+    AND TABLE_NAME = tableName
     AND COLUMN_NAME = colName;
 
     -- 如果列不存在，则添加列

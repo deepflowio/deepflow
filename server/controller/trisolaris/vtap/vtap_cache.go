@@ -30,9 +30,9 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
-	cmodel "github.com/deepflowio/deepflow/server/controller/model"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -40,7 +40,7 @@ import (
 )
 
 type VTapConfig struct {
-	models.RVTapGroupConfiguration
+	agent_config.RAgentGroupConfigModel
 	ConvertedL4LogTapTypes       []uint32
 	ConvertedL4LogIgnoreTapSides []uint32
 	ConvertedL7LogIgnoreTapSides []uint32
@@ -124,9 +124,9 @@ func (f *VTapConfig) modifyConfig(v *VTapInfo) {
 	}
 }
 
-func NewVTapConfig(config *models.RVTapGroupConfiguration) *VTapConfig {
+func NewVTapConfig(config *agent_config.RAgentGroupConfigModel) *VTapConfig {
 	vTapConfig := &VTapConfig{}
-	vTapConfig.RVTapGroupConfiguration = *config
+	vTapConfig.RAgentGroupConfigModel = *config
 	vTapConfig.convertData()
 	return vTapConfig
 }
@@ -163,6 +163,7 @@ type VTapCache struct {
 	processName        *string
 	licenseType        int
 	tapMode            int
+	teamID             int
 	lcuuid             *string
 	licenseFunctions   *string
 	licenseFunctionSet mapset.Set
@@ -204,9 +205,11 @@ type VTapCache struct {
 	VPCID int
 	// vtap platform data
 	PlatformData *atomic.Value //*PlatformData
+
+	vTapInfo *VTapInfo
 }
 
-func NewVTapCache(vtap *models.VTap) *VTapCache {
+func NewVTapCache(vtap *models.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache := &VTapCache{}
 	vTapCache.id = vtap.ID
 	vTapCache.name = proto.String(vtap.Name)
@@ -242,6 +245,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.processName = proto.String(vtap.ProcessName)
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.tapMode = vtap.TapMode
+	vTapCache.teamID = vtap.TeamID
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
 	vTapCache.licenseFunctionSet = mapset.NewSet()
@@ -267,6 +271,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.PlatformData = &atomic.Value{}
 	vTapCache.expectedRevision = proto.String(vtap.ExpectedRevision)
 	vTapCache.upgradePackage = proto.String(vtap.UpgradePackage)
+	vTapCache.vTapInfo = vTapInfo
 	vTapCache.convertLicenseFunctions()
 	return vTapCache
 }
@@ -299,15 +304,16 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 }
 
 func (c *VTapCache) convertLicenseFunctions() {
+	v := c.vTapInfo
 	c.unsetLicenseFunctionEnable()
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
 		c.licenseFunctionSet = mapset.NewSet()
-		log.Warningf("vtap(%s) no license functions", c.GetKey())
+		log.Warningf(v.Logf("vtap(%s) no license functions", c.GetKey()))
 		return
 	}
 	licenseFunctionsInt, err := ConvertStrToIntList(*c.licenseFunctions)
 	if err != nil {
-		log.Errorf("convert licence functions failed err :%s", err)
+		log.Errorf(v.Logf("convert licence functions failed err :%s", err))
 		return
 	}
 
@@ -365,12 +371,12 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		configure.L4PerformanceEnabled = DISABLED
 		configure.ConvertedL4LogTapTypes = nil
 	}
-
+	v := c.vTapInfo
 	// modify static config
-	yamlConfig := &cmodel.StaticConfig{}
+	yamlConfig := &agent_config.StaticConfig{}
 	err := yaml.Unmarshal([]byte(configure.YamlConfig), yamlConfig)
 	if err != nil {
-		log.Error(err)
+		log.Error(v.Logf("%s", err))
 		return
 	}
 
@@ -384,7 +390,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledCallMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &cmodel.EbpfConfig{
+			yamlConfig.Ebpf = &agent_config.EbpfConfig{
 				Disabled: proto.Bool(true),
 			}
 		} else {
@@ -394,10 +400,10 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	if c.EnabledFunctionMonitoring() == false {
 		if yamlConfig.Ebpf == nil {
-			yamlConfig.Ebpf = &cmodel.EbpfConfig{}
+			yamlConfig.Ebpf = &agent_config.EbpfConfig{}
 		}
 		if yamlConfig.Ebpf.OnCpuProfile == nil {
-			yamlConfig.Ebpf.OnCpuProfile = &cmodel.OnCpuProfile{
+			yamlConfig.Ebpf.OnCpuProfile = &agent_config.OnCpuProfile{
 				Disabled: proto.Bool(true),
 			}
 		} else {
@@ -417,7 +423,7 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	b, err := yaml.Marshal(yamlConfig)
 	if err != nil {
-		log.Error(err)
+		log.Error(v.Logf("%s", err))
 		return
 	}
 	configure.YamlConfig = string(b)
@@ -631,7 +637,8 @@ func (c *VTapCache) GetLaunchServer() string {
 
 var regV = regexp.MustCompile("B_LC_RELEASE_v6_[12]")
 
-func (c *VTapCache) GetExternalAgentHTTPProxyEnabledConfig(v *VTapInfo) int {
+func (c *VTapCache) GetExternalAgentHTTPProxyEnabledConfig() int {
+	v := c.vTapInfo
 	if enabled, ok := v.vtapGroupLcuuidToEAHPEnabled[c.GetVTapGroupLcuuid()]; ok {
 		if enabled != nil {
 			return *enabled
@@ -801,6 +808,14 @@ func (c *VTapCache) updateTapMode(tapMode int) {
 	c.tapMode = tapMode
 }
 
+func (c *VTapCache) GetTeamID() int {
+	return c.teamID
+}
+
+func (c *VTapCache) updateTeamID(teamID int) {
+	c.teamID = teamID
+}
+
 func (c *VTapCache) UpdateRevision(revision string) {
 	c.revision = &revision
 }
@@ -855,9 +870,10 @@ func (c *VTapCache) GetExceptions() int64 {
 
 // 只更新采集器返回的异常，控制器异常不用更新，由控制器处理其异常
 func (c *VTapCache) UpdateExceptions(exceptions int64) {
-	log.Infof(
+	v := c.vTapInfo
+	log.Infof(v.Logf(
 		"modify vtap(%s) exception %d to %d",
-		c.GetVTapHost(), c.GetExceptions(), exceptions)
+		c.GetVTapHost(), c.GetExceptions(), exceptions))
 	atomic.StoreInt64(&c.exceptions, int64(exceptions))
 }
 
@@ -883,28 +899,31 @@ func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch,
 }
 
 func (c *VTapCache) UpdateCtrlMacFromGrpc(ctrlMac string) {
+	v := c.vTapInfo
 	if c.GetCtrlMac() == "" || c.GetCtrlMac() != ctrlMac {
 		c.updateCtrlMac(ctrlMac)
-		log.Infof("grpc modify vtap(%s) ctrl_mac (%s) to (%s)",
-			c.GetVTapHost(), c.GetCtrlMac(), ctrlMac)
+		log.Infof(v.Logf("grpc modify vtap(%s) ctrl_mac (%s) to (%s)",
+			c.GetVTapHost(), c.GetCtrlMac(), ctrlMac))
 	}
 }
 
 func (c *VTapCache) updateCtrlMacFromDB(ctrlMac string) {
+	v := c.vTapInfo
 	if c.GetCtrlMac() == "" && ctrlMac != "" {
 		c.updateCtrlMac(ctrlMac)
-		log.Infof("db modify vtap(%s) ctrl_mac (%s) to (%s)",
-			c.GetVTapHost(), c.GetCtrlMac(), ctrlMac)
+		log.Infof(v.Logf("db modify vtap(%s) ctrl_mac (%s) to (%s)",
+			c.GetVTapHost(), c.GetCtrlMac(), ctrlMac))
 	}
 }
 
-func (c *VTapCache) init(v *VTapInfo) {
-	c.modifyVTapCache(v)
-	c.initVTapPodDomains(v)
-	c.initVTapConfig(v)
+func (c *VTapCache) init() {
+	c.modifyVTapCache()
+	c.initVTapPodDomains()
+	c.initVTapConfig()
 }
 
-func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
+func (c *VTapCache) modifyVTapCache() {
+	v := c.vTapInfo
 	if c.state == VTAP_STATE_PENDING {
 		c.enable = 0
 	}
@@ -914,11 +933,11 @@ func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
 	if vTapType == VTAP_TYPE_POD_HOST || vTapType == VTAP_TYPE_POD_VM {
 		c.podClusterID, ok = v.lcuuidToPodClusterID[c.GetLcuuid()]
 		if ok == false {
-			log.Warningf("vtap(%s) not found podClusterID", c.GetVTapHost())
+			log.Warningf(v.Logf("vtap(%s) not found podClusterID", c.GetVTapHost()))
 		}
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {
-			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	} else if vTapType == VTAP_TYPE_K8S_SIDECAR {
 		pod := v.metaData.GetPlatformDataOP().GetRawData().GetPod(c.GetLaunchServerID())
@@ -929,27 +948,28 @@ func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
 	} else if vTapType == VTAP_TYPE_WORKLOAD_V || vTapType == VTAP_TYPE_WORKLOAD_P {
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {
-			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	} else if vTapType == VTAP_TYPE_HYPER_V && v.hypervNetworkHostIds.Contains(c.GetLaunchServerID()) {
 		c.vTapType = VTAP_TYPE_HYPER_V_NETWORK
 		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
 		if ok == false {
-			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	} else if vTapType == VTAP_TYPE_KVM || vTapType == VTAP_TYPE_HYPER_V {
 		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
 		if ok == false {
-			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf(v.Logf("vtap(%s) not found VPCID", c.GetVTapHost()))
 		}
 	}
 }
 
-func (c *VTapCache) initVTapPodDomains(v *VTapInfo) {
-	c.podDomains = v.getVTapPodDomains(c)
+func (c *VTapCache) initVTapPodDomains() {
+	c.podDomains = c.vTapInfo.getVTapPodDomains(c)
 }
 
-func (c *VTapCache) initVTapConfig(v *VTapInfo) {
+func (c *VTapCache) initVTapConfig() {
+	v := c.vTapInfo
 	realConfig := VTapConfig{}
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
@@ -966,7 +986,8 @@ func (c *VTapCache) initVTapConfig(v *VTapInfo) {
 	c.updateVTapConfig(&realConfig)
 }
 
-func (c *VTapCache) updateVTapConfigFromDB(v *VTapInfo) {
+func (c *VTapCache) updateVTapConfigFromDB() {
+	v := c.vTapInfo
 	newConfig := VTapConfig{}
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
@@ -999,7 +1020,8 @@ func (c *VTapCache) GetConfigTapMode() int {
 	return config.TapMode
 }
 
-func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
+func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap) {
+	v := c.vTapInfo
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State
 	c.enable = vtap.Enable
@@ -1007,6 +1029,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 		c.updateLicenseFunctions(vtap.LicenseFunctions)
 	}
 	c.updateTapMode(vtap.TapMode)
+	c.updateTeamID(vtap.TeamID)
 	if c.vTapType != vtap.Type {
 		c.vTapType = vtap.Type
 		v.setVTapChangedForSegment()
@@ -1047,13 +1070,13 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 	if c.GetRegion() != vtap.Region {
 		c.updateRegion(vtap.Region)
 	}
-	c.modifyVTapCache(v)
+	c.modifyVTapCache()
 	// 采集器组变化 重新生成平台数据
 	if c.GetVTapGroupLcuuid() != vtap.VtapGroupLcuuid {
 		c.updateVTapGroupLcuuid(vtap.VtapGroupLcuuid)
 		v.setVTapChangedForPD()
 	}
-	c.updateVTapConfigFromDB(v)
+	c.updateVTapConfigFromDB()
 	newPodDomains := v.getVTapPodDomains(c)
 	oldPodDomains := c.getPodDomains()
 	// podDomain 发生变化重新生成平台数据
@@ -1062,7 +1085,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 		v.setVTapChangedForPD()
 	}
 	if c.GetConfigTapMode() != c.GetTapMode() {
-		log.Warningf("config tap_mode(%d) is not equal to vtap(%s) tap_mode(%d)", c.GetConfigTapMode(), c.GetKey(), c.GetTapMode())
+		log.Warningf(v.Logf("config tap_mode(%d) is not equal to vtap(%s) tap_mode(%d)", c.GetConfigTapMode(), c.GetKey(), c.GetTapMode()))
 	}
 }
 
@@ -1089,9 +1112,10 @@ func (c *VTapCache) updateTSDBIP(ip string) {
 }
 
 func (c *VTapCache) GetVTapConfig() *VTapConfig {
+	v := c.vTapInfo
 	config := c.config.Load()
 	if config == nil {
-		log.Warningf("vtap(%s) no config", c.GetVTapHost())
+		log.Warningf(v.Logf("vtap(%s) no config", c.GetVTapHost()))
 		return nil
 	}
 	return config.(*VTapConfig)
@@ -1112,9 +1136,10 @@ func (c *VTapCache) setVTapPlatformData(d *metadata.PlatformData) {
 }
 
 func (c *VTapCache) GetVTapPlatformData() *metadata.PlatformData {
+	v := c.vTapInfo
 	platformData := c.PlatformData.Load()
 	if platformData == nil {
-		log.Warningf("vtap(%s) no platformData", c.GetVTapHost())
+		log.Warningf(v.Logf("vtap(%s) no platformData", c.GetVTapHost()))
 		return nil
 	}
 	return platformData.(*metadata.PlatformData)

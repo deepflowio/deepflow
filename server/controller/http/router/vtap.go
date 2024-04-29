@@ -32,6 +32,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/election"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -47,185 +48,209 @@ func NewVtap(cfg *config.ControllerConfig) *Vtap {
 }
 
 func (v *Vtap) RegisterTo(e *gin.Engine) {
-	e.GET("/v1/vtaps/:lcuuid/", getVtap)
-	e.GET("/v1/vtaps/", getVtaps)
-	e.POST("/v1/vtaps/", createVtap)
-	e.PATCH("/v1/vtaps/:lcuuid/", updateVtap)
-	e.PATCH("/v1/vtaps-by-name/:name/", updateVtap)
-	e.DELETE("/v1/vtaps/:lcuuid/", deleteVtap)
-	e.POST("/v1/vtaps/batch/", batchUpdateVtap)
-	e.DELETE("/v1/vtaps/batch/", batchDeleteVtap)
+	e.GET("/v1/vtaps/:lcuuid/", v.getVtap())
+	e.GET("/v1/vtaps/", v.getVtaps())
+	e.POST("/v1/vtaps/", v.createVtap())
+	e.PATCH("/v1/vtaps/:lcuuid/", v.updateVtap())
+	e.PATCH("/v1/vtaps-by-name/:name/", v.updateVtap())
+	e.DELETE("/v1/vtaps/:lcuuid/", v.deleteVtap())
+	e.POST("/v1/vtaps/batch/", v.batchUpdateVtap())
+	e.DELETE("/v1/vtaps/batch/", v.batchDeleteVtap())
 
 	e.POST("/v1/rebalance-vtap/", rebalanceVtap(v.cfg))
 
-	e.PATCH("/v1/vtaps-license-type/:lcuuid/", updateVtapLicenseType)
-	e.PATCH("/v1/vtaps-license-type/", batchUpdateVtapLicenseType)
-	e.PATCH("/v1/vtaps-tap-mode/", batchUpdateVtapTapMode)
+	e.PATCH("/v1/vtaps-license-type/:lcuuid/", v.updateVtapLicenseType())
+	e.PATCH("/v1/vtaps-license-type/", v.batchUpdateVtapLicenseType())
 
-	e.POST("/v1/vtaps-csv/", getVtapCSV)
+	e.POST("/v1/vtaps-csv/", v.getVtapCSV())
 
 	e.GET("/v1/vtap-ports/", getVTapPorts)
 }
 
-func getVtap(c *gin.Context) {
-	args := make(map[string]interface{})
-	args["lcuuid"] = c.Param("lcuuid")
-	data, err := service.GetVtaps(args)
-	JsonResponse(c, data, err)
+func (v *Vtap) getVtap() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		args := make(map[string]interface{})
+		args["lcuuid"] = c.Param("lcuuid")
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Get(args)
+		JsonResponse(c, data, err)
+	}
 }
 
-func getVtaps(c *gin.Context) {
-	args := make(map[string]interface{})
-	args["names"] = c.QueryArray("name")
-	if value, ok := c.GetQuery("type"); ok {
-		args["type"] = value
+func (v *Vtap) getVtaps() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		args := make(map[string]interface{})
+		args["names"] = c.QueryArray("name")
+		if value, ok := c.GetQuery("type"); ok {
+			args["type"] = value
+		}
+		if value, ok := c.GetQuery("vtap_group_lcuuid"); ok {
+			args["vtap_group_lcuuid"] = value
+		}
+		if value, ok := c.GetQuery("controller_ip"); ok {
+			args["controller_ip"] = value
+		}
+		if value, ok := c.GetQuery("analyzer_ip"); ok {
+			args["analyzer_ip"] = value
+		}
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Get(args)
+		JsonResponse(c, data, err)
 	}
-	if value, ok := c.GetQuery("vtap_group_lcuuid"); ok {
-		args["vtap_group_lcuuid"] = value
-	}
-	if value, ok := c.GetQuery("controller_ip"); ok {
-		args["controller_ip"] = value
-	}
-	if value, ok := c.GetQuery("analyzer_ip"); ok {
-		args["analyzer_ip"] = value
-	}
-	data, err := service.GetVtaps(args)
-	JsonResponse(c, data, err)
 }
 
-func createVtap(c *gin.Context) {
-	var err error
-	var vtapCreate model.VtapCreate
+func (v *Vtap) createVtap() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
+		var vtapCreate model.VtapCreate
 
-	// 参数校验
-	err = c.ShouldBindBodyWith(&vtapCreate, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
+		// 参数校验
+		err = c.ShouldBindBodyWith(&vtapCreate, binding.JSON)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Create(vtapCreate)
+		JsonResponse(c, data, err)
 	}
-
-	data, err := service.CreateVtap(vtapCreate)
-	JsonResponse(c, data, err)
 }
 
-func updateVtap(c *gin.Context) {
-	var err error
-	var vtapUpdate model.VtapUpdate
+func (v *Vtap) updateVtap() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
+		var vtapUpdate model.VtapUpdate
 
-	// 参数校验
-	err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
+		// 参数校验
+		err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+
+		// 接收参数
+		// 避免struct会有默认值，这里转为map作为函数入参
+		patchMap := map[string]interface{}{}
+		c.ShouldBindBodyWith(&patchMap, binding.JSON)
+
+		lcuuid := c.Param("lcuuid")
+		name := c.Param("name")
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Update(lcuuid, name, patchMap)
+		JsonResponse(c, data, err)
 	}
-
-	// 接收参数
-	// 避免struct会有默认值，这里转为map作为函数入参
-	patchMap := map[string]interface{}{}
-	c.ShouldBindBodyWith(&patchMap, binding.JSON)
-
-	lcuuid := c.Param("lcuuid")
-	name := c.Param("name")
-	data, err := service.UpdateVtap(lcuuid, name, patchMap)
-	JsonResponse(c, data, err)
 }
 
-func batchUpdateVtap(c *gin.Context) {
-	var err error
+func (v *Vtap) batchUpdateVtap() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
 
-	// 参数校验
-	vtapUpdateList := make(map[string][]model.VtapUpdate)
-	err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
+		// 参数校验
+		vtapUpdateList := make(map[string][]model.VtapUpdate)
+		err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+
+		// 接收参数
+		updateMap := make(map[string]([]map[string]interface{}))
+		c.ShouldBindBodyWith(&updateMap, binding.JSON)
+
+		// 参数校验
+		if _, ok := updateMap["DATA"]; !ok {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
+		}
+
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).BatchUpdate(updateMap["DATA"])
+		JsonResponse(c, data, err)
 	}
-
-	// 接收参数
-	updateMap := make(map[string]([]map[string]interface{}))
-	c.ShouldBindBodyWith(&updateMap, binding.JSON)
-
-	// 参数校验
-	if _, ok := updateMap["DATA"]; !ok {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
-	}
-
-	data, err := service.BatchUpdateVtap(updateMap["DATA"])
-	JsonResponse(c, data, err)
 }
 
-func updateVtapLicenseType(c *gin.Context) {
-	var err error
-	var vtapUpdate model.VtapUpdate
+func (v *Vtap) updateVtapLicenseType() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
+		var vtapUpdate model.VtapUpdate
 
-	// 参数校验
-	err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
+		// 参数校验
+		err = c.ShouldBindBodyWith(&vtapUpdate, binding.JSON)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+
+		// 接收参数
+		// 避免struct会有默认值，这里转为map作为函数入参
+		patchMap := map[string]interface{}{}
+		c.ShouldBindBodyWith(&patchMap, binding.JSON)
+
+		lcuuid := c.Param("lcuuid")
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).UpdateVtapLicenseType(lcuuid, patchMap)
+		JsonResponse(c, data, err)
 	}
-
-	// 接收参数
-	// 避免struct会有默认值，这里转为map作为函数入参
-	patchMap := map[string]interface{}{}
-	c.ShouldBindBodyWith(&patchMap, binding.JSON)
-
-	lcuuid := c.Param("lcuuid")
-	data, err := service.UpdateVtapLicenseType(lcuuid, patchMap)
-	JsonResponse(c, data, err)
 }
 
-func batchUpdateVtapLicenseType(c *gin.Context) {
-	var err error
+func (v *Vtap) batchUpdateVtapLicenseType() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
 
-	// 参数校验
-	vtapUpdateList := make(map[string][]model.VtapUpdate)
-	err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
+		// 参数校验
+		vtapUpdateList := make(map[string][]model.VtapUpdate)
+		err = c.ShouldBindBodyWith(&vtapUpdateList, binding.JSON)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+
+		// 接收参数
+		updateMap := make(map[string]([]map[string]interface{}))
+		c.ShouldBindBodyWith(&updateMap, binding.JSON)
+
+		// 参数校验
+		if _, ok := updateMap["DATA"]; !ok {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
+		}
+
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).BatchUpdateVtapLicenseType(updateMap["DATA"])
+		JsonResponse(c, data, err)
 	}
-
-	// 接收参数
-	updateMap := make(map[string]([]map[string]interface{}))
-	c.ShouldBindBodyWith(&updateMap, binding.JSON)
-
-	// 参数校验
-	if _, ok := updateMap["DATA"]; !ok {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
-	}
-
-	data, err := service.BatchUpdateVtapLicenseType(updateMap["DATA"])
-	JsonResponse(c, data, err)
 }
 
-func deleteVtap(c *gin.Context) {
-	var err error
+func (v *Vtap) deleteVtap() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
 
-	lcuuid := c.Param("lcuuid")
-	data, err := service.DeleteVtap(lcuuid)
-	JsonResponse(c, data, err)
+		lcuuid := c.Param("lcuuid")
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Delete(lcuuid)
+		JsonResponse(c, data, err)
+	}
 }
 
-func batchDeleteVtap(c *gin.Context) {
-	var err error
+func (v *Vtap) batchDeleteVtap() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var err error
 
-	// 接收参数
-	deleteMap := make(map[string][](map[string]string))
-	c.ShouldBindBodyWith(&deleteMap, binding.JSON)
+		// 接收参数
+		deleteMap := make(map[string][](map[string]string))
+		c.ShouldBindBodyWith(&deleteMap, binding.JSON)
 
-	// 参数校验
-	if _, ok := deleteMap["DATA"]; !ok {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
-		return
+		// 参数校验
+		if _, ok := deleteMap["DATA"]; !ok {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
+			return
+		}
+
+		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).BatchDelete(deleteMap["DATA"])
+		JsonResponse(c, data, err)
 	}
-
-	data, err := service.BatchDeleteVtap(deleteMap["DATA"])
-	JsonResponse(c, data, err)
 }
 
 func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		// 如果不是masterController，将请求转发至是masterController
+		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
+		if !isMasterController {
+			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			return
+		}
+
 		args := make(map[string]interface{})
 		args["check"] = false
 		if value, ok := c.GetQuery("check"); ok {
@@ -249,64 +274,48 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 	})
 }
 
-func batchUpdateVtapTapMode(c *gin.Context) {
-	var err error
-	var vtapUpdateTapMode model.VtapUpdateTapMode
+func (v *Vtap) getVtapCSV() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		value, ok := c.GetPostForm("CSV_HEADERS")
+		if !ok {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "can not not get form data(CSV_HEADERS)")
+			return
+		}
+		var headers []model.CSVHeader
+		if err := json.Unmarshal([]byte(value), &headers); err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "parse form data(CSV_HEADERS) failed")
+			return
+		}
 
-	err = c.ShouldBindBodyWith(&vtapUpdateTapMode, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
-	}
+		vtaps, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Get(nil)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.SERVER_ERROR, "get vtaps failed")
+			return
+		}
 
-	if len(vtapUpdateTapMode.VTapLcuuids) == 0 {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "VTAP_LCUUIDS cannot be empty")
-		return
+		buf := new(bytes.Buffer)
+		buf.WriteString("\xEF\xBB\xBF")
+		w := csv.NewWriter(buf)
+		// write header
+		var writeHeaders []string
+		headerMap := make(map[string]int)
+		for i, header := range headers {
+			writeHeaders = append(writeHeaders, header.DisplayName)
+			headerMap[header.FieldName] = i
+		}
+		w.Write(writeHeaders)
+		// write data
+		for _, vtap := range vtaps {
+			data := getVtapCSVData(headerMap, &vtap)
+			w.Write(data)
+		}
+		w.Flush()
+		c.Writer.Header().Add("Content-type", "application/octet-stream")
+		fileName := fmt.Sprintf("DeepFlow-采集器列表-%s.csv", time.Now().Format("2006-01-02"))
+		fileName = url.QueryEscape(fileName)
+		c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename*=utf-8''%s", fileName))
+		_, err = io.Copy(c.Writer, buf)
 	}
-	data, err := service.BatchUpdateVtapTapMode(&vtapUpdateTapMode)
-	JsonResponse(c, data, err)
-}
-
-func getVtapCSV(c *gin.Context) {
-	value, ok := c.GetPostForm("CSV_HEADERS")
-	if !ok {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "can not not get form data(CSV_HEADERS)")
-		return
-	}
-	var headers []model.CSVHeader
-	if err := json.Unmarshal([]byte(value), &headers); err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "parse form data(CSV_HEADERS) failed")
-		return
-	}
-
-	vtaps, err := service.GetVtaps(nil)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.SERVER_ERROR, "get vtaps failed")
-		return
-	}
-
-	buf := new(bytes.Buffer)
-	buf.WriteString("\xEF\xBB\xBF")
-	w := csv.NewWriter(buf)
-	// write header
-	var writeHeaders []string
-	headerMap := make(map[string]int)
-	for i, header := range headers {
-		writeHeaders = append(writeHeaders, header.DisplayName)
-		headerMap[header.FieldName] = i
-	}
-	w.Write(writeHeaders)
-	// write data
-	for _, vtap := range vtaps {
-		data := getVtapCSVData(headerMap, &vtap)
-		w.Write(data)
-	}
-	w.Flush()
-	c.Writer.Header().Add("Content-type", "application/octet-stream")
-	fileName := fmt.Sprintf("DeepFlow-采集器列表-%s.csv", time.Now().Format("2006-01-02"))
-	fileName = url.QueryEscape(fileName)
-	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename*=utf-8''%s", fileName))
-	_, err = io.Copy(c.Writer, buf)
 }
 
 func getVtapCSVData(headerMap map[string]int, vtap *model.Vtap) []string {

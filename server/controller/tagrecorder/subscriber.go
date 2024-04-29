@@ -21,10 +21,11 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgconstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
-	trconfig "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 )
 
 var (
@@ -51,18 +52,25 @@ func (c *SubscriberManager) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
 }
 
-func (c *SubscriberManager) Start() {
+func (c *SubscriberManager) Start() (err error) {
 	log.Info("tagrecorder subscriber manager started")
-	c.domainLcuuidToIconID, c.resourceTypeToIconID, _ = UpdateIconInfo(c.cfg) // TODO adds icon cache and refresh by timer?
+	c.domainLcuuidToIconID, c.resourceTypeToIconID, err = GetIconInfo(c.cfg)
+	if err != nil {
+		return err
+	}
 	c.subscribers = c.getSubscribers()
 	log.Infof("tagrecorder run start")
 	for _, subscriber := range c.subscribers {
-		subscriber.SetConfig(c.cfg.TagRecorderCfg)
+		subscriber.SetConfig(c.cfg)
 		subscriber.Subscribe()
 	}
+	return nil
 }
 
 func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber {
+	if subResourceType == pubsub.PubSubTypeDomain {
+		return m.subscribers
+	}
 	ss := make([]Subscriber, 0)
 	for _, s := range m.subscribers {
 		if s.GetSubResourceType() == subResourceType {
@@ -135,22 +143,23 @@ func (c *SubscriberManager) HealthCheck() {
 
 type Subscriber interface {
 	Subscribe()
-	SetConfig(trconfig.TagRecorderConfig)
+	SetConfig(config.ControllerConfig)
 	Check() error
 	GetSubResourceType() string
 	pubsub.ResourceBatchAddedSubscriber
 	pubsub.ResourceUpdatedSubscriber
 	pubsub.ResourceBatchDeletedSubscriber
+	OnDomainDeleted(md *message.Metadata)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
-	sourceToTarget(resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
-	onResourceUpdated(int, MUPT)
-	softDeletedTargetsUpdated([]CT)
+	sourceToTarget(md *message.Metadata, resourceMySQLItem *MT) (chKeys []KT, chItems []CT) // 将源表数据转换为CH表数据
+	onResourceUpdated(int, MUPT, *mysql.DB)
+	softDeletedTargetsUpdated([]CT, *mysql.DB)
 }
 
 type SubscriberComponent[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] struct {
-	cfg trconfig.TagRecorderConfig
+	cfg config.ControllerConfig
 
 	subResourceTypeName string // 订阅表资源类型，即源表资源类型
 	resourceTypeName    string // CH表资源类型
@@ -177,18 +186,18 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) initDBOperator() {
 	s.dbOperator = newOperator[CT, KT](s.resourceTypeName)
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(sources []*MT) ([]KT, []CT) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) generateKeyTargets(md *message.Metadata, sources []*MT) ([]KT, []CT) {
 	keys := []KT{}
 	targets := []CT{}
 	for _, item := range sources {
-		ks, ts := s.subscriberDG.sourceToTarget(item)
+		ks, ts := s.subscriberDG.sourceToTarget(md, item)
 		keys = append(keys, ks...)
 		targets = append(targets, ts...)
 	}
 	return keys, targets
 }
 
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg trconfig.TagRecorderConfig) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) SetConfig(cfg config.ControllerConfig) {
 	s.cfg = cfg
 	s.dbOperator.setConfig(cfg)
 }
@@ -208,25 +217,45 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(orgID int, msg interface{}) { // TODO handle org
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { // TODO handle org
 	items := msg.([]*MT)
-	keys, chItems := s.generateKeyTargets(items)
-	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add)
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
+	keys, chItems := s.generateKeyTargets(md, items)
+	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
 }
 
 // OnResourceBatchUpdated implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(orgID int, msg interface{}) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	updateFields := msg.(MUPT)
-	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields)
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
+	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(orgID int, msg interface{}, softDelete bool) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool) {
 	items := msg.([]*MT)
-	keys, chItems := s.generateKeyTargets(items)
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
+	keys, chItems := s.generateKeyTargets(md, items)
 	if softDelete {
-		s.subscriberDG.softDeletedTargetsUpdated(chItems)
+		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {
-		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete)
+		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
+	}
+}
+
+// Delete resource by domain
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
+	var chModel CT
+	if err := mysql.Db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
+		log.Error(err)
 	}
 }

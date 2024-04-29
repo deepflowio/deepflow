@@ -133,6 +133,17 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	g := genesis.NewGenesis(cfg)
 	g.Start()
 
+	// start tagrecorder before manager to prevent recorder from publishing message when tagrecorder is not ready
+	router.SetInitStageForHealthChecker("TagRecorder init")
+	tr := tagrecorder.GetSingleton()
+	tr.Init(ctx, *cfg)
+	err = tr.SubscriberManager.Start()
+	if err != nil {
+		log.Errorf("get icon failed: %s", err.Error())
+		time.Sleep(time.Second)
+		os.Exit(0)
+	}
+
 	router.SetInitStageForHealthChecker("Manager init")
 	// 启动resource manager
 	// 每个云平台启动一个cloud和recorder
@@ -141,8 +152,8 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Trisolaris init")
 	// 启动trisolaris
-	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
-	go t.Start()
+	tm := trisolaris.NewTrisolarisManager(&cfg.TrisolarisCfg, mysql.Db)
+	go tm.Start()
 
 	router.SetInitStageForHealthChecker("Prometheus init")
 	prometheus := prometheus.GetSingleton()
@@ -154,10 +165,6 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 		prometheus.Encoder.Start()
 	}
 
-	router.SetInitStageForHealthChecker("TagRecorder init")
-	tr := tagrecorder.GetSingleton()
-	tr.Init(ctx, *cfg)
-	tr.SubscriberManager.Start()
 	go checkAndStartAllRegionMasterFunctions()
 
 	router.SetInitStageForHealthChecker("Master function init")

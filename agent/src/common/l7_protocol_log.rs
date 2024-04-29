@@ -38,7 +38,7 @@ use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
 use crate::flow_generator::protocol_logs::plugin::get_custom_log_parser;
 use crate::flow_generator::protocol_logs::sql::ObfuscateCache;
 use crate::flow_generator::protocol_logs::{
-    AmqpLog, DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, NatsLog,
+    AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, NatsLog,
     OpenWireLog, OracleLog, PostgresqlLog, PulsarLog, RedisLog, SofaRpcLog, TlsLog, ZmtpLog,
 };
 use crate::flow_generator::{LogMessageType, Result};
@@ -171,6 +171,7 @@ impl_protocol_parser! {
         PostgreSQL(PostgresqlLog),
         Dubbo(DubboLog),
         FastCGI(FastCGILog),
+        Brpc(BrpcLog),
         Oracle(OracleLog),
         MQTT(MqttLog),
         AMQP(AmqpLog),
@@ -374,6 +375,7 @@ pub struct ParseParam<'a> {
 
     // the config of `l7_log_packet_size`, must set in parse_payload and check_payload
     pub buf_size: u16,
+    pub captured_byte: u16,
 
     pub oracle_parse_conf: OracleParseConfig,
 }
@@ -422,6 +424,7 @@ impl<'a> ParseParam<'a> {
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
 
             buf_size: 0,
+            captured_byte: 0,
 
             oracle_parse_conf: OracleParseConfig::default(),
         };
@@ -455,6 +458,10 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_buf_size(&mut self, buf_size: usize) {
         self.buf_size = buf_size as u16;
+    }
+
+    pub fn set_captured_byte(&mut self, captured_byte: usize) {
+        self.captured_byte = captured_byte as u16;
     }
 
     pub fn set_rrt_timeout(&mut self, t: usize) {

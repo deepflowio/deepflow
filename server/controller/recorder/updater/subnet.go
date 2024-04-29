@@ -58,7 +58,7 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			wholeCache,
-			db.NewSubnet().SetORG(wholeCache.GetORG()),
+			db.NewSubnet().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.Subnets,
 			cloudData,
 		),
@@ -75,7 +75,7 @@ func (s *Subnet) getDiffBaseByCloudItem(cloudItem *cloudmodel.Subnet) (diffBase 
 func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subnet, bool) {
 	networkID, exists := s.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {
-		log.Error(s.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(s.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.Lcuuid,
 		)))
@@ -83,7 +83,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 	}
 	prefix, netmask, err := rcommon.CIDRToPreNetMask(cloudItem.CIDR)
 	if err != nil {
-		log.Error(s.org.LogPre("convert %s cidr: %s failed: %v", ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.CIDR, err))
+		log.Error(s.metadata.LogPre("convert %s cidr: %s failed: %v", ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.CIDR, err))
 		return nil, false
 	}
 
@@ -94,7 +94,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 		Netmask:   netmask,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		NetworkID: networkID,
-		Domain:    s.cache.DomainLcuuid,
+		Domain:    s.metadata.Domain.Lcuuid,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

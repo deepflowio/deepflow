@@ -57,7 +57,7 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			wholeCache,
-			db.NewNATVMConnection().SetORG(wholeCache.GetORG()),
+			db.NewNATVMConnection().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.NATVMConnections,
 			cloudData,
 		),
@@ -90,7 +90,7 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 	}
 
 	dbItem := &mysql.NATVMConnection{
-		Domain:       c.cache.DomainLcuuid,
+		Domain:       c.metadata.Domain.Lcuuid,
 		VMID:         vmID,
 		NATGatewayID: natID,
 	}

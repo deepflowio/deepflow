@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodK8sEnv struct {
@@ -39,7 +40,7 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysql.ChPodK8sEnv, bool) {
 	var pods []mysql.Pod
 
-	err := mysql.Db.Unscoped().Find(&pods).Error
+	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
@@ -56,11 +57,13 @@ func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysql.ChPodK8sEnv, bool) 
 					Key: envInfo[0],
 				}
 				keyToItem[key] = mysql.ChPodK8sEnv{
-					ID:      pod.ID,
-					Key:     envInfo[0],
-					Value:   envInfo[1],
-					L3EPCID: pod.VPCID,
-					PodNsID: pod.PodNamespaceID,
+					ID:       pod.ID,
+					Key:      envInfo[0],
+					Value:    envInfo[1],
+					L3EPCID:  pod.VPCID,
+					PodNsID:  pod.PodNamespaceID,
+					TeamID:   tagrecorder.DomainToTeamID[pod.Domain],
+					DomainID: tagrecorder.DomainToDomainID[pod.Domain],
 				}
 			}
 		}

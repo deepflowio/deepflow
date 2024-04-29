@@ -57,7 +57,7 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		](
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			wholeCache,
-			db.NewPeerConnection().SetORG(wholeCache.GetORG()),
+			db.NewPeerConnection().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.PeerConnections,
 			cloudData,
 		),
@@ -74,7 +74,7 @@ func (c *PeerConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.PeerConnec
 func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnection) (*mysql.PeerConnection, bool) {
 	remoteVPCID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.RemoteVPCLcuuid)
 	if !exists {
-		log.Error(c.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.RemoteVPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 		)))
@@ -82,7 +82,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	}
 	localVPCID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.LocalVPCLcuuid)
 	if !exists {
-		log.Error(c.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.LocalVPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 		)))
@@ -90,7 +90,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	}
 	remoteRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.RemoteRegionLcuuid)
 	if !exists {
-		log.Error(c.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.RemoteRegionLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 		)))
@@ -98,7 +98,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	}
 	localRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.LocalRegionLcuuid)
 	if !exists {
-		log.Error(c.org.LogPre(resourceAForResourceBNotFound(
+		log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.LocalRegionLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 		)))
@@ -107,7 +107,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	dbItem := &mysql.PeerConnection{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
-		Domain:         c.cache.DomainLcuuid,
+		Domain:         c.metadata.Domain.Lcuuid,
 		RemoteVPCID:    remoteVPCID,
 		LocalVPCID:     localVPCID,
 		RemoteRegionID: remoteRegionID,
@@ -127,7 +127,7 @@ func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, c
 	if diffBase.RemoteRegionLcuuid != cloudItem.RemoteRegionLcuuid {
 		remoteRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.RemoteRegionLcuuid)
 		if !exists {
-			log.Error(c.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.RemoteRegionLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 			)))
@@ -140,7 +140,7 @@ func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, c
 	if diffBase.LocalRegionLcuuid != cloudItem.LocalRegionLcuuid {
 		localRegionID, exists := c.cache.ToolDataSet.GetRegionIDByLcuuid(cloudItem.LocalRegionLcuuid)
 		if !exists {
-			log.Error(c.org.LogPre(resourceAForResourceBNotFound(
+			log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_REGION_EN, cloudItem.LocalRegionLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, cloudItem.Lcuuid,
 			)))

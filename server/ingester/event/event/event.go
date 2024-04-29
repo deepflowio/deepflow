@@ -17,6 +17,7 @@
 package event
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/event/decoder"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -41,6 +43,7 @@ type Event struct {
 	ResourceEventor *Eventor
 	PerfEventor     *Eventor
 	AlarmEventor    *Eventor
+	K8sEventor      *Eventor
 }
 
 type Eventor struct {
@@ -49,14 +52,14 @@ type Eventor struct {
 	PlatformDatas []*grpc.PlatformInfoTable
 }
 
-func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager) (*Event, error) {
+func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*Event, error) {
 	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EVENT_QUEUE)
-	resourceEventor, err := NewResouceEventor(resourceEventQueue, common.RESOURCE_EVENT, config, platformDataManager.GetMasterPlatformInfoTable())
+	resourceEventor, err := NewResouceEventor(resourceEventQueue, config, platformDataManager.GetMasterPlatformInfoTable())
 	if err != nil {
 		return nil, err
 	}
 
-	perfEventor, err := NewPerfEventor(config, recv, manager, platformDataManager)
+	perfEventor, err := NewEventor(common.PERF_EVENT, config, recv, manager, platformDataManager, exporters)
 	if err != nil {
 		return nil, err
 	}
@@ -66,24 +69,32 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 		return nil, err
 	}
 
+	k8sEventor, err := NewEventor(common.K8S_EVENT, config, recv, manager, platformDataManager, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Event{
 		Config:          config,
 		ResourceEventor: resourceEventor,
 		PerfEventor:     perfEventor,
 		AlarmEventor:    alarmEventor,
+		K8sEventor:      k8sEventor,
 	}, nil
 }
 
-func NewResouceEventor(eventQueue *queue.OverwriteQueue, eventType common.EventType, config *config.Config, platformTable *grpc.PlatformInfoTable) (*Eventor, error) {
-	eventWriter, err := dbwriter.NewEventWriter(eventType.TableName(), 0, config)
+func NewResouceEventor(eventQueue *queue.OverwriteQueue, config *config.Config, platformTable *grpc.PlatformInfoTable) (*Eventor, error) {
+	eventWriter, err := dbwriter.NewEventWriter(common.RESOURCE_EVENT, 0, config)
 	if err != nil {
 		return nil, err
 	}
 	d := decoder.NewDecoder(
-		eventType,
+		0,
+		common.RESOURCE_EVENT,
 		queue.QueueReader(eventQueue),
 		eventWriter,
 		platformTable,
+		nil,
 		config,
 	)
 	return &Eventor{
@@ -108,10 +119,12 @@ func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dr
 		return nil, err
 	}
 	d := decoder.NewDecoder(
+		0,
 		common.ALARM_EVENT,
 		queue.QueueReader(decodeQueues.FixedMultiQueue[0]),
 		eventWriter,
 		platformTable,
+		nil,
 		config,
 	)
 	return &Eventor{
@@ -120,34 +133,50 @@ func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dr
 	}, nil
 }
 
-func NewPerfEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager) (*Eventor, error) {
-	eventMsg := datatype.MESSAGE_TYPE_PROC_EVENT
-	queueCount := config.DecoderQueueCount
+func NewEventor(eventType common.EventType, config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*Eventor, error) {
+	var queueCount, queueSize int
+	var msgType datatype.MessageType
+
+	switch eventType {
+	case common.PERF_EVENT:
+		queueCount = config.PerfDecoderQueueCount
+		queueSize = config.PerfDecoderQueueSize
+		msgType = datatype.MESSAGE_TYPE_PROC_EVENT
+	case common.K8S_EVENT:
+		queueCount = config.K8sDecoderQueueCount
+		queueSize = config.K8sDecoderQueueSize
+		msgType = datatype.MESSAGE_TYPE_K8S_EVENT
+	default:
+		return nil, fmt.Errorf("unsupport event %s", eventType)
+	}
+
 	decodeQueues := manager.NewQueues(
-		"1-receive-to-decode-"+eventMsg.String(),
-		config.DecoderQueueSize,
+		"1-receive-to-decode-"+eventType.String(),
+		queueSize,
 		queueCount,
 		1,
 		libqueue.OptionFlushIndicator(3*time.Second),
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
-	recv.RegistHandler(eventMsg, decodeQueues, queueCount)
+	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
-		eventWriter, err := dbwriter.NewEventWriter(common.PERF_EVENT.TableName(), i, config)
+		eventWriter, err := dbwriter.NewEventWriter(eventType, i, config)
 		if err != nil {
 			return nil, err
 		}
-		platformDatas[i], err = platformDataManager.NewPlatformInfoTable("event-" + eventMsg.String() + "-" + strconv.Itoa(i))
+		platformDatas[i], err = platformDataManager.NewPlatformInfoTable("event-" + eventType.String() + "-" + strconv.Itoa(i))
 		if err != nil {
 			return nil, err
 		}
 		decoders[i] = decoder.NewDecoder(
-			common.PERF_EVENT,
+			i,
+			eventType,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			eventWriter,
 			platformDatas[i],
+			exporters,
 			config,
 		)
 	}
@@ -180,11 +209,13 @@ func (e *Event) Start() {
 	e.ResourceEventor.Start()
 	e.PerfEventor.Start()
 	e.AlarmEventor.Start()
+	e.K8sEventor.Start()
 }
 
 func (e *Event) Close() error {
 	e.ResourceEventor.Close()
 	e.PerfEventor.Close()
 	e.AlarmEventor.Close()
+	e.K8sEventor.Close()
 	return nil
 }

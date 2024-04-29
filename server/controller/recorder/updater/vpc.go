@@ -57,7 +57,7 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,
-			db.NewVPC().SetORG(wholeCache.GetORG()),
+			db.NewVPC().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.VPCs,
 			cloudData,
 		),
@@ -77,7 +77,7 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysql.VPC, bool) 
 		Label:        cloudItem.Label,
 		UID:          cloudItem.Label,
 		CreateMethod: ctrlrcommon.CREATE_METHOD_LEARN,
-		Domain:       v.cache.DomainLcuuid,
+		Domain:       v.metadata.Domain.Lcuuid,
 		Region:       cloudItem.RegionLcuuid,
 		CIDR:         cloudItem.CIDR,
 		TunnelID:     cloudItem.TunnelID,

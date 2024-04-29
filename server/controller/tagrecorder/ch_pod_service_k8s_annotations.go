@@ -37,18 +37,18 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate) {
+func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
-	var annotations string
 	var chItem mysql.ChPodServiceK8sAnnotations
+
 	if fieldsUpdate.Annotation.IsDifferent() {
-		annotations = common.StrToJsonstr(fieldsUpdate.Annotation.GetNew())
+		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 		if annotations != "" {
 			updateInfo["annotations"] = annotations
 		}
 	}
 	if len(updateInfo) > 0 {
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sAnnotationsKey{{ID: sourceID}},
@@ -56,28 +56,33 @@ func (c *ChPodServiceK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdat
 					ID:          sourceID,
 					Annotations: updateInfo["annotations"].(string),
 				}},
+				db,
 			)
 		} else {
 			c.SubscriberComponent.dbOperator.update(
 				chItem,
 				updateInfo,
-				K8sAnnotationsKey{ID: sourceID})
+				K8sAnnotationsKey{ID: sourceID},
+				db)
 		}
 	}
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) sourceToTarget(item *mysql.PodService) (keys []K8sAnnotationsKey, targets []mysql.ChPodServiceK8sAnnotations) {
+func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *mysql.PodService) (keys []K8sAnnotationsKey, targets []mysql.ChPodServiceK8sAnnotations) {
 	if item.Annotation == "" {
 		return
 	}
+	annotations, _ := common.StrToJsonAndMap(item.Annotation)
 	return []K8sAnnotationsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sAnnotations{{
 		ID:          item.ID,
-		Annotations: common.StrToJsonstr(item.Annotation),
+		Annotations: annotations,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
 	}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodServiceK8sAnnotations) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sAnnotations) {
+func (c *ChPodServiceK8sAnnotations) softDeletedTargetsUpdated(targets []mysql.ChPodServiceK8sAnnotations, db *mysql.DB) {
 
 }

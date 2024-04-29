@@ -32,7 +32,7 @@ use super::{
     consts::*,
     round_to_minute,
     types::{FlowMeterWithFlow, MiniFlow},
-    MetricsType,
+    MetricsType, QgStats,
 };
 
 use crate::common::{
@@ -48,7 +48,7 @@ use crate::rpc::get_timestamp;
 use crate::utils::{
     lru::Lru,
     possible_host::PossibleHost,
-    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
+    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
     buffer::BatchedBox,
@@ -289,6 +289,7 @@ struct SubQuadGen {
     delay_seconds: u64,
 
     stashs: VecDeque<QuadrupleStash>, // flow_generator 不会有超过2分钟的延时
+    batch_buffer: Vec<Box<FlowMeterWithFlow>>,
 
     connections: VecDeque<ConcurrentConnection>,
     ntp_diff: Arc<AtomicI64>,
@@ -438,20 +439,46 @@ impl SubQuadGen {
         self.stashs.push_back(QuadrupleStash::new());
         let stash = self.stashs.swap_remove_back(stash_index).unwrap();
         if !stash.v4_flows.is_empty() {
-            let mut v4_flows: Vec<Box<FlowMeterWithFlow>> =
-                stash.v4_flows.into_values().map(Box::new).collect();
-            Self::set_connection(&mut v4_flows, connection, possible_host);
-            if let Err(_) = self.output.send_large(v4_flows) {
-                debug!("qg push v4 flows to queue failed maybe queue have terminated");
+            self.batch_buffer.clear();
+            let mut values = stash.v4_flows.into_values();
+
+            while let Some(flow) = values.next() {
+                self.batch_buffer.push(Box::new(flow));
+                if self.batch_buffer.len() >= QUEUE_BATCH_SIZE {
+                    Self::set_connection(&mut self.batch_buffer, connection, possible_host);
+                    if let Err(e) = self.output.send_all(&mut self.batch_buffer) {
+                        debug!("qg push l7 stats to queue failed: {}", e);
+                        self.batch_buffer.clear();
+                    }
+                }
+            }
+            if !self.batch_buffer.is_empty() {
+                Self::set_connection(&mut self.batch_buffer, connection, possible_host);
+                if let Err(e) = self.output.send_all(&mut self.batch_buffer) {
+                    debug!("qg push l7 stats to queue failed: {}", e);
+                    self.batch_buffer.clear();
+                }
             }
         }
 
         if !stash.v6_flows.is_empty() {
-            let mut v6_flows: Vec<Box<FlowMeterWithFlow>> =
-                stash.v6_flows.into_values().map(Box::new).collect();
-            Self::set_connection(&mut v6_flows, connection, possible_host);
-            if let Err(_) = self.output.send_large(v6_flows) {
-                debug!("qg push v6 flows to queue failed maybe queue have terminated");
+            self.batch_buffer.clear();
+            let mut values = stash.v6_flows.into_values();
+
+            while let Some(flow) = values.next() {
+                self.batch_buffer.push(Box::new(flow));
+                if self.batch_buffer.len() >= QUEUE_BATCH_SIZE {
+                    Self::set_connection(&mut self.batch_buffer, connection, possible_host);
+                    if let Err(_) = self.output.send_all(&mut self.batch_buffer) {
+                        self.batch_buffer.clear();
+                    }
+                }
+            }
+            if !self.batch_buffer.is_empty() {
+                Self::set_connection(&mut self.batch_buffer, connection, possible_host);
+                if let Err(_) = self.output.send_all(&mut self.batch_buffer) {
+                    self.batch_buffer.clear();
+                }
             }
         }
     }
@@ -731,6 +758,7 @@ impl QuadrupleGenerator {
                 number_of_slots: second_slots as u64,
                 delay_seconds: second_delay_seconds,
                 stashs: VecDeque::with_capacity(second_slots),
+                batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
                 connections: VecDeque::with_capacity(second_slots),
                 counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
@@ -750,13 +778,9 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats { id, kind: "second" },
                 Countable::Ref(Arc::downgrade(&second_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "second".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
         }
 
@@ -770,6 +794,7 @@ impl QuadrupleGenerator {
                 number_of_slots: minute_slots as u64,
                 delay_seconds: minute_delay_seconds,
                 stashs: VecDeque::with_capacity(minute_slots),
+                batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
                 connections: VecDeque::with_capacity(minute_slots),
                 counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
@@ -789,13 +814,9 @@ impl QuadrupleGenerator {
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
             stats.register_countable(
-                "quadruple_generator",
+                &QgStats { id, kind: "minute" },
                 Countable::Ref(Arc::downgrade(&minute_quad_gen.as_ref().unwrap().counter)
                     as Weak<dyn RefCountable>),
-                vec![
-                    StatsOption::Tag("kind", "minute".to_owned()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
             );
         }
 
@@ -1150,9 +1171,12 @@ impl QuadrupleGenerator {
                         }
                     }
                     if send_batch.len() > 0 {
-                        if let Err(_) = self.output_flow.as_mut().unwrap().send_all(&mut send_batch)
+                        if let Err(e) = self.output_flow.as_mut().unwrap().send_all(&mut send_batch)
                         {
-                            debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
+                            debug!(
+                                "qg push TaggedFlow to l4_flow queue failed, because {:?}",
+                                e
+                            );
                             send_batch.clear();
                         }
                     }
@@ -1221,6 +1245,7 @@ mod test {
             number_of_slots: slots,
             delay_seconds: slots,
             stashs: VecDeque::with_capacity(slots as usize),
+            batch_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
             connections: VecDeque::with_capacity(slots as usize),
             counter: Arc::new(QgCounter::default()),
             ntp_diff,

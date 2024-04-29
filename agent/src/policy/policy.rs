@@ -94,7 +94,6 @@ pub struct Policy {
 
     nat: RwLock<Vec<AHashMap<u128, GpidEntry>>>,
 
-    queue_count: usize,
     first_hit: usize,
     fast_hit: usize,
 
@@ -116,7 +115,6 @@ impl Policy {
             table: FirstPath::new(queue_count, level, map_size, fast_disable),
             forward: Forward::new(queue_count, forward_capacity),
             nat: RwLock::new(vec![AHashMap::new(), AHashMap::new()]),
-            queue_count,
             first_hit: 0,
             fast_hit: 0,
             monitor: None,
@@ -266,8 +264,8 @@ impl Policy {
         let key = &mut packet.lookup_key;
 
         if packet.signal_source == SignalSource::EBPF {
-            let (endpoints, gpid_entries) = self.lookup_all_by_epc(key, local_epc_id);
-            packet.endpoint_data = Some(EndpointDataPov::new(Arc::new(endpoints)));
+            let (endpoints, gpid_entries) = self.lookup_from_ebpf(key, local_epc_id);
+            packet.endpoint_data = Some(EndpointDataPov::new(endpoints));
             packet.policy_data = Some(Arc::new(PolicyData::default())); // Only endpoint is required for ebpf data
             Self::fill_gpid_entry(packet, &gpid_entries);
             return;
@@ -355,12 +353,13 @@ impl Policy {
         endpoints.dst_info.l3_epc_id
     }
 
+    // NOTE: This function has insufficient performance and is only used in low PPS scenarios.
+    // Currently, only the Integration collector is calling this function.
     pub fn lookup_all_by_epc(
         &self,
         key: &mut LookupKey,
         local_epc_id: i32,
     ) -> (EndpointData, GpidEntry) {
-        // TODO：可能也需要走fast提升性能
         let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
             (local_epc_id, 0)
         } else {
@@ -369,6 +368,54 @@ impl Policy {
         let endpoints =
             self.labeler
                 .get_endpoint_data_by_epc(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1);
+        let entry = self.lookup_gpid_entry(key, &endpoints);
+        self.send_ebpf(
+            key.src_ip,
+            key.dst_ip,
+            key.src_port,
+            key.dst_port,
+            endpoints.src_info.l3_epc_id,
+            endpoints.dst_info.l3_epc_id,
+            &entry,
+        );
+
+        (endpoints, entry)
+    }
+
+    fn lookup_from_ebpf(
+        &mut self,
+        key: &mut LookupKey,
+        local_epc_id: i32,
+    ) -> (Arc<EndpointData>, GpidEntry) {
+        let (l3_epc_id_0, l3_epc_id_1) = if key.l2_end_0 {
+            (local_epc_id, 0)
+        } else {
+            (0, local_epc_id)
+        };
+
+        if let Some(endpoints) =
+            self.table
+                .ebpf_fast_get(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1)
+        {
+            let entry = self.lookup_gpid_entry(key, &endpoints);
+            self.send_ebpf(
+                key.src_ip,
+                key.dst_ip,
+                key.src_port,
+                key.dst_port,
+                endpoints.src_info.l3_epc_id,
+                endpoints.dst_info.l3_epc_id,
+                &entry,
+            );
+            return (endpoints, entry);
+        }
+
+        let endpoints =
+            self.labeler
+                .get_endpoint_data_by_epc(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1);
+        let endpoints =
+            self.table
+                .ebpf_fast_add(key.src_ip, key.dst_ip, l3_epc_id_0, l3_epc_id_1, endpoints);
         let entry = self.lookup_gpid_entry(key, &endpoints);
         self.send_ebpf(
             key.src_ip,
@@ -511,6 +558,10 @@ impl Policy {
     pub fn set_memory_limit(&self, limit: u64) {
         self.table.set_memory_limit(limit);
     }
+
+    pub fn reset_queue_size(&mut self, queue_count: usize) {
+        self.table.reset_queue_size(queue_count);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -615,10 +666,6 @@ impl PolicySetter {
         unsafe { &mut *self.policy }
     }
 
-    pub fn update_map_size(&mut self, map_size: usize) {
-        self.policy().table.update_map_size(map_size);
-    }
-
     pub fn update_local_epc(&mut self, local_epc: i32) {
         self.policy().labeler.update_local_epc(local_epc);
     }
@@ -679,6 +726,10 @@ impl PolicySetter {
 
     pub fn set_memory_limit(&self, limit: u64) {
         self.policy().set_memory_limit(limit)
+    }
+
+    pub fn reset_queue_size(&self, queue_count: usize) {
+        self.policy().reset_queue_size(queue_count);
     }
 }
 

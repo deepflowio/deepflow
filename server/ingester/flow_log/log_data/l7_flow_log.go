@@ -45,48 +45,49 @@ type L7Base struct {
 	// 知识图谱
 	KnowledgeGraph
 
+	Time uint32 `json:"time" category:"$tag" sub:"flow_info"` // s
 	// 网络层
-	IP40     uint32 `json:"ip4_0"`
-	IP41     uint32 `json:"ip4_1"`
-	IP60     net.IP `json:"ip6_0"`
-	IP61     net.IP `json:"ip6_1"`
-	IsIPv4   bool   `json:"is_ipv4"`
-	Protocol uint8
+	IP40     uint32 `json:"ip4_0" category:"$tag" sub:"network_layer" to_string:"IPv4String"`
+	IP41     uint32 `json:"ip4_1" category:"$tag" sub:"network_layer" to_string:"IPv4String"`
+	IP60     net.IP `json:"ip6_0" category:"$tag" sub:"network_layer" to_string:"IPv6String"`
+	IP61     net.IP `json:"ip6_1" category:"$tag" sub:"network_layer" to_string:"IPv6String"`
+	IsIPv4   bool   `json:"is_ipv4" category:"$tag" sub:"network_layer"`
+	Protocol uint8  `json:"protocol" category:"$tag" sub:"network_layer" enumfile:"l7_ip_protocol"`
 
 	// 传输层
-	ClientPort uint16 `json:"client_port"`
-	ServerPort uint16 `json:"server_port"`
+	ClientPort uint16 `json:"client_port" category:"$tag" sub:"transport_layer" `
+	ServerPort uint16 `json:"server_port" category:"$tag" sub:"transport_layer"`
 
 	// 流信息
-	FlowID       uint64 `json:"flow_id"`
-	TapType      uint8  `json:"capture_network_type_id"`
-	NatSource    uint8  `json:"nat_source"`
-	TapPortType  uint8  `json:"capture_nic_type"`
-	SignalSource uint16 `json:"signal_source"`
-	TunnelType   uint8  `json:"tunnel_type"`
-	TapPort      uint32 `json:"capture_nic"`
-	TapSide      string `json:"observation_point"`
-	VtapID       uint16 `json:"agent_id"`
-	ReqTcpSeq    uint32 `json:"req_tcp_seq"`
-	RespTcpSeq   uint32 `json:"resp_tcp_seq"`
-	StartTime    int64  `json:"start_time"` // us
-	EndTime      int64  `json:"end_time"`   // us
-	GPID0        uint32
-	GPID1        uint32
-	BizType      uint8
+	FlowID       uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
+	TapType      uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
+	NatSource    uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
+	TapPortType  uint8  `json:"capture_nic_type category:"$tag" sub:"capture_info"`
+	SignalSource uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l7_signal_source"`
+	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
+	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
+	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
+	ReqTcpSeq    uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
+	RespTcpSeq   uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
+	StartTime    int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
+	EndTime      int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
+	GPID0        uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
+	GPID1        uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
+	BizType      uint8  `json:"biz_type" category:"$tag" sub:"capture_info"`
 
-	ProcessID0             uint32
-	ProcessID1             uint32
-	ProcessKName0          string
-	ProcessKName1          string
-	SyscallTraceIDRequest  uint64
-	SyscallTraceIDResponse uint64
-	SyscallThread0         uint32
-	SyscallThread1         uint32
-	SyscallCoroutine0      uint64
-	SyscallCoroutine1      uint64
-	SyscallCapSeq0         uint32
-	SyscallCapSeq1         uint32
+	ProcessID0             uint32 `json:"process_id_0" category:"$tag" sub:"service_info"`
+	ProcessID1             uint32 `json:"process_id_1" category:"$tag" sub:"service_info"`
+	ProcessKName0          string `json:"process_kname_0" category:"$tag" sub:"service_info"`
+	ProcessKName1          string `json:"process_kname_1" category:"$tag" sub:"service_info"`
+	SyscallTraceIDRequest  uint64 `json:"syscall_trace_id_request" category:"$tag" sub:"tracing_info"`
+	SyscallTraceIDResponse uint64 `json:"syscall_trace_id_response" category:"$tag" sub:"tracing_info"`
+	SyscallThread0         uint32 `json:"syscall_thread_0" category:"$tag" sub:"tracing_info"`
+	SyscallThread1         uint32 `json:"syscall_thread_1" category:"$tag" sub:"tracing_info"`
+	SyscallCoroutine0      uint64 `json:"syscall_coroutine_0" category:"$tag" sub:"tracing_info"`
+	SyscallCoroutine1      uint64 `json:"syscall_coroutine_1" category:"$tag" sub:"tracing_info"`
+	SyscallCapSeq0         uint32 `json:"syscall_cap_seq_0" category:"$tag" sub:"tracing_info"`
+	SyscallCapSeq1         uint32 `json:"syscall_cap_seq_1" category:"$tag" sub:"tracing_info"`
 }
 
 func L7BaseColumns() []*ckdb.Column {
@@ -145,7 +146,7 @@ func L7BaseColumns() []*ckdb.Column {
 func (f *L7Base) WriteBlock(block *ckdb.Block) {
 	f.KnowledgeGraph.WriteBlock(block)
 
-	block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR))
+	block.WriteDateTime(f.Time)
 	block.WriteIPv4(f.IP40)
 	block.WriteIPv4(f.IP41)
 	block.WriteIPv6(f.IP60)
@@ -189,59 +190,63 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) {
 
 type L7FlowLog struct {
 	pool.ReferenceCount
-	_id uint64
+	_id uint64 `json:"_id" category:"$tag" sub:"flow_info"`
 
 	L7Base
 
-	L7Protocol    uint8
-	L7ProtocolStr string
-	Version       string
-	Type          uint8
-	IsTLS         uint8
+	L7Protocol    uint8  `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"`
+	L7ProtocolStr string `json:"l7_protocol_str" category:"$tag" sub:"application_layer"`
+	Version       string `json:"version" category:"$tag" sub:"application_layer"`
+	Type          uint8  `json:"type" category:"$tag" sub:"application_layer" enumfile:"l7_log_type"`
+	IsTLS         uint8  `json:"is_tls" category:"$tag" sub:"application_layer"`
 
-	RequestType     string
-	RequestDomain   string
-	RequestResource string
-	Endpoint        string
+	RequestType     string `json:"request_type" category:"$tag" sub:"application_layer"`
+	RequestDomain   string `json:"request_domain" category:"$tag" sub:"application_layer"`
+	RequestResource string `json:"request_resource" category:"$tag" sub:"application_layer"`
+	Endpoint        string `json:"end_point" category:"$tag" sub:"service_info"`
 
 	// 数据库nullabled类型的字段, 需使用指针传值写入。如果值无意义，应传递nil.
-	RequestId *uint64
+	RequestId *uint64 `json:"request_id" category:"$tag" sub:"application_layer" data_type:"*uint64"`
 	requestId uint64
 
-	ResponseStatus    uint8
-	ResponseCode      *int32
+	ResponseStatus    uint8  `json:"response_status" category:"$tag" sub:"application_layer" enumfile:"response_status"`
+	ResponseCode      *int32 `json:"response_code" category:"$tag" sub:"application_layer" data_type:"*int32"`
 	responseCode      int32
-	ResponseException string
-	ResponseResult    string
+	ResponseException string `json:"response_exception" category:"$tag" sub:"application_layer"`
+	ResponseResult    string `json:"response_result" category:"$tag" sub:"application_layer"`
 
-	HttpProxyClient string
-	XRequestId0     string
-	XRequestId1     string
-	TraceId         string
+	HttpProxyClient string `json:"http_proxy_client" category:"$tag" sub:"tracing_info"`
+	XRequestId0     string `json:"x_request_id_0" category:"$tag" sub:"tracing_info"`
+	XRequestId1     string `json:"x_request_id_1" category:"$tag" sub:"tracing_info"`
+	TraceId         string `json:"trace_id" category:"$tag" sub:"tracing_info"`
 	TraceIdIndex    uint64
-	SpanId          string
-	ParentSpanId    string
+	SpanId          string `json:"span_id" category:"$tag" sub:"tracing_info"`
+	ParentSpanId    string `json:"parent_span_id" category:"$tag" sub:"tracing_info"`
 	SpanKind        uint8
-	spanKind        *uint8
-	AppService      string
-	AppInstance     string
+	spanKind        *uint8 `json:"span_kind" category:"$tag" sub:"tracing_info" enumfile:"span_kind" data_type:"*uint8"`
+	AppService      string `json:"app_service" category:"$tag" sub:"service_info"`
+	AppInstance     string `json:"app_instance" category:"$tag" sub:"service_info"`
 
-	ResponseDuration uint64
-	RequestLength    *int64
+	ResponseDuration uint64 `json:"response_duration" category:"$metrics" sub:"delay"`
+	RequestLength    *int64 `json:"request_length" category:"$metrics" sub:"throughput" data_type:"*int64"`
 	requestLength    int64
-	ResponseLength   *int64
+	ResponseLength   *int64 `json:"response_length" category:"$metrics" sub:"throughput" data_type:"*int64"`
 	responseLength   int64
-	SqlAffectedRows  *uint64
+	SqlAffectedRows  *uint64 `json:"sql_affected_rows" category:"$metrics" sub:"throughput" data_type:"*uint64"`
 	sqlAffectedRows  uint64
-	DirectionScore   uint8
+	DirectionScore   uint8 `json:"direction_score" category:"$metrics" sub:"l4_throughput"`
 
-	AttributeNames  []string
-	AttributeValues []string
+	// For Packet signal sources, it represents the packet length captured by AF_PACKET, excluding the layer 4 headers; for eBPF signal sources, it indicates the number of bytes for a single system call, and note that when TCP stream reassembly is enabled, it represents the total number of bytes from multiple system calls.
+	CapturedRequestByte  uint32
+	CapturedResponseByte uint32
 
-	MetricsNames  []string
-	MetricsValues []float64
+	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
+	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
 
-	Events string
+	MetricsNames  []string  `json:"metrics_names" category:"$metrics" data_type:"[]string"`
+	MetricsValues []float64 `json:"metrics_values" category:"$metrics" data_type:"[]float64"`
+
+	Events string `json:"events" category:"$tag" sub:"application_layer"`
 }
 
 func L7FlowLogColumns() []*ckdb.Column {
@@ -282,6 +287,8 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
 		ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
+		ckdb.NewColumn("captured_request_byte", ckdb.UInt32),
+		ckdb.NewColumn("captured_response_byte", ckdb.UInt32),
 
 		ckdb.NewColumn("attribute_names", ckdb.ArrayLowCardinalityString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
@@ -329,6 +336,8 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.ResponseLength,
 		h.SqlAffectedRows,
 		h.DirectionScore,
+		h.CapturedRequestByte,
+		h.CapturedResponseByte,
 
 		h.AttributeNames,
 		h.AttributeValues,
@@ -336,6 +345,10 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.MetricsValues,
 		h.Events,
 	)
+}
+
+func (h *L7FlowLog) OrgID() uint16 {
+	return h.KnowledgeGraph.OrgId
 }
 
 func base64ToHexString(str string) string {
@@ -397,6 +410,8 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 		h.SqlAffectedRows = &h.sqlAffectedRows
 	}
 	h.DirectionScore = uint8(l.DirectionScore)
+	h.CapturedRequestByte = l.CapturedRequestByte
+	h.CapturedResponseByte = l.CapturedResponseByte
 
 	if l.Req != nil {
 		h.RequestDomain = l.Req.Domain
@@ -565,6 +580,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.RespTcpSeq = l.RespTcpSeq
 	b.StartTime = int64(l.StartTime) / int64(time.Microsecond)
 	b.EndTime = int64(l.EndTime) / int64(time.Microsecond)
+	b.Time = uint32(l.EndTime / uint64(time.Second))
 	b.GPID0 = l.Gpid_0
 	b.GPID1 = l.Gpid_1
 	b.BizType = uint8(l.BizType)
@@ -597,7 +613,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,
 		l.Gpid_0, l.Gpid_1,
-		l.VtapId, l.PodId_0, l.PodId_1,
+		uint16(l.VtapId), l.PodId_0, l.PodId_1,
 		uint16(l.PortDst),
 		l.TapSide,
 		protocol,
@@ -671,6 +687,8 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 			Table:   common.L7_FLOW_ID.String(),
 			VpcId:   L3EpcIDs[idx],
 			PodNsId: PodNSIDs[idx],
+			OrgId:   h.OrgId,
+			TeamID:  h.TeamID,
 		}
 
 		for i, name := range attributeNames[:minNamesLen] {

@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChostCloudTag struct {
@@ -36,7 +37,7 @@ func NewChChostCloudTag() *ChChostCloudTag {
 
 func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysql.ChChostCloudTag, bool) {
 	var vms []mysql.VM
-	err := mysql.Db.Unscoped().Find(&vms).Error
+	err := c.db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err))
 		return nil, false
@@ -50,9 +51,11 @@ func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysql.ChChostCloudT
 				Key: k,
 			}
 			keyToItem[key] = mysql.ChChostCloudTag{
-				ID:    vm.ID,
-				Key:   k,
-				Value: v,
+				ID:       vm.ID,
+				Key:      k,
+				Value:    v,
+				TeamID:   tagrecorder.DomainToTeamID[vm.Domain],
+				DomainID: tagrecorder.DomainToDomainID[vm.Domain],
 			}
 		}
 	}

@@ -37,34 +37,38 @@ func NewChPodK8sLabels() *ChPodK8sLabels {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate) {
+func (c *ChPodK8sLabels) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Label.IsDifferent() {
-		updateInfo["labels"] = fieldsUpdate.Label.GetNew()
+		labels, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		updateInfo["labels"] = labels
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodK8sLabels
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
+		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]K8sLabelsKey{{ID: sourceID}},
 				[]mysql.ChPodK8sLabels{{ID: sourceID, Labels: updateInfo["labels"].(string)}},
+				db,
 			)
 		} else {
-			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID})
+			c.SubscriberComponent.dbOperator.update(chItem, updateInfo, K8sLabelsKey{ID: sourceID}, db)
 		}
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) sourceToTarget(item *mysql.Pod) (keys []K8sLabelsKey, targets []mysql.ChPodK8sLabels) {
+func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, item *mysql.Pod) (keys []K8sLabelsKey, targets []mysql.ChPodK8sLabels) {
 	if item.Label == "" {
 		return
 	}
-	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: item.Label}}
+	labels, _ := common.StrToJsonAndMap(item.Label)
+	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: labels, TeamID: md.TeamID, DomainID: md.DomainID}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodK8sLabels) {
+func (c *ChPodK8sLabels) softDeletedTargetsUpdated(targets []mysql.ChPodK8sLabels, db *mysql.DB) {
 
 }

@@ -139,7 +139,7 @@ func (p *Process) ProduceByDelete(lcuuids []string) {
 		var name string
 		processInfo, exists := p.ToolDataSet.GetProcessInfoByLcuuid(lcuuid)
 		if !exists {
-			log.Error(p.org.LogPre("process info not fount, lcuuid: %s", lcuuid))
+			log.Error(p.metadata.LogPre("process info not fount, lcuuid: %s", lcuuid))
 		} else {
 			id = processInfo.ID
 			name = processInfo.Name
@@ -169,7 +169,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 		vtapIDs.Add(item.VTapID)
 	}
 	var vtaps []mysql.VTap
-	if err := p.org.DB.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
+	if err := p.metadata.DB.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
 		return nil, err
 	}
 	type vtapInfo struct {
@@ -195,7 +195,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 
 	// store vm info
 	var vms []mysql.VM
-	if err := p.org.DB.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
+	if err := p.metadata.DB.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	vmIDToName := make(map[int]string, len(vms))
@@ -205,7 +205,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 
 	// store pod node info
 	var podNodes []mysql.PodNode
-	if err := p.org.DB.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
+	if err := p.metadata.DB.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
 		return nil, err
 	}
 	podNodeIDToName := make(map[int]string, len(podNodes))
@@ -215,7 +215,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 
 	// store pod info
 	var pods []mysql.Pod
-	if err := p.org.DB.Find(&pods).Error; err != nil {
+	if err := p.metadata.DB.Find(&pods).Error; err != nil {
 		return nil, err
 	}
 	podIDToName := make(map[int]string, len(pods))

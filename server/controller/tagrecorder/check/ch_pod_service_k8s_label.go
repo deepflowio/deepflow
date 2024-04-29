@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sLabel struct {
@@ -40,17 +41,17 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 	var podServices []mysql.PodService
 	var podGroups []mysql.PodGroup
 	var podClusters []mysql.PodCluster
-	err := mysql.Db.Unscoped().Find(&podServices).Error
+	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&podGroups).Error
+	err = k.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&podClusters).Error
+	err = k.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
 		return nil, false
@@ -71,11 +72,13 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 					Key: splitSingleLabel[0],
 				}
 				keyToItem[key] = mysql.ChPodServiceK8sLabel{
-					ID:      podService.ID,
-					Key:     splitSingleLabel[0],
-					Value:   splitSingleLabel[1],
-					L3EPCID: podService.VPCID,
-					PodNsID: podService.PodNamespaceID,
+					ID:       podService.ID,
+					Key:      splitSingleLabel[0],
+					Value:    splitSingleLabel[1],
+					L3EPCID:  podService.VPCID,
+					PodNsID:  podService.PodNamespaceID,
+					TeamID:   tagrecorder.DomainToTeamID[podService.Domain],
+					DomainID: tagrecorder.DomainToDomainID[podService.Domain],
 				}
 			}
 		}

@@ -28,6 +28,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/pcap/config"
 	"github.com/deepflowio/deepflow/server/ingester/pcap/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
@@ -176,5 +177,6 @@ func pcapToStore(vtapID uint16, pcapHeader []byte, pcap *trident.Pcap) *dbwriter
 	for _, id := range pcap.GetAclGids() {
 		s.AclGids = append(s.AclGids, uint16(id))
 	}
+	s.OrgId, s.TeamID = grpc.QueryVtapOrgAndTeamID(vtapID)
 	return s
 }

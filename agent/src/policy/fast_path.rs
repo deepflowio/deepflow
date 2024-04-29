@@ -16,12 +16,15 @@
 
 use std::cmp::max;
 use std::net::IpAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, RwLock,
+};
 use std::thread;
 use std::time::Duration;
 
 use ipnet::{IpNet, Ipv4Net};
-use log::{info, warn};
+use log::warn;
 use lru::LruCache;
 
 use crate::common::endpoint::{EndpointData, EndpointStore};
@@ -49,28 +52,35 @@ struct PolicyTableItem {
 pub struct FastPath {
     interest_table: RwLock<Vec<PortRange>>,
     policy_table: Vec<Option<TableLruCache>>,
+    // Multi threaded access has thread safety issues, the ebpf
+    // table must be accessed by an ebpf dispatcher thread.
+    ebpf_table: LruCache<u128, Arc<EndpointData>>,
 
     // Use the first 16 bits of the IPv4 address to query the table and obtain the corresponding netmask.
     netmask_table: RwLock<Vec<u32>>,
 
-    policy_table_flush_flags: [bool; super::MAX_QUEUE_COUNT + 1],
+    policy_table_flush_flags: [AtomicBool; super::MAX_QUEUE_COUNT + 1],
+    ebpf_table_flush_flag: AtomicBool,
 
     mask_from_interface: RwLock<Vec<u32>>,
     mask_from_ipgroup: RwLock<Vec<u32>>,
     mask_from_cidr: RwLock<Vec<u32>>,
 
     map_size: usize,
-    queue_count: usize,
 
     // 统计计数
     policy_count: usize,
 }
 
+const FLUSH_FLAGS: AtomicBool = AtomicBool::new(false);
 impl FastPath {
     // 策略相关等内容更新后必须执行该函数以清空策略表
     pub fn flush(&mut self) {
         self.generate_mask_table();
-        self.policy_table_flush_flags = [true; super::MAX_QUEUE_COUNT + 1];
+        self.policy_table_flush_flags.iter_mut().for_each(|f| {
+            f.store(true, Ordering::Relaxed);
+        });
+        self.ebpf_table_flush_flag.store(true, Ordering::Relaxed);
         self.policy_count = 0;
     }
 
@@ -177,8 +187,8 @@ impl FastPath {
         *self.netmask_table.write().unwrap() = netmask_table;
     }
 
-    fn generate_mask_ip(&self, key: &LookupKey) -> (u32, u32) {
-        match (key.src_ip, key.dst_ip) {
+    fn generate_mask_ip(&self, ip_src: IpAddr, ip_dst: IpAddr) -> (u32, u32) {
+        match (ip_src, ip_dst) {
             (IpAddr::V4(src_addr), IpAddr::V4(dst_addr)) => {
                 let src = u32::from_be_bytes(src_addr.octets());
                 let dst = u32::from_be_bytes(dst_addr.octets());
@@ -207,8 +217,8 @@ impl FastPath {
             }
             _ => {
                 warn!(
-                    "LookupKey({}) is invalid: ip address version is inconsistent, deepflow-agent restart...\n",
-                    key
+                    "IpAddr({:?} and {:?}) is invalid: ip address version is inconsistent, deepflow-agent restart...\n",
+                    ip_src, ip_dst,
                 );
                 thread::sleep(Duration::from_secs(1));
                 std::process::exit(-1);
@@ -261,30 +271,15 @@ impl FastPath {
         key.dst_port = table[key.dst_port as usize].min();
     }
 
-    pub fn update_map_size(&mut self, map_size: usize) {
-        if self.map_size == map_size {
-            return;
-        }
-        info!(
-            "fastpath map size change from {} to {}",
-            self.map_size, map_size
-        );
-        self.map_size = map_size;
-
-        for i in 0..self.queue_count {
-            self.policy_table_flush_flags[i] = true
-        }
-    }
-
     fn table_flush_check(&mut self, key: &LookupKey) -> bool {
         let start_index = key.fast_index * MAX_TAP_TYPE;
-        if self.policy_table_flush_flags[key.fast_index] {
+        if self.policy_table_flush_flags[key.fast_index].load(Ordering::Relaxed) {
             for i in 0..MAX_TAP_TYPE {
                 if let Some(t) = &mut self.policy_table[start_index + i] {
                     t.clear();
                 }
             }
-            self.policy_table_flush_flags[key.fast_index] = false
+            self.policy_table_flush_flags[key.fast_index].store(false, Ordering::Relaxed);
         }
 
         if self.policy_table[start_index + u16::from(key.tap_type) as usize].is_none() {
@@ -412,11 +407,70 @@ impl FastPath {
         return None;
     }
 
+    // NOTE: Only one thread can access it at a time.
+    pub fn ebpf_add_endpoints(
+        &mut self,
+        ip_src: IpAddr,
+        ip_dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+        endpoints: EndpointData,
+    ) -> Arc<EndpointData> {
+        let (key_0, key_1) =
+            self.generate_ebpf_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst);
+        let key = (key_0 as u128) << 64 | key_1 as u128;
+        let endpoints = Arc::new(endpoints);
+        self.ebpf_table.put(key, endpoints.clone());
+
+        // NOTE: key_0 and key_1 cannot be the same.
+        let key = (key_1 as u128) << 64 | key_0 as u128;
+        self.ebpf_table.put(key, Arc::new(endpoints.reversed()));
+
+        return endpoints;
+    }
+
+    pub fn ebpf_get_endpoints(
+        &mut self,
+        ip_src: IpAddr,
+        ip_dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+    ) -> Option<Arc<EndpointData>> {
+        if self.ebpf_table_flush_flag.load(Ordering::Relaxed) {
+            self.ebpf_table.clear();
+            self.ebpf_table_flush_flag.store(false, Ordering::Relaxed);
+            return None;
+        }
+
+        let (key_0, key_1) =
+            self.generate_ebpf_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst);
+        let key = (key_0 as u128) << 64 | key_1 as u128;
+
+        self.ebpf_table.get(&key).and_then(|x| Some(x.clone()))
+    }
+
     // 查询路径调用会影响性能
     fn generate_map_key(&self, key: &LookupKey) -> (u64, u64) {
-        let (src_masked_ip, dst_masked_ip) = self.generate_mask_ip(key);
+        let (src_masked_ip, dst_masked_ip) = self.generate_mask_ip(key.src_ip, key.dst_ip);
 
         key.fast_key(src_masked_ip, dst_masked_ip)
+    }
+
+    fn generate_ebpf_map_key(
+        &self,
+        ip_src: IpAddr,
+        ip_dst: IpAddr,
+        l3_epc_id_src: i32,
+        l3_epc_id_dst: i32,
+    ) -> (u64, u64) {
+        let (src_masked_ip, dst_masked_ip) = self.generate_mask_ip(ip_src, ip_dst);
+        let l3_epc_id_src = l3_epc_id_src as u64;
+        let l3_epc_id_dst = l3_epc_id_dst as u64;
+
+        (
+            (src_masked_ip as u64) | 0xffff << 32 | l3_epc_id_src << 48,
+            (dst_masked_ip as u64) | 0xffff << 32 | l3_epc_id_dst << 48,
+        )
     }
 
     pub fn new(queue_count: usize, map_size: usize) -> Self {
@@ -426,7 +480,6 @@ impl FastPath {
         );
         FastPath {
             map_size,
-            queue_count,
 
             mask_from_interface: RwLock::new(
                 std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
@@ -450,12 +503,25 @@ impl FastPath {
                 }
                 table
             },
+            ebpf_table: LruCache::new(map_size.try_into().unwrap()),
 
-            policy_table_flush_flags: [false; super::MAX_QUEUE_COUNT + 1],
+            policy_table_flush_flags: [FLUSH_FLAGS; super::MAX_QUEUE_COUNT + 1],
+            ebpf_table_flush_flag: FLUSH_FLAGS,
 
             // 统计计数
             policy_count: 0,
         }
+    }
+
+    pub fn reset_queue_size(&mut self, queue_count: usize) {
+        assert!(
+            queue_count <= super::MAX_QUEUE_COUNT,
+            "Fastpath queue count over limit."
+        );
+        self.policy_table_flush_flags.iter_mut().for_each(|f| {
+            f.store(true, Ordering::Relaxed);
+        });
+        self.ebpf_table_flush_flag.store(true, Ordering::Relaxed)
     }
 }
 
@@ -704,5 +770,31 @@ mod test {
         for i in 0xc0a9..0xc0b0 {
             assert_eq!(table.mask_from_ipgroup.read().unwrap()[i], 0xfff80000);
         }
+    }
+
+    #[test]
+    fn test_ebpf_fast() {
+        let mut table = FastPath::new(1, 1024);
+        let ip_src = IpAddr::from("192.169.1.100".parse::<Ipv4Addr>().unwrap());
+        let ip_dst = IpAddr::from("172.29.2.200".parse::<Ipv4Addr>().unwrap());
+        let mut endpoints: EndpointData = Default::default();
+        endpoints.src_info.l3_epc_id = 10;
+        endpoints.dst_info.l3_epc_id = 20;
+
+        let e = table.ebpf_add_endpoints(ip_src, ip_dst, 10, 0, endpoints);
+        assert_eq!(10, e.src_info.l3_epc_id);
+        assert_eq!(20, e.dst_info.l3_epc_id);
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 10, 0).unwrap();
+        assert_eq!(10, e.src_info.l3_epc_id);
+        assert_eq!(20, e.dst_info.l3_epc_id);
+        let e = table.ebpf_get_endpoints(ip_dst, ip_src, 0, 10).unwrap();
+        assert_eq!(20, e.src_info.l3_epc_id);
+        assert_eq!(10, e.dst_info.l3_epc_id);
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 0, 0);
+        assert!(e.is_none());
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 0, 10);
+        assert!(e.is_none());
+        let e = table.ebpf_get_endpoints(ip_src, ip_dst, 10, 20);
+        assert!(e.is_none());
     }
 }

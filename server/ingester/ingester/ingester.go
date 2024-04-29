@@ -26,6 +26,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/ingester/ckmonitor"
 	"github.com/deepflowio/deepflow/server/ingester/datasource"
+	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/pool"
@@ -43,6 +44,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/droplet/droplet"
 	eventcfg "github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/event"
+	exporterscfg "github.com/deepflowio/deepflow/server/ingester/exporters/config"
 	extmetricscfg "github.com/deepflowio/deepflow/server/ingester/ext_metrics/config"
 	"github.com/deepflowio/deepflow/server/ingester/ext_metrics/ext_metrics"
 	flowlogcfg "github.com/deepflowio/deepflow/server/ingester/flow_log/config"
@@ -128,6 +130,10 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		bytes, _ = yaml.Marshal(prometheusConfig)
 		log.Infof("prometheus config:\n%s", string(bytes))
 
+		exportersConfig := exporterscfg.Load(cfg, configPath)
+		bytes, _ = yaml.Marshal(exportersConfig)
+		log.Infof("exporters config:\n%s", string(bytes))
+
 		var issu *ckissu.Issu
 		if !cfg.StorageDisabled {
 			var err error
@@ -160,8 +166,14 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			cfg.NodeIP,
 			receiver)
 
+		exporters := exporters.NewExporters(exportersConfig)
+		if exporters != nil {
+			exporters.Start()
+			closers = append(closers, exporters)
+		}
+
 		// 写流日志数据
-		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver, platformDataManager)
+		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver, platformDataManager, exporters)
 		checkError(err)
 		flowLog.Start()
 		closers = append(closers, flowLog)
@@ -174,13 +186,13 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			closers = append(closers, extMetrics)
 
 			// 写遥测数据
-			flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver, platformDataManager)
+			flowMetrics, err := flowmetrics.NewFlowMetrics(flowMetricsConfig, receiver, platformDataManager, exporters)
 			checkError(err)
 			flowMetrics.Start()
 			closers = append(closers, flowMetrics)
 
 			// write event data
-			event, err := event.NewEvent(eventConfig, shared.ResourceEventQueue, receiver, platformDataManager)
+			event, err := event.NewEvent(eventConfig, shared.ResourceEventQueue, receiver, platformDataManager, exporters)
 			checkError(err)
 			event.Start()
 			closers = append(closers, event)

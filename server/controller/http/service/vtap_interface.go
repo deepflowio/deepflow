@@ -17,10 +17,11 @@
 package service
 
 import (
+	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 func GetVTapInterfaces(filter map[string]interface{}) (resp []model.VTapInterface, err error) {
-	return tagrecorder.GetVTapInterfaces(filter)
+	return tagrecorder.GetVTapInterfaces(filter, mysqlCommon.DEFAULT_ORG_ID) // TODO Give a default ID and process it later.
 }

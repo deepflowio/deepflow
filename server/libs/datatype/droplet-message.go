@@ -34,7 +34,7 @@ type MessageType uint8
 const (
 	MESSAGE_TYPE_COMPRESS MessageType = iota
 	MESSAGE_TYPE_SYSLOG
-	MESSAGE_TYPE_STATSD
+	MESSAGE_TYPE_SERVER_DFSTATS
 
 	MESSAGE_TYPE_METRICS
 	MESSAGE_TYPE_TAGGEDFLOW
@@ -50,13 +50,14 @@ const (
 	MESSAGE_TYPE_PROFILE
 	MESSAGE_TYPE_PROC_EVENT
 	MESSAGE_TYPE_ALARM_EVENT
+	MESSAGE_TYPE_K8S_EVENT
 	MESSAGE_TYPE_MAX
 )
 
 var MessageTypeString = [MESSAGE_TYPE_MAX]string{
-	MESSAGE_TYPE_COMPRESS: "compressed_pcap",
-	MESSAGE_TYPE_SYSLOG:   "syslog",
-	MESSAGE_TYPE_STATSD:   "statsd",
+	MESSAGE_TYPE_COMPRESS:       "compressed_pcap",
+	MESSAGE_TYPE_SYSLOG:         "syslog",
+	MESSAGE_TYPE_SERVER_DFSTATS: "deepflow_server_stats",
 
 	MESSAGE_TYPE_METRICS:        "metrics",
 	MESSAGE_TYPE_TAGGEDFLOW:     "l4_log",
@@ -72,6 +73,7 @@ var MessageTypeString = [MESSAGE_TYPE_MAX]string{
 	MESSAGE_TYPE_PROFILE:                  "profile",
 	MESSAGE_TYPE_PROC_EVENT:               "proc_event",
 	MESSAGE_TYPE_ALARM_EVENT:              "alarm_event",
+	MESSAGE_TYPE_K8S_EVENT:                "k8s_event",
 }
 
 func (m MessageType) String() string {
@@ -94,9 +96,9 @@ const (
 )
 
 var MessageHeaderTypes = [MESSAGE_TYPE_MAX]MessageHeaderType{
-	MESSAGE_TYPE_COMPRESS: HEADER_TYPE_LT,
-	MESSAGE_TYPE_SYSLOG:   HEADER_TYPE_LT_NOCHECK,
-	MESSAGE_TYPE_STATSD:   HEADER_TYPE_LT_NOCHECK,
+	MESSAGE_TYPE_COMPRESS:       HEADER_TYPE_LT,
+	MESSAGE_TYPE_SYSLOG:         HEADER_TYPE_LT_NOCHECK,
+	MESSAGE_TYPE_SERVER_DFSTATS: HEADER_TYPE_LT_VTAP,
 
 	MESSAGE_TYPE_METRICS:        HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_TAGGEDFLOW:     HEADER_TYPE_LT_VTAP,
@@ -112,6 +114,7 @@ var MessageHeaderTypes = [MESSAGE_TYPE_MAX]MessageHeaderType{
 	MESSAGE_TYPE_PROFILE:                  HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_PROC_EVENT:               HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_ALARM_EVENT:              HEADER_TYPE_LT_VTAP,
+	MESSAGE_TYPE_K8S_EVENT:                HEADER_TYPE_LT_VTAP,
 }
 
 func (m MessageType) HeaderType() MessageHeaderType {

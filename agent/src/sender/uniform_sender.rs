@@ -36,7 +36,7 @@ use super::{get_sender_id, QUEUE_BATCH_SIZE};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{
-    Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
+    self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
 };
 use public::proto::trident::{Exception, SocketType};
 use public::queue::{Error, Receiver};
@@ -370,6 +370,7 @@ impl<T: Sendable> UniformSender<T> {
         if self.encoder.buffer_len() > 0 {
             self.encoder.set_header_frame_size();
             Self::send_buffer(
+                &self.running,
                 &self.name,
                 &self.counter,
                 &self.exception_handler,
@@ -381,6 +382,7 @@ impl<T: Sendable> UniformSender<T> {
     }
 
     fn send_buffer(
+        running: &Arc<AtomicBool>,
         name: &str,
         counter: &SenderCounter,
         exception_handler: &ExceptionHandler,
@@ -443,7 +445,7 @@ impl<T: Sendable> UniformSender<T> {
         let tcp_stream = conn.tcp_stream.as_mut().unwrap();
 
         let mut write_offset = 0usize;
-        loop {
+        while running.load(Ordering::Relaxed) {
             let result = tcp_stream.write(&buffer[write_offset..]);
             match result {
                 Ok(size) => {
@@ -481,9 +483,8 @@ impl<T: Sendable> UniformSender<T> {
             return;
         }
         self.stats.register_countable(
-            "collect_sender",
+            &stats::SingleTagModule("collect_sender", "type", message_type),
             Countable::Ref(Arc::downgrade(&self.counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("type", message_type.to_string())],
         );
         self.stats_registered = true;
     }
@@ -499,6 +500,9 @@ impl<T: Sendable> UniformSender<T> {
             ) {
                 Ok(_) => {
                     for send_item in batch.drain(..) {
+                        if !self.running.load(Ordering::Relaxed) {
+                            break;
+                        }
                         let message_type = send_item.message_type();
                         self.counter.rx.fetch_add(1, Ordering::Relaxed);
                         debug!(

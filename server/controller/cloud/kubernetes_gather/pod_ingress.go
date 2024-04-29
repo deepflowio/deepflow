@@ -22,7 +22,6 @@ import (
 	"github.com/bitly/go-simplejson"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingressRules []model.PodIngressRule, ingressRuleBackends []model.PodIngressRuleBackend, err error) {
@@ -64,8 +63,9 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			log.Infof("ingress (%s) namespace not found", name)
 			continue
 		}
+		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		ingress := model.PodIngress{
-			Lcuuid:             uID,
+			Lcuuid:             uLcuuid,
 			Name:               name,
 			PodNamespaceLcuuid: namespaceLcuuid,
 			AZLcuuid:           k.azLcuuid,
@@ -76,12 +76,12 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 		rules := iData.Get("spec").Get("rules")
 		for index := range rules.MustArray() {
 			rule := rules.GetIndex(index)
-			ruleLcuuid := common.GetUUID(uID+rule.Get("host").MustString()+"_"+strconv.Itoa(index), uuid.Nil)
+			ruleLcuuid := common.GetUUIDByOrgID(k.orgID, uLcuuid+rule.Get("host").MustString()+"_"+strconv.Itoa(index))
 			ingressRule := model.PodIngressRule{
 				Lcuuid:           ruleLcuuid,
 				Host:             rule.Get("host").MustString(),
 				Protocol:         "HTTP",
-				PodIngressLcuuid: uID,
+				PodIngressLcuuid: uLcuuid,
 			}
 			ingressRules = append(ingressRules, ingressRule)
 			for p := range rule.Get("http").Get("paths").MustArray() {
@@ -105,10 +105,10 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 					ports = v
 					break
 				}
-				if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uID {
+				if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uLcuuid {
 					log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID)
 				} else {
-					k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uID
+					k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uLcuuid
 				}
 				portString := backend.Get("servicePort").MustString()
 				if portString == "" {
@@ -127,12 +127,12 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				}
 				key := serviceName + "_" + strconv.Itoa(port)
 				ingressRuleBackend := model.PodIngressRuleBackend{
-					Lcuuid:               common.GetUUID(uID+key+path.Get("path").MustString(), uuid.Nil),
+					Lcuuid:               common.GetUUIDByOrgID(k.orgID, uLcuuid+key+path.Get("path").MustString()),
 					Path:                 path.Get("path").MustString(),
 					Port:                 port,
 					PodServiceLcuuid:     serviceLcuuid,
 					PodIngressRuleLcuuid: ruleLcuuid,
-					PodIngressLcuuid:     uID,
+					PodIngressLcuuid:     uLcuuid,
 				}
 				ingressRuleBackends = append(ingressRuleBackends, ingressRuleBackend)
 			}
@@ -142,11 +142,11 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			backend, ok = iData.Get("spec").CheckGet("defaultBackend")
 		}
 		if ok {
-			ruleLcuuid := common.GetUUID(uID+"defaultBackend", uuid.Nil)
+			ruleLcuuid := common.GetUUIDByOrgID(k.orgID, uLcuuid+"defaultBackend")
 			ingressRule := model.PodIngressRule{
 				Lcuuid:           ruleLcuuid,
 				Protocol:         "HTTP",
-				PodIngressLcuuid: uID,
+				PodIngressLcuuid: uLcuuid,
 			}
 			ingressRules = append(ingressRules, ingressRule)
 			serviceName := backend.Get("serviceName").MustString()
@@ -164,11 +164,11 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				ports = v
 				break
 			}
-			if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uID {
+			if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uLcuuid {
 				log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID)
 
 			} else {
-				k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uID
+				k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uLcuuid
 			}
 			portString := backend.Get("servicePort").MustString()
 			if portString == "" {
@@ -187,23 +187,23 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			}
 			key := serviceName + "_" + strconv.Itoa(port)
 			ingressRuleBackend := model.PodIngressRuleBackend{
-				Lcuuid:               common.GetUUID(uID+key+"default", uuid.Nil),
+				Lcuuid:               common.GetUUIDByOrgID(k.orgID, uLcuuid+key+"default"),
 				Port:                 port,
 				PodServiceLcuuid:     serviceLcuuid,
 				PodIngressRuleLcuuid: ruleLcuuid,
-				PodIngressLcuuid:     uID,
+				PodIngressLcuuid:     uLcuuid,
 			}
 			ingressRuleBackends = append(ingressRuleBackends, ingressRuleBackend)
 		}
 		if _, ok := iData.Get("spec").CheckGet("host"); ok {
 			spec := iData.Get("spec")
 			host := spec.Get("host").MustString()
-			ruleLcuuid := common.GetUUID(uID+host, uuid.Nil)
+			ruleLcuuid := common.GetUUIDByOrgID(k.orgID, uLcuuid+host)
 			ingressRule := model.PodIngressRule{
 				Lcuuid:           ruleLcuuid,
 				Protocol:         "HTTP",
 				Host:             host,
-				PodIngressLcuuid: uID,
+				PodIngressLcuuid: uLcuuid,
 			}
 			ingressRules = append(ingressRules, ingressRule)
 			serviceName := spec.Get("to").Get("name").MustString()
@@ -218,11 +218,11 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				ports = v
 				break
 			}
-			if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uID {
+			if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uLcuuid {
 				log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID)
 
 			} else {
-				k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uID
+				k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uLcuuid
 			}
 			if _, ok := spec.CheckGet("port"); !ok {
 				log.Infof("ingress (%s) port not found", uID)
@@ -238,11 +238,11 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			}
 			key := serviceName + "_" + strconv.Itoa(port)
 			ingressRuleBackend := model.PodIngressRuleBackend{
-				Lcuuid:               common.GetUUID(uID+key+"default", uuid.Nil),
+				Lcuuid:               common.GetUUIDByOrgID(k.orgID, uLcuuid+key+"default"),
 				Port:                 port,
 				PodServiceLcuuid:     serviceLcuuid,
 				PodIngressRuleLcuuid: ruleLcuuid,
-				PodIngressLcuuid:     uID,
+				PodIngressLcuuid:     uLcuuid,
 			}
 			ingressRuleBackends = append(ingressRuleBackends, ingressRuleBackend)
 		}

@@ -39,7 +39,7 @@ func NewChPodService() *ChPodService {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodService) sourceToTarget(source *mysql.PodService) (keys []IDKey, targets []mysql.ChPodService) {
+func (c *ChPodService) sourceToTarget(md *message.Metadata, source *mysql.PodService) (keys []IDKey, targets []mysql.ChPodService) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
@@ -51,13 +51,16 @@ func (c *ChPodService) sourceToTarget(source *mysql.PodService) (keys []IDKey, t
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
 		PodNsID:      source.PodNamespaceID,
+		TeamID:       md.TeamID,
+		DomainID:     md.DomainID,
 	})
 	return
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodService) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate) {
+func (c *ChPodService) onResourceUpdated(sourceID int, fieldsUpdate *message.PodServiceFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
+
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
@@ -69,14 +72,15 @@ func (c *ChPodService) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 	}
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChPodService
-		mysql.Db.Where("id = ?", sourceID).First(&chItem)
-		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodService) softDeletedTargetsUpdated(targets []mysql.ChPodService) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (c *ChPodService) softDeletedTargetsUpdated(targets []mysql.ChPodService, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

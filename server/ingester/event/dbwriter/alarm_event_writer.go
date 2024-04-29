@@ -70,6 +70,8 @@ type AlarmEventStore struct {
 	PolicyThresholdCritical string
 	PolicyThresholdError    string
 	PolicyThresholdWarning  string
+	OrgId                   uint16
+	TeamID                  uint16
 }
 
 func AlarmEventColumns() []*ckdb.Column {
@@ -102,6 +104,7 @@ func AlarmEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("policy_threshold_critical", ckdb.String),
 		ckdb.NewColumn("policy_threshold_error", ckdb.String),
 		ckdb.NewColumn("policy_threshold_warning", ckdb.String),
+		ckdb.NewColumn("team_id", ckdb.UInt16),
 	}
 }
 
@@ -134,11 +137,16 @@ func (e *AlarmEventStore) WriteBlock(block *ckdb.Block) {
 		e.PolicyThresholdCritical,
 		e.PolicyThresholdError,
 		e.PolicyThresholdWarning,
+		e.TeamID,
 	)
 }
 
 func (e *AlarmEventStore) Release() {
 	ReleaseAlarmEventStore(e)
+}
+
+func (e *AlarmEventStore) OrgID() uint16 {
+	return e.OrgId
 }
 
 func GenAlarmEventCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
@@ -173,14 +181,14 @@ func NewAlarmEventWriter(config *config.Config) (*EventWriter, error) {
 		ckdbCluster:       config.Base.CKDB.ClusterName,
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
 		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
-		ttl:               config.AlarmTTL,
+		ttl:               config.AlarmEventTTL,
 		writerConfig:      config.CKWriterConfig,
 	}
 
 	ckTable := GenAlarmEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, common.ALARM_EVENT.TableName()))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		common.ALARM_EVENT.TableName(), config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		common.ALARM_EVENT.TableName(), config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
 	if err != nil {
 		return nil, err
 	}

@@ -43,30 +43,33 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate) {
+func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpdate, db *mysql.DB) {
 	updateInfo := make(map[string]interface{})
 	if fieldsUpdate.Name.IsDifferent() {
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
-	// if oldItem.IconID != newItem.IconID { // TODO need icon id
-	// 	updateInfo["icon_id"] = newItem.IconID
-	// }
-	// TODO refresh control
 	if len(updateInfo) > 0 {
 		var chItem mysql.ChAZ
-		mysql.Db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
-		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID})
+		db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
+		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) sourceToTarget(az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ) {
+func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ) {
 	iconID := a.domainLcuuidToIconID[az.Domain]
+	var err error
 	if iconID == 0 {
-		key := IconKey{
-			NodeType: RESOURCE_TYPE_AZ,
+		a.domainLcuuidToIconID, a.resourceTypeToIconID, err = GetIconInfo(a.cfg)
+		if err == nil {
+			iconID = a.domainLcuuidToIconID[az.Domain]
 		}
-		iconID = a.resourceTypeToIconID[key]
+		if iconID == 0 {
+			key := IconKey{
+				NodeType: RESOURCE_TYPE_AZ,
+			}
+			iconID = a.resourceTypeToIconID[key]
+		}
 	}
 	keys = append(keys, IDKey{ID: az.ID})
 	name := az.Name
@@ -74,16 +77,18 @@ func (a *ChAZ) sourceToTarget(az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ)
 		name += " (deleted)"
 	}
 	targets = append(targets, mysql.ChAZ{
-		ID:     az.ID,
-		Name:   name,
-		IconID: iconID,
+		ID:       az.ID,
+		Name:     name,
+		IconID:   iconID,
+		TeamID:   md.TeamID,
+		DomainID: md.DomainID,
 	})
 	return
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (a *ChAZ) softDeletedTargetsUpdated(targets []mysql.ChAZ) {
-	mysql.Db.Clauses(clause.OnConflict{
+func (a *ChAZ) softDeletedTargetsUpdated(targets []mysql.ChAZ, db *mysql.DB) {
+	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)

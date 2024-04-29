@@ -20,6 +20,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
 type TInterfaces []*trident.Interface
@@ -36,9 +37,10 @@ type DomainInterfaceProto struct {
 	allCompleteInterfacesExceptPod       TInterfaces
 	regionToInterfacesOnlyPod            DomainInterfaceData
 	azToInterfacesOnlyPod                DomainInterfaceData
+	ORGID
 }
 
-func NewDomainInterfaceProto() *DomainInterfaceProto {
+func NewDomainInterfaceProto(orgID ORGID) *DomainInterfaceProto {
 	return &DomainInterfaceProto{
 		domainToInterfacesExceptPod:          make(DomainInterfaceData),
 		domainToAllInterfaces:                make(DomainInterfaceData),
@@ -49,6 +51,7 @@ func NewDomainInterfaceProto() *DomainInterfaceProto {
 		allCompleteInterfacesExceptPod:       make(TInterfaces, 0),
 		regionToInterfacesOnlyPod:            make(DomainInterfaceData),
 		azToInterfacesOnlyPod:                make(DomainInterfaceData),
+		ORGID:                                orgID,
 	}
 }
 
@@ -98,7 +101,7 @@ func (d *DomainInterfaceProto) addInterfaceProto(vif *models.VInterface, ifpd *I
 		}
 		podDevice, ok := rawData.typeIDToDevice[typeIDKey]
 		if ok == false {
-			log.Error("VIF (device_id:%s device_type:%s) not found", vif.DeviceID, vif.DeviceType)
+			log.Error(d.Logf("VIF (device_id:%d device_type:%d) not found", vif.DeviceID, vif.DeviceType))
 		}
 		az := podDevice.AZ
 		if _, ok := d.azToInterfacesOnlyPod[az]; ok {
