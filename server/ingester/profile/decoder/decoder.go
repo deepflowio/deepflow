@@ -58,7 +58,7 @@ type Counter struct {
 	RawCount           int64 `statsd:"raw-count"`
 	JavaProfileCount   int64 `statsd:"java-profile-count"`
 	GolangProfileCount int64 `statsd:"golang-profile-count"`
-	EBPFProfileCount   int64 `statsd:"EBPF-profile-count"`
+	EBPFProfileCount   int64 `statsd:"ebpf-profile-count"`
 
 	UncompressSize int64 `statsd:"uncompress-size"`
 	CompressedSize int64 `statsd:"compressed-size"`

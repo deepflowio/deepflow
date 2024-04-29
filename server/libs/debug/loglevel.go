@@ -100,9 +100,9 @@ func (l *LogLevelControl) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, op
 			}
 			module, logLevel := moduleLoglevel[0], moduleLoglevel[1]
 
-			log.Infof("set module(%s) logLevel to (%s)", module, logLevel)
+			log.Infof("set module (%s) logLevel to (%s)", module, logLevel)
 			if err := setLogLevel(module, logLevel); err != nil {
-				log.Warningf("set module(%s) logLevel(%s) failed: %s", module, logLevel, err)
+				log.Warningf("set module (%s) logLevel (%s) failed: %s", module, logLevel, err)
 				SendToClient(conn, remote, 1, nil)
 			} else {
 				enc, _ := encodeBuffer(logLevel)
