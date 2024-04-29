@@ -213,7 +213,9 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			time.Sleep(time.Second)
 			err = issu.Start()
 			checkError(err)
-			closers = append(closers, issu)
+			// after issu execution is completed, should close it to prevent the connection from occupying memory.
+			issu.Close()
+			issu = nil
 		}
 	}
 	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志
