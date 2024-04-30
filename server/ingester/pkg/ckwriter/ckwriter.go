@@ -429,7 +429,7 @@ func (w *CKWriter) writeItems(queueID, connID int, cache *Cache) error {
 	if IsNil(ck) {
 		if err := w.ResetConnection(connID); err != nil {
 			time.Sleep(time.Second * 10)
-			return fmt.Errorf("can not connect to clickhouse: %s", err)
+			return fmt.Errorf("write block failed, can not connect to clickhouse: %s", err)
 		}
 		ck = w.conns[connID]
 	}
@@ -439,13 +439,13 @@ func (w *CKWriter) writeItems(queueID, connID int, cache *Cache) error {
 	if IsNil(batch) {
 		w.batchs[batchID], err = ck.PrepareBatch(context.Background(), cache.prepare)
 		if err != nil {
-			return err
+			return fmt.Errorf("prepare batch item write block failed: %s", err)
 		}
 		batch = w.batchs[batchID]
 	} else {
 		batch, err = ck.PrepareReuseBatch(context.Background(), cache.prepare, batch)
 		if err != nil {
-			return err
+			return fmt.Errorf("prepare reuse batch item write block failed: %s", err)
 		}
 		w.batchs[batchID] = batch
 	}
