@@ -132,6 +132,8 @@ pub struct FlowMap {
     time_window_size: usize,
     total_flow: usize,
     time_set_slot_size: usize,
+    capacity: usize,
+    size: isize,
 
     tagged_flow_allocator: Allocator<TaggedFlow>,
     l7_stats_allocator: Allocator<L7Stats>,
@@ -260,9 +262,7 @@ impl FlowMap {
             l7_stats_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
             protolog_buffer: Vec::with_capacity(QUEUE_BATCH_SIZE),
             last_queue_flush: Duration::ZERO,
-            perf_cache: Rc::new(RefCell::new(L7PerfCache::new(
-                (config.capacity >> 2) as usize,
-            ))),
+            perf_cache: Rc::new(RefCell::new(L7PerfCache::new(config.capacity as usize))),
             flow_perf_counter,
             ntp_diff,
             packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
@@ -297,6 +297,8 @@ impl FlowMap {
                 None
             },
             stats_collector,
+            capacity: config.capacity as usize,
+            size: 0,
         }
     }
 
@@ -622,17 +624,21 @@ impl FlowMap {
         true
     }
 
+    fn lookup_without_flow(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
+        // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let local_epc_id = match config.ebpf.as_ref() {
+            Some(c) => c.epc_id as i32,
+            _ => 0,
+        };
+        #[cfg(target_os = "windows")]
+        let local_epc_id = 0;
+        (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
+    }
+
     pub fn inject_meta_packet(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
         if !self.inject_flush_ticker(config, meta_packet.lookup_key.timestamp.into()) {
-            // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            let local_epc_id = match config.ebpf.as_ref() {
-                Some(c) => c.epc_id as i32,
-                _ => 0,
-            };
-            #[cfg(target_os = "windows")]
-            let local_epc_id = 0;
-            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
+            self.lookup_without_flow(config, meta_packet);
             return;
         }
 
@@ -1745,8 +1751,14 @@ impl FlowMap {
         config: &Config,
         meta_packet: &mut MetaPacket,
     ) -> Option<Box<FlowNode>> {
-        // To avoid using each package to query policies that may lead to CPU increase and performance decrease,
-        // there will not be use config.capacity to limit the addition of FlowNode
+        if self.size as usize >= self.capacity {
+            self.stats_counter
+                .drop_by_capacity
+                .fetch_add(1, Ordering::Relaxed);
+            self.lookup_without_flow(config, meta_packet);
+            return None;
+        }
+
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         let mut node = match meta_packet.lookup_key.proto {
             IpProtocol::TCP => self.new_tcp_node(config, meta_packet),
@@ -1760,10 +1772,12 @@ impl FlowMap {
             {
                 // For ebpf data, if server_port is 0, it means that parsed data failed,
                 // the info in node maybe wrong, we should not create this node.
+                self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
                 return None;
             }
         }
 
+        self.size += 1;
         self.stats_counter
             .concurrent
             .fetch_add(1, Ordering::Relaxed);
@@ -1885,6 +1899,7 @@ impl FlowMap {
             }
         }
 
+        self.size -= 1;
         self.stats_counter
             .concurrent
             .fetch_sub(1, Ordering::Relaxed);
@@ -2317,6 +2332,7 @@ pub struct FlowMapCounter {
     new: AtomicU64,                      // the number of created flow
     closed: AtomicU64,                   // the number of closed flow
     drop_by_window: AtomicU64,           // times of flush which drop by window
+    drop_by_capacity: AtomicU64,         // packet counter which drop by capacity
     packet_delay: AtomicI64,             // inject_meta_packet delay compared to ntp corrected system time
     flush_delay: AtomicI64,              // inject_flush_ticker delay compared to ntp corrected system time
     flow_delay: AtomicI64,               // output flow `flow_stat_time` delay compared to ntp corrected system time
@@ -2349,6 +2365,11 @@ impl RefCountable for FlowMapCounter {
                 "drop_by_window",
                 CounterType::Gauged,
                 CounterValue::Unsigned(self.drop_by_window.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "drop_by_capacity",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.drop_by_capacity.swap(0, Ordering::Relaxed)),
             ),
             (
                 "packet_delay",
