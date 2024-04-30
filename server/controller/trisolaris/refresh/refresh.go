@@ -19,6 +19,7 @@ package refresh
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/op/go-logging"
@@ -66,11 +67,10 @@ func (r *RefreshOP) refreshCache(orgID int, dataTypes []common.DataChanged) {
 	}
 	log.Infof("refresh cache for trisolaris(%v %v)", localControllerIPs, remoteControllerIPs)
 	params := url.Values{}
-	params.Add("org_id", string(orgID))
+	params.Add("org_id", strconv.Itoa(orgID))
 	for _, dataType := range dataTypes {
 		params.Add("type", string(dataType))
 	}
-	params.Add("org_id", string(orgID))
 	paramsEncode := params.Encode()
 	for _, controllerIP := range localControllerIPs {
 		err := common.IsTCPActive(controllerIP, common.GConfig.HTTPPort)

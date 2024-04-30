@@ -4,20 +4,25 @@ vtap_group_id: g-xxxxxx
 ####################
 ## Resource Limit ##
 ####################
-## CPU Limit
-## Unit: number of logical cores. Default: 1. Range: [1, 100000]
-## Note: deepflow-agent uses cgroups to limit CPU usage.
-##   But please note that deepflow-agent running in K8s Pod
-##   cannot be limited by this value, please configure it
-##   through K8s Limit.
+## CPU Limit (in CPU Cores)
+## Unit: number of logical cores. Default: 1. Range: [1, 1000]
+## Note: deepflow-agent uses cgroups to limit CPU usage. 1 cpu = 1 core.
+##   The actual CPU limit is based on the lesser of max_cpus and max_millicpus.
+##   For example, if max_cpus = 2 and max_millicpus = 1500, the actual CPU limit
+##   would be 1.5 cores.
 #max_cpus: 1
+
+## CPU Limit (in MilliCPUs)
+## Unit: number of millicpus. Default: 1000. Range: [1, 1000000]
+## Note: deepflow-agent uses cgroups to limit CPU usage. 1 millicpu = 1 millicore = 0.001 core.
+##   The actual CPU limit is based on the lesser of max_cpus and max_millicpus.
+##   For example, if max_cpus = 2 and max_millicpus = 1500, the actual CPU limit
+##   would be 1.5 cores.
+#max_millicpus: 1000
 
 ## Memory Limit
 ## Unit: M bytes. Default: 768. Range: [128, 100000]
 ## Note: deepflow-agent uses cgroups to limit memory usage.
-##   But please note that deepflow-agent running in K8s Pod
-##   cannot be limited by this value, please configure it
-##   through K8s Limit.
 #max_memory: 768
 
 ## System Free Memory Limit
@@ -826,11 +831,11 @@ vtap_group_id: g-xxxxxx
     #flow-slots-size: 131072
 
     ## Maximum Flow
-    ## Default: 1048576
+    ## Default: 65535
     ## Note: Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
-    ##   the RRT cache, Example: rrt-cache-capacity = flow-count-limit / 4. When rrt-cache-capacity is
+    ##   the RRT cache, Example: rrt-cache-capacity = flow-count-limit. When rrt-cache-capacity is
     ##   not enough, it will be unable to calculate the rrt of l7.
-    #flow-count-limit: 1048576
+    #flow-count-limit: 65535
 
     ## Queue Size of FlowAggregator (1s->1m)
     ## Default: 65536. Range: [65536, +oo)

@@ -1043,7 +1043,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
 		}
 		sql = fmt.Sprintf(
-			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s",
+			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid, icon_id FROM device_map %s GROUP BY value, display_name, device_type, uid, icon_id ORDER BY %s ASC %s",
 			whereSql, orderBy, limitSql,
 		)
 	} else if tag == "vpc" || tag == "l2_vpc" {
