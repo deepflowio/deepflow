@@ -1094,7 +1094,7 @@ impl Default for FlowGeneratorConfig {
             opening_rst_timeout: Duration::from_secs(1),
 
             hash_slots: 131072,
-            capacity: 1048576,
+            capacity: 65535,
             flush_interval: Duration::from_secs(1),
             aggr_queue_size: 65535,
             memory_pool_size: 65536,
