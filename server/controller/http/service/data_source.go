@@ -472,7 +472,7 @@ func CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql
 	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call add data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("POST", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
-	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
 		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
 	}
 	return err
@@ -492,7 +492,7 @@ func CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource, ing
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call mod data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("PATCH", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
-	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
 		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
 	}
 	return err
@@ -511,7 +511,7 @@ func CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql.DataSource, ing
 	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), ingesterApiPort)
 	log.Infof("call del data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("DELETE", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
-	if !errors.Is(err, httpcommon.ErrorPending) && !errors.Is(err, httpcommon.ErrorFail) {
+	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
 		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
 	}
 	return err
