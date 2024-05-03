@@ -1380,7 +1380,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, tps, 0,
-			     relase_profiler, create_profiler,
+			     release_profiler, create_profiler,
 			     (void *)callback, freq);
 	if (tracer == NULL)
 		return (-1);
