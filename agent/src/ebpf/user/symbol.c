@@ -574,10 +574,12 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 
 	kv->v.proc_info_p = pointer_to_uword(p);
 	kv->v.cache = 0;
-	if (symbol_caches_hash_add_del
-	    (h, (symbol_caches_hash_kv *) kv, 1 /* is_add */ )) {
+	int ret;
+	if ((ret = symbol_caches_hash_add_del
+	    (h, (symbol_caches_hash_kv *) kv, 2 /* is_add = 2, Add but do not overwrite? */ )) != 0) {
+		// If it already exists, return -2.
 		ebpf_warning
-		    ("symbol_caches_hash_add_del() failed.(pid %d)\n", pid);
+		    ("symbol_caches_hash_add_del() failed.(pid %d), return %d\n", pid, ret);
 		free_symbolizer_cache_kvp(kv);
 		return NULL;
 	} else
@@ -770,6 +772,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->new_java_syms_file = false;
 	p->cache_need_update = false;
 	p->gen_java_syms_file_err = false;
+	p->lock = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
 	if (p->netns_id == 0)
 		return ETR_INVAL;
@@ -826,10 +829,12 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			return;
 	} else {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (!p->verified) {
 			if (((curr_time - (p->stime / 1000ULL)) <
 			     PROC_INFO_VERIFY_TIME)) {
+				symbolizer_proc_unlock(p);
 				goto fetch_proc_info;
 			}
 
@@ -851,6 +856,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 				 * information has not yet been cleared. In this case, we
 				 * continue to use the previously retained information.
 				 */
+				symbolizer_proc_unlock(p);
 				goto fetch_proc_info;
 			}
 
@@ -865,7 +871,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 
 			p->verified = true;
 		}
-
+		symbolizer_proc_unlock(p);
 	}
 
 fetch_proc_info:

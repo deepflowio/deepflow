@@ -82,7 +82,20 @@ struct symbolizer_proc_info {
 	char container_id[CONTAINER_ID_SIZE];
 	/* reference counting */
 	u64 use;
+	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
+	volatile u32 lock;
 };
+
+static inline void symbolizer_proc_lock(struct symbolizer_proc_info *p)
+{
+        while (__atomic_test_and_set(&p->lock, __ATOMIC_ACQUIRE))
+                CLIB_PAUSE();
+}
+
+static inline void symbolizer_proc_unlock(struct symbolizer_proc_info *p)
+{
+        __atomic_clear(&p->lock, __ATOMIC_RELEASE);
+}
 
 struct symbolizer_cache_kvp {
 	struct {
