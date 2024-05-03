@@ -44,12 +44,15 @@
 #include <regex.h>
 #include "java/config.h"
 #include "java/df_jattach.h"
+#include "profile_common.h"
 
 #include "../perf_profiler_bpf_common.c"
 
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
+
+static struct profiler_context oncpu_ctx;
 
 /* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
 int g_java_syms_write_bytes_max;
@@ -126,14 +129,8 @@ static u64 process_count;
 static void print_profiler_status(struct bpf_tracer *t, u64 iter_count,
 				  stack_str_hash_t * h,
 				  stack_trace_msg_hash_t * msg_h);
-static void print_cp_tracer_status(struct bpf_tracer *t);
-
-/*
- * During the parsing process, it is possible for processes in procfs
- * to be missing (processes that start and exit quickly). This variable
- * is used to count the number of lost processes during the parsing process.
- */
-static atomic64_t process_lost_count;
+static void print_cp_tracer_status(struct bpf_tracer *t,
+				   struct profiler_context *ctx);
 
 /* Continuous Profiler debug related settings. */
 static pthread_mutex_t cpdbg_mutex;
@@ -157,9 +154,9 @@ static u64 perf_buf_lost_b_count;
 
 static volatile u64 g_enable_perf_sample;
 
-static u64 get_process_lost_count(void)
+static u64 get_process_lost_count(struct profiler_context *ctx)
 {
-	return atomic64_read(&process_lost_count);
+	return atomic64_read(&ctx->process_lost_count);
 }
 
 static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
@@ -203,7 +200,8 @@ static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
-static void set_stack_trace_msg(stack_trace_msg_t * msg,
+static void set_stack_trace_msg(struct profiler_context *ctx,
+				stack_trace_msg_t * msg,
 				struct stack_trace_key_t *v,
 				bool matched,
 				u64 stime,
@@ -251,7 +249,7 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 		 */
 		strcpy_s_inline(msg->process_name, sizeof(msg->process_name),
 				v->comm, strlen(v->comm));
-		atomic64_inc(&process_lost_count);
+		atomic64_inc(&ctx->process_lost_count);
 	}
 
 	if (!matched || stime <= 0) {
@@ -323,7 +321,7 @@ static int release_profiler(struct bpf_tracer *tracer)
 	/* free all readers */
 	free_all_readers(tracer);
 
-	print_cp_tracer_status(tracer);
+	print_cp_tracer_status(tracer, &oncpu_ctx);
 
 	/* release object */
 	release_object(tracer->obj);
@@ -519,7 +517,8 @@ static inline void add_stack_id_to_bitmap(int stack_id, bool is_a)
 	}
 }
 
-static inline void update_matched_process_in_total(stack_trace_msg_hash_t *
+static inline void update_matched_process_in_total(struct profiler_context *ctx,
+						   stack_trace_msg_hash_t *
 						   msg_hash,
 						   char *process_name,
 						   struct stack_trace_key_t *v)
@@ -552,7 +551,7 @@ static inline void update_matched_process_in_total(stack_trace_msg_hash_t *
 		return;
 	}
 
-	set_stack_trace_msg(msg, v, false, 0, 0, process_name, NULL);
+	set_stack_trace_msg(ctx, msg, v, false, 0, 0, process_name, NULL);
 	snprintf((char *)&msg->data[0], strlen(trace_str) + 2, "%s", trace_str);
 	msg->data_len = strlen((char *)msg->data);
 	kv.msg_ptr = pointer_to_uword(msg);
@@ -567,7 +566,8 @@ static inline void update_matched_process_in_total(stack_trace_msg_hash_t *
 	}
 }
 
-static void aggregate_stack_traces(struct bpf_tracer *t,
+static void aggregate_stack_traces(struct profiler_context *ctx,
+				   struct bpf_tracer *t,
 				   const char *stack_map_name,
 				   stack_str_hash_t * stack_str_hash,
 				   stack_trace_msg_hash_t * msg_hash,
@@ -684,8 +684,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		 * of each process in the overall sampling.
 		 */
 		if (matched)
-			update_matched_process_in_total(msg_hash, process_name,
-							v);
+			update_matched_process_in_total(ctx, msg_hash,
+							process_name, v);
 
 	      skip_proc_find:
 		if (stack_trace_msg_hash_search
@@ -729,8 +729,8 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 			memset(msg, 0, len);
 			struct symbolizer_proc_info *__p = info_p;
-			set_stack_trace_msg(msg, v, matched, stime, netns_id,
-					    process_name,
+			set_stack_trace_msg(ctx, msg, v, matched, stime,
+					    netns_id, process_name,
 					    __p ? __p->container_id : NULL);
 
 			snprintf(pre_tag, sizeof(pre_tag), "%s ",
@@ -884,7 +884,8 @@ static void cleanup_stackmap(struct bpf_tracer *t,
 	}
 }
 
-static void process_bpf_stacktraces(struct bpf_tracer *t,
+static void process_bpf_stacktraces(struct profiler_context *ctx,
+				    struct bpf_tracer *t,
 				    struct bpf_perf_reader *r_a,
 				    struct bpf_perf_reader *r_b)
 {
@@ -971,8 +972,9 @@ static void process_bpf_stacktraces(struct bpf_tracer *t,
 		 * After the reader completes data reading, the work of
 		 * data aggregation will be blocked if there is no data.
 		 */
-		aggregate_stack_traces(t, stack_map_name, &g_stack_str_hash,
-				       &g_msg_hash, &count, using_map_set_a);
+		aggregate_stack_traces(ctx, t, stack_map_name,
+				       &g_stack_str_hash, &g_msg_hash, &count,
+				       using_map_set_a);
 
 		/*
 		 * To ensure that all data in the perf ring-buffer is procenssed
@@ -1017,7 +1019,7 @@ static void java_syms_update_work(void *arg)
 	java_syms_update_main(arg);
 }
 
-static void cp_reader_work(void *arg)
+static void oncpu_reader_work(void *arg)
 {
 	thread_index = THREAD_PROFILER_READER_IDX;
 	struct bpf_tracer *t = profiler_tracer;
@@ -1056,12 +1058,12 @@ static void cp_reader_work(void *arg)
 			set_enable_perf_sample(t, 1);
 
 		tracer_reader_lock(t);
-		process_bpf_stacktraces(t, reader_a, reader_b);
+		process_bpf_stacktraces(&oncpu_ctx, t, reader_a, reader_b);
 		tracer_reader_unlock(t);
 	}
 
 exit:
-	print_cp_tracer_status(t);
+	print_cp_tracer_status(t, &oncpu_ctx);
 
 	print_hash_stack_str(&g_stack_str_hash);
 	/* free stack_str_hash */
@@ -1150,8 +1152,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 	 * Start a new thread to execute the data
 	 * reading of perf buffer.
 	 */
-	ret = enable_tracer_reader_work("cp_reader", 0, tracer,
-					(void *)&cp_reader_work);
+	ret = enable_tracer_reader_work("oncpu_reader", 0, tracer,
+					(void *)&oncpu_reader_work);
 
 	if (ret) {
 		goto error;
@@ -1186,7 +1188,8 @@ int stop_continuous_profiler(void)
 	return (0);
 }
 
-static void print_cp_tracer_status(struct bpf_tracer *t)
+static void print_cp_tracer_status(struct bpf_tracer *t,
+				   struct profiler_context *ctx)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
@@ -1236,7 +1239,7 @@ static void print_cp_tracer_status(struct bpf_tracer *t)
 		  atomic64_read(&t->recv), process_count,
 		  atomic64_read(&t->lost), perf_buf_lost_a_count,
 		  perf_buf_lost_b_count, perf_buf_lost_a_count,
-		  perf_buf_lost_b_count, get_process_lost_count(),
+		  perf_buf_lost_b_count, get_process_lost_count(ctx),
 		  get_stack_table_data_miss_count(),
 		  stackmap_clear_failed_count, stack_trace_lost, transfer_count,
 		  ((double)atomic64_read(&t->recv) / (double)transfer_count),
@@ -1331,6 +1334,8 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	if (!run_conditions_check())
 		return (-1);
 
+	memset(&oncpu_ctx, 0, sizeof(oncpu_ctx));
+
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
 	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
@@ -1346,7 +1351,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	set_java_syms_fetch_delay(java_syms_update_delay);
 	ebpf_info("set java_syms_update_delay : %lu\n", java_syms_update_delay);
 
-	atomic64_init(&process_lost_count);
+	atomic64_init(&oncpu_ctx.process_lost_count);
 
 	/*
 	 * Initialize cpdbg

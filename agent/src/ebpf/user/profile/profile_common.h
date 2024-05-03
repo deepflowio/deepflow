@@ -58,7 +58,7 @@ struct profiler_context {
 	 * `<process name + u_stack_id + k_stack_id + cpu>`.
 	 */
 	regex_t profiler_regex;
-	bool regex_existed = false;
+	bool regex_existed;
 
 	/*
 	 * The profiler stop flag, with 1 indicating stop and
