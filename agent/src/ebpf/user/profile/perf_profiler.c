@@ -63,25 +63,13 @@ static pthread_t java_syms_update_thread;
 extern char linux_release[128];
 extern __thread uword thread_index;
 
-struct stack_trace_key_t *raw_stack_data;
 struct bpf_tracer *profiler_tracer;
 
 // for flame-graph test
 static FILE *folded_file;
 #define FOLDED_FILE_PATH "./profiler.folded"
-static char *flame_graph_start_time;
+char *flame_graph_start_time;
 static char *flame_graph_end_time;
-
-/*
- * 'cpu_aggregation_flag' is used to set whether to retrieve CPUID
- * and include it in the aggregation of stack trace data.
- *
- * If valude is set to 1, CPUID will be retrieved and included in
- * the aggregation of stack trace data. If value is set to 0,
- * CPUID will not be retrieved and will not be included in the
- * aggregation. Any other value is considered invalid.
- */
-static volatile u64 cpu_aggregation_flag;
 
 /*
  * Cache hash: obtain folded stack trace string from stack ID.
@@ -92,8 +80,6 @@ static stack_str_hash_t g_stack_str_hash;
  * Used for tracking data statistics and pushing.
  */
 static stack_trace_msg_hash_t g_msg_hash;
-
-static u64 process_count;
 
 static void print_cp_tracer_status(struct bpf_tracer *t,
 				   struct profiler_context *ctx);
@@ -109,120 +95,6 @@ static uint32_t cpdbg_timeout;
 static u64 get_process_lost_count(struct profiler_context *ctx)
 {
 	return atomic64_read(&ctx->process_lost_count);
-}
-
-static inline stack_trace_msg_t *alloc_stack_trace_msg(int len)
-{
-	void *trace_msg;
-	trace_msg = clib_mem_alloc_aligned("stack_msg", len, 0, NULL);
-	if (trace_msg == NULL) {
-		ebpf_warning("stack trace msg alloc memory failed.\n");
-	} else {
-		stack_trace_msg_t *msg = trace_msg;
-		return msg;
-	}
-
-	return NULL;
-}
-
-/* 
- * The invocation of this interface is always when the process name does
- * not match.
- */
-static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
-				struct stack_trace_key_t *v, void *msg_value)
-{
-	strcpy_s_inline(kvp->c_k.comm, sizeof(kvp->c_k.comm),
-			v->comm, strlen(v->comm));
-	kvp->c_k.cpu = v->cpu;
-	kvp->c_k.pid = v->tgid;
-	kvp->c_k.reserved = 0;
-	kvp->msg_ptr = pointer_to_uword(msg_value);
-}
-
-static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
-			struct stack_trace_key_t *v, u64 stime, void *msg_value)
-{
-	kvp->k.tgid = v->tgid;
-	kvp->k.pid = v->pid;
-	kvp->k.stime = stime;
-	kvp->k.cpu = v->cpu;
-	kvp->k.u_stack_id = (u32) v->userstack;
-	kvp->k.k_stack_id = (u32) v->kernstack;
-	kvp->msg_ptr = pointer_to_uword(msg_value);
-}
-
-static void set_stack_trace_msg(struct profiler_context *ctx,
-				stack_trace_msg_t * msg,
-				struct stack_trace_key_t *v,
-				bool matched,
-				u64 stime,
-				u64 ns_id,
-				const char *process_name,
-				const char *container_id)
-{
-	msg->pid = v->tgid;
-	msg->tid = v->pid;
-	msg->cpu = v->cpu;
-	msg->u_stack_id = (u32) v->userstack;
-	msg->k_stack_id = (u32) v->kernstack;
-	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
-	msg->stime = stime;
-	msg->netns_id = ns_id;
-	if (container_id != NULL) {
-		strcpy_s_inline(msg->container_id, sizeof(msg->container_id),
-				container_id, strlen(container_id));
-	}
-
-	if (stime > 0) {
-		/*
-		 * Note: There is no process with PID 0 in procfs.
-		 * If the PID is 0, it will return the kernel's
-		 * startup time, and the process name will be
-		 * obtained from data retrieved through eBPF.
-		 */
-		if (msg->pid == 0) {
-			memcpy(msg->process_name, v->comm, sizeof(msg->comm));
-		} else {
-			if (process_name != NULL) {
-				strcpy_s_inline(msg->process_name,
-						sizeof(msg->process_name),
-						process_name,
-						strlen(process_name));
-			}
-		}
-
-	} else {
-
-		/*
-		 * If the process has already exited, then execution reaches
-		 * this point, which means aggregating data based on the
-		 * process name.
-		 */
-		strcpy_s_inline(msg->process_name, sizeof(msg->process_name),
-				v->comm, strlen(v->comm));
-		atomic64_inc(&ctx->process_lost_count);
-	}
-
-	if (!matched || stime <= 0) {
-		/* The aggregation method is identified as 
-		 * { process name + [u,k]stack_trace_id + cpu} */
-		msg->stime = 0;
-		if (!matched) {
-			msg->pid = msg->tid = 0;
-			snprintf((char *)msg->process_name,
-				 sizeof(msg->process_name), "%s", "Total");
-		}
-	}
-
-	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
-	msg->count = 1;
-	msg->data_ptr = pointer_to_uword(&msg->data[0]);
-
-	/* Only use for test flame graph. */
-	if (flame_graph_start_time == NULL) {
-		flame_graph_start_time = gen_file_name_by_datetime();
-	}
 }
 
 static void reader_lost_cb_a(void *cookie, u64 lost)
@@ -255,7 +127,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 	v = (struct stack_trace_key_t *)raw;
 
 	int ret = VEC_OK;
-	vec_add1(raw_stack_data, *v, ret);
+	vec_add1(oncpu_ctx.raw_stack_data, *v, ret);
 	if (ret != VEC_OK) {
 		ebpf_warning("vec add failed\n");
 	}
@@ -342,287 +214,6 @@ void cpdbg_process(stack_trace_msg_t * msg)
 
 	}
 	pthread_mutex_unlock(&cpdbg_mutex);
-}
-
-static inline void add_stack_id_to_bitmap(struct profiler_context *ctx,
-					  int stack_id, bool is_a)
-{
-	if (stack_id < 0)
-		return;
-
-	struct stack_ids_bitmap *ids;
-	if (is_a)
-		ids = &ctx->stack_ids_a;
-	else
-		ids = &ctx->stack_ids_b;
-
-	if (!is_set_bitmap(ids->bitmap, stack_id)) {
-		set_bitmap(ids->bitmap, stack_id);
-		int ret = VEC_OK;
-
-		if (is_a)
-			vec_add1(ctx->clear_stack_ids_a, stack_id, ret);
-		else
-			vec_add1(ctx->clear_stack_ids_b, stack_id, ret);
-
-		if (ret != VEC_OK) {
-			ebpf_warning("vec add failed\n");
-		}
-
-		ids->count++;
-	}
-}
-
-static inline void update_matched_process_in_total(struct profiler_context *ctx,
-						   stack_trace_msg_hash_t *
-						   msg_hash,
-						   char *process_name,
-						   struct stack_trace_key_t *v)
-{
-	stack_trace_msg_kv_t kv;
-	set_msg_kvp_by_comm(&kv, v, (void *)0);
-
-	if (stack_trace_msg_hash_search
-	    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
-	     (stack_trace_msg_hash_kv *) & kv) == 0) {
-		__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-		((stack_trace_msg_t *) kv.msg_ptr)->count++;
-		return;
-	}
-
-	/* append ';' '\0' and '[p/t]' */
-	char trace_str[(TASK_COMM_LEN * 2) + 10];
-	bool is_thread = (v->pid != v->tgid);
-	if (is_thread)
-		snprintf(trace_str, sizeof(trace_str), "[p] %s;[t] %s",
-			 process_name, v->comm);
-	else
-		snprintf(trace_str, sizeof(trace_str), "[p] %s", process_name);
-
-	/* append 2 byte for ';''\0' */
-	int len = sizeof(stack_trace_msg_t) + strlen(trace_str) + 2;
-	stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
-	if (msg == NULL) {
-		clib_mem_free(trace_str);
-		return;
-	}
-
-	set_stack_trace_msg(ctx, msg, v, false, 0, 0, process_name, NULL);
-	snprintf((char *)&msg->data[0], strlen(trace_str) + 2, "%s", trace_str);
-	msg->data_len = strlen((char *)msg->data);
-	kv.msg_ptr = pointer_to_uword(msg);
-
-	if (stack_trace_msg_hash_add_del(msg_hash,
-					 (stack_trace_msg_hash_kv
-					  *) & kv, 1 /* is_add */ )) {
-		ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
-		clib_mem_free(msg);
-	} else {
-		__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
-	}
-}
-
-void aggregate_stack_traces(struct profiler_context *ctx,
-			    struct bpf_tracer *t,
-			    const char *stack_map_name,
-			    stack_str_hash_t * stack_str_hash,
-			    stack_trace_msg_hash_t * msg_hash,
-			    u32 * count, bool use_a_map)
-{
-	struct stack_trace_key_t *v;
-	vec_foreach(v, raw_stack_data) {
-		if (v == NULL)
-			break;
-
-		if (unlikely(ctx->profiler_stop == 1))
-			break;
-
-		/*
-		 * If cpu_aggregation_flag=0, the CPU value for stack trace data
-		 * reporting is a special value (CPU_INVALID:0xfff) used to indicate
-		 * that it is an invalid value, the  CPUID will not be included in
-		 * the aggregation.
-		 */
-		if (cpu_aggregation_flag == 0)
-			v->cpu = CPU_INVALID;
-
-		/*
-		 * Uniform idle process names to reduce the aggregated count of stack
-		 * trace data (when we aggregate using process names as part of the key).
-		 * "swapper/0", "swapper/1", "swapper/2" ... > "swapper" 
-		 */
-		if (v->pid == v->tgid && v->pid == 0) {
-			const char *idle_name = "swapper";
-			strcpy_s_inline(v->comm, sizeof(v->comm),
-					idle_name, strlen(idle_name));
-		}
-
-		/* -EEXIST: Hash bucket collision in the stack trace table */
-		if (v->kernstack == -EEXIST)
-			ctx->stack_trace_err++;
-
-		if (v->userstack == -EEXIST)
-			ctx->stack_trace_err++;
-
-		add_stack_id_to_bitmap(ctx, v->kernstack, use_a_map);
-		add_stack_id_to_bitmap(ctx, v->userstack, use_a_map);
-
-		/* Total iteration count for this iteration. */
-		(*count)++;
-
-		/* Total iteration count for all iterations. */
-		process_count++;
-
-		/*
-		 * Firstly, search the stack-trace-msg hash to see if the
-		 * stack trace messages has already been stored. 
-		 */
-		stack_trace_msg_kv_t kv;
-		char name[TASK_COMM_LEN];
-		memset(name, 0, sizeof(name));
-		u64 stime, netns_id;
-		stime = netns_id = 0;
-		void *info_p = NULL;
-		char *process_name = NULL;
-		bool matched, is_match_finish;
-		matched = is_match_finish = false;
-
-		/* If it is a process, match operation will be performed immediately. */
-		if (v->pid == v->tgid) {
-			is_match_finish = true;
-			matched =
-			    (regexec(&ctx->profiler_regex, v->comm, 0, NULL, 0)
-			     == 0);
-			if (!matched) {
-				set_msg_kvp_by_comm(&kv, v, (void *)0);
-				goto skip_proc_find;
-			}
-		}
-
-		get_process_info_by_pid(v->tgid, &stime, &netns_id,
-					(char *)name, &info_p);
-
-		/* 
-		 * If the data collected is from a running process, and the process
-		 * name and the command name of the task (captured by eBPF) are not
-		 * consistent, it indicates that the cached process information is
-		 * no longer valid.
-		 */
-		if (stime > 0 && v->pid == v->tgid && strcmp(name, v->comm)) {
-			stime = netns_id = 0;
-			name[0] = '\0';
-			process_name = NULL;
-			info_p = NULL;
-		}
-
-		if (stime > 0) {
-			if (v->tgid == 0)
-				process_name = v->comm;
-			else
-				process_name = name;
-
-			if (!is_match_finish)
-				matched =
-				    (regexec
-				     (&ctx->profiler_regex, process_name, 0,
-				      NULL, 0)
-				     == 0);
-			if (matched)
-				set_msg_kvp(&kv, v, stime, (void *)0);
-			else
-				set_msg_kvp_by_comm(&kv, v, (void *)0);
-		} else {
-			/* Not find process in procfs. */
-			set_msg_kvp_by_comm(&kv, v, (void *)0);
-		}
-
-		/*
-		 * Here, we duplicate the matched process data and place it into
-		 * the Total process, with the aim of showcasing the proportion
-		 * of each process in the overall sampling.
-		 */
-		if (matched)
-			update_matched_process_in_total(ctx, msg_hash,
-							process_name, v);
-
-	      skip_proc_find:
-		if (stack_trace_msg_hash_search
-		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
-		     (stack_trace_msg_hash_kv *) & kv) == 0) {
-			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-			((stack_trace_msg_t *) kv.msg_ptr)->count++;
-			continue;
-		}
-
-		/*
-		 * Folded stack trace string and generate stack trace messages.
-		 *
-		 * Folded stack trace string (taken from a performance profiler test):
-		 * main;xxx();yyy()
-		 * It is a list of symbols corresponding to addresses in the underlying
-		 * stack trace, separated by ';'.
-		 */
-
-		char *trace_str =
-		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
-						    stack_str_hash, matched,
-						    process_name, info_p);
-		if (trace_str) {
-			/*
-			 * append process/thread name to stack string
-			 * append 2 byte for ';''\0'
-			 * append pre_tag '[p/t]'
-			 */
-			char pre_tag[5];
-			int str_len = strlen(trace_str) + 2;
-			if (matched)
-				str_len += strlen(v->comm) + sizeof(pre_tag);
-
-			int len = sizeof(stack_trace_msg_t) + str_len;
-			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
-			if (msg == NULL) {
-				clib_mem_free(trace_str);
-				continue;
-			}
-
-			memset(msg, 0, len);
-			struct symbolizer_proc_info *__p = info_p;
-			set_stack_trace_msg(ctx, msg, v, matched, stime,
-					    netns_id, process_name,
-					    __p ? __p->container_id : NULL);
-
-			snprintf(pre_tag, sizeof(pre_tag), "%s ",
-				 v->pid == v->tgid ? "[p]" : "[t]");
-			if (matched)
-				snprintf((char *)&msg->data[0], str_len,
-					 "%s%s;%s", pre_tag, v->comm,
-					 trace_str);
-			else
-				snprintf((char *)&msg->data[0], str_len, "%s",
-					 trace_str);
-
-			msg->data_len = strlen((char *)msg->data);
-			clib_mem_free(trace_str);
-			kv.msg_ptr = pointer_to_uword(msg);
-
-			if (stack_trace_msg_hash_add_del(msg_hash,
-							 (stack_trace_msg_hash_kv
-							  *) & kv,
-							 1 /* is_add */ )) {
-				ebpf_warning
-				    ("stack_trace_msg_hash_add_del() failed.\n");
-				clib_mem_free(msg);
-			} else {
-				__sync_fetch_and_add
-				    (&msg_hash->hash_elems_count, 1);
-			}
-		}
-
-		/* check and clean symbol cache */
-		exec_proc_info_cache_update();
-	}
-
-	vec_free(raw_stack_data);
 }
 
 static void java_syms_update_work(void *arg)
@@ -805,31 +396,31 @@ static void print_cp_tracer_status(struct bpf_tracer *t,
 	get_mem_stat(&alloc_b, &free_b);
 
 	u64 sample_drop_cnt = 0;
-	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, SAMPLE_CNT_DROP,
+	if (!bpf_table_get_value(t, ctx->state_map_name, SAMPLE_CNT_DROP,
 				 (void *)&sample_drop_cnt)) {
 		ebpf_warning("Get map '%s' sample_drop_cnt failed.\n",
-			     MAP_PROFILER_STATE_MAP);
+			     ctx->state_map_name);
 	}
 
 	u64 output_err_cnt = 0;
-	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, ERROR_IDX,
+	if (!bpf_table_get_value(t, ctx->state_map_name, ERROR_IDX,
 				 (void *)&output_err_cnt)) {
 		ebpf_warning("Get map '%s' output_err_cnt failed.\n",
-			     MAP_PROFILER_STATE_MAP);
+			     ctx->state_map_name);
 	}
 
 	u64 output_count = 0;
-	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, OUTPUT_CNT_IDX,
+	if (!bpf_table_get_value(t, ctx->state_map_name, OUTPUT_CNT_IDX,
 				 (void *)&output_count)) {
 		ebpf_warning("Get map '%s' output_cnt failed.\n",
-			     MAP_PROFILER_STATE_MAP);
+			     ctx->state_map_name);
 	}
 
 	u64 iter_max_cnt = 0;
-	if (!bpf_table_get_value(t, MAP_PROFILER_STATE_MAP, SAMPLE_ITER_CNT_MAX,
+	if (!bpf_table_get_value(t, ctx->state_map_name, SAMPLE_ITER_CNT_MAX,
 				 (void *)&iter_max_cnt)) {
 		ebpf_warning("Get map '%s' iter_max_cnt failed.\n",
-			     MAP_PROFILER_STATE_MAP);
+			     ctx->state_map_name);
 	}
 
 	ebpf_info("\n\n----------------------------\nrecv envent:\t%lu\n"
@@ -846,7 +437,7 @@ static void print_cp_tracer_status(struct bpf_tracer *t,
 		  " - output_err_cnt:\t%lu\n"
 		  " - iter_max_cnt:\t%lu\n"
 		  "----------------------------\n\n",
-		  atomic64_read(&t->recv), process_count,
+		  atomic64_read(&t->recv), ctx->process_count,
 		  atomic64_read(&t->lost), ctx->perf_buf_lost_a_count,
 		  ctx->perf_buf_lost_b_count, ctx->perf_buf_lost_a_count,
 		  ctx->perf_buf_lost_b_count, get_process_lost_count(ctx),
@@ -926,8 +517,8 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	if (!run_conditions_check())
 		return (-1);
 
-	profiler_context_init(&oncpu_ctx, MAP_PROFILER_STATE_MAP,
-			      MAP_STACK_A_NAME, MAP_STACK_B_NAME);
+	profiler_context_init(&oncpu_ctx, MAP_PROFILER_STATE_NAME,
+			      MAP_STACK_A_NAME, MAP_STACK_B_NAME, false);
 
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
@@ -1080,7 +671,7 @@ int set_profiler_cpu_aggregation(int flag)
 		return (-1);
 	}
 
-	cpu_aggregation_flag = (u64) flag;
+	oncpu_ctx.cpu_aggregation_flag = (u64) flag;
 
 	ebpf_info(LOG_CP_TAG
 		  "Set 'cpu_aggregation_flag' successful, value %d\n", flag);

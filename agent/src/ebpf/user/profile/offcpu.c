@@ -102,7 +102,8 @@ int extended_reader_create(struct bpf_tracer *tracer)
 {
 	profiler_context_init(&offcpu_ctx,
 			      MAP_OFFCPU_STATE_MAP,
-			      MAP_OFFCPU_STACK_A_NAME, MAP_OFFCPU_STACK_B_NAME);
+			      MAP_OFFCPU_STACK_A_NAME, MAP_OFFCPU_STACK_B_NAME,
+			      true);
 
 	set_enable_profiler(tracer, &offcpu_ctx, 0);
 

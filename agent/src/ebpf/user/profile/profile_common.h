@@ -124,7 +124,7 @@ void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
 int profiler_context_init(struct profiler_context *ctx,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
-			  const char *stack_map_name_b);
+			  const char *stack_map_name_b, bool only_matched);
 bool run_conditions_check(void);
 int java_libs_and_tools_install(void);
 void push_and_release_stack_trace_msg(struct profiler_context *ctx,
