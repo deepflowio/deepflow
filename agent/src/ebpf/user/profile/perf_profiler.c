@@ -77,8 +77,6 @@ static FILE *folded_file;
 static char *flame_graph_start_time;
 static char *flame_graph_end_time;
 
-/* profiler start time(monotonic seconds). */
-static u64 start_time;
 /* Record the time of the last data push
  * (in seconds since system startup)*/
 static u64 last_push_time;
@@ -1341,8 +1339,6 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	 * Initialize cpdbg
 	 */
 	pthread_mutex_init(&cpdbg_mutex, NULL);
-
-	start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
 
 	// CPUID will not be included in the aggregation of stack trace data.
 	set_profiler_cpu_aggregation(0);
