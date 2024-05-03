@@ -100,6 +100,12 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 
 int extended_reader_create(struct bpf_tracer *tracer)
 {
+	profiler_context_init(&offcpu_ctx,
+			      MAP_OFFCPU_STATE_MAP,
+			      MAP_OFFCPU_STACK_A_NAME, MAP_OFFCPU_STACK_B_NAME);
+
+	set_enable_profiler(tracer, &offcpu_ctx, 0);
+
 	struct bpf_perf_reader *reader_a, *reader_b;
 	reader_a = create_perf_buffer_reader(tracer,
 					     MAP_OFFCPU_BUF_A_NAME,
@@ -121,7 +127,6 @@ int extended_reader_create(struct bpf_tracer *tracer)
 		return ETR_NORESOURCE;
 	}
 
-	printf("XXXXXXXXXXXXXXX \n");
 	return 0;
 }
 

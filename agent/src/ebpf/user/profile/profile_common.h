@@ -19,7 +19,7 @@
 
 struct profiler_context {
 	// The name of the status map
-	char stack_map_name[MAP_NAME_SZ];
+	char state_map_name[MAP_NAME_SZ];
 	// The dual-buffered reader is used to read data from the perf buffer.
 	struct bpf_perf_reader *r_a;
 	struct bpf_perf_reader *r_b;
@@ -67,6 +67,12 @@ struct profiler_context {
 	volatile u64 profiler_stop;
 
 	/*
+	 * This flag is used to enable the eBPF program to start working.
+	 * with 1 indicating enable and 0 indicating disable.
+	 */
+	volatile u64 enable_bpf_profile;
+
+	/*
 	 * The identifier to only retrieve matched data. This flag
 	 * setting will exclude the total process.
 	 */
@@ -97,7 +103,12 @@ struct profiler_context {
 	atomic64_t process_lost_count;
 };
 
-int profiler_context_init(struct profiler_context *ctx);
+void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
+			 u64 enable_flag);
+int profiler_context_init(struct profiler_context *ctx,
+			  const char *state_map_name,
+			  const char *stack_map_name_a,
+			  const char *stack_map_name_b);
 bool run_conditions_check(void);
 int java_libs_and_tools_install(void);
 #endif /*DF_USER_PROFILE_COMMON_H */

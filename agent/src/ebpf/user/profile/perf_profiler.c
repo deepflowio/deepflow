@@ -151,8 +151,6 @@ static u64 stackmap_clear_failed_count;
 static u64 perf_buf_lost_a_count;
 static u64 perf_buf_lost_b_count;
 
-static volatile u64 g_enable_perf_sample;
-
 static u64 get_process_lost_count(struct profiler_context *ctx)
 {
 	return atomic64_read(&ctx->process_lost_count);
@@ -768,21 +766,6 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 	vec_free(raw_stack_data);
 }
 
-void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag)
-{
-	if (bpf_table_set_value(t, MAP_PROFILER_STATE_MAP,
-				ENABLE_IDX, &enable_flag) == false) {
-		ebpf_warning("profiler state map update error."
-			     "(%s enable_flag %lu) - %s\n",
-			     MAP_PROFILER_STATE_MAP,
-			     enable_flag, strerror(errno));
-	}
-
-	g_enable_perf_sample = enable_flag;
-
-	ebpf_info("%s() success, enable_flag:%d\n", __func__, enable_flag);
-}
-
 static u32 delete_all_stackmap_elems(struct bpf_tracer *tracer,
 				     const char *stack_map_name)
 {
@@ -1030,8 +1013,8 @@ static void oncpu_reader_work(void *arg)
 
 	for (;;) {
 		if (unlikely(oncpu_ctx.profiler_stop == 1)) {
-			if (g_enable_perf_sample)
-				set_enable_perf_sample(t, 0);
+			if (oncpu_ctx.enable_bpf_profile)
+				set_enable_profiler(t, &oncpu_ctx, 0);
 
 			goto exit;
 		}
@@ -1048,15 +1031,15 @@ static void oncpu_reader_work(void *arg)
 		 */
 		if (unlikely(!regex_existed ||
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
-			if (g_enable_perf_sample)
-				set_enable_perf_sample(t, 0);
+			if (oncpu_ctx.enable_bpf_profile)
+				set_enable_profiler(t, &oncpu_ctx, 0);
 			exec_proc_info_cache_update();
 			sleep(1);
 			continue;
 		}
 
-		if (unlikely(!g_enable_perf_sample))
-			set_enable_perf_sample(t, 1);
+		if (unlikely(!oncpu_ctx.enable_bpf_profile))
+			set_enable_profiler(t, &oncpu_ctx, 1);
 
 		tracer_reader_lock(t);
 		process_bpf_stacktraces(&oncpu_ctx, t, reader_a, reader_b);
@@ -1100,7 +1083,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
 
-	set_enable_perf_sample(tracer, 0);
+	set_enable_profiler(tracer, &oncpu_ctx, 0);
 
 	/*
 	 * create reader for read eBPF-profiler data.
@@ -1336,7 +1319,8 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	if (!run_conditions_check())
 		return (-1);
 
-	profiler_context_init(&oncpu_ctx);
+	profiler_context_init(&oncpu_ctx, MAP_PROFILER_STATE_MAP,
+			      MAP_STACK_A_NAME, MAP_STACK_B_NAME);
 
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
@@ -1609,7 +1593,7 @@ struct bpf_tracer *get_profiler_tracer(void)
 	return NULL;
 }
 
-void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag)
+void set_enable_profiler(struct bpf_tracer *t, u64 enable_flag)
 {
 }
 

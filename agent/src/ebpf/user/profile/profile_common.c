@@ -68,12 +68,37 @@ extern int major, minor;
 
 static bool java_installed;
 
-int profiler_context_init(struct profiler_context *ctx)
+int profiler_context_init(struct profiler_context *ctx,
+			  const char *state_map_name,
+			  const char *stack_map_name_a,
+			  const char *stack_map_name_b)
 {
 	memset(ctx, 0, sizeof(struct profiler_context));
 	atomic64_init(&ctx->process_lost_count);
 	ctx->profiler_stop = 0;
+	snprintf(ctx->state_map_name, sizeof(ctx->state_map_name), "%s",
+		 state_map_name);
+	snprintf(ctx->stack_map_name_a, sizeof(ctx->stack_map_name_a), "%s",
+		 stack_map_name_a);
+	snprintf(ctx->stack_map_name_b, sizeof(ctx->stack_map_name_b), "%s",
+		 stack_map_name_b);
 	return 0;
+}
+
+void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
+			 u64 enable_flag)
+{
+	if (bpf_table_set_value(t, ctx->state_map_name,
+				ENABLE_IDX, &enable_flag) == false) {
+		ebpf_warning("profiler state map update error."
+			     "(%s enable_flag %lu) - %s\n",
+			     MAP_PROFILER_STATE_MAP,
+			     enable_flag, strerror(errno));
+	}
+
+	ctx->enable_bpf_profile = enable_flag;
+
+	ebpf_info("%s() success, enable_flag:%d\n", __func__, enable_flag);
 }
 
 static bool check_kallsyms_addr_is_zero(void)
