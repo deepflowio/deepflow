@@ -488,8 +488,20 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 #ifndef AARCH64_MUSL
 static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
-static void *k_resolver;	// for kernel symbol cache
+static volatile void *k_resolver;	// for kernel symbol cache
+static volatile u32 k_resolver_lock;
 static u64 sys_btime_msecs;	// system boot time(milliseconds)
+
+static inline void symbolizer_kernel_lock(void)
+{
+	while (__atomic_test_and_set(&k_resolver_lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
+}
+
+static inline void symbolizer_kernel_unlock(void)
+{
+	__atomic_clear(&k_resolver_lock, __ATOMIC_RELEASE);
+}
 
 static bool inline enable_proc_info_cache(void)
 {
@@ -576,10 +588,12 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 	kv->v.cache = 0;
 	int ret;
 	if ((ret = symbol_caches_hash_add_del
-	    (h, (symbol_caches_hash_kv *) kv, 2 /* is_add = 2, Add but do not overwrite? */ )) != 0) {
+	     (h, (symbol_caches_hash_kv *) kv,
+	      2 /* is_add = 2, Add but do not overwrite? */ )) != 0) {
 		// If it already exists, return -2.
 		ebpf_warning
-		    ("symbol_caches_hash_add_del() failed.(pid %d), return %d\n", pid, ret);
+		    ("symbol_caches_hash_add_del() failed.(pid %d), return %d\n",
+		     pid, ret);
 		free_symbolizer_cache_kvp(kv);
 		return NULL;
 	} else
@@ -773,6 +787,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->cache_need_update = false;
 	p->gen_java_syms_file_err = false;
 	p->lock = 0;
+	p->syms_cache = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
 	if (p->netns_id == 0)
 		return ETR_INVAL;
@@ -803,6 +818,17 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	return ETR_OK;
 }
 
+static inline void write_return_value(struct symbolizer_cache_kvp *kv,
+				      struct symbolizer_proc_info *p,
+				      u64 * stime, u64 * netns_id, char *name,
+				      void **ptr)
+{
+	copy_process_name(kv, name);
+	*stime = cache_process_stime(kv);
+	*netns_id = cache_process_netns_id(kv);
+	*ptr = p;
+}
+
 void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			     void **ptr)
 {
@@ -827,6 +853,10 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 		p = add_proc_info_to_cache(&kv);
 		if (p == NULL)
 			return;
+		symbolizer_proc_lock(p);
+		write_return_value(&kv, p, stime, netns_id, name, ptr);
+		symbolizer_proc_unlock(p);
+
 	} else {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		symbolizer_proc_lock(p);
@@ -834,8 +864,10 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 		if (!p->verified) {
 			if (((curr_time - (p->stime / 1000ULL)) <
 			     PROC_INFO_VERIFY_TIME)) {
+				write_return_value(&kv, p, stime, netns_id,
+						   name, ptr);
 				symbolizer_proc_unlock(p);
-				goto fetch_proc_info;
+				return;
 			}
 
 			/*
@@ -856,8 +888,10 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 				 * information has not yet been cleared. In this case, we
 				 * continue to use the previously retained information.
 				 */
+				write_return_value(&kv, p, stime, netns_id,
+						   name, ptr);
 				symbolizer_proc_unlock(p);
-				goto fetch_proc_info;
+				return;
 			}
 
 			p->stime = stime;
@@ -871,14 +905,10 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 
 			p->verified = true;
 		}
+
+		write_return_value(&kv, p, stime, netns_id, name, ptr);
 		symbolizer_proc_unlock(p);
 	}
-
-fetch_proc_info:
-	copy_process_name(&kv, name);
-	*stime = cache_process_stime(&kv);
-	*netns_id = cache_process_netns_id(&kv);
-	*ptr = p;
 }
 
 static void *symbols_cache_update(symbol_caches_hash_t * h,
@@ -917,6 +947,7 @@ exit:
 	p->new_java_syms_file = false;
 	p->add_task_list = false;
 	p->cache_need_update = false;
+	p->syms_cache = kv->v.cache;
 	return (void *)kv->v.cache;
 }
 
@@ -924,6 +955,8 @@ static inline void java_expired_update(symbol_caches_hash_t * h,
 				       struct symbolizer_cache_kvp *kv,
 				       struct symbolizer_proc_info *p)
 {
+	ASSERT(p != NULL);
+
 	/* Update java symbols table, will be executed during
 	 * the next Java symbolication */
 
@@ -954,8 +987,12 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 	ASSERT(pid >= 0);
 
 	if (k_resolver == NULL && pid == 0) {
-		k_resolver = (void *)bcc_symcache_new(-1, &lazy_opt);
-		sys_btime_msecs = get_sys_btime_msecs();
+		symbolizer_kernel_lock();
+		if (k_resolver == NULL) {
+			k_resolver = (void *)bcc_symcache_new(-1, &lazy_opt);
+			sys_btime_msecs = get_sys_btime_msecs();
+		}
+		symbolizer_kernel_unlock();
 	}
 
 	if (!new_cache)
@@ -973,6 +1010,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (p->verified) {
 			/*
@@ -1004,7 +1042,8 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 				 * generation of Java symbol tables, additional random value
 				 * for each java process's delay.
 				 */
-				if (kv.v.cache == 0 && !p->gen_java_syms_file_err) {
+				if (kv.v.cache == 0
+				    && !p->gen_java_syms_file_err) {
 					p->update_syms_table_time =
 					    generate_random_integer
 					    (PROFILER_DEFER_RANDOM_MAX);
@@ -1015,18 +1054,27 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			    && curr_time >= p->update_syms_table_time) {
 				if (p->is_java) {
 					java_expired_update(h, &kv, p);
+					symbolizer_proc_unlock(p);
 					return (void *)kv.v.cache;
 				} else {
-					return symbols_cache_update(h, &kv, p);
+					void *ret =
+					    symbols_cache_update(h, &kv, p);
+					symbolizer_proc_unlock(p);
+					return ret;
 				}
 			}
 		} else {
+			symbolizer_proc_unlock(p);
 			/* Ensure that newly launched JAVA processes are detected. */
 			return NULL;
 		}
 
-		if (kv.v.cache)
+		if (kv.v.cache) {
+			symbolizer_proc_unlock(p);
 			return (void *)kv.v.cache;
+		}
+
+		symbolizer_proc_unlock(p);
 	}
 
 	return NULL;

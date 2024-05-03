@@ -84,17 +84,19 @@ struct symbolizer_proc_info {
 	u64 use;
 	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
 	volatile u32 lock;
+	/* Recording symbol resolution cache. */
+	volatile uword syms_cache;
 };
 
 static inline void symbolizer_proc_lock(struct symbolizer_proc_info *p)
 {
-        while (__atomic_test_and_set(&p->lock, __ATOMIC_ACQUIRE))
-                CLIB_PAUSE();
+	while (__atomic_test_and_set(&p->lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
 }
 
 static inline void symbolizer_proc_unlock(struct symbolizer_proc_info *p)
 {
-        __atomic_clear(&p->lock, __ATOMIC_RELEASE);
+	__atomic_clear(&p->lock, __ATOMIC_RELEASE);
 }
 
 struct symbolizer_cache_kvp {
@@ -168,27 +170,28 @@ struct symbol_tracepoint {
 	char *name;
 };
 
-static_always_inline u64
-cache_process_stime(struct symbolizer_cache_kvp *kv)
+static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
 {
-	return (u64)((struct symbolizer_proc_info *)kv->v.proc_info_p)->stime;
+	return (u64) ((struct symbolizer_proc_info *)kv->v.proc_info_p)->stime;
 }
 
-static_always_inline u64
-cache_process_netns_id(struct symbolizer_cache_kvp *kv)
+static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *kv)
 {
-	return (u64)((struct symbolizer_proc_info *)kv->v.proc_info_p)->netns_id;
+	return (u64) ((struct symbolizer_proc_info *)kv->v.proc_info_p)->
+	    netns_id;
 }
 
 static_always_inline void
 copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 {
 	static const int len =
-		sizeof(((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm);
+	    sizeof(((struct symbolizer_proc_info *) kv->v.proc_info_p)->comm);
 
 	strcpy_s_inline(dst, len,
-			((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm,
-			strlen(((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm));
+			((struct symbolizer_proc_info *)kv->v.proc_info_p)->
+			comm,
+			strlen(((struct symbolizer_proc_info *)kv->v.
+				proc_info_p)->comm));
 }
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,

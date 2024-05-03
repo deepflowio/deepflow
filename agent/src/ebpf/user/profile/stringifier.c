@@ -78,7 +78,7 @@ static const char *u_sym_prefix = "";
  * in the loss of stack data. This situation is rare and difficult
  * to occur.
  */
-static u64 stack_table_data_miss;
+static __thread u64 stack_table_data_miss;
 
 u64 get_stack_table_data_miss_count(void)
 {
@@ -159,14 +159,26 @@ static inline char *create_symbol_str(int len, char *src, const char *tag)
 }
 
 static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
-				   struct bcc_symbol *sym)
+				   struct bcc_symbol *sym, void *info_p)
 {
 	ASSERT(pid >= 0);
 
+	struct symbolizer_proc_info *p = info_p;
+	symbolizer_proc_lock(p);
+	if ((u64) resolver != (u64) p->syms_cache) {
+		symbolizer_proc_unlock(p);
+		return (-1);
+	}
+
+	int ret;
 	if (pid == 0)
-		return bcc_symcache_resolve_no_demangle(resolver, address, sym);
+		ret = bcc_symcache_resolve_no_demangle(resolver, address, sym);
 	else
-		return bcc_symcache_resolve(resolver, address, sym);
+		ret = bcc_symcache_resolve(resolver, address, sym);
+
+	symbolizer_proc_unlock(p);
+
+	return ret;
 }
 
 static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
@@ -209,7 +221,7 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
 	if (resolver == NULL)
 		goto resolver_err;
 
-	int ret = symcache_resolve(pid, resolver, address, &sym);
+	int ret = symcache_resolve(pid, resolver, address, &sym, info_p);
 	if (ret == 0) {
 		ptr = symbol_name_fetch(pid, &sym);
 		if (ptr) {
@@ -241,9 +253,11 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
 		ptr = create_symbol_str(len, format_str, "");
 		if (info_p) {
 			struct symbolizer_proc_info *p = info_p;
+			symbolizer_proc_lock(p);
 			if (p->is_java && strstr(format_str, "perf-")) {
 				p->unknown_syms_found = true;
 			}
+			symbolizer_proc_unlock(p);
 		}
 		goto finish;
 	}
