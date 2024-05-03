@@ -32,8 +32,21 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
+#include "java/gen_syms_file.h"
 #include "perf_profiler.h"
+#include "../elf.h"
+#include "../load.h"
+#include "../../kernel/include/perf_profiler.h"
+#include "../perf_reader.h"
+#include "../bihash_8_8.h"
+#include "stringifier.h"
+#include "../table.h"
+#include <regex.h>
+#include "java/config.h"
+#include "java/df_jattach.h"
+#include "profile_common.h"
 
+static struct profiler_context offcpu_ctx;
 extern struct bpf_tracer *profiler_tracer;
 extern volatile u64 profiler_stop;
 static u64 offcpu_buf_lost_a_count;
@@ -61,7 +74,7 @@ static void reader_lost_cb_b(void *cookie, u64 lost)
 
 static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
-	if (unlikely(profiler_stop == 1))
+	if (unlikely(offcpu_ctx.profiler_stop == 1))
 		return;
 
 	struct reader_forward_info *fwd_info = cookie;

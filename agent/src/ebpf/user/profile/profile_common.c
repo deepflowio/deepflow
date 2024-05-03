@@ -22,6 +22,7 @@
  *
  * This function is used to check if the kernel address is 0.
  */
+
 #include <sys/stat.h>
 #include <bcc/perf_reader.h>
 #include "../config.h"
@@ -30,10 +31,22 @@
 #include "../mem.h"
 #include "../log.h"
 #include "../types.h"
+#include "../vec.h"
 #include "../tracer.h"
-#include "perf_profiler.h"
-#include "java/config.h"
+#include "../socket.h"
 #include "java/gen_syms_file.h"
+#include "perf_profiler.h"
+#include "../elf.h"
+#include "../load.h"
+#include "../../kernel/include/perf_profiler.h"
+#include "../perf_reader.h"
+#include "../bihash_8_8.h"
+#include "stringifier.h"
+#include "../table.h"
+#include <regex.h>
+#include "java/config.h"
+#include "java/df_jattach.h"
+#include "profile_common.h"
 
 /*
  * This section is for symbolization of Java addresses, and we need
@@ -54,6 +67,15 @@
 extern int major, minor;
 
 static bool java_installed;
+
+int profiler_context_init(struct profiler_context *ctx)
+{
+	memset(ctx, 0, sizeof(struct profiler_context));
+	atomic64_init(&ctx->process_lost_count);
+	ctx->profiler_stop = 0;
+	return 0;
+}
+
 static bool check_kallsyms_addr_is_zero(void)
 {
 	const int check_num = 100;

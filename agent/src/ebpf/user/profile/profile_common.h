@@ -97,6 +97,7 @@ struct profiler_context {
 	atomic64_t process_lost_count;
 };
 
+int profiler_context_init(struct profiler_context *ctx);
 bool run_conditions_check(void);
 int java_libs_and_tools_install(void);
 #endif /*DF_USER_PROFILE_COMMON_H */

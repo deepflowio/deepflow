@@ -66,7 +66,6 @@ extern __thread uword thread_index;
 struct stack_trace_key_t *raw_stack_data;
 static u64 stack_trace_lost;
 struct bpf_tracer *profiler_tracer;
-volatile u64 profiler_stop;
 
 // for stack_trace_msg_hash relese
 static __thread stack_trace_msg_hash_kv *trace_msg_kvps;
@@ -289,7 +288,7 @@ static void reader_lost_cb_b(void *cookie, u64 lost)
 
 static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
-	if (unlikely(profiler_stop == 1))
+	if (unlikely(oncpu_ctx.profiler_stop == 1))
 		return;
 
 	struct reader_forward_info *fwd_info = cookie;
@@ -402,8 +401,9 @@ static void cpdbg_process(stack_trace_msg_t * msg)
 	pthread_mutex_unlock(&cpdbg_mutex);
 }
 
-static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
+static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *arg)
 {
+	struct profiler_context *ctx = arg;
 	stack_trace_msg_kv_t *msg_kv = (stack_trace_msg_kv_t *) kv;
 	if (msg_kv->msg_ptr != 0) {
 		stack_trace_msg_t *msg = (stack_trace_msg_t *) msg_kv->msg_ptr;
@@ -417,7 +417,7 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
 		 * higher level for processing. The higher level will se-
 		 * nd the data to the server for storage as required.
 		 */
-		if (likely(profiler_stop == 0))
+		if (likely(ctx->profiler_stop == 0))
 			fun(msg);
 
 		clib_mem_free((void *)msg);
@@ -438,7 +438,8 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *ctx)
  * Push the data and release the resources.
  * @is_force: Do you need to perform a forced release?
  */
-static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
+static void push_and_release_stack_trace_msg(struct profiler_context *ctx,
+					     stack_trace_msg_hash_t * h,
 					     bool is_force)
 {
 	ASSERT(profiler_tracer != NULL);
@@ -464,7 +465,7 @@ static void push_and_release_stack_trace_msg(stack_trace_msg_hash_t * h,
 	push_count++;
 
 	stack_trace_msg_hash_foreach_key_value_pair(h, push_and_free_msg_kvp_cb,
-						    NULL);
+						    (void *)ctx);
 	/*
 	 * In this iteration, all elements will be cleared, and in the
 	 * next iteration, this hash will be reused.
@@ -578,7 +579,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		if (v == NULL)
 			break;
 
-		if (unlikely(profiler_stop == 1))
+		if (unlikely(ctx->profiler_stop == 1))
 			break;
 
 		/*
@@ -959,7 +960,7 @@ static void process_bpf_stacktraces(struct profiler_context *ctx,
 	if (nfds > 0) {
 
 	      check_again:
-		if (unlikely(profiler_stop == 1))
+		if (unlikely(ctx->profiler_stop == 1))
 			goto release_iter;
 
 		/* 
@@ -1011,7 +1012,7 @@ release_iter:
 	clean_stack_strs(&g_stack_str_hash);
 
 	/* Push messages and free stack_trace_msg_hash */
-	push_and_release_stack_trace_msg(&g_msg_hash, false);
+	push_and_release_stack_trace_msg(ctx, &g_msg_hash, false);
 }
 
 static void java_syms_update_work(void *arg)
@@ -1028,7 +1029,7 @@ static void oncpu_reader_work(void *arg)
 	reader_b = &t->readers[1];
 
 	for (;;) {
-		if (unlikely(profiler_stop == 1)) {
+		if (unlikely(oncpu_ctx.profiler_stop == 1)) {
 			if (g_enable_perf_sample)
 				set_enable_perf_sample(t, 0);
 
@@ -1075,7 +1076,7 @@ exit:
 	/* free stack_str_hash */
 	if (likely(g_msg_hash.buckets != NULL)) {
 		/* Ensure that all elements are released properly/cleanly */
-		push_and_release_stack_trace_msg(&g_msg_hash, true);
+		push_and_release_stack_trace_msg(&oncpu_ctx, &g_msg_hash, true);
 		stack_trace_msg_hash_free(&g_msg_hash);
 	}
 
@@ -1168,7 +1169,7 @@ error:
 
 int stop_continuous_profiler(void)
 {
-	profiler_stop = 1;
+	oncpu_ctx.profiler_stop = 1;
 	if (flame_graph_end_time == NULL) {
 		flame_graph_end_time = gen_file_name_by_datetime();
 	}
@@ -1323,6 +1324,7 @@ static struct tracer_sockopts cpdbg_sockopts = {
  * @callback Profile data processing callback interface
  * @returns 0 on success, < 0 on error
  */
+
 int start_continuous_profiler(int freq, int java_syms_space_limit,
 			      int java_syms_update_delay,
 			      tracer_callback_t callback)
@@ -1334,7 +1336,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	if (!run_conditions_check())
 		return (-1);
 
-	memset(&oncpu_ctx, 0, sizeof(oncpu_ctx));
+	profiler_context_init(&oncpu_ctx);
 
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
@@ -1351,14 +1353,11 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	set_java_syms_fetch_delay(java_syms_update_delay);
 	ebpf_info("set java_syms_update_delay : %lu\n", java_syms_update_delay);
 
-	atomic64_init(&oncpu_ctx.process_lost_count);
-
 	/*
 	 * Initialize cpdbg
 	 */
 	pthread_mutex_init(&cpdbg_mutex, NULL);
 
-	profiler_stop = 0;
 	start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC);
 
 	// CPUID will not be included in the aggregation of stack trace data.
