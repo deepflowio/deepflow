@@ -1110,17 +1110,12 @@ static int create_profiler(struct bpf_tracer *tracer)
 		return ETR_NORESOURCE;
 	}
 
-	extended_reader_create(tracer);
-
 	/* clear old perf files */
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
 
 	if (tracer_probes_init(tracer))
 		return (-1);
-
-	/* attach perf event */
-	tracer_hooks_attach(tracer);
 
 	ret = create_work_thread("java_update",
 				 &java_syms_update_thread,
@@ -1141,6 +1136,11 @@ static int create_profiler(struct bpf_tracer *tracer)
 		goto error;
 	}
 
+	extended_reader_create(tracer);
+
+	/* attach perf event */
+	tracer_hooks_attach(tracer);
+		
 	return ETR_OK;
 
 error:
