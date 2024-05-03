@@ -103,6 +103,7 @@ struct profiler_context {
 	atomic64_t process_lost_count;
 };
 
+int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx);
 void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
 			 u64 enable_flag);
 int profiler_context_init(struct profiler_context *ctx,

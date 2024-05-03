@@ -82,20 +82,6 @@ static char *flame_graph_end_time;
 static u64 last_push_time;
 static u64 push_count;
 
-/* 
- * To perform regular expression matching on process names,
- * the 'profiler_regex' is set using the 'set_profiler_regex()'
- * interface. Processes that successfully match the regular
- * expression are aggregated using the key:
- * `{pid + stime + u_stack_id + k_stack_id + tid + cpu}`.
- *
- * For processes that do not match, they are aggregated using the
- * key:
- * `<process name + u_stack_id + k_stack_id + cpu>`.
- */
-static regex_t profiler_regex;
-static bool regex_existed = false;
-
 /*
  * 'cpu_aggregation_flag' is used to set whether to retrieve CPUID
  * and include it in the aggregation of stack trace data.
@@ -631,8 +617,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		/* If it is a process, match operation will be performed immediately. */
 		if (v->pid == v->tgid) {
 			is_match_finish = true;
-			matched = (regexec(&profiler_regex, v->comm, 0, NULL, 0)
-				   == 0);
+			matched =
+			    (regexec(&ctx->profiler_regex, v->comm, 0, NULL, 0)
+			     == 0);
 			if (!matched) {
 				set_msg_kvp_by_comm(&kv, v, (void *)0);
 				goto skip_proc_find;
@@ -664,7 +651,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			if (!is_match_finish)
 				matched =
 				    (regexec
-				     (&profiler_regex, process_name, 0, NULL, 0)
+				     (&ctx->profiler_regex, process_name, 0,
+				      NULL, 0)
 				     == 0);
 			if (matched)
 				set_msg_kvp(&kv, v, stime, (void *)0);
@@ -1027,7 +1015,7 @@ static void oncpu_reader_work(void *arg)
 		 * exit events. We want to ensure that everything is ready
 		 * before the profiler performs address translation.
 		 */
-		if (unlikely(!regex_existed ||
+		if (unlikely(!oncpu_ctx.regex_existed ||
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			if (oncpu_ctx.enable_bpf_profile)
 				set_enable_profiler(t, &oncpu_ctx, 0);
@@ -1140,7 +1128,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 
 	/* attach perf event */
 	tracer_hooks_attach(tracer);
-		
+
 	return ETR_OK;
 
 error:
@@ -1160,9 +1148,9 @@ int stop_continuous_profiler(void)
 
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
-	if (regex_existed) {
-		regfree(&profiler_regex);
-		regex_existed = false;
+	if (oncpu_ctx.regex_existed) {
+		regfree(&oncpu_ctx.profiler_regex);
+		oncpu_ctx.regex_existed = false;
 	}
 
 	ebpf_info(LOG_CP_TAG "== alloc_b %lu bytes, free_b %lu bytes, "
@@ -1456,34 +1444,7 @@ int set_profiler_regex(const char *pattern)
 	 * coordination between these two threads.
 	 */
 	tracer_reader_lock(profiler_tracer);
-	if (*pattern == '\0') {
-		regex_existed = false;
-		ebpf_warning(LOG_CP_TAG
-			     "Set 'profiler_regex' pattern : '', an empty"
-			     " regular expression will not generate any stack data."
-			     "Please configure the regular expression for profiler.\n");
-		tracer_reader_unlock(profiler_tracer);
-		return (0);
-	}
-
-	if (regex_existed) {
-		regfree(&profiler_regex);
-	}
-
-	int ret = regcomp(&profiler_regex, pattern, REG_EXTENDED);
-	if (ret != 0) {
-		char error_buffer[100];
-		regerror(ret, &profiler_regex, error_buffer,
-			 sizeof(error_buffer));
-		ebpf_warning(LOG_CP_TAG
-			     "Pattern %s failed to compile the regular "
-			     "expression: %s\n", pattern, error_buffer);
-		regex_existed = false;
-		tracer_reader_unlock(profiler_tracer);
-		return (-1);
-	}
-
-	regex_existed = true;
+	do_profiler_regex_config(pattern, &oncpu_ctx);
 	tracer_reader_unlock(profiler_tracer);
 	ebpf_info(LOG_CP_TAG "Set 'profiler_regex' successful, pattern : '%s'",
 		  pattern);

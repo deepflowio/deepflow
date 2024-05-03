@@ -647,6 +647,8 @@ extern "C" {
         timeout: c_int,
         callback: extern "C" fn(data: *mut c_char, len: c_int),
     ) -> c_int;
+
+    pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
 }
 
 #[no_mangle]

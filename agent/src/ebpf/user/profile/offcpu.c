@@ -130,10 +130,35 @@ int extended_reader_create(struct bpf_tracer *tracer)
 	return 0;
 }
 
+/*
+ * To set the offcpu regex matching for the profiler. 
+ *
+ * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
+ * @returns 0 on success, < 0 on error
+ */
+int set_offcpu_profiler_regex(const char *pattern)
+{
+	if (profiler_tracer == NULL) {
+		ebpf_warning("The 'profiler_tracer' has not been created yet."
+			     " Please use start_continuous_profiler() to create it first.\n");
+		return (-1);
+	}
+
+	tracer_reader_lock(profiler_tracer);
+	do_profiler_regex_config(pattern, &offcpu_ctx);
+	tracer_reader_unlock(profiler_tracer);
+	ebpf_info("Set 'profiler_regex' successful, pattern : '%s'", pattern);
+	return (0);
+}
+
 #else /* defined AARCH64_MUSL */
 int extended_reader_create(struct bpf_tracer *tracer)
 {
 	return 0;
 }
 
+int set_offcpu_profiler_regex(const char *pattern)
+{
+	return 0;
+}
 #endif /* AARCH64_MUSL */

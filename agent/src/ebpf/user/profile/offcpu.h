@@ -39,5 +39,6 @@ do {							\
 } while(0)
 
 int extended_reader_create(struct bpf_tracer *tracer);
+int set_offcpu_profiler_regex(const char *pattern);
 
 #endif /*DF_USER_OFFCPU_H */

@@ -82,6 +82,8 @@ int profiler_context_init(struct profiler_context *ctx,
 		 stack_map_name_a);
 	snprintf(ctx->stack_map_name_b, sizeof(ctx->stack_map_name_b), "%s",
 		 stack_map_name_b);
+	ctx->regex_existed = false;
+
 	return 0;
 }
 
@@ -99,6 +101,35 @@ void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
 	ctx->enable_bpf_profile = enable_flag;
 
 	ebpf_info("%s() success, enable_flag:%d\n", __func__, enable_flag);
+}
+
+int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx)
+{
+	if (*pattern == '\0') {
+		ctx->regex_existed = false;
+		ebpf_warning("Set 'profiler_regex' pattern : '', an empty"
+			     " regular expression will not generate any stack data."
+			     "Please configure the regular expression for profiler.\n");
+		return (0);
+	}
+
+	if (ctx->regex_existed) {
+		regfree(&ctx->profiler_regex);
+	}
+
+	int ret = regcomp(&ctx->profiler_regex, pattern, REG_EXTENDED);
+	if (ret != 0) {
+		char error_buffer[100];
+		regerror(ret, &ctx->profiler_regex, error_buffer,
+			 sizeof(error_buffer));
+		ebpf_warning("Pattern %s failed to compile the regular "
+			     "expression: %s\n", pattern, error_buffer);
+		ctx->regex_existed = false;
+		return (-1);
+	}
+
+	ctx->regex_existed = true;
+	return 0;
 }
 
 static bool check_kallsyms_addr_is_zero(void)
