@@ -201,10 +201,10 @@ fn main() {
 
         bpf_tracer_finish();
 
-        //if cpdbg_set_config(60, debug_callback) != 0 {
-        //    println!("cpdbg_set_config() error");
-        //    ::std::process::exit(1);
-        //}
+        if cpdbg_set_config(60, debug_callback) != 0 {
+            println!("cpdbg_set_config() error");
+            ::std::process::exit(1);
+        }
 
         let stats = socket_tracer_stats();
         print!("{:#?}\n", stats);

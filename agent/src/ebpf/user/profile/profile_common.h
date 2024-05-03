@@ -85,6 +85,10 @@ struct profiler_context {
 	int *clear_stack_ids_a;
 	int *clear_stack_ids_b;
 
+	// for stack_trace_msg_hash relese
+	stack_trace_msg_hash_kv *trace_msg_kvps;
+	bool msg_clear_hash;
+
 	/* profiler statistics */
 
 	// Switching between dual buffers.
@@ -101,8 +105,19 @@ struct profiler_context {
 	 * is used to count the number of lost processes during the parsing process.
 	 */
 	atomic64_t process_lost_count;
+	// Stack error quantity statistics obtained by eBPF.
+	u64 stack_trace_err;
+	// Quantity statistics of data pushed.
+	u64 push_count;
+	/*
+	 * Record the time of the last data push
+	 * (in seconds since system startup)
+	 */
+	u64 last_push_time;
 };
 
+void process_bpf_stacktraces(struct profiler_context *ctx,
+			     struct bpf_tracer *t);
 int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx);
 void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
 			 u64 enable_flag);
@@ -112,4 +127,7 @@ int profiler_context_init(struct profiler_context *ctx,
 			  const char *stack_map_name_b);
 bool run_conditions_check(void);
 int java_libs_and_tools_install(void);
+void push_and_release_stack_trace_msg(struct profiler_context *ctx,
+				      stack_trace_msg_hash_t * h,
+				      bool is_force);
 #endif /*DF_USER_PROFILE_COMMON_H */

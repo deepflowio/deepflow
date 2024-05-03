@@ -1,0 +1,6 @@
+#! /bin/bash
+
+indent -npro -kr -i8 -ts8 -nss -nsc -ncs -nprs -sob -l80 -ss -cp1 --space-after-for --space-after-if --space-after-while --space-special-semicolon --blank-lines-after-procedures -v $1
+sed -i "s/{ }/{}/g" $1
+sed -i "s/) ;/);/g" $1
+sed -i "s/^      //g" $1
