@@ -177,8 +177,8 @@ static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
 
 static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *kv)
 {
-	return (u64) ((struct symbolizer_proc_info *)kv->v.proc_info_p)->
-	    netns_id;
+	return (u64) ((struct symbolizer_proc_info *)kv->v.
+		      proc_info_p)->netns_id;
 }
 
 static_always_inline void
@@ -188,10 +188,10 @@ copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 	    sizeof(((struct symbolizer_proc_info *) kv->v.proc_info_p)->comm);
 
 	strcpy_s_inline(dst, len,
-			((struct symbolizer_proc_info *)kv->v.proc_info_p)->
-			comm,
-			strlen(((struct symbolizer_proc_info *)kv->v.
-				proc_info_p)->comm));
+			((struct symbolizer_proc_info *)kv->v.
+			 proc_info_p)->comm,
+			strlen(((struct symbolizer_proc_info *)kv->
+				v.proc_info_p)->comm));
 }
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
@@ -214,6 +214,9 @@ u64 get_pid_stime(pid_t pid);
 void exec_proc_info_cache_update(void);
 void set_java_syms_fetch_delay(int delay_secs);
 u64 get_java_syms_fetch_delay(void);
+void free_proc_cache(struct symbolizer_proc_info *p);
+void symbolizer_kernel_lock(void);
+void symbolizer_kernel_unlock(void);
 #endif
 int create_and_init_proc_info_caches(void);
 void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size);

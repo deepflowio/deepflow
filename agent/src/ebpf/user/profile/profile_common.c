@@ -729,6 +729,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		u64 stime, netns_id;
 		stime = netns_id = 0;
 		void *info_p = NULL;
+		struct symbolizer_proc_info *__info_p = NULL;
 		char *process_name = NULL;
 		bool matched, is_match_finish;
 		matched = is_match_finish = false;
@@ -747,6 +748,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 
 		get_process_info_by_pid(v->tgid, &stime, &netns_id,
 					(char *)name, &info_p);
+		__info_p = info_p;
 
 		/*
 		 * If the data collected is from a running process, and the process
@@ -776,14 +778,23 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			if (matched)
 				set_msg_kvp(&kv, v, stime, (void *)0);
 			else {
-				if (ctx->only_matched_data)
+				if (ctx->only_matched_data) {
+					if (__info_p
+					    && AO_SUB_F(&__info_p->use, 1) == 0)
+						free_proc_cache(__info_p);
+
 					continue;
+				}
 
 				set_msg_kvp_by_comm(&kv, v, (void *)0);
 			}
 		} else {
-			if (ctx->only_matched_data)
+			if (ctx->only_matched_data) {
+				if (__info_p
+				    && AO_SUB_F(&__info_p->use, 1) == 0)
+					free_proc_cache(__info_p);
 				continue;
+			}
 
 			/* Not find process in procfs. */
 			set_msg_kvp_by_comm(&kv, v, (void *)0);
@@ -804,6 +815,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			((stack_trace_msg_t *) kv.msg_ptr)->count++;
+			if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
+				free_proc_cache(__info_p);
+
 			continue;
 		}
 
@@ -835,6 +849,10 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
 			if (msg == NULL) {
 				clib_mem_free(trace_str);
+				if (__info_p
+				    && AO_SUB_F(&__info_p->use, 1) == 0)
+					free_proc_cache(__info_p);
+
 				continue;
 			}
 
@@ -870,6 +888,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				    (&msg_hash->hash_elems_count, 1);
 			}
 		}
+
+		if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
+			free_proc_cache(__info_p);
 
 		/* check and clean symbol cache */
 		exec_proc_info_cache_update();

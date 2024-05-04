@@ -163,20 +163,23 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 {
 	ASSERT(pid >= 0);
 
-	struct symbolizer_proc_info *p = info_p;
-	symbolizer_proc_lock(p);
-	if ((u64) resolver != (u64) p->syms_cache) {
-		symbolizer_proc_unlock(p);
-		return (-1);
-	}
-
-	int ret;
-	if (pid == 0)
+	int ret = -1;
+	if (pid == 0) {
+		symbolizer_kernel_lock();
 		ret = bcc_symcache_resolve_no_demangle(resolver, address, sym);
-	else
-		ret = bcc_symcache_resolve(resolver, address, sym);
-
-	symbolizer_proc_unlock(p);
+		symbolizer_kernel_unlock();
+	} else {
+		struct symbolizer_proc_info *p = info_p;
+		if (p) {
+			symbolizer_proc_lock(p);
+			if ((u64) resolver != (u64) p->syms_cache) {
+				symbolizer_proc_unlock(p);
+				return (-1);
+			}
+			ret = bcc_symcache_resolve(resolver, address, sym);
+			symbolizer_proc_unlock(p);
+		}
+	}
 
 	return ret;
 }
@@ -217,6 +220,7 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
 	char *ptr = NULL;
 	char format_str[32];
 	struct bcc_symbol sym;
+	memset(&sym, 0, sizeof(sym));
 	void *resolver = get_symbol_cache(pid, is_create);
 	if (resolver == NULL)
 		goto resolver_err;

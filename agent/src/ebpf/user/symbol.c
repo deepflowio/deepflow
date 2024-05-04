@@ -488,17 +488,17 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 #ifndef AARCH64_MUSL
 static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
-static volatile void *k_resolver;	// for kernel symbol cache
+static void *k_resolver;	// for kernel symbol cache
 static volatile u32 k_resolver_lock;
 static u64 sys_btime_msecs;	// system boot time(milliseconds)
 
-static inline void symbolizer_kernel_lock(void)
+void symbolizer_kernel_lock(void)
 {
 	while (__atomic_test_and_set(&k_resolver_lock, __ATOMIC_ACQUIRE))
 		CLIB_PAUSE();
 }
 
-static inline void symbolizer_kernel_unlock(void)
+void symbolizer_kernel_unlock(void)
 {
 	__atomic_clear(&k_resolver_lock, __ATOMIC_RELEASE);
 }
@@ -508,29 +508,40 @@ static bool inline enable_proc_info_cache(void)
 	return (syms_cache_hash.buckets != NULL);
 }
 
-static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
+void free_proc_cache(struct symbolizer_proc_info *p)
 {
-	if (kv->v.cache) {
-		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
-		free_symcache_count++;
-		kv->v.cache = 0;
+	symbolizer_proc_lock(p);
+	if (p->is_java) {
+		/* Delete target ns Java files */
+		int pid = (int)p->pid;
+		if (pid > 0) {
+			clean_local_java_symbols_files(pid);
+		}
 	}
 
+	if (p->syms_cache) {
+		bcc_free_symcache((void *)p->syms_cache, p->pid);
+		free_symcache_count++;
+	}
+	p->syms_cache = 0;
+	symbolizer_proc_unlock(p);
+	clib_mem_free((void *)p);
+}
+
+static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
+{
 	if (kv->v.proc_info_p) {
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
-		if (p->is_java) {
-			/* Delete target ns Java files */
-			int pid = (int)kv->k.pid;
-			if (pid > 0) {
-				clean_local_java_symbols_files(pid);
-			}
-		}
-
 		/* Ensure that all tasks are completed before releasing. */
 		if (AO_SUB_F(&p->use, 1) == 0) {
-			clib_mem_free((void *)p);
+			if (kv->v.cache != p->syms_cache)
+				ebpf_warning
+				    ("kv->v.cache 0x%lx p->syms_cache 0x%lx\n",
+				     kv->v.cache, p->syms_cache);
+			free_proc_cache(p);
 			kv->v.proc_info_p = 0;
+			kv->v.cache = 0;
 		}
 	}
 }
@@ -827,6 +838,7 @@ static inline void write_return_value(struct symbolizer_cache_kvp *kv,
 	*stime = cache_process_stime(kv);
 	*netns_id = cache_process_netns_id(kv);
 	*ptr = p;
+	AO_INC(&p->use);
 }
 
 void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
@@ -877,11 +889,11 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			 * for a period of time to avoid such situations.
 			 */
 			char comm[sizeof(p->comm)];
-			u64 stime = (u64)
+			u64 proc_stime = (u64)
 			    get_process_starttime_and_comm(pid,
 							   comm,
 							   sizeof(comm));
-			if (stime == 0) {
+			if (proc_stime == 0) {
 				/* 
 				 * Here, indicate that during the symbolization process,
 				 * the process has already terminated, but the process
@@ -894,7 +906,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 				return;
 			}
 
-			p->stime = stime;
+			p->stime = proc_stime;
 			memcpy(p->comm, comm, sizeof(p->comm));
 			p->comm[sizeof(p->comm) - 1] = '\0';
 

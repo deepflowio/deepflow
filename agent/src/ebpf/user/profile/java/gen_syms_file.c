@@ -62,8 +62,9 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 
 	char args[PERF_PATH_SZ * 2];
 	snprintf(args, sizeof(args),
-		"%d %d," DF_AGENT_LOCAL_PATH_FMT ".map," DF_AGENT_LOCAL_PATH_FMT ".log",
-		pid, g_java_syms_write_bytes_max, pid, pid);
+		 "%d %d," DF_AGENT_LOCAL_PATH_FMT ".map,"
+		 DF_AGENT_LOCAL_PATH_FMT ".log", pid,
+		 g_java_syms_write_bytes_max, pid, pid);
 
 	i64 curr_local_sz;
 	curr_local_sz = get_local_symbol_file_sz(pid, target_ns_pid);
@@ -131,6 +132,7 @@ void java_syms_update_main(void *arg)
 
 		if (task != NULL) {
 			struct symbolizer_proc_info *p = task->p;
+			symbolizer_proc_lock(p);
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
 				int ret;
@@ -151,10 +153,10 @@ void java_syms_update_main(void *arg)
 
 				AO_SET(&p->new_java_syms_file, true);
 			}
-
+			symbolizer_proc_unlock(p);
 			/* Ensure that all tasks are completed before releasing. */
 			if (AO_SUB_F(&p->use, 1) == 0) {
-				clib_mem_free((void *)p);
+				free_proc_cache(p);
 			}
 
 			clib_mem_free((void *)task);
