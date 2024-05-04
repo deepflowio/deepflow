@@ -44,6 +44,7 @@ MAP_PERF_EVENT(offcpu_output_b, int, __u32, MAX_CPU)
 MAP_STACK_TRACE(offcpu_stack_map_a, STACK_MAP_ENTRIES)
 MAP_STACK_TRACE(offcpu_stack_map_b, STACK_MAP_ENTRIES)
 
+MAP_ARRAY(offset_state_map, __u32, __u64, PROFILER_CNT);
 // For process filtering
 
 /* *INDENT-ON* */
@@ -121,11 +122,11 @@ static inline __u64 fetch_delta_time(int curr_pid, int offcpu_pid)
 static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
 {
 	// create map key
-	struct offcpu_data_s data = {};
+	struct stack_trace_key_t data = {};
 	data.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
 					 USER_STACKID_FLAGS);
 
-	/* 
+	/*
 	 * It only handles user-space programs. If there's no
 	 * user-space stack, it won't process.
 	 */
@@ -137,7 +138,9 @@ static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
 	data.pid = pid;
 	data.tgid = tgid;
 	data.duration_ns = delta_ns;
-	bpf_get_current_comm(&data.name, sizeof(data.name));
+	data.cpu = bpf_get_smp_processor_id();
+	data.timestamp = bpf_ktime_get_ns();
+	bpf_get_current_comm(&data.comm, sizeof(data.comm));
 
 	bpf_perf_event_output(ctx, &NAME(offcpu_output_a),
 			      BPF_F_CURRENT_CPU, &data, sizeof(data));

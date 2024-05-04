@@ -48,31 +48,78 @@
 
 static struct profiler_context offcpu_ctx;
 extern struct bpf_tracer *profiler_tracer;
-extern volatile u64 profiler_stop;
-static u64 offcpu_buf_lost_a_count;
-static u64 offcpu_buf_lost_b_count;
+extern __thread uword thread_index;
 
 static void offcpu_reader_work(void *arg)
 {
-	for (;;)
-		sleep(10);
+	thread_index = READER_OFFCPU_THREAD_IDX;
+	struct bpf_tracer *t = profiler_tracer;
+	for (;;) {
+		if (unlikely(offcpu_ctx.profiler_stop == 1)) {
+			if (offcpu_ctx.enable_bpf_profile)
+				set_enable_profiler(t, &offcpu_ctx, 0);
+
+			goto exit;
+		}
+
+		if (unlikely(!offcpu_ctx.regex_existed ||
+			     get_socket_tracer_state() != TRACER_RUNNING)) {
+			if (offcpu_ctx.enable_bpf_profile)
+				set_enable_profiler(t, &offcpu_ctx, 0);
+			exec_proc_info_cache_update();
+			sleep(1);
+			continue;
+		}
+
+		if (unlikely(!offcpu_ctx.enable_bpf_profile))
+			set_enable_profiler(t, &offcpu_ctx, 1);
+
+		tracer_reader_lock(t);
+		process_bpf_stacktraces(&offcpu_ctx, t);
+		tracer_reader_unlock(t);
+	}
+
+exit:
+	//print_cp_tracer_status(t, &offcpu_ctx);
+
+	print_hash_stack_str(&offcpu_ctx.stack_str_hash);
+	/* free stack_str_hash */
+	if (likely(offcpu_ctx.stack_str_hash.buckets != NULL)) {
+		release_stack_str_hash(&offcpu_ctx.stack_str_hash);
+	}
+
+	print_hash_stack_trace_msg(&offcpu_ctx.msg_hash);
+	/* free stack_str_hash */
+	if (likely(offcpu_ctx.msg_hash.buckets != NULL)) {
+		/* Ensure that all elements are released properly/cleanly */
+		push_and_release_stack_trace_msg(&offcpu_ctx,
+						 &offcpu_ctx.msg_hash, true);
+		stack_trace_msg_hash_free(&offcpu_ctx.msg_hash);
+	}
+
+	/* clear thread */
+	t->perf_worker[READER_OFFCPU_THREAD_IDX] = 0;
+	ebpf_info("perf profiler reader-thread exit.\n");
+
+	pthread_exit(NULL);
+
 }
 
-static void reader_lost_cb_a(void *cookie, u64 lost)
+static void offcpu_reader_lost_cb_a(void *cookie, u64 lost)
 {
 	struct bpf_tracer *tracer = profiler_tracer;
 	atomic64_add(&tracer->lost, lost);
-	offcpu_buf_lost_a_count++;
+	offcpu_ctx.perf_buf_lost_a_count++;
 }
 
-static void reader_lost_cb_b(void *cookie, u64 lost)
+static void offcpu_reader_lost_cb_b(void *cookie, u64 lost)
 {
 	struct bpf_tracer *tracer = profiler_tracer;
 	atomic64_add(&tracer->lost, lost);
-	offcpu_buf_lost_b_count++;
+	offcpu_ctx.perf_buf_lost_b_count++;
 }
 
-static void reader_raw_cb(void *cookie, void *raw, int raw_size)
+static void offcpu_reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
 	if (unlikely(offcpu_ctx.profiler_stop == 1))
 		return;
@@ -83,18 +130,16 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		return;
 	}
 
-	struct bpf_tracer *tracer = profiler_tracer;
-#if 0
 	struct stack_trace_key_t *v;
 	struct bpf_tracer *tracer = profiler_tracer;
 	v = (struct stack_trace_key_t *)raw;
 
 	int ret = VEC_OK;
-	vec_add1(raw_stack_data, *v, ret);
+	vec_add1(offcpu_ctx.raw_stack_data, *v, ret);
 	if (ret != VEC_OK) {
 		ebpf_warning("vec add failed\n");
 	}
-#endif
+
 	atomic64_add(&tracer->recv, 1);
 }
 
@@ -110,8 +155,8 @@ int extended_reader_create(struct bpf_tracer *tracer)
 	struct bpf_perf_reader *reader_a, *reader_b;
 	reader_a = create_perf_buffer_reader(tracer,
 					     MAP_OFFCPU_BUF_A_NAME,
-					     reader_raw_cb,
-					     reader_lost_cb_a,
+					     offcpu_reader_raw_cb,
+					     offcpu_reader_lost_cb_a,
 					     PROFILE_PG_CNT_DEF, 1,
 					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_a == NULL)
@@ -119,13 +164,29 @@ int extended_reader_create(struct bpf_tracer *tracer)
 
 	reader_b = create_perf_buffer_reader(tracer,
 					     MAP_OFFCPU_BUF_B_NAME,
-					     reader_raw_cb,
-					     reader_lost_cb_b,
+					     offcpu_reader_raw_cb,
+					     offcpu_reader_lost_cb_b,
 					     PROFILE_PG_CNT_DEF, 1,
 					     PROFILER_READER_EPOLL_TIMEOUT);
 	if (reader_b == NULL) {
 		free_perf_buffer_reader(reader_a);
+		ebpf_warning("create offcpu reader failed.\n");
 		return ETR_NORESOURCE;
+	}
+
+	offcpu_ctx.r_a = reader_a;
+	offcpu_ctx.r_b = reader_b;
+
+	/*
+	 * Start a new thread to execute the data
+	 * reading of perf buffer.
+	 */
+	int ret =
+	    enable_tracer_reader_work("offcpu_reader", READER_OFFCPU_THREAD_IDX,
+				      tracer, (void *)&offcpu_reader_work);
+
+	if (ret) {
+		return ret;
 	}
 
 	return 0;

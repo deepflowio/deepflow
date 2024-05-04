@@ -25,7 +25,7 @@
 #define MAP_OFFCPU_STACK_A_NAME        "__offcpu_stack_map_a"
 #define MAP_OFFCPU_STACK_B_NAME        "__offcpu_stack_map_b"
 #define MAP_OFFCPU_STATE_MAP      "__offcpu_state_map"
-#define THREAD_OFFCPU_READER_IDX 1
+#define READER_OFFCPU_THREAD_IDX 1
 
 #undef CP_PROFILE_SET_PROBES
 #define CP_PROFILE_SET_PROBES(T)			\

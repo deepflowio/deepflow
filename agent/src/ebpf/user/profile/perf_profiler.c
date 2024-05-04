@@ -71,16 +71,6 @@ static FILE *folded_file;
 char *flame_graph_start_time;
 static char *flame_graph_end_time;
 
-/*
- * Cache hash: obtain folded stack trace string from stack ID.
- */
-static stack_str_hash_t g_stack_str_hash;
-
-/*
- * Used for tracking data statistics and pushing.
- */
-static stack_trace_msg_hash_t g_msg_hash;
-
 static void print_cp_tracer_status(struct bpf_tracer *t,
 				   struct profiler_context *ctx);
 
@@ -266,18 +256,19 @@ static void oncpu_reader_work(void *arg)
 exit:
 	print_cp_tracer_status(t, &oncpu_ctx);
 
-	print_hash_stack_str(&g_stack_str_hash);
+	print_hash_stack_str(&oncpu_ctx.stack_str_hash);
 	/* free stack_str_hash */
-	if (likely(g_stack_str_hash.buckets != NULL)) {
-		release_stack_str_hash(&g_stack_str_hash);
+	if (likely(oncpu_ctx.stack_str_hash.buckets != NULL)) {
+		release_stack_str_hash(&oncpu_ctx.stack_str_hash);
 	}
 
-	print_hash_stack_trace_msg(&g_msg_hash);
+	print_hash_stack_trace_msg(&oncpu_ctx.msg_hash);
 	/* free stack_str_hash */
-	if (likely(g_msg_hash.buckets != NULL)) {
+	if (likely(oncpu_ctx.msg_hash.buckets != NULL)) {
 		/* Ensure that all elements are released properly/cleanly */
-		push_and_release_stack_trace_msg(&oncpu_ctx, &g_msg_hash, true);
-		stack_trace_msg_hash_free(&g_msg_hash);
+		push_and_release_stack_trace_msg(&oncpu_ctx,
+						 &oncpu_ctx.msg_hash, true);
+		stack_trace_msg_hash_free(&oncpu_ctx.msg_hash);
 	}
 
 	/* resouce share release */

@@ -59,15 +59,6 @@ struct sched_switch_ctx {
 	int next_prio;
 };
 
-struct offcpu_data_s {
-	int pid;
-	int tgid;
-	int userstack;
-	int kernstack;
-	__u64 duration_ns;
-	char name[TASK_COMM_LEN];
-};
-
 struct sched_info_s {
 	int prev_pid;
 };
