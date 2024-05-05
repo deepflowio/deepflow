@@ -190,7 +190,14 @@ fn main() {
         }
 
         set_profiler_regex(
-            CString::new("^(socket_tracer|java|deepflow-.*)$".as_bytes())
+            CString::new("".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
+
+        set_offcpu_profiler_regex(
+            CString::new("^(Xorg)$".as_bytes())
                 .unwrap()
                 .as_c_str()
                 .as_ptr(),
@@ -201,7 +208,7 @@ fn main() {
 
         bpf_tracer_finish();
 
-        if cpdbg_set_config(60, debug_callback) != 0 {
+        if cpdbg_set_config(600, debug_callback) != 0 {
             println!("cpdbg_set_config() error");
             ::std::process::exit(1);
         }

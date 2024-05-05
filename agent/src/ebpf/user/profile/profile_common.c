@@ -689,7 +689,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		 * that it is an invalid value, the  CPUID will not be included in
 		 * the aggregation.
 		 */
-		if (ctx->cpu_aggregation_flag == 0 && !ctx->only_matched_data)
+		if (ctx->cpu_aggregation_flag == 0)
 			v->cpu = CPU_INVALID;
 
 		/*
@@ -743,6 +743,10 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			     == 0);
 			profile_regex_unlock(ctx);
 			if (!matched) {
+				if (ctx->only_matched_data) {
+					continue;
+				}
+
 				set_msg_kvp_by_comm(&kv, v, (void *)0);
 				goto skip_proc_find;
 			}
@@ -811,7 +815,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		 * the Total process, with the aim of showcasing the proportion
 		 * of each process in the overall sampling.
 		 */
-		if (matched)
+		if (matched && !ctx->only_matched_data)
 			update_matched_process_in_total(ctx, msg_hash,
 							process_name, v);
 
@@ -823,7 +827,6 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			((stack_trace_msg_t *) kv.msg_ptr)->count++;
 			if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
 				free_proc_cache(__info_p);
-
 			continue;
 		}
 
@@ -840,6 +843,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 						    stack_str_hash, matched,
 						    process_name, info_p);
+
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string

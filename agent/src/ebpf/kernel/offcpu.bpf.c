@@ -175,7 +175,7 @@ static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
 	__u64 offcpu_count = 0;
 	struct stack_trace_key_t data = {};
 	if (!((*transfer_count_ptr) & 0x1ULL)) {
-		data.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
+		data.userstack = bpf_get_stackid(ctx, &NAME(offcpu_stack_map_a),
 						 USER_STACKID_FLAGS);
 
 		if (-EEXIST == data.userstack)
@@ -188,7 +188,7 @@ static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
 		if (data.userstack < 0)
 			return 0;
 
-		data.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
+		data.kernstack = bpf_get_stackid(ctx, &NAME(offcpu_stack_map_a),
 						 KERN_STACKID_FLAGS);
 
 		if (-EEXIST == data.kernstack)
@@ -210,7 +210,7 @@ static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
 		bpf_perf_event_output(ctx, &NAME(offcpu_output_a),
 				      BPF_F_CURRENT_CPU, &data, sizeof(data));
 	} else {
-		data.userstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
+		data.userstack = bpf_get_stackid(ctx, &NAME(offcpu_stack_map_b),
 						 USER_STACKID_FLAGS);
 
 		if (-EEXIST == data.userstack)
@@ -223,7 +223,7 @@ static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
 		if (data.userstack < 0)
 			return 0;
 
-		data.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
+		data.kernstack = bpf_get_stackid(ctx, &NAME(offcpu_stack_map_b),
 						 KERN_STACKID_FLAGS);
 
 		if (-EEXIST == data.kernstack)

@@ -46,6 +46,8 @@
 #include "java/df_jattach.h"
 #include "profile_common.h"
 
+#define LOG_TAG      "[OFFCPU] "
+
 static struct profiler_context offcpu_ctx;
 extern struct bpf_tracer *profiler_tracer;
 extern __thread uword thread_index;
@@ -97,7 +99,7 @@ exit:
 
 	/* clear thread */
 	t->perf_workers[READER_OFFCPU_THREAD_IDX] = 0;
-	ebpf_info("perf profiler reader-thread exit.\n");
+	ebpf_info(LOG_TAG "perf profiler reader-thread exit.\n");
 
 	pthread_exit(NULL);
 
@@ -124,7 +126,7 @@ static void offcpu_reader_raw_cb(void *cookie, void *raw, int raw_size)
 
 	struct reader_forward_info *fwd_info = cookie;
 	if (unlikely(fwd_info->queue_id != 0)) {
-		ebpf_warning("cookie(%d) error", (u64) cookie);
+		ebpf_warning(LOG_TAG "cookie(%d) error", (u64) cookie);
 		return;
 	}
 
@@ -135,7 +137,7 @@ static void offcpu_reader_raw_cb(void *cookie, void *raw, int raw_size)
 	int ret = VEC_OK;
 	vec_add1(offcpu_ctx.raw_stack_data, *v, ret);
 	if (ret != VEC_OK) {
-		ebpf_warning("vec add failed\n");
+		ebpf_warning(LOG_TAG "vec add failed\n");
 	}
 
 	atomic64_add(&tracer->recv, 1);
@@ -199,7 +201,8 @@ int extended_reader_create(struct bpf_tracer *tracer)
 int set_offcpu_profiler_regex(const char *pattern)
 {
 	if (profiler_tracer == NULL) {
-		ebpf_warning("The 'profiler_tracer' has not been created yet."
+		ebpf_warning(LOG_TAG
+			     "The 'profiler_tracer' has not been created yet."
 			     " Please use start_continuous_profiler() to create it first.\n");
 		return (-1);
 	}
@@ -207,7 +210,8 @@ int set_offcpu_profiler_regex(const char *pattern)
 	profile_regex_lock(&offcpu_ctx);
 	do_profiler_regex_config(pattern, &offcpu_ctx);
 	profile_regex_unlock(&offcpu_ctx);
-	ebpf_info("Set 'profiler_regex' successful, pattern : '%s'", pattern);
+	ebpf_info(LOG_TAG "Set 'profiler_regex' successful, pattern : '%s'",
+		  pattern);
 	return (0);
 }
 
