@@ -30,6 +30,11 @@
 
 #include "offcpu.h"
 
+#define OFFCPU_CNT_A_IDX SAMPLE_CNT_A_IDX
+#define OFFCPU_CNT_B_IDX SAMPLE_CNT_B_IDX
+#define OFFCPU_CNT_DROP SAMPLE_CNT_DROP
+#define OFFCPU_ITER_CNT_MAX SAMPLE_ITER_CNT_MAX
+
 /* *INDENT-OFF* */
 // Records offcpu information
 BPF_HASH(offcpu_sched_map, int, struct sched_info_s)
@@ -44,13 +49,22 @@ MAP_PERF_EVENT(offcpu_output_b, int, __u32, MAX_CPU)
 MAP_STACK_TRACE(offcpu_stack_map_a, STACK_MAP_ENTRIES)
 MAP_STACK_TRACE(offcpu_stack_map_b, STACK_MAP_ENTRIES)
 
-MAP_ARRAY(offset_state_map, __u32, __u64, PROFILER_CNT);
+MAP_ARRAY(offcpu_state_map, __u32, __u64, PROFILER_CNT);
 // For process filtering
 
 /* *INDENT-ON* */
 
 static inline int record_sched_info(struct sched_switch_ctx *ctx)
 {
+	__u32 count_idx = ENABLE_IDX;
+	__u64 *enable_ptr = offcpu_state_map__lookup(&count_idx);
+
+	if (enable_ptr == NULL)
+		return 0;
+
+	if (unlikely(*enable_ptr == 0))
+		return 0;
+
 	__u64 id = bpf_get_current_pid_tgid();
 
 	// CPU idle process does not perform any processing.
@@ -121,29 +135,121 @@ static inline __u64 fetch_delta_time(int curr_pid, int offcpu_pid)
 // The current task is a new task that has been scheduled.
 static inline int oncpu(struct pt_regs *ctx, int pid, int tgid, __u64 delta_ns)
 {
-	// create map key
-	struct stack_trace_key_t data = {};
-	data.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
-					 USER_STACKID_FLAGS);
-
-	/*
-	 * It only handles user-space programs. If there's no
-	 * user-space stack, it won't process.
-	 */
-	if (data.userstack < 0)
+	__u32 count_idx;
+	count_idx = ENABLE_IDX;
+	__u64 *enable_ptr = offcpu_state_map__lookup(&count_idx);
+	if (enable_ptr == NULL)
 		return 0;
 
-	data.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
-					 KERN_STACKID_FLAGS);
-	data.pid = pid;
-	data.tgid = tgid;
-	data.duration_ns = delta_ns;
-	data.cpu = bpf_get_smp_processor_id();
-	data.timestamp = bpf_ktime_get_ns();
-	bpf_get_current_comm(&data.comm, sizeof(data.comm));
+	count_idx = TRANSFER_CNT_IDX;
+	__u64 *transfer_count_ptr = offcpu_state_map__lookup(&count_idx);
 
-	bpf_perf_event_output(ctx, &NAME(offcpu_output_a),
-			      BPF_F_CURRENT_CPU, &data, sizeof(data));
+	count_idx = OFFCPU_CNT_A_IDX;
+	__u64 *offcpu_count_a_ptr = offcpu_state_map__lookup(&count_idx);
+
+	count_idx = OFFCPU_CNT_B_IDX;
+	__u64 *offcpu_count_b_ptr = offcpu_state_map__lookup(&count_idx);
+
+	count_idx = OFFCPU_CNT_DROP;
+	__u64 *drop_count_ptr = offcpu_state_map__lookup(&count_idx);
+
+	count_idx = OFFCPU_ITER_CNT_MAX;
+	__u64 *iter_count_ptr = offcpu_state_map__lookup(&count_idx);
+
+	count_idx = OUTPUT_CNT_IDX;
+	__u64 *output_count_ptr = offcpu_state_map__lookup(&count_idx);
+
+	count_idx = ERROR_IDX;
+	__u64 *error_count_ptr = offcpu_state_map__lookup(&count_idx);
+
+	if (transfer_count_ptr == NULL || offcpu_count_a_ptr == NULL ||
+	    offcpu_count_b_ptr == NULL || drop_count_ptr == NULL ||
+	    iter_count_ptr == NULL || error_count_ptr == NULL ||
+	    output_count_ptr == NULL) {
+		count_idx = ERROR_IDX;
+		__u64 err_val = 1;
+		offcpu_state_map__update(&count_idx, &err_val);
+		return 0;
+	}
+
+	__u64 offcpu_count = 0;
+	struct stack_trace_key_t data = {};
+	if (!((*transfer_count_ptr) & 0x1ULL)) {
+		data.userstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
+						 USER_STACKID_FLAGS);
+
+		if (-EEXIST == data.userstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		/*
+		 * It only handles user-space programs. If there's no
+		 * user-space stack, it won't process.
+		 */
+		if (data.userstack < 0)
+			return 0;
+
+		data.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_a),
+						 KERN_STACKID_FLAGS);
+
+		if (-EEXIST == data.kernstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		if (data.userstack < 0 && data.kernstack < 0)
+			return 0;
+
+		offcpu_count = *offcpu_count_a_ptr;
+		__sync_fetch_and_add(offcpu_count_a_ptr, 1);
+
+		data.pid = pid;
+		data.tgid = tgid;
+		data.duration_ns = delta_ns;
+		data.cpu = bpf_get_smp_processor_id();
+		data.timestamp = bpf_ktime_get_ns();
+		bpf_get_current_comm(&data.comm, sizeof(data.comm));
+
+		bpf_perf_event_output(ctx, &NAME(offcpu_output_a),
+				      BPF_F_CURRENT_CPU, &data, sizeof(data));
+	} else {
+		data.userstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
+						 USER_STACKID_FLAGS);
+
+		if (-EEXIST == data.userstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		/*
+		 * It only handles user-space programs. If there's no
+		 * user-space stack, it won't process.
+		 */
+		if (data.userstack < 0)
+			return 0;
+
+		data.kernstack = bpf_get_stackid(ctx, &NAME(stack_map_b),
+						 KERN_STACKID_FLAGS);
+
+		if (-EEXIST == data.kernstack)
+			__sync_fetch_and_add(drop_count_ptr, 1);
+
+		if (data.userstack < 0 && data.kernstack < 0)
+			return 0;
+
+		offcpu_count = *offcpu_count_b_ptr;
+		__sync_fetch_and_add(offcpu_count_b_ptr, 1);
+
+		data.pid = pid;
+		data.tgid = tgid;
+		data.duration_ns = delta_ns;
+		data.cpu = bpf_get_smp_processor_id();
+		data.timestamp = bpf_ktime_get_ns();
+		bpf_get_current_comm(&data.comm, sizeof(data.comm));
+
+		bpf_perf_event_output(ctx, &NAME(offcpu_output_b),
+				      BPF_F_CURRENT_CPU, &data, sizeof(data));
+
+	}
+
+	// Record the maximum offcpu count for each iteration.
+	if (offcpu_count > *iter_count_ptr)
+		*iter_count_ptr = offcpu_count;
 
 	return 0;
 }
