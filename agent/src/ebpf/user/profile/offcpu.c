@@ -74,9 +74,7 @@ static void offcpu_reader_work(void *arg)
 		if (unlikely(!offcpu_ctx.enable_bpf_profile))
 			set_enable_profiler(t, &offcpu_ctx, 1);
 
-		tracer_reader_lock(t);
 		process_bpf_stacktraces(&offcpu_ctx, t);
-		tracer_reader_unlock(t);
 	}
 
 exit:
@@ -98,7 +96,7 @@ exit:
 	}
 
 	/* clear thread */
-	t->perf_worker[READER_OFFCPU_THREAD_IDX] = 0;
+	t->perf_workers[READER_OFFCPU_THREAD_IDX] = 0;
 	ebpf_info("perf profiler reader-thread exit.\n");
 
 	pthread_exit(NULL);
@@ -206,9 +204,9 @@ int set_offcpu_profiler_regex(const char *pattern)
 		return (-1);
 	}
 
-	tracer_reader_lock(profiler_tracer);
+	profile_regex_lock(&offcpu_ctx);
 	do_profiler_regex_config(pattern, &offcpu_ctx);
-	tracer_reader_unlock(profiler_tracer);
+	profile_regex_unlock(&offcpu_ctx);
 	ebpf_info("Set 'profiler_regex' successful, pattern : '%s'", pattern);
 	return (0);
 }

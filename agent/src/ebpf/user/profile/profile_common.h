@@ -59,6 +59,7 @@ struct profiler_context {
 	 */
 	regex_t profiler_regex;
 	bool regex_existed;
+	volatile u32 regex_lock;
 
 	/*
 	 * The profiler stop flag, with 1 indicating stop and
@@ -115,6 +116,17 @@ struct profiler_context {
 	 */
 	u64 last_push_time;
 };
+
+static inline void profile_regex_lock(struct profiler_context *c)
+{
+	while (__atomic_test_and_set(&c->regex_lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
+}
+
+static inline void profile_regex_unlock(struct profiler_context *c)
+{
+	__atomic_clear(&c->regex_lock, __ATOMIC_RELEASE);
+}
 
 void process_bpf_stacktraces(struct profiler_context *ctx,
 			     struct bpf_tracer *t);

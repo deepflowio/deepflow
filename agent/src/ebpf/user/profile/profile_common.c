@@ -737,9 +737,11 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		/* If it is a process, match operation will be performed immediately. */
 		if (v->pid == v->tgid) {
 			is_match_finish = true;
+			profile_regex_lock(ctx);
 			matched =
 			    (regexec(&ctx->profiler_regex, v->comm, 0, NULL, 0)
 			     == 0);
+			profile_regex_unlock(ctx);
 			if (!matched) {
 				set_msg_kvp_by_comm(&kv, v, (void *)0);
 				goto skip_proc_find;
@@ -769,12 +771,16 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			else
 				process_name = name;
 
-			if (!is_match_finish)
+			if (!is_match_finish) {
+				profile_regex_lock(ctx);
 				matched =
 				    (regexec
 				     (&ctx->profiler_regex, process_name, 0,
 				      NULL, 0)
 				     == 0);
+				profile_regex_unlock(ctx);
+			}
+
 			if (matched)
 				set_msg_kvp(&kv, v, stime, (void *)0);
 			else {

@@ -248,9 +248,7 @@ static void oncpu_reader_work(void *arg)
 		if (unlikely(!oncpu_ctx.enable_bpf_profile))
 			set_enable_profiler(t, &oncpu_ctx, 1);
 
-		tracer_reader_lock(t);
 		process_bpf_stacktraces(&oncpu_ctx, t);
-		tracer_reader_unlock(t);
 	}
 
 exit:
@@ -275,7 +273,7 @@ exit:
 	release_symbol_caches();
 
 	/* clear thread */
-	t->perf_worker[0] = 0;
+	t->perf_workers[THREAD_PROFILER_READER_IDX] = 0;
 	ebpf_info(LOG_CP_TAG "perf profiler reader-thread exit.\n");
 
 	pthread_exit(NULL);
@@ -339,8 +337,10 @@ static int create_profiler(struct bpf_tracer *tracer)
 	 * Start a new thread to execute the data
 	 * reading of perf buffer.
 	 */
-	ret = enable_tracer_reader_work("oncpu_reader", 0, tracer,
-					(void *)&oncpu_reader_work);
+	ret =
+	    enable_tracer_reader_work("oncpu_reader",
+				      THREAD_PROFILER_READER_IDX, tracer,
+				      (void *)&oncpu_reader_work);
 
 	if (ret) {
 		goto error;
@@ -358,9 +358,28 @@ error:
 	return ETR_INVAL;
 }
 
+static inline bool all_perf_workers_exit(struct bpf_tracer *t)
+{
+	int i;
+	int count = ARRAY_SIZE(t->perf_workers);
+	for (i = 0; i < count; i++) {
+		if (t->perf_workers[i])
+			return false;
+	}
+
+	return true;
+}
+
 int stop_continuous_profiler(void)
 {
 	oncpu_ctx.profiler_stop = 1;
+	if (profiler_tracer == NULL)
+		return (0);
+
+	// Wait for all reader threads to exit.
+	while (!all_perf_workers_exit(profiler_tracer))
+		sleep(1);
+
 	if (flame_graph_end_time == NULL) {
 		flame_graph_end_time = gen_file_name_by_datetime();
 	}
@@ -646,9 +665,9 @@ int set_profiler_regex(const char *pattern)
 	 * ates is different. Synchronization is implemented to ensure protection and
 	 * coordination between these two threads.
 	 */
-	tracer_reader_lock(profiler_tracer);
+	profile_regex_lock(&oncpu_ctx);
 	do_profiler_regex_config(pattern, &oncpu_ctx);
-	tracer_reader_unlock(profiler_tracer);
+	profile_regex_unlock(&oncpu_ctx);
 	ebpf_info(LOG_CP_TAG "Set 'profiler_regex' successful, pattern : '%s'",
 		  pattern);
 	return (0);

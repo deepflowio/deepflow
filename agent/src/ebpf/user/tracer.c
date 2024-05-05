@@ -218,13 +218,6 @@ int release_bpf_tracer(const char *name)
 	if (t->release_cb != NULL)
 		t->release_cb(t);
 
-	/*
-	 * Check if the reader thread has exited before releasing
-	 * the reader lock.
-	 */
-	while (t->perf_worker[0] != 0)
-		sleep(1);
-
 	if (t->lock) {
 		clib_mem_free((void *)t->lock);
 		t->lock = NULL;
@@ -253,7 +246,7 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 	int ret;
 	char name[TASK_COMM_LEN];
 	snprintf(name, sizeof(name), "%s-%d", prefix_name, idx);
-	ret = pthread_create(&tracer->perf_worker[idx], NULL, fn,
+	ret = pthread_create(&tracer->perf_workers[idx], NULL, fn,
 			     (void *)(uint64_t)idx);
 	if (ret) {
 		ebpf_warning("tracer reader(%s), pthread_create "
@@ -262,14 +255,14 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 	}
 
 	/* set thread name */
-	pthread_setname_np(tracer->perf_worker[idx], name);
+	pthread_setname_np(tracer->perf_workers[idx], name);
 
 	/*
 	 * Separating threads is to automatically release
 	 * resources after pthread_exit(), without being
 	 * blocked or stuck.
 	 */
-	ret = pthread_detach(tracer->perf_worker[idx]);
+	ret = pthread_detach(tracer->perf_workers[idx]);
 	if (ret != 0) {
 		ebpf_warning("Error detaching thread, error:%s\n",
 			     strerror(errno));

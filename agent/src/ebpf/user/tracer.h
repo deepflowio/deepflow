@@ -351,7 +351,7 @@ struct bpf_tracer {
 	/*
 	 * Data distribution processing worker, queues
 	 */
-	pthread_t perf_worker[MAX_CPU_NR];      // Main thread for user-space receiving perf-buffer data
+	pthread_t perf_workers[MAX_CPU_NR];      // Main thread for user-space receiving perf-buffer data
 	pthread_t dispatch_workers[MAX_CPU_NR]; // Dispatch threads
 	int dispatch_workers_nr;                // Number of dispatch threads
 	struct queue queues[MAX_CPU_NR];        // Dispatch queues, each dispatch thread has its corresponding queue.
