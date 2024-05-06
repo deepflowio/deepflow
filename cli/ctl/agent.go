@@ -166,7 +166,8 @@ func listAgentUpgrade(cmd *cobra.Command, args []string) {
 	url := fmt.Sprintf("http://%s:%d/v1/vtaps/", server.IP, server.Port)
 
 	// 调用采集器API，并输出返回结果
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -208,7 +209,8 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 	}
 
 	// 调用采集器API，并输出返回结果
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -264,7 +266,8 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, args[0])
 	// curl vtap API，get lcuuid
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -274,7 +277,8 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
 		url := fmt.Sprintf("http://%s:%d/v1/vtaps/%s/", server.IP, server.Port, lcuuid)
 		// call vtap delete api
-		_, err := common.CURLPerform("DELETE", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+		_, err := common.CURLPerform("DELETE", url, nil, "",
+			[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -305,7 +309,8 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, vtapName)
 	// call vtap api, get lcuuid
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -325,7 +330,8 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 		updateBody["TAP_MODE"] = common.GetVtapTapModeByName(tapMode.(string))
 
 		updateJson, _ := json.Marshal(updateBody)
-		_, err := common.CURLPerform("PATCH", url, nil, string(updateJson), []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+		_, err := common.CURLPerform("PATCH", url, nil, string(updateJson),
+			[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -350,7 +356,8 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 	if agentGroupID != nil {
 		url := fmt.Sprintf("http://%s:%d/v1/vtap-groups/?short_uuid=%s", server.IP, server.Port, agentGroupID)
 		// call vtap-group api, get lcuuid
-		response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+		response, err := common.CURLPerform("GET", url, nil, "",
+			[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -374,7 +381,8 @@ func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
 	// call vtap update api
 	updateJson, _ := json.Marshal(updateMap)
 	url = fmt.Sprintf("http://%s:%d/v1/vtaps/%s/", server.IP, server.Port, lcuuid)
-	_, err = common.CURLPerform("PATCH", url, nil, string(updateJson), []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	_, err = common.CURLPerform("PATCH", url, nil, string(updateJson),
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -402,7 +410,8 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 
 	server := common.GetServerInfo(cmd)
 	serverURL := fmt.Sprintf("http://%s:%d/v1/controllers/", server.IP, server.Port)
-	response, err := common.CURLPerform("GET", serverURL, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", serverURL, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -425,7 +434,8 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	}
 
 	vtapURL := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, vtapName)
-	response, err = common.CURLPerform("GET", vtapURL, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err = common.CURLPerform("GET", vtapURL, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -455,7 +465,8 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	}
 	for host, _ := range hosts {
 		url := fmt.Sprintf(url_format, host, server.Port, vtapLcuuid)
-		response, err := common.CURLPerform("PATCH", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+		response, err := common.CURLPerform("PATCH", url, body, "",
+			[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			fmt.Printf("upgrade agent %s server %s failed, response: %s\n", vtapName, host, response)
@@ -493,7 +504,8 @@ func rebalance(cmd *cobra.Command, rebalanceType RebalanceType, typeVal string) 
 func ifNeedRebalance(cmd *cobra.Command, typeStr string) (bool, error) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/rebalance-vtap/?check=false&type=%s", server.IP, server.Port, typeStr)
-	resp, err := common.CURLPerform("POST", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	resp, err := common.CURLPerform("POST", url, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return false, err
 	}
@@ -506,7 +518,8 @@ func ifNeedRebalance(cmd *cobra.Command, typeStr string) (bool, error) {
 func execRebalance(cmd *cobra.Command, typeStr string) (*simplejson.Json, error) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/rebalance-vtap/?check=true&type=%s", server.IP, server.Port, typeStr)
-	resp, err := common.CURLPerform("POST", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	resp, err := common.CURLPerform("POST", url, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return nil, err
 	}

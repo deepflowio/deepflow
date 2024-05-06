@@ -16,6 +16,8 @@
 
 package common
 
+import "errors"
+
 const (
 	SUCCESS                         = "SUCCESS"
 	FAIL                            = "FAIL"
@@ -35,4 +37,8 @@ const (
 
 	// http status codes
 	STATUES_PARTIAL_CONTENT = "STATUES_PARTIAL_CONTENT" // 206
+)
+
+var (
+	ERR_NO_PERMISSIONS = errors.New("NO_PERMISSIONS")
 )

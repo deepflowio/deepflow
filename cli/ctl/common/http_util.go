@@ -26,8 +26,11 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 
 	simplejson "github.com/bitly/go-simplejson"
 	"github.com/spf13/cobra"
@@ -39,6 +42,7 @@ type Filter map[string]interface{}
 
 type HTTPConf struct {
 	Timeout time.Duration
+	ORGID   int
 }
 
 type HTTPOption func(*HTTPConf)
@@ -46,6 +50,12 @@ type HTTPOption func(*HTTPConf)
 func WithTimeout(t time.Duration) HTTPOption {
 	return func(h *HTTPConf) {
 		h.Timeout = t
+	}
+}
+
+func WithORGID(orgID int) HTTPOption {
+	return func(h *HTTPConf) {
+		h.ORGID = orgID
 	}
 }
 
@@ -72,6 +82,9 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 
 	if err != nil {
 		return nil, err
+	}
+	if cfg.ORGID != 0 {
+		req.Header.Set(ctrlcommon.HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json, text/plain")
@@ -194,6 +207,11 @@ func GetServerInfo(cmd *cobra.Command) *Server {
 func GetTimeout(cmd *cobra.Command) time.Duration {
 	t, _ := cmd.Flags().GetDuration("timeout")
 	return t
+}
+
+func GetORGID(cmd *cobra.Command) int {
+	orgID, _ := cmd.Flags().GetUint32("org-id")
+	return int(orgID)
 }
 
 func PrettyPrint(data interface{}) {
