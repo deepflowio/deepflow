@@ -65,14 +65,17 @@ use crate::{
     handler::PacketHandlerBuilder,
     metric::document::TapSide,
     trident::{AgentComponents, RunningMode},
-    utils::environment::{free_memory_check, get_container_mem_limit, running_in_container},
+    utils::environment::{free_memory_check, running_in_container},
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
     platform::ProcRegRewrite,
-    utils::environment::{get_ctrl_ip_and_mac, is_tt_workload},
+    utils::environment::{
+        get_container_resource_limits, get_ctrl_ip_and_mac, is_tt_workload,
+        set_container_resource_limit,
+    },
 };
 #[cfg(target_os = "linux")]
 use crate::{
@@ -194,7 +197,7 @@ impl fmt::Debug for CollectorConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct EnvironmentConfig {
     pub max_memory: u64,
-    pub max_cpus: u32,
+    pub max_millicpus: u32,
     pub process_threshold: u32,
     pub thread_threshold: u32,
     pub sys_free_memory_limit: u32,
@@ -1202,10 +1205,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
     type Error = ConfigError;
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
-        let (static_config, mut conf) = conf;
-        if running_in_container() {
-            conf.max_memory = get_container_mem_limit().unwrap_or(conf.max_memory);
-        }
+        let (static_config, conf) = conf;
         let controller_ip = static_config.controller_ips[0].parse::<IpAddr>().unwrap();
         let dest_ip = if conf.analyzer_ip.len() > 0 {
             conf.analyzer_ip.clone()
@@ -1231,7 +1231,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             environment: EnvironmentConfig {
                 max_memory: conf.max_memory,
-                max_cpus: conf.max_cpus,
+                max_millicpus: conf.max_millicpus,
                 process_threshold: conf.process_threshold,
                 thread_threshold: conf.thread_threshold,
                 sys_free_memory_limit: conf.sys_free_memory_limit,
@@ -1574,6 +1574,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 pub struct ConfigHandler {
     pub ctrl_ip: IpAddr,
     pub ctrl_mac: MacAddr,
+    pub container_cpu_limit: u32, // unit: milli-core
+    pub container_mem_limit: u64, // unit: bytes
     pub logger_handle: Option<LoggerHandle>,
     // need update
     pub static_config: Config,
@@ -1587,10 +1589,17 @@ impl ConfigHandler {
             ModuleConfig::try_from((config.clone(), RuntimeConfig::default())).unwrap();
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
 
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let (container_cpu_limit, container_mem_limit) = get_container_resource_limits();
+        #[cfg(target_os = "windows")]
+        let (container_cpu_limit, container_mem_limit) = (0, 0);
+
         Self {
             static_config: config,
             ctrl_ip,
             ctrl_mac,
+            container_cpu_limit,
+            container_mem_limit,
             candidate_config,
             current_config,
             logger_handle: None,
@@ -2194,9 +2203,26 @@ impl ConfigHandler {
                 candidate_config.environment.max_memory = new_config.environment.max_memory;
             }
 
-            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
-                info!("cpu limit set to {}", new_config.environment.max_cpus);
-                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
+            if candidate_config.environment.max_millicpus != new_config.environment.max_millicpus {
+                info!(
+                    "cpu limit set to {}",
+                    new_config.environment.max_millicpus as f64 / 1000.0
+                );
+                candidate_config.environment.max_millicpus = new_config.environment.max_millicpus;
+            }
+            #[cfg(target_os = "linux")]
+            if running_in_container() {
+                if self.container_cpu_limit != candidate_config.environment.max_millicpus
+                    || self.container_mem_limit != candidate_config.environment.max_memory
+                {
+                    info!("current container cpu limit: {}, memory limit: {}bytes, set cpu limit {} and memory limit {}bytes", self.container_cpu_limit as f64 / 1000.0, self.container_mem_limit, candidate_config.environment.max_millicpus as f64 / 1000.0, candidate_config.environment.max_memory);
+                    if let Err(e) = runtime.block_on(set_container_resource_limit(
+                        candidate_config.environment.max_millicpus,
+                        candidate_config.environment.max_memory,
+                    )) {
+                        warn!("set container resources limit failed: {:?}", e);
+                    };
+                }
             }
         } else {
             let mut system = sysinfo::System::new();
@@ -2204,15 +2230,16 @@ impl ConfigHandler {
             let max_memory = system.total_memory();
             system.refresh_cpu();
             let max_cpus = 1.max(system.cpus().len()) as u32;
+            let max_millicpus = max_cpus * 1000;
 
             if candidate_config.environment.max_memory != max_memory {
                 info!("memory set ulimit when tap_mode=analyzer");
                 candidate_config.environment.max_memory = max_memory;
             }
 
-            if candidate_config.environment.max_cpus != max_cpus {
+            if candidate_config.environment.max_millicpus != max_millicpus {
                 info!("cpu set ulimit when tap_mode=analyzer");
-                candidate_config.environment.max_cpus = max_cpus;
+                candidate_config.environment.max_millicpus = max_millicpus;
             }
         }
 
