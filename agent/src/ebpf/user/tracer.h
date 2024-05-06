@@ -347,6 +347,7 @@ struct bpf_tracer {
 	 */
 	int per_cpu_fds[MAX_CPU_NR];
 	int sample_freq; // sample frequency, Hertz.
+	bool enable_sample; // Enable CPU sampling?
 
 	/*
 	 * Data distribution processing worker, queues

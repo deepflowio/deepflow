@@ -71,14 +71,19 @@ extern int major, minor;
 static bool java_installed;
 
 int profiler_context_init(struct profiler_context *ctx,
+			  const char *tag,
+			  bool enable_profiler,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
 			  const char *stack_map_name_b,
 			  bool only_matched, bool use_delta_time)
 {
 	memset(ctx, 0, sizeof(struct profiler_context));
+	ctx->tag = tag;
 	atomic64_init(&ctx->process_lost_count);
-	ctx->profiler_stop = 0;
+	if (!enable_profiler)
+		ctx->profiler_stop = 1;
+
 	snprintf(ctx->state_map_name, sizeof(ctx->state_map_name), "%s",
 		 state_map_name);
 	snprintf(ctx->stack_map_name_a, sizeof(ctx->stack_map_name_a), "%s",
@@ -92,28 +97,34 @@ int profiler_context_init(struct profiler_context *ctx,
 	return 0;
 }
 
-void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
+void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 			 u64 enable_flag)
 {
+	if (ctx->profiler_stop == 1)
+		return;
+
 	if (bpf_table_set_value(t, ctx->state_map_name,
 				ENABLE_IDX, &enable_flag) == false) {
-		ebpf_warning("profiler state map update error."
+		ebpf_warning("%sprofiler state map update error."
 			     "(%s enable_flag %lu) - %s\n",
-			     ctx->state_map_name, enable_flag, strerror(errno));
+			     ctx->tag, ctx->state_map_name, enable_flag,
+			     strerror(errno));
 	}
 
 	ctx->enable_bpf_profile = enable_flag;
 
-	ebpf_info("%s() success, enable_flag:%d\n", __func__, enable_flag);
+	ebpf_info("%s%s() success, enable_flag:%d\n", ctx->tag, __func__,
+		  enable_flag);
 }
 
 int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx)
 {
 	if (*pattern == '\0') {
 		ctx->regex_existed = false;
-		ebpf_warning("Set 'profiler_regex' pattern : '', an empty"
+		ebpf_warning("%sSet 'profiler_regex' pattern : '', an empty"
 			     " regular expression will not generate any stack data."
-			     "Please configure the regular expression for profiler.\n");
+			     "Please configure the regular expression for profiler.\n",
+			     ctx->tag);
 		return (0);
 	}
 
@@ -126,8 +137,9 @@ int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx)
 		char error_buffer[100];
 		regerror(ret, &ctx->profiler_regex, error_buffer,
 			 sizeof(error_buffer));
-		ebpf_warning("Pattern %s failed to compile the regular "
-			     "expression: %s\n", pattern, error_buffer);
+		ebpf_warning("%sPattern %s failed to compile the regular "
+			     "expression: %s\n", ctx->tag, pattern,
+			     error_buffer);
 		ctx->regex_existed = false;
 		return (-1);
 	}
@@ -307,8 +319,8 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 
 	if (ids->count != vec_len(clear_stack_ids)) {
 		ebpf_warning
-		    ("stack_ids.count(%lu) != vec_len(clear_stack_ids)(%d)",
-		     ids->count, vec_len(clear_stack_ids));
+		    ("%sstack_ids.count(%lu) != vec_len(clear_stack_ids)(%d)",
+		     ctx->tag, ids->count, vec_len(clear_stack_ids));
 	}
 
 	/*
@@ -363,14 +375,14 @@ static void print_profiler_status(struct profiler_context *ctx,
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
-	ebpf_debug("\n\n----------------------------\nrecv envent:\t%lu\n"
+	ebpf_debug("\n\n----------------------------\n%srecv envent:\t%lu\n"
 		   "kern_lost:\t%lu, perf_buf_lost_a:\t%lu, perf_buf_lost_b:\t%lu\n"
 		   "stack_trace_err:\t%lu\n"
 		   "stackmap_clear_failed_count\t%lu\n"
 		   "ransfer_count:\t%lu iter_count:\t%lu\nall"
 		   "oc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n"
 		   "stack_str_hash.hit_count %lu\nstack_trace_msg_hash hit %lu\n",
-		   atomic64_read(&t->recv), atomic64_read(&t->lost),
+		   ctx->tag, atomic64_read(&t->recv), atomic64_read(&t->lost),
 		   ctx->perf_buf_lost_a_count, ctx->perf_buf_lost_b_count,
 		   ctx->stack_trace_err, ctx->stackmap_clear_failed_count,
 		   ctx->transfer_count, iter_count,
@@ -452,7 +464,8 @@ void push_and_release_stack_trace_msg(struct profiler_context *ctx,
 	vec_foreach(v, ctx->trace_msg_kvps) {
 		if (stack_trace_msg_hash_add_del(h, v, 0 /* delete */ )) {
 			ebpf_warning
-			    ("stack_trace_msg_hash_add_del() failed.\n");
+			    ("%sstack_trace_msg_hash_add_del() failed.\n",
+			     ctx->tag);
 			ctx->msg_clear_hash = true;
 		}
 	}
@@ -500,7 +513,7 @@ static void add_stack_id_to_bitmap(struct profiler_context *ctx,
 			vec_add1(ctx->clear_stack_ids_b, stack_id, ret);
 
 		if (ret != VEC_OK) {
-			ebpf_warning("vec add failed\n");
+			ebpf_warning("%svec add failed\n", ctx->tag);
 		}
 
 		ids->count++;
@@ -666,7 +679,8 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 	if (stack_trace_msg_hash_add_del(msg_hash,
 					 (stack_trace_msg_hash_kv
 					  *) & kv, 1 /* is_add */ )) {
-		ebpf_warning("stack_trace_msg_hash_add_del() failed.\n");
+		ebpf_warning("%sstack_trace_msg_hash_add_del() failed.\n",
+			     ctx->tag);
 		clib_mem_free(msg);
 	} else {
 		__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
@@ -897,7 +911,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 							  *) & kv,
 							 1 /* is_add */ )) {
 				ebpf_warning
-				    ("stack_trace_msg_hash_add_del() failed.\n");
+				    ("%sstack_trace_msg_hash_add_del() failed.\n",
+				     ctx->tag);
 				clib_mem_free(msg);
 			} else {
 				__sync_fetch_and_add
@@ -933,9 +948,9 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 	if (bpf_table_set_value(t, ctx->state_map_name,
 				TRANSFER_CNT_IDX,
 				&ctx->transfer_count) == false) {
-		ebpf_warning("profiler state map update error."
+		ebpf_warning("%sprofiler state map update error."
 			     "(%s transfer_count %lu) - %s\n",
-			     ctx->state_map_name, ctx->transfer_count,
+			     ctx->tag, ctx->state_map_name, ctx->transfer_count,
 			     strerror(errno));
 		ctx->transfer_count--;
 	}
@@ -959,7 +974,8 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 	if (unlikely(ctx->stack_str_hash.buckets == NULL)) {
 		if (init_stack_str_hash
 		    (&ctx->stack_str_hash, "profile_stack_str")) {
-			ebpf_warning("init_stack_str_hash() failed.\n");
+			ebpf_warning("%sinit_stack_str_hash() failed.\n",
+				     ctx->tag);
 			return;
 		}
 	}
@@ -982,7 +998,8 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 	if (unlikely(ctx->msg_hash.buckets == NULL)) {
 		if (init_stack_trace_msg_hash
 		    (&ctx->msg_hash, "stack_trace_msg")) {
-			ebpf_warning("init_stack_trace_msg_hash() failed.\n");
+			ebpf_warning("%sinit_stack_trace_msg_hash() failed.\n",
+				     ctx->tag);
 			return;
 		}
 	}

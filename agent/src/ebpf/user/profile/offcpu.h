@@ -28,14 +28,17 @@
 #define READER_OFFCPU_THREAD_IDX 1
 
 #undef CP_PROFILE_SET_PROBES
-#define CP_PROFILE_SET_PROBES(T)			\
-do {							\
-	int index = 0, curr_idx;			\
-	probes_set_enter_symbol((T), KP_HOOK_NAME);  	\
-	tps->kprobes_nr = index;			\
-	index = 0;					\
-	tps_set_symbol((T), TP_HOOK_NAME);		\
-	(T)->tps_nr = index;				\
+extern bool g_enable_offcpu;
+#define CP_PROFILE_SET_PROBES(T)				\
+do {								\
+	if (g_enable_offcpu) {					\
+		int index = 0, curr_idx;			\
+		probes_set_enter_symbol((T), KP_HOOK_NAME);  	\
+		tps->kprobes_nr = index;			\
+		index = 0;					\
+		tps_set_symbol((T), TP_HOOK_NAME);		\
+		(T)->tps_nr = index;				\
+	}							\
 } while(0)
 
 int extended_reader_create(struct bpf_tracer *tracer);

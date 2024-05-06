@@ -182,6 +182,9 @@ fn main() {
             ::std::process::exit(1);
         }
 
+        enable_offcpu_profiler();
+        enable_oncpu_profiler();
+
         // Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
         if start_continuous_profiler(97, 10, 300, continuous_profiler_callback) != 0 {

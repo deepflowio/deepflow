@@ -46,7 +46,9 @@
 #include "java/df_jattach.h"
 #include "profile_common.h"
 
-#define LOG_TAG      "[OFFCPU] "
+bool g_enable_offcpu;
+
+#define LOG_OFFCPU_TAG      "[OFFCPU] "
 
 static struct profiler_context offcpu_ctx;
 extern struct bpf_tracer *profiler_tracer;
@@ -59,7 +61,7 @@ static void offcpu_reader_work(void *arg)
 	for (;;) {
 		if (unlikely(offcpu_ctx.profiler_stop == 1)) {
 			if (offcpu_ctx.enable_bpf_profile)
-				set_enable_profiler(t, &offcpu_ctx, 0);
+				set_bpf_run_enabled(t, &offcpu_ctx, 0);
 
 			goto exit;
 		}
@@ -67,14 +69,14 @@ static void offcpu_reader_work(void *arg)
 		if (unlikely(!offcpu_ctx.regex_existed ||
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			if (offcpu_ctx.enable_bpf_profile)
-				set_enable_profiler(t, &offcpu_ctx, 0);
+				set_bpf_run_enabled(t, &offcpu_ctx, 0);
 			exec_proc_info_cache_update();
 			sleep(1);
 			continue;
 		}
 
 		if (unlikely(!offcpu_ctx.enable_bpf_profile))
-			set_enable_profiler(t, &offcpu_ctx, 1);
+			set_bpf_run_enabled(t, &offcpu_ctx, 1);
 
 		process_bpf_stacktraces(&offcpu_ctx, t);
 	}
@@ -99,7 +101,7 @@ exit:
 
 	/* clear thread */
 	t->perf_workers[READER_OFFCPU_THREAD_IDX] = 0;
-	ebpf_info(LOG_TAG "perf profiler reader-thread exit.\n");
+	ebpf_info(LOG_OFFCPU_TAG "perf profiler reader-thread exit.\n");
 
 	pthread_exit(NULL);
 
@@ -126,7 +128,7 @@ static void offcpu_reader_raw_cb(void *cookie, void *raw, int raw_size)
 
 	struct reader_forward_info *fwd_info = cookie;
 	if (unlikely(fwd_info->queue_id != 0)) {
-		ebpf_warning(LOG_TAG "cookie(%d) error", (u64) cookie);
+		ebpf_warning(LOG_OFFCPU_TAG "cookie(%d) error", (u64) cookie);
 		return;
 	}
 
@@ -137,7 +139,7 @@ static void offcpu_reader_raw_cb(void *cookie, void *raw, int raw_size)
 	int ret = VEC_OK;
 	vec_add1(offcpu_ctx.raw_stack_data, *v, ret);
 	if (ret != VEC_OK) {
-		ebpf_warning(LOG_TAG "vec add failed\n");
+		ebpf_warning(LOG_OFFCPU_TAG "vec add failed\n");
 	}
 
 	atomic64_add(&tracer->recv, 1);
@@ -145,12 +147,19 @@ static void offcpu_reader_raw_cb(void *cookie, void *raw, int raw_size)
 
 int extended_reader_create(struct bpf_tracer *tracer)
 {
-	profiler_context_init(&offcpu_ctx,
+	if (!g_enable_offcpu) {
+		ebpf_info(LOG_OFFCPU_TAG "=== offcpu profiler disabled ===\n");
+		return 0;
+	}
+
+	ebpf_info(LOG_OFFCPU_TAG "=== offcpu profiler enabled ===\n");
+
+	profiler_context_init(&offcpu_ctx, LOG_OFFCPU_TAG, g_enable_offcpu,
 			      MAP_OFFCPU_STATE_MAP,
 			      MAP_OFFCPU_STACK_A_NAME, MAP_OFFCPU_STACK_B_NAME,
 			      true, true);
 
-	set_enable_profiler(tracer, &offcpu_ctx, 0);
+	set_bpf_run_enabled(tracer, &offcpu_ctx, 0);
 
 	struct bpf_perf_reader *reader_a, *reader_b;
 	reader_a = create_perf_buffer_reader(tracer,
@@ -201,18 +210,38 @@ int extended_reader_create(struct bpf_tracer *tracer)
 int set_offcpu_profiler_regex(const char *pattern)
 {
 	if (profiler_tracer == NULL) {
-		ebpf_warning(LOG_TAG
+		ebpf_warning(LOG_OFFCPU_TAG
 			     "The 'profiler_tracer' has not been created yet."
 			     " Please use start_continuous_profiler() to create it first.\n");
+		return (-1);
+	}
+
+	if (!g_enable_offcpu) {
+		ebpf_warning(LOG_OFFCPU_TAG
+			     "'profiler_regex' cannot be set while off-CPU is currently disabled.\n");
 		return (-1);
 	}
 
 	profile_regex_lock(&offcpu_ctx);
 	do_profiler_regex_config(pattern, &offcpu_ctx);
 	profile_regex_unlock(&offcpu_ctx);
-	ebpf_info(LOG_TAG "Set 'profiler_regex' successful, pattern : '%s'",
-		  pattern);
+	ebpf_info(LOG_OFFCPU_TAG
+		  "Set 'profiler_regex' successful, pattern : '%s'", pattern);
 	return (0);
+}
+
+int enable_offcpu_profiler(void)
+{
+	g_enable_offcpu = true;
+	ebpf_info(LOG_OFFCPU_TAG "Set offcpu profiler enable.\n");
+	return 0;
+}
+
+int disable_offcpu_profiler(void)
+{
+	g_enable_offcpu = false;
+	ebpf_info(LOG_OFFCPU_TAG "Set offcpu profiler disable.\n");
+	return 0;
 }
 
 #else /* defined AARCH64_MUSL */
@@ -222,6 +251,16 @@ int extended_reader_create(struct bpf_tracer *tracer)
 }
 
 int set_offcpu_profiler_regex(const char *pattern)
+{
+	return 0;
+}
+
+int enable_offcpu_profiler(void)
+{
+	return 0;
+}
+
+int disable_offcpu_profiler(void)
 {
 	return 0;
 }

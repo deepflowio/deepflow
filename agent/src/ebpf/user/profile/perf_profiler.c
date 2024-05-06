@@ -57,6 +57,8 @@ static struct profiler_context oncpu_ctx;
 /* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
 int g_java_syms_write_bytes_max;
 
+static bool g_enable_oncpu = true;
+
 /* Used for handling updates to JAVA symbol files */
 static pthread_t java_syms_update_thread;
 
@@ -215,13 +217,11 @@ static void oncpu_reader_work(void *arg)
 {
 	thread_index = THREAD_PROFILER_READER_IDX;
 	struct bpf_tracer *t = profiler_tracer;
-	oncpu_ctx.r_a = &t->readers[0];
-	oncpu_ctx.r_b = &t->readers[1];
 
 	for (;;) {
 		if (unlikely(oncpu_ctx.profiler_stop == 1)) {
 			if (oncpu_ctx.enable_bpf_profile)
-				set_enable_profiler(t, &oncpu_ctx, 0);
+				set_bpf_run_enabled(t, &oncpu_ctx, 0);
 
 			goto exit;
 		}
@@ -239,14 +239,14 @@ static void oncpu_reader_work(void *arg)
 		if (unlikely(!oncpu_ctx.regex_existed ||
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			if (oncpu_ctx.enable_bpf_profile)
-				set_enable_profiler(t, &oncpu_ctx, 0);
+				set_bpf_run_enabled(t, &oncpu_ctx, 0);
 			exec_proc_info_cache_update();
 			sleep(1);
 			continue;
 		}
 
 		if (unlikely(!oncpu_ctx.enable_bpf_profile))
-			set_enable_profiler(t, &oncpu_ctx, 1);
+			set_bpf_run_enabled(t, &oncpu_ctx, 1);
 
 		process_bpf_stacktraces(&oncpu_ctx, t);
 	}
@@ -289,41 +289,9 @@ static int create_profiler(struct bpf_tracer *tracer)
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
 
-	set_enable_profiler(tracer, &oncpu_ctx, 0);
-
-	/*
-	 * create reader for read eBPF-profiler data.
-	 * To implement eBPF perf-profiler double buffering output,
-	 * it is necessary to create two readers to correspond to
-	 * the double buffering structure design.
-	 */
-	struct bpf_perf_reader *reader_a, *reader_b;
-	reader_a = create_perf_buffer_reader(tracer,
-					     MAP_PERF_PROFILER_BUF_A_NAME,
-					     reader_raw_cb,
-					     reader_lost_cb_a,
-					     PROFILE_PG_CNT_DEF, 1,
-					     PROFILER_READER_EPOLL_TIMEOUT);
-	if (reader_a == NULL)
-		return ETR_NORESOURCE;
-
-	reader_b = create_perf_buffer_reader(tracer,
-					     MAP_PERF_PROFILER_BUF_B_NAME,
-					     reader_raw_cb,
-					     reader_lost_cb_b,
-					     PROFILE_PG_CNT_DEF, 1,
-					     PROFILER_READER_EPOLL_TIMEOUT);
-	if (reader_b == NULL) {
-		free_perf_buffer_reader(reader_a);
-		return ETR_NORESOURCE;
-	}
-
 	/* clear old perf files */
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
 	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
-
-	if (tracer_probes_init(tracer))
-		return (-1);
 
 	ret = create_work_thread("java_update",
 				 &java_syms_update_thread,
@@ -333,18 +301,61 @@ static int create_profiler(struct bpf_tracer *tracer)
 		goto error;
 	}
 
-	/*
-	 * Start a new thread to execute the data
-	 * reading of perf buffer.
-	 */
-	ret =
-	    enable_tracer_reader_work("oncpu_reader",
-				      THREAD_PROFILER_READER_IDX, tracer,
-				      (void *)&oncpu_reader_work);
+	if (g_enable_oncpu) {
+		ebpf_info(LOG_CP_TAG "=== oncpu profiler enabled ===\n");
+		tracer->enable_sample = true;
+		set_bpf_run_enabled(tracer, &oncpu_ctx, 0);
 
-	if (ret) {
-		goto error;
+		/*
+		 * create reader for read eBPF-profiler data.
+		 * To implement eBPF perf-profiler double buffering output,
+		 * it is necessary to create two readers to correspond to
+		 * the double buffering structure design.
+		 */
+		struct bpf_perf_reader *reader_a, *reader_b;
+		reader_a = create_perf_buffer_reader(tracer,
+						     MAP_PERF_PROFILER_BUF_A_NAME,
+						     reader_raw_cb,
+						     reader_lost_cb_a,
+						     PROFILE_PG_CNT_DEF, 1,
+						     PROFILER_READER_EPOLL_TIMEOUT);
+		if (reader_a == NULL)
+			return ETR_NORESOURCE;
+
+		reader_b = create_perf_buffer_reader(tracer,
+						     MAP_PERF_PROFILER_BUF_B_NAME,
+						     reader_raw_cb,
+						     reader_lost_cb_b,
+						     PROFILE_PG_CNT_DEF, 1,
+						     PROFILER_READER_EPOLL_TIMEOUT);
+		if (reader_b == NULL) {
+			free_perf_buffer_reader(reader_a);
+			return ETR_NORESOURCE;
+		}
+
+		oncpu_ctx.r_a = reader_a;
+		oncpu_ctx.r_b = reader_b;
+
+		/*
+		 * Start a new thread to execute the data
+		 * reading of perf buffer.
+		 */
+		ret =
+		    enable_tracer_reader_work("oncpu_reader",
+					      THREAD_PROFILER_READER_IDX,
+					      tracer,
+					      (void *)&oncpu_reader_work);
+
+		if (ret) {
+			goto error;
+		}
+	} else {
+		tracer->enable_sample = false;
+		ebpf_info(LOG_CP_TAG "=== oncpu profiler disabled ===\n");
 	}
+
+	if (tracer_probes_init(tracer))
+		return (-1);
 
 	extended_reader_create(tracer);
 
@@ -527,8 +538,9 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	if (!run_conditions_check())
 		return (-1);
 
-	profiler_context_init(&oncpu_ctx, MAP_PROFILER_STATE_NAME,
-			      MAP_STACK_A_NAME, MAP_STACK_B_NAME, false, false);
+	profiler_context_init(&oncpu_ctx, LOG_CP_TAG, g_enable_oncpu,
+			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
+			      MAP_STACK_B_NAME, false, false);
 
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
@@ -659,6 +671,12 @@ int set_profiler_regex(const char *pattern)
 		return (-1);
 	}
 
+	if (!g_enable_oncpu) {
+		ebpf_warning(LOG_CP_TAG
+			     "'profiler_regex' cannot be set while on-CPU is currently disabled.\n");
+		return (-1);
+	}
+
 	/*
 	 * During the data processing, the thread responsible for matching reads the
 	 * regular expression, while the thread handling the regular expression upd-
@@ -730,6 +748,20 @@ finish:
 	return 0;
 }
 
+int enable_oncpu_profiler(void)
+{
+	g_enable_oncpu = true;
+	ebpf_info(LOG_CP_TAG "Set oncpu profiler enable.\n");
+	return 0;
+}
+
+int disable_oncpu_profiler(void)
+{
+	g_enable_oncpu = false;
+	ebpf_info(LOG_CP_TAG "Set oncpu profiler distable.\n");
+	return 0;
+}
+
 #else /* defined AARCH64_MUSL */
 #include "../tracer.h"
 #include "perf_profiler.h"
@@ -772,12 +804,23 @@ struct bpf_tracer *get_profiler_tracer(void)
 	return NULL;
 }
 
-void set_enable_profiler(struct bpf_tracer *t, u64 enable_flag)
+void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
+			 u64 enable_flag)
 {
 }
 
 int cpdbg_set_config(int timeout, debug_callback_t cb)
 {
+}
+
+int enable_oncpu_profiler(void)
+{
+	return 0;
+}
+
+int disable_oncpu_profiler(void)
+{
+	return 0;
 }
 
 #endif /* AARCH64_MUSL */

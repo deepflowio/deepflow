@@ -653,6 +653,10 @@ extern "C" {
     ) -> c_int;
 
     pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
+    pub fn enable_offcpu_profiler() -> c_int;
+    pub fn disable_offcpu_profiler() -> c_int;
+    pub fn enable_oncpu_profiler() -> c_int;
+    pub fn disable_oncpu_profiler() -> c_int;
 }
 
 #[no_mangle]

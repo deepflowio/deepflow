@@ -18,6 +18,8 @@
 #define DF_USER_PROFILE_COMMON_H
 
 struct profiler_context {
+	// log output flag string
+	const char *tag;
 	// The name of the status map
 	char state_map_name[MAP_NAME_SZ];
 	// The dual-buffered reader is used to read data from the perf buffer.
@@ -140,9 +142,11 @@ static inline void profile_regex_unlock(struct profiler_context *c)
 void process_bpf_stacktraces(struct profiler_context *ctx,
 			     struct bpf_tracer *t);
 int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx);
-void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
+void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 			 u64 enable_flag);
 int profiler_context_init(struct profiler_context *ctx,
+			  const char *tag,
+			  bool enable_profiler,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
 			  const char *stack_map_name_b,
