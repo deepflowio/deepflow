@@ -89,8 +89,7 @@ OBJS := user/elf.o \
 	user/vec.o \
 	user/bihash.o \
 	user/profile/profile_common.o \
-	user/profile/offcpu.o \
-	user/profile/extended.o \
+	$(patsubst %.c,%.o,$(wildcard user/profile/extended/*.c)) \
 	user/profile/perf_profiler.o \
 	user/profile/stringifier.o \
 	user/profile/java/df_jattach.o \
@@ -155,7 +154,7 @@ $(ELFFILES): tools/bintobuffer
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
-	$(Q)mkdir -p $@/user/profile/java
+	$(Q)mkdir -p $@/user/profile/{java,extended}
 
 $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)

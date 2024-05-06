@@ -14,19 +14,9 @@
  * limitations under the License.
  */
 
-#include <sys/stat.h>
-#include <bcc/perf_reader.h>
-#include "../config.h"
-#include "../utils.h"
-#include "../common.h"
-#include "../mem.h"
-#include "../log.h"
-#include "../types.h"
-#include "../vec.h"
-#include "../tracer.h"
-#include "../socket.h"
+#ifndef DF_PROFILE_EXT_H
+#define DF_PROFILE_EXT_H
 
-int __attribute__ ((weak)) extended_reader_create(struct bpf_tracer *tracer)
-{
-	return 0;
-}
+#include "offcpu.h"
+
+#endif /* DF_PROFILE_EXT_H */

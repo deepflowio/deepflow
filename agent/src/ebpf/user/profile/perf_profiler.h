@@ -17,7 +17,7 @@
 #ifndef DF_USER_PERF_PROFILER_H
 #define DF_USER_PERF_PROFILER_H
 #define CP_PROFILE_SET_PROBES
-#include "offcpu.h"		// identoffcpu
+#include "extended/extended.h"
 #include "../bihash_24_8.h"
 #include "../../kernel/include/perf_profiler.h"
 

@@ -1294,57 +1294,60 @@ vtap_group_id: g-xxxxxx
     ## Note: Only collect IO events with delay exceeding this threshold, the default value is 1ms.
     #io-event-minimal-duration: 1ms
 
-    ## continuous-profile:
-      ## When deepflow-agent finds that an unresolved function name appears in the function call stack
-      ## of a Java process, it will trigger the regeneration of the symbol file of the process.
-      ## Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
-      ## Java processes, the regeneration will be deferred for a period of time.
-      ## Default: 600s. Range: [5, 3600]s
-      ## The unit of measurement used is seconds.
-      #java-symbol-file-refresh-defer-interval: 600s
+    ## Java compliant update latency time
+    ## Default: 600s. Range: [5, 3600]s
+    ## Note:
+    ##   When deepflow-agent finds that an unresolved function name appears in the function call stack
+    ##   of a Java process, it will trigger the regeneration of the symbol file of the process.
+    ##   Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
+    ##   Java processes, the regeneration will be deferred for a period of time.
+    #java-symbol-file-refresh-defer-interval: 600s
 
-      ## on-cpu profile configuration
-      #on-cpu-profile:
-        ## eBPF on-cpu Profile Switch
-        ## Default: false
-        #disabled: false
+    ## on-cpu profile configuration
+    #on-cpu-profile:
+      ## eBPF on-cpu Profile Switch
+      ## Default: false
+      #disabled: false
 
-        ## Sampling frequency
-        ## Default: 99
-        #frequency: 99
+      ## Sampling frequency
+      ## Default: 99
+      #frequency: 99
 
-        ## Whether to obtain the value of CPUID and decide whether to participate in aggregation.
-        ## Set to 1:
-        ##    Obtain the value of CPUID and will be included in the aggregation of stack trace data.
-        ## Set to 0:
-        ##    It will not be included in the aggregation. Any other value is considered invalid,
-        ##    the CPU value for stack trace data reporting is a special value (CPU_INVALID:0xfff)
-        ##    used to indicate that it is an invalid value.
-        ## Default: 0
-        #cpu: 0
+      ## Whether to obtain the value of CPUID and decide whether to participate in aggregation.
+      ## Set to 1:
+      ##    Obtain the value of CPUID and will be included in the aggregation of stack trace data.
+      ## Set to 0:
+      ##    It will not be included in the aggregation. Any other value is considered invalid,
+      ##    the CPU value for stack trace data reporting is a special value (CPU_INVALID:0xfff)
+      ##    used to indicate that it is an invalid value.
+      ## Default: 0
+      #cpu: 0
 
-        ## Sampling process name
-        ## Default: ^deepflow-.*
-        #regex: ^deepflow-.*
+      ## Sampling process name
+      ## Default: ^deepflow-.*
+      #regex: ^deepflow-.*
 
-      ## off-cpu profile configuration
-      #off-cpu-profile:
-        ## eBPF off-cpu Profile Switch
-        ## Default: true
-        #disabled: true
+    ## off-cpu profile configuration
+    #off-cpu-profile:
+      ## eBPF off-cpu Profile Switch
+      ## Default: true
+      #disabled: true
 
-        ## Sampling process name
-        ## Default: ^deepflow-.*
-        #regex: ^deepflow-.*
+      ## Sampling process name
+      ## Default: ^deepflow-.*
+      #regex: ^deepflow-.*
 
-        ## Scheduler events are still high-frequency events, as their rate may exceed 1 million events
-        ## per second, so caution should still be exercised.
-        ## If overhead remains an issue, you can configure the 'minblock' tunable parameter here.
-        ## If the off-CPU time is less than the value configured in this item, the data will be discarded.
-        ## If your goal is to trace longer blocking events, increasing this parameter can filter out shorter
-        ## blocking events, further reducing overhead.
-        ## Default: 1us, Range: [1, +oo)us
-        #minblock: 1us
+      ## Configure the minimum blocking event time
+      ## Default: 1us. Range: [1, +oo)us
+      ## Note:
+      ##   Scheduler events are still high-frequency events, as their rate may exceed 1 million events
+      ##   per second, so caution should still be exercised.
+      ##   If overhead remains an issue, you can configure the 'minblock' tunable parameter here.
+      ##   If the off-CPU time is less than the value configured in this item, the data will be discarded.
+      ##   If your goal is to trace longer blocking events, increasing this parameter can filter out shorter
+      ##   blocking events, further reducing overhead. Additionally, we will not collect events with a block
+      ##   time exceeding 1 hour.
+      #minblock: 1us
 
   ######################################
   ## Agent Running in Standalone Mode ##
