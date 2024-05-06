@@ -133,7 +133,7 @@ impl Cgroups {
 
         let environment_config = self.config.clone();
         let running = self.running.clone();
-        let mut last_cpu = 0;
+        let mut last_millicpus = 0;
         let mut last_memory = 0;
         let cgroup = self.cgroup.clone();
         let thread = thread::Builder::new()
@@ -141,10 +141,10 @@ impl Cgroups {
             .spawn(move || {
                 loop {
                     let environment = environment_config.load();
-                    let max_cpus = environment.max_cpus;
+                    let max_millicpus = environment.max_millicpus;
                     let max_memory = environment.max_memory;
-                    if max_cpus != last_cpu || max_memory != last_memory {
-                        if let Err(e) = Self::apply(cgroup.clone(), max_cpus, max_memory) {
+                    if max_millicpus != last_millicpus || max_memory != last_memory {
+                        if let Err(e) = Self::apply(cgroup.clone(), max_millicpus, max_memory) {
                             warn!(
                                 "apply cgroups resource failed, {}, deepflow-agent restart...",
                                 e
@@ -153,7 +153,7 @@ impl Cgroups {
                             break;
                         }
                     }
-                    last_cpu = max_cpus;
+                    last_millicpus = max_millicpus;
                     last_memory = max_memory;
 
                     let (running, timer) = &*running;
@@ -175,9 +175,9 @@ impl Cgroups {
     }
 
     /// 更改资源限制
-    pub fn apply(cgroup: Cgroup, max_cpus: u32, max_memory: u64) -> Result<(), Error> {
+    pub fn apply(cgroup: Cgroup, max_millicpus: u32, max_memory: u64) -> Result<(), Error> {
         let mut resources = Resources::default();
-        let cpu_quota = max_cpus * DEFAULT_CPU_CFS_PERIOD_US;
+        let cpu_quota = max_millicpus * 100; // The unit of cpu_quota is 100_000 us. Convert max_millicpus to the unit of cpu_quota
         let cpu_resources = CpuResources {
             quota: Some(cpu_quota as i64),
             period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
