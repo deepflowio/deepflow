@@ -237,6 +237,9 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 }
 
 func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
+	if err := IsAddPermitted(a.cfg.FPermit, a.userInfo, vtapCreate.TeamID); err != nil {
+		return model.Vtap{}, err
+	}
 	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
@@ -308,6 +311,9 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 		}
 	} else {
 		return model.Vtap{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify name or lcuuid")
+	}
+	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+		return model.Vtap{}, err
 	}
 
 	log.Infof("ORG(id=%d database=%s) update vtap (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
@@ -397,6 +403,9 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
+	}
+	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+		return model.Vtap{}, err
 	}
 
 	log.Infof("ORG(id=%d database=%s) update vtap (%s) license %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
@@ -498,6 +507,9 @@ func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
 	var vtap mysql.VTap
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
+	}
+	if err := IsDeletePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+		return nil, err
 	}
 
 	log.Infof("ORG(id=%d database=%s) delete vtap (%s)", dbInfo.ORGID, dbInfo.Name, vtap.Name)

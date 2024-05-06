@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/deepflowio/deepflow/cli/ctl/common"
+	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl/cmd"
 )
 
@@ -42,6 +43,7 @@ func Execute(version string) {
 	root.PersistentFlags().Uint32P("api-port", "", 30417, "deepflow-server service node port")
 	root.PersistentFlags().Uint32P("rpc-port", "", 30035, "deepflow-server service grpc port")
 	root.PersistentFlags().Uint32P("svc-port", "", 20417, "deepflow-server service http port")
+	root.PersistentFlags().Uint32P("org-id", "", ctrlcommon.DEFAULT_ORG_ID, fmt.Sprintf("organization id (default %d)", ctrlcommon.DEFAULT_ORG_ID))
 	root.PersistentFlags().DurationP("timeout", "", time.Second*30, "deepflow-ctl timeout")
 	root.ParseFlags(os.Args[1:])
 

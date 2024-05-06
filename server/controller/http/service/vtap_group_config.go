@@ -33,6 +33,16 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
+type AgentGroupConfig struct {
+	cfg *config.ControllerConfig
+
+	userInfo *UserInfo
+}
+
+func NewAgentGroupConfig(userInfo *UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
+	return &AgentGroupConfig{userInfo: userInfo, cfg: cfg}
+}
+
 func ConvertStrToIntList(convertStr string) ([]int, error) {
 	if len(convertStr) == 0 {
 		return []int{}, nil
@@ -499,7 +509,7 @@ func convertToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.Agent
 	}
 }
 
-func CreateVTapGroupConfig(orgID int, createData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
+func (a *AgentGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -521,6 +531,10 @@ func CreateVTapGroupConfig(orgID int, createData *agent_config.AgentGroupConfig)
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
 	}
+	if err := IsAddPermitted(a.cfg.FPermit, a.userInfo, dbGroup.TeamID); err != nil {
+		return nil, err
+	}
+
 	dbData := &agent_config.AgentGroupConfigModel{}
 	convertJsonToDb(createData, dbData)
 	dbData.VTapGroupLcuuid = createData.VTapGroupLcuuid
@@ -531,7 +545,7 @@ func CreateVTapGroupConfig(orgID int, createData *agent_config.AgentGroupConfig)
 	return dbData, nil
 }
 
-func DeleteVTapGroupConfig(orgID int, lcuuid string) (*agent_config.AgentGroupConfigModel, error) {
+func (a *AgentGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*agent_config.AgentGroupConfigModel, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -546,12 +560,20 @@ func DeleteVTapGroupConfig(orgID int, lcuuid string) (*agent_config.AgentGroupCo
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
+	var vtapGroup *mysql.VTapGroup
+	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
+		return nil, err
+	}
+	if err := IsDeletePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+		return nil, err
+	}
+
 	db.Delete(dbConfig)
 	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return dbConfig, nil
 }
 
-func UpdateVTapGroupConfig(orgID int, lcuuid string, updateData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
+func (a *AgentGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updateData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -566,6 +588,14 @@ func UpdateVTapGroupConfig(orgID int, lcuuid string, updateData *agent_config.Ag
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
+	var vtapGroup *mysql.VTapGroup
+	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
+		return nil, err
+	}
+	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+		return nil, err
+	}
+
 	convertJsonToDb(updateData, dbConfig)
 	ret = db.Save(dbConfig)
 	if ret.Error != nil {

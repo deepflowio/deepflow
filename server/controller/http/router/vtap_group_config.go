@@ -39,9 +39,9 @@ func NewVTapGroupConfig(cfg *config.ControllerConfig) *VTapGroupConfig {
 }
 
 func (cgc *VTapGroupConfig) RegisterTo(e *gin.Engine) {
-	e.POST("/v1/vtap-group-configuration/", createVTapGroupConfig)
-	e.DELETE("/v1/vtap-group-configuration/:lcuuid/", deleteVTapGroupConfig)
-	e.PATCH("/v1/vtap-group-configuration/:lcuuid/", updateVTapGroupConfig)
+	e.POST("/v1/vtap-group-configuration/", createVTapGroupConfig(cgc.cfg))
+	e.DELETE("/v1/vtap-group-configuration/:lcuuid/", deleteVTapGroupConfig(cgc.cfg))
+	e.PATCH("/v1/vtap-group-configuration/:lcuuid/", updateVTapGroupConfig(cgc.cfg))
 	e.GET("/v1/vtap-group-configuration/", getVTapGroupConfigs(cgc.cfg))
 	e.GET("/v1/vtap-group-configuration/detailed/:lcuuid/", getVTapGroupDetailedConfig)
 	e.POST("/v1/vtap-group-configuration/advanced/", createVTapGroupAdvancedConfig)
@@ -54,32 +54,39 @@ func (cgc *VTapGroupConfig) RegisterTo(e *gin.Engine) {
 	e.DELETE("/v1/vtap-group-configuration/filter/", deleteVTapGroupConfigByFilter)
 }
 
-func createVTapGroupConfig(c *gin.Context) {
-	vTapGroupConfig := &agent_config.AgentGroupConfig{}
-	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
-	if err == nil {
-		data, err := service.CreateVTapGroupConfig(service.GetUserInfo(c).ORGID, vTapGroupConfig)
-		JsonResponse(c, data, err)
-	} else {
-		JsonResponse(c, nil, err)
+func createVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		vTapGroupConfig := &agent_config.AgentGroupConfig{}
+		err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
+		if err == nil {
+
+			data, err := service.NewAgentGroupConfig(service.GetUserInfo(c), cfg).CreateVTapGroupConfig(service.GetUserInfo(c).ORGID, vTapGroupConfig)
+			JsonResponse(c, data, err)
+		} else {
+			JsonResponse(c, nil, err)
+		}
 	}
 }
 
-func deleteVTapGroupConfig(c *gin.Context) {
-	lcuuid := c.Param("lcuuid")
-	data, err := service.DeleteVTapGroupConfig(service.GetUserInfo(c).ORGID, lcuuid)
-	JsonResponse(c, data, err)
+func deleteVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		lcuuid := c.Param("lcuuid")
+		data, err := service.NewAgentGroupConfig(service.GetUserInfo(c), cfg).DeleteVTapGroupConfig(service.GetUserInfo(c).ORGID, lcuuid)
+		JsonResponse(c, data, err)
+	}
 }
 
-func updateVTapGroupConfig(c *gin.Context) {
-	lcuuid := c.Param("lcuuid")
-	vTapGroupConfig := &agent_config.AgentGroupConfig{}
-	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
-	if err == nil {
-		data, err := service.UpdateVTapGroupConfig(service.GetUserInfo(c).ORGID, lcuuid, vTapGroupConfig)
-		JsonResponse(c, data, err)
-	} else {
-		JsonResponse(c, nil, err)
+func updateVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		lcuuid := c.Param("lcuuid")
+		vTapGroupConfig := &agent_config.AgentGroupConfig{}
+		err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
+		if err == nil {
+			data, err := service.NewAgentGroupConfig(service.GetUserInfo(c), cfg).UpdateVTapGroupConfig(service.GetUserInfo(c).ORGID, lcuuid, vTapGroupConfig)
+			JsonResponse(c, data, err)
+		} else {
+			JsonResponse(c, nil, err)
+		}
 	}
 }
 

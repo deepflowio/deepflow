@@ -133,6 +133,10 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 }
 
 func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.VtapGroup, err error) {
+	if err := IsAddPermitted(a.cfg.FPermit, a.userInfo, vtapGroupCreate.TeamID); err != nil {
+		return model.VtapGroup{}, err
+	}
+
 	cfg := a.cfg
 	var vtapGroupCount int64
 
@@ -231,6 +235,9 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 	var dbUpdateMap = make(map[string]interface{})
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
+	}
+	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+		return model.VtapGroup{}, err
 	}
 
 	log.Infof("ORG(id=%d database=%s) update vtap_group (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtapGroup.Name, vtapGroupUpdate)
@@ -345,6 +352,9 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
+	if err := IsDeletePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+		return nil, err
+	}
 
 	var defaultVtapGroup mysql.VTapGroup
 	if ret := db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
@@ -353,7 +363,8 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 
 	log.Infof("ORG(id=%d database=%s) delete vtap_group (%s)", dbInfo.ORGID, dbInfo.Name, vtapGroup.Name)
 
-	db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
+	db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).
+		Updates(map[string]interface{}{"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": defaultVtapGroup.TeamID})
 	db.Delete(&vtapGroup)
 	db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agent_config.AgentGroupConfigModel{})
 	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
