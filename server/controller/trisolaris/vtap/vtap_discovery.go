@@ -867,7 +867,7 @@ func (r *VTapRegister) registerVTapByCtrlIPMac(db *gorm.DB) (vtap *models.VTap, 
 		vtap, ok = r.registerVTapAnalyzerTapMode(db)
 
 	default:
-		log.Errorf(r.vTapInfo.Logf("unkown tap_mode(%d) from agent(%s)", r.tapMode, r.getKey()))
+		log.Errorf(r.vTapInfo.Logf("unknown tap_mode(%d) from agent(%s)", r.tapMode, r.getKey()))
 	}
 
 	return
@@ -907,7 +907,7 @@ func (r *VTapRegister) registerVTap(done func()) {
 	case AGENT_IDENTIFIE_IP:
 		vtap, ok = r.registerVTapByCtrlIP(v.db)
 	default:
-		log.Errorf(r.Logf("unkown agent_unique_identifier(%d) from agent(%s)", r.agentUniqueIdentifier, r.getKey()))
+		log.Errorf(r.Logf("unknown agent_unique_identifier(%d) from agent(%s)", r.agentUniqueIdentifier, r.getKey()))
 
 	}
 

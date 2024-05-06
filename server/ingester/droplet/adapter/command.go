@@ -103,7 +103,7 @@ func RegisterCommand(moduleId debug.ModuleId) *cobra.Command {
 	}
 	show := &cobra.Command{
 		Use:   "show",
-		Short: "show module adapter infomation",
+		Short: "show module adapter information",
 		Run: func(cmd *cobra.Command, args []string) {
 			count := PacketCounter{}
 			if CommmandGetResult(moduleId, ADAPTER_CMD_SHOW, &count) {
