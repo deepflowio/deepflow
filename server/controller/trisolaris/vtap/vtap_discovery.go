@@ -148,12 +148,15 @@ var reg = regexp.MustCompile(` |:`)
 
 func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	vTapName := reg.ReplaceAllString(dbVTap.Name, "-")
-	oldVTap, err := dbmgr.DBMgr[models.VTap](db).GetFromName(vTapName)
+	vtapMgr := dbmgr.DBMgr[models.VTap](db)
+	oldVTap, err := vtapMgr.GetByOption(
+		vtapMgr.WithCtrlIP(r.ctrlIP),
+		vtapMgr.WithCtrlMac(r.ctrlMac))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		dbVTap.Name = vTapName
 	} else {
 		if err == nil {
-			log.Errorf(r.Logf("agent(%s) name=%s already exist", r, vTapName))
+			log.Errorf(r.Logf("agent(%s) ctrl_ip=%s ctrl_mac= %s already exist", r, r.ctrlIP, r.ctrlMac))
 			if oldVTap.State == VTAP_STATE_NOT_CONNECTED {
 				log.Warningf(r.Logf("vtap(%s) info (ctrl_ip: %s, ctr_mac: %s) change to (ctrl_ip: %s, ctr_mac: %s)", vTapName,
 					oldVTap.CtrlIP, oldVTap.CtrlMac, dbVTap.CtrlIP, dbVTap.CtrlMac))
