@@ -5,8 +5,7 @@ time                       , 触发时间                    , 将 end_time 取�
 region                     , 区域                       ,
 
 user                       , 创建人                      ,
-policy_id                  , 策略ID                      ,
-policy_name                , 策略名称                    ,
+alarm_policy               , 告警策略                    ,
 policy_level               , 策略等级                    ,
 policy_app_type            , 监控对象                    ,
 policy_target_uid          , 事件信息UID                 ,

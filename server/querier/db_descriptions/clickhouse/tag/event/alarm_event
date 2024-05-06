@@ -5,8 +5,7 @@ time                       , time                      , time                   
 region                     , region                    , region                    , resource       ,                       , Universal Tag   , 110          , 0
 
 user                       , user                      , user                      , string         ,                       , Alarm Info      , 111          , 0
-policy_id                  , policy_id                 , policy_id                 , int            ,                       , Alarm Info      , 111          , 0
-policy_name                , policy_name               , policy_name               , string         ,                       , Alarm Info      , 111          , 0
+alarm_policy               , alarm_policy              , alarm_policy              , resource       ,                       , Universal Tag   , 110          , 0
 policy_level               , policy_level              , policy_level              , int_enum       , policy_level          , Alarm Info      , 111          , 0
 policy_app_type            , policy_app_type           , policy_app_type           , int_enum       , policy_app_type       , Alarm Info      , 111          , 0
 policy_target_uid          , policy_target_uid         , policy_target_uid         , string         ,                       , Alarm Info      , 111          , 0

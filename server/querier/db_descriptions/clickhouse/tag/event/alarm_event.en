@@ -5,8 +5,7 @@ time                       , triggeringTime             , Round end_time to seco
 region                     , Region                     ,
 
 user                       , Creator                    ,
-policy_id                  , PolicyID                   ,
-policy_name                , PolicyName                 ,
+alarm_policy               , AlarmPolicy                ,
 policy_level               , PolicyLevel                ,
 policy_app_type            , MonitoredObject            ,
 policy_target_uid          , EventInfoUID               ,

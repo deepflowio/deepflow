@@ -1271,6 +1271,25 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+	// 告警策略
+	// alarm_policy
+	tagResourceMap["alarm_policy"] = map[string]*Tag{
+		"default": NewTag(
+			"policy_name",
+			"policy_name!=''",
+			"policy_name %s %s",
+			"%s(policy_name, %s)",
+		),
+	}
+	tagResourceMap["alarm_policy_id"] = map[string]*Tag{
+		"default": NewTag(
+			"policy_id",
+			"policy_id!=0",
+			"policy_id %s %s",
+			"",
+		),
+	}
+
 	return tagResourceMap
 }
 
