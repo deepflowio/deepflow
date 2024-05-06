@@ -73,7 +73,8 @@ static bool java_installed;
 int profiler_context_init(struct profiler_context *ctx,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
-			  const char *stack_map_name_b, bool only_matched)
+			  const char *stack_map_name_b,
+			  bool only_matched, bool use_delta_time)
 {
 	memset(ctx, 0, sizeof(struct profiler_context));
 	atomic64_init(&ctx->process_lost_count);
@@ -86,6 +87,7 @@ int profiler_context_init(struct profiler_context *ctx,
 		 stack_map_name_b);
 	ctx->regex_existed = false;
 	ctx->only_matched_data = only_matched;
+	ctx->use_delta_time = use_delta_time;
 
 	return 0;
 }
@@ -596,7 +598,10 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	}
 
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
-	msg->count = 1;
+	if (ctx->use_delta_time)
+		msg->count = v->duration_ns;
+	else
+		msg->count = 1;
 	msg->data_ptr = pointer_to_uword(&msg->data[0]);
 
 	/* Only use for test flame graph. */
@@ -824,7 +829,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-			((stack_trace_msg_t *) kv.msg_ptr)->count++;
+			((stack_trace_msg_t *) kv.msg_ptr)->count +=
+			    v->duration_ns;
 			if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
 				free_proc_cache(__info_p);
 			continue;

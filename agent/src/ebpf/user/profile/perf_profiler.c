@@ -178,7 +178,7 @@ static void print_cp_data(stack_trace_msg_t * msg)
 	snprintf(buff, sizeof(buff),
 		 "%s [cpdbg] netns_id %lu container_id %s pid %u tid %u "
 		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
-		 " %u cpu %u count %u tiemstamp %lu datalen %u data %s\n",
+		 " %u cpu %u count %lu tiemstamp %lu datalen %u data %s\n",
 		 timestamp, msg->netns_id, cid, msg->pid, msg->tid,
 		 msg->process_name, msg->comm, msg->stime,
 		 msg->u_stack_id,
@@ -528,7 +528,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 		return (-1);
 
 	profiler_context_init(&oncpu_ctx, MAP_PROFILER_STATE_NAME,
-			      MAP_STACK_A_NAME, MAP_STACK_B_NAME, false);
+			      MAP_STACK_A_NAME, MAP_STACK_B_NAME, false, false);
 
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
@@ -604,10 +604,10 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * msg)
 	char str[len];
 	/* profile regex match ? */
 	if (msg->stime > 0)
-		snprintf(str, len, "%s (%d);%s %u\n", msg->process_name,
+		snprintf(str, len, "%s (%d);%s %lu\n", msg->process_name,
 			 msg->pid, msg->data, msg->count);
 	else
-		snprintf(str, len, "%s;%s %u\n", msg->process_name,	/*msg->pid, */
+		snprintf(str, len, "%s;%s %lu\n", msg->process_name,	/*msg->pid, */
 			 msg->data, msg->count);
 
 	os_puts(folded_file, str, strlen(str), false);

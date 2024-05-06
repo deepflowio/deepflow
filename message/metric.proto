@@ -220,7 +220,7 @@ message Profile {
     uint32 u_stack_id = 27;
     uint32 k_stack_id = 28;
     uint32 cpu = 29;
-    uint32 count = 30;
+    uint64 count = 30;
     // Deprecated in v6.4.1: uint64 netns_id = 31;
     // Deprecated in v6.4.1: string container_id = 32;
     uint32 pod_id = 33;

@@ -131,7 +131,7 @@ typedef struct {
 	u32 u_stack_id;
 	u32 k_stack_id;
 	u32 cpu;
-	u32 count;
+	u64 count;
 	u8 comm[TASK_COMM_LEN];
 	u8 process_name[TASK_COMM_LEN];
 	u8 container_id[CONTAINER_ID_SIZE];

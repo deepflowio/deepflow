@@ -384,8 +384,12 @@ pub struct stack_profile_data {
      * The profiler captures the number of occurrences of the same
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+     * Note:
+     * In the sampling scenario, the number of samples is used; in the
+     * non-sampling scenario, real-time intervals (in nanoseconds) are
+     * used.
      */
-    pub count: u32,
+    pub count: u64,
     /*
      * comm in task_struct(linux kernel), always 16 bytes
      * If the capture is a process, fill in the process name here.

@@ -79,6 +79,14 @@ struct profiler_context {
 	 */
 	bool only_matched_data;
 
+	/*
+	 * In the sampling scenario, the number of samples is used; in the
+	 * non-sampling scenario, real-time intervals (in nanoseconds) are
+	 * used. This setting determines whether to use time intervals,
+	 * with a default value of false.
+	 */
+	bool use_delta_time;
+
 	// Record all stack IDs in each iteration for quick retrieval.
 	struct stack_ids_bitmap stack_ids_a;
 	struct stack_ids_bitmap stack_ids_b;
@@ -110,6 +118,7 @@ struct profiler_context {
 	u64 stack_trace_err;
 	// Quantity statistics of data pushed.
 	u64 push_count;
+
 	/*
 	 * Record the time of the last data push
 	 * (in seconds since system startup)
@@ -136,7 +145,8 @@ void set_enable_profiler(struct bpf_tracer *t, struct profiler_context *ctx,
 int profiler_context_init(struct profiler_context *ctx,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
-			  const char *stack_map_name_b, bool only_matched);
+			  const char *stack_map_name_b,
+			  bool only_matched, bool use_delta_time);
 bool run_conditions_check(void);
 int java_libs_and_tools_install(void);
 void push_and_release_stack_trace_msg(struct profiler_context *ctx,

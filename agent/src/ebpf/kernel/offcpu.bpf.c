@@ -1,6 +1,6 @@
 /*
  * This code runs using bpf in the Linux kernel.
- * Copyright 2022- The Yunshan Networks Authors.
+ * Copyright 2024- The Yunshan Networks Authors.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -83,14 +83,6 @@ static inline int record_sched_info(struct sched_switch_ctx *ctx)
 	 */
 	if (!(((ctx->prev_state & (TASK_REPORT_MAX - 1)) & 0x01)
 	      || ((ctx->prev_state & (TASK_REPORT_MAX - 1)) & 0x02)))
-		return -1;
-
-	// Filter out the high volume of scheduling events caused by self-monitoring.
-	char comm[TASK_COMM_LEN];
-	bpf_get_current_comm(comm, sizeof(comm));
-	if ((comm[0] == 't' && comm[1] == 'c' && comm[2] == '\0')
-	    || (comm[0] == 's' && comm[1] == 's' && comm[2] == 'h')
-	    || (comm[0] == 'p' && comm[1] == 'e' && comm[2] == 'r'))
 		return -1;
 
 	struct sched_info_s val = {};
