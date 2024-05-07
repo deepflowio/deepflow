@@ -17,7 +17,6 @@
 package clickhouse
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -68,7 +67,9 @@ type Function interface {
 	SetAlias(alias string)
 }
 
-func GetTagFunction(name string, args []string, alias, db, table string) (Statement, error) {
+func GetTagFunction(name string, args []string, alias string, e *CHEngine) (Statement, error) {
+	db := e.DB
+	table := e.Table
 	if !common.IsValueInSliceString(name, TAG_FUNCTIONS) {
 		return nil, nil
 	}
@@ -77,15 +78,18 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 		time := Time{Args: args, Alias: alias}
 		return &time, nil
 	default:
-		tagFunction := TagFunction{Name: name, Args: args, Alias: alias, DB: db, Table: table}
+		tagFunction := TagFunction{Name: name, Args: args, Alias: alias, DB: db, Table: table, Engine: e}
 		err := tagFunction.Check()
 		return &tagFunction, err
 	}
 }
 
-func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context, isDerivative bool, derivativeGroupBy []string, derivativeArgs []string) (Statement, int, string, error) {
+func GetAggFunc(name string, args []string, alias string, derivativeArgs []string, e *CHEngine) (Statement, int, string, error) {
+	db := e.DB
+	isDerivative := e.IsDerivative
+	derivativeGroupBy := e.DerivativeGroupBy
 	if name == view.FUNCTION_TOPK || name == view.FUNCTION_ANY {
-		return GetTopKTrans(name, args, alias, db, table, ctx)
+		return GetTopKTrans(name, args, alias, e)
 	}
 
 	var levelFlag int
@@ -101,7 +105,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	if !ok {
 		return nil, 0, "", nil
 	}
-	metricStruct, ok := metrics.GetAggMetrics(field, db, table, ctx)
+	metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 	if !ok {
 		return nil, 0, "", nil
 	}
@@ -134,7 +138,9 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	}, levelFlag, unit, nil
 }
 
-func GetTopKTrans(name string, args []string, alias string, db string, table string, ctx context.Context) (Statement, int, string, error) {
+func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statement, int, string, error) {
+	db := e.DB
+	table := e.Table
 	function, ok := metrics.METRICS_FUNCTIONS_MAP[name]
 	if !ok {
 		return nil, 0, "", nil
@@ -166,7 +172,7 @@ func GetTopKTrans(name string, args []string, alias string, db string, table str
 	for i, field := range fields {
 
 		field = strings.Trim(field, "`")
-		metricStruct, ok = metrics.GetAggMetrics(field, db, table, ctx)
+		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 			return nil, 0, "", nil
 		}
@@ -701,13 +707,14 @@ func (t *Time) Format(m *view.Model) {
 }
 
 type TagFunction struct {
-	Name  string
-	Args  []string
-	Alias string
-	Withs []view.Node
-	Value string
-	DB    string
-	Table string
+	Name   string
+	Args   []string
+	Alias  string
+	Withs  []view.Node
+	Value  string
+	DB     string
+	Table  string
+	Engine *CHEngine
 }
 
 func (f *TagFunction) SetAlias(alias string) {
@@ -839,7 +846,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		return node
 	case TAG_FUNCTION_FAST_TRANS:
 		if f.DB == chCommon.DB_NAME_PROMETHEUS && f.Args[0] == "tag" {
-			_, labelFastTranslatorStr, _ := GetPrometheusAllTagTranslator(f.Table)
+			_, labelFastTranslatorStr, _ := GetPrometheusAllTagTranslator(f.Engine)
 			f.Value = labelFastTranslatorStr
 		}
 		if f.Alias == "" {

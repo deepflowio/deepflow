@@ -20,6 +20,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bitly/go-simplejson"
+	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
@@ -68,4 +71,32 @@ func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 	log.Infof("delete org (id: %d) data", orgID)
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
 	return migrator.DropDatabase(cfg)
+}
+
+func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
+	errResponse, _ := simplejson.NewJson([]byte("{}"))
+	body := make(map[string]interface{})
+	// master region
+	if cfg.TrisolarisCfg.NodeType != controllerCommon.TRISOLARIS_NODE_TYPE_MASTER {
+		var controller mysql.Controller
+		err := mysql.Db.Where("node_type = ? AND state = ?", controllerCommon.CONTROLLER_NODE_TYPE_MASTER, controllerCommon.CONTROLLER_STATE_NORMAL).First(&controller).Error
+		if err != nil {
+			log.Error(err)
+			return errResponse, err
+		}
+		orgResponse, err := controllerCommon.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/orgs/", controller.IP, cfg.ListenNodePort), body)
+		if err != nil {
+			log.Error(err)
+			return errResponse, err
+		}
+		response := orgResponse.Get("DATA")
+		return response, err
+	}
+	orgResponse, err := controllerCommon.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/orgs", cfg.FPermit.Host, cfg.FPermit.Port), body)
+	if err != nil {
+		log.Error(err)
+		return errResponse, err
+	}
+	response := orgResponse.Get("DATA")
+	return response, err
 }

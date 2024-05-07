@@ -100,7 +100,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func GetAggMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
+func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	if field == COUNT_METRICS_NAME {
 		return &Metrics{
@@ -113,10 +113,10 @@ func GetAggMetrics(field string, db string, table string, ctx context.Context) (
 			Table:       table,
 		}, true
 	}
-	return GetMetrics(field, db, table, ctx)
+	return GetMetrics(field, db, table, orgID)
 }
 
-func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
+func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
 	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
@@ -201,15 +201,15 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					if err != nil {
 						return nil, false
 					}
-					nameDBField, err := GetTagDBField(name, db, table)
+					nameDBField, err := GetTagDBField(name, db, table, orgID)
 					if err != nil {
 						return nil, false
 					}
-					clientNameDBField, err := GetTagDBField(clientName, db, table)
+					clientNameDBField, err := GetTagDBField(clientName, db, table, orgID)
 					if err != nil {
 						return nil, false
 					}
-					serverNameDBField, err := GetTagDBField(serverName, db, table)
+					serverNameDBField, err := GetTagDBField(serverName, db, table, orgID)
 					if err != nil {
 						return nil, false
 					}
@@ -448,23 +448,23 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 	}, nil
 }
 
-func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error) {
+func GetPrometheusSingleTagTranslator(tag, table, orgID string) (string, string, error) {
 	labelType := ""
 	TagTranslatorStr := ""
 	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[orgID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
 		return "", "", errors.New(errorMessage)
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[orgID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -481,14 +481,14 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	return TagTranslatorStr, labelType, nil
 }
 
-func GetPrometheusAllTagTranslator(table string) (string, error) {
+func GetPrometheusAllTagTranslator(table, orgID string) (string, error) {
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[orgID].MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
-			if labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+			if labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[appLabel.AppLabelName]; ok {
 				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 			}
@@ -506,7 +506,7 @@ func GetPrometheusAllTagTranslator(table string) (string, error) {
 	return tagTranslatorStr, nil
 }
 
-func GetTagDBField(name, db, table string) (string, error) {
+func GetTagDBField(name, db, table, orgID string) (string, error) {
 	selectTag := name
 	tagTranslatorStr := name
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
@@ -575,7 +575,7 @@ func GetTagDBField(name, db, table string) (string, error) {
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == ckcommon.DB_NAME_PROMETHEUS {
-					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table)
+					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table, orgID)
 					if err != nil {
 						return tagTranslatorStr, err
 					}
@@ -596,7 +596,7 @@ func GetTagDBField(name, db, table string) (string, error) {
 				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
 			}
 		} else if name == "tag" && db == ckcommon.DB_NAME_PROMETHEUS {
-			tagTranslatorStr, err := GetPrometheusAllTagTranslator(table)
+			tagTranslatorStr, err := GetPrometheusAllTagTranslator(table, orgID)
 			if err != nil {
 				return tagTranslatorStr, err
 			}

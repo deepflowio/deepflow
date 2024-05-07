@@ -34,10 +34,12 @@ import (
 var log = logging.MustGetLogger("clickhouse")
 var Cfg *QuerierConfig
 var TraceConfig *TraceIdWithIndex
+var ControllerCfg *ControllerConfig
 
 type Config struct {
 	QuerierConfig    QuerierConfig    `yaml:"querier"`
 	TraceIdWithIndex TraceIdWithIndex `yaml:"trace-id-with-index"`
+	ControllerConfig ControllerConfig `yaml:"controller"`
 }
 
 type QuerierConfig struct {
@@ -91,6 +93,10 @@ type AutoCustomTags struct {
 	TagFields   []string `yaml:"tag-fields" binding:"omitempty,dive"`
 	DisplayName string   `default:"" yaml:"display_name"`
 	Description string   `default:"" yaml:"description"`
+}
+
+type ControllerConfig struct {
+	ListenPort int `default:"20417" yaml:"listen-port"`
 }
 
 func (c *Config) expendEnv() {
