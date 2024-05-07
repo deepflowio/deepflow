@@ -1223,8 +1223,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     monitoring_interval     CHAR(64) DEFAULT "1m",
     trigger_info_event      INTEGER DEFAULT 0,
     trigger_recovery_event  INTEGER DEFAULT 1,
-    lcuuid                  CHAR(64),
-    team_id                 INTEGER DEFAULT 1
+    lcuuid                  CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
 
