@@ -58,9 +58,9 @@ pub(super) const IMPORT_FUNC_VM_READ_CUSTOM_MESSAGE: &str = "vm_read_custom_mess
 pub(super) const IMPORT_FUNC_HOST_READ_L7_PROTOCOL_INFO: &str = "host_read_l7_protocol_info";
 pub(super) const IMPORT_FUNC_HOST_READ_STR_RESULT: &str = "host_read_str_result";
 
-pub(super) const LOG_LEVEL_INFO: i32 = 0;
-pub(super) const LOG_LEVEL_WARN: i32 = 1;
-pub(super) const LOG_LEVEL_ERR: i32 = 2;
+pub(super) const LOG_LEVEL_INFO: u32 = 0;
+pub(super) const LOG_LEVEL_WARN: u32 = 1;
+pub(super) const LOG_LEVEL_ERR: u32 = 2;
 
 pub const WASM_EXPORT_FUNC_NAME: [&'static str; 5] = [
     EXPORT_FUNC_CHECK_PAYLOAD,

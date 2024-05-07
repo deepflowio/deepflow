@@ -236,6 +236,10 @@ type L7FlowLog struct {
 	sqlAffectedRows  uint64
 	DirectionScore   uint8 `json:"direction_score" category:"$metrics" sub:"l4_throughput"`
 
+	// For Packet signal sources, it represents the packet length captured by AF_PACKET, excluding the layer 4 headers; for eBPF signal sources, it indicates the number of bytes for a single system call, and note that when TCP stream reassembly is enabled, it represents the total number of bytes from multiple system calls.
+	CapturedRequestByte  uint32
+	CapturedResponseByte uint32
+
 	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
 	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
 
@@ -283,6 +287,8 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
 		ckdb.NewColumn("direction_score", ckdb.UInt8).SetIndex(ckdb.IndexMinmax),
+		ckdb.NewColumn("captured_request_byte", ckdb.UInt32),
+		ckdb.NewColumn("captured_response_byte", ckdb.UInt32),
 
 		ckdb.NewColumn("attribute_names", ckdb.ArrayLowCardinalityString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
@@ -330,6 +336,8 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.ResponseLength,
 		h.SqlAffectedRows,
 		h.DirectionScore,
+		h.CapturedRequestByte,
+		h.CapturedResponseByte,
 
 		h.AttributeNames,
 		h.AttributeValues,
@@ -402,6 +410,8 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 		h.SqlAffectedRows = &h.sqlAffectedRows
 	}
 	h.DirectionScore = uint8(l.DirectionScore)
+	h.CapturedRequestByte = l.CapturedRequestByte
+	h.CapturedResponseByte = l.CapturedResponseByte
 
 	if l.Req != nil {
 		h.RequestDomain = l.Req.Domain
@@ -661,7 +671,7 @@ func (h *L7FlowLog) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	namesLen, valuesLen := len(attributeNames), len(attributeValues)
 	minNamesLen := namesLen
 	if namesLen != valuesLen {
-		log.Warningf("the lengths of AttributeNames(%v) and attributeValues(%v) is different", attributeNames, attributeValues)
+		log.Warningf("the lengths of AttributeNames (%v) and attributeValues (%v) is different", attributeNames, attributeValues)
 		if namesLen > valuesLen {
 			minNamesLen = valuesLen
 		}

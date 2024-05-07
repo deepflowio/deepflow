@@ -75,7 +75,7 @@ func (c *command) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate ui
 		}
 		debug.SendToClient(conn, remote, 0, &buff)
 	default:
-		log.Warningf("Trident Adapter recv unknown command(%v).", operate)
+		log.Warningf("Trident Adapter recv unknown command (%v).", operate)
 	}
 }
 
@@ -103,7 +103,7 @@ func RegisterCommand(moduleId debug.ModuleId) *cobra.Command {
 	}
 	show := &cobra.Command{
 		Use:   "show",
-		Short: "show module adapter infomation",
+		Short: "show module adapter information",
 		Run: func(cmd *cobra.Command, args []string) {
 			count := PacketCounter{}
 			if CommmandGetResult(moduleId, ADAPTER_CMD_SHOW, &count) {

@@ -21,8 +21,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getVPCs() ([]model.VPC, error) {
@@ -35,7 +33,7 @@ func (g *Genesis) getVPCs() ([]model.VPC, error) {
 	for _, v := range vpcsData {
 		vpcLcuuid := v.Lcuuid
 		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUID(v.Name, uuid.Nil)
+			vpcLcuuid = common.GetUUIDByOrgID(g.orgID, v.Name)
 		}
 		vpc := model.VPC{
 			Lcuuid:       vpcLcuuid,

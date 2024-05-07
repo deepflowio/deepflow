@@ -26,7 +26,7 @@ import (
 func (k *KubernetesGather) getPrometheusTargets() ([]model.PrometheusTarget, error) {
 	log.Debug("get prometheus target starting")
 	var prometheusTargets []model.PrometheusTarget
-	pTargets, err := genesis.GenesisService.GetPrometheusResponse(k.ClusterID)
+	pTargets, err := genesis.GenesisService.GetPrometheusResponse(k.orgID, k.ClusterID)
 	if err != nil {
 		log.Warning(err.Error())
 		return prometheusTargets, err

@@ -35,7 +35,7 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 	}
 	type fields struct {
 		vTapIDToTraffic map[int]int64
-		vtaps           []*mysql.VTap
+		vtaps           map[int]*mysql.VTap
 		analyzers       []*mysql.Analyzer
 	}
 	tests := []struct {
@@ -51,10 +51,10 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 			arg:  arg{ifCheck: true},
 			fields: fields{
 				vTapIDToTraffic: map[int]int64{1: 100, 2: 100, 3: 100},
-				vtaps: []*mysql.VTap{
-					{ID: 1, AnalyzerIP: "192.168.0.1"},
-					{ID: 2, AnalyzerIP: "192.168.0.2"},
-					{ID: 3, AnalyzerIP: "192.168.0.3"},
+				vtaps: map[int]*mysql.VTap{
+					1: {ID: 1, AnalyzerIP: "192.168.0.1"},
+					2: {ID: 2, AnalyzerIP: "192.168.0.2"},
+					3: {ID: 3, AnalyzerIP: "192.168.0.3"},
 				},
 				analyzers: []*mysql.Analyzer{
 					{IP: "192.168.0.1", State: common.HOST_STATE_COMPLETE},
@@ -84,10 +84,10 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 			arg:  arg{ifCheck: true},
 			fields: fields{
 				vTapIDToTraffic: map[int]int64{1: 100, 2: 200, 3: 0},
-				vtaps: []*mysql.VTap{
-					{ID: 1, AnalyzerIP: "192.168.0.1"},
-					{ID: 2, AnalyzerIP: "192.168.0.2"},
-					{ID: 3, AnalyzerIP: ""},
+				vtaps: map[int]*mysql.VTap{
+					1: {ID: 1, AnalyzerIP: "192.168.0.1"},
+					2: {ID: 2, AnalyzerIP: "192.168.0.2"},
+					3: {ID: 3, AnalyzerIP: ""},
 				},
 				analyzers: []*mysql.Analyzer{
 					{IP: "192.168.0.1", State: common.HOST_STATE_COMPLETE},
@@ -117,10 +117,10 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 			arg:  arg{ifCheck: true},
 			fields: fields{
 				vTapIDToTraffic: map[int]int64{1: 100, 2: 200, 3: 300},
-				vtaps: []*mysql.VTap{
-					{ID: 1, AnalyzerIP: "192.168.0.1"},
-					{ID: 2, AnalyzerIP: "192.168.0.2"},
-					{ID: 3, AnalyzerIP: "192.168.0.3"},
+				vtaps: map[int]*mysql.VTap{
+					1: {ID: 1, AnalyzerIP: "192.168.0.1"},
+					2: {ID: 2, AnalyzerIP: "192.168.0.2"},
+					3: {ID: 3, AnalyzerIP: "192.168.0.3"},
 				},
 				analyzers: []*mysql.Analyzer{
 					{IP: "192.168.0.1", State: common.HOST_STATE_COMPLETE},
@@ -150,12 +150,12 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 			arg:  arg{ifCheck: true},
 			fields: fields{
 				vTapIDToTraffic: map[int]int64{1: 100, 2: 200, 3: 300, 4: 0, 5: 0},
-				vtaps: []*mysql.VTap{
-					{ID: 1, AnalyzerIP: "192.168.0.1"},
-					{ID: 2, AnalyzerIP: "192.168.0.2"},
-					{ID: 3, AnalyzerIP: "192.168.0.3"},
-					{ID: 4, AnalyzerIP: ""},
-					{ID: 5, AnalyzerIP: ""},
+				vtaps: map[int]*mysql.VTap{
+					1: {ID: 1, AnalyzerIP: "192.168.0.1"},
+					2: {ID: 2, AnalyzerIP: "192.168.0.2"},
+					3: {ID: 3, AnalyzerIP: "192.168.0.3"},
+					4: {ID: 4, AnalyzerIP: ""},
+					5: {ID: 5, AnalyzerIP: ""},
 				},
 				analyzers: []*mysql.Analyzer{
 					{IP: "192.168.0.1", State: common.HOST_STATE_COMPLETE},
@@ -190,13 +190,13 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 			arg:  arg{ifCheck: true},
 			fields: fields{
 				vTapIDToTraffic: map[int]int64{1: 100, 2: 200, 3: 10, 4: 200, 5: 600, 6: 800},
-				vtaps: []*mysql.VTap{
-					{ID: 1, AnalyzerIP: "192.168.0.1"},
-					{ID: 2, AnalyzerIP: "192.168.0.2"},
-					{ID: 3, AnalyzerIP: "192.168.0.3"},
-					{ID: 4, AnalyzerIP: "192.168.0.1"},
-					{ID: 5, AnalyzerIP: "192.168.0.3"},
-					{ID: 6, AnalyzerIP: "192.168.0.2"},
+				vtaps: map[int]*mysql.VTap{
+					1: {ID: 1, AnalyzerIP: "192.168.0.1"},
+					2: {ID: 2, AnalyzerIP: "192.168.0.2"},
+					3: {ID: 3, AnalyzerIP: "192.168.0.3"},
+					4: {ID: 4, AnalyzerIP: "192.168.0.1"},
+					5: {ID: 5, AnalyzerIP: "192.168.0.3"},
+					6: {ID: 6, AnalyzerIP: "192.168.0.2"},
 				},
 				analyzers: []*mysql.Analyzer{
 					{IP: "192.168.0.1", State: common.HOST_STATE_COMPLETE}, // traffic: 300
@@ -229,13 +229,13 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 			arg:  arg{ifCheck: true},
 			fields: fields{
 				vTapIDToTraffic: map[int]int64{1: 100, 2: 100, 3: 900, 4: 100, 5: 100, 6: 900},
-				vtaps: []*mysql.VTap{
-					{ID: 1, AnalyzerIP: "192.168.0.1"},
-					{ID: 2, AnalyzerIP: "192.168.0.1"},
-					{ID: 3, AnalyzerIP: "192.168.0.2"},
-					{ID: 4, AnalyzerIP: "192.168.0.2"},
-					{ID: 5, AnalyzerIP: "192.168.0.3"},
-					{ID: 6, AnalyzerIP: "192.168.0.3"},
+				vtaps: map[int]*mysql.VTap{
+					1: {ID: 1, AnalyzerIP: "192.168.0.1"},
+					2: {ID: 2, AnalyzerIP: "192.168.0.1"},
+					3: {ID: 3, AnalyzerIP: "192.168.0.2"},
+					4: {ID: 4, AnalyzerIP: "192.168.0.2"},
+					5: {ID: 5, AnalyzerIP: "192.168.0.3"},
+					6: {ID: 6, AnalyzerIP: "192.168.0.3"},
 				},
 				analyzers: []*mysql.Analyzer{
 					{IP: "192.168.0.1", State: common.HOST_STATE_COMPLETE}, // traffic: 200
@@ -269,13 +269,13 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 			isAllNewVTaps: true,
 			fields: fields{
 				vTapIDToTraffic: map[int]int64{1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0},
-				vtaps: []*mysql.VTap{
-					{ID: 1, AnalyzerIP: ""},
-					{ID: 2, AnalyzerIP: ""},
-					{ID: 3, AnalyzerIP: ""},
-					{ID: 4, AnalyzerIP: ""},
-					{ID: 5, AnalyzerIP: ""},
-					{ID: 6, AnalyzerIP: ""},
+				vtaps: map[int]*mysql.VTap{
+					1: {ID: 1, AnalyzerIP: ""},
+					2: {ID: 2, AnalyzerIP: ""},
+					3: {ID: 3, AnalyzerIP: ""},
+					4: {ID: 4, AnalyzerIP: ""},
+					5: {ID: 5, AnalyzerIP: ""},
+					6: {ID: 6, AnalyzerIP: ""},
 				},
 				analyzers: []*mysql.Analyzer{
 					{IP: "192.168.0.1", State: common.HOST_STATE_COMPLETE},
@@ -308,10 +308,10 @@ func TestAZInfo_rebalanceAnalyzer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &AZInfo{
 				vTapIDToTraffic: tt.fields.vTapIDToTraffic,
-				vtaps:           tt.fields.vtaps,
+				vtapIDToVTap:    tt.fields.vtaps,
 				analyzers:       tt.fields.analyzers,
 			}
-			got, got1 := p.rebalanceAnalyzer(tt.arg.ifCheck)
+			got, got1 := p.rebalanceAnalyzer(nil, tt.arg.ifCheck)
 			if !tt.isAllNewVTaps {
 				assert.EqualValues(t, tt.want, got)
 			}
@@ -562,7 +562,7 @@ func Test_AnalyzerInfo_RebalanceAnalyzerByTraffic(t *testing.T) {
 					"analyzer22-V82":                822718331962,
 					"Automation-Public-Debug-W2523": 0,
 				}
-				mockQuerier.EXPECT().GetAgentDispatcher("master-", 0).Return(vtapNameToTraffic1, nil).AnyTimes()
+				mockQuerier.EXPECT().GetAgentDispatcher(nil, "master-", 0).Return(vtapNameToTraffic1, nil).AnyTimes()
 				vtapNameToTraffic2 := map[string]int64{
 					"master65-V96":                            6695427268,
 					"zqy-k8s-test2-V95":                       5510451019,
@@ -584,7 +584,7 @@ func Test_AnalyzerInfo_RebalanceAnalyzerByTraffic(t *testing.T) {
 					"ubuntu-22.04-master-V22":                 37401081294,
 					"10.50.1.153-H42":                         763009540,
 				}
-				mockQuerier.EXPECT().GetAgentDispatcher("slave1-", 0).Return(vtapNameToTraffic2, nil).AnyTimes()
+				mockQuerier.EXPECT().GetAgentDispatcher(nil, "slave1-", 0).Return(vtapNameToTraffic2, nil).AnyTimes()
 				analyzerInfo.db = mockDB
 				analyzerInfo.query = mockQuerier
 				analyzerInfo.dbInfo = &DBInfo{
@@ -739,7 +739,7 @@ func Test_AnalyzerInfo_RebalanceAnalyzerByTraffic(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := NewAnalyzerInfo()
+			r := NewAnalyzerInfo(nil)
 			tt.prepareMock(t, r)
 			got, err := r.RebalanceAnalyzerByTraffic(tt.args.ifCheckout, tt.args.dataDuration)
 			if (err != nil) != tt.wantErr {

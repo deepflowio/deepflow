@@ -163,7 +163,7 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 	}
 
 	if currentCount != maxLabelColumnIndex {
-		log.Infof("current app label count(%d) smaller than max app label index(%d)", currentCount, maxLabelColumnIndex)
+		log.Infof("current app label count (%d) smaller than max app label index (%d)", currentCount, maxLabelColumnIndex)
 		currentCount = 0
 	}
 

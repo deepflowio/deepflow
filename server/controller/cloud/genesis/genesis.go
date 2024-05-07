@@ -18,11 +18,13 @@ package genesis
 
 import (
 	"errors"
-
-	"inet.af/netaddr"
+	"fmt"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	"github.com/op/go-logging"
+	"inet.af/netaddr"
+
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
@@ -31,16 +33,15 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
-	"github.com/op/go-logging"
-	uuid "github.com/satori/go.uuid"
 )
 
-var log = logging.MustGetLogger("cloud.genesis")
+var log *logging.Logger
 
 type Genesis struct {
-	defaultVpc      bool
+	orgID           int
 	ipV4CIDRMaxMask int
 	ipV6CIDRMaxMask int
+	defaultVpc      bool
 	Name            string
 	Lcuuid          string
 	UuidGenerate    string
@@ -49,11 +50,13 @@ type Genesis struct {
 	defaultVpcName  string
 	ips             []cloudmodel.IP
 	subnets         []cloudmodel.Subnet
-	genesisData     genesis.GenesisSyncData
+	genesisData     genesis.GenesisSyncDataResponse
 	cloudStatsd     statsd.CloudStatsd
 }
 
-func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
+func NewGenesis(orgID int, domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
+	log = logging.MustGetLogger(fmt.Sprintf("cloud.org:%d.genesis", orgID))
+
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -68,6 +71,7 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		ipV6MaxMask = 64
 	}
 	return &Genesis{
+		orgID:           orgID,
 		ipV4CIDRMaxMask: ipV4MaxMask,
 		ipV6CIDRMaxMask: ipV6MaxMask,
 		Name:            domain.Name,
@@ -75,7 +79,7 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		UuidGenerate:    domain.DisplayName,
 		defaultVpcName:  cfg.GenesisDefaultVpcName,
 		regionUuid:      config.Get("region_uuid").MustString(),
-		genesisData:     genesis.GenesisSyncData{},
+		genesisData:     genesis.GenesisSyncDataResponse{},
 		cloudStatsd:     statsd.NewCloudStatsd(),
 	}, nil
 }
@@ -99,8 +103,8 @@ func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	}
 }
 
-func (g *Genesis) getGenesisData() (genesis.GenesisSyncData, error) {
-	return genesis.GenesisService.GetGenesisSyncResponse()
+func (g *Genesis) getGenesisData() (genesis.GenesisSyncDataResponse, error) {
+	return genesis.GenesisService.GetGenesisSyncResponse(g.orgID)
 }
 
 func (g *Genesis) generateIPsAndSubnets() {
@@ -175,7 +179,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 			knownCIDRs.Add(cidr.Masked())
 			if _, ok := subnetMap[cidr.Masked().String()]; !ok {
 				subnet := cloudmodel.Subnet{
-					Lcuuid:        common.GetUUID(networkID+cidr.Masked().String(), uuid.Nil),
+					Lcuuid:        common.GetUUIDByOrgID(g.orgID, networkID+cidr.Masked().String()),
 					CIDR:          cidr.Masked().String(),
 					NetworkLcuuid: networkID,
 					VPCLcuuid:     NetworkIDToVpcID[networkID],
@@ -235,7 +239,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 				if cidr.Contains(ipNet) {
 					if _, ok := subnetMap[cidr.String()]; !ok {
 						subnet := cloudmodel.Subnet{
-							Lcuuid:        common.GetUUID(networkID+cidr.String(), uuid.Nil),
+							Lcuuid:        common.GetUUIDByOrgID(g.orgID, networkID+cidr.String()),
 							NetworkLcuuid: networkID,
 							CIDR:          cidr.String(),
 							VPCLcuuid:     NetworkIDToVpcID[networkID],
@@ -314,7 +318,7 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	}
 	if g.defaultVpc {
 		vpc := cloudmodel.VPC{
-			Lcuuid:       common.GetUUID(g.defaultVpcName, uuid.Nil),
+			Lcuuid:       common.GetUUIDByOrgID(g.orgID, g.defaultVpcName),
 			Name:         g.defaultVpcName,
 			RegionLcuuid: g.regionUuid,
 		}

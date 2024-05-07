@@ -207,7 +207,7 @@ func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uu
 }
 
 // 根据采集器上报的接口信息，生成宿主机的接口和IP信息
-func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex string, excludeIPs []string) (
+func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNameRegex string, excludeIPs []string) (
 	[]model.Subnet, []model.VInterface, []model.IP, map[string][]model.Subnet, error,
 ) {
 	var retSubnets []model.Subnet
@@ -225,7 +225,7 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 	if genesis.GenesisService == nil {
 		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, errors.New("genesis service is nil")
 	}
-	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse(orgID)
 	if err != nil {
 		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, err
 	}

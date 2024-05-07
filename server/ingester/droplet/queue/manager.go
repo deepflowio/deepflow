@@ -104,7 +104,7 @@ func (m *Manager) RecvCommand(conn *net.UDPConn, remote *net.UDPAddr, operate ui
 		}
 		debug.SendToClient(conn, remote, 0, nil)
 	default:
-		log.Warningf("Trident Adapter recv unknown command(%v).", operate)
+		log.Warningf("Trident Adapter recv unknown command (%v).", operate)
 	}
 }
 

@@ -79,8 +79,8 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.24.0
 	go.opentelemetry.io/otel/sdk v1.24.0
 	go.opentelemetry.io/proto/otlp v1.1.0
-	golang.org/x/net v0.22.0
-	golang.org/x/sys v0.18.0
+	golang.org/x/net v0.24.0
+	golang.org/x/sys v0.19.0
 	google.golang.org/grpc v1.62.1
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -109,7 +109,7 @@ require (
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pyroscope-io/pyroscope v0.37.1
 	go.opentelemetry.io/collector/pdata v1.0.0
-	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
+	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	skywalking.apache.org/repo/goapi v0.0.0-20230712035303-201c1fb2d6ec
 )
 
@@ -243,13 +243,12 @@ require (
 	go.uber.org/goleak v1.1.12 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230426161633-7e06285ff160 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/sync v0.6.0
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/crypto v0.22.0 // indirect
+	golang.org/x/oauth2 v0.19.0 // indirect
+	golang.org/x/sync v0.7.0
+	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect

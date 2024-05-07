@@ -277,7 +277,7 @@ func (t *PrometheusLabelTable) updateDroppedTargets(droppedTargetIds []uint32, d
 	for _, droppedTargeIdKey := range droppedTargetIdKeys {
 		t.targetIDs.Del(droppedTargeIdKey)
 	}
-	log.Infof("prometheus update target_ids drop(%v)", droppedTargetIds)
+	log.Infof("prometheus update target_ids drop (%v)", droppedTargetIds)
 
 	droppedTargetMetricKeys, droppedMetriIds := []uint64{}, []uint32{}
 	t.metricTargetPair.Range(func(k uint64, v struct{}) bool {
@@ -294,7 +294,7 @@ func (t *PrometheusLabelTable) updateDroppedTargets(droppedTargetIds []uint32, d
 		t.metricTargetPair.Del(droppedTargetMetricKey)
 	}
 	if len(droppedTargetMetricKeys) > 0 {
-		log.Infof("prometheus update target_metrics drop metricIds(%v), drop targetMetric(%v)", droppedMetriIds, droppedTargetMetricKeys)
+		log.Infof("prometheus update target_metrics drop metricIds (%v), drop targetMetric (%v)", droppedMetriIds, droppedTargetMetricKeys)
 	}
 
 	droppedColumnIndexKeys := []uint64{}
@@ -313,7 +313,7 @@ func (t *PrometheusLabelTable) updateDroppedTargets(droppedTargetIds []uint32, d
 		t.labelColumnIndexs.Del(columnIndexKey)
 	}
 	if len(droppedColumnIndexKeys) > 0 {
-		log.Infof("prometheus update drop column_indexs(%v)", droppedColumnIndexKeys)
+		log.Infof("prometheus update drop column_indexs (%v)", droppedColumnIndexKeys)
 	}
 }
 
@@ -417,7 +417,7 @@ func (t *PrometheusLabelTable) updateTargetLabelIds(targetId uint32, targetLabel
 		}
 		return true
 	})
-	log.Infof("prometheus update target labels of target_id(%d) from %+v to %+v", targetId, oldLabelIds, targetLabelIDs)
+	log.Infof("prometheus update target labels of target_id (%d) from %+v to %+v", targetId, oldLabelIds, targetLabelIDs)
 	newLabelIds := oldLabelIds[:0]
 	newLabelIds = append(newLabelIds, targetLabelIDs...)
 	t.targetLabelIDs.Set(targetId, newLabelIds)

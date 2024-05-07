@@ -168,6 +168,7 @@ func (s *SkyWalkingAdapter) skywalkingTracesToExTraces(traces *query.Trace) *mod
 			AppInstance:     skywalkingSpan.ServiceInstanceName,
 			ServiceUname:    skywalkingSpan.ServiceCode,
 			RequestResource: *skywalkingSpan.EndpointName, // maybe overwrite by tags
+			SignalSource:    model.L7_FLOW_SIGNAL_SOURCE_OTEL,
 			Attribute:       s.swTagsToAttributes(skywalkingSpan.Tags),
 		}
 		s.swTagsToSpanRequestInfo(*skywalkingSpan.Layer, skywalkingSpan.Tags, &span)

@@ -959,6 +959,10 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 }
 
 func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, error) {
+	// Resource tag showtagvalues:
+	// Device resources, auto_instance, auto_service and resources without their own map, use device_map.
+	// Resources that have their own map, use their own map.
+
 	sqlSplit := strings.Fields(rawSql)
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
@@ -1039,7 +1043,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 			whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
 		}
 		sql = fmt.Sprintf(
-			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s",
+			"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid, icon_id FROM device_map %s GROUP BY value, display_name, device_type, uid, icon_id ORDER BY %s ASC %s",
 			whereSql, orderBy, limitSql,
 		)
 	} else if tag == "vpc" || tag == "l2_vpc" {
@@ -1054,7 +1058,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if tag == "policy" || tag == "npb_tunnel" {
 		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
-	} else if tag == "policy_name" {
+	} else if tag == "alarm_policy" {
 		sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM alarm_policy_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if tag == common.TAP_PORT_HOST || tag == common.TAP_PORT_CHOST || tag == common.TAP_PORT_POD_NODE || tag == common.CAPTURE_NIC_HOST || tag == common.CAPTURE_NIC_CHOST || tag == common.CAPTURE_NIC_POD_NODE {
 		if whereSql != "" {

@@ -19,7 +19,7 @@ package service
 import (
 	"testing"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 

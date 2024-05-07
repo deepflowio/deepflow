@@ -17,7 +17,6 @@
 package http
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -47,9 +46,7 @@ func HandleOrgIDMiddleware() gin.HandlerFunc {
 		var err error
 		var userType, userID int
 		userTypeString := ctx.Request.Header.Get(common.HEADER_KEY_X_USER_TYPE)
-		if userTypeString == "" {
-			log.Warningf("header is invalid: no %s", common.HEADER_KEY_X_USER_TYPE)
-		} else {
+		if len(userTypeString) != 0 {
 			userType, err = strconv.Atoi(userTypeString)
 			if err != nil {
 				ctx.Abort()
@@ -57,9 +54,7 @@ func HandleOrgIDMiddleware() gin.HandlerFunc {
 			}
 		}
 		userIDString := ctx.Request.Header.Get(common.HEADER_KEY_X_USER_ID)
-		if len(userIDString) == 0 {
-			err = errors.New(fmt.Sprintf("header is invalid: no %s", common.HEADER_KEY_X_USER_ID))
-		} else {
+		if len(userIDString) != 0 {
 			userID, err = strconv.Atoi(userIDString)
 			if err != nil {
 				ctx.Abort()

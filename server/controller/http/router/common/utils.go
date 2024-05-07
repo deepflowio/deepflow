@@ -19,11 +19,13 @@ package common
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 )
 
 func GetContextOrgDB(ctx *gin.Context) (*mysql.DB, error) {
@@ -37,4 +39,17 @@ func GetContextOrgDB(ctx *gin.Context) (*mysql.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+func GetContextOrgID(ctx *gin.Context) (int, error) {
+	orgID := mysqlcommon.DEFAULT_ORG_ID
+	orgIDString := ctx.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+	if orgIDString != "" {
+		oID, err := strconv.Atoi(orgIDString)
+		if err != nil {
+			return 0, err
+		}
+		orgID = oID
+	}
+	return orgID, nil
 }

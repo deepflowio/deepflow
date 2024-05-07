@@ -82,11 +82,11 @@ func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 func (g *Genesis) Start() {
 	ctx := context.Context(context.Background())
 	genesisSyncDataChan := make(chan GenesisSyncData)
-	kubernetesDataChan := make(chan map[string]KubernetesInfo)
-	prometheusDataChan := make(chan map[string]PrometheusInfo)
-	sQueue := queue.NewOverwriteQueue("genesis sync data", g.cfg.QueueLengths)
-	kQueue := queue.NewOverwriteQueue("genesis k8s data", g.cfg.QueueLengths)
-	pQueue := queue.NewOverwriteQueue("genesis prometheus data", g.cfg.QueueLengths)
+	kubernetesDataChan := make(chan map[int]map[string]KubernetesInfo)
+	prometheusDataChan := make(chan map[int]map[string]PrometheusInfo)
+	sQueue := queue.NewOverwriteQueue("genesis-sync-data", g.cfg.QueueLengths)
+	kQueue := queue.NewOverwriteQueue("genesis-k8s-data", g.cfg.QueueLengths)
+	pQueue := queue.NewOverwriteQueue("genesis-prometheus-data", g.cfg.QueueLengths)
 
 	// 由于可能需要从数据库恢复数据，这里先启动监听
 	go g.receiveGenesisSyncData(genesisSyncDataChan)
@@ -128,19 +128,37 @@ func (g *Genesis) receiveGenesisSyncData(sChan chan GenesisSyncData) {
 	}
 }
 
-func (g *Genesis) GetGenesisSyncData() GenesisSyncData {
-	return g.genesisSyncData.Load().(GenesisSyncData)
+func (g *Genesis) GetGenesisSyncData(orgID int) GenesisSyncDataResponse {
+	syncData := g.genesisSyncData.Load().(GenesisSyncData)
+	return GenesisSyncDataResponse{
+		IPLastSeens: syncData.IPLastSeens[orgID],
+		VIPs:        syncData.VIPs[orgID],
+		VMs:         syncData.VMs[orgID],
+		VPCs:        syncData.VPCs[orgID],
+		Hosts:       syncData.Hosts[orgID],
+		Lldps:       syncData.Lldps[orgID],
+		Ports:       syncData.Ports[orgID],
+		Networks:    syncData.Networks[orgID],
+		Vinterfaces: syncData.Vinterfaces[orgID],
+		Processes:   syncData.Processes[orgID],
+	}
 }
 
-func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
-	retGenesisSyncData := GenesisSyncData{}
+func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, error) {
+	retGenesisSyncData := GenesisSyncDataResponse{}
+
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get org id (%d) mysql session failed", orgID)
+		return retGenesisSyncData, err
+	}
 
 	var controllers []mysql.Controller
 	var azControllerConns []mysql.AZControllerConnection
 	var currentRegion string
 
-	mysql.Db.Where("state <> ?", common.CONTROLLER_STATE_EXCEPTION).Find(&controllers)
-	mysql.Db.Find(&azControllerConns)
+	db.Where("state <> ?", common.CONTROLLER_STATE_EXCEPTION).Find(&controllers)
+	db.Find(&azControllerConns)
 
 	controllerIPToRegion := make(map[string]string)
 	for _, conn := range azControllerConns {
@@ -168,7 +186,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 
 		// get effective vtap ids in current controller
 		var storages []model.GenesisStorage
-		mysql.Db.Where("node_ip = ?", controller.IP).Find(&storages)
+		db.Where("node_ip = ?", controller.IP).Find(&storages)
 		vtapIDMap := map[uint32]int{0: 0}
 		for _, storage := range storages {
 			vtapIDMap[storage.VtapID] = 0
@@ -189,7 +207,11 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 		defer conn.Close()
 
 		client := api.NewControllerClient(conn)
-		ret, err := client.GenesisSharingSync(context.Background(), &api.GenesisSharingSyncRequest{})
+		reqOrgID := uint32(orgID)
+		req := &api.GenesisSharingSyncRequest{
+			OrgId: &reqOrgID,
+		}
+		ret, err := client.GenesisSharingSync(context.Background(), req)
 		if err != nil {
 			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
 			log.Warning(msg)
@@ -428,19 +450,25 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 	return retGenesisSyncData, nil
 }
 
-func (g *Genesis) getServerIPs() ([]string, error) {
+func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get org id (%d) mysql session failed", orgID)
+		return []string{}, err
+	}
+
 	var serverIPs []string
 	var controllers []mysql.Controller
 	var azControllerConns []mysql.AZControllerConnection
 	var currentRegion string
 
 	nodeIP := os.Getenv(common.NODE_IP_KEY)
-	err := mysql.Db.Find(&azControllerConns).Error
+	err = db.Find(&azControllerConns).Error
 	if err != nil {
 		log.Warningf("query az_controller_connection failed (%s)", err.Error())
 		return []string{}, err
 	}
-	err = mysql.Db.Where("ip <> ? AND state <> ?", nodeIP, common.CONTROLLER_STATE_EXCEPTION).Find(&controllers).Error
+	err = db.Where("ip <> ? AND state <> ?", nodeIP, common.CONTROLLER_STATE_EXCEPTION).Find(&controllers).Error
 	if err != nil {
 		log.Warningf("query controller failed (%s)", err.Error())
 		return []string{}, err
@@ -470,7 +498,7 @@ func (g *Genesis) getServerIPs() ([]string, error) {
 	return serverIPs, nil
 }
 
-func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
+func (g *Genesis) receiveKubernetesData(kChan chan map[int]map[string]KubernetesInfo) {
 	for {
 		select {
 		case k := <-kChan:
@@ -481,26 +509,31 @@ func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
 	}
 }
 
-func (g *Genesis) GetKubernetesData(clusterID string) (KubernetesInfo, bool) {
-	k8sInterface, ok := g.kubernetesData.Load(clusterID)
+func (g *Genesis) GetKubernetesData(orgID int, clusterID string) (KubernetesInfo, bool) {
+	k8sDataInterface, ok := g.kubernetesData.Load(orgID)
 	if !ok {
-		log.Warningf("kubernetes data not found cluster id (%s)", clusterID)
+		log.Warningf("kubernetes data not found org_id (%d)", orgID)
 		return KubernetesInfo{}, false
 	}
-	k8sData, ok := k8sInterface.(KubernetesInfo)
+	k8sData, ok := k8sDataInterface.(map[string]KubernetesInfo)
 	if !ok {
-		log.Warning("kubernetes data interface assert failed")
+		log.Error("kubernetes data interface assert failed")
 		return KubernetesInfo{}, false
 	}
-	return k8sData, true
+	k8sInfo, ok := k8sData[clusterID]
+	if !ok {
+		log.Warningf("kubernetes data not found org_id %d cluster id (%s)", orgID, clusterID)
+		return KubernetesInfo{}, false
+	}
+	return k8sInfo, true
 }
 
-func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, error) {
+func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string][]string, error) {
 	k8sResp := map[string][]string{}
 
-	k8sInfo, ok := g.GetKubernetesData(clusterID)
+	k8sInfo, ok := g.GetKubernetesData(orgID, clusterID)
 
-	serverIPs, err := g.getServerIPs()
+	serverIPs, err := g.getServerIPs(orgID)
 	if err != nil {
 		return k8sResp, err
 	}
@@ -516,7 +549,9 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		defer conn.Close()
 
 		client := api.NewControllerClient(conn)
+		reqOrgID := uint32(orgID)
 		req := &api.GenesisSharingK8SRequest{
+			OrgId:     &reqOrgID,
 			ClusterId: &clusterID,
 		}
 		ret, err := client.GenesisSharingK8S(context.Background(), req)
@@ -576,7 +611,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 	return k8sResp, nil
 }
 
-func (g *Genesis) receivePrometheusData(pChan chan map[string]PrometheusInfo) {
+func (g *Genesis) receivePrometheusData(pChan chan map[int]map[string]PrometheusInfo) {
 	for {
 		select {
 		case p := <-pChan:
@@ -587,26 +622,31 @@ func (g *Genesis) receivePrometheusData(pChan chan map[string]PrometheusInfo) {
 	}
 }
 
-func (g *Genesis) GetPrometheusData(clusterID string) (PrometheusInfo, bool) {
-	prometheusInterface, ok := g.prometheusData.Load(clusterID)
+func (g *Genesis) GetPrometheusData(orgID int, clusterID string) (PrometheusInfo, bool) {
+	prometheusDataInterface, ok := g.prometheusData.Load(orgID)
+	if !ok {
+		log.Warningf("prometheus data not found org_id (%d)", orgID)
+		return PrometheusInfo{}, false
+	}
+	prometheusData, ok := prometheusDataInterface.(map[string]PrometheusInfo)
+	if !ok {
+		log.Error("prometheus data interface assert failed")
+		return PrometheusInfo{}, false
+	}
+	prometheusInfo, ok := prometheusData[clusterID]
 	if !ok {
 		log.Warningf("prometheus data not found cluster id (%s)", clusterID)
 		return PrometheusInfo{}, false
 	}
-	prometheusData, ok := prometheusInterface.(PrometheusInfo)
-	if !ok {
-		log.Warning("prometheus data interface assert failed")
-		return PrometheusInfo{}, false
-	}
-	return prometheusData, true
+	return prometheusInfo, true
 }
 
-func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.PrometheusTarget, error) {
+func (g *Genesis) GetPrometheusResponse(orgID int, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
 	prometheusEntries := []cloudmodel.PrometheusTarget{}
 
-	prometheusInfo, _ := g.GetPrometheusData(clusterID)
+	prometheusInfo, _ := g.GetPrometheusData(orgID, clusterID)
 
-	serverIPs, err := g.getServerIPs()
+	serverIPs, err := g.getServerIPs(orgID)
 	if err != nil {
 		return []cloudmodel.PrometheusTarget{}, err
 	}
@@ -621,7 +661,9 @@ func (g *Genesis) GetPrometheusResponse(clusterID string) ([]cloudmodel.Promethe
 		defer conn.Close()
 
 		client := api.NewControllerClient(conn)
+		reqOrgID := uint32(orgID)
 		req := &api.GenesisSharingPrometheusRequest{
+			OrgId:     &reqOrgID,
 			ClusterId: &clusterID,
 		}
 		ret, err := client.GenesisSharingPrometheus(context.Background(), req)

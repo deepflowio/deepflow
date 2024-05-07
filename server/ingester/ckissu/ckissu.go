@@ -146,6 +146,7 @@ type ColumnDatasourceAdds struct {
 	OldColumnNames             []string
 	ColumnTypes                []ckdb.ColumnType
 	OnlyMapTable, OnlyAppTable bool
+	DefaultValue               string
 }
 
 type ColumnDatasourceAdd struct {
@@ -153,6 +154,7 @@ type ColumnDatasourceAdd struct {
 	OldColumnName              string
 	ColumnType                 ckdb.ColumnType
 	OnlyMapTable, OnlyAppTable bool
+	DefaultValue               string
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
@@ -318,10 +320,11 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 		}
 		aggTable := d.name + "_agg"
 		addColumn := &ColumnAdd{
-			Db:         d.db,
-			Table:      aggTable,
-			ColumnName: add.ColumnName,
-			ColumnType: add.ColumnType,
+			Db:           d.db,
+			Table:        aggTable,
+			ColumnName:   add.ColumnName,
+			ColumnType:   add.ColumnType,
+			DefaultValue: add.DefaultValue,
 		}
 		if err := i.addColumn(connect, addColumn); err != nil {
 			return dones, err
@@ -336,7 +339,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	}
 
 	if len(dones) == 0 {
-		log.Infof("datasource db(%s) table(%s) already updated.", d.db, d.name)
+		log.Infof("datasource db (%s) table (%s) already updated.", d.db, d.name)
 		return nil, nil
 	}
 
@@ -1014,6 +1017,7 @@ func getColumnDatasourceAdds(columnDatasourceAddss []*ColumnDatasourceAdds) []*C
 				ColumnType:    columnAdds.ColumnTypes[i],
 				OnlyMapTable:  columnAdds.OnlyMapTable,
 				OnlyAppTable:  columnAdds.OnlyAppTable,
+				DefaultValue:  columnAdds.DefaultValue,
 			})
 		}
 	}
@@ -1029,7 +1033,7 @@ func (i *Issu) addColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnAdd, er
 			return dones, err
 		}
 		if version == common.CK_VERSION {
-			log.Infof("db(%s) table(%s) already updated", add.Db, add.Table)
+			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
 		}
 		if err := i.addColumn(connect, add); err != nil {
@@ -1067,11 +1071,11 @@ func (i *Issu) addIndexs(connect *sql.DB, orgIDPrefix string) ([]*IndexAdd, erro
 			return dones, err
 		}
 		if version == common.CK_VERSION {
-			log.Infof("db(%s) table(%s) already updated", add.Db, add.Table)
+			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
 		}
 		if err := i.addIndex(connect, add); err != nil {
-			log.Warningf("db(%s) table(%s) add index failed.err: %s", add.Db, add.Table, err)
+			log.Warningf("db (%s) table (%s) add index failed.err: %s", add.Db, add.Table, err)
 			continue
 		}
 		dones = append(dones, add)

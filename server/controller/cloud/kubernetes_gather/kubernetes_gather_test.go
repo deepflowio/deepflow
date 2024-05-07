@@ -85,9 +85,9 @@ func TestKubernetes(t *testing.T) {
 
 		g := genesis.NewGenesis(&config.ControllerConfig{})
 		vJsonData, _ := os.ReadFile("./testfiles/vinterfaces.json")
-		var vData genesis.GenesisSyncData
+		var vData genesis.GenesisSyncDataResponse
 		json.Unmarshal(vJsonData, &vData)
-		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis) (genesis.GenesisSyncData, error) {
+		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis, _ int) (genesis.GenesisSyncDataResponse, error) {
 			return vData, nil
 		})
 		defer vinterfacesInfoPatch.Reset()

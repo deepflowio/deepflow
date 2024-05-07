@@ -337,14 +337,14 @@ func (c *Config) Validate() error {
 		if watcher == nil {
 			watcher, err = NewWatcher(myNodeName, myPodName, myNamespace, c.CKDB.Host, c.CKDB.EndpointTCPPortName, c.CKDB.External, c.ControllerIPs, int(c.ControllerPort), c.GrpcBufferSize)
 			if err != nil {
-				log.Warningf("get kubernetes watcher failed %s", err)
+				log.Warningf("get kubernetes watcher failed: %s", err)
 				continue
 			}
 		}
 
 		endpoints, err := watcher.GetMyClickhouseEndpoints()
 		if err != nil {
-			log.Warningf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err)
+			log.Warningf("get clickhouse endpoints (%s) failed: %s", c.CKDB.Host, err)
 			continue
 		}
 		c.CKDB.ActualAddrs = c.CKDB.ActualAddrs[:0]
@@ -361,17 +361,17 @@ func (c *Config) Validate() error {
 
 		conns, err := common.NewCKConnections(c.CKDB.ActualAddrs, c.CKDBAuth.Username, c.CKDBAuth.Password)
 		if err != nil {
-			log.Warningf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddrs, err)
+			log.Warningf("connect to clickhouse %s failed: %s", c.CKDB.ActualAddrs, err)
 			continue
 		}
 
 		if err := CheckCluster(conns, c.CKDB.ClusterName); err != nil {
-			log.Errorf("get clickhouse cluster(%s) info from table 'system.clusters' failed, err: %s", c.CKDB.ClusterName, err)
+			log.Errorf("get clickhouse cluster (%s) info from table 'system.clusters' failed: %s", c.CKDB.ClusterName, err)
 			continue
 		}
 
 		if err := CheckStoragePolicy(conns, c.CKDB.StoragePolicy); err != nil {
-			log.Errorf("get clickhouse storage policy(%s) info from table 'system.storage_polices' failed, err: %s", c.CKDB.StoragePolicy, err)
+			log.Errorf("get clickhouse storage policy (%s) info from table 'system.storage_polices' failed: %s", c.CKDB.StoragePolicy, err)
 			continue
 		}
 		break

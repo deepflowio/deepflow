@@ -30,6 +30,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -94,7 +95,7 @@ func (s *SyncStorage) Renew(data GenesisSyncDataOperation) {
 	}
 }
 
-func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
+func (s *SyncStorage) Update(data GenesisSyncDataOperation, info VIFRPCMessage) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -140,16 +141,21 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		updateFlag = true
 		s.genesisSyncInfo.Processes.Update(data.Processes.Fetch(), now)
 	}
-	if updateFlag && vtapID != 0 {
+	if updateFlag && info.vtapID != 0 {
 		// push immediately after update
 		s.fetch()
 
+		db, err := mysql.GetDB(info.orgID)
+		if err != nil {
+			log.Errorf("get org id (%d) mysql session failed", info.orgID)
+			return
+		}
 		nodeIP := os.Getenv(common.NODE_IP_KEY)
-		mysql.Db.Clauses(clause.OnConflict{
+		db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "vtap_id"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
 		}).Create(&model.GenesisStorage{
-			VtapID: vtapID,
+			VtapID: info.vtapID,
 			NodeIP: nodeIP,
 		})
 	}
@@ -188,34 +194,34 @@ func (s *SyncStorage) loadFromDatabase(ageTime time.Duration) {
 	var vinterfaces []model.GenesisVinterface
 	var processes []model.GenesisProcess
 
-	s.genesisSyncInfo.VIPs = NewVIPPlatformDataOperation(vips)
+	s.genesisSyncInfo.VIPs = NewVIPPlatformDataOperation(mcommon.DEFAULT_ORG_ID, vips)
 	s.genesisSyncInfo.VIPs.Load(now, ageTime)
 
-	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation(vms)
+	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation(mcommon.DEFAULT_ORG_ID, vms)
 	s.genesisSyncInfo.VMs.Load(now, ageTime)
 
-	s.genesisSyncInfo.VPCs = NewVpcPlatformDataOperation(vpcs)
+	s.genesisSyncInfo.VPCs = NewVpcPlatformDataOperation(mcommon.DEFAULT_ORG_ID, vpcs)
 	s.genesisSyncInfo.VPCs.Load(now, ageTime)
 
-	s.genesisSyncInfo.Hosts = NewHostPlatformDataOperation(hosts)
+	s.genesisSyncInfo.Hosts = NewHostPlatformDataOperation(mcommon.DEFAULT_ORG_ID, hosts)
 	s.genesisSyncInfo.Hosts.Load(now, ageTime)
 
-	s.genesisSyncInfo.Ports = NewPortPlatformDataOperation(ports)
+	s.genesisSyncInfo.Ports = NewPortPlatformDataOperation(mcommon.DEFAULT_ORG_ID, ports)
 	s.genesisSyncInfo.Ports.Load(now, ageTime)
 
-	s.genesisSyncInfo.Lldps = NewLldpInfoPlatformDataOperation(lldps)
+	s.genesisSyncInfo.Lldps = NewLldpInfoPlatformDataOperation(mcommon.DEFAULT_ORG_ID, lldps)
 	s.genesisSyncInfo.Lldps.Load(now, ageTime)
 
-	s.genesisSyncInfo.IPlastseens = NewIPLastSeenPlatformDataOperation(ipLastSeens)
+	s.genesisSyncInfo.IPlastseens = NewIPLastSeenPlatformDataOperation(mcommon.DEFAULT_ORG_ID, ipLastSeens)
 	s.genesisSyncInfo.IPlastseens.Load(now, ageTime)
 
-	s.genesisSyncInfo.Networks = NewNetworkPlatformDataOperation(networks)
+	s.genesisSyncInfo.Networks = NewNetworkPlatformDataOperation(mcommon.DEFAULT_ORG_ID, networks)
 	s.genesisSyncInfo.Networks.Load(now, ageTime)
 
-	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(vinterfaces)
+	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(mcommon.DEFAULT_ORG_ID, vinterfaces)
 	s.genesisSyncInfo.Vinterfaces.Load(now, ageTime)
 
-	s.genesisSyncInfo.Processes = NewProcessPlatformDataOperation(processes)
+	s.genesisSyncInfo.Processes = NewProcessPlatformDataOperation(mcommon.DEFAULT_ORG_ID, processes)
 	s.genesisSyncInfo.Processes.Load(now, ageTime)
 
 	s.fetch()
@@ -243,27 +249,39 @@ func (s *SyncStorage) refreshDatabase() {
 
 	for range ticker.C {
 		// clean genesis storage invalid data
-		vTaps := []mysql.VTap{}
-		vTapIDs := map[int]bool{}
-		storages := []model.GenesisStorage{}
-		invalidStorages := []model.GenesisStorage{}
-		mysql.Db.Find(&vTaps)
+		orgIDs, err := mysql.GetORGIDs()
+		if err != nil {
+			log.Error("get org ids failed")
+			return
+		}
 		nodeIP := os.Getenv(common.NODE_IP_KEY)
-		mysql.Db.Where("node_ip = ?", nodeIP).Find(&storages)
-		for _, v := range vTaps {
-			vTapIDs[v.ID] = false
-		}
-		for _, s := range storages {
-			if _, ok := vTapIDs[int(s.VtapID)]; !ok {
-				invalidStorages = append(invalidStorages, s)
-			}
-		}
-		if len(invalidStorages) > 0 {
-			err := mysql.Db.Delete(&invalidStorages).Error
+		for _, orgID := range orgIDs {
+			db, err := mysql.GetDB(orgID)
 			if err != nil {
-				log.Errorf("node (%s) clean genesis storage invalid data failed: %s", nodeIP, err)
-			} else {
-				log.Infof("node (%s) clean genesis storage invalid data success", nodeIP)
+				log.Errorf("get org id (%d) mysql session failed", orgID)
+				continue
+			}
+			vTaps := []mysql.VTap{}
+			vTapIDs := map[int]bool{}
+			storages := []model.GenesisStorage{}
+			invalidStorages := []model.GenesisStorage{}
+			db.Find(&vTaps)
+			db.Where("node_ip = ?", nodeIP).Find(&storages)
+			for _, v := range vTaps {
+				vTapIDs[v.ID] = false
+			}
+			for _, s := range storages {
+				if _, ok := vTapIDs[int(s.VtapID)]; !ok {
+					invalidStorages = append(invalidStorages, s)
+				}
+			}
+			if len(invalidStorages) > 0 {
+				err := db.Delete(&invalidStorages).Error
+				if err != nil {
+					log.Errorf("node (%s) clean org (%d) genesis storage invalid data failed: %s", nodeIP, orgID, err)
+				} else {
+					log.Infof("node (%s) clean org (%d) genesis storage invalid data success", nodeIP, orgID)
+				}
 			}
 		}
 
@@ -316,12 +334,12 @@ type KubernetesStorage struct {
 	cfg            config.GenesisConfig
 	kCtx           context.Context
 	kCancel        context.CancelFunc
-	channel        chan map[string]KubernetesInfo
-	kubernetesData map[string]KubernetesInfo
+	channel        chan map[int]map[string]KubernetesInfo
+	kubernetesData map[int]map[string]KubernetesInfo
 	mutex          sync.Mutex
 }
 
-func NewKubernetesStorage(port, nPort int, cfg config.GenesisConfig, kChan chan map[string]KubernetesInfo, ctx context.Context) *KubernetesStorage {
+func NewKubernetesStorage(port, nPort int, cfg config.GenesisConfig, kChan chan map[int]map[string]KubernetesInfo, ctx context.Context) *KubernetesStorage {
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesStorage{
 		listenPort:     port,
@@ -330,7 +348,7 @@ func NewKubernetesStorage(port, nPort int, cfg config.GenesisConfig, kChan chan 
 		kCtx:           kCtx,
 		kCancel:        kCancel,
 		channel:        kChan,
-		kubernetesData: map[string]KubernetesInfo{},
+		kubernetesData: map[int]map[string]KubernetesInfo{},
 		mutex:          sync.Mutex{},
 	}
 }
@@ -339,49 +357,62 @@ func (k *KubernetesStorage) Clear() {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
-	k.kubernetesData = map[string]KubernetesInfo{}
+	k.kubernetesData = map[int]map[string]KubernetesInfo{}
 }
 
-func (k *KubernetesStorage) Add(newInfo KubernetesInfo) {
+func (k *KubernetesStorage) Add(orgID int, newInfo KubernetesInfo) {
 	k.mutex.Lock()
-	triggerFlag := false
-	// 上报消息中version未变化时，只更新epoch和error_msg
-	if oldInfo, ok := k.kubernetesData[newInfo.ClusterID]; ok && oldInfo.Version == newInfo.Version {
-		oldInfo.Epoch = newInfo.Epoch
-		oldInfo.ErrorMSG = newInfo.ErrorMSG
-		k.kubernetesData[newInfo.ClusterID] = oldInfo
+	unTriggerFlag := false
+	kubernetesData, ok := k.kubernetesData[orgID]
+	if ok {
+		// 上报消息中version未变化时，只更新epoch和error_msg
+		if oldInfo, ok := kubernetesData[newInfo.ClusterID]; ok && oldInfo.Version == newInfo.Version {
+			unTriggerFlag = true
+			oldInfo.Epoch = newInfo.Epoch
+			oldInfo.ErrorMSG = newInfo.ErrorMSG
+			kubernetesData[newInfo.ClusterID] = oldInfo
+		} else {
+			kubernetesData[newInfo.ClusterID] = newInfo
+		}
 	} else {
-		triggerFlag = true
-		k.kubernetesData[newInfo.ClusterID] = newInfo
+		k.kubernetesData[orgID] = map[string]KubernetesInfo{
+			newInfo.ClusterID: newInfo,
+		}
 	}
 	k.mutex.Unlock()
 
 	k.channel <- k.fetch()
 
-	if triggerFlag {
-		err := k.triggerCloudRrefresh(newInfo.ClusterID, newInfo.Version)
+	if !unTriggerFlag {
+		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
 		if err != nil {
 			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()))
 		}
 	}
 }
 
-func (k *KubernetesStorage) fetch() map[string]KubernetesInfo {
+func (k *KubernetesStorage) fetch() map[int]map[string]KubernetesInfo {
 	return k.kubernetesData
 }
 
-func (k *KubernetesStorage) triggerCloudRrefresh(clusterID string, version uint64) error {
+func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, version uint64) error {
 	var controllerIP, domainLcuuid, subDomainLcuuid string
 
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get org id (%d) mysql session failed", orgID)
+		return err
+	}
+
 	var subDomains []mysql.SubDomain
-	err := mysql.Db.Where("cluster_id = ?", clusterID).Find(&subDomains).Error
+	err = db.Where("cluster_id = ?", clusterID).Find(&subDomains).Error
 	if err != nil {
 		return err
 	}
 	var domain mysql.Domain
 	switch len(subDomains) {
 	case 0:
-		err = mysql.Db.Where("cluster_id = ? AND type = ?", clusterID, common.KUBERNETES).First(&domain).Error
+		err = db.Where("cluster_id = ? AND type = ?", clusterID, common.KUBERNETES).First(&domain).Error
 		if err != nil {
 			return err
 		}
@@ -389,7 +420,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(clusterID string, version uint6
 		domainLcuuid = domain.Lcuuid
 		subDomainLcuuid = domain.Lcuuid
 	case 1:
-		err = mysql.Db.Where("lcuuid = ? AND type = ?", subDomains[0].Domain, common.KUBERNETES).First(&domain).Error
+		err = db.Where("lcuuid = ? AND type = ?", subDomains[0].Domain, common.KUBERNETES).First(&domain).Error
 		if err != nil {
 			return err
 		}
@@ -401,7 +432,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(clusterID string, version uint6
 	}
 
 	var controller mysql.Controller
-	err = mysql.Db.Where("ip = ? AND state <> ?", controllerIP, common.CONTROLLER_STATE_EXCEPTION).First(&controller).Error
+	err = db.Where("ip = ? AND state <> ?", controllerIP, common.CONTROLLER_STATE_EXCEPTION).First(&controller).Error
 	if err != nil {
 		return err
 	}
@@ -419,7 +450,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(clusterID string, version uint6
 		"version":           strconv.Itoa(int(version)),
 	}
 
-	log.Debugf("trigger cloud (%s) kubernetes (%s) refresh version (%d)", requestUrl, clusterID, version)
+	log.Debugf("trigger cloud (%s) org (%d) kubernetes (%s) refresh version (%d)", requestUrl, orgID, clusterID, version)
 
 	return gcommon.RequestGet(requestUrl, 30, queryStrings)
 }
@@ -429,11 +460,13 @@ func (k *KubernetesStorage) run() {
 		time.Sleep(time.Duration(k.cfg.DataPersistenceInterval) * time.Second)
 		now := time.Now()
 		k.mutex.Lock()
-		for key, s := range k.kubernetesData {
-			if now.Sub(s.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
-				continue
+		for _, kubernetesData := range k.kubernetesData {
+			for key, s := range kubernetesData {
+				if now.Sub(s.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
+					continue
+				}
+				delete(kubernetesData, key)
 			}
-			delete(k.kubernetesData, key)
 		}
 		k.mutex.Unlock()
 
@@ -455,19 +488,19 @@ type PrometheusStorage struct {
 	cfg            config.GenesisConfig
 	kCtx           context.Context
 	kCancel        context.CancelFunc
-	channel        chan map[string]PrometheusInfo
-	prometheusData map[string]PrometheusInfo
+	channel        chan map[int]map[string]PrometheusInfo
+	prometheusData map[int]map[string]PrometheusInfo
 	mutex          sync.Mutex
 }
 
-func NewPrometheusStorage(cfg config.GenesisConfig, pChan chan map[string]PrometheusInfo, ctx context.Context) *PrometheusStorage {
+func NewPrometheusStorage(cfg config.GenesisConfig, pChan chan map[int]map[string]PrometheusInfo, ctx context.Context) *PrometheusStorage {
 	pCtx, pCancel := context.WithCancel(ctx)
 	return &PrometheusStorage{
 		cfg:            cfg,
 		kCtx:           pCtx,
 		kCancel:        pCancel,
 		channel:        pChan,
-		prometheusData: map[string]PrometheusInfo{},
+		prometheusData: map[int]map[string]PrometheusInfo{},
 		mutex:          sync.Mutex{},
 	}
 }
@@ -476,24 +509,31 @@ func (p *PrometheusStorage) Clear() {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	p.prometheusData = map[string]PrometheusInfo{}
+	p.prometheusData = map[int]map[string]PrometheusInfo{}
 }
 
-func (p *PrometheusStorage) Add(isUpdate bool, newInfo PrometheusInfo) {
+func (p *PrometheusStorage) Add(orgID int, isUpdate bool, newInfo PrometheusInfo) {
 	p.mutex.Lock()
-	if oldInfo, ok := p.prometheusData[newInfo.ClusterID]; ok && !isUpdate {
-		oldInfo.Epoch = newInfo.Epoch
-		oldInfo.ErrorMSG = newInfo.ErrorMSG
-		p.prometheusData[newInfo.ClusterID] = oldInfo
+	prometheusData, ok := p.prometheusData[orgID]
+	if ok {
+		if oldInfo, ok := prometheusData[newInfo.ClusterID]; ok && !isUpdate {
+			oldInfo.Epoch = newInfo.Epoch
+			oldInfo.ErrorMSG = newInfo.ErrorMSG
+			prometheusData[newInfo.ClusterID] = oldInfo
+		} else {
+			prometheusData[newInfo.ClusterID] = newInfo
+		}
 	} else {
-		p.prometheusData[newInfo.ClusterID] = newInfo
+		p.prometheusData[orgID] = map[string]PrometheusInfo{
+			newInfo.ClusterID: newInfo,
+		}
 	}
 	p.mutex.Unlock()
 
 	p.channel <- p.fetch()
 }
 
-func (p *PrometheusStorage) fetch() map[string]PrometheusInfo {
+func (p *PrometheusStorage) fetch() map[int]map[string]PrometheusInfo {
 	return p.prometheusData
 }
 
@@ -502,11 +542,13 @@ func (p *PrometheusStorage) run() {
 		time.Sleep(time.Duration(p.cfg.DataPersistenceInterval) * time.Second)
 		now := time.Now()
 		p.mutex.Lock()
-		for key, s := range p.prometheusData {
-			if now.Sub(s.Epoch) <= time.Duration(p.cfg.AgingTime)*time.Second {
-				continue
+		for _, prometheusData := range p.prometheusData {
+			for key, s := range prometheusData {
+				if now.Sub(s.Epoch) <= time.Duration(p.cfg.AgingTime)*time.Second {
+					continue
+				}
+				delete(prometheusData, key)
 			}
-			delete(p.prometheusData, key)
 		}
 		p.mutex.Unlock()
 		p.channel <- p.fetch()

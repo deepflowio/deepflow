@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 )
 
@@ -55,36 +56,42 @@ func (c *VTapCounter) SetNull(vtapName string) {
 	counter.Weight = 0
 }
 
-func (c *VTapCounter) SetCounter(vtapName string, weight float64, isChanged uint64) {
+func (c *VTapCounter) SetCounter(db *mysql.DB, teamID int, vtapName string, weight float64, isChanged uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if counter, ok := c.VTapNameCounter[vtapName]; ok {
 		if counter.Weight != weight || counter.IsAnalyzerChanged != isChanged {
-			log.Infof("agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
-				vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged)
+			log.Infof("ORG(id=%d database=%s) agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
+				db.ORGID, db.Name, vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged)
 		}
 		counter.Weight = weight
 		counter.IsAnalyzerChanged = isChanged
+		counter.ORGID = uint16(db.ORGID)
+		counter.TeamID = uint16(teamID)
 		return
 	}
 
 	newCounter := &GetVTapWeightCounter{
 		Name: vtapName,
 		VTapWeightCounter: &VTapWeightCounter{
+			ORGID:             uint16(db.ORGID),
+			TeamID:            uint16(teamID),
 			Weight:            weight,
 			IsAnalyzerChanged: isChanged,
 		},
 	}
 	c.VTapNameCounter[vtapName] = newCounter
 	b, _ := json.Marshal(newCounter.VTapWeightCounter)
-	log.Infof("agent(%v) register counter: %v", vtapName, string(b))
+	log.Infof("ORG(id=%d database=%s) agent(%v) register counter: %v", db.ORGID, db.Name, vtapName, string(b))
 	err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer_alloc", newCounter, stats.OptionStatTags{"host": vtapName})
 	if err != nil {
-		log.Error(err)
+		log.Errorf("ORG(id=%d database=%s) %s", db.ORGID, db.Name, err.Error())
 	}
 }
 
 type VTapWeightCounter struct {
+	ORGID             uint16  `statsd:"org_id"`
+	TeamID            uint16  `statsd:"team_id"`
 	Weight            float64 `statsd:"weight"`
 	IsAnalyzerChanged uint64  `statsd:"is_analyzer_changed"`
 }

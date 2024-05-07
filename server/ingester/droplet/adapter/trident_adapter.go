@@ -166,7 +166,7 @@ func cacheLookup(dispatcher *tridentDispatcher, packet *packetBuffer, cacheSize 
 	// 倒退
 	if seq < dispatcher.seq {
 		if timestamp > dispatcher.maxTimestamp { // 序列号更小但时间更大，trident重启
-			log.Warningf("trident %v index %d restart but some packets lost, received timestamp %d > %d, reset sequence to max(%d-%d, %d).",
+			log.Warningf("trident %v index %d restart but some packets lost, received timestamp %d > %d, reset sequence to max (%d-%d, %d).",
 				packet.tridentIp, packet.decoder.tridentDispatcherIndex,
 				timestamp, dispatcher.maxTimestamp, seq, cacheSize, 1)
 			// 重启前的包如果还在cache中一定存在丢失的部分，直接抛弃且不计数。

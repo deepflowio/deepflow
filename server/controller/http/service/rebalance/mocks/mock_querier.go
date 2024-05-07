@@ -7,6 +7,7 @@ package mocks
 import (
 	reflect "reflect"
 
+	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -34,16 +35,16 @@ func (m *MockQuerier) EXPECT() *MockQuerierMockRecorder {
 }
 
 // GetAgentDispatcher mocks base method.
-func (m *MockQuerier) GetAgentDispatcher(domainPrefix string, dataDuration int) (map[string]int64, error) {
+func (m *MockQuerier) GetAgentDispatcher(db *mysql.DB, domainPrefix string, dataDuration int) (map[string]int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAgentDispatcher", domainPrefix, dataDuration)
+	ret := m.ctrl.Call(m, "GetAgentDispatcher", db, domainPrefix, dataDuration)
 	ret0, _ := ret[0].(map[string]int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAgentDispatcher indicates an expected call of GetAgentDispatcher.
-func (mr *MockQuerierMockRecorder) GetAgentDispatcher(domainPrefix, dataDuration interface{}) *gomock.Call {
+func (mr *MockQuerierMockRecorder) GetAgentDispatcher(db, domainPrefix, dataDuration interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAgentDispatcher", reflect.TypeOf((*MockQuerier)(nil).GetAgentDispatcher), domainPrefix, dataDuration)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAgentDispatcher", reflect.TypeOf((*MockQuerier)(nil).GetAgentDispatcher), db, domainPrefix, dataDuration)
 }
