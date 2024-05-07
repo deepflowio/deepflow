@@ -40,8 +40,9 @@ func GetVirtualTableFilter(db, table string) (view.Node, bool) {
 	return nil, false
 }
 
-func GetMetricIDFilter(db, table string) (view.Node, error) {
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+func GetMetricIDFilter(e *CHEngine) (view.Node, error) {
+	table := e.Table
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return nil, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)

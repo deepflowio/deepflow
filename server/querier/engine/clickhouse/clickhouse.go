@@ -972,7 +972,8 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 		}
 		targetOriginFilterStr := strings.Join(trgetOriginFilters, " AND ")
 		prometheusSubqueryCache := GetPrometheusSubqueryCache()
-		targetFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(targetOriginFilterStr)
+		entryKey := common.EntryKey{ORGID: e.ORGID, Filter: targetOriginFilterStr}
+		targetFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(entryKey)
 		if ok {
 			filter := targetFilter.Filter
 			filterTime := targetFilter.Time
@@ -1027,12 +1028,12 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 			op := view.Operator{Type: view.AND}
 			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
 			entryValue := common.EntryValue{Time: time.Now(), Filter: targetFilter}
-			prometheusSubqueryCache.PrometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
+			prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
 		} else if len(targetIDs) >= config.Cfg.MaxCacheableEntrySize {
 			// When you find that you can't join the cache,
 			// insert a special value into the cache so that the next time you check the cache, you will find
 			entryValue := common.EntryValue{Time: time.Now(), Filter: INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY}
-			prometheusSubqueryCache.PrometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
+			prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
 
 			targetFilter := fmt.Sprintf("toUInt64(target_id) IN (%s)", sql)
 			rightExpr := &view.Expr{Value: targetFilter}
@@ -1102,7 +1103,7 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 				table = "deepflow_system"
 			} else if e.DB == chCommon.DB_NAME_PROMETHEUS {
 				whereStmt := Where{}
-				metricIDFilter, err := GetMetricIDFilter(e.DB, e.Table)
+				metricIDFilter, err := GetMetricIDFilter(e)
 				if err != nil {
 					return err
 				}
@@ -1296,7 +1297,7 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
-		notNullExpr, ok := GetNotNullFilter(groupTag, e.AsTagMap, e.DB, e.Table)
+		notNullExpr, ok := GetNotNullFilter(groupTag, e)
 		if !ok {
 			return nil
 		}
@@ -1401,7 +1402,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 				functionAs = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
 			}
 		}
-		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy, derivativeArgs)
+		function, levelFlag, unit, err := GetAggFunc(name, args, functionAs, derivativeArgs, e)
 		if err != nil {
 			return err
 		}
@@ -1416,7 +1417,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return nil
 		}
 		args[0] = strings.Trim(args[0], "`")
-		tagFunction, err := GetTagFunction(name, args, as, e.DB, e.Table)
+		tagFunction, err := GetTagFunction(name, args, as, e)
 		if err != nil {
 			return err
 		}
@@ -1468,7 +1469,7 @@ func (e *CHEngine) parseFunction(item *sqlparser.FuncExpr) (name string, args []
 						if !slices.Contains(e.DerivativeGroupBy, originArg) {
 							tagTranslatorStr := originArg
 							if strings.Contains(originArg, "tag") {
-								tagTranslatorStr = GetPrometheusGroup(originArg, e.Table, e.AsTagMap)
+								tagTranslatorStr = GetPrometheusGroup(originArg, e)
 							} else {
 								tagItem, ok := tag.GetTag(name, e.DB, e.Table, "default")
 								if ok {
@@ -1529,7 +1530,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if err != nil {
 			return nil, err
 		}
-		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table, e.Context, e.IsDerivative, e.DerivativeGroupBy, derivativeArgs)
+		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", derivativeArgs, e)
 		if err != nil {
 			return nil, err
 		}
@@ -1542,7 +1543,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			}
 			return aggfunction.(Function), nil
 		}
-		tagFunction, err := GetTagFunction(name, args, "", e.DB, e.Table)
+		tagFunction, err := GetTagFunction(name, args, "", e)
 		if err != nil {
 			return nil, err
 		}
@@ -1568,7 +1569,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		}
-		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.Context)
+		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
 		if ok {
 			return &Field{Value: metricStruct.DBField}, nil
 		}
@@ -1580,7 +1581,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 }
 
 func (e *CHEngine) AddGroup(group string) error {
-	stmts, err := GetGroup(group, e.AsTagMap, e.DB, e.Table)
+	stmts, err := GetGroup(group, e)
 	if err != nil {
 		return err
 	}
@@ -1597,7 +1598,7 @@ func (e *CHEngine) AddTable(table string) {
 
 func (e *CHEngine) AddTag(tag string, alias string) (string, error) {
 
-	stmts, labelType, err := GetTagTranslator(tag, alias, e.DB, e.Table)
+	stmts, labelType, err := GetTagTranslator(tag, alias, e)
 
 	if err != nil {
 		return labelType, err
@@ -1606,7 +1607,7 @@ func (e *CHEngine) AddTag(tag string, alias string) (string, error) {
 		e.Statements = append(e.Statements, stmts...)
 		return labelType, nil
 	}
-	stmt, err := GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
+	stmt, err := GetMetricsTag(tag, alias, e)
 	if err != nil {
 		return labelType, err
 	}
@@ -1681,7 +1682,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
+			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID)
 			if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
 				whereTag = metricStruct.DBField
 			}
