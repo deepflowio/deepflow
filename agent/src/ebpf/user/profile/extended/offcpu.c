@@ -47,6 +47,7 @@
 #include "../profile_common.h"
 
 bool g_enable_offcpu;
+static u64 g_min_block_us = 1;
 
 #define LOG_OFFCPU_TAG      "[OFFCPU] "
 
@@ -159,6 +160,7 @@ int extended_reader_create(struct bpf_tracer *tracer)
 			      MAP_OFFCPU_STACK_A_NAME, MAP_OFFCPU_STACK_B_NAME,
 			      true, true);
 
+	set_offcpu_minblock_time(g_min_block_us);
 	set_bpf_run_enabled(tracer, &offcpu_ctx, 0);
 
 	struct bpf_perf_reader *reader_a, *reader_b;
@@ -244,6 +246,38 @@ int disable_offcpu_profiler(void)
 	return 0;
 }
 
+int set_offcpu_minblock_time(u32 block_time)
+{
+	if (!g_enable_offcpu) {
+		ebpf_warning(LOG_OFFCPU_TAG
+			     "Off-CPU profiling is currently disabled.");
+		return (-1);
+	}
+
+	struct bpf_tracer *t = profiler_tracer;
+	if (t == NULL) {
+		ebpf_warning(LOG_OFFCPU_TAG
+			     "The profiler is currently not established.");
+		return (-1);
+	}
+
+	u64 block_us = block_time;
+	if (bpf_table_set_value(t, offcpu_ctx.state_map_name,
+				MINBLOCK_TIME_IDX, (void *)&block_us) == false) {
+		ebpf_warning("%sprofiler state map update error."
+			     "(%s block_us %lu) - errno %d (%s)\n",
+			     LOG_OFFCPU_TAG, offcpu_ctx.state_map_name,
+			     block_us, errno, strerror(errno));
+		return (-1);
+	}
+
+	g_min_block_us = block_time;
+	ebpf_info(LOG_OFFCPU_TAG "%s() success, g_min_block_us: %d\n", __func__,
+		  g_min_block_us);
+
+	return 0;
+}
+
 #else /* defined AARCH64_MUSL */
 int extended_reader_create(struct bpf_tracer *tracer)
 {
@@ -261,6 +295,11 @@ int enable_offcpu_profiler(void)
 }
 
 int disable_offcpu_profiler(void)
+{
+	return 0;
+}
+
+int set_offcpu_minblock_time(u32 block_time)
 {
 	return 0;
 }

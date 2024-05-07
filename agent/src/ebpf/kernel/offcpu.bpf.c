@@ -116,9 +116,15 @@ static inline __u64 fetch_delta_time(int curr_pid, int offcpu_pid)
 	 * If overhead remains an issue, you can check the 'MINBLOCK_US' tunable parameter
 	 * in the code. If your goal is to trace longer blocking events, then increasing
 	 * this parameter can filter out shorter blocking events, further reducing overhead.
+	 * Additionally, we will not collect events with a block time exceeding 1 hour.
 	 */
 	__u64 delta_us = delta_ns / 1000;
-	if ((delta_us < MINBLOCK_US) || (delta_us > MAXBLOCK_US))
+	__u32 count_idx = MINBLOCK_TIME_IDX;
+	__u64 *min_block_ts_ptr = offcpu_state_map__lookup(&count_idx);
+	if (min_block_ts_ptr == NULL)
+		return 0;
+
+	if ((delta_us < *min_block_ts_ptr) || (delta_us > MAXBLOCK_US))
 		return 0;
 
 	return delta_ns;

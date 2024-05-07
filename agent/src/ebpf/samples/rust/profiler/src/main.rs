@@ -25,11 +25,11 @@ use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
 lazy_static::lazy_static! {
-    static ref SUM: Mutex<u64> = Mutex::new(0);
+    static ref SUM: Mutex<u32> = Mutex::new(0);
 }
 
 lazy_static::lazy_static! {
-    static ref COUNTER: Mutex<u64> = Mutex::new(0);
+    static ref COUNTER: Mutex<u32> = Mutex::new(0);
 }
 
 #[allow(dead_code)]
@@ -79,7 +79,7 @@ fn cp_container_id_safe(cp: *mut stack_profile_data) -> String {
     }
 }
 
-fn increment_counter(num: u64, counter_type: u32) {
+fn increment_counter(num: u32, counter_type: u32) {
     if counter_type == 0 {
         let mut counter = COUNTER.lock().unwrap();
         *counter += num;
@@ -143,7 +143,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     }
 }
 
-fn get_counter(counter_type: u64) -> u64 {
+fn get_counter(counter_type: u32) -> u32 {
     if counter_type == 0 {
         *COUNTER.lock().unwrap()
     } else {
@@ -183,7 +183,7 @@ fn main() {
         }
 
         enable_offcpu_profiler();
-        enable_oncpu_profiler();
+        disable_oncpu_profiler();
 
         // Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
@@ -208,7 +208,7 @@ fn main() {
 
         // CPUID will not be included in the aggregation of stack trace data.
         set_profiler_cpu_aggregation(0);
-
+        set_offcpu_minblock_time(10);
         bpf_tracer_finish();
 
         if cpdbg_set_config(600, debug_callback) != 0 {

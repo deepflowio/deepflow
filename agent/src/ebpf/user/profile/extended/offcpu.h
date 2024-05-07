@@ -43,5 +43,6 @@ do {								\
 
 int extended_reader_create(struct bpf_tracer *tracer);
 int set_offcpu_profiler_regex(const char *pattern);
+int set_offcpu_minblock_time(u32 block_time);
 
 #endif /*DF_USER_OFFCPU_H */

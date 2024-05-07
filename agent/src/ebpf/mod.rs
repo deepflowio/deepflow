@@ -657,7 +657,9 @@ extern "C" {
     pub fn disable_offcpu_profiler() -> c_int;
     pub fn enable_oncpu_profiler() -> c_int;
     pub fn disable_oncpu_profiler() -> c_int;
-    
+    pub fn set_offcpu_minblock_time(
+        block_time: c_uint,
+    ) -> c_int;
 }
 
 #[no_mangle]

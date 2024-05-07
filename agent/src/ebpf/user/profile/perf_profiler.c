@@ -180,7 +180,7 @@ static void print_cp_data(stack_trace_msg_t * msg)
 	snprintf(buff, sizeof(buff),
 		 "%s [cpdbg] netns_id %lu container_id %s pid %u tid %u "
 		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
-		 " %u cpu %u count %lu tiemstamp %lu datalen %u data %s\n",
+		 " %u cpu %u count %u tiemstamp %lu datalen %u data %s\n",
 		 timestamp, msg->netns_id, cid, msg->pid, msg->tid,
 		 msg->process_name, msg->comm, msg->stime,
 		 msg->u_stack_id,
@@ -616,10 +616,10 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * msg)
 	char str[len];
 	/* profile regex match ? */
 	if (msg->stime > 0)
-		snprintf(str, len, "%s (%d);%s %lu\n", msg->process_name,
+		snprintf(str, len, "%s (%d);%s %u\n", msg->process_name,
 			 msg->pid, msg->data, msg->count);
 	else
-		snprintf(str, len, "%s;%s %lu\n", msg->process_name,	/*msg->pid, */
+		snprintf(str, len, "%s;%s %u\n", msg->process_name,	/*msg->pid, */
 			 msg->data, msg->count);
 
 	os_puts(folded_file, str, strlen(str), false);

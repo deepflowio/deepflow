@@ -37,7 +37,7 @@ typedef enum {
 	ERROR_IDX,		/* Count the number of failed push notifications. */
 	ENABLE_IDX,		/* Enable profiler sampling flag.
 				   0: disable sampling; 1: enable sampling. */
-
+	MINBLOCK_TIME_IDX,	/* The minimum blocking time, applied in the profiler extension.*/
 	PROFILER_CNT
 } profiler_idx;
 

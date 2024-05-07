@@ -109,6 +109,7 @@ void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 			     "(%s enable_flag %lu) - %s\n",
 			     ctx->tag, ctx->state_map_name, enable_flag,
 			     strerror(errno));
+		return;
 	}
 
 	ctx->enable_bpf_profile = enable_flag;
@@ -612,7 +613,8 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	if (ctx->use_delta_time)
-		msg->count = v->duration_ns;
+		// Using microseconds for storage.
+		msg->count = v->duration_ns / 1000;
 	else
 		msg->count = 1;
 	msg->data_ptr = pointer_to_uword(&msg->data[0]);

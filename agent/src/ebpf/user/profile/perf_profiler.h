@@ -104,6 +104,10 @@ typedef struct {
  *   The profiler captures the number of occurrences of the same
  *   data by querying with the quadruple
  *   "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+ *     1.1936h
+ *   In the sampling scenario, the number of samples is used; in the
+ *   non-sampling scenario, real-time intervals (in Microseconds) are
+ *   used. Range: [1, 2^32-1)us
  * @comm
  *   comm in task_struct(linux kernel), always 16 bytes
  *   If the capture is a process, fill in the process name here.
@@ -131,7 +135,7 @@ typedef struct {
 	u32 u_stack_id;
 	u32 k_stack_id;
 	u32 cpu;
-	u64 count;
+	u32 count;
 	u8 comm[TASK_COMM_LEN];
 	u8 process_name[TASK_COMM_LEN];
 	u8 container_id[CONTAINER_ID_SIZE];
