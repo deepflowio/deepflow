@@ -115,6 +115,7 @@ type StaticConfig struct {
 	NtpMaxInterval                     *string                     `yaml:"ntp-max-interval,omitempty"`
 	NtpMinInterval                     *string                     `yaml:"ntp-min-interval,omitempty"`
 	DispatcherQueue                    *bool                       `yaml:"dispatcher-queue,omitempty"`
+	EbpfCollectorQueueSize             *int                        `yaml:"ebpf-collector-queue-size,omitempty"`
 }
 
 type XflowCollectorConfig struct {
