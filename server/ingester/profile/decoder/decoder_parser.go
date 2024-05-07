@@ -53,7 +53,7 @@ type processTracer struct {
 	pid       uint32
 	stime     int64
 	eventType string
-	value     uint64
+	value     uint32
 }
 
 // implement storage.Putter

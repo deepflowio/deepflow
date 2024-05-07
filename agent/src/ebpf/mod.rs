@@ -386,10 +386,10 @@ pub struct stack_profile_data {
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
      * Note:
      * In the sampling scenario, the number of samples is used; in the
-     * non-sampling scenario, real-time intervals (in nanoseconds) are
+     * non-sampling scenario, real-time intervals (in Microseconds) are
      * used.
      */
-    pub count: u64,
+    pub count: u32,
     /*
      * comm in task_struct(linux kernel), always 16 bytes
      * If the capture is a process, fill in the process name here.
@@ -657,6 +657,7 @@ extern "C" {
     pub fn disable_offcpu_profiler() -> c_int;
     pub fn enable_oncpu_profiler() -> c_int;
     pub fn disable_oncpu_profiler() -> c_int;
+    
 }
 
 #[no_mangle]
