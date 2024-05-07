@@ -209,7 +209,7 @@ func (l7 *L7FlowLog) EncodeToOtlp(utags *utag.UniversalTagsManager, dataTypeBits
 	if dataTypeBits&config.CAPTURE_INFO != 0 {
 		putStrWithoutEmpty(resAttrs, "df.capture_info.signal_source", datatype.SignalSource(l7.SignalSource).String())
 		putStrWithoutEmpty(resAttrs, "df.capture_info.nat_source", datatype.NATSource(l7.NatSource).String())
-		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic", datatype.TapPort(l7.TapPort).String())
+		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic", datatype.TapPortValueToString(l7.TapPort, l7.TapPortType, datatype.TunnelType(l7.TunnelType)))
 		putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic_type", tapPortTypeToString(l7.TapPortType))
 		// todo suport TapPortName
 		// putStrWithoutEmpty(resAttrs, "df.capture_info.capture_nic_name", tags0.TapPortName)
