@@ -41,29 +41,26 @@ use crate::ebpf::{
     self, set_allow_port_bitmap, set_bypass_port_bitmap, set_profiler_cpu_aggregation,
     set_profiler_regex, set_protocol_ports_bitmap, start_continuous_profiler,
 };
+use crate::exception::ExceptionHandler;
 use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
 use crate::policy::PolicyGetter;
 use crate::utils::stats;
+
 use public::{
     buffer::BatchedBox,
-    counter::{Counter, CounterType, CounterValue, OwnedCountable},
+    counter::{Countable, Counter, CounterType, CounterValue, OwnedCountable},
     debug::QueueDebugger,
     l7_protocol::L7Protocol,
     leaky_bucket::LeakyBucket,
-    proto::{common::TridentType, metric},
+    proto::{common::TridentType, metric, trident::Exception},
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
 
 pub struct EbpfCounter {
     rx: AtomicU64,
-}
-
-impl EbpfCounter {
-    fn get_rx(&self) -> u64 {
-        self.rx.swap(0, Ordering::Relaxed)
-    }
+    get_token_failed: AtomicU64,
 }
 
 pub struct SyncEbpfCounter {
@@ -72,7 +69,8 @@ pub struct SyncEbpfCounter {
 
 impl OwnedCountable for SyncEbpfCounter {
     fn get_counters(&self) -> Vec<Counter> {
-        let rx = self.counter.get_rx();
+        let rx = self.counter.rx.swap(0, Ordering::Relaxed);
+        let get_token_failed = self.counter.get_token_failed.swap(0, Ordering::Relaxed);
         let ebpf_counter = unsafe { ebpf::socket_tracer_stats() };
 
         vec![
@@ -80,6 +78,11 @@ impl OwnedCountable for SyncEbpfCounter {
                 "collector_in",
                 CounterType::Counted,
                 CounterValue::Unsigned(rx),
+            ),
+            (
+                "get_token_failed",
+                CounterType::Counted,
+                CounterValue::Unsigned(get_token_failed),
             ),
             (
                 "perf_pages_count",
@@ -201,7 +204,7 @@ struct EbpfDispatcher {
 impl EbpfDispatcher {
     const FLOW_MAP_SIZE: usize = 1 << 14;
 
-    fn run(&self, counter: Arc<EbpfCounter>) {
+    fn run(&self, counter: Arc<EbpfCounter>, exception_handler: ExceptionHandler) {
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
             self.flow_output.clone(),
@@ -241,6 +244,8 @@ impl EbpfDispatcher {
 
             for mut packet in batch.drain(..) {
                 if !leaky_bucket.acquire(1) {
+                    counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
+                    exception_handler.set(Exception::RxPpsThresholdExceeded);
                     continue;
                 }
 
@@ -283,6 +288,8 @@ pub struct EbpfCollector {
     thread_handle: Option<JoinHandle<()>>,
 
     counter: Arc<EbpfCounter>,
+
+    exception_handler: ExceptionHandler,
 }
 
 static mut SWITCH: bool = false;
@@ -648,6 +655,7 @@ impl EbpfCollector {
         ebpf_profile_sender: DebugSender<Profile>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
+        exception_handler: ExceptionHandler,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
         if ebpf_config.ebpf.disabled {
@@ -655,8 +663,17 @@ impl EbpfCollector {
             return Err(Error::EbpfDisabled);
         }
         info!("ebpf collector init...");
-        let (sender, receiver, _) =
-            bounded_with_debug(4096, "0-ebpf-packet-to-ebpf-dispatcher", queue_debugger);
+        let queue_name = "0-ebpf-to-ebpf-collector";
+        let (sender, receiver, counter) =
+            bounded_with_debug(ebpf_config.queue_size, queue_name, queue_debugger);
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                stats::StatsOption::Tag("module", queue_name.to_string()),
+                stats::StatsOption::Tag("index", 0.to_string()),
+            ],
+        );
 
         Self::ebpf_init(
             &ebpf_config,
@@ -689,7 +706,9 @@ impl EbpfCollector {
             thread_handle: None,
             counter: Arc::new(EbpfCounter {
                 rx: AtomicU64::new(0),
+                get_token_failed: AtomicU64::new(0),
             }),
+            exception_handler,
         }))
     }
 
@@ -729,11 +748,12 @@ impl EbpfCollector {
         }
 
         let sync_counter = self.counter.clone();
+        let exception_handler = self.exception_handler.clone();
         let dispatcher = self.thread_dispatcher.clone();
         self.thread_handle = Some(
             thread::Builder::new()
                 .name("ebpf-collector".to_owned())
-                .spawn(move || dispatcher.run(sync_counter))
+                .spawn(move || dispatcher.run(sync_counter, exception_handler))
                 .unwrap(),
         );
 
