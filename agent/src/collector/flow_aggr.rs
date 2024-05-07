@@ -64,6 +64,7 @@ pub struct FlowAggrThread {
     input: Arc<Receiver<Arc<BatchedBox<TaggedFlow>>>>,
     output: DebugSender<BoxedTaggedFlow>,
     config: CollectorAccess,
+    delay: Duration,
 
     thread_handle: Option<JoinHandle<()>>,
 
@@ -79,6 +80,7 @@ impl FlowAggrThread {
         input: Receiver<Arc<BatchedBox<TaggedFlow>>>,
         output: DebugSender<BoxedTaggedFlow>,
         config: CollectorAccess,
+        delay: Duration,
         ntp_diff: Arc<AtomicI64>,
     ) -> (Self, Arc<FlowAggrCounter>) {
         let running = Arc::new(AtomicBool::new(false));
@@ -90,6 +92,7 @@ impl FlowAggrThread {
                 output: output.clone(),
                 thread_handle: None,
                 config,
+                delay,
                 running,
                 ntp_diff,
                 metrics: metrics.clone(),
@@ -109,6 +112,7 @@ impl FlowAggrThread {
             self.output.clone(),
             self.running.clone(),
             self.config.clone(),
+            self.delay,
             self.ntp_diff.clone(),
             self.metrics.clone(),
         );
@@ -169,10 +173,11 @@ impl FlowAggr {
         output: DebugSender<BoxedTaggedFlow>,
         running: Arc<AtomicBool>,
         config: CollectorAccess,
+        delay: Duration,
         ntp_diff: Arc<AtomicI64>,
         metrics: Arc<FlowAggrCounter>,
     ) -> Self {
-        let slot_count = TIMESTAMP_SLOT_COUNT + config.load().packet_delay.as_secs() as usize + 1;
+        let slot_count = TIMESTAMP_SLOT_COUNT + delay.as_secs() as usize;
         let mut flow_stashs = VecDeque::with_capacity(slot_count);
         for _ in 0..slot_count {
             flow_stashs.push_back(HashMap::with_capacity(Self::MIN_STASH_CAPACITY_SECOND));
