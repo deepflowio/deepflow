@@ -27,7 +27,6 @@ BEGIN
 END;
 
 CALL AddColumnIfNotExists('pcap_policy', 'team_id', 'INTEGER');
-CALL AddColumnIfNotExists('alarm_policy', 'team_id', 'INTEGER');
 
 DROP PROCEDURE AddColumnIfNotExists;
 
