@@ -1161,7 +1161,8 @@ CREATE TABLE IF NOT EXISTS pcap_policy (
     user_id                INTEGER,
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    lcuuid                 CHAR(64)
+    lcuuid                 CHAR(64),
+    team_id                INTEGER DEFAULT 1
 ) ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1;
 TRUNCATE TABLE pcap_policy;
 
@@ -2085,7 +2086,6 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     type                    INTEGER,
-    icon_id                 INTEGER,
     team_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2784,6 +2784,7 @@ CREATE TABLE IF NOT EXISTS ch_policy (
     `acl_gid`         INTEGER NOT NULL,
     `id`              INTEGER,
     `name`            VARCHAR(256),
+    `team_id`         INTEGER DEFAULT 1,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`tunnel_type`, `acl_gid`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2792,6 +2793,7 @@ TRUNCATE TABLE ch_policy;
 CREATE TABLE IF NOT EXISTS ch_npb_tunnel (
     `id`              INTEGER NOT NULL PRIMARY KEY,
     `name`            VARCHAR(256),
+    `team_id`         INTEGER DEFAULT 1,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_npb_tunnel;
@@ -2800,6 +2802,7 @@ CREATE TABLE IF NOT EXISTS ch_alarm_policy (
     `id`              INTEGER NOT NULL PRIMARY KEY,
     `name`            VARCHAR(256),
     `user_id`         INTEGER,
+    `team_id`         INTEGER DEFAULT 1,
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_alarm_policy;

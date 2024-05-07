@@ -55,6 +55,10 @@ type Task struct {
 func NewTask(orgID int, domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
 	tCtx, tCancel := context.WithCancel(ctx)
 	cloudTask := cloud.NewCloud(orgID, domain, cfg.CloudCfg, tCtx)
+	if cloudTask == nil {
+		log.Error(common.FmtLog(orgID, "domain: %s %s, failed to create cloud task", domain.Name, domain.Lcuuid))
+		return nil
+	}
 	rcd := recorder.NewRecorder(tCtx, cfg.RecorderCfg, resourceEventQueue, orgID, domain.Lcuuid)
 	if rcd == nil {
 		log.Error(common.FmtLog(orgID, "domain: %s %s, failed to create recorder", domain.Name, domain.Lcuuid))

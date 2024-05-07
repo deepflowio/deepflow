@@ -114,7 +114,7 @@ func writeK8sLabels(sb *strings.Builder, keyName, valueName string, k8sLabels ut
 
 func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.ExporterCfg, uTags0, uTags1 *utag.UniversalTags, k8sLabels0, k8sLabels1 utag.Labels) string {
 	var sb = &strings.Builder{}
-	sb.WriteString("{datasource:\"")
+	sb.WriteString("{\"datasource\":\"")
 	sb.WriteString(config.DataSourceID(dataSourceId).String())
 	sb.WriteString(`"`)
 

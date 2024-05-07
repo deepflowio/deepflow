@@ -121,6 +121,10 @@ func (p TapPort) SetReservedBytes(v uint32) TapPort {
 
 func (p TapPort) String() string {
 	tapPort, tapPortType, _, tunnelType := p.SplitToPortTypeTunnel()
+	return TapPortValueToString(tapPort, tapPortType, tunnelType)
+}
+
+func TapPortValueToString(tapPort uint32, tapPortType uint8, tunnelType TunnelType) string {
 	switch tapPortType {
 	case TAPPORT_FROM_LOCAL_MAC:
 		return fmt.Sprintf("LMAC@%s@%02x:%02x:%02x:%02x",
@@ -139,6 +143,6 @@ func (p TapPort) String() string {
 	case TAPPORT_FROM_SFLOW:
 		return fmt.Sprintf("SFlow@%d", tapPort)
 	default:
-		panic(fmt.Sprintf("Invalid TapPort type is %d.", tapPortType))
+		return fmt.Sprintf("Invalid TapPort type is %d.", tapPortType)
 	}
 }
