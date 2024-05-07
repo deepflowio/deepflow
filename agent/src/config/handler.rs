@@ -801,6 +801,7 @@ pub struct EbpfConfig {
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     pub l7_protocol_ports: std::collections::HashMap<String, String>,
+    pub queue_size: usize,
     pub ebpf: EbpfYamlConfig,
 }
 
@@ -833,6 +834,7 @@ impl fmt::Debug for EbpfConfig {
                 "l7_protocol_enabled_bitmap",
                 &self.l7_protocol_enabled_bitmap,
             )
+            .field("queue_size", &self.queue_size)
             .field("l7_protocol_ports", &self.l7_protocol_ports)
             .field("ebpf", &self.ebpf)
             .finish()
@@ -1551,6 +1553,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     (&conf.yaml_config).get_protocol_port_parse_bitmap(),
                 ),
                 l7_protocol_ports: conf.yaml_config.get_protocol_port(),
+                queue_size: conf.yaml_config.ebpf_collector_queue_size,
                 ebpf: conf.yaml_config.ebpf.clone(),
             },
             metric_server: MetricServerConfig {

@@ -537,6 +537,7 @@ pub struct YamlConfig {
     pub kubernetes_api_list_interval: Duration,
     pub kubernetes_resources: Vec<KubernetesResourceConfig>,
     pub external_metrics_sender_queue_size: usize,
+    pub ebpf_collector_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
     pub packet_sequence_block_size: usize, // Enterprise Edition Feature: packet-sequence
@@ -675,6 +676,10 @@ impl YamlConfig {
 
         if c.external_metrics_sender_queue_size == 0 {
             c.external_metrics_sender_queue_size = 1 << 12;
+        }
+
+        if c.ebpf_collector_queue_size < 4096 {
+            c.ebpf_collector_queue_size = 1 << 16;
         }
 
         if c.l7_protocol_inference_max_fail_count == 0 {
@@ -991,6 +996,7 @@ impl Default for YamlConfig {
                 int_compress: true,
                 resp_0x04_extra_byte: false,
             },
+            ebpf_collector_queue_size: 65535,
         }
     }
 }

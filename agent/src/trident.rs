@@ -2154,7 +2154,7 @@ impl AgentComponents {
         let proc_event_queue_name = "1-proc-event-to-sender";
         #[allow(unused)]
         let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
+            yaml_config.ebpf_collector_queue_size,
             proc_event_queue_name,
             &queue_debugger,
         );
@@ -2176,7 +2176,7 @@ impl AgentComponents {
 
         let profile_queue_name = "1-profile-to-sender";
         let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
+            yaml_config.ebpf_collector_queue_size,
             profile_queue_name,
             &queue_debugger,
         );
@@ -2290,6 +2290,7 @@ impl AgentComponents {
                 profile_sender.clone(),
                 &queue_debugger,
                 stats_collector.clone(),
+                exception_handler.clone(),
             ) {
                 Ok(ebpf_collector) => {
                     synchronizer
