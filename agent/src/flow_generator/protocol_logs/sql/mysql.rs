@@ -601,7 +601,7 @@ impl MysqlLog {
                 if let Some(config) = config {
                     if config
                         .obfuscate_enabled_protocols
-                        .is_enabled(L7Protocol::MySQL)
+                        .is_disabled(L7Protocol::MySQL)
                     {
                         self.set_parameter_counter(info.context.as_bytes());
                     }
