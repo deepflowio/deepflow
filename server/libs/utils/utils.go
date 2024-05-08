@@ -408,60 +408,61 @@ func GetValueByOffsetAndKind(ptr, offset uintptr, kind reflect.Kind, dataType Da
 	}
 }
 
-func ConvertToFloat64(data interface{}) (float64, bool) {
+// converting uint64, int64 to float64 may cause loss of precision, so the original string needs to be returned.
+func ConvertToFloat64(data interface{}) (float64, string, bool) {
 	switch v := data.(type) {
 	case uint:
-		return float64(v), true
+		return float64(v), strconv.FormatUint(uint64(v), 10), true
 	case uint8:
-		return float64(v), true
+		return float64(v), strconv.FormatUint(uint64(v), 10), true
 	case uint16:
-		return float64(v), true
+		return float64(v), strconv.FormatUint(uint64(v), 10), true
 	case uint32:
-		return float64(v), true
+		return float64(v), strconv.FormatUint(uint64(v), 10), true
 	case uint64:
-		return float64(v), true
+		return float64(v), strconv.FormatUint(v, 10), true
 	case uintptr:
-		return float64(v), true
+		return float64(v), strconv.FormatUint(uint64(v), 10), true
 	case int:
-		return float64(v), true
+		return float64(v), strconv.FormatInt(int64(v), 10), true
 	case int8:
-		return float64(v), true
+		return float64(v), strconv.FormatInt(int64(v), 10), true
 	case int16:
-		return float64(v), true
+		return float64(v), strconv.FormatInt(int64(v), 10), true
 	case int32:
-		return float64(v), true
+		return float64(v), strconv.FormatInt(int64(v), 10), true
 	case int64:
-		return float64(v), true
+		return float64(v), strconv.FormatInt(v, 10), true
 	case float64:
-		return v, true
+		return v, strconv.FormatFloat(v, 'f', -1, 64), true
 	case bool:
 		if v {
-			return 1, true
+			return 1, "1", true
 		} else {
-			return 0, true
+			return 0, "1", true
 		}
 	case *uint:
-		return float64(*v), true
+		return float64(*v), strconv.FormatUint(uint64(*v), 10), true
 	case *uint8:
-		return float64(*v), true
+		return float64(*v), strconv.FormatUint(uint64(*v), 10), true
 	case *uint16:
-		return float64(*v), true
+		return float64(*v), strconv.FormatUint(uint64(*v), 10), true
 	case *uint32:
-		return float64(*v), true
+		return float64(*v), strconv.FormatUint(uint64(*v), 10), true
 	case *uint64:
-		return float64(*v), true
+		return float64(*v), strconv.FormatUint(*v, 10), true
 	case *int:
-		return float64(*v), true
+		return float64(*v), strconv.FormatInt(int64(*v), 10), true
 	case *int8:
-		return float64(*v), true
+		return float64(*v), strconv.FormatInt(int64(*v), 10), true
 	case *int16:
-		return float64(*v), true
+		return float64(*v), strconv.FormatInt(int64(*v), 10), true
 	case *int32:
-		return float64(*v), true
+		return float64(*v), strconv.FormatInt(int64(*v), 10), true
 	case *int64:
-		return float64(*v), true
+		return float64(*v), strconv.FormatInt(*v, 10), true
 	default:
-		return 0, false
+		return 0, "", false
 	}
 }
 

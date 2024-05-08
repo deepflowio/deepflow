@@ -150,9 +150,10 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 		} else if v, ok := value.([]float64); ok {
 			isFloat64Slice = true
 			float64Slice = v
-		} else if v, ok := utils.ConvertToFloat64(value); ok {
+		} else if v, vStr, ok := utils.ConvertToFloat64(value); ok {
 			isFloat64 = true
 			valueFloat64 = v
+			valueStr = vStr
 		} else {
 			isString = true
 			valueStr = fmt.Sprintf("%v", value)
@@ -226,7 +227,7 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 			}
 			sb.WriteString("]")
 		} else if isFloat64 {
-			sb.WriteString(strconv.FormatFloat(valueFloat64, 'f', -1, 64))
+			sb.WriteString(valueStr)
 		} else {
 			log.Warningf("unreachable")
 		}

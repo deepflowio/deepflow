@@ -303,10 +303,11 @@ func (t *TagFilter) MatchFloatValue(value float64) bool {
 
 func (t *TagFilter) MatchValue(value interface{}) bool {
 	var float64Value float64
+	var valueStr string
 	var isFloat64 bool
 	strValue, isStr := value.(string)
 	if !isStr {
-		float64Value, isFloat64 = utils.ConvertToFloat64(value)
+		float64Value, valueStr, isFloat64 = utils.ConvertToFloat64(value)
 	}
 
 	if !isStr && !isFloat64 {
@@ -316,7 +317,10 @@ func (t *TagFilter) MatchValue(value interface{}) bool {
 	if isStr {
 		return t.MatchStringValue(strValue)
 	} else if isFloat64 {
-		return t.MatchFloatValue(float64Value)
+		if t.MatchFloatValue(float64Value) {
+			return true
+		}
+		return t.MatchStringValue(valueStr)
 	}
 	return true
 }
