@@ -65,21 +65,22 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	if err != nil {
 		return nil, err
 	}
-	Db := dbInfo.DB
+	Db, vtapDB := dbInfo.DB, dbInfo.DB
 	for _, param := range []string{
 		"lcuuid", "name", "type", "vtap_group_lcuuid", "controller_ip", "analyzer_ip",
 	} {
 		where := fmt.Sprintf("%s = ?", param)
 		if _, ok := filter[param]; ok {
-			Db = Db.Where(where, filter[param])
+			vtapDB = vtapDB.Where(where, filter[param])
 		}
 	}
 	if _, ok := filter["names"]; ok {
 		if len(filter["names"].([]string)) > 0 {
-			Db = Db.Where("name IN (?)", filter["names"].([]string))
+			vtapDB = vtapDB.Where("name IN (?)", filter["names"].([]string))
 		}
 	}
-	if err := Db.Find(&allVTaps).Error; err != nil {
+
+	if err := vtapDB.Find(&allVTaps).Error; err != nil {
 		return nil, err
 	}
 	if err := Db.Find(&vtapGroups).Error; err != nil {
