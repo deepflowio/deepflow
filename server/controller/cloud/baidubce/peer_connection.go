@@ -68,7 +68,7 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 				continue
 			}
 			retPeerConnections = append(retPeerConnections, model.PeerConnection{
-				Lcuuid:             common.GenerateUUID(conn.PeerConnId),
+				Lcuuid:             common.GenerateUUIDByOrgID(b.orgID, conn.PeerConnId),
 				Name:               conn.PeerConnId,
 				Label:              conn.PeerConnId,
 				LocalVPCLcuuid:     localVPCLcuuid,

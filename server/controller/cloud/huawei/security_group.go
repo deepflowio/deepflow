@@ -142,7 +142,7 @@ func (h *HuaWei) formatSecurityGroupRules(jRules *simplejson.Json, sgLcuuid stri
 	for _, direction := range directions {
 		for etherType, remote := range etherTypeToRemote {
 			rule := model.SecurityGroupRule{
-				Lcuuid:              common.GenerateUUID(sgLcuuid + strconv.Itoa(direction) + remote),
+				Lcuuid:              common.GenerateUUIDByOrgID(h.orgID, sgLcuuid+strconv.Itoa(direction)+remote),
 				SecurityGroupLcuuid: sgLcuuid,
 				Action:              cloudcommon.SECURITY_GROUP_RULE_DROP,
 				Direction:           direction,

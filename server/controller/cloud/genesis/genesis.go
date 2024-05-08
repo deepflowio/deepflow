@@ -18,7 +18,6 @@ package genesis
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
@@ -35,7 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
-var log *logging.Logger
+var log = logging.MustGetLogger("cloud.genesis")
 
 type Genesis struct {
 	orgID           int
@@ -55,8 +54,6 @@ type Genesis struct {
 }
 
 func NewGenesis(orgID int, domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
-	log = logging.MustGetLogger(fmt.Sprintf("cloud.org:%d.genesis", orgID))
-
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)

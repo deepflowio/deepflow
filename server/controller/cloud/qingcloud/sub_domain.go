@@ -57,7 +57,7 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 				vpcLcuuid, _ := q.regionIdToDefaultVPCLcuuid[regionId]
 				vpcRouterId := cluster.Get("vxnet").Get("vpc_router_id").MustString()
 				if vpcRouterId != "" {
-					vpcLcuuid = common.GenerateUUID(vpcRouterId)
+					vpcLcuuid = common.GenerateUUIDByOrgID(q.orgID, vpcRouterId)
 				}
 
 				config := map[string]interface{}{
@@ -72,7 +72,7 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 				}
 				configJson, _ := json.Marshal(config)
 				retSubDomains = append(retSubDomains, model.SubDomain{
-					Lcuuid:      common.GenerateUUID(clusterId),
+					Lcuuid:      common.GenerateUUIDByOrgID(q.orgID, clusterId),
 					Name:        cluster.Get("name").MustString(),
 					DisplayName: clusterId,
 					ClusterID:   clusterId,

@@ -23,7 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, error) {
@@ -67,13 +66,13 @@ func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, erro
 			continue
 		}
 		peerConnections = append(peerConnections, model.PeerConnection{
-			Lcuuid:             common.GetUUID(peerConnectionID, uuid.Nil),
+			Lcuuid:             common.GetUUIDByOrgID(a.orgID, peerConnectionID),
 			Name:               peerConnectionName,
 			Label:              peerConnectionID,
-			RemoteVPCLcuuid:    common.GetUUID(a.getStringPointerValue(pData.AccepterVpcInfo.VpcId), uuid.Nil),
-			LocalVPCLcuuid:     common.GetUUID(a.getStringPointerValue(pData.RequesterVpcInfo.VpcId), uuid.Nil),
-			RemoteRegionLcuuid: a.getRegionLcuuid(common.GetUUID(a.getStringPointerValue(pData.AccepterVpcInfo.Region), uuid.Nil)),
-			LocalRegionLcuuid:  a.getRegionLcuuid(common.GetUUID(a.getStringPointerValue(pData.RequesterVpcInfo.Region), uuid.Nil)),
+			RemoteVPCLcuuid:    common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.AccepterVpcInfo.VpcId)),
+			LocalVPCLcuuid:     common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.RequesterVpcInfo.VpcId)),
+			RemoteRegionLcuuid: a.getRegionLcuuid(common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.AccepterVpcInfo.Region))),
+			LocalRegionLcuuid:  a.getRegionLcuuid(common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.RequesterVpcInfo.Region))),
 		})
 	}
 	log.Debug("get peer connections complete")

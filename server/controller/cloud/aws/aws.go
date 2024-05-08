@@ -43,6 +43,7 @@ const (
 )
 
 type Aws struct {
+	orgID                 int
 	name                  string
 	lcuuid                string
 	regionUUID            string
@@ -72,7 +73,7 @@ type awsGressRule struct {
 	rule      types.IpPermission
 }
 
-func NewAws(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
+func NewAws(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -115,6 +116,7 @@ func NewAws(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 
 	return &Aws{
 		// TODO: display_name后期需要修改为uuid_generate
+		orgID:            orgID,
 		name:             domain.Name,
 		lcuuid:           domain.Lcuuid,
 		uuidGenerate:     domain.DisplayName,

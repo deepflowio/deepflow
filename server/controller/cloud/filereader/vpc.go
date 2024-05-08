@@ -30,7 +30,7 @@ func (f *FileReader) getVPCs(fileInfo *FileInfo) ([]model.VPC, error) {
 			return nil, err
 		}
 
-		lcuuid := common.GenerateUUID(f.UuidGenerate + "_vpc_" + vpc.Name)
+		lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_vpc_"+vpc.Name)
 		f.vpcNameToLcuuid[vpc.Name] = lcuuid
 		retVPCs = append(retVPCs, model.VPC{
 			Lcuuid:       lcuuid,

@@ -77,7 +77,7 @@ func (h *HuaWei) getLBs() (
 			lbs = append(lbs, lb)
 			h.toolDataSet.regionLcuuidToResourceNum[regionLcuuid]++
 
-			vifLcuuid := common.GenerateUUID(id)
+			vifLcuuid := common.GenerateUUIDByOrgID(h.orgID, id)
 			vifs = append(
 				vifs,
 				model.VInterface{
@@ -101,7 +101,7 @@ func (h *HuaWei) getLBs() (
 			ips = append(
 				ips,
 				model.IP{
-					Lcuuid:           common.GenerateUUID(vifLcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vifLcuuid+ip),
 					VInterfaceLcuuid: vifLcuuid,
 					IP:               ip,
 					SubnetLcuuid:     subnetLcuuid,

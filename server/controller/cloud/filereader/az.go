@@ -30,7 +30,7 @@ func (f *FileReader) getAZs(fileInfo *FileInfo) ([]model.AZ, error) {
 			return nil, err
 		}
 
-		lcuuid := common.GenerateUUID(f.UuidGenerate + "_az_" + az.Name)
+		lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_az_"+az.Name)
 		f.azNameToLcuuid[az.Name] = lcuuid
 		retAZs = append(retAZs, model.AZ{
 			Lcuuid:       lcuuid,

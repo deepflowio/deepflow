@@ -50,7 +50,7 @@ func (f *FileReader) getNetworks(fileInfo *FileInfo) ([]model.Network, error) {
 			netType = 4
 		}
 
-		lcuuid := common.GenerateUUID(f.UuidGenerate + "_network_" + network.Name)
+		lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_network_"+network.Name)
 		network := model.Network{
 			Lcuuid:         lcuuid,
 			Name:           network.Name,

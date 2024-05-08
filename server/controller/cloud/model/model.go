@@ -611,12 +611,11 @@ type AdditionalSubdomainResource struct {
 }
 
 type BasicInfo struct {
-	Lcuuid          string        `json:"lcuuid"`
-	Name            string        `json:"name"`
-	PlatformType    string        `json:"platform_type"`
-	ErrorMsg        string        `json:"error_msg"`
-	Type            int           `json:"type"`
-	Interval        time.Duration `json:"interval"`
-	LastStartedAt   time.Time     `json:"last_started_at"`
-	LastCompletedAt time.Time     `json:"last_completed_at"`
+	OrgID     int       `json:"org_id"`
+	TeamID    int       `json:"team_id"`
+	Lcuuid    string    `json:"lcuuid"`
+	Name      string    `json:"name"`
+	Type      int       `json:"type"`
+	Interval  int       `json:"interval"`
+	CreatedAt time.Time `json:"created_at"`
 }

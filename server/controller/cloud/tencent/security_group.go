@@ -23,7 +23,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) analysisProtocolPort(region tencentRegion, serviceID ...string) mapset.Set {
@@ -103,7 +102,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 			continue
 		}
 		sgID := sData.Get("SecurityGroupId").MustString()
-		sgLcuuid := common.GetUUID(sgID, uuid.Nil)
+		sgLcuuid := common.GetUUIDByOrgID(t.orgID, sgID)
 		sgs = append(sgs, model.SecurityGroup{
 			Lcuuid:       sgLcuuid,
 			Name:         sData.Get("SecurityGroupName").MustString(),
@@ -159,7 +158,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 
 			if rSGID, ok := rule.rule.CheckGet("SecurityGroupId"); ok && rSGID.MustString() != "" {
 				etherType = common.SECURITY_GROUP_IP_TYPE_UNKNOWN
-				addressSet.Add(common.GetUUID(rSGID.MustString(), uuid.Nil))
+				addressSet.Add(common.GetUUIDByOrgID(t.orgID, rSGID.MustString()))
 			}
 
 			if rule.rule.Get("Action").MustString() != "ACCEPT" {
@@ -241,7 +240,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 					}
 					sgGenerateID := sgID + local + strconv.Itoa(policyIndex) + s.(tencentProtocolPort).protocol + "_" + s.(tencentProtocolPort).port + address + strconv.Itoa(action) + "_" + strconv.Itoa(rule.direction)
 					sgRules = append(sgRules, model.SecurityGroupRule{
-						Lcuuid:              common.GetUUID(sgGenerateID, uuid.Nil),
+						Lcuuid:              common.GetUUIDByOrgID(t.orgID, sgGenerateID),
 						SecurityGroupLcuuid: sgLcuuid,
 						Direction:           rule.direction,
 						Protocol:            s.(tencentProtocolPort).protocol,
@@ -263,7 +262,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 					remote = common.SECURITY_GROUP_RULE_IPV4_CIDR
 				}
 				sgRules = append(sgRules, model.SecurityGroupRule{
-					Lcuuid:              common.GetUUID(sgLcuuid+strconv.Itoa(d)+remote, uuid.Nil),
+					Lcuuid:              common.GetUUIDByOrgID(t.orgID, sgLcuuid+strconv.Itoa(d)+remote),
 					SecurityGroupLcuuid: sgLcuuid,
 					Direction:           d,
 					EtherType:           e,

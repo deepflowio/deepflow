@@ -65,9 +65,9 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 					)
 					continue
 				}
-				networkLcuuid := common.GenerateUUID(vxnetId)
+				networkLcuuid := common.GenerateUUIDByOrgID(q.orgID, vxnetId)
 				if vxnetId == q.defaultVxnetName {
-					networkLcuuid = common.GenerateUUID(vxnetId + regionLcuuid)
+					networkLcuuid = common.GenerateUUIDByOrgID(q.orgID, vxnetId+regionLcuuid)
 				}
 				vxnetName := network.Get("vxnet_name").MustString()
 				if vxnetName == "" {
@@ -95,11 +95,11 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 				netType := common.NETWORK_TYPE_LAN
 				vpcRouterId := network.Get("vpc_router_id").MustString()
 				if vpcRouterId != "" {
-					vpcLcuuid = common.GenerateUUID(vpcRouterId)
+					vpcLcuuid = common.GenerateUUIDByOrgID(q.orgID, vpcRouterId)
 				} else if routerId != "" {
-					vpcLcuuid = common.GenerateUUID(routerId)
+					vpcLcuuid = common.GenerateUUIDByOrgID(q.orgID, routerId)
 				} else {
-					vpcLcuuid = common.GenerateUUID(q.UuidGenerate + "_default_vpc_" + regionLcuuid)
+					vpcLcuuid = common.GenerateUUIDByOrgID(q.orgID, q.UuidGenerate+"_default_vpc_"+regionLcuuid)
 					netType = common.NETWORK_TYPE_WAN
 				}
 				// 判断是否为多可用区
@@ -107,7 +107,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 				azLcuuid := "multi"
 				index := sort.SearchStrings(q.ZoneNames, zoneId)
 				if index < len(q.ZoneNames) && q.ZoneNames[index] == zoneId {
-					azLcuuid = common.GenerateUUID(q.UuidGenerate + "_" + zoneId)
+					azLcuuid = common.GenerateUUIDByOrgID(q.orgID, q.UuidGenerate+"_"+zoneId)
 				}
 
 				vxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
@@ -134,7 +134,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 				if subnetCidr == "" {
 					continue
 				}
-				subnetLcuuid := common.GenerateUUID(networkLcuuid)
+				subnetLcuuid := common.GenerateUUIDByOrgID(q.orgID, networkLcuuid)
 				vxnetIdToSubnetLcuuid[vxnetId] = subnetLcuuid
 				retSubnets = append(retSubnets, model.Subnet{
 					Lcuuid:        subnetLcuuid,

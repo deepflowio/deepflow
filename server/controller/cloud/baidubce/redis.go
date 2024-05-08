@@ -79,7 +79,7 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 				log.Infof("redis (%s) zone (%s) not found", redis.InstanceID, redis.ZoneNames[0])
 				continue
 			}
-			redisLcuuid := common.GenerateUUID(redis.InstanceID)
+			redisLcuuid := common.GenerateUUIDByOrgID(b.orgID, redis.InstanceID)
 			redisInstances = append(redisInstances, model.RedisInstance{
 				Lcuuid:       redisLcuuid,
 				Name:         redis.InstanceName,
@@ -118,7 +118,7 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 					ipType = common.VIF_TYPE_WAN
 				}
 
-				vinterfaceLcuuid := common.GenerateUUID(redisLcuuid + ip)
+				vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, redisLcuuid+ip)
 				vinterfaces = append(vinterfaces, model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
 					Type:          ipType,
@@ -130,10 +130,10 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 					RegionLcuuid:  region.Lcuuid,
 				})
 				ips = append(ips, model.IP{
-					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
-					SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+					SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
 					RegionLcuuid:     region.Lcuuid,
 				})
 			}
