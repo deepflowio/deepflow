@@ -71,7 +71,7 @@ func (q *QingCloud) GetLoadBalances() (
 				}
 
 				lbId := lb.Get("loadbalancer_id").MustString()
-				lbLcuuid := common.GenerateUUID(lbId)
+				lbLcuuid := common.GenerateUUIDByOrgID(q.orgID, lbId)
 				lbName := lb.Get("loadbalancer_name").MustString()
 				if lbName == "" {
 					lbName = lbId
@@ -110,9 +110,9 @@ func (q *QingCloud) GetLoadBalances() (
 							continue
 						}
 						retLBVMConnections = append(retLBVMConnections, model.LBVMConnection{
-							Lcuuid:   common.GenerateUUID(lbLcuuid + instanceId),
+							Lcuuid:   common.GenerateUUIDByOrgID(q.orgID, lbLcuuid+instanceId),
 							LBLcuuid: lbLcuuid,
-							VMLcuuid: common.GenerateUUID(instanceId),
+							VMLcuuid: common.GenerateUUIDByOrgID(q.orgID, instanceId),
 						})
 					}
 				}
@@ -134,8 +134,8 @@ func (q *QingCloud) GetLoadBalances() (
 
 				// 添加VIP接口
 				if vip != "" && subnetLcuuid != "" {
-					vinterfaceLcuuid := common.GenerateUUID(lbLcuuid + vip)
-					networkLcuuid := common.GenerateUUID(vxnetId)
+					vinterfaceLcuuid := common.GenerateUUIDByOrgID(q.orgID, lbLcuuid+vip)
+					networkLcuuid := common.GenerateUUIDByOrgID(q.orgID, vxnetId)
 					retVInterfaces = append(retVInterfaces, model.VInterface{
 						Lcuuid:        vinterfaceLcuuid,
 						Type:          common.VIF_TYPE_LAN,
@@ -147,7 +147,7 @@ func (q *QingCloud) GetLoadBalances() (
 						RegionLcuuid:  regionLcuuid,
 					})
 					retIPs = append(retIPs, model.IP{
-						Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + vip),
+						Lcuuid:           common.GenerateUUIDByOrgID(q.orgID, vinterfaceLcuuid+vip),
 						VInterfaceLcuuid: vinterfaceLcuuid,
 						IP:               vip,
 						SubnetLcuuid:     subnetLcuuid,
@@ -156,7 +156,7 @@ func (q *QingCloud) GetLoadBalances() (
 				}
 				// 添加外网IP及接口
 				if len(eips) > 0 {
-					vinterfaceLcuuid := common.GenerateUUID(lbLcuuid)
+					vinterfaceLcuuid := common.GenerateUUIDByOrgID(q.orgID, lbLcuuid)
 					retVInterfaces = append(retVInterfaces, model.VInterface{
 						Lcuuid:        vinterfaceLcuuid,
 						Type:          common.VIF_TYPE_WAN,
@@ -169,7 +169,7 @@ func (q *QingCloud) GetLoadBalances() (
 					})
 					for _, eip := range eips {
 						retIPs = append(retIPs, model.IP{
-							Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + eip),
+							Lcuuid:           common.GenerateUUIDByOrgID(q.orgID, vinterfaceLcuuid+eip),
 							VInterfaceLcuuid: vinterfaceLcuuid,
 							IP:               eip,
 							RegionLcuuid:     regionLcuuid,
@@ -252,11 +252,11 @@ func (q *QingCloud) getLBListenerAndTargetServers(
 					continue
 				}
 
-				listenerLcuuid := common.GenerateUUID(listenerId)
+				listenerLcuuid := common.GenerateUUIDByOrgID(q.orgID, listenerId)
 				listenerProtocol := strings.ToUpper(listener.Get("listener_protocol").MustString())
 				retLBListeners = append(retLBListeners, model.LBListener{
 					Lcuuid:   listenerLcuuid,
-					LBLcuuid: common.GenerateUUID(lbId),
+					LBLcuuid: common.GenerateUUIDByOrgID(q.orgID, lbId),
 					IPs:      lbIP,
 					Name:     listenerName,
 					Label:    listenerId,
@@ -301,14 +301,14 @@ func (q *QingCloud) getLBListenerAndTargetServers(
 								continue
 							}
 							serverType = common.LB_SERVER_TYPE_VM
-							vmLcuuid = common.GenerateUUID(resourceId)
+							vmLcuuid = common.GenerateUUIDByOrgID(q.orgID, resourceId)
 							ip = server.Get("private_ip").MustString()
 						}
 						retLBTargetServers = append(retLBTargetServers, model.LBTargetServer{
-							Lcuuid: common.GenerateUUID(
+							Lcuuid: common.GenerateUUIDByOrgID(q.orgID,
 								server.Get("loadbalancer_backend_id").MustString(),
 							),
-							LBLcuuid:         common.GenerateUUID(lbId),
+							LBLcuuid:         common.GenerateUUIDByOrgID(q.orgID, lbId),
 							LBListenerLcuuid: listenerLcuuid,
 							Type:             serverType,
 							VMLcuuid:         vmLcuuid,

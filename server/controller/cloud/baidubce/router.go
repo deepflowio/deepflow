@@ -45,7 +45,7 @@ func (b *BaiduBce) getRouterAndTables(
 
 		b.cloudStatsd.RefreshAPIMoniter("GetRouteTableDetail", len(result.RouteRules), startTime)
 		b.debugger.WriteJson("GetRouteTableDetail", " ", structToJson([]*vpc.GetRouteTableResult{result}))
-		vrouterLcuuid := common.GenerateUUID(result.RouteTableId)
+		vrouterLcuuid := common.GenerateUUIDByOrgID(b.orgID, result.RouteTableId)
 		vrouterName, _ := vpcIdToName[vpcId]
 		retVRouter := model.VRouter{
 			Lcuuid:       vrouterLcuuid,
@@ -79,7 +79,7 @@ func (b *BaiduBce) getRouterAndTables(
 			if nType, ok := nexthop_types[string(rule.NexthopType)]; ok {
 				nexthopType = nType
 			}
-			tableLcuuid := common.GenerateUUID(vrouterLcuuid + destination + nexthop)
+			tableLcuuid := common.GenerateUUIDByOrgID(b.orgID, vrouterLcuuid+destination+nexthop)
 			retRoutingTable := model.RoutingTable{
 				Lcuuid:        tableLcuuid,
 				VRouterLcuuid: vrouterLcuuid,

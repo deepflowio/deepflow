@@ -173,7 +173,7 @@ func GetBasicNetworkLcuuid(vpcLcuuid string) string {
 	return common.GenerateUUID(vpcLcuuid)
 }
 
-func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uuidGenerate string) ([]model.VPC, []model.Network) {
+func GetBasicVPCAndNetworks(orgID int, regions []model.Region, regionLcuuid, domainName, uuidGenerate string) ([]model.VPC, []model.Network) {
 	var retVPCs []model.VPC
 	var retNetworks []model.Network
 
@@ -186,7 +186,7 @@ func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uu
 	}
 
 	for _, region := range regions {
-		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, region.Lcuuid)
+		vpcLcuuid := common.GenerateUUIDByOrgID(orgID, uuidGenerate+region.Lcuuid)
 		vpcName := fmt.Sprintf("%s_基础VPC_%s", domainName, region.Name)
 		retVPCs = append(retVPCs, model.VPC{
 			Lcuuid:       vpcLcuuid,
@@ -194,7 +194,7 @@ func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uu
 			RegionLcuuid: region.Lcuuid,
 		})
 		retNetworks = append(retNetworks, model.Network{
-			Lcuuid:         GetBasicNetworkLcuuid(vpcLcuuid),
+			Lcuuid:         common.GenerateUUIDByOrgID(orgID, vpcLcuuid),
 			Name:           vpcName + "子网",
 			SegmentationID: 1,
 			NetType:        common.NETWORK_TYPE_LAN,
@@ -258,8 +258,8 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 			log.Debugf("no host (%s) vinterfaces in response", host.IP)
 			continue
 		}
-		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, host.RegionLcuuid)
-		networkLcuuid := GetBasicNetworkLcuuid(vpcLcuuid)
+		vpcLcuuid := common.GenerateUUIDByOrgID(orgID, uuidGenerate+host.RegionLcuuid)
+		networkLcuuid := common.GenerateUUIDByOrgID(orgID, vpcLcuuid)
 		subnets, ok := vpcLcuuidToSubnets[vpcLcuuid]
 		if !ok {
 			subnets = []model.Subnet{}
@@ -279,7 +279,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 				continue
 			}
 
-			vinterfaceLcuuid := common.GenerateUUID(host.Lcuuid + vinterface.Mac)
+			vinterfaceLcuuid := common.GenerateUUIDByOrgID(orgID, host.Lcuuid+vinterface.Mac)
 			ips := strings.Split(vinterface.IPs, ",")
 			for _, ip := range ips {
 				subnetLcuuid := ""
@@ -331,7 +331,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 						continue
 					}
 					subnetCidr := cidrParse.First().IP.String() + "/" + ipMask
-					subnetLcuuid = common.GenerateUUID(networkLcuuid + subnetCidr)
+					subnetLcuuid = common.GenerateUUIDByOrgID(orgID, networkLcuuid+subnetCidr)
 					retSubnet := model.Subnet{
 						Lcuuid:        subnetLcuuid,
 						Name:          subnetCidr,
@@ -347,7 +347,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 
 				// 增加IP信息
 				retIPs = append(retIPs, model.IP{
-					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ipMasks[0]),
+					Lcuuid:           common.GenerateUUIDByOrgID(orgID, vinterfaceLcuuid+ipMasks[0]),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ipMasks[0],
 					SubnetLcuuid:     subnetLcuuid,
@@ -402,7 +402,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 				continue
 			}
 			subnetCidr := cidrParse.First().IP.String() + "/" + ipMask
-			subnetLcuuid = common.GenerateUUID(networkLcuuid + subnetCidr)
+			subnetLcuuid = common.GenerateUUIDByOrgID(orgID, networkLcuuid+subnetCidr)
 			retSubnet := model.Subnet{
 				Lcuuid:        subnetLcuuid,
 				Name:          subnetCidr,
@@ -418,7 +418,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 
 		// 增加接口和IP信息
 		mac := common.VIF_DEFAULT_MAC
-		vinterfaceLcuuid := common.GenerateUUID(host.Lcuuid + mac)
+		vinterfaceLcuuid := common.GenerateUUIDByOrgID(orgID, host.Lcuuid+mac)
 		retVInterfaces = append(retVInterfaces, model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_LAN,
@@ -430,7 +430,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 			RegionLcuuid:  host.RegionLcuuid,
 		})
 		retIPs = append(retIPs, model.IP{
-			Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + host.IP),
+			Lcuuid:           common.GenerateUUIDByOrgID(orgID, vinterfaceLcuuid+host.IP),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               host.IP,
 			SubnetLcuuid:     subnetLcuuid,

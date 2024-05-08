@@ -73,7 +73,7 @@ func (q *QingCloud) GetNATGateways() (
 					if _, ok := natIdToLcuuid[natId]; ok {
 						continue
 					}
-					natLcuuid := common.GenerateUUID(natId)
+					natLcuuid := common.GenerateUUIDByOrgID(q.orgID, natId)
 
 					eips := []string{}
 					for j := range nat.Get("eips").MustArray() {
@@ -102,9 +102,9 @@ func (q *QingCloud) GetNATGateways() (
 								continue
 							}
 							retNATVMConns = append(retNATVMConns, model.NATVMConnection{
-								Lcuuid:           common.GenerateUUID(natLcuuid + instanceId),
+								Lcuuid:           common.GenerateUUIDByOrgID(q.orgID, natLcuuid+instanceId),
 								NATGatewayLcuuid: natLcuuid,
-								VMLcuuid:         common.GenerateUUID(instanceId),
+								VMLcuuid:         common.GenerateUUIDByOrgID(q.orgID, instanceId),
 							})
 						}
 					}
@@ -122,7 +122,7 @@ func (q *QingCloud) GetNATGateways() (
 
 					// 生成NATGateway接口及IP信息
 					if len(eips) > 0 {
-						vinterfaceLcuuid := common.GenerateUUID(natLcuuid)
+						vinterfaceLcuuid := common.GenerateUUIDByOrgID(q.orgID, natLcuuid)
 						retVInterfaces = append(retVInterfaces, model.VInterface{
 							Lcuuid:        vinterfaceLcuuid,
 							Type:          common.VIF_TYPE_WAN,
@@ -135,7 +135,7 @@ func (q *QingCloud) GetNATGateways() (
 						})
 						for _, eip := range eips {
 							retIPs = append(retIPs, model.IP{
-								Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + eip),
+								Lcuuid:           common.GenerateUUIDByOrgID(q.orgID, vinterfaceLcuuid+eip),
 								VInterfaceLcuuid: vinterfaceLcuuid,
 								IP:               eip,
 								RegionLcuuid:     regionLcuuid,

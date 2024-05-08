@@ -41,7 +41,7 @@ func (f *FileReader) getSubnets(fileInfo *FileInfo) ([]model.Subnet, error) {
 			return nil, err
 		}
 
-		lcuuid := common.GenerateUUID(f.UuidGenerate + "_subnet_" + subnet.Name)
+		lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_subnet_"+subnet.Name)
 		f.subnetNameToNetworkLcuuid[subnet.Name] = networkLcuuid
 		f.subnetNameToLcuuid[subnet.Name] = lcuuid
 		retSubnets = append(retSubnets, model.Subnet{

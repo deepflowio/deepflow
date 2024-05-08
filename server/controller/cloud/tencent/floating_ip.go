@@ -19,14 +19,13 @@ package tencent
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getFloatingIPs() (floatingIPs []model.FloatingIP, err error) {
 	log.Debug("get floating ips starting")
 	for ip, v := range t.publicIPToVinterface {
 		floatingIP := model.FloatingIP{
-			Lcuuid:        common.GetUUID(v.Lcuuid+ip, uuid.Nil),
+			Lcuuid:        common.GetUUIDByOrgID(t.orgID, v.Lcuuid+ip),
 			IP:            ip,
 			VMLcuuid:      v.DeviceLcuuid,
 			NetworkLcuuid: common.NETWORK_ISP_LCUUID,

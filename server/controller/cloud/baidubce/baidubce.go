@@ -42,6 +42,7 @@ import (
 var log = logging.MustGetLogger("cloud.baidu")
 
 type BaiduBce struct {
+	orgID        int
 	name         string
 	uuid         string
 	uuidGenerate string
@@ -59,7 +60,7 @@ type BaiduBce struct {
 	debugger    *cloudcommon.Debugger
 }
 
-func NewBaiduBce(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, error) {
+func NewBaiduBce(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -90,8 +91,9 @@ func NewBaiduBce(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, e
 	}
 
 	return &BaiduBce{
-		uuid: domain.Lcuuid,
-		name: domain.Name,
+		orgID: orgID,
+		uuid:  domain.Lcuuid,
+		name:  domain.Name,
 		// TODO: display_name后期需要修改为uuid_generate
 		uuidGenerate: domain.DisplayName,
 		regionUuid:   config.Get("region_uuid").MustString(),

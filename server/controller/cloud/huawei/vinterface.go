@@ -155,7 +155,7 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 	floatingIP := h.toolDataSet.macToFloatingIP[vif.Mac]
 	if floatingIP != "" && vif.DeviceType == common.VIF_DEVICE_TYPE_VM {
 		fIP = model.FloatingIP{
-			Lcuuid:        common.GenerateUUID(vif.Lcuuid + floatingIP),
+			Lcuuid:        common.GenerateUUIDByOrgID(h.orgID, vif.Lcuuid+floatingIP),
 			IP:            floatingIP,
 			VMLcuuid:      vif.DeviceLcuuid,
 			NetworkLcuuid: vif.NetworkLcuuid,
@@ -179,7 +179,7 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 		ips = append(
 			ips,
 			model.IP{
-				Lcuuid:           common.GenerateUUID(vif.Lcuuid + ipAddr),
+				Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vif.Lcuuid+ipAddr),
 				VInterfaceLcuuid: vif.Lcuuid,
 				IP:               ipAddr,
 				SubnetLcuuid:     subnetLcuuid,
@@ -190,7 +190,7 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 		if floatingIP != "" {
 			if i == 0 {
 				natRule = model.NATRule{
-					Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
+					Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, floatingIP+"_"+ipAddr),
 					Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
 					Protocol:         cloudcommon.PROTOCOL_ALL,
 					FloatingIP:       floatingIP,
@@ -199,7 +199,7 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 				}
 			} else {
 				natRule.FixedIP = natRule.FixedIP + "," + ipAddr
-				natRule.Lcuuid = common.GenerateUUID(floatingIP + "_" + natRule.FixedIP)
+				natRule.Lcuuid = common.GenerateUUIDByOrgID(h.orgID, floatingIP+"_"+natRule.FixedIP)
 			}
 		}
 	}

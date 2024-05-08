@@ -28,10 +28,10 @@ func (f *FileReader) getRegions(fileInfo *FileInfo) ([]model.Region, error) {
 
 	if f.RegionUuid == "" {
 		for _, region := range fileInfo.Regions {
-			lcuuid := common.GenerateUUID(f.UuidGenerate + "_region_" + region.Name)
+			lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_region_"+region.Name)
 			f.regionNameToLcuuid[region.Name] = lcuuid
 			retRegions = append(retRegions, model.Region{
-				Lcuuid: common.GenerateUUID(f.UuidGenerate + "_region_" + region.Name),
+				Lcuuid: common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_region_"+region.Name),
 				Name:   region.Name,
 			})
 		}

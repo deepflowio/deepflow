@@ -104,7 +104,7 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 				rdsEngine = common.RDS_UNKNOWN
 			}
 
-			rdsLcuuid := common.GenerateUUID(rds.InstanceId)
+			rdsLcuuid := common.GenerateUUIDByOrgID(b.orgID, rds.InstanceId)
 			retRDSInstances = append(retRDSInstances, model.RDSInstance{
 				Lcuuid:       rdsLcuuid,
 				Name:         rdsName,
@@ -133,7 +133,7 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 
 			// 内网接口 + IP
 			if rds.Endpoint.VnetIp != "" {
-				vinterfaceLcuuid := common.GenerateUUID(rdsLcuuid + rds.Endpoint.VnetIp)
+				vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, rdsLcuuid+rds.Endpoint.VnetIp)
 				retVInterfaces = append(retVInterfaces, model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
 					Type:          common.VIF_TYPE_LAN,
@@ -145,17 +145,17 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 					RegionLcuuid:  region.Lcuuid,
 				})
 				retIPs = append(retIPs, model.IP{
-					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + rds.Endpoint.VnetIp),
+					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+rds.Endpoint.VnetIp),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               rds.Endpoint.VnetIp,
-					SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+					SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
 					RegionLcuuid:     region.Lcuuid,
 				})
 			}
 
 			// 公网接口 + IP
 			if rds.Endpoint.InetIp != "" {
-				vinterfaceLcuuid := common.GenerateUUID(rdsLcuuid + rds.Endpoint.InetIp)
+				vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, rdsLcuuid+rds.Endpoint.InetIp)
 				retVInterfaces = append(retVInterfaces, model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
 					Type:          common.VIF_TYPE_WAN,
@@ -167,7 +167,7 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 					RegionLcuuid:  region.Lcuuid,
 				})
 				retIPs = append(retIPs, model.IP{
-					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + rds.Endpoint.InetIp),
+					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+rds.Endpoint.InetIp),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               rds.Endpoint.InetIp,
 					RegionLcuuid:     region.Lcuuid,

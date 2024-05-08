@@ -145,7 +145,7 @@ func (h *HuaWei) formatVMSecurityGroups(jSGs *simplejson.Json, projectID, vmLcuu
 			continue
 		}
 		vmSG := model.VMSecurityGroup{
-			Lcuuid:              common.GenerateUUID(vmLcuuid + sgLcuuid),
+			Lcuuid:              common.GenerateUUIDByOrgID(h.orgID, vmLcuuid+sgLcuuid),
 			VMLcuuid:            vmLcuuid,
 			SecurityGroupLcuuid: sgLcuuid,
 			Priority:            i,
@@ -173,7 +173,7 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 				continue
 			}
 			vif := model.VInterface{
-				Lcuuid:        common.GenerateUUID(vmLcuuid + mac),
+				Lcuuid:        common.GenerateUUIDByOrgID(h.orgID, vmLcuuid+mac),
 				Type:          common.VIF_TYPE_WAN,
 				Mac:           cloudcommon.GenerateWANVInterfaceMac(mac),
 				DeviceLcuuid:  vmLcuuid,
@@ -195,7 +195,7 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 			ips = append(
 				ips,
 				model.IP{
-					Lcuuid:           common.GenerateUUID(vif.Lcuuid + ipAddr),
+					Lcuuid:           common.GenerateUUIDByOrgID(h.orgID, vif.Lcuuid+ipAddr),
 					VInterfaceLcuuid: vif.Lcuuid,
 					IP:               ipAddr,
 					SubnetLcuuid:     subnetLcuuid,
