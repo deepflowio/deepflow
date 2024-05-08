@@ -290,7 +290,7 @@ type Field struct {
 	PodNSID1          uint16     `json:"pod_ns_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
 	PodID1            uint32     `json:"pod_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
 	PodClusterID1     uint16     `json:"pod_cluster_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
-	ServiceID1        uint32     `json:"service_id_0" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
+	ServiceID1        uint32     `json:"service_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
 	AutoInstanceID1   uint32     `json:"auto_instance_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
 	AutoInstanceType1 uint8      `json:"auto_instance_type_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
 	AutoServiceID1    uint32     `json:"auto_service_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
@@ -304,12 +304,14 @@ type Field struct {
 	VTAPID     uint16            `json:"agent_id" category:"$tag" sub:"capture_info"`
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'flow_metrics', otherwise stored in '<OrgId>_flow_metrics'.
-	OrgId        uint16
-	TeamID       uint16
-	TAPPort      datatype.TapPort `json:"tap_port" category:"$tag" sub:"capture_info" datasource:"nm|am"`
-	TAPSide      TAPSideEnum      `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point" datasource:"nm|am"`
-	TAPType      TAPTypeEnum      `json:"capture_netwok_type" category:"$tag" sub:"capture_info"`
-	IsIPv4       uint8            `json:"is_ipv4" category:"$tag" sub:"network_layer"` // (8B) 与IP/IP6是共生字段
+	OrgId   uint16           `json:"org_id" category:"$tag"`
+	TeamID  uint16           `json:"team_id" category:"$tag"`
+	TAPPort datatype.TapPort `json:"tap_port" category:"$tag" sub:"capture_info" datasource:"nm|am"`
+	TAPSide TAPSideEnum
+	// only for exporters
+	TAPSideStr   string      `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point" datasource:"nm|am"`
+	TAPType      TAPTypeEnum `json:"capture_netwok_type" category:"$tag" sub:"capture_info"`
+	IsIPv4       uint8       `json:"is_ipv4" category:"$tag" sub:"network_layer"` // (8B) 与IP/IP6是共生字段
 	IsKeyService uint8
 	L7Protocol   datatype.L7Protocol `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol" datasource:"a|am"`
 	AppService   string              `json:"app_service" category:"$tag" sub:"service_info" datasource:"a|am"`
@@ -1359,6 +1361,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.L3EpcID1 = MarshalInt32WithSpecialID(p.Field.L3EpcId1)
 	t.Direction = DirectionEnum(p.Field.Direction)
 	t.TAPSide = TAPSideEnum(p.Field.TapSide)
+	t.TAPSideStr = TAPSideEnum(p.Field.TapSide).String()
 	t.Protocol = layers.IPProtocol(p.Field.Protocol)
 	t.ACLGID = uint16(p.Field.AclGid)
 	t.ServerPort = uint16(p.Field.ServerPort)

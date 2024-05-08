@@ -277,8 +277,10 @@ type KnowledgeGraph struct {
 	TagSource0 uint8
 	TagSource1 uint8
 
-	OrgId  uint16 // no need to store
-	TeamID uint16
+	// Not stored, only determines which database to store in.
+	// When Orgid is 0 or 1, it is stored in database 'event', otherwise stored in '<OrgId>_event'.
+	OrgId  uint16 `json:"org_id" category:"$tag"`
+	TeamID uint16 `json:"team_id" category:"$tag"`
 }
 
 var KnowledgeGraphColumns = []*ckdb.Column{
