@@ -73,7 +73,7 @@ func (e EventManagerBase) fillEvent(
 	event *eventapi.ResourceEvent,
 	eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
 ) {
-	event.ORGID = uint16(e.metadata.ORGID)
+	event.ORGID = uint16(e.metadata.GetORGID())
 	event.TeamID = uint16(e.metadata.Domain.TeamID)
 	event.Time = time.Now().Unix()
 	event.TimeMilli = time.Now().UnixMilli()
