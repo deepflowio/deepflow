@@ -815,11 +815,15 @@ impl Stash {
                 Entry::Occupied(o) => {
                     let mut doc = o.remove();
                     doc.meter.sequential_merge(&meter);
+                    doc.timestamp = self.start_time.as_secs() as u32;
+                    doc.flags |= self.doc_flag;
                     self.push_closed_doc(BoxedDocument(Box::new(doc)));
                 }
                 Entry::Vacant(_) => {
                     let mut doc = Document::new(meter);
                     doc.tagger = tagger;
+                    doc.timestamp = self.start_time.as_secs() as u32;
+                    doc.flags |= self.doc_flag;
                     self.push_closed_doc(BoxedDocument(Box::new(doc)));
                 }
             }
