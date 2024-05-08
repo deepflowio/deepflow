@@ -13,7 +13,7 @@ BEGIN
     SELECT COUNT(*)
     INTO column_count
     FROM information_schema.columns
-    WHERE TABLE_SCHEMA = @tableSchema
+    WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = tableName
     AND column_name = colName;
 
