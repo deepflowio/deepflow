@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -109,7 +110,7 @@ func dropPartiton(connect *sql.DB, partition, fullTable string) error {
 	return nil
 }
 
-func checkAndDropExpiredPartition(connect *sql.DB) error {
+func (m *Monitor) checkAndDropExpiredPartition(connect *sql.DB) error {
 	ttlsMap, err := getDfStorageTTLsMap(connect)
 	if err != nil {
 		log.Warningf("get ttlsMap failed: %s", err)
@@ -132,6 +133,10 @@ func checkAndDropExpiredPartition(connect *sql.DB) error {
 				if err := dropPartiton(connect, partition, fullTable); err != nil {
 					log.Warningf("%s drop partition %s failed: %s", fullTable, partition, err)
 					continue
+				}
+				parts := strings.Split(fullTable, ".`")
+				if len(parts) >= 2 {
+					m.sendStatsTTLExpiredDeleteData(parts[0], strings.TrimRight(parts[1], "`"), partition)
 				}
 			}
 		}

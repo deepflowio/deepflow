@@ -71,6 +71,10 @@ func SetDFRemote(addr string) {
 	setDFRemote(addr)
 }
 
+func GetDFRemote() string {
+	return dfRemote
+}
+
 // 指定远程服务器类型，默认influxdb
 func SetRemoteType(t RemoteType) {
 	remoteType = t

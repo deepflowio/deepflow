@@ -27,6 +27,9 @@ import (
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/libs/stats/pb"
 )
 
 var log = logging.MustGetLogger("monitor")
@@ -39,6 +42,9 @@ type Monitor struct {
 	Addrs              []string
 	username, password string
 	exit               bool
+
+	statsClient  *stats.UDPClient
+	statsEncoder *codec.SimpleEncoder
 }
 
 type DiskInfo struct {
@@ -59,14 +65,50 @@ func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
 		Addrs:         cfg.CKDB.ActualAddrs,
 		username:      cfg.CKDBAuth.Username,
 		password:      cfg.CKDBAuth.Password,
+		statsEncoder:  &codec.SimpleEncoder{},
 	}
-	var err error
+	statsClient, err := stats.NewUDPClient(
+		stats.UDPConfig{
+			Addr:        stats.GetDFRemote(),
+			PayloadSize: 1400},
+	)
+	if err != nil {
+		return nil, err
+	}
+	m.statsClient = statsClient
 	m.Conns, err = common.NewCKConnections(m.Addrs, m.username, m.password)
 	if err != nil {
 		return nil, err
 	}
 
 	return m, nil
+}
+
+func (m *Monitor) sendStatsForceDeleteData(db, table, partition string, bytesOnDisk, rows uint64) {
+	m.sendStats("deepflow_server_ingester_force_delete_clickhouse_data", db, table, partition, bytesOnDisk, rows)
+}
+
+func (m *Monitor) sendStatsTTLExpiredDeleteData(db, table, partition string) {
+	m.sendStats("deepflow_server_ingester_ttl_expired_delete_clickhouse_data", db, table, partition, 0, 0)
+}
+
+func (m *Monitor) sendStats(name, db, table, partition string, bytesOnDisk, rows uint64) {
+	dfStats := &pb.Stats{
+		Name:               name,
+		Timestamp:          uint64(time.Now().Unix()),
+		TagNames:           make([]string, 0, 3),
+		TagValues:          make([]string, 0, 3),
+		MetricsFloatNames:  make([]string, 0, 2),
+		MetricsFloatValues: make([]float64, 0, 2),
+	}
+	dfStats.TagNames = append(dfStats.TagNames, "db", "table", "partition")
+	dfStats.TagValues = append(dfStats.TagValues, db, table, partition)
+	dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, "bytes_on_disk", "rows")
+	dfStats.MetricsFloatValues = append(dfStats.MetricsFloatValues, float64(bytesOnDisk), float64(rows))
+
+	m.statsEncoder.Reset()
+	dfStats.Encode(m.statsEncoder)
+	m.statsClient.Write(m.statsEncoder.Bytes())
 }
 
 // 如果clickhouse重启等，需要自动更新连接
@@ -179,7 +221,7 @@ func (m *Monitor) isPriorityDrop(database, table string) bool {
 }
 
 func (m *Monitor) getMinPartitions(connect *sql.DB, diskInfo *DiskInfo) ([]Partition, error) {
-	sql := fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,min(min_time),max(max_time),sum(rows),sum(bytes_on_disk) FROM system.parts WHERE disk_name='%s' and active=1 GROUP BY database,table ORDER BY database,table ASC",
+	sql := fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,min(min_time),max(max_time),argMin(rows,partition),argMin(bytes_on_disk,partition) FROM system.parts WHERE disk_name='%s' and active=1 GROUP BY database,table ORDER BY database,table ASC",
 		diskInfo.name)
 	rows, err := connect.Query(sql)
 	if err != nil {
@@ -226,6 +268,7 @@ func (m *Monitor) dropMinPartitions(connect *sql.DB, diskInfo *DiskInfo) error {
 		if err != nil {
 			return err
 		}
+		m.sendStatsForceDeleteData(p.database, p.table, p.partition, p.bytesOnDisk, p.rows)
 	}
 	return nil
 }
@@ -281,7 +324,7 @@ func (m *Monitor) start() {
 
 			// the frequency of TTL check is 1/16 of disk check
 			if counter%(m.checkInterval<<4) == 0 && !m.cfg.CKDiskMonitor.TTLCheckDisabled {
-				checkAndDropExpiredPartition(connect)
+				m.checkAndDropExpiredPartition(connect)
 			}
 		}
 	}
