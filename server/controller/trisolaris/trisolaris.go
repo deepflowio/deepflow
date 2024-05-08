@@ -683,22 +683,34 @@ func (m *TrisolarisManager) updateUniversalTagNames(data *trident.UniversalTagNa
 }
 
 func (m *TrisolarisManager) generateUniversalTagNameMaps(dbCache *metadata.DBDataCache) *trident.UniversalTagNameMapsResponse {
+	devices := dbCache.GetChDevicesIDTypeAndName()
+	pods := dbCache.GetPods()
+	regions := dbCache.GetRegions()
+	azs := dbCache.GetAZs()
+	podNodes := dbCache.GetPodNodes()
+	podNSes := dbCache.GetPodNSsIDAndName()
+	podGroups := dbCache.GetPodGroups()
+	podClusters := dbCache.GetPodClusters()
+	vpcs := dbCache.GetVPCs()
+	subnets := dbCache.GetSubnets()
+	processes := dbCache.GetProcesses()
+	vtaps := dbCache.GetVTapsIDAndName()
 	resp := &trident.UniversalTagNameMapsResponse{
-		DeviceMap:      make([]*trident.DeviceMap, len(dbCache.GetChDevicesIDTypeAndName())),
-		PodK8SLabelMap: make([]*trident.PodK8SLabelMap, len(dbCache.GetPods())),
-		PodMap:         make([]*trident.IdNameMap, len(dbCache.GetPods())),
-		RegionMap:      make([]*trident.IdNameMap, len(dbCache.GetRegions())),
-		AzMap:          make([]*trident.IdNameMap, len(dbCache.GetAZs())),
-		PodNodeMap:     make([]*trident.IdNameMap, len(dbCache.GetPodNodes())),
-		PodNsMap:       make([]*trident.IdNameMap, len(dbCache.GetPodNSsIDAndName())),
-		PodGroupMap:    make([]*trident.IdNameMap, len(dbCache.GetPodGroups())),
-		PodClusterMap:  make([]*trident.IdNameMap, len(dbCache.GetPodClusters())),
-		L3EpcMap:       make([]*trident.IdNameMap, len(dbCache.GetVPCs())),
-		SubnetMap:      make([]*trident.IdNameMap, len(dbCache.GetSubnets())),
-		GprocessMap:    make([]*trident.IdNameMap, len(dbCache.GetProcesses())),
-		VtapMap:        make([]*trident.IdNameMap, len(dbCache.GetVTapsIDAndName())),
+		DeviceMap:      make([]*trident.DeviceMap, len(devices)),
+		PodK8SLabelMap: make([]*trident.PodK8SLabelMap, len(pods)),
+		PodMap:         make([]*trident.IdNameMap, len(pods)),
+		RegionMap:      make([]*trident.IdNameMap, len(regions)),
+		AzMap:          make([]*trident.IdNameMap, len(azs)),
+		PodNodeMap:     make([]*trident.IdNameMap, len(podNodes)),
+		PodNsMap:       make([]*trident.IdNameMap, len(podNSes)),
+		PodGroupMap:    make([]*trident.IdNameMap, len(podGroups)),
+		PodClusterMap:  make([]*trident.IdNameMap, len(podClusters)),
+		L3EpcMap:       make([]*trident.IdNameMap, len(vpcs)),
+		SubnetMap:      make([]*trident.IdNameMap, len(subnets)),
+		GprocessMap:    make([]*trident.IdNameMap, len(processes)),
+		VtapMap:        make([]*trident.IdNameMap, len(vtaps)),
 	}
-	for i, pod := range dbCache.GetPods() {
+	for i, pod := range pods {
 		var labelName, labelValue []string
 		for _, label := range strings.Split(pod.Label, ", ") {
 			if value := strings.Split(label, ":"); len(value) > 1 {
@@ -716,67 +728,67 @@ func (m *TrisolarisManager) generateUniversalTagNameMaps(dbCache *metadata.DBDat
 			Name: proto.String(pod.Name),
 		}
 	}
-	for i, region := range dbCache.GetRegions() {
+	for i, region := range regions {
 		resp.RegionMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(region.ID)),
 			Name: proto.String(region.Name),
 		}
 	}
-	for i, az := range dbCache.GetAZs() {
+	for i, az := range azs {
 		resp.AzMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(az.ID)),
 			Name: proto.String(az.Name),
 		}
 	}
-	for i, podNode := range dbCache.GetPodNodes() {
+	for i, podNode := range podNodes {
 		resp.PodNodeMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(podNode.ID)),
 			Name: proto.String(podNode.Name),
 		}
 	}
-	for i, podNS := range dbCache.GetPodNSsIDAndName() {
+	for i, podNS := range podNSes {
 		resp.PodNsMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(podNS.ID)),
 			Name: proto.String(podNS.Name),
 		}
 	}
-	for i, podGroup := range dbCache.GetPodGroups() {
+	for i, podGroup := range podGroups {
 		resp.PodGroupMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(podGroup.ID)),
 			Name: proto.String(podGroup.Name),
 		}
 	}
-	for i, podCluster := range dbCache.GetPodClusters() {
+	for i, podCluster := range podClusters {
 		resp.PodClusterMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(podCluster.ID)),
 			Name: proto.String(podCluster.Name),
 		}
 	}
-	for i, vpc := range dbCache.GetVPCs() {
+	for i, vpc := range vpcs {
 		resp.L3EpcMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(vpc.ID)),
 			Name: proto.String(vpc.Name),
 		}
 	}
-	for i, subnet := range dbCache.GetSubnets() {
+	for i, subnet := range subnets {
 		resp.SubnetMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(subnet.ID)),
 			Name: proto.String(subnet.Name),
 		}
 	}
-	for i, process := range dbCache.GetProcesses() {
+	for i, process := range processes {
 		resp.GprocessMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(process.ID)),
 			Name: proto.String(process.Name),
 		}
 	}
-	for i, vtap := range dbCache.GetVTapsIDAndName() {
+	for i, vtap := range vtaps {
 		resp.VtapMap[i] = &trident.IdNameMap{
 			Id:   proto.Uint32(uint32(vtap.ID)),
 			Name: proto.String(vtap.Name),
 		}
 	}
-	for i, chDevice := range dbCache.GetChDevicesIDTypeAndName() {
+	for i, chDevice := range devices {
 		resp.DeviceMap[i] = &trident.DeviceMap{
 			Id:   proto.Uint32(uint32(chDevice.DeviceID)),
 			Type: proto.Uint32(uint32(chDevice.DeviceType)),

@@ -161,6 +161,7 @@ type VTapCache struct {
 	os                 *string
 	kernelVersion      *string
 	processName        *string
+	currentK8sImage    *string
 	licenseType        int
 	tapMode            int
 	teamID             int
@@ -243,6 +244,7 @@ func NewVTapCache(vtap *models.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.os = proto.String(vtap.Os)
 	vTapCache.kernelVersion = proto.String(vtap.KernelVersion)
 	vTapCache.processName = proto.String(vtap.ProcessName)
+	vTapCache.currentK8sImage = proto.String(vtap.CurrentK8sImage)
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.tapMode = vtap.TapMode
 	vTapCache.teamID = vtap.TeamID
@@ -800,6 +802,17 @@ func (c *VTapCache) updateProcessName(processName string) {
 	c.processName = &processName
 }
 
+func (c *VTapCache) GetCurrentK8SImage() string {
+	if c.currentK8sImage != nil {
+		return *c.currentK8sImage
+	}
+	return ""
+}
+
+func (c *VTapCache) updateCurrentK8SImage(currentK8sImage string) {
+	c.currentK8sImage = &currentK8sImage
+}
+
 func (c *VTapCache) GetTapMode() int {
 	return c.tapMode
 }
@@ -877,7 +890,7 @@ func (c *VTapCache) UpdateExceptions(exceptions int64) {
 	atomic.StoreInt64(&c.exceptions, int64(exceptions))
 }
 
-func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch, os, kernelVersion, processName string) {
+func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch, os, kernelVersion, processName, currentK8sImage string) {
 	if cpuNum != 0 {
 		c.updateCPUNum(cpuNum)
 	}
@@ -895,6 +908,9 @@ func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch,
 	}
 	if processName != "" {
 		c.updateProcessName(processName)
+	}
+	if currentK8sImage != "" {
+		c.updateCurrentK8SImage(currentK8sImage)
 	}
 }
 

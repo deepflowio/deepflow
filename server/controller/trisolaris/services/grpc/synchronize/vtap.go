@@ -112,6 +112,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		CollectorSocketType:           &collectorSocketType,
 		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
 		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
+		MaxMillicpus:                  proto.Uint32(uint32(vtapConfig.MaxMilliCPUs)),
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
 		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
 		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
@@ -400,7 +401,8 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		in.GetArch(),
 		in.GetOs(),
 		in.GetKernelVersion(),
-		in.GetProcessName())
+		in.GetProcessName(),
+		in.GetCurrentK8SImage())
 
 	vtapCache.UpdateCtrlMacFromGrpc(in.GetCtrlMac())
 	vtapCache.SetControllerSyncFlag()
@@ -503,6 +505,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 		CollectorSocketType:           &collectorSocketType,
 		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
 		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
+		MaxMillicpus:                  proto.Uint32(uint32(vtapConfig.MaxMilliCPUs)),
 		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
 		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
 		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
