@@ -157,7 +157,9 @@ func (k *KubernetesInfo) CacheClusterID(teamUID, clusterID, clusterName string) 
 		k.clusterIDToDomain[clusterID] = ""
 		log.Infof(k.Logf("cache cluster_id: %s, cluster_name: %s", clusterID, clusterName))
 		go func() {
-			for k.clusterIDToDomain[clusterID] == "" {
+			tries := 0
+			for k.clusterIDToDomain[clusterID] == "" && tries <= 10 {
+				tries++
 				domainLcuuid, err := k.createDomain(teamUID, clusterID, clusterName)
 				if err != nil {
 					log.Errorf(k.Logf("auto create domain failed: %s, try again after 3s", err.Error()))
@@ -183,7 +185,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 	teamID := DEFAULT_TEAM_ID
 	if teamUID != "" {
 		var team *mysql.Team
-		if err := mysql.DefaultDB.Where("short_lcuuid = ?", teamUID).First(&team).Error; err != nil {
+		if err := k.db.Where("short_lcuuid = ?", teamUID).First(&team).Error; err != nil {
 			log.Errorf(k.Logf("failed to get team by uid: %s", teamUID))
 			return "", err
 		}
