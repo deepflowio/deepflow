@@ -71,7 +71,7 @@ extern int major, minor;
 static bool java_installed;
 
 int profiler_context_init(struct profiler_context *ctx,
-			  const char *tag,
+			  const char *tag, u8 type,
 			  bool enable_profiler,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
@@ -93,6 +93,7 @@ int profiler_context_init(struct profiler_context *ctx,
 	ctx->regex_existed = false;
 	ctx->only_matched_data = only_matched;
 	ctx->use_delta_time = use_delta_time;
+	ctx->type = type;
 
 	return 0;
 }
@@ -565,6 +566,7 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
 	msg->stime = stime;
 	msg->netns_id = ns_id;
+	msg->profiler_type = ctx->type;
 	if (container_id != NULL) {
 		strcpy_s_inline(msg->container_id, sizeof(msg->container_id),
 				container_id, strlen(container_id));

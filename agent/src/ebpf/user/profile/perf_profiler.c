@@ -178,12 +178,12 @@ static void print_cp_data(stack_trace_msg_t * msg)
 
 	char buff[DEBUG_BUFF_SIZE];
 	snprintf(buff, sizeof(buff),
-		 "%s [cpdbg] netns_id %lu container_id %s pid %u tid %u "
+		 "%s [cpdbg] type %d netns_id %lu container_id %s pid %u tid %u "
 		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
 		 " %u cpu %u count %u tiemstamp %lu datalen %u data %s\n",
-		 timestamp, msg->netns_id, cid, msg->pid, msg->tid,
-		 msg->process_name, msg->comm, msg->stime,
-		 msg->u_stack_id,
+		 timestamp, msg->profiler_type, msg->netns_id,
+		 cid, msg->pid, msg->tid, msg->process_name, msg->comm,
+		 msg->stime, msg->u_stack_id,
 		 msg->k_stack_id, msg->cpu, msg->count,
 		 msg->time_stamp, msg->data_len, msg->data);
 
@@ -538,7 +538,8 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	if (!run_conditions_check())
 		return (-1);
 
-	profiler_context_init(&oncpu_ctx, LOG_CP_TAG, g_enable_oncpu,
+	profiler_context_init(&oncpu_ctx, LOG_CP_TAG,
+			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
 			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
 			      MAP_STACK_B_NAME, false, false);
 

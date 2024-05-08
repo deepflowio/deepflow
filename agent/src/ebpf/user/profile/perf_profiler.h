@@ -81,9 +81,17 @@ typedef struct {
 	uword msg_ptr;
 } stack_trace_msg_kv_t;
 
+enum {
+	PROFILER_TYPE_UNKNOWN,
+	PROFILER_TYPE_ONCPU,
+	PROFILER_TYPE_NUM,
+};
+
 /*
  * stack trace message value, push data
  *
+ * @profiler_type
+ *   Profiler type, such as PROFILER_TYPE_ONCPU.
  * @time_stamp
  *   Timestamp of the stack trace data(unit: nanoseconds).
  * @pid
@@ -127,6 +135,7 @@ typedef struct {
  *   <user space folded stack trace string> + ";" + <kernel space folded stack trace string>
  */
 typedef struct {
+	u8 profiler_type;
 	u64 time_stamp;
 	u32 pid;
 	u32 tid;

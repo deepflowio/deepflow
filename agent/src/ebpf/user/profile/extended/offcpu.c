@@ -155,9 +155,13 @@ int extended_reader_create(struct bpf_tracer *tracer)
 
 	ebpf_info(LOG_OFFCPU_TAG "=== offcpu profiler enabled ===\n");
 
-	profiler_context_init(&offcpu_ctx, LOG_OFFCPU_TAG, g_enable_offcpu,
+	profiler_context_init(&offcpu_ctx,
+			      LOG_OFFCPU_TAG,
+			      PROFILER_TYPE_OFFCPU,
+			      g_enable_offcpu,
 			      MAP_OFFCPU_STATE_MAP,
-			      MAP_OFFCPU_STACK_A_NAME, MAP_OFFCPU_STACK_B_NAME,
+			      MAP_OFFCPU_STACK_A_NAME,
+			      MAP_OFFCPU_STACK_B_NAME,
 			      true, true);
 
 	set_offcpu_minblock_time(g_min_block_us);

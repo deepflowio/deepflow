@@ -20,6 +20,8 @@
 struct profiler_context {
 	// log output flag string
 	const char *tag;
+	// Profiler type
+	u8 type;
 	// The name of the status map
 	char state_map_name[MAP_NAME_SZ];
 	// The dual-buffered reader is used to read data from the perf buffer.
@@ -146,6 +148,7 @@ void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 			 u64 enable_flag);
 int profiler_context_init(struct profiler_context *ctx,
 			  const char *tag,
+			  u8 type,
 			  bool enable_profiler,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
