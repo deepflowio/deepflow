@@ -1,1 +1,2 @@
-user/socket_trace_bpf_5_2_plus.c
+user/socket_trace_bpf_*.c
+user/perf_profiler_bpf_*.c

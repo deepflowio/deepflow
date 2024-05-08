@@ -131,28 +131,59 @@ endif
 
 all: build
 
-ELFFILES = ./.data_done
+SOCKET_TRACE_ELFS := \
+	user/socket_trace_bpf_common.c \
+	user/socket_trace_bpf_3_10_0.c \
+	user/socket_trace_bpf_5_2_plus.c \
+	user/socket_trace_bpf_kylin.c
+
+PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c
+
+ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS)
 
 tools/bintobuffer:
 	$(call msg,TOOLS,tools/bintobuffer)
 	@$(CC) tools/bintobuffer.c -o tools/bintobuffer
 
-$(ELFFILES): tools/bintobuffer
+define check_clang
 	$(call msg,Clang/LLVM,,$(CLANG_VER))
 	@if [ $(CLANG_VER_MAIN) -lt 10 ]; then \
                 echo "  check llvm-clang fail. expect Clang/LLVM 10+" && exit 1; \
         fi
 	@rm -rf data
+endef
+
+user/socket_trace_bpf_common.c: tools/bintobuffer kernel/socket_trace.bpf.c
+	$(call check_clang)
 	$(call compile_socket_trace_elf, common)
+
+user/socket_trace_bpf_3_10_0.c: tools/bintobuffer kernel/socket_trace.bpf.c
+	$(call check_clang)
 	$(call compile_socket_trace_elf, 3_10_0, LINUX_VER_3_10_0=1)
+
+user/socket_trace_bpf_5_2_plus.c: tools/bintobuffer kernel/socket_trace.bpf.c
+	$(call check_clang)
 	$(call compile_socket_trace_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
+
+user/socket_trace_bpf_kylin.c: tools/bintobuffer kernel/socket_trace.bpf.c
+	$(call check_clang)
 	$(call compile_socket_trace_elf, kylin, LINUX_VER_KYLIN=1)
+
+user/perf_profiler_bpf_common.c: tools/bintobuffer kernel/perf_profiler.bpf.c
+	$(call check_clang)
 	$(call compile_perf_profiler_elf, common)
-	@touch $(ELFFILES)
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
 	$(Q)mkdir -p $@/user/profile/java
+
+$(STATIC_OBJDIR)/user/socket.o: user/socket.c $(SOCKET_TRACE_ELFS) | $(STATIC_OBJDIR)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+$(STATIC_OBJDIR)/user/profile/perf_profiler.o: user/profile/perf_profiler.c $(PERF_PROFILER_ELFS) | $(STATIC_OBJDIR)
+	$(call msg,CC,$@)
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)
