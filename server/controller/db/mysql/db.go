@@ -78,6 +78,14 @@ func (d *DB) PreORGID(format string, a ...any) string { // TODO optimize
 	return fmt.Sprintf("[OID-%d] %s", d.ORGID, fmt.Sprintf(format, a...))
 }
 
+func (d *DB) GetORGID() int {
+	return d.ORGID
+}
+
+func (d *DB) GetName() string {
+	return d.Name
+}
+
 type DBs struct {
 	cfg config.MySqlConfig
 

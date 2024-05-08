@@ -106,16 +106,6 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 }
 
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
-	// TODO delete
-	// var domain *mysql.Domain
-	// result := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain)
-	// if result.RowsAffected != int64(1) {
-	// 	err := errors.New(d.metadata.LogPre("db domain not found"))
-	// 	log.Error(d.metadata.LogPre(err.Error()))
-	// 	return err
-	// }
-	// d.metadata.Domain.Name = domain.Name
-
 	if cloudData.Verified {
 		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 {
 			log.Info(d.metadata.LogPre("domain has no networks or vinterfaces, does nothing"))
@@ -268,7 +258,7 @@ func (d *domain) notifyOnResourceChanged(updatersInUpdateOrder []updater.Resourc
 	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
 	if platformDataChanged {
 		log.Info(d.metadata.LogPre("domain data changed, refresh platform data"))
-		refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
+		refresh.RefreshCache(d.metadata.GetORGID(), []common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
 	}
 }
 
@@ -355,20 +345,18 @@ func (d *domain) formatStateInfo(domainResource cloudmodel.Resource) (state int,
 	return
 }
 
-var platformDataResource = []string{
-	"mysql.Region", "mysql.AZ", "mysql.Host", "mysql.VM", "mysql.VInterface",
-	"mysql.VRouter", "mysql.Network", "mysql.PeerConnection",
-	"mysql.Pod", "mysql.PodNode", "mysql.Process",
+var changeSensitiveResourceTypes = []string{
+	common.RESOURCE_TYPE_REGION_EN, common.RESOURCE_TYPE_AZ_EN, common.RESOURCE_TYPE_HOST_EN, common.RESOURCE_TYPE_VM_EN, common.RESOURCE_TYPE_VINTERFACE_EN,
+	common.RESOURCE_TYPE_VROUTER_EN, common.RESOURCE_TYPE_NETWORK_EN, common.RESOURCE_TYPE_PEER_CONNECTION_EN,
+	common.RESOURCE_TYPE_POD_EN, common.RESOURCE_TYPE_POD_NODE_EN, common.RESOURCE_TYPE_PROCESS_EN,
 }
 
-func isPlatformDataChanged(updatersInUpdateOrder []updater.ResourceUpdater) bool {
-	platformDataChanged := false
-	for _, updater := range updatersInUpdateOrder {
-		for _, resource := range updater.GetMySQLModelString() {
-			if common.Contains(platformDataResource, resource) {
-				platformDataChanged = platformDataChanged || updater.GetChanged()
-			}
+func isPlatformDataChanged(updaters []updater.ResourceUpdater) bool {
+	changed := false
+	for _, updater := range updaters {
+		if common.Contains(changeSensitiveResourceTypes, updater.GetResourceType()) {
+			changed = changed || updater.GetChanged()
 		}
 	}
-	return platformDataChanged
+	return changed
 }

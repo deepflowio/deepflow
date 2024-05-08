@@ -49,6 +49,10 @@ func (m *Metadata) Copy() *Metadata {
 	}
 }
 
+func (m *Metadata) GetORGID() int {
+	return m.ORGID
+}
+
 func (m *Metadata) SetDomain(domain mysql.Domain) {
 	m.Domain = &DomainInfo{domain}
 	m.Logger.SetDomainName(domain.Name)

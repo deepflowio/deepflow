@@ -25,7 +25,7 @@ import (
 var log = logging.MustGetLogger("recorder.common")
 
 type Logger struct {
-	ORGID         int
+	orgID         int
 	DomainName    string
 	SubDomainName string
 	MsgPre        string
@@ -33,14 +33,14 @@ type Logger struct {
 
 func NewLogger(orgID int) *Logger {
 	return &Logger{
-		ORGID:  orgID,
+		orgID:  orgID,
 		MsgPre: fmt.Sprintf("[OID-%d] ", orgID),
 	}
 }
 
 func (l *Logger) InitMsgPre() {
-	if l.ORGID != 0 {
-		l.MsgPre = fmt.Sprintf("[OID-%d] ", l.ORGID)
+	if l.orgID != 0 {
+		l.MsgPre = fmt.Sprintf("[OID-%d] ", l.orgID)
 	}
 	if l.DomainName != "" {
 		l.MsgPre += fmt.Sprintf("[DN-%s] ", l.DomainName)
@@ -70,7 +70,7 @@ func (l *Logger) AddPre(format string, a ...any) string {
 
 func (l *Logger) Copy() *Logger {
 	return &Logger{
-		ORGID:         l.ORGID,
+		orgID:         l.orgID,
 		DomainName:    l.DomainName,
 		SubDomainName: l.SubDomainName,
 		MsgPre:        l.MsgPre,

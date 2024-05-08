@@ -70,10 +70,6 @@ func (i *IP) GetResourceType() string {
 	return ctrlrcommon.RESOURCE_TYPE_IP_EN
 }
 
-func (i *IP) GetMySQLModelString() []string {
-	return []string{i.wanIPUpdater.GetMySQLModelString()[0], i.lanIPUpdater.GetMySQLModelString()[0]}
-}
-
 func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []cloudmodel.IP) {
 	wanCloudData := []cloudmodel.IP{}
 	lanCloudData := []cloudmodel.IP{}

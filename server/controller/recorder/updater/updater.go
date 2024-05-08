@@ -17,8 +17,6 @@
 package updater
 
 import (
-	"reflect"
-
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -46,7 +44,6 @@ type ResourceUpdater interface {
 type Publisher interface {
 	GetChanged() bool
 	GetResourceType() string
-	GetMySQLModelString() []string
 }
 
 type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase, MFUPT msg.FieldsUpdatePtr[MFUT], MFUT msg.FieldsUpdate] interface {
@@ -115,7 +112,7 @@ func newUpdaterBase[
 		diffBaseData: diffBaseData,
 		cloudData:    cloudData,
 	}
-	u.msgMetadata = message.NewMetadata(u.metadata.ORGID, u.metadata.Domain.TeamID, u.metadata.Domain.ID)
+	u.msgMetadata = message.NewMetadata(u.metadata.GetORGID(), u.metadata.Domain.TeamID, u.metadata.Domain.ID)
 	u.initPubSub()
 	return u
 }
@@ -189,11 +186,6 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 
 func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) GetChanged() bool {
 	return u.Changed
-}
-
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) GetMySQLModelString() []string { // TODO delete
-	var mt MT
-	return []string{reflect.TypeOf(mt).String()}
 }
 
 func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) add(dbItemsToAdd []*MT) {
