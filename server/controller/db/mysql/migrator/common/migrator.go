@@ -28,6 +28,7 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration/script"
@@ -138,7 +139,7 @@ func executeIssue(dc *DBConfig, nextVersion string) error {
 		return nil
 	}
 
-	strSQL := fmt.Sprintf("SET @tableSchema='%s';\n", dc.Config.Database) + string(byteSQL)
+	strSQL := fmt.Sprintf("SET @defaultDatabaseName='%s';\n", mysql.DefaultDB.Name) + string(byteSQL)
 	err = dc.DB.Exec(strSQL).Error
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to execute db issue (version: %s): %s", nextVersion, err.Error()))

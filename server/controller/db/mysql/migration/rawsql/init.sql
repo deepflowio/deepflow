@@ -1133,6 +1133,7 @@ TRUNCATE TABLE resource_group_extra_info;
 
 CREATE TABLE IF NOT EXISTS npb_policy (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id                INTEGER DEFAULT 1,
     team_id                INTEGER DEFAULT 1,
     name                   CHAR(64),
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
@@ -1699,6 +1700,7 @@ TRUNCATE TABLE vtap_group_configuration;
 
 CREATE TABLE IF NOT EXISTS npb_tunnel (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id             INTEGER DEFAULT 1,
     team_id             INTEGER DEFAULT 1,
     name                CHAR(64) NOT NULL,
     ip                  CHAR(64),
