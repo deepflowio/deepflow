@@ -88,8 +88,8 @@ type EventStore struct {
 
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'event', otherwise stored in '<OrgId>_event'.
-	OrgId  uint16
-	TeamID uint16
+	OrgId  uint16 `json:"org_id" category:"$tag"`
+	TeamID uint16 `json:"team_id" category:"$tag"`
 
 	AutoInstanceID   uint32 `json:"auto_instance_id" category:"$tag" sub:"universal_tag"`
 	AutoInstanceType uint8  `json:"auto_instance_type" category:"$tag" sub:"universal_tag" enumfile:"auto_instance_type"`

@@ -106,7 +106,7 @@ func writeK8sLabels(sb *strings.Builder, keyName, valueName string, k8sLabels ut
 		valuesBuilder.WriteString(`"`)
 
 	}
-	sb.WriteString(`]"`)
+	sb.WriteString(`]`)
 	valuesBuilder.WriteString(`]`)
 
 	sb.WriteString(valuesBuilder.String())
