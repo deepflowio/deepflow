@@ -1156,6 +1156,9 @@ impl HttpLog {
             } else {
                 info.x_request_id_1 = val.to_owned();
             }
+            if key.eq_ignore_ascii_case("x-gw-rsp-seq") {
+                info.trace_id = val.to_owned();
+            }
         }
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
             info.client_ip = Some(val.to_owned());
