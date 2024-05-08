@@ -80,7 +80,7 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 		log.Error(o.metadata.LogPre("add %s (lcuuids: %v) failed", o.resourceTypeName, lcuuidsToAdd))
 
 		if o.allocateID && len(allocatedIDs) > 0 {
-			idmng.ReleaseIDs(o.metadata.ORGID, o.resourceTypeName, allocatedIDs)
+			idmng.ReleaseIDs(o.metadata.GetORGID(), o.resourceTypeName, allocatedIDs)
 		}
 		return nil, false
 	}
@@ -239,7 +239,7 @@ func (o *OperatorBase[MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 			}
 		}
 		if count > 0 {
-			ids, err := idmng.GetIDs(o.metadata.ORGID, o.resourceTypeName, count)
+			ids, err := idmng.GetIDs(o.metadata.GetORGID(), o.resourceTypeName, count)
 			if err != nil {
 				log.Error(o.metadata.LogPre("%s request ids failed", o.resourceTypeName))
 				return itemsHasID, []int{}, false
@@ -265,7 +265,7 @@ func (o *OperatorBase[MT]) returnUsedIDs(deletedItems []*MT) {
 		for _, dbItem := range deletedItems {
 			ids = append(ids, (*dbItem).GetID())
 		}
-		err := idmng.ReleaseIDs(o.metadata.ORGID, o.resourceTypeName, ids)
+		err := idmng.ReleaseIDs(o.metadata.GetORGID(), o.resourceTypeName, ids)
 		if err != nil {
 			log.Error(o.metadata.LogPre("%s release ids: %v failed", o.resourceTypeName, ids))
 		}

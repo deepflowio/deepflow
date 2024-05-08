@@ -418,7 +418,7 @@ func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, item
 func deleteExpired[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time) {
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Delete(new(MT)).Error
 	if err != nil {
-		log.Errorf("oid: %d, mysql delete resource failed: %v", db.ORGID, err)
+		log.Errorf("oid: %d, mysql delete resource failed: %v", db.GetORGID(), err)
 	}
 }
 

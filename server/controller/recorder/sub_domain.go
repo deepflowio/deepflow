@@ -243,10 +243,10 @@ func (r *subDomain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpda
 }
 
 func (s *subDomain) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
-	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
-	if platformDataChanged {
+	changed := isPlatformDataChanged(updatersInUpdateOrder)
+	if changed {
 		log.Info(s.metadata.LogPre("sub domain data changed, refresh platform data"))
-		refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
+		refresh.RefreshCache(s.metadata.GetORGID(), []common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
 	}
 }
 
