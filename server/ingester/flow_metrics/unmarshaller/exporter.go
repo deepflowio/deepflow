@@ -183,7 +183,7 @@ func EncodeToPrometheus(e app.Document, utags *utag.UniversalTagsManager, cfg *c
 			continue
 		}
 
-		valueFloat64, isFloat64 := utils.ConvertToFloat64(value)
+		valueFloat64, _, isFloat64 := utils.ConvertToFloat64(value)
 		if !isFloat64 {
 			continue
 		}
