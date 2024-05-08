@@ -100,7 +100,7 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId)
 				continue
 			}
-			lbLcuuid := common.GenerateUUID(lb.BlbId)
+			lbLcuuid := common.GenerateUUIDByOrgID(b.orgID, lb.BlbId)
 			retLB := model.LB{
 				Lcuuid:       lbLcuuid,
 				Name:         lb.Name,
@@ -166,7 +166,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId)
 				continue
 			}
-			lbLcuuid := common.GenerateUUID(lb.BlbId)
+			lbLcuuid := common.GenerateUUIDByOrgID(b.orgID, lb.BlbId)
 			retLB := model.LB{
 				Lcuuid:       lbLcuuid,
 				Name:         lb.Name,
@@ -198,7 +198,7 @@ func (b *BaiduBce) getLBVInterfaceAndIPs(
 
 	// 内网接口+IP
 	if ip != "" {
-		vinterfaceLcuuid := common.GenerateUUID(lbLcuuid + ip)
+		vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, lbLcuuid+ip)
 		retVInterfaces = append(retVInterfaces, model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_LAN,
@@ -210,17 +210,17 @@ func (b *BaiduBce) getLBVInterfaceAndIPs(
 			RegionLcuuid:  region.Lcuuid,
 		})
 		retIPs = append(retIPs, model.IP{
-			Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ip),
+			Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+ip),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               ip,
-			SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+			SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
 			RegionLcuuid:     region.Lcuuid,
 		})
 	}
 
 	// 公网接口+IP
 	if publicIP != "" {
-		vinterfaceLcuuid := common.GenerateUUID(lbLcuuid + publicIP)
+		vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, lbLcuuid+publicIP)
 		retVInterfaces = append(retVInterfaces, model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_WAN,
@@ -232,7 +232,7 @@ func (b *BaiduBce) getLBVInterfaceAndIPs(
 			RegionLcuuid:  region.Lcuuid,
 		})
 		retIPs = append(retIPs, model.IP{
-			Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + publicIP),
+			Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+publicIP),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               publicIP,
 			RegionLcuuid:     region.Lcuuid,

@@ -63,7 +63,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 				log.Debugf("nat_gateway (%s) vpc (%s) not found", nat.Id, nat.VpcId)
 				continue
 			}
-			natGatewayLcuuid := common.GenerateUUID(nat.Id)
+			natGatewayLcuuid := common.GenerateUUIDByOrgID(b.orgID, nat.Id)
 			retNATGateway := model.NATGateway{
 				Lcuuid:       natGatewayLcuuid,
 				Name:         nat.Name,
@@ -78,7 +78,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 			// TODO: 目前Go sdk只能返回snat_ip，需要后续跟进dnat_ips
 			// 将nat_ip作为接口 + 公网IP返回
 			for _, ip := range nat.Eips {
-				vinterfaceLcuuid := common.GenerateUUID(natGatewayLcuuid + ip)
+				vinterfaceLcuuid := common.GenerateUUIDByOrgID(b.orgID, natGatewayLcuuid+ip)
 				retVInterface := model.VInterface{
 					Lcuuid:        vinterfaceLcuuid,
 					Type:          common.VIF_TYPE_LAN,
@@ -92,7 +92,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 				retVInterfaces = append(retVInterfaces, retVInterface)
 
 				retIP := model.IP{
-					Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ip),
+					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
 					RegionLcuuid:     region.Lcuuid,

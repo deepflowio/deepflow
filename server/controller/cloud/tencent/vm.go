@@ -22,7 +22,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGroup, error) {
@@ -52,7 +51,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 		}
 
 		vmID := vData.Get("InstanceId").MustString()
-		vmLcuuid := common.GetUUID(vmID, uuid.Nil)
+		vmLcuuid := common.GetUUIDByOrgID(t.orgID, vmID)
 
 		vmState := vData.Get("InstanceState").MustString()
 		state, ok := states[vmState]
@@ -67,7 +66,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 		}
 
 		azID := vData.Get("Placement").Get("Zone").MustString()
-		azLcuuid := common.GetUUID(t.uuidGenerate+"_"+azID, uuid.Nil)
+		azLcuuid := common.GetUUIDByOrgID(t.orgID, t.uuidGenerate+"_"+azID)
 		vms = append(vms, model.VM{
 			Lcuuid:       vmLcuuid,
 			Name:         vmName,
@@ -76,7 +75,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 			State:        state,
 			CreatedAt:    createAt,
 			CloudTags:    expand.GetVMTags(vData),
-			VPCLcuuid:    common.GetUUID(vpcID, uuid.Nil),
+			VPCLcuuid:    common.GetUUIDByOrgID(t.orgID, vpcID),
 			AZLcuuid:     azLcuuid,
 			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
@@ -86,8 +85,8 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 		for s := range sgIDs.MustArray() {
 			sgID := sgIDs.GetIndex(s).MustString()
 			vmSGs = append(vmSGs, model.VMSecurityGroup{
-				Lcuuid:              common.GetUUID(vmLcuuid+sgID, uuid.Nil),
-				SecurityGroupLcuuid: common.GetUUID(sgID, uuid.Nil),
+				Lcuuid:              common.GetUUIDByOrgID(t.orgID, vmLcuuid+sgID),
+				SecurityGroupLcuuid: common.GetUUIDByOrgID(t.orgID, sgID),
 				VMLcuuid:            vmLcuuid,
 				Priority:            s,
 			})

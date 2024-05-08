@@ -53,7 +53,7 @@ func (q *QingCloud) GetSecurityGroups() ([]model.SecurityGroup, []model.Security
 				if securityGroupName == "" {
 					securityGroupName = securityGroupId
 				}
-				securityGroupLcuuid := common.GenerateUUID(securityGroupId)
+				securityGroupLcuuid := common.GenerateUUIDByOrgID(q.orgID, securityGroupId)
 				retSecurityGroups = append(retSecurityGroups, model.SecurityGroup{
 					Lcuuid:       securityGroupLcuuid,
 					Name:         securityGroupName,
@@ -77,9 +77,7 @@ func (q *QingCloud) GetSecurityGroups() ([]model.SecurityGroup, []model.Security
 						retSecurityGroupRules = append(
 							retSecurityGroupRules,
 							model.SecurityGroupRule{
-								Lcuuid: common.GenerateUUID(
-									securityGroupLcuuid + strconv.Itoa(direction) + remote,
-								),
+								Lcuuid:              common.GenerateUUIDByOrgID(q.orgID, securityGroupLcuuid+strconv.Itoa(direction)+remote),
 								SecurityGroupLcuuid: securityGroupLcuuid,
 								Direction:           direction,
 								EtherType:           ethertype,
@@ -202,8 +200,8 @@ func (q *QingCloud) getSecurityGroupRules() ([]model.SecurityGroupRule, error) {
 				retSecurityGroupRules = append(
 					retSecurityGroupRules,
 					model.SecurityGroupRule{
-						Lcuuid:              common.GenerateUUID(ruleId),
-						SecurityGroupLcuuid: common.GenerateUUID(securityGroupId),
+						Lcuuid:              common.GenerateUUIDByOrgID(q.orgID, ruleId),
+						SecurityGroupLcuuid: common.GenerateUUIDByOrgID(q.orgID, securityGroupId),
 						Direction:           direction,
 						EtherType:           ethertype,
 						Protocol:            protocol,

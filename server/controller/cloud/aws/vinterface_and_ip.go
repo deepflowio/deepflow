@@ -24,7 +24,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 	"inet.af/netaddr"
 )
 
@@ -84,10 +83,10 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 		description := a.getStringPointerValue(vData.Description)
 		if vData.Attachment.InstanceId != nil {
 			instanceID := *vData.Attachment.InstanceId
-			deviceLcuuid := common.GetUUID(instanceID, uuid.Nil)
-			vinterfaceLcuuid := common.GetUUID(a.getStringPointerValue(vData.NetworkInterfaceId), uuid.Nil)
-			networkLcuuid := common.GetUUID(a.getStringPointerValue(vData.SubnetId), uuid.Nil)
-			vpcLcuuid := common.GetUUID(a.getStringPointerValue(vData.VpcId), uuid.Nil)
+			deviceLcuuid := common.GetUUIDByOrgID(a.orgID, instanceID)
+			vinterfaceLcuuid := common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(vData.NetworkInterfaceId))
+			networkLcuuid := common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(vData.SubnetId))
+			vpcLcuuid := common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(vData.VpcId))
 			vinterface := model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          common.VIF_TYPE_LAN,
@@ -122,10 +121,10 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 					}
 				}
 				ips = append(ips, model.IP{
-					Lcuuid:           common.GetUUID(vinterfaceLcuuid+privateIP, uuid.Nil),
+					Lcuuid:           common.GetUUIDByOrgID(a.orgID, vinterfaceLcuuid+privateIP),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               privateIP,
-					SubnetLcuuid:     common.GetUUID(networkLcuuid, uuid.Nil),
+					SubnetLcuuid:     common.GetUUIDByOrgID(a.orgID, networkLcuuid),
 					RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
 				})
 
@@ -136,7 +135,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 				publicIP := a.getStringPointerValue(ip.Association.PublicIp)
 				netPublicIP, err := netaddr.ParseIP(publicIP)
 				if err == nil && netPublicIP.Is4() {
-					vLcuuid := common.GetUUID(vinterfaceLcuuid, uuid.Nil)
+					vLcuuid := common.GetUUIDByOrgID(a.orgID, vinterfaceLcuuid)
 					vinterfaces = append(vinterfaces, model.VInterface{
 						Lcuuid:        vLcuuid,
 						Type:          common.VIF_TYPE_WAN,
@@ -149,7 +148,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 					})
 
 					ips = append(ips, model.IP{
-						Lcuuid:           common.GetUUID(vinterfaceLcuuid+publicIP, uuid.Nil),
+						Lcuuid:           common.GetUUIDByOrgID(a.orgID, vinterfaceLcuuid+publicIP),
 						VInterfaceLcuuid: vLcuuid,
 						IP:               publicIP,
 						RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
@@ -158,7 +157,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 					a.publicIPToVinterface[publicIP] = vinterface
 
 					vNatRules = append(vNatRules, model.NATRule{
-						Lcuuid:           common.GetUUID(publicIP+vinterfaceLcuuid+privateIP, uuid.Nil),
+						Lcuuid:           common.GetUUIDByOrgID(a.orgID, publicIP+vinterfaceLcuuid+privateIP),
 						Type:             "DNAT",
 						Protocol:         "ALL",
 						FloatingIP:       publicIP,

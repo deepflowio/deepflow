@@ -52,7 +52,7 @@ func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]str
 	} else {
 		return nil, nil, nil, nil
 	}
-	regionLcuuid := common.GenerateUUID(regionName)
+	regionLcuuid := common.GenerateUUIDByOrgID(b.orgID, regionName)
 	retRegionLcuuid := regionLcuuid
 
 	if b.regionUuid == "" {
@@ -67,7 +67,7 @@ func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]str
 
 	zoneNameToAZLcuuid = make(map[string]string)
 	for _, zone := range zones {
-		azLcuuid := common.GenerateUUID(regionLcuuid + zone.ZoneName)
+		azLcuuid := common.GenerateUUIDByOrgID(b.orgID, regionLcuuid+zone.ZoneName)
 		retAZ := model.AZ{
 			Lcuuid:       azLcuuid,
 			Name:         zone.ZoneName,

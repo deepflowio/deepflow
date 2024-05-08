@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 )
 
 func TestHuaWei(t *testing.T) {
@@ -31,7 +32,7 @@ func TestHuaWei(t *testing.T) {
 			DisplayName: "test_huawei",
 		}
 
-		huawei, _ := NewHuaWei(domain, config.CloudConfig{})
+		huawei, _ := NewHuaWei(common.DEFAULT_ORG_ID, domain, config.CloudConfig{})
 		data, _ := huawei.GetCloudData()
 		Convey("huaweiResource number should be equal", func() {
 			So(len(data.VPCs), ShouldEqual, 3)

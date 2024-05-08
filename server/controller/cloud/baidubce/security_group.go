@@ -65,7 +65,7 @@ func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[stri
 				log.Debugf("security_group (%s) vpc (%s) not found", securityGroup.Id, securityGroup.VpcId)
 				continue
 			}
-			securityGroupLcuuid := common.GenerateUUID(securityGroup.Id)
+			securityGroupLcuuid := common.GenerateUUIDByOrgID(b.orgID, securityGroup.Id)
 			retSecurityGroup := model.SecurityGroup{
 				Lcuuid:       securityGroupLcuuid,
 				Name:         securityGroup.Name,
@@ -115,10 +115,7 @@ func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[stri
 					local, remote = remote, local
 				}
 
-				ruleLcuuid := common.GenerateUUID(
-					securityGroupLcuuid + strconv.Itoa(direction) + local + remote +
-						rule.Protocol + rule.PortRange + strconv.Itoa(ruleIndex),
-				)
+				ruleLcuuid := common.GenerateUUIDByOrgID(b.orgID, securityGroupLcuuid+strconv.Itoa(direction)+local+remote+rule.Protocol+rule.PortRange+strconv.Itoa(ruleIndex))
 				retRule := model.SecurityGroupRule{
 					Lcuuid:              ruleLcuuid,
 					SecurityGroupLcuuid: securityGroupLcuuid,
@@ -148,9 +145,7 @@ func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[stri
 						remote = common.SECURITY_GROUP_RULE_IPV6_CIDR
 					}
 					retRule := model.SecurityGroupRule{
-						Lcuuid: common.GenerateUUID(
-							securityGroupLcuuid + strconv.Itoa(direction) + remote,
-						),
+						Lcuuid:              common.GenerateUUIDByOrgID(b.orgID, securityGroupLcuuid+strconv.Itoa(direction)+remote),
 						SecurityGroupLcuuid: securityGroupLcuuid,
 						Direction:           direction,
 						EtherType:           ethertype,

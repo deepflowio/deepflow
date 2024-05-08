@@ -20,7 +20,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -57,9 +57,9 @@ func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {
 			if strings.HasPrefix(regionId, "ap") {
 				regionId = zoneId
 			}
-			regionLcuuid := common.GenerateUUID(q.UuidGenerate + "_" + regionId)
+			regionLcuuid := common.GenerateUUIDByOrgID(q.orgID, q.UuidGenerate+"_"+regionId)
 			retAZs = append(retAZs, model.AZ{
-				Lcuuid:       common.GenerateUUID(q.UuidGenerate + "_" + zoneId),
+				Lcuuid:       common.GenerateUUIDByOrgID(q.orgID, q.UuidGenerate+"_"+zoneId),
 				Name:         zoneId,
 				Label:        zoneId,
 				RegionLcuuid: q.GetRegionLcuuid(regionLcuuid),
@@ -84,7 +84,7 @@ func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {
 	for _, regionId := range regionIds.ToSlice() {
 		regionIdStr := regionId.(string)
 		retRegions = append(retRegions, model.Region{
-			Lcuuid: common.GenerateUUID(q.UuidGenerate + "_" + regionIdStr),
+			Lcuuid: common.GenerateUUIDByOrgID(q.orgID, q.UuidGenerate+"_"+regionIdStr),
 			Name:   strings.ToUpper(regionIdStr),
 		})
 	}

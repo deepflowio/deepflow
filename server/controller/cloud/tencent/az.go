@@ -19,7 +19,6 @@ package tencent
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getAZs(region tencentRegion) ([]model.AZ, error) {
@@ -38,7 +37,7 @@ func (t *Tencent) getAZs(region tencentRegion) ([]model.AZ, error) {
 		}
 		zone := aData.Get("Zone").MustString()
 		name := aData.Get("ZoneName").MustString()
-		lcuuid := common.GetUUID(t.uuidGenerate+"_"+zone, uuid.Nil)
+		lcuuid := common.GetUUIDByOrgID(t.orgID, t.uuidGenerate+"_"+zone)
 		if _, ok := t.azLcuuidMap[lcuuid]; !ok {
 			log.Debugf("az (%s) has no resource", name)
 			continue

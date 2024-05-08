@@ -70,7 +70,7 @@ func (b *BaiduBce) getNetworks(
 				continue
 			}
 
-			networkLcuuid := common.GenerateUUID(subnet.SubnetId)
+			networkLcuuid := common.GenerateUUIDByOrgID(b.orgID, subnet.SubnetId)
 			retNetwork := model.Network{
 				Lcuuid:       networkLcuuid,
 				Name:         subnet.Name,
@@ -87,7 +87,7 @@ func (b *BaiduBce) getNetworks(
 			b.regionLcuuidToResourceNum[retNetwork.RegionLcuuid]++
 
 			retSubnet := model.Subnet{
-				Lcuuid:        common.GenerateUUID(networkLcuuid),
+				Lcuuid:        common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
 				Name:          subnet.Name,
 				CIDR:          subnet.Cidr,
 				NetworkLcuuid: networkLcuuid,

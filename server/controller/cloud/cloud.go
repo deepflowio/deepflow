@@ -74,16 +74,19 @@ func NewCloud(orgID int, domain mysql.Domain, cfg config.CloudConfig, ctx contex
 		return nil
 	}
 
-	log.Infof("cloud task (%s) init success", domain.Name)
+	log.Infof("org (%d) cloud task (%s) init success", orgID, domain.Name)
 
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
 		orgID: orgID,
 		db:    mysqlDB,
 		basicInfo: model.BasicInfo{
-			Lcuuid: domain.Lcuuid,
-			Name:   domain.Name,
-			Type:   domain.Type,
+			OrgID:     orgID,
+			TeamID:    domain.TeamID,
+			Lcuuid:    domain.Lcuuid,
+			Name:      domain.Name,
+			Type:      domain.Type,
+			CreatedAt: domain.CreatedAt,
 		},
 		platform:                platform,
 		kubernetesGatherTaskMap: make(map[string]*KubernetesGatherTask),
@@ -303,34 +306,35 @@ func (c *Cloud) sendStatsd(cloudCost float64) {
 }
 
 func (c *Cloud) run() {
-	log.Infof("cloud (%s) started", c.basicInfo.Name)
+	log.Infof("org (%d) cloud (%s) started", c.orgID, c.basicInfo.Name)
 
 	if err := c.platform.CheckAuth(); err != nil {
-		log.Errorf("cloud (%+v) check auth failed", c.basicInfo)
+		log.Errorf("org (%d) cloud (%+v) check auth failed", c.orgID, c.basicInfo)
 	}
-	log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name)
+	log.Infof("org (%d) cloud (%s) assemble data starting", c.orgID, c.basicInfo.Name)
 	c.getCloudData()
-	log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
+	log.Infof("org (%d) cloud (%s) assemble data complete", c.orgID, c.basicInfo.Name)
 
 	cloudGatherInterval := c.getCloudGatherInterval()
+	c.basicInfo.Interval = cloudGatherInterval
 	ticker := time.NewTicker(time.Second * time.Duration(cloudGatherInterval))
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name)
+			log.Infof("org (%d) cloud (%s) assemble data starting", c.orgID, c.basicInfo.Name)
 			c.getCloudData()
-			log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
+			log.Infof("org (%d) cloud (%s) assemble data complete", c.orgID, c.basicInfo.Name)
 		case <-c.cCtx.Done():
-			log.Infof("cloud (%s) stopped", c.basicInfo.Name)
+			log.Infof("org (%d) cloud (%s) stopped", c.orgID, c.basicInfo.Name)
 			return
 		}
 	}
 }
 
 func (c *Cloud) startKubernetesGatherTask() {
-	log.Infof("cloud (%s) kubernetes gather task started", c.basicInfo.Name)
+	log.Infof("org (%d) cloud (%s) kubernetes gather task started", c.orgID, c.basicInfo.Name)
 	c.runKubernetesGatherTask()
 	go func() {
 		for range time.Tick(time.Duration(c.cfg.KubernetesGatherInterval) * time.Second) {

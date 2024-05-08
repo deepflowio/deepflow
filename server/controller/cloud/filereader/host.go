@@ -39,7 +39,7 @@ func (f *FileReader) getHosts(fileInfo *FileInfo) ([]model.Host, error) {
 			return nil, err
 		}
 
-		lcuuid := common.GenerateUUID(f.UuidGenerate + "_host_" + host.IP)
+		lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_host_"+host.IP)
 		retHosts = append(retHosts, model.Host{
 			Lcuuid:       lcuuid,
 			Name:         host.IP,

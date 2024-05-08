@@ -33,7 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-var log *logging.Logger
+var log = logging.MustGetLogger("cloud.aliyun")
 
 type Aliyun struct {
 	orgID          int
@@ -56,8 +56,6 @@ type Aliyun struct {
 }
 
 func NewAliyun(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aliyun, error) {
-	log = logging.MustGetLogger(fmt.Sprintf("cloud.org:%d.aliyun", orgID))
-
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)

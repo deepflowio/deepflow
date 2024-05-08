@@ -58,7 +58,7 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 	vpcIdToLcuuid = make(map[string]string)
 	for _, r := range results {
 		for _, vpc := range r.VPCs {
-			vpcLcuuid := common.GenerateUUID(vpc.VPCID)
+			vpcLcuuid := common.GenerateUUIDByOrgID(b.orgID, vpc.VPCID)
 			retVPC := model.VPC{
 				Lcuuid:       vpcLcuuid,
 				Name:         vpc.Name,

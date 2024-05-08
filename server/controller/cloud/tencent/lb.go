@@ -22,7 +22,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBListener, []model.LBTargetServer, []model.VInterface, []model.IP, error) {
@@ -49,7 +48,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			continue
 		}
 		vpcID := lbData.Get("VpcId").MustString()
-		vpcLcuuid := common.GetUUID(vpcID, uuid.Nil)
+		vpcLcuuid := common.GetUUIDByOrgID(t.orgID, vpcID)
 		lbName := lbData.Get("LoadBalancerName").MustString()
 		if vpcID == "" {
 			log.Warningf("load balance (%s) vpc not found", lbName)
@@ -65,7 +64,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 		for i := range lbData.Get("LoadBalancerVips").MustArray() {
 			lbIPStrings = append(lbIPStrings, lbData.Get("LoadBalancerVips").GetIndex(i).MustString())
 		}
-		lbLcuuid := common.GetUUID(lbID, uuid.Nil)
+		lbLcuuid := common.GetUUIDByOrgID(t.orgID, lbID)
 		lbs = append(lbs, model.LB{
 			Lcuuid:       lbLcuuid,
 			Name:         lbName,
@@ -97,7 +96,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 				listenerProtocol := lbListenerData.Get("Protocol").MustString()
 				listenerPort := lbListenerData.Get("Port").MustInt()
 				lbListeners = append(lbListeners, model.LBListener{
-					Lcuuid:   common.GetUUID(listenerID, uuid.Nil),
+					Lcuuid:   common.GetUUIDByOrgID(t.orgID, listenerID),
 					LBLcuuid: lbLcuuid,
 					Name:     listenerName,
 					Label:    listenerID,
@@ -153,15 +152,15 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 					aPIPSlice = append(aPIPSlice, aPrivateIPs.GetIndex(ap).MustString())
 				}
 
-				listenerLcuuid := common.GetUUID(s.lcuuid, uuid.Nil)
+				listenerLcuuid := common.GetUUIDByOrgID(t.orgID, s.lcuuid)
 				sPort := s.server.Get("Port").MustInt()
 				key := instanceID + listenerLcuuid + strconv.Itoa(sPort)
 				lbTargetServers = append(lbTargetServers, model.LBTargetServer{
-					Lcuuid:           common.GetUUID(key, uuid.Nil),
+					Lcuuid:           common.GetUUIDByOrgID(t.orgID, key),
 					LBLcuuid:         lbLcuuid,
 					LBListenerLcuuid: listenerLcuuid,
 					Type:             common.LB_SERVER_TYPE_VM,
-					VMLcuuid:         common.GetUUID(instanceID, uuid.Nil),
+					VMLcuuid:         common.GetUUIDByOrgID(t.orgID, instanceID),
 					Port:             sPort,
 					IP:               aPIPSlice[0],
 					VPCLcuuid:        vpcLcuuid,
@@ -181,7 +180,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 				}
 				listenerID := clbListenerData.Get("ListenerId").MustString()
 				listenerProtocol := clbListenerData.Get("Protocol").MustString()
-				listenerLcuuid := common.GetUUID(listenerID, uuid.Nil)
+				listenerLcuuid := common.GetUUIDByOrgID(t.orgID, listenerID)
 				lbListeners = append(lbListeners, model.LBListener{
 					Lcuuid:   listenerLcuuid,
 					LBLcuuid: lbLcuuid,
@@ -213,11 +212,11 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 					}
 
 					lbTargetServers = append(lbTargetServers, model.LBTargetServer{
-						Lcuuid:           common.GetUUID(clbTargetServerInstanceID+listenerLcuuid, uuid.Nil),
+						Lcuuid:           common.GetUUIDByOrgID(t.orgID, clbTargetServerInstanceID+listenerLcuuid),
 						LBLcuuid:         lbLcuuid,
 						LBListenerLcuuid: listenerLcuuid,
 						Type:             common.LB_SERVER_TYPE_VM,
-						VMLcuuid:         common.GetUUID(clbTargetServerInstanceID, uuid.Nil),
+						VMLcuuid:         common.GetUUIDByOrgID(t.orgID, clbTargetServerInstanceID),
 						IP:               cPIPSlice[0],
 						Port:             clbListenerData.Get("InstancePort").MustInt(),
 						VPCLcuuid:        vpcLcuuid,
@@ -227,12 +226,12 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			}
 		}
 
-		vinterfaceLcuuid := common.GetUUID(lbLcuuid, uuid.Nil)
+		vinterfaceLcuuid := common.GetUUIDByOrgID(t.orgID, lbLcuuid)
 		vType := common.VIF_TYPE_WAN
 		networkLcuuid := common.NETWORK_ISP_LCUUID
 		if lbModel == common.LB_MODEL_INTERNAL {
 			vType = common.VIF_TYPE_LAN
-			networkLcuuid = common.GetUUID(lbData.Get("SubnetId").MustString(), uuid.Nil)
+			networkLcuuid = common.GetUUIDByOrgID(t.orgID, lbData.Get("SubnetId").MustString())
 		}
 		lbVinterfaces = append(lbVinterfaces, model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
@@ -248,10 +247,10 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 		for v := range lbVIPs.MustArray() {
 			lbVIP := lbVIPs.GetIndex(v).MustString()
 			lbIPs = append(lbIPs, model.IP{
-				Lcuuid:           common.GetUUID(vinterfaceLcuuid+lbVIP, uuid.Nil),
+				Lcuuid:           common.GetUUIDByOrgID(t.orgID, vinterfaceLcuuid+lbVIP),
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				IP:               lbVIP,
-				SubnetLcuuid:     common.GetUUID(networkLcuuid, uuid.Nil),
+				SubnetLcuuid:     common.GetUUIDByOrgID(t.orgID, networkLcuuid),
 				RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 			})
 		}

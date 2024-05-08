@@ -17,7 +17,6 @@
 package kubernetes
 
 import (
-	"fmt"
 	"regexp"
 
 	simplejson "github.com/bitly/go-simplejson"
@@ -28,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-var log *logging.Logger
+var log = logging.MustGetLogger("cloud.kubernetes")
 
 type Kubernetes struct {
 	name                  string
@@ -43,8 +42,6 @@ type Kubernetes struct {
 }
 
 func NewKubernetes(orgID int, domain mysql.Domain) (*Kubernetes, error) {
-	log = logging.MustGetLogger(fmt.Sprintf("cloud.org:%d.kubernetes", orgID))
-
 	configJson, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)

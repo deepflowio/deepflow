@@ -54,6 +54,7 @@ var pagesIntControl = map[string]int{
 }
 
 type Tencent struct {
+	orgID                int
 	name                 string
 	lcuuid               string
 	regionUUID           string
@@ -93,7 +94,7 @@ type tencentProtocolPort struct {
 	protocol string
 }
 
-func NewTencent(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, error) {
+func NewTencent(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err)
@@ -134,6 +135,7 @@ func NewTencent(domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, err
 
 	return &Tencent{
 		// TODO: display_name后期需要修改为uuid_generate
+		orgID:          orgID,
 		name:           domain.Name,
 		lcuuid:         domain.Lcuuid,
 		uuidGenerate:   domain.DisplayName,

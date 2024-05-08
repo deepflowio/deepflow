@@ -47,7 +47,7 @@ func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface,
 			return nil, nil, nil, err
 		}
 
-		lcuuid := common.GenerateUUID(f.UuidGenerate + "_vm_" + vm.Name)
+		lcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+"_vm_"+vm.Name)
 		retVMs = append(retVMs, model.VM{
 			Lcuuid:       lcuuid,
 			Name:         vm.Name,
@@ -74,7 +74,7 @@ func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface,
 				return nil, nil, nil, err
 			}
 
-			vinterfaceLcuuid := common.GenerateUUID(f.UuidGenerate + port.Mac)
+			vinterfaceLcuuid := common.GenerateUUIDByOrgID(f.orgID, f.UuidGenerate+port.Mac)
 			retVInterfaces = append(retVInterfaces, model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          netType,
@@ -93,7 +93,7 @@ func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface,
 				return nil, nil, nil, err
 			}
 			retIPs = append(retIPs, model.IP{
-				Lcuuid:           common.GenerateUUID(port.IP + port.Mac),
+				Lcuuid:           common.GenerateUUIDByOrgID(f.orgID, port.IP+port.Mac),
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				IP:               port.IP,
 				SubnetLcuuid:     subnetLcuuid,
