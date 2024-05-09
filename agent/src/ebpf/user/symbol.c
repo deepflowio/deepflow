@@ -616,7 +616,6 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
-	free_symbolizer_cache_kvp(kv);
 	if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) kv,
 				       0 /* delete */ )) {
 		ebpf_warning
@@ -626,7 +625,7 @@ static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 	} else {
 		__sync_fetch_and_add(&h->hash_elems_count, -1);
 	}
-
+	free_symbolizer_cache_kvp(kv);
 	return 0;
 }
 
