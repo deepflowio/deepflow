@@ -137,7 +137,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 					"switch_vtap_num(%v) before_vtap_weight(%v) after_vtap_weight(%v)",
 					db.ORGID, db.Name, detail.AZ, detail.IP, detail.State, detail.BeforeVTapNum, detail.AfterVTapNum,
 					detail.SwitchVTapNum, detail.BeforeVTapWeights, detail.AfterVTapWeights)
-				log.Infof("ORG(id=%d database=%s) analyzer rebalance result az(%v) ip(%v) before vtap traffic(%v), after vtap traffic",
+				log.Infof("ORG(id=%d database=%s) analyzer rebalance result az(%v) ip(%v) before vtap traffic(%v), after vtap traffic(%v)",
 					db.ORGID, db.Name, detail.AZ, detail.IP, detail.BeforeVTapTraffic, detail.AfterVTapTraffic)
 				if len(detail.NewVTapToTraffic) > 0 {
 					b, _ := json.Marshal(detail.NewVTapToTraffic)
