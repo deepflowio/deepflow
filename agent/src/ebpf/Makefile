@@ -88,6 +88,8 @@ OBJS := user/elf.o \
 	user/mem.o \
 	user/vec.o \
 	user/bihash.o \
+	user/profile/profile_common.o \
+	$(patsubst %.c,%.o,$(wildcard user/profile/extended/*.c)) \
 	user/profile/perf_profiler.o \
 	user/profile/stringifier.o \
 	user/profile/java/df_jattach.o \
@@ -175,7 +177,7 @@ user/perf_profiler_bpf_common.c: tools/bintobuffer kernel/perf_profiler.bpf.c
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
-	$(Q)mkdir -p $@/user/profile/java
+	$(Q)mkdir -p $@/user/profile/{java,extended}
 
 $(STATIC_OBJDIR)/user/socket.o: user/socket.c $(SOCKET_TRACE_ELFS) | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)

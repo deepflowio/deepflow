@@ -16,6 +16,8 @@
 
 #ifndef DF_USER_PERF_PROFILER_H
 #define DF_USER_PERF_PROFILER_H
+#define CP_PROFILE_SET_PROBES(T)
+#include "extended/extended.h"
 #include "../bihash_24_8.h"
 #include "../../kernel/include/perf_profiler.h"
 
@@ -49,22 +51,20 @@ typedef struct {
 	union {
 		struct {
 			/*
-		 	 * tgid:(max 67,108,864)
-		 	 *   The tgid (Thread Group ID) in kernel space
-		 	 *   is equivalent to the process ID in user space.
-		 	 * pid:(max 67,108,864)
-		 	 *   The process ID or thread ID in kernel space.
-		 	 * cpu: (max 4,096)
-		 	 *   Which CPU core does the perf event occur on?
-		 	 */
-			u64 tgid: 26,
-			    pid: 26, 
-			    cpu: 12;
+			 * tgid:(max 67,108,864)
+			 *   The tgid (Thread Group ID) in kernel space
+			 *   is equivalent to the process ID in user space.
+			 * pid:(max 67,108,864)
+			 *   The process ID or thread ID in kernel space.
+			 * cpu: (max 4,096)
+			 *   Which CPU core does the perf event occur on?
+			 */
+			u64 tgid:26, pid:26, cpu:12;
 
 			/*
 			 * process start time(the number of millisecond
 			 * elapsed since January 1, 1970 00:00:00).
- 			 */
+			 */
 			u64 stime;
 			u32 u_stack_id;
 			u32 k_stack_id;
@@ -73,19 +73,25 @@ typedef struct {
 		/* Matching and combining for process/thread name. */
 		struct {
 			u8 comm[TASK_COMM_LEN];
-			u64 pid: 26,
-			    reserved: 26,
-			    cpu: 12;
+			u64 pid:26, reserved:26, cpu:12;
 		} c_k;
 	};
 
 	/* Store perf profiler data */
 	uword msg_ptr;
-} stack_trace_msg_kv_t; 
+} stack_trace_msg_kv_t;
+
+enum {
+	PROFILER_TYPE_UNKNOWN,
+	PROFILER_TYPE_ONCPU,
+	PROFILER_TYPE_NUM,
+};
 
 /*
  * stack trace message value, push data
  *
+ * @profiler_type
+ *   Profiler type, such as PROFILER_TYPE_ONCPU.
  * @time_stamp
  *   Timestamp of the stack trace data(unit: nanoseconds).
  * @pid
@@ -106,6 +112,10 @@ typedef struct {
  *   The profiler captures the number of occurrences of the same
  *   data by querying with the quadruple
  *   "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+ *     1.1936h
+ *   In the sampling scenario, the number of samples is used; in the
+ *   non-sampling scenario, real-time intervals (in Microseconds) are
+ *   used. Range: [1, 2^32-1)us
  * @comm
  *   comm in task_struct(linux kernel), always 16 bytes
  *   If the capture is a process, fill in the process name here.
@@ -125,6 +135,7 @@ typedef struct {
  *   <user space folded stack trace string> + ";" + <kernel space folded stack trace string>
  */
 typedef struct {
+	u8 profiler_type;
 	u64 time_stamp;
 	u32 pid;
 	u32 tid;
@@ -151,10 +162,11 @@ int stop_continuous_profiler(void);
 int start_continuous_profiler(int freq, int java_syms_space_limit,
 			      int java_syms_update_delay,
 			      tracer_callback_t callback);
-void process_stack_trace_data_for_flame_graph(stack_trace_msg_t *val);
+void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val);
 void release_flame_graph_hash(void);
 int set_profiler_regex(const char *pattern);
 int set_profiler_cpu_aggregation(int flag);
 struct bpf_tracer *get_profiler_tracer(void);
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
+void cpdbg_process(stack_trace_msg_t * msg);
 #endif /* DF_USER_PERF_PROFILER_H */

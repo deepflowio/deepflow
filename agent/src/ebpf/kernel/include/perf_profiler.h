@@ -37,7 +37,7 @@ typedef enum {
 	ERROR_IDX,		/* Count the number of failed push notifications. */
 	ENABLE_IDX,		/* Enable profiler sampling flag.
 				   0: disable sampling; 1: enable sampling. */
-
+	MINBLOCK_TIME_IDX,	/* The minimum blocking time, applied in the profiler extension.*/
 	PROFILER_CNT
 } profiler_idx;
 
@@ -49,6 +49,7 @@ struct stack_trace_key_t {
 	int kernstack;
 	int userstack;
 	__u64 timestamp;
+	__u64 duration_ns;
 };
 
 #endif /* DF_BPF_PERF_PROFILER_H */

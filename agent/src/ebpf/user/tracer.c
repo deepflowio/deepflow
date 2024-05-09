@@ -218,13 +218,6 @@ int release_bpf_tracer(const char *name)
 	if (t->release_cb != NULL)
 		t->release_cb(t);
 
-	/*
-	 * Check if the reader thread has exited before releasing
-	 * the reader lock.
-	 */
-	while (t->perf_worker[0] != 0)
-		sleep(1);
-
 	if (t->lock) {
 		clib_mem_free((void *)t->lock);
 		t->lock = NULL;
@@ -253,8 +246,8 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 	int ret;
 	char name[TASK_COMM_LEN];
 	snprintf(name, sizeof(name), "%s-%d", prefix_name, idx);
-	ret = pthread_create(&tracer->perf_worker[idx], NULL, fn,
-			     (void *)(uint64_t)idx);
+	ret = pthread_create(&tracer->perf_workers[idx], NULL, fn,
+			     (void *)(uint64_t) idx);
 	if (ret) {
 		ebpf_warning("tracer reader(%s), pthread_create "
 			     "is error:%s\n", name, strerror(errno));
@@ -262,14 +255,14 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 	}
 
 	/* set thread name */
-	pthread_setname_np(tracer->perf_worker[idx], name);
+	pthread_setname_np(tracer->perf_workers[idx], name);
 
 	/*
 	 * Separating threads is to automatically release
 	 * resources after pthread_exit(), without being
 	 * blocked or stuck.
 	 */
-	ret = pthread_detach(tracer->perf_worker[idx]);
+	ret = pthread_detach(tracer->perf_workers[idx]);
 	if (ret != 0) {
 		ebpf_warning("Error detaching thread, error:%s\n",
 			     strerror(errno));
@@ -346,6 +339,7 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 	bt->release_cb = free_cb;
 	bt->create_cb = create_cb;
 	bt->sample_freq = sample_freq;
+	bt->enable_sample = false;
 
 	bt->dispatch_workers_nr = workers_nr;
 	bt->process_fn = handle;
@@ -871,8 +865,8 @@ static int tracepoint_detach(struct tracepoint *tp)
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_fun) (struct probe * p) = NULL;
-	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
+	int (*probe_fun)(struct probe * p) = NULL;
+	int (*tracepoint_fun)(struct tracepoint * p) = NULL;
 	if (type == HOOK_ATTACH) {
 		probe_fun = probe_attach;
 		tracepoint_fun = tracepoint_attach;
@@ -959,6 +953,10 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 	}
 
 perf_event:
+
+	if (!tracer->enable_sample)
+		return ETR_OK;
+
 	/*
 	 * perf event
 	 */
@@ -1010,8 +1008,8 @@ perf_event:
 			errno = 0;
 			int ret =
 			    program__detach_perf_event(tracer->per_cpu_fds,
-						       ARRAY_SIZE(tracer->
-								  per_cpu_fds));
+						       ARRAY_SIZE
+						       (tracer->per_cpu_fds));
 			if (!ret) {
 				ebpf_info
 				    ("tracer \"%s\" detach perf event prog successful.\n",
@@ -1169,7 +1167,7 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 			spread_id = 0;
 
 		struct reader_forward_info *fwd_info =
-			malloc(sizeof(struct reader_forward_info));
+		    malloc(sizeof(struct reader_forward_info));
 		if (fwd_info == NULL) {
 			ebpf_error("reader_forward_info malloc() failed.\n");
 			return ETR_NOMEM;
@@ -1181,12 +1179,10 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 
 		ebpf_info("Perf buffer reader cpu(%d) -> queue(%d)\n",
 			  fwd_info->cpu_id, fwd_info->queue_id);
-		reader =
-		    (struct perf_reader *)
+		reader = (struct perf_reader *)
 		    bpf_open_perf_buffer(perf_reader->raw_cb,
 					 perf_reader->lost_cb,
-					 (void *)fwd_info, -1, i,
-					 pages_cnt);
+					 (void *)fwd_info, -1, i, pages_cnt);
 		if (reader == NULL) {
 			ebpf_error("bpf_open_perf_buffer() failed.\n");
 			return ETR_NORESOURCE;
@@ -1436,7 +1432,7 @@ static int tracer_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			      void **out, size_t * outsize)
+			      void **out, size_t *outsize)
 {
 	*outsize = sizeof(struct bpf_tracer_param_array) +
 	    sizeof(struct bpf_tracer_param) * tracers_count;
