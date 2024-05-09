@@ -82,7 +82,21 @@ struct symbolizer_proc_info {
 	char container_id[CONTAINER_ID_SIZE];
 	/* reference counting */
 	u64 use;
+	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
+	pthread_mutex_t mutex;
+	/* Recording symbol resolution cache. */
+	volatile uword syms_cache;
 };
+
+static inline void symbolizer_proc_lock(struct symbolizer_proc_info *p)
+{
+	pthread_mutex_lock(&p->mutex);
+}
+
+static inline void symbolizer_proc_unlock(struct symbolizer_proc_info *p)
+{
+	pthread_mutex_unlock(&p->mutex);
+}
 
 struct symbolizer_cache_kvp {
 	struct {
@@ -155,27 +169,28 @@ struct symbol_tracepoint {
 	char *name;
 };
 
-static_always_inline u64
-cache_process_stime(struct symbolizer_cache_kvp *kv)
+static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
 {
-	return (u64)((struct symbolizer_proc_info *)kv->v.proc_info_p)->stime;
+	return (u64) ((struct symbolizer_proc_info *)kv->v.proc_info_p)->stime;
 }
 
-static_always_inline u64
-cache_process_netns_id(struct symbolizer_cache_kvp *kv)
+static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *kv)
 {
-	return (u64)((struct symbolizer_proc_info *)kv->v.proc_info_p)->netns_id;
+	return (u64) ((struct symbolizer_proc_info *)kv->v.
+		      proc_info_p)->netns_id;
 }
 
 static_always_inline void
 copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 {
 	static const int len =
-		sizeof(((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm);
+	    sizeof(((struct symbolizer_proc_info *) kv->v.proc_info_p)->comm);
 
 	strcpy_s_inline(dst, len,
-			((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm,
-			strlen(((struct symbolizer_proc_info *)kv->v.proc_info_p)->comm));
+			((struct symbolizer_proc_info *)kv->v.
+			 proc_info_p)->comm,
+			strlen(((struct symbolizer_proc_info *)kv->
+				v.proc_info_p)->comm));
 }
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
@@ -192,12 +207,16 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname);
 void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			     void **ptr);
 #ifndef AARCH64_MUSL
+int creat_ksyms_cache(void);
 void *get_symbol_cache(pid_t pid, bool new_cache);
 void release_symbol_caches(void);
 u64 get_pid_stime(pid_t pid);
 void exec_proc_info_cache_update(void);
 void set_java_syms_fetch_delay(int delay_secs);
 u64 get_java_syms_fetch_delay(void);
+void free_proc_cache(struct symbolizer_proc_info *p);
+void symbolizer_kernel_lock(void);
+void symbolizer_kernel_unlock(void);
 #endif
 int create_and_init_proc_info_caches(void);
 void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size);

@@ -261,6 +261,7 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #define KRETPROG(F) SEC("kretprobe/"__stringify(F)) int kretprobe__##F
 #define KPROG(F) SEC("kprobe/"__stringify(F)) int kprobe__##F
 #define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F
+#define TP_SCHED_PROG(F) SEC("tracepoint/sched/"__stringify(F)) int bpf_func_##F
 
 #ifndef CUR_CPU_IDENTIFIER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)

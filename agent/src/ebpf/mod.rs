@@ -153,6 +153,12 @@ pub const EVENT_TYPE_PROC_EXEC: u32 = 1 << 5;
 #[allow(dead_code)]
 pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 6;
 
+// Profiler types
+#[allow(dead_code)]
+pub const PROFILER_TYPE_UNKNOWN: u8 = 0;
+#[allow(dead_code)]
+pub const PROFILER_TYPE_ONCPU: u8 = 1;
+
 //Process exec/exit events
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -367,6 +373,7 @@ pub struct SK_TRACE_STATS {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
+    pub profiler_type : u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
     pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
     pub pid: u32,       // User-space process-ID.
     /*
@@ -384,6 +391,10 @@ pub struct stack_profile_data {
      * The profiler captures the number of occurrences of the same
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+     * Note:
+     * In the sampling scenario, the number of samples is used; in the
+     * non-sampling scenario, real-time intervals (in Microseconds) are
+     * used.
      */
     pub count: u32,
     /*
@@ -647,6 +658,9 @@ extern "C" {
         timeout: c_int,
         callback: extern "C" fn(data: *mut c_char, len: c_int),
     ) -> c_int;
+
+    pub fn enable_oncpu_profiler() -> c_int;
+    pub fn disable_oncpu_profiler() -> c_int;
 }
 
 #[no_mangle]
