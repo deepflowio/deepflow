@@ -52,8 +52,9 @@ type Cleaner struct {
 
 func GetCleaner() *Cleaner {
 	cleanerOnce.Do(func() {
+		en, _ := encoder.GetEncoder(1)
 		cleaner = &Cleaner{
-			encoder:  encoder.GetSingleton(),
+			encoder:  en,
 			canClean: make(chan struct{}, 1),
 		}
 	})

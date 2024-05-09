@@ -25,22 +25,25 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type labelName struct {
+	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
 	strToID      *hashmap.Map[string, int]
 	ascIDAllocator
 }
 
-func newLabelName(max int) *labelName {
+func newLabelName(org *common.ORG, max int) *labelName {
 	ln := &labelName{
+		org:          org,
 		resourceType: "label_name",
 		strToID:      hashmap.New[string, int](),
 	}
-	ln.ascIDAllocator = newAscIDAllocator(ln.resourceType, 1, max)
+	ln.ascIDAllocator = newAscIDAllocator(org, ln.resourceType, 1, max)
 	ln.rawDataProvider = ln
 	return ln
 }
@@ -80,9 +83,9 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 	for i := range ids {
 		dbToAdd[i].ID = ids[i]
 	}
-	err = addBatch(dbToAdd, ln.resourceType)
+	err = addBatch(ln.org.DB, dbToAdd, ln.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", ln.resourceType, err.Error())
+		log.Error(ln.org.Logf("add %s error: %s", ln.resourceType, err.Error()))
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -96,9 +99,9 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 
 func (ln *labelName) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusLabelName
-	err = mysql.Db.Find(&items).Error
+	err = ln.org.DB.Find(&items).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", ln.resourceType, err)
+		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
 		return nil, err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
@@ -111,16 +114,16 @@ func (ln *labelName) load() (ids mapset.Set[int], err error) {
 
 func (ln *labelName) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusLabelName
-	err = mysql.Db.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", ln.resourceType, err)
+		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, item.ID)
 		}
-		log.Infof("%s ids: %+v are in use.", ln.resourceType, inUseIDs)
+		log.Info(ln.org.Logf("%s ids: %+v are in use.", ln.resourceType, inUseIDs))
 	}
 	return
 }

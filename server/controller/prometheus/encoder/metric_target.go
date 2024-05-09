@@ -25,17 +25,20 @@ import (
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type metricTarget struct {
+	org           *common.ORG
 	lock          sync.Mutex
 	resourceType  string
 	metricTargets mapset.Set[cache.MetricTargetKey]
 	targetEncoder *target
 }
 
-func newMetricTarget(te *target) *metricTarget {
+func newMetricTarget(org *common.ORG, te *target) *metricTarget {
 	return &metricTarget{
+		org:           org,
 		resourceType:  "metric_target",
 		metricTargets: mapset.NewSet[cache.MetricTargetKey](),
 		targetEncoder: te,
@@ -44,7 +47,7 @@ func newMetricTarget(te *target) *metricTarget {
 
 func (mt *metricTarget) refresh(args ...interface{}) error {
 	var items []*mysql.PrometheusMetricTarget
-	err := mysql.Db.Find(&items).Error
+	err := mt.org.DB.Find(&items).Error
 	if err != nil {
 		return err
 	}
@@ -81,9 +84,9 @@ func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTargetRequest
 		}
 	}
 
-	err := addBatch(dbToAdd, mt.resourceType)
+	err := addBatch(mt.org.DB, dbToAdd, mt.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", mt.resourceType, err.Error())
+		log.Error(mt.org.Logf("add %s error: %s", mt.resourceType, err.Error()))
 		return resp, err
 	}
 	for _, item := range dbToAdd {
