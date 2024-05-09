@@ -98,6 +98,7 @@ type DataSet struct {
 
 	podGroupLcuuidToID map[string]int
 	podGroupIDToLcuuid map[int]string
+	podGroupIDToType   map[int]int
 
 	podReplicaSetLcuuidToID map[string]int
 	podReplicaSetIDToLcuuid map[int]string
@@ -169,6 +170,7 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 
 		podGroupLcuuidToID: make(map[string]int),
 		podGroupIDToLcuuid: make(map[int]string),
+		podGroupIDToType:   make(map[int]int),
 
 		podReplicaSetLcuuidToID: make(map[string]int),
 		podReplicaSetIDToLcuuid: make(map[int]string),
@@ -867,12 +869,14 @@ func (t *DataSet) DeletePodService(lcuuid string) {
 func (t *DataSet) AddPodGroup(item *mysql.PodGroup) {
 	t.podGroupLcuuidToID[item.Lcuuid] = item.ID
 	t.podGroupIDToLcuuid[item.ID] = item.Lcuuid
+	t.podGroupIDToType[item.ID] = item.Type
 	t.GetLogFunc()(t.metadata.LogPre(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, item.Lcuuid)))
 }
 
 func (t *DataSet) DeletePodGroup(lcuuid string) {
 	id, _ := t.podGroupLcuuidToID[lcuuid]
 	delete(t.podGroupIDToLcuuid, id)
+	delete(t.podGroupIDToType, id)
 	delete(t.podGroupLcuuidToID, lcuuid)
 	log.Info(t.metadata.LogPre(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid)))
 }
@@ -1622,6 +1626,23 @@ func (t *DataSet) GetPodGroupIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(t.metadata.LogPre(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid)))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetPodGroupTypeByID(id int) (int, bool) {
+	podGroupType, exists := t.podGroupIDToType[id]
+	if exists {
+		return podGroupType, true
+	}
+	log.Warning(t.metadata.LogPre(fmt.Sprintf("cache %s type (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, id)))
+	var podGroup mysql.PodGroup
+	result := t.metadata.DB.Where("id = ?", id).Find(&podGroup)
+	if result.RowsAffected == 1 {
+		t.AddPodGroup(&podGroup)
+		return podGroup.Type, true
+	} else {
+		log.Error(t.metadata.LogPre(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, id)))
+		return 0, false
 	}
 }
 

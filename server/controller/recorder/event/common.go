@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 )
 
@@ -270,6 +271,7 @@ func (i *IPTool) getPodOptionsByID(id int) ([]eventapi.TagFieldOption, error) {
 		eventapi.TagPodClusterID(info.PodClusterID),
 		eventapi.TagPodNSID(info.PodNamespaceID),
 		eventapi.TagPodGroupID(info.PodGroupID),
+		eventapi.TagPodGroupType(metadata.PodGroupTypeMap[info.PodGroupID]),
 		eventapi.TagPodNodeID(info.PodNodeID),
 		eventapi.TagPodID(id),
 	}...)
