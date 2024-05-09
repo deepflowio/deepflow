@@ -148,6 +148,12 @@ func TagPodGroupID(id int) TagFieldOption {
 	}
 }
 
+func TagPodGroupType(t uint32) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.PodGroupType = uint8(t)
+	}
+}
+
 func TagPodID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodID = uint32(id)
