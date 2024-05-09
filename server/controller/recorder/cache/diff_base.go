@@ -20,6 +20,7 @@ import (
 	"time"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
@@ -348,6 +349,10 @@ func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolD
 	if dbItem.NetworkID != 0 {
 		networkLcuuid, _ = toolDataSet.GetNetworkLcuuidByID(dbItem.NetworkID)
 	}
+	var deviceLcuuid string
+	if dbItem.DeviceType == common.VIF_DEVICE_TYPE_VM {
+		deviceLcuuid, _ = toolDataSet.GetVMLcuuidByID(dbItem.DeviceID)
+	}
 	b.VInterfaces[dbItem.Lcuuid] = &VInterface{
 		DiffBase: DiffBase{
 			Sequence: seq,
@@ -356,6 +361,7 @@ func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolD
 		Name:            dbItem.Name,
 		Type:            dbItem.Type,
 		TapMac:          dbItem.TapMac,
+		DeviceLcuuid:    deviceLcuuid,
 		NetworkLcuuid:   networkLcuuid,
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
@@ -1179,6 +1185,7 @@ type VInterface struct {
 	Name            string `json:"name"`
 	Type            int    `json:"type"`
 	TapMac          string `json:"tap_mac"`
+	DeviceLcuuid    string `json:"device_lcuuid"`
 	NetworkLcuuid   string `json:"network_lcuuid"`
 	RegionLcuuid    string `json:"region_lcuuid"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
@@ -1188,6 +1195,7 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.Name = cloudItem.Name
 	v.Type = cloudItem.Type
 	v.TapMac = cloudItem.TapMac
+	v.DeviceLcuuid = cloudItem.DeviceLcuuid
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_VINTERFACE_EN, v))

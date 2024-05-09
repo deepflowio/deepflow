@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -116,6 +117,19 @@ func (i *VInterface) generateUpdateInfo(diffBase *cache.VInterface, cloudItem *c
 				}
 			}
 			updateInfo["subnetid"] = networkID
+		}
+	}
+	if cloudItem.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_VM {
+		if diffBase.DeviceLcuuid != cloudItem.DeviceLcuuid {
+			vmID, exists := i.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.DeviceLcuuid)
+			if !exists {
+				log.Errorf(resourceAForResourceBNotFound(
+					common.RESOURCE_TYPE_VM_EN, cloudItem.DeviceLcuuid,
+					common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+				))
+				return nil, false
+			}
+			updateInfo["deviceid"] = vmID
 		}
 	}
 	if diffBase.Name != cloudItem.Name {

@@ -41,6 +41,7 @@ type ToolDataSet struct {
 	hostLcuuidToID map[string]int
 
 	vmLcuuidToID map[string]int
+	vmIDToLcuuid map[int]string
 
 	vpcLcuuidToID map[string]int
 	vpcIDToLcuuid map[int]string
@@ -121,6 +122,7 @@ func NewToolDataSet() ToolDataSet {
 		hostLcuuidToID: make(map[string]int),
 
 		vmLcuuidToID: make(map[string]int),
+		vmIDToLcuuid: make(map[int]string),
 
 		vpcLcuuidToID: make(map[string]int),
 		vpcIDToLcuuid: make(map[int]string),
@@ -268,6 +270,7 @@ func (t *ToolDataSet) updateHost(cloudItem *cloudmodel.Host) {
 
 func (t *ToolDataSet) addVM(item *mysql.VM) {
 	t.vmLcuuidToID[item.Lcuuid] = item.ID
+	t.vmIDToLcuuid[item.ID] = item.Lcuuid
 	t.vmIDToInfo[item.ID] = &vmInfo{
 		Name:  item.Name,
 		VPCID: item.VPCID,
@@ -312,6 +315,7 @@ func (t *ToolDataSet) updateVM(cloudItem *cloudmodel.VM) {
 
 func (t *ToolDataSet) deleteVM(lcuuid string) {
 	id, _ := t.GetVMIDByLcuuid(lcuuid)
+	delete(t.vmIDToLcuuid, id)
 	delete(t.vmIDToIPNetworkIDMap, id)
 	delete(t.vmLcuuidToID, lcuuid)
 	delete(t.vmIDToInfo, id)
@@ -1112,6 +1116,23 @@ func (t *ToolDataSet) GetVPCLcuuidByID(id int) (string, bool) {
 		return vpc.Lcuuid, true
 	} else {
 		log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_VPC_EN, id))
+		return lcuuid, false
+	}
+}
+
+func (t *ToolDataSet) GetVMLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.vmIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(cacheLcuuidByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	var vm mysql.VM
+	result := mysql.Db.Where("lcuuid = ?", id).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.addVM(&vm)
+		return vm.Lcuuid, true
+	} else {
+		log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_VM_EN, id))
 		return lcuuid, false
 	}
 }
