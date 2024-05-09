@@ -1194,8 +1194,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 		kernel_struct_field_offset(obj, "sock_common", "skc_num");
 	int struct_sock_skc_state_offset =
 		kernel_struct_field_offset(obj, "sock_common", "skc_state");
-	int struct_sock_common_ipv6only_offset =
-		kernel_struct_field_offset(obj, "sock_common", "skc_flags");
+	int struct_sock_common_ipv6only_offset = struct_sock_skc_state_offset + 1;
 
 	if (copied_seq_offs < 0 || write_seq_offs < 0 || files_offs < 0 ||
 	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
