@@ -30,8 +30,15 @@ const (
 	ORG_ID_PREFIX_LEN = 5 // length of 'xxxx_'
 )
 
-func OrgDatabasePrefix(orgID uint16) string {
+func IsDefaultOrgID(orgID uint16) bool {
 	if orgID == DEFAULT_ORG_ID || orgID == INVALID_ORG_ID {
+		return true
+	}
+	return false
+}
+
+func OrgDatabasePrefix(orgID uint16) string {
+	if IsDefaultOrgID(orgID) {
 		return ""
 	}
 	// format it as a 4-digit number. If there are less than 4 digits, fill the high bits with 0
