@@ -18,4 +18,6 @@ message Stats {
     repeated string tag_values = 4;
     repeated string metrics_float_names = 7;
     repeated double metrics_float_values = 8;
+    uint32 org_id = 9;
+    uint32 team_id = 10;
 }

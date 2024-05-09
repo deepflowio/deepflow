@@ -35,6 +35,7 @@ var log = logging.MustGetLogger("cloud.huawei")
 
 type HuaWei struct {
 	orgID           int
+	teamID          int
 	lcuuid          string
 	lcuuidGenerate  string
 	name            string
@@ -54,6 +55,7 @@ func NewHuaWei(orgID int, domain mysql.Domain, globalCloudCfg config.CloudConfig
 	}
 	return &HuaWei{
 		orgID:  orgID,
+		teamID: domain.TeamID,
 		lcuuid: domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
 		lcuuidGenerate:  domain.DisplayName,
@@ -196,6 +198,8 @@ func (h *HuaWei) GetStatter() statsd.StatsdStatter {
 	}
 
 	return statsd.StatsdStatter{
+		OrgID:      h.orgID,
+		TeamID:     h.teamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(h.cloudStatsd),
 	}
