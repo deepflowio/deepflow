@@ -198,7 +198,7 @@ var ColumnAdd65 = []*ColumnAdds{
 		Tables: []string{
 			"deepflow_system_custom_field_local", "deepflow_system_custom_field",
 			"deepflow_system_custom_field_value_local", "deepflow_system_custom_field_value",
-			"event_custom_field_local", "event_custom_field_local",
+			"event_custom_field_local", "event_custom_field",
 			"event_custom_field_value_local", "event_custom_field_value",
 			"ext_metrics_custom_field_local", "ext_metrics_custom_field",
 			"ext_metrics_custom_field_value_local", "ext_metrics_custom_field_value",
