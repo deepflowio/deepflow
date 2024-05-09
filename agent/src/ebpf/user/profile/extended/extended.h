@@ -16,7 +16,5 @@
 
 #ifndef DF_PROFILE_EXT_H
 #define DF_PROFILE_EXT_H
-
-#include "offcpu.h"
-
+int __attribute__ ((weak)) extended_reader_create(struct bpf_tracer *tracer);
 #endif /* DF_PROFILE_EXT_H */

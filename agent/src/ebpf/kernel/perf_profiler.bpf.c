@@ -215,4 +215,3 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 	return 0;
 }
 
-#include "offcpu.bpf.c"

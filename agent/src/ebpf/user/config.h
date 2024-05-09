@@ -50,9 +50,6 @@
 #define MAP_PERF_PROFILER_BUF_B_NAME    "__profiler_output_b"
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
 
-#define MAP_OFFCPU_PROFILER_BUF_A_NAME "__offcpu_output_a"
-#define MAP_OFFCPU_PROFILER_BUF_B_NAME "__offcpu_output_b"
-
 enum {
 	PROG_PROTO_INFER_TP_IDX,
 	PROG_DATA_SUBMIT_TP_IDX,
