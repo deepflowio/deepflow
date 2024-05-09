@@ -1227,6 +1227,15 @@ static int update_offset_map_default(struct bpf_tracer *t,
 		offset.struct_files_private_data_offset = 0xc8;
 	};
 
+	/*
+	 * In Tencent Linux (4.14.105-1-tlinux3-0023.1), there is a difference in
+	 * `struct_files_private_data_offset`. If the offset value of the generic
+	 * eBPF program is used, it will result in the kernel being unable to adapt.
+	 * A separate correction is made here.
+	 */
+	if (strstr(linux_release, "tlinux3"))
+		offset.struct_files_private_data_offset = 0xc0;	
+
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
 	offset.struct_file_dentry_offset = 0x18;
@@ -1329,8 +1338,7 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    kernel_struct_field_offset(obj, "sock_common", "skc_num");
 	int struct_sock_skc_state_offset =
 	    kernel_struct_field_offset(obj, "sock_common", "skc_state");
-	int struct_sock_common_ipv6only_offset =
-	    kernel_struct_field_offset(obj, "sock_common", "skc_flags");
+	int struct_sock_common_ipv6only_offset = struct_sock_skc_state_offset + 1;
 
 	if (copied_seq_offs < 0 || write_seq_offs < 0 || files_offs < 0 ||
 	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
