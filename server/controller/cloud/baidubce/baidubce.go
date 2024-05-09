@@ -43,6 +43,7 @@ var log = logging.MustGetLogger("cloud.baidu")
 
 type BaiduBce struct {
 	orgID        int
+	teamID       int
 	name         string
 	uuid         string
 	uuidGenerate string
@@ -91,9 +92,10 @@ func NewBaiduBce(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*
 	}
 
 	return &BaiduBce{
-		orgID: orgID,
-		uuid:  domain.Lcuuid,
-		name:  domain.Name,
+		orgID:  orgID,
+		teamID: domain.TeamID,
+		uuid:   domain.Lcuuid,
+		name:   domain.Name,
 		// TODO: display_name后期需要修改为uuid_generate
 		uuidGenerate: domain.DisplayName,
 		regionUuid:   config.Get("region_uuid").MustString(),
@@ -126,6 +128,8 @@ func (b *BaiduBce) GetStatter() statsd.StatsdStatter {
 	}
 
 	return statsd.StatsdStatter{
+		OrgID:      b.orgID,
+		TeamID:     b.teamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(b.cloudStatsd),
 	}
