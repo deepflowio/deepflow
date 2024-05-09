@@ -25,10 +25,12 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
 type indexAllocator struct {
+	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
 	metricName   string
@@ -36,13 +38,14 @@ type indexAllocator struct {
 	ascIDAllocator
 }
 
-func newIndexAllocator(metricName string, max int) *indexAllocator {
+func newIndexAllocator(org *common.ORG, metricName string, max int) *indexAllocator {
 	ia := &indexAllocator{
+		org:          org,
 		resourceType: fmt.Sprintf("%s app_label_index", metricName),
 		metricName:   metricName,
 		strToIdx:     make(map[string]int),
 	}
-	ia.ascIDAllocator = newAscIDAllocator(ia.resourceType, 1, max)
+	ia.ascIDAllocator = newAscIDAllocator(org, ia.resourceType, 1, max)
 	ia.rawDataProvider = ia
 	return ia
 }
@@ -86,9 +89,9 @@ func (ia *indexAllocator) encode(strs []string) ([]*controller.PrometheusMetricA
 	for i := range idxs {
 		dbToAdd[i].APPLabelColumnIndex = uint8(idxs[i])
 	}
-	err = addBatch(dbToAdd, ia.resourceType)
+	err = addBatch(ia.org.DB, dbToAdd, ia.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", ia.resourceType, err.Error())
+		log.Error(ia.org.Logf("add %s error: %s", ia.resourceType, err.Error()))
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -102,16 +105,16 @@ func (ia *indexAllocator) encode(strs []string) ([]*controller.PrometheusMetricA
 
 func (ia *indexAllocator) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusMetricAPPLabelLayout
-	err = mysql.Db.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Find(&dbItems).Error
+	err = ia.org.DB.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Find(&dbItems).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", ia.resourceType, err)
+		log.Error(ia.org.Logf("db query %s failed: %v", ia.resourceType, err))
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, int(item.APPLabelColumnIndex))
 		}
-		log.Infof("%s ids: %+v are in use.", ia.resourceType, inUseIDs)
+		log.Info(ia.org.Logf("%s ids: %+v are in use.", ia.resourceType, inUseIDs))
 	}
 	return
 }
@@ -120,7 +123,7 @@ func (ia *indexAllocator) release(ids []int) error {
 	ia.lock.Lock()
 	defer ia.lock.Unlock()
 
-	err := mysql.Db.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Delete(&mysql.PrometheusMetricAPPLabelLayout{}).Error
+	err := ia.org.DB.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Delete(&mysql.PrometheusMetricAPPLabelLayout{}).Error
 	if err != nil {
 		return err
 	}
@@ -129,15 +132,16 @@ func (ia *indexAllocator) release(ids []int) error {
 }
 
 type labelLayout struct {
-	appLabelIndexMax int
-
+	org                      *common.ORG
 	lock                     sync.Mutex
 	resourceType             string
+	appLabelIndexMax         int
 	metricNameToIdxAllocator map[string]*indexAllocator
 }
 
-func newLabelLayout(cfg *prometheuscfg.Config) *labelLayout {
+func newLabelLayout(org *common.ORG, cfg prometheuscfg.Config) *labelLayout {
 	return &labelLayout{
+		org:              org,
 		appLabelIndexMax: cfg.APPLabelIndexMax,
 
 		resourceType:             "metric_app_label_layout",
@@ -147,7 +151,7 @@ func newLabelLayout(cfg *prometheuscfg.Config) *labelLayout {
 
 func (ll *labelLayout) refresh(args ...interface{}) error {
 	var items []*mysql.PrometheusMetricAPPLabelLayout
-	err := mysql.Db.Find(&items).Error
+	err := ll.org.DB.Find(&items).Error
 	if err != nil {
 		return err
 	}
@@ -198,7 +202,7 @@ func (ll *labelLayout) createIndexAllocatorIfNotExists(metricName string) (*inde
 	if allocator, ok := ll.metricNameToIdxAllocator[metricName]; ok {
 		return allocator, nil
 	}
-	ia := newIndexAllocator(metricName, ll.appLabelIndexMax)
+	ia := newIndexAllocator(ll.org, metricName, ll.appLabelIndexMax)
 	ia.refresh(make(map[string]int))
 	ll.metricNameToIdxAllocator[metricName] = ia
 	return ll.metricNameToIdxAllocator[metricName], nil
@@ -212,13 +216,13 @@ func (ll *labelLayout) getIndexAllocator(metricName string) (*indexAllocator, bo
 }
 
 func (ll *labelLayout) SingleEncode(metricName string, labelNames []string) ([]*controller.PrometheusMetricAPPLabelLayout, error) {
-	log.Infof("encode metric: %s app label names: %v", metricName, labelNames)
+	log.Info(ll.org.Logf("encode metric: %s app label names: %v", metricName, labelNames))
 	ia, _ := ll.createIndexAllocatorIfNotExists(metricName)
 	return ia.encode(labelNames)
 }
 
 func (ll *labelLayout) SingleRelease(metricName string, indexes []int) error {
-	log.Infof("recycle metric: %s indexes: %v", metricName, indexes)
+	log.Info(ll.org.Logf("recycle metric: %s indexes: %v", metricName, indexes))
 	if allocator, ok := ll.getIndexAllocator(metricName); ok {
 		return allocator.release(indexes)
 	}

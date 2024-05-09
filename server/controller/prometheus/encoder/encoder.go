@@ -17,32 +17,21 @@
 package encoder
 
 import (
-	"context"
 	"sync"
-	"time"
 
 	"github.com/op/go-logging"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	. "github.com/deepflowio/deepflow/server/controller/prometheus/common"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
 var log = logging.MustGetLogger("prometheus.synchronizer.encoder")
 
-var (
-	encoderOnce sync.Once
-	encoder     *Encoder
-)
-
 type Encoder struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	mux             sync.Mutex
-	working         bool
-	refreshInterval time.Duration
+	org *common.ORG
+	mux sync.Mutex
 
 	metricName      *metricName
 	labelName       *labelName
@@ -54,110 +43,65 @@ type Encoder struct {
 	target          *target
 }
 
-func GetSingleton() *Encoder {
-	encoderOnce.Do(func() {
-		encoder = &Encoder{}
-	})
-	return encoder
-}
-
-func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
-	log.Infof("init prometheus encoder")
-	mCtx, mCancel := context.WithCancel(ctx)
-	e.ctx = mCtx
-	e.cancel = mCancel
-	e.metricName = newMetricName(cfg.ResourceMaxID1)
-	e.labelName = newLabelName(cfg.ResourceMaxID0)
-	e.labelValue = newLabelValue()
-	e.label = newLabel()
-	e.LabelLayout = newLabelLayout(cfg)
-	e.metricLabelName = newMetricLabelName(e.metricName, e.labelName)
-	e.target = newTarget(cfg.ResourceMaxID1)
-	e.metricTarget = newMetricTarget(e.target)
-	e.refreshInterval = time.Duration(cfg.EncoderCacheRefreshInterval) * time.Second
-	return
-}
-
-func (e *Encoder) Start() error {
-	e.mux.Lock()
-	if e.working {
-		e.mux.Unlock()
-		return nil
+func newEncoder(cfg prometheuscfg.Config, orgID int) (*Encoder, error) {
+	log.Infof("[OID-%d] new prometheus encoder", orgID)
+	org, err := common.NewORG(orgID)
+	if err != nil {
+		log.Errorf("[OID-%d] failed to create org object: %s", orgID, err.Error())
+		return nil, err
 	}
-	e.working = true
-	e.mux.Unlock()
-
-	log.Info("prometheus encoder started")
-	e.refresh()
-	go func() {
-		ticker := time.NewTicker(e.refreshInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-e.ctx.Done():
-				return
-			case <-ticker.C:
-				e.refresh()
-			}
-		}
-	}()
-	return nil
-}
-
-func (e *Encoder) Stop() {
-	if e.cancel != nil {
-		e.cancel()
-	}
-	e.mux.Lock()
-	e.working = false
-	e.mux.Unlock()
-	log.Info("prometheus encoder stopped")
+	e := &Encoder{org: org}
+	e.metricName = newMetricName(org, cfg.ResourceMaxID1)
+	e.labelName = newLabelName(org, cfg.ResourceMaxID0)
+	e.labelValue = newLabelValue(org)
+	e.label = newLabel(org)
+	e.LabelLayout = newLabelLayout(org, cfg)
+	e.metricLabelName = newMetricLabelName(org, e.metricName, e.labelName)
+	e.target = newTarget(org, cfg.ResourceMaxID1)
+	e.metricTarget = newMetricTarget(org, e.target)
+	return e, nil
 }
 
 func (e *Encoder) Refresh() error {
-	return e.refresh()
-}
-
-func (e *Encoder) refresh() error {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 
-	log.Info("prometheus encoder refresh started")
+	log.Info(e.org.Log("prometheus encoder refresh started"))
 	e.label.refresh()
 	eg := &errgroup.Group{}
-	AppendErrGroup(eg, e.metricName.refresh)
-	AppendErrGroup(eg, e.labelName.refresh)
-	AppendErrGroup(eg, e.labelValue.refresh)
-	AppendErrGroup(eg, e.LabelLayout.refresh)
-	AppendErrGroup(eg, e.metricLabelName.refresh)
-	AppendErrGroup(eg, e.metricTarget.refresh)
-	AppendErrGroup(eg, e.target.refresh)
+	common.AppendErrGroup(eg, e.metricName.refresh)
+	common.AppendErrGroup(eg, e.labelName.refresh)
+	common.AppendErrGroup(eg, e.labelValue.refresh)
+	common.AppendErrGroup(eg, e.LabelLayout.refresh)
+	common.AppendErrGroup(eg, e.metricLabelName.refresh)
+	common.AppendErrGroup(eg, e.metricTarget.refresh)
+	common.AppendErrGroup(eg, e.target.refresh)
 	err := eg.Wait()
-	log.Info("prometheus encoder refresh completed")
+	log.Info(e.org.Log("prometheus encoder refresh completed"))
 	return err
 }
 
 func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
 	resp := new(controller.SyncPrometheusResponse)
 	eg1RunAhead := &errgroup.Group{}
-	AppendErrGroup(eg1RunAhead, e.encodeMetricName, resp, req.GetMetricNames())
-	AppendErrGroup(eg1RunAhead, e.encodeLabelName, resp, req.GetLabelNames())
-	AppendErrGroup(eg1RunAhead, e.encodeLabelValue, resp, req.GetLabelValues())
+	common.AppendErrGroup(eg1RunAhead, e.encodeMetricName, resp, req.GetMetricNames())
+	common.AppendErrGroup(eg1RunAhead, e.encodeLabelName, resp, req.GetLabelNames())
+	common.AppendErrGroup(eg1RunAhead, e.encodeLabelValue, resp, req.GetLabelValues())
 	err := eg1RunAhead.Wait()
 	if err != nil {
 		return resp, err
 	}
 	eg2RunAhead := &errgroup.Group{}
-	AppendErrGroup(eg2RunAhead, e.encodeLabel, resp, req.GetLabels())
-	AppendErrGroup(eg2RunAhead, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
-	AppendErrGroup(eg2RunAhead, e.encodeTarget, resp, req.GetTargets())
+	common.AppendErrGroup(eg2RunAhead, e.encodeLabel, resp, req.GetLabels())
+	common.AppendErrGroup(eg2RunAhead, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
+	common.AppendErrGroup(eg2RunAhead, e.encodeTarget, resp, req.GetTargets())
 	err = eg2RunAhead.Wait()
 	if err != nil {
 		return resp, err
 	}
 	eg := &errgroup.Group{}
-	AppendErrGroup(eg, e.encodeMetricLabelName, resp, req.GetMetricLabelNames())
-	AppendErrGroup(eg, e.encodeMetricTarget, resp, req.GetMetricTargets())
+	common.AppendErrGroup(eg, e.encodeMetricLabelName, resp, req.GetMetricLabelNames())
+	common.AppendErrGroup(eg, e.encodeMetricTarget, resp, req.GetMetricTargets())
 	err = eg.Wait()
 	return resp, err
 }
