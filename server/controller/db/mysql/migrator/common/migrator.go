@@ -62,7 +62,14 @@ func LogDBName(databaseName string, format string, a ...any) string {
 
 func DropDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "drop database"))
-	return dc.DB.Exec(fmt.Sprintf("DROP DATABASE %s", dc.Config.Database)).Error
+	var databaseName string
+	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
+	if databaseName == dc.Config.Database {
+		return dc.DB.Exec(fmt.Sprintf("DROP DATABASE %s", dc.Config.Database)).Error
+	} else {
+		log.Infof(LogDBName(dc.Config.Database, "database doesn't exist"))
+		return nil
+	}
 }
 
 func CreateDatabase(dc *DBConfig) error {
