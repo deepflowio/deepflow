@@ -72,6 +72,7 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 				}
 				configJson, _ := json.Marshal(config)
 				retSubDomains = append(retSubDomains, model.SubDomain{
+					TeamID:      q.teamID,
 					Lcuuid:      common.GenerateUUIDByOrgID(q.orgID, clusterId),
 					Name:        cluster.Get("name").MustString(),
 					DisplayName: clusterId,

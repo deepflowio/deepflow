@@ -72,6 +72,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 			}
 			configJson, _ := json.Marshal(config)
 			retSubDomains = append(retSubDomains, model.SubDomain{
+				TeamID:      b.teamID,
 				Lcuuid:      common.GenerateUUIDByOrgID(b.orgID, cluster.ClusterUuid),
 				Name:        cluster.ClusterName,
 				DisplayName: cluster.ClusterUuid,
