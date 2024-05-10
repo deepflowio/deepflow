@@ -384,7 +384,7 @@ impl L7ProtocolParserInterface for MysqlLog {
         }
         set_captured_byte!(info, param);
         if info.msg_type != LogMessageType::Session {
-            info.cal_rrt(param, None).map(|rrt| {
+            info.cal_rrt(param).map(|rrt| {
                 info.rrt = rrt;
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
@@ -866,10 +866,7 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         let mut previous_command = 0u8;
-        let mut log_config = LogParserConfig::default();
-        log_config
-            .obfuscate_enabled_protocols
-            .set_enabled(L7Protocol::MySQL);
+        let log_config = LogParserConfig::default();
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer

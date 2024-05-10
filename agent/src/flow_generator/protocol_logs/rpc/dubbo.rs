@@ -325,7 +325,7 @@ impl L7ProtocolParserInterface for DubboLog {
         let mut info = DubboInfo::default();
         self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
         info.is_tls = param.is_tls();
-        info.cal_rrt(param, None).map(|rrt| {
+        info.cal_rrt(param).map(|rrt| {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
