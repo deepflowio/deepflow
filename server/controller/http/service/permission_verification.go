@@ -52,11 +52,8 @@ func isPermitted(fpermit config.FPermit, userInfo *UserInfo, m PermitVerifyMetho
 	if err != nil {
 		return err
 	}
-	result, err := response.Get("DATA").Bool()
-	if err != nil {
-		return err
-	}
-	if result == false {
+	havePermission := response.Get("DATA").MustBool()
+	if !havePermission {
 		if des := response.Get("DESCRIPTION").MustString(); des != "" {
 			fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, des)
 		}

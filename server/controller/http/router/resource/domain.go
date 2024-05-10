@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/router/common"
+	svc "github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -48,18 +50,18 @@ func NewDomain(cfg *config.ControllerConfig) *Domain {
 // TODO: 后续通过header中携带的用户信息校验用户权限
 func (d *Domain) RegisterTo(e *gin.Engine) {
 	// TODO: 后续统一为v2
-	e.GET("/v2/domains/:lcuuid/", getDomain)
-	e.GET("/v2/domains/", getDomains)
+	e.GET("/v2/domains/:lcuuid/", getDomain(d.cfg))
+	e.GET("/v2/domains/", getDomains(d.cfg))
 	e.POST("/v1/domains/", createDomain(d.cfg))
 	e.PATCH("/v1/domains/:lcuuid/", updateDomain(d.cfg))
-	e.DELETE("/v1/domains/:name-or-uuid/", deleteDomainByNameOrUUID)
-	e.DELETE("/v1/domains/", deleteDomainByName)
+	e.DELETE("/v1/domains/:name-or-uuid/", deleteDomainByNameOrUUID(d.cfg))
+	e.DELETE("/v1/domains/", deleteDomainByName(d.cfg))
 
-	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain)
-	e.GET("/v2/sub-domains/", getSubDomains)
-	e.POST("/v2/sub-domains/", createSubDomain)
-	e.PATCH("/v2/sub-domains/:lcuuid/", updateSubDomain)
-	e.DELETE("/v2/sub-domains/:lcuuid/", deleteSubDomain)
+	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain(d.cfg))
+	e.GET("/v2/sub-domains/", getSubDomains(d.cfg))
+	e.POST("/v2/sub-domains/", createSubDomain(d.cfg))
+	e.PATCH("/v2/sub-domains/:lcuuid/", updateSubDomain(d.cfg))
+	e.DELETE("/v2/sub-domains/:lcuuid/", deleteSubDomain(d.cfg))
 
 	e.PUT("/v1/domain-additional-resources/", applyDomainAddtionalResource)
 	e.GET("/v1/domain-additional-resources/", listDomainAddtionalResource)
@@ -68,28 +70,76 @@ func (d *Domain) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/domain-additional-resources/advanced/", getDomainAddtionalResourceAdvanced)
 }
 
-func getDomain(c *gin.Context) {
-	args := make(map[string]interface{})
-	args["lcuuid"] = c.Param("lcuuid")
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
-	data, err := resource.GetDomains(db, args)
-	common.JsonResponse(c, data, err)
+func getDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := make(map[string]interface{})
+		args["lcuuid"] = c.Param("lcuuid")
+		if uValue, ok := c.GetQuery("user_id"); ok {
+			userID, err := strconv.Atoi(uValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			}
+			args["user_id"] = userID
+		}
+		if tValue, ok := c.GetQuery("team_id"); ok {
+			teamID, err := strconv.Atoi(tValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			}
+			args["team_id"] = teamID
+		}
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+		excludeTeamIDs := []int{}
+		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+		}
+		for k := range teamIDs {
+			excludeTeamIDs = append(excludeTeamIDs, k)
+		}
+		data, err := resource.GetDomains(db, excludeTeamIDs, args)
+		common.JsonResponse(c, data, err)
+	})
 }
 
-func getDomains(c *gin.Context) {
-	args := make(map[string]interface{})
-	if value, ok := c.GetQuery("name"); ok {
-		args["name"] = value
-	}
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
-	data, err := resource.GetDomains(db, args)
-	common.JsonResponse(c, data, err)
+func getDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := make(map[string]interface{})
+		if value, ok := c.GetQuery("name"); ok {
+			args["name"] = value
+		}
+		if uValue, ok := c.GetQuery("user_id"); ok {
+			userID, err := strconv.Atoi(uValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			}
+			args["user_id"] = userID
+		}
+		if tValue, ok := c.GetQuery("team_id"); ok {
+			teamID, err := strconv.Atoi(tValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			}
+			args["team_id"] = teamID
+		}
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+		excludeTeamIDs := []int{}
+		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+		}
+		for k := range teamIDs {
+			excludeTeamIDs = append(excludeTeamIDs, k)
+		}
+		data, err := resource.GetDomains(db, excludeTeamIDs, args)
+		common.JsonResponse(c, data, err)
+	})
 }
 
 func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
@@ -101,7 +151,6 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		err = c.ShouldBindBodyWith(&domainCreate, binding.JSON)
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
-			return
 		}
 
 		db, err := common.GetContextOrgDB(c)
@@ -109,7 +158,13 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 		}
 
-		data, err := resource.CreateDomain(db, domainCreate, cfg)
+		userInfo := svc.GetUserInfo(c)
+		err = svc.IsAddPermitted(cfg.FPermit, userInfo, domainCreate.TeamID)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+		}
+		//create with the user id in the header
+		data, err := resource.CreateDomain(userInfo, db, domainCreate, cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -126,12 +181,6 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		var vTapValue string
-		v, ok := domainUpdate.Config["vtap_id"]
-		if ok && v != nil {
-			vTapValue = v.(string)
-		}
-
 		// transfer json format to map
 		patchMap := map[string]interface{}{}
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
@@ -143,146 +192,156 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 		}
 
-		// set vtap
-		err = resource.KubernetesSetVtap(lcuuid, vTapValue, false, db)
-		if err != nil {
-			common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
-			return
-		}
-
-		data, err := resource.UpdateDomain(lcuuid, patchMap, cfg, db)
+		data, err := resource.UpdateDomain(lcuuid, patchMap, svc.GetUserInfo(c), cfg, db)
 		common.JsonResponse(c, data, err)
 	})
 }
 
-func deleteDomainByNameOrUUID(c *gin.Context) {
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
-	nameOrUUID := c.Param("name-or-uuid")
-	data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db)
-	common.JsonResponse(c, data, err)
+func deleteDomainByNameOrUUID(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+
+		nameOrUUID := c.Param("name-or-uuid")
+		data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db, svc.GetUserInfo(c), cfg)
+		common.JsonResponse(c, data, err)
+	})
 }
 
-func deleteDomainByName(c *gin.Context) {
-	rawQuery := strings.Split(c.Request.URL.RawQuery, "name=")
-	if len(rawQuery) < 1 {
-		common.JsonResponse(c, nil, fmt.Errorf("please fill in the name parameter: domains/?name={}"))
-		return
-	}
-	name := rawQuery[1]
-	name, err := url.QueryUnescape(name)
-	if err != nil {
-		log.Warning(err)
-		name = rawQuery[1]
-	}
-	log.Infof("delete domain by name(%v)", name)
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
-	data, err := resource.DeleteDomainByNameOrUUID(name, db)
-	common.JsonResponse(c, data, err)
+func deleteDomainByName(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		rawQuery := strings.Split(c.Request.URL.RawQuery, "name=")
+		if len(rawQuery) < 1 {
+			common.JsonResponse(c, nil, fmt.Errorf("please fill in the name parameter: domains/?name={}"))
+			return
+		}
+		name := rawQuery[1]
+		name, err := url.QueryUnescape(name)
+		if err != nil {
+			log.Warning(err)
+			name = rawQuery[1]
+		}
+		log.Infof("delete domain by name(%v)", name)
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+		data, err := resource.DeleteDomainByNameOrUUID(name, db, svc.GetUserInfo(c), cfg)
+		common.JsonResponse(c, data, err)
+	})
 }
 
-func getSubDomain(c *gin.Context) {
-	args := make(map[string]interface{})
-	args["lcuuid"] = c.Param("lcuuid")
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
-	data, err := resource.GetSubDomains(db, args)
-	common.JsonResponse(c, data, err)
+func getSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := make(map[string]interface{})
+		args["lcuuid"] = c.Param("lcuuid")
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+		excludeTeamIDs := []int{}
+		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+		}
+		for k := range teamIDs {
+			excludeTeamIDs = append(excludeTeamIDs, k)
+		}
+		data, err := resource.GetSubDomains(db, excludeTeamIDs, args)
+		common.JsonResponse(c, data, err)
+	})
 }
 
-func getSubDomains(c *gin.Context) {
-	args := make(map[string]interface{})
-	if value, ok := c.GetQuery("domain"); ok {
-		args["domain"] = value
-	}
-	if value, ok := c.GetQuery("cluster_id"); ok {
-		args["cluster_id"] = value
-	}
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
-	data, err := resource.GetSubDomains(db, args)
-	common.JsonResponse(c, data, err)
+func getSubDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		args := make(map[string]interface{})
+		if value, ok := c.GetQuery("domain"); ok {
+			args["domain"] = value
+		}
+		if value, ok := c.GetQuery("cluster_id"); ok {
+			args["cluster_id"] = value
+		}
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
+		excludeTeamIDs := []int{}
+		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
+		}
+		for k := range teamIDs {
+			excludeTeamIDs = append(excludeTeamIDs, k)
+		}
+		data, err := resource.GetSubDomains(db, excludeTeamIDs, args)
+		common.JsonResponse(c, data, err)
+	})
 }
 
-func createSubDomain(c *gin.Context) {
-	var err error
-	var subDomainCreate model.SubDomainCreate
+func createSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		var err error
+		var subDomainCreate model.SubDomainCreate
 
-	// 参数校验
-	err = c.ShouldBindBodyWith(&subDomainCreate, binding.JSON)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
-		return
-	}
+		// 参数校验
+		err = c.ShouldBindBodyWith(&subDomainCreate, binding.JSON)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+		}
 
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
 
-	data, err := resource.CreateSubDomain(db, subDomainCreate)
-	common.JsonResponse(c, data, err)
+		data, err := resource.CreateSubDomain(subDomainCreate, db, svc.GetUserInfo(c), cfg)
+		common.JsonResponse(c, data, err)
+	})
 }
 
-func deleteSubDomain(c *gin.Context) {
-	var err error
+func deleteSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		var err error
 
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
 
-	lcuuid := c.Param("lcuuid")
-	data, err := resource.DeleteSubDomain(lcuuid, db)
-	common.JsonResponse(c, data, err)
+		lcuuid := c.Param("lcuuid")
+		data, err := resource.DeleteSubDomain(lcuuid, db, svc.GetUserInfo(c), cfg)
+		common.JsonResponse(c, data, err)
+	})
 }
 
-func updateSubDomain(c *gin.Context) {
-	var err error
-	var subDomainUpdate model.SubDomainUpdate
+func updateSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		var err error
+		var subDomainUpdate model.SubDomainUpdate
 
-	// 参数校验
-	err = c.ShouldBindBodyWith(&subDomainUpdate, binding.JSON)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
-	}
+		// 参数校验
+		err = c.ShouldBindBodyWith(&subDomainUpdate, binding.JSON)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+		}
 
-	var vTapValue string
-	v, ok := subDomainUpdate.Config["vtap_id"]
-	if ok && v != nil {
-		vTapValue = v.(string)
-	}
+		// 接收参数
+		// 避免struct会有默认值，这里转为map作为函数入参
+		patchMap := map[string]interface{}{}
+		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
-	// 接收参数
-	// 避免struct会有默认值，这里转为map作为函数入参
-	patchMap := map[string]interface{}{}
-	c.ShouldBindBodyWith(&patchMap, binding.JSON)
+		lcuuid := c.Param("lcuuid")
 
-	lcuuid := c.Param("lcuuid")
+		db, err := common.GetContextOrgDB(c)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		}
 
-	db, err := common.GetContextOrgDB(c)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
-	}
-
-	err = resource.KubernetesSetVtap(lcuuid, vTapValue, true, db)
-	if err != nil {
-		common.BadRequestResponse(c, httpcommon.K8S_SET_VTAP_FAIL, err.Error())
-		return
-	}
-
-	data, err := resource.UpdateSubDomain(lcuuid, db, patchMap)
-	common.JsonResponse(c, data, err)
+		data, err := resource.UpdateSubDomain(lcuuid, db, svc.GetUserInfo(c), cfg, patchMap)
+		common.JsonResponse(c, data, err)
+	})
 }
 
 func applyDomainAddtionalResource(c *gin.Context) {

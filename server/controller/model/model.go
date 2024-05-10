@@ -315,6 +315,7 @@ type Domain struct {
 	VTapCtrlMAC    string                 `json:"VTAP_CTRL_MAC"`
 	IconID         int                    `json:"ICON_ID"`
 	TeamID         int                    `json:"TEAM_ID"`
+	UserID         int                    `json:"USER_ID"`
 	K8sEnabled     int                    `json:"K8S_ENABLED"`
 	Config         map[string]interface{} `json:"CONFIG"`
 	AZCount        int                    `json:"AZ_COUNT"`
@@ -328,7 +329,7 @@ type Domain struct {
 type DomainCreate struct {
 	Name                string                 `json:"NAME" binding:"required"`
 	Type                int                    `json:"TYPE" binding:"required"`
-	TeamID              int                    `json:"TEAM_ID"`
+	TeamID              int                    `json:"TEAM_ID" binding:"required"`
 	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required
@@ -340,6 +341,7 @@ type DomainUpdate struct {
 	Enabled      int                    `json:"ENABLED"`
 	IconID       int                    `json:"ICON_ID"`
 	TeamID       int                    `json:"TEAM_ID"`
+	UserID       int                    `json:"USER_ID"`
 	ControllerIP string                 `json:"CONTROLLER_IP"`
 	Config       map[string]interface{} `json:"CONFIG"`
 }

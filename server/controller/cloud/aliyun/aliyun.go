@@ -37,6 +37,7 @@ var log = logging.MustGetLogger("cloud.aliyun")
 
 type Aliyun struct {
 	orgID          int
+	teamID         int
 	uuid           string
 	uuidGenerate   string
 	regionUuid     string
@@ -93,8 +94,9 @@ func NewAliyun(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Al
 	}
 
 	return &Aliyun{
-		orgID: orgID,
-		uuid:  domain.Lcuuid,
+		orgID:  orgID,
+		teamID: domain.TeamID,
+		uuid:   domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
 		uuidGenerate: domain.DisplayName,
 		regionUuid:   config.Get("region_uuid").MustString(),

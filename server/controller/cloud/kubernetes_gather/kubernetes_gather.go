@@ -102,6 +102,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 			log.Error("subdomain model is nil")
 			return nil
 		}
+		teamID = subDomain.TeamID
 		name = subDomain.Name
 		lcuuid = subDomain.Lcuuid
 		displayName = subDomain.DisplayName

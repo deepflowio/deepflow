@@ -73,6 +73,7 @@ func (d *SubDomain) getDiffBaseByCloudItem(cloudItem *cloudmodel.SubDomain) (dif
 
 func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql.SubDomain, bool) {
 	dbItem := &mysql.SubDomain{
+		TeamID:      cloudItem.TeamID,
 		Name:        cloudItem.Name,
 		DisplayName: cloudItem.DisplayName,
 		ClusterID:   cloudItem.ClusterID,
