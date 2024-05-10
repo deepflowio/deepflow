@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 )
 
@@ -247,6 +248,10 @@ func getPodOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, erro
 	if err != nil {
 		return nil, err
 	}
+	podGroupType, ok := t.GetPodGroupTypeByID(info.PodGroupID)
+	if !ok {
+		log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID)
+	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
@@ -256,6 +261,7 @@ func getPodOptionsByID(t *tool.DataSet, id int) ([]eventapi.TagFieldOption, erro
 		eventapi.TagPodClusterID(info.PodClusterID),
 		eventapi.TagPodNSID(info.PodNamespaceID),
 		eventapi.TagPodGroupID(info.PodGroupID),
+		eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
 		eventapi.TagPodNodeID(info.PodNodeID),
 		eventapi.TagPodID(id),
 	}...)
