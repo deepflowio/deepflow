@@ -16,7 +16,7 @@
 
 use std::sync::atomic::Ordering;
 
-use super::{flow::PacketDirection, l7_protocol_log::KafkaInfoCache};
+use super::flow::PacketDirection;
 use enum_dispatch::enum_dispatch;
 use log::{debug, error, warn};
 use serde::Serialize;
@@ -163,7 +163,7 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
         if have no previous log cache, cache the current log rrt
     */
-    fn cal_rrt(&self, param: &ParseParam, kafka_info: Option<KafkaInfoCache>) -> Option<u64> {
+    fn cal_rrt(&self, param: &ParseParam) -> Option<u64> {
         let mut perf_cache = param.l7_perf_cache.borrow_mut();
         let cache_key = self.cal_cache_key(param);
         let previous_log_info = perf_cache.rrt_cache.pop(&cache_key);
@@ -186,7 +186,6 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                     LogCache {
                         msg_type: param.direction.into(),
                         time: param.time,
-                        kafka_info,
                         multi_merge_info: None,
                     },
                 );
@@ -220,7 +219,6 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         LogCache {
                             msg_type: param.direction.into(),
                             time: param.time,
-                            kafka_info,
                             multi_merge_info: None,
                         },
                     );
@@ -273,7 +271,6 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                         LogCache {
                             msg_type: param.direction.into(),
                             time: param.time,
-                            kafka_info,
                             multi_merge_info: None,
                         },
                     );
@@ -332,7 +329,6 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
                 LogCache {
                     msg_type: param.direction.into(),
                     time: param.time,
-                    kafka_info: None,
                     multi_merge_info: Some((req_end, resp_end, false)),
                 },
             );

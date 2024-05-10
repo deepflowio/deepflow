@@ -206,7 +206,7 @@ impl L7ProtocolParserInterface for DnsLog {
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = DnsInfo::default();
         self.parse(payload, &mut info, param)?;
-        info.cal_rrt(param, None).map(|rrt| {
+        info.cal_rrt(param).map(|rrt| {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
