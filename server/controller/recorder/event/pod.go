@@ -64,7 +64,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 		}
 		podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(item.PodGroupID)
 		if !ok {
-			log.Error(err)
+			log.Error(p.metadata.LogPre(fmt.Sprintf("db pod_group type(id: %d) not found", item.PodGroupID)))
 		}
 
 		opts = append(opts, []eventapi.TagFieldOption{
