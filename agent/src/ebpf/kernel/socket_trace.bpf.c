@@ -1022,36 +1022,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	 * 采用的策略是：沿用上次trace_info保存的traceID。
 	 */
 
-	/*
-	 * Socket A actively sends a request as a client (traceID is 0), 
-	 * and associates socket B with the thread ID. Socket B receives a
-	 * response as the client, create new traceID as the starting point
-	 * for the entire tracking process. There is a problem in tracking
-	 * down like this, and a closed loop cannot be formed. This is due to
-	 * receiving a response from socket B to start the trace, but not being
-	 * able to get a request from socket B to finish the entire trace.
-	 *
-	 * (socket A) -- request ->
-	 *            |
-	 *       (socket B) <- response (traceID-1) [The starting point of trace]
-	 *               |
-	 *             (socket C) -- request -> (traceID-1)
-	 *                    |
-	 *                  (socket D) <- response (traceID-2)
-	 *                         |
-	 *                      (socket E) -- request -> (traceID-2)
-	 *                            ... ...  (Can't finish the whole trace)
-	 *
-	 * In order to avoid invalid association of the client, the behavior of creating
-	 * a new trace on socket B is cancelled.
-	 *
-	 * (socket A) ------- request -------->
-	 *        |
-	 *     thread-ID
-	 *        |
-	 *      (socket B) <---- response (Here, not create new trace.)
-	 */
-
 	__u64 pre_trace_id = 0;
 	int ret;
 	if (is_socket_info_valid(socket_info_ptr) &&
@@ -1061,28 +1031,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	}
 
 	if (conn_info->direction == T_INGRESS) {
-		if (trace_info_ptr) {
-			/*
-			 * The following scenarios do not track:
-			 * ---------------------------------------
-			 *                 [traceID : 0]
-			 * (client-socket) request ->
-			 *       |
-			 *     thread-ID
-			 *       |
-			 *     (client-socket) <- response
-			 */
-			if (trace_info_ptr->is_trace_id_zero &&
-			    conn_info->message_type == MSG_RESPONSE &&
-			    conn_info->infer_reliable) {
-				if (!trace_map__delete(trace_key)) {
-					__sync_fetch_and_add
-					    (&trace_stats->trace_map_count, -1);
-				}
-				return;
-			}
-		}
-
 		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
 		    (pre_trace_id ==
@@ -1105,19 +1053,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 		}
 	} else {		/* direction == T_EGRESS */
 		if (trace_info_ptr) {
-			/*
-			 * Skip the scene below:
-			 * ------------------------------------------------
-			 * (client-socket) request [traceID : 0] ->
-			 *        |
-			 *      thread-ID
-			 *        |
-			 *      (client-socket) request [traceID : 0] ->
-			 */
-			if (trace_info_ptr->is_trace_id_zero) {
-				return;
-			}
-
 			*thread_trace_id = trace_info_ptr->thread_trace_id;
 
 			/*
@@ -1143,22 +1078,6 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			if (!trace_map__delete(trace_key)) {
 				__sync_fetch_and_add
 				    (&trace_stats->trace_map_count, -1);
-			}
-		} else {
-			/*
-			 * Record the scene below:
-			 * ------------------------------------------------
-			 * (client-socket) request [traceID : 0] ->
-			 */
-			if (conn_info->message_type == MSG_REQUEST
-			    && conn_info->infer_reliable) {
-				struct trace_info_t trace_info = { 0 };
-				trace_info.is_trace_id_zero = true;
-				trace_info.update_time =
-				    time_stamp / NS_PER_SEC;
-				trace_map__update(trace_key, &trace_info);
-				__sync_fetch_and_add
-				    (&trace_stats->trace_map_count, 1);
 			}
 		}
 	}

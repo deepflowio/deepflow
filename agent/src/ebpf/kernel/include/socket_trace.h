@@ -130,7 +130,7 @@ struct conn_info_s {
 	__u16 skc_family;	/* PF_INET, PF_INET6... */
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only:1;
-	__u8 infer_reliable:1;	// Is protocol inference reliable?
+	__u8 reserved:1;
 	/*
 	 * Whether the socket l7 protocol type needs
 	 * to be confirmed again.
