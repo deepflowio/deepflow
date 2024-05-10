@@ -749,11 +749,14 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 	defaultData := &agent_config.AgentGroupConfigResponse{}
 	convertDBToJson(common.DefaultVTapGroupConfig, defaultData, idToTapTypeName, lcuuidToDomain)
 
-	var vtapGroup mysql.VTapGroup
-	if err := db.Where("lcuuid = ?", realConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
-		return nil, err
+	realData.TeamID = common.DEFAULT_TEAM_ID
+	if realConfig.VTapGroupLcuuid != nil {
+		var vtapGroup mysql.VTapGroup
+		if err := db.Where("lcuuid = ?", *realConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
+			return nil, err
+		}
+		realData.TeamID = vtapGroup.TeamID
 	}
-	realData.TeamID = vtapGroup.TeamID
 
 	response := &model.DetailedConfig{
 		RealConfig:    realData,
