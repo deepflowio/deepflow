@@ -1178,13 +1178,12 @@ impl Collector {
         receiver: Receiver<Box<FlowMeterWithFlow>>,
         sender: DebugSender<BoxedDocument>,
         metric_type: MetricsType,
-        delay_seconds: u32,
+        delay_seconds: u64,
         stats: &Arc<stats::Collector>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
         agent_mode: RunningMode,
     ) -> Self {
-        let delay_seconds = delay_seconds as u64;
         let (kind, name) = match metric_type {
             MetricsType::MINUTE => {
                 if delay_seconds < MINUTE || delay_seconds >= MINUTE * 2 {
@@ -1320,13 +1319,12 @@ impl L7Collector {
         l7_receiver: Receiver<Box<AppMeterWithFlow>>,
         sender: DebugSender<BoxedDocument>,
         metric_type: MetricsType,
-        delay_seconds: u32,
+        delay_seconds: u64,
         stats: &Arc<stats::Collector>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
         agent_mode: RunningMode,
     ) -> Self {
-        let delay_seconds = delay_seconds as u64;
         let (kind, name) = match metric_type {
             MetricsType::MINUTE => {
                 if delay_seconds < MINUTE || delay_seconds >= MINUTE * 2 {
