@@ -613,6 +613,13 @@ func deleteDomain(domain *mysql.Domain, db *mysql.DB) (map[string]string, error)
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.AZ{})
 
 	db.Delete(&domain)
+
+	// pub to tagrecorder
+	metadata := message.NewMetadata(db.ORGID, domain.TeamID, domain.ID)
+	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("domain") {
+		s.OnDomainDeleted(metadata)
+	}
+
 	log.Infof("delete domain (%s) resources completed", domain.Name)
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
