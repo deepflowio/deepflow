@@ -40,7 +40,7 @@ use std::time::Duration;
 
 const FLOW_METRICS_PEER_SRC: usize = 0;
 const FLOW_METRICS_PEER_DST: usize = 1;
-const TIME_UNIT: Duration = Duration::from_secs(1);
+pub const TIME_UNIT: Duration = Duration::from_secs(1);
 const QUEUE_BATCH_SIZE: usize = 1024;
 const STATISTICAL_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_L7_LOG_PACKET_SIZE: u32 = 256;
