@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -65,6 +66,11 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 			if err != nil {
 				log.Error(err)
 			} else {
+				podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(info.PodGroupID)
+				if !ok {
+					log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID)
+				}
+
 				opts = append(opts, []eventapi.TagFieldOption{
 					eventapi.TagPodID(podID),
 					eventapi.TagRegionID(info.RegionID),
@@ -72,6 +78,7 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 					eventapi.TagVPCID(info.VPCID),
 					eventapi.TagPodClusterID(info.PodClusterID),
 					eventapi.TagPodGroupID(info.PodGroupID),
+					eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
 					eventapi.TagPodNodeID(info.PodNodeID),
 					eventapi.TagPodNSID(info.PodNamespaceID),
 				}...)
