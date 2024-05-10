@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -59,11 +60,17 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 			}...)
 			domainLcuuid = info.DomainLcuuid
 		}
+		podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(item.PodGroupID)
+		if !ok {
+			log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID)
+		}
+
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagPodID(item.ID),
 			eventapi.TagVPCID(item.VPCID),
 			eventapi.TagPodClusterID(item.PodClusterID),
 			eventapi.TagPodGroupID(item.PodGroupID),
+			eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
 			eventapi.TagPodNodeID(item.PodNodeID),
 			eventapi.TagPodNSID(item.PodNamespaceID),
 		}...)
