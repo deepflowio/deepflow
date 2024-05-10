@@ -294,6 +294,9 @@ static u32 delete_all_stackmap_elems(struct bpf_tracer *tracer,
 		key = next_key;
 	}
 
+	if (find_count == 0)
+		return 0;
+
 	reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
 
 	ebpf_info("[%s] table %s find_count %u reclaim_count :%u\n",

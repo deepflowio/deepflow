@@ -82,7 +82,11 @@ struct symbolizer_proc_info {
 	char container_id[CONTAINER_ID_SIZE];
 	/* reference counting */
 	u64 use;
+	/* Has the process exited? */
+	u64 is_exit;
 	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
+	u32 lock;
+	/* Multithreaded symbol resolution protection. */
 	pthread_mutex_t mutex;
 	/* Recording symbol resolution cache. */
 	volatile uword syms_cache;
@@ -90,12 +94,13 @@ struct symbolizer_proc_info {
 
 static inline void symbolizer_proc_lock(struct symbolizer_proc_info *p)
 {
-	pthread_mutex_lock(&p->mutex);
+	while (__atomic_test_and_set(&p->lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
 }
 
 static inline void symbolizer_proc_unlock(struct symbolizer_proc_info *p)
 {
-	pthread_mutex_unlock(&p->mutex);
+	__atomic_clear(&p->lock, __ATOMIC_RELEASE);
 }
 
 struct symbolizer_cache_kvp {
@@ -176,8 +181,8 @@ static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
 
 static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *kv)
 {
-	return (u64) ((struct symbolizer_proc_info *)kv->v.
-		      proc_info_p)->netns_id;
+	return (u64) ((struct symbolizer_proc_info *)kv->v.proc_info_p)->
+	    netns_id;
 }
 
 static_always_inline void
@@ -187,10 +192,10 @@ copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 	    sizeof(((struct symbolizer_proc_info *) kv->v.proc_info_p)->comm);
 
 	strcpy_s_inline(dst, len,
-			((struct symbolizer_proc_info *)kv->v.
-			 proc_info_p)->comm,
-			strlen(((struct symbolizer_proc_info *)kv->
-				v.proc_info_p)->comm));
+			((struct symbolizer_proc_info *)kv->v.proc_info_p)->
+			comm,
+			strlen(((struct symbolizer_proc_info *)kv->v.
+				proc_info_p)->comm));
 }
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,

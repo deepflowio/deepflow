@@ -1354,7 +1354,7 @@ vtap_group_id: g-xxxxxx
       #regex: ^deepflow-.*
 
       ## Configure the minimum blocking event time
-      ## Default: 1us. Range: [1, 2^32-1)us
+      ## Default: 50us. Range: [1, 2^32-1)us
       ## Note:
       ##   Scheduler events are still high-frequency events, as their rate may exceed 1 million events
       ##   per second, so caution should still be exercised.
@@ -1363,7 +1363,7 @@ vtap_group_id: g-xxxxxx
       ##   If your goal is to trace longer blocking events, increasing this parameter can filter out shorter
       ##   blocking events, further reducing overhead. Additionally, we will not collect events with a block
       ##   time exceeding 1 hour.
-      #minblock: 1us
+      #minblock: 50us
 
   ######################################
   ## Agent Running in Standalone Mode ##

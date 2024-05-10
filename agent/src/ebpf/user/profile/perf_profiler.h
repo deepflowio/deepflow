@@ -21,6 +21,8 @@
 #include "../bihash_24_8.h"
 #include "../../kernel/include/perf_profiler.h"
 
+#define PROFILER_CTX_NUM 2
+
 /*
  * stack_trace_msg_hash, used to store stack trace messages and
  * perform statistics. These data are pushed to the higher level
