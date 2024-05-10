@@ -524,6 +524,7 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 		free_symcache_count++;
 	}
 	p->syms_cache = 0;
+	CLIB_MEMORY_STORE_BARRIER();
 	symbolizer_proc_unlock(p);
 	clib_mem_free((void *)p);
 }
@@ -602,9 +603,10 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 	     (h, (symbol_caches_hash_kv *) kv,
 	      2 /* is_add = 2, Add but do not overwrite? */ )) != 0) {
 		// If it already exists, return -2.
-		ebpf_warning
-		    ("symbol_caches_hash_add_del() failed.(pid %d), return %d\n",
-		     pid, ret);
+		if (ret != -2)
+			ebpf_warning
+			    ("symbol_caches_hash_add_del() failed.(pid %d), return %d\n",
+			     pid, ret);
 		free_symbolizer_cache_kvp(kv);
 		return NULL;
 	} else
@@ -702,6 +704,12 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		int ret = VEC_OK;
+		struct symbolizer_proc_info *p;
+		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		if (p != NULL) {
+			p->is_exit = 1;
+			CLIB_MEMORY_STORE_BARRIER();
+		}
 
 		symbol_cache_pids_lock();
 		if (pid_is_already_existed((int)kv.k.pid)) {
@@ -796,6 +804,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->new_java_syms_file = false;
 	p->cache_need_update = false;
 	p->gen_java_syms_file_err = false;
+	p->lock = 0;
 	pthread_mutex_init(&p->mutex, NULL);
 	p->syms_cache = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
@@ -959,6 +968,8 @@ exit:
 	p->add_task_list = false;
 	p->cache_need_update = false;
 	p->syms_cache = kv->v.cache;
+	CLIB_MEMORY_STORE_BARRIER();
+
 	return (void *)kv->v.cache;
 }
 

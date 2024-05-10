@@ -26,6 +26,12 @@
 #include "../../tracer.h"
 #include "../../socket.h"
 
+/*
+ * You can rewrite the extended_reader_create() function to expand
+ * the functionality of other function stack profiling. Inside it,
+ * you can append new readers to read data from the eBPF perfbuf
+ * and enable new threads to handle the reception.
+ */
 int __attribute__ ((weak)) extended_reader_create(struct bpf_tracer *tracer)
 {
 	return 0;

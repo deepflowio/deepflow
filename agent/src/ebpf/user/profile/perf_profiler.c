@@ -51,7 +51,9 @@
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
+#define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
 
+struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 static struct profiler_context oncpu_ctx;
 
 /* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
@@ -144,6 +146,7 @@ static int release_profiler(struct bpf_tracer *tracer)
 
 	tracer_reader_unlock(tracer);
 
+	ebpf_info("release_profiler().... finish!\n");
 	return ETR_OK;
 }
 
@@ -383,7 +386,12 @@ static inline bool all_perf_workers_exit(struct bpf_tracer *t)
 
 int stop_continuous_profiler(void)
 {
-	oncpu_ctx.profiler_stop = 1;
+	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
+		if (g_ctx_array[i] == NULL)
+			continue;
+		g_ctx_array[i]->profiler_stop = 1;
+	}
+	
 	if (profiler_tracer == NULL)
 		return (0);
 
@@ -538,10 +546,12 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	if (!run_conditions_check())
 		return (-1);
 
+	memset(g_ctx_array, 0, sizeof(g_ctx_array));
 	profiler_context_init(&oncpu_ctx, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
 			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
 			      MAP_STACK_B_NAME, false, false);
+	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
 
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
 	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||

@@ -169,13 +169,11 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	} else {
 		struct symbolizer_proc_info *p = info_p;
 		if (p) {
-			symbolizer_proc_lock(p);
-			if ((u64) resolver != (u64) p->syms_cache) {
-				symbolizer_proc_unlock(p);
+			if (p->is_exit || ((u64) resolver != (u64) p->syms_cache))
 				return (-1);
-			}
+			pthread_mutex_lock(&p->mutex);
 			ret = bcc_symcache_resolve(resolver, address, sym);
-			symbolizer_proc_unlock(p);
+			pthread_mutex_unlock(&p->mutex);
 		}
 	}
 
