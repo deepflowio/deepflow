@@ -10,7 +10,6 @@ CREATE PROCEDURE AddColumnAndSetIfNotExists(
 BEGIN
     DECLARE col_count INT;
 
-    -- check whether the column exists, pay attention to specify the @tableSchema variable which will be added when this file is executed
     SELECT COUNT(*)
     INTO col_count
     FROM INFORMATION_SCHEMA.COLUMNS
