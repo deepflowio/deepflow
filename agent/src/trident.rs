@@ -72,6 +72,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{
         protocol_logs::BoxAppProtoLogsData, protocol_logs::SessionAggregator, PacketSequenceParser,
+        TIME_UNIT,
     },
     handler::{NpbBuilder, PacketHandlerBuilder},
     integration_collector::{
@@ -121,7 +122,8 @@ use public::{
 };
 
 const MINUTE: Duration = Duration::from_secs(60);
-const COMMON_DELAY: u32 = 5;
+const COMMON_DELAY: u64 = 5; // Potential delay from other processing steps in flow_map
+const QG_PROCESS_MAX_DELAY: u64 = 1; // Potential delay from processing steps in qg
 
 #[derive(Debug, Default)]
 pub struct ChangedConfig {
@@ -1450,6 +1452,21 @@ pub struct AgentComponents {
 }
 
 impl AgentComponents {
+    fn get_flowgen_tolerable_delay(yaml_config: &YamlConfig) -> u64 {
+        // FIXME: The flow_generator and dispatcher should be decoupled, and a delay function should be provided for this purpose.
+        // The components of quadruple_generator's Delay are as follows:
+        //   - Inherent delay in flow statistics data in flow_map: second_flow_extra_delay + packet_delay
+        //   - Additional delay in inject_flush_ticker in flow_map: TIME_UNIT
+        //   - Delay in flushing the output queue in flow_map: flow.flush_interval
+        //   - Potential delay from other processing steps in flow_map: COMMON_DELAY 5 seconds
+        //   - The delay caused by the time window being pushed ahead in flow_map: flow.flush_interval
+        yaml_config.packet_delay.as_secs()
+            + TIME_UNIT.as_secs()
+            + yaml_config.flow.flush_interval.as_secs()
+            + COMMON_DELAY
+            + yaml_config.second_flow_extra_delay.as_secs()
+            + yaml_config.flow.flush_interval.as_secs() // The flow_map may send data to qg ahead of time due to the output_buffer exceeding its limit. This can result in the time_window of qg being advanced prematurely, with the maximum advancement time being the flush_interval.
+    }
     fn new_collector(
         id: usize,
         stats_collector: Arc<stats::Collector>,
@@ -1465,17 +1482,7 @@ impl AgentComponents {
     ) -> CollectorThread {
         let yaml_config = &config_handler.candidate_config.yaml_config;
 
-        // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
-        // QuadrupleGenerator的Delay组成部分：
-        //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
-        //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
-        //   FlowGen中输出队列Flush的Delay：flushInterval
-        //   FlowGen中其它处理流程可能产生的Delay: 5s
-        let flowgen_tolerable_delay = (yaml_config.packet_delay.as_secs()
-            + 1
-            + yaml_config.flow.flush_interval.as_secs()
-            + COMMON_DELAY as u64)
-            + yaml_config.second_flow_extra_delay.as_secs();
+        let flowgen_tolerable_delay = Self::get_flowgen_tolerable_delay(yaml_config);
         // minute QG window is also pushed forward by flow stat time,
         // therefore its delay should be 60 + second delay (including extra flow delay)
         let minute_quadruple_tolerable_delay = 60 + flowgen_tolerable_delay;
@@ -1560,7 +1567,7 @@ impl AgentComponents {
                 second_receiver,
                 metrics_sender.clone(),
                 MetricsType::SECOND,
-                flowgen_tolerable_delay as u32 + 1, // one more second for latency in qg
+                flowgen_tolerable_delay + QG_PROCESS_MAX_DELAY,
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
@@ -1573,7 +1580,7 @@ impl AgentComponents {
                 minute_receiver,
                 metrics_sender,
                 MetricsType::MINUTE,
-                minute_quadruple_tolerable_delay as u32 + 1, // one more second for latency in qg
+                minute_quadruple_tolerable_delay + QG_PROCESS_MAX_DELAY,
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
@@ -1627,17 +1634,7 @@ impl AgentComponents {
             Countable::Owned(Box::new(counter)),
         );
 
-        // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
-        // QuadrupleGenerator的Delay组成部分：
-        //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
-        //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
-        //   FlowGen中输出队列Flush的Delay：flushInterval
-        //   FlowGen中其它处理流程可能产生的Delay: 5s
-        let second_quadruple_tolerable_delay = (yaml_config.packet_delay.as_secs()
-            + 1
-            + yaml_config.flow.flush_interval.as_secs()
-            + COMMON_DELAY as u64)
-            + yaml_config.second_flow_extra_delay.as_secs();
+        let second_quadruple_tolerable_delay = Self::get_flowgen_tolerable_delay(yaml_config);
         // minute QG window is also pushed forward by flow stat time,
         // therefore its delay should be 60 + second delay (including extra flow delay)
         let minute_quadruple_tolerable_delay = 60 + second_quadruple_tolerable_delay;
@@ -1663,7 +1660,7 @@ impl AgentComponents {
                 l7_second_receiver,
                 metrics_sender.clone(),
                 MetricsType::SECOND,
-                second_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                second_quadruple_tolerable_delay + QG_PROCESS_MAX_DELAY,
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
@@ -1676,7 +1673,7 @@ impl AgentComponents {
                 l7_minute_receiver,
                 metrics_sender,
                 MetricsType::MINUTE,
-                minute_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
+                minute_quadruple_tolerable_delay + QG_PROCESS_MAX_DELAY,
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
