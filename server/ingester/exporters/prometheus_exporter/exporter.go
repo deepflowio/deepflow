@@ -237,9 +237,9 @@ func (e *PrometheusExporter) sendRequest(queueID int, batchs []prompb.TimeSeries
 	// Reference for different behavior according to status code:
 	// https://github.com/prometheus/prometheus/pull/2552/files#diff-ae8db9d16d8057358e49d694522e7186
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 256))
-	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+	if resp.StatusCode >= 400 {
 		e.requestFailedCounters[queueID]++
-		return fmt.Errorf("remote write returned HTTP status %v; err = %w: %s", resp.Status, err, body)
+		return fmt.Errorf("remote write returned HTTP status %v; err = %s: %s", resp.Status, err, body)
 	}
 
 	return nil
