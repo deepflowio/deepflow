@@ -33,10 +33,11 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
-            LogMessageType,
+            set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
+            L7ResponseStatus, LogMessageType,
         },
     },
+    plugin::{wasm::WasmData, CustomInfo},
     utils::bytes::{read_u32_be, read_u64_be},
 };
 
@@ -104,20 +105,47 @@ pub struct DubboInfo {
     captured_response_byte: u32,
 
     rrt: u64,
+
+    // set by wasm plugin
+    custom_result: Option<String>,
+    custom_exception: Option<String>,
+
+    #[serde(skip)]
+    attributes: Vec<KeyVal>,
 }
 
 impl DubboInfo {
     pub fn merge(&mut self, other: &mut Self) {
-        if self.resp_msg_size.is_none() {
-            self.resp_msg_size = other.resp_msg_size;
+        if other.is_tls {
+            self.is_tls = other.is_tls;
         }
+        if other.event > 0 {
+            self.event = other.event;
+        }
+        if other.serial_id > 0 {
+            self.serial_id = other.serial_id;
+        }
+        swap_if!(self, req_msg_size, is_none, other);
+        swap_if!(self, dubbo_version, is_empty, other);
+        swap_if!(self, service_name, is_empty, other);
+        swap_if!(self, service_version, is_empty, other);
+        swap_if!(self, method_name, is_empty, other);
+        swap_if!(self, resp_msg_size, is_none, other);
         if other.resp_status != L7ResponseStatus::default() {
             self.resp_status = other.resp_status;
         }
-        if self.status_code.is_none() {
-            self.status_code = other.status_code;
+        swap_if!(self, status_code, is_none, other);
+        swap_if!(self, custom_result, is_none, other);
+        swap_if!(self, custom_exception, is_none, other);
+        swap_if!(self, trace_id, is_empty, other);
+        swap_if!(self, span_id, is_empty, other);
+        self.attributes.append(&mut other.attributes);
+        if other.captured_request_byte > 0 {
+            self.captured_request_byte = other.captured_request_byte;
         }
-        self.captured_response_byte = other.captured_response_byte;
+        if other.captured_response_byte > 0 {
+            self.captured_response_byte = other.captured_response_byte;
+        }
     }
 
     fn set_trace_id(&mut self, trace_id: String, trace_type: &TraceType) {
@@ -173,6 +201,47 @@ impl DubboInfo {
             }
             _ => return,
         };
+    }
+
+    pub fn merge_custom_info(&mut self, custom: CustomInfo) {
+        // req rewrite
+        if !custom.req.domain.is_empty() {
+            self.service_name = custom.req.domain;
+        }
+
+        if !custom.req.req_type.is_empty() {
+            self.method_name = custom.req.req_type;
+        }
+
+        //resp rewrite
+        if let Some(code) = custom.resp.code {
+            self.status_code = Some(code);
+        }
+
+        if custom.resp.status != self.resp_status {
+            self.resp_status = custom.resp.status;
+        }
+
+        if !custom.resp.result.is_empty() {
+            self.custom_result = Some(custom.resp.result);
+        }
+
+        if !custom.resp.exception.is_empty() {
+            self.custom_exception = Some(custom.resp.exception);
+        }
+
+        //trace info rewrite
+        if custom.trace.trace_id.is_some() {
+            self.trace_id = custom.trace.trace_id.unwrap();
+        }
+        if custom.trace.span_id.is_some() {
+            self.span_id = custom.trace.span_id.unwrap();
+        }
+
+        // extend attribute
+        if !custom.attributes.is_empty() {
+            self.attributes.extend(custom.attributes);
+        }
     }
 }
 
@@ -243,6 +312,14 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 _ => f.serial_id.to_string(),
             },
         };
+        let mut attrs = vec![serial_id_attr];
+        if f.event != 0 {
+            attrs.push(KeyVal {
+                key: "event".into(),
+                val: f.event.to_string(),
+            });
+        }
+        attrs.extend(f.attributes);
         let flags = if f.is_tls {
             EbpfFlags::TLS.bits()
         } else {
@@ -258,12 +335,13 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 resource: f.service_name.clone(),
                 req_type: f.method_name.clone(),
                 endpoint,
-                ..Default::default()
+                domain: f.service_name.clone(),
             },
             resp: L7Response {
                 status: f.resp_status,
                 code: f.status_code,
-                ..Default::default()
+                exception: f.custom_exception.unwrap_or_default(),
+                result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
                 trace_id: Some(f.trace_id),
@@ -273,17 +351,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             ext_info: Some(ExtendedInfo {
                 rpc_service: Some(f.service_name),
                 request_id: Some(f.request_id as u32),
-                attributes: Some(if f.event == 0 {
-                    vec![serial_id_attr]
-                } else {
-                    vec![
-                        KeyVal {
-                            key: "event".into(),
-                            val: f.event.to_string(),
-                        },
-                        serial_id_attr,
-                    ]
-                }),
+                attributes: Some(attrs),
                 ..Default::default()
             }),
             flags,
@@ -331,6 +399,7 @@ impl L7ProtocolParserInterface for DubboLog {
         });
         set_captured_byte!(info, param);
         if param.parse_log {
+            self.wasm_hook(param, payload, &mut info);
             Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
         } else {
             Ok(L7ParseResult::None)
@@ -742,6 +811,17 @@ impl DubboLog {
             }
         }
         Ok(())
+    }
+
+    fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8], info: &mut DubboInfo) {
+        let mut vm_ref = param.wasm_vm.borrow_mut();
+        let Some(vm) = vm_ref.as_mut() else {
+            return;
+        };
+        let wasm_data = WasmData::new(L7Protocol::Dubbo);
+        if let Some(custom) = vm.on_custom_message(payload, param, wasm_data) {
+            info.merge_custom_info(custom);
+        }
     }
 }
 
