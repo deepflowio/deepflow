@@ -12,14 +12,6 @@ services:
       - NET_RAW
       - IPC_LOCK
       - SYSLOG
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 768M
-        reservations:
-          cpus: '1'
-          memory: 768M
     volumes:
       - /etc/deepflow-agent.yaml:/etc/deepflow-agent/deepflow-agent.yaml:ro
       - /sys/kernel/debug:/sys/kernel/debug:ro
