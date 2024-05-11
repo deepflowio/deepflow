@@ -293,10 +293,10 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 request_id: f.statement_id.into(),
                 ..Default::default()
             }),
-            trace_info: if let (Some(tid), Some(sid)) = (f.trace_id, f.span_id) {
+            trace_info: if f.trace_id.is_some() || f.span_id.is_some() {
                 Some(TraceInfo {
-                    trace_id: Some(tid),
-                    span_id: Some(sid),
+                    trace_id: f.trace_id,
+                    span_id: f.span_id,
                     ..Default::default()
                 })
             } else {
