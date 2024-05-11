@@ -104,6 +104,14 @@ impl WasmData {
             protobuf: message.encode_to_vec(),
         }
     }
+
+    pub fn new(protocol: L7Protocol) -> Self {
+        Self {
+            hook_point: HookPoint::ProtocolParse,
+            type_code: protocol as u32,
+            protobuf: vec![],
+        }
+    }
 }
 
 impl WasmVm {
