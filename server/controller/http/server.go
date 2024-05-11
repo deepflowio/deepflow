@@ -115,6 +115,7 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewMail(),
 		router.NewPrometheus(),
 		router.NewDatabase(s.controllerConfig),
+		router.NewAgentCMD(),
 		// icon
 		router.NewIcon(s.controllerConfig),
 
