@@ -18,9 +18,12 @@ package common
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
+	"github.com/baidubce/bce-sdk-go/util/log"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -53,4 +56,42 @@ func ForwardMasterController(c *gin.Context, masterControllerName string, port i
 	}
 
 	c.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, make(map[string]string))
+}
+
+func ForwardToController(c *gin.Context, host string) {
+	targetURL := fmt.Sprintf("http://%s:%d", host, common.GConfig.HTTPNodePort)
+	req, err := http.NewRequest(c.Request.Method, targetURL, c.Request.Body)
+	if err != nil {
+		log.Error(err)
+		c.String(http.StatusInternalServerError, err.Error())
+		c.Abort()
+		return
+	}
+	copyHeader(c.Request.Header, req.Header)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error(err)
+		c.String(http.StatusInternalServerError, err.Error())
+		c.Abort()
+		return
+	}
+	defer resp.Body.Close()
+
+	for k, vv := range resp.Header {
+		for _, v := range vv {
+			c.Writer.Header().Add(k, v)
+		}
+	}
+	c.Writer.WriteHeader(resp.StatusCode)
+	io.Copy(c.Writer, resp.Body)
+}
+
+func copyHeader(src http.Header, dst http.Header) {
+	for k, vv := range src {
+		for _, v := range vv {
+			dst.Add(k, v)
+		}
+	}
 }
