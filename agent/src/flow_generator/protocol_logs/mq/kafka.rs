@@ -145,6 +145,13 @@ impl KafkaInfo {
         if other.status_code.is_some() {
             self.status_code = other.status_code;
         }
+        if self.offset == 0 && other.offset > 0 {
+            self.offset = other.offset;
+        }
+        if self.partition == 0 && other.partition > 0 {
+            self.partition = other.partition;
+        }
+        self.msg_type = LogMessageType::Session;
         self.captured_response_byte = other.captured_response_byte;
         crate::flow_generator::protocol_logs::swap_if!(self, topic_name, is_empty, other);
     }
@@ -239,11 +246,15 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             EbpfFlags::NONE.bits()
         };
         let resource = match (f.api_key, f.msg_type) {
-            (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session) => {
+            (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session)
+                if !f.topic_name.is_empty() =>
+            {
                 format!("{}-{}:{}", f.topic_name, f.partition, f.offset)
             }
             (KAFKA_PRODUCE, LogMessageType::Response)
-            | (KAFKA_PRODUCE, LogMessageType::Session) => {
+            | (KAFKA_PRODUCE, LogMessageType::Session)
+                if !f.topic_name.is_empty() =>
+            {
                 format!("{}-{}:{}", f.topic_name, f.partition, f.offset)
             }
             _ => String::new(),
