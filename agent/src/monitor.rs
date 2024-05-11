@@ -224,9 +224,9 @@ impl RefCountable for SysStatusBroker {
             CounterValue::Unsigned(self.config.load().max_memory as u64),
         ));
         metrics.push((
-            "max_cpus",
+            "max_millicpus",
             CounterType::Gauged,
-            CounterValue::Unsigned(self.config.load().max_cpus as u64),
+            CounterValue::Unsigned(self.config.load().max_millicpus as u64),
         ));
         metrics.push((
             "system_free_memory_limit",

@@ -915,10 +915,18 @@ vtap_group_id: g-xxxxxx
   #################################
   ## sFlow & NetFlow Server Ports
   #xflow-collector:
-    #sflow-ports:
-    #- 6343
-    #netflow-ports:
-    #- 2055
+    ## sFlow Server Ports
+    ## Default: [], means that no sFlow data will be collected.
+    ## Note: This feature is only supported by the Enterprise Edition of Trident.
+    ##   In general, sFlow uses port 6343.
+    #sflow-ports: []
+
+    ## NetFlow Server Ports
+    ## Default: [], means that no NetFlow data will be collected.
+    ## Note: This feature is only supported by the Enterprise Edition of Trident.
+    ##   Additionally, only NetFlow v5 is currently supported. In general, NetFlow
+    ##   uses port 2055.
+    #netflow-ports: []
 
   #########
   ## NPB ##

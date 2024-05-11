@@ -264,7 +264,7 @@ impl Guard {
                 return false;
             }
         };
-        (cpu_limit * 100) as f32 > cpu_usage
+        (cpu_limit / 10) as f32 > cpu_usage // The cpu_usage is in percentage, and the unit of cpu_limit is milli-cores. Divide cpu_limit by 10 to align the units
     }
 
     pub fn start(&self) {
@@ -300,7 +300,7 @@ impl Guard {
             loop {
                 let config = config.load();
                 let tap_mode = config.tap_mode;
-                let cpu_limit = config.max_cpus;
+                let cpu_limit = config.max_millicpus;
                 let mut system_guard = system.lock().unwrap();
                 if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
                     warn!("refresh process with cpu failed");

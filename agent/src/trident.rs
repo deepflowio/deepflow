@@ -90,7 +90,7 @@ use crate::{
         command::get_hostname,
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
-            get_env, kernel_check, running_in_container, tap_interface_check,
+            get_env, kernel_check, running_in_container, running_in_k8s, tap_interface_check,
             trident_process_check,
         },
         guard::Guard,
@@ -428,7 +428,6 @@ impl Trident {
                 "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ctrl_ip
             );
-            warn!("When running in a container, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s or docker for resource limits.");
         }
 
         #[cfg(target_os = "linux")]
@@ -498,7 +497,7 @@ impl Trident {
         if matches!(
             config_handler.static_config.agent_mode,
             RunningMode::Managed
-        ) && running_in_container()
+        ) && running_in_k8s()
             && config_handler
                 .static_config
                 .kubernetes_cluster_id
