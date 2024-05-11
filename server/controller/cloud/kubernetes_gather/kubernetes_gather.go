@@ -39,6 +39,7 @@ var log = logging.MustGetLogger("cloud.kubernetes_gather")
 
 type KubernetesGather struct {
 	orgID                        int
+	teamID                       int
 	Name                         string
 	Lcuuid                       string
 	UuidGenerate                 string
@@ -80,6 +81,7 @@ type networkLcuuidCIDRs struct {
 }
 
 func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGather {
+	var teamID int
 	var name string
 	var displayName string
 	var clusterID string
@@ -114,6 +116,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 			log.Error("domain model is nil")
 			return nil
 		}
+		teamID = domain.TeamID
 		name = domain.Name
 		lcuuid = domain.Lcuuid
 		displayName = domain.DisplayName
@@ -175,6 +178,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 		Lcuuid:                lcuuid,
 		UuidGenerate:          displayName,
 		ClusterID:             clusterID,
+		teamID:                teamID,
 		orgID:                 db.ORGID,
 		db:                    db.DB,
 		RegionUUID:            configJson.Get("region_uuid").MustString(),
@@ -229,6 +233,8 @@ func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
 	}
 
 	return statsd.StatsdStatter{
+		OrgID:      k.orgID,
+		TeamID:     k.teamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(k.cloudStatsd),
 	}

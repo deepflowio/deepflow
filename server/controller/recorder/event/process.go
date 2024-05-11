@@ -65,13 +65,14 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 		case common.VIF_DEVICE_TYPE_POD:
 			podID := processData[item.ID].ResourceID
 			info, err := p.ToolDataSet.GetPodInfoByID(podID)
-			podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(info.PodGroupID)
-			if !ok {
-				log.Error(err)
-			}
 			if err != nil {
 				log.Error(err)
 			} else {
+				podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(info.PodGroupID)
+				if !ok {
+					log.Error(p.metadata.LogPre(fmt.Sprintf("db pod_group type(id: %d) not found", info.PodGroupID)))
+				}
+
 				opts = append(opts, []eventapi.TagFieldOption{
 					eventapi.TagPodID(podID),
 					eventapi.TagRegionID(info.RegionID),

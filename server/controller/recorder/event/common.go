@@ -262,6 +262,10 @@ func (i *IPTool) getPodOptionsByID(id int) ([]eventapi.TagFieldOption, error) {
 	if err != nil {
 		return nil, err
 	}
+	podGroupType, ok := i.t.GetPodGroupTypeByID(info.PodGroupID)
+	if !ok {
+		log.Error(i.metadata.LogPre(fmt.Sprintf("db pod_group type(id: %d) not found", info.PodGroupID)))
+	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
@@ -271,7 +275,7 @@ func (i *IPTool) getPodOptionsByID(id int) ([]eventapi.TagFieldOption, error) {
 		eventapi.TagPodClusterID(info.PodClusterID),
 		eventapi.TagPodNSID(info.PodNamespaceID),
 		eventapi.TagPodGroupID(info.PodGroupID),
-		eventapi.TagPodGroupType(metadata.PodGroupTypeMap[info.PodGroupID]),
+		eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
 		eventapi.TagPodNodeID(info.PodNodeID),
 		eventapi.TagPodID(id),
 	}...)

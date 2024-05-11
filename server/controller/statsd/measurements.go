@@ -35,6 +35,8 @@ type Statsdtable interface {
 }
 
 type StatsdStatter struct {
+	OrgID      int
+	TeamID     int
 	Element    []StatsdElement
 	GlobalTags map[string]string
 }

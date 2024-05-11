@@ -45,6 +45,7 @@ var log = logging.MustGetLogger("cloud.qingcloud")
 
 type QingCloud struct {
 	orgID                 int
+	teamID                int
 	Uuid                  string
 	UuidGenerate          string
 	Name                  string
@@ -125,8 +126,9 @@ func NewQingCloud(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (
 	}
 
 	return &QingCloud{
-		orgID: orgID,
-		Uuid:  domain.Lcuuid,
+		orgID:  orgID,
+		teamID: domain.TeamID,
+		Uuid:   domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
 		UuidGenerate:          domain.DisplayName,
 		Name:                  domain.Name,
@@ -323,6 +325,8 @@ func (q *QingCloud) GetStatter() statsd.StatsdStatter {
 	}
 
 	return statsd.StatsdStatter{
+		OrgID:      q.orgID,
+		TeamID:     q.teamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(q.CloudStatsd),
 	}

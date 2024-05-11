@@ -26,9 +26,9 @@ BEGIN
     END IF;
 END;
 
-CALL AddColumnAndSetIfNotExists('alarm_policy', 'team_id', 'INTEGER', '1', 'id');
-CALL AddColumnAndSetIfNotExists('alarm_endpoint', 'team_id', 'INTEGER', '1', 'id');
+CALL AddColumnAndSetIfNotExists('npb_policy', 'user_id', 'INTEGER', '1', 'id');
+CALL AddColumnAndSetIfNotExists('npb_tunnel', 'user_id', 'INTEGER', '1', 'id');
 
 -- update db_version to latest, remeber update DB_VERSION_EXPECT in migrate/init.go
-UPDATE db_version SET version='6.5.1.25';
+UPDATE db_version SET version='6.5.1.29';
 -- modify end
