@@ -48,6 +48,11 @@ pub fn read_u32_le(bs: &[u8]) -> u32 {
     u32::from_le_bytes(bs[..4].try_into().unwrap())
 }
 
+pub fn read_i32_be(bs: &[u8]) -> i32 {
+    assert!(bs.len() >= 4);
+    i32::from_be_bytes(bs[..4].try_into().unwrap())
+}
+
 pub fn read_i32_le(bs: &[u8]) -> i32 {
     assert!(bs.len() >= 4);
     i32::from_le_bytes(bs[..4].try_into().unwrap())
@@ -61,6 +66,11 @@ pub fn read_u64_be(bs: &[u8]) -> u64 {
 pub fn read_u64_le(bs: &[u8]) -> u64 {
     assert!(bs.len() >= 8);
     u64::from_le_bytes(bs[..8].try_into().unwrap())
+}
+
+pub fn read_i64_be(bs: &[u8]) -> i64 {
+    assert!(bs.len() >= 8);
+    i64::from_be_bytes(bs[..8].try_into().unwrap())
 }
 
 pub fn read_i64_le(bs: &[u8]) -> i64 {

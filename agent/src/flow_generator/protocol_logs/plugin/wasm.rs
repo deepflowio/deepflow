@@ -104,7 +104,7 @@ impl L7ProtocolParserInterface for WasmLog {
                             }
                         }
 
-                        i.cal_rrt(param, None).map(|rrt| {
+                        i.cal_rrt(param).map(|rrt| {
                             i.rrt = rrt;
                             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
                         });

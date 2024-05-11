@@ -313,10 +313,10 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 request_id: f.statement_id.into(),
                 ..Default::default()
             }),
-            trace_info: if let (Some(tid), Some(sid)) = (f.trace_id, f.span_id) {
+            trace_info: if f.trace_id.is_some() || f.span_id.is_some() {
                 Some(TraceInfo {
-                    trace_id: Some(tid),
-                    span_id: Some(sid),
+                    trace_id: f.trace_id,
+                    span_id: f.span_id,
                     ..Default::default()
                 })
             } else {
@@ -367,7 +367,7 @@ impl L7ProtocolParserInterface for MysqlLog {
         }
         set_captured_byte!(info, param);
         if info.msg_type != LogMessageType::Session {
-            info.cal_rrt(param, None).map(|rrt| {
+            info.cal_rrt(param).map(|rrt| {
                 info.rrt = rrt;
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });
@@ -941,10 +941,7 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         let mut previous_command = 0u8;
-        let mut log_config = LogParserConfig::default();
-        log_config
-            .obfuscate_enabled_protocols
-            .set_enabled(L7Protocol::MySQL);
+        let log_config = LogParserConfig::default();
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer

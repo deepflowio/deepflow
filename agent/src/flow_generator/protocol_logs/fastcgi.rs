@@ -503,7 +503,7 @@ impl L7ProtocolParserInterface for FastCGILog {
                 self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
-        info.cal_rrt(param, None).map(|rrt| {
+        info.cal_rrt(param).map(|rrt| {
             info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
         });
