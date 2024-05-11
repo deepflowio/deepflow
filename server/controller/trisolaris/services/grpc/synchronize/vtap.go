@@ -669,7 +669,7 @@ func (e *VTapEvent) getVTapCache(in *api.SyncRequest, orgID int) (*vtap.VTapCach
 	return vtapCache, nil
 }
 
-func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error) {
+func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncResponse, error) {
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
 	teamIDStr := in.GetTeamId()
@@ -705,42 +705,41 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
 	pushVersionPolicy := vtapCache.GetPushVersionPolicy()
 	newAcls := gVTapInfo.GetVTapPolicyData(vtapID, functions)
+	changedInfo := fmt.Sprintf("push data ctrl_ip is %s, ctrl_mac is %s, "+
+		"(platform data version  %d -> %d), "+
+		"(acls version %d -> %d datalen: %d), "+
+		"(groups version %d -> %d), "+
+		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+		ctrlIP, ctrlMac,
+		versionPlatformData, pushVersionPlatformData,
+		versionPolicy, pushVersionPolicy, len(newAcls),
+		versionGroups, pushVersionGroups,
+		in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	if versionPlatformData != pushVersionPlatformData ||
 		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
-		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, team_id: (str=%s,int=%d), org_id is %d, "+
-			"(platform data version  %d -> %d), "+
-			"(acls version %d -> %d datalen: %d), "+
-			"(groups version %d -> %d), "+
-			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID,
-			versionPlatformData, pushVersionPlatformData,
-			versionPolicy, pushVersionPolicy, len(newAcls),
-			versionGroups, pushVersionGroups,
-			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
+		log.Infof(changedInfo)
 	} else {
-		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, team_id: (str=%s,int=%d), org_id is %d, "+
-			"(platform data version  %d -> %d), "+
-			"(acls version %d -> %d), "+
-			"(groups version %d -> %d), "+
-			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID,
-			versionPlatformData, pushVersionPlatformData,
-			versionPolicy, pushVersionPolicy,
-			versionGroups, pushVersionGroups,
-			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
+		log.Debugf(changedInfo)
 	}
 
 	platformData := []byte{}
-	if versionPlatformData != pushVersionPlatformData {
-		platformData = vtapCache.GetSimplePlatformDataStr()
-	}
 	groups := []byte{}
-	if versionGroups != pushVersionGroups {
-		groups = gVTapInfo.GetGroupData()
-	}
 	acls := []byte{}
-	if versionPolicy != pushVersionPolicy {
+	if all {
+		log.Info("first push data: ", changedInfo)
+		platformData = vtapCache.GetSimplePlatformDataStr()
+		groups = gVTapInfo.GetGroupData()
 		acls = gVTapInfo.GetVTapPolicyData(vtapID, functions)
+	} else {
+		if versionPlatformData != pushVersionPlatformData {
+			platformData = vtapCache.GetSimplePlatformDataStr()
+		}
+		if versionGroups != pushVersionGroups {
+			groups = gVTapInfo.GetGroupData()
+		}
+		if versionPolicy != pushVersionPolicy {
+			acls = gVTapInfo.GetVTapPolicyData(vtapID, functions)
+		}
 	}
 
 	// 只有专属采集器下发tap_types
@@ -781,6 +780,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	}, nil
 }
 
+// The first push link sends full data
 func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error {
 	var err error
 	orgID := trisolaris.GetOrgIDByTeamID(r.GetTeamId())
@@ -796,8 +796,18 @@ func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 
 		return nil
 	}
+	response, err := e.pushResponse(r, true)
+	if err != nil {
+		log.Error(err)
+	}
+	err = in.Send(response)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
 	for {
-		response, err := e.pushResponse(r)
+		pushmanager.Wait(orgID)
+		response, err := e.pushResponse(r, false)
 		if err != nil {
 			log.Error(err)
 		}
@@ -806,7 +816,6 @@ func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 			log.Error(err)
 			break
 		}
-		pushmanager.Wait(orgID)
 	}
 	log.Info("exit agent push", r.GetCtrlIp(), r.GetCtrlMac())
 	return err

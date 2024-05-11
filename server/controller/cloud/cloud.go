@@ -224,6 +224,8 @@ func (c *Cloud) GetKubernetesGatherTaskMap() map[string]*KubernetesGatherTask {
 
 func (c *Cloud) GetStatter() statsd.StatsdStatter {
 	return statsd.StatsdStatter{
+		OrgID:   c.orgID,
+		TeamID:  c.basicInfo.TeamID,
 		Element: statsd.GetCloudTaskStatsd(c.taskCost),
 	}
 }

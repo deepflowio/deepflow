@@ -113,6 +113,8 @@ impl Batch {
             tag_values,
             metrics_float_names,
             metrics_float_values,
+            org_id: 0,
+            team_id: 0,
         }
     }
 }

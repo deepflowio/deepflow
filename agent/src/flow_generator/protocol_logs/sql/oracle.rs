@@ -213,7 +213,7 @@ impl L7ProtocolParserInterface for OracleLog {
             _ => {}
         }
 
-        log_info.cal_rrt(param, None).map(|rrt| {
+        log_info.cal_rrt(param).map(|rrt| {
             log_info.rrt = rrt;
             self.perf_stats.as_mut().map(|p| p.update_rrt(log_info.rrt));
         });

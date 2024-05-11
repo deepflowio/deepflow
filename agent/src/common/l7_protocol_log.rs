@@ -41,6 +41,7 @@ use crate::flow_generator::protocol_logs::{
     AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, MongoDBLog, MqttLog, MysqlLog, NatsLog,
     OpenWireLog, OracleLog, PostgresqlLog, PulsarLog, RedisLog, SofaRpcLog, TlsLog, ZmtpLog,
 };
+
 use crate::flow_generator::{LogMessageType, Result};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::plugin::c_ffi::SoPluginFunc;
@@ -277,18 +278,9 @@ pub struct EbpfParam<'a> {
     pub process_kname: &'a str,
 }
 
-pub struct KafkaInfoCache {
-    // kafka req
-    pub api_key: u16,
-    pub api_version: u16,
-
-    // kafka resp code
-    pub code: i16,
-}
 pub struct LogCache {
     pub msg_type: LogMessageType,
     pub time: u64,
-    pub kafka_info: Option<KafkaInfoCache>,
     // req_end, resp_end, merged
     // set merged to true when req and resp merge once
     pub multi_merge_info: Option<(bool, bool, bool)>,

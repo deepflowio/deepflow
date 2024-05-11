@@ -22,7 +22,7 @@
 #ifndef DF_BPF_SOCKET_TRACE_COMMON_H
 #define DF_BPF_SOCKET_TRACE_COMMON_H
 #define CAP_DATA_SIZE 1024		// For no-brust send buffer
-#define BURST_DATA_BUF_SIZE 8192	// For brust send buffer
+#define BURST_DATA_BUF_SIZE  16384	// For brust send buffer
 
 enum endpoint_role {
 	ROLE_UNKNOWN,

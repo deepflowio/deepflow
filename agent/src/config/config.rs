@@ -1159,7 +1159,7 @@ pub struct RuntimeConfig {
     pub vtap_group_id: String,
     #[serde(skip)]
     pub enabled: bool,
-    pub max_cpus: u32,
+    pub max_millicpus: u32,
     pub max_memory: u64,
     pub sync_interval: u64,          // unit(second)
     pub platform_sync_interval: u64, // unit(second)
@@ -1307,7 +1307,7 @@ impl RuntimeConfig {
         Self {
             vtap_group_id: Default::default(),
             enabled: true,
-            max_cpus: 1,
+            max_millicpus: 1000,
             max_memory: 768,
             sync_interval: 60,
             platform_sync_interval: 10,
@@ -1487,7 +1487,16 @@ impl TryFrom<trident::Config> for RuntimeConfig {
         let rc = Self {
             vtap_group_id: Default::default(),
             enabled: conf.enabled(),
-            max_cpus: conf.max_cpus(),
+            max_millicpus: {
+                // Compatible with max_cpus and max_millicpus, take the smaller value in milli-cores.
+                let max_cpus = conf.max_cpus() * 1000;
+                let max_millicpus = conf.max_millicpus.unwrap_or(max_cpus); // conf.max_millicpus may be None, handle the case where conf.max_millicpus is None
+                if max_cpus != 0 && max_millicpus != 0 {
+                    max_cpus.min(max_millicpus)
+                } else {
+                    max_cpus | max_millicpus
+                }
+            },
             max_memory: (conf.max_memory() as u64) << 20,
             sync_interval: conf.sync_interval() as u64,
             platform_sync_interval: conf.platform_sync_interval() as u64,
