@@ -22,6 +22,7 @@ use std::{
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 use arc_swap::access::Access;
@@ -90,6 +91,8 @@ pub struct ConstructDebugCtx {
 }
 
 impl Debugger {
+    const TIMEOUT: Duration = Duration::from_millis(500);
+
     pub fn start(&self) {
         if self.running.swap(true, Ordering::Relaxed) {
             return;
@@ -124,7 +127,9 @@ impl Debugger {
                     }
                 };
                 info!("debugger listening on: {:?}", sock.local_addr().unwrap());
-
+                if let Err(e) = sock.set_read_timeout(Some(Self::TIMEOUT)) {
+                    warn!("debugger set timeout error: {:?}", e);
+                }
                 let sock_clone = sock.clone();
                 let running_clone = running.clone();
                 let serialize_conf = config::standard();
@@ -194,11 +199,16 @@ impl Debugger {
                             .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                         }
                         Err(e) => {
-                            warn!(
-                                "receive udp packet error: kind=({:?}) detail={}",
-                                e.kind(),
-                                e
-                            );
+                            match e.kind() {
+                                ErrorKind::WouldBlock => {}
+                                _ => {
+                                    warn!(
+                                        "receive udp packet error: kind=({:?}) detail={}",
+                                        e.kind(),
+                                        e
+                                    );
+                                }
+                            }
                             continue;
                         }
                     }
@@ -252,7 +262,12 @@ impl Debugger {
                     sock_v4.local_addr().unwrap(),
                     sock_v6.local_addr().unwrap()
                 );
-
+                if let Err(e) = sock_v4.set_read_timeout(Some(Self::TIMEOUT)) {
+                    warn!("debugger ipv4 set timeout error: {:?}", e);
+                }
+                if let Err(e) = sock_v6.set_read_timeout(Some(Self::TIMEOUT)) {
+                    warn!("debugger ipv6 set timeout error: {:?}", e);
+                }
                 let sock_v4_clone = sock_v4.clone();
                 let sock_v6_clone = sock_v6.clone();
                 let running_clone = running.clone();
@@ -340,6 +355,7 @@ impl Debugger {
                             Err(e) => {
                                 match e.kind() {
                                     ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
+                                    ErrorKind::WouldBlock => {}
                                     _ => {
                                         warn!(
                                             "receive udp packet error: kind=({:?}) detail={}",
@@ -375,6 +391,7 @@ impl Debugger {
                             Err(e) => {
                                 match e.kind() {
                                     ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
+                                    ErrorKind::WouldBlock => {}
                                     _ => {
                                         warn!(
                                             "receive udp packet error: kind=({:?}) detail={}",
