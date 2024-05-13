@@ -64,6 +64,7 @@ func (ml *metricLabelName) store(item *mysql.PrometheusMetricLabelName) {
 }
 
 func (ml *metricLabelName) refresh(args ...interface{}) error {
+	log.Infof("refresh %s", ml.resourceType)
 	var items []*mysql.PrometheusMetricLabelName
 	err := mysql.Db.Find(&items).Error
 	if err != nil {
