@@ -50,6 +50,7 @@ func (mn *metricName) getID(str string) (int, bool) {
 }
 
 func (mn *metricName) refresh(args ...interface{}) error {
+	log.Infof("refresh %s", mn.resourceType)
 	mn.lock.Lock()
 	defer mn.lock.Unlock()
 

@@ -35,6 +35,7 @@ var (
 	appLabelLayoutUpdater     *APPLabelLayoutUpdater
 )
 
+// APPLabelLayoutUpdater update prometheus_metric_app_label_layout encoder cache, because label type can be changed by target info from recorder
 type APPLabelLayoutUpdater struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -60,7 +61,6 @@ func (au *APPLabelLayoutUpdater) Init(ctx context.Context, cfg *prometheuscfg.Co
 
 func (e *APPLabelLayoutUpdater) Start() error {
 	log.Info("prometheus app label layout updater started")
-	// it depends on cache module data, so it should not be refresh immediately.
 	go func() {
 		ticker := time.NewTicker(e.refreshInterval)
 		defer ticker.Stop()
@@ -104,7 +104,7 @@ func (au *APPLabelLayoutUpdater) refresh() error {
 		if appLabelNamesToEncode := newAPPLabelNames.Difference(oldAPPLabelNames).ToSlice(); len(appLabelNamesToEncode) > 0 {
 			_, err = au.encoder.LabelLayout.SingleEncode(mn, appLabelNamesToEncode)
 			if err != nil {
-				log.Debugf("encode metric: %s labels: %v failed: %s", mn, appLabelNamesToEncode, err.Error())
+				log.Infof("encode metric: %s labels: %v failed: %s", mn, appLabelNamesToEncode, err.Error())
 			}
 		}
 
@@ -117,7 +117,7 @@ func (au *APPLabelLayoutUpdater) refresh() error {
 		if len(indexesToRecycle) > 0 {
 			err = au.encoder.LabelLayout.SingleRelease(mn, indexesToRecycle)
 			if err != nil {
-				log.Debugf("recycle metric: %s label indexes: %v failed: %s", mn, indexesToRecycle, err.Error())
+				log.Infof("recycle metric: %s label indexes: %v failed: %s", mn, indexesToRecycle, err.Error())
 			}
 		}
 	}
