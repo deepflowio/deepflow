@@ -242,6 +242,7 @@ impl Trident {
         version_info: &'static VersionInfo,
         agent_mode: RunningMode,
         sidecar_mode: bool,
+        disable_cgroups: bool,
     ) -> Result<Trident> {
         let config = match agent_mode {
             RunningMode::Managed => {
@@ -404,6 +405,7 @@ impl Trident {
                 exception_handler,
                 config_path,
                 sidecar_mode,
+                disable_cgroups,
                 ntp_diff,
             ) {
                 warn!(
@@ -432,6 +434,7 @@ impl Trident {
         exception_handler: ExceptionHandler,
         config_path: Option<PathBuf>,
         sidecar_mode: bool,
+        disable_cgroups: bool,
         ntp_diff: Arc<AtomicI64>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
@@ -583,6 +586,8 @@ impl Trident {
         } else if !is_kernel_available_for_cgroups() {
             // fixme: Linux after kernel version 2.6.24 can use cgroups
             info!("don't initialize cgroups controller, because kernel version < 3 or agent is in Windows");
+        } else if disable_cgroups {
+            info!("don't initialize cgroups controller, disable cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits");
         } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
                 Ok(cg_controller) => {
@@ -603,7 +608,6 @@ impl Trident {
         let guard = match Guard::new(
             config_handler.environment(),
             log_dir.to_string(),
-            config_handler.candidate_config.yaml_config.guard_interval,
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
@@ -611,6 +615,7 @@ impl Trident {
                 .candidate_config
                 .yaml_config
                 .memory_trim_disabled,
+            disable_cgroups,
         ) {
             Ok(g) => g,
             Err(e) => {
