@@ -356,6 +356,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 			if ok {
 				nameNoPreffix := strings.TrimPrefix(tagName, "tag.")
 				nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
+				nameNoPreffix = strings.Trim(nameNoPreffix, "`")
 				if strings.Contains(op, "match") {
 					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, nameNoPreffix, value)
 				} else {
