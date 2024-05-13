@@ -80,8 +80,7 @@ func IDGenerateUUID(orgID int, s string) string {
 	if orgID == mysqlcommon.DEFAULT_ORG_ID {
 		return s
 	}
-	s = strconv.Itoa(orgID) + "_" + s
-	return GetUUID(s, uuid.Nil)
+	return GetUUID(strconv.Itoa(orgID)+"_"+s, uuid.Nil)
 }
 
 func GenerateKuberneteClusterIDByMD5(md5 string) (string, error) {
