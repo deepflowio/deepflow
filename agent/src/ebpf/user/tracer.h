@@ -347,7 +347,14 @@ struct bpf_tracer {
 	 */
 	int per_cpu_fds[MAX_CPU_NR];
 	int sample_freq; // sample frequency, Hertz.
-	bool enable_sample; // Enable CPU sampling?
+	/*
+	 * Enable CPU sampling?
+	 * For the following scenario:
+	 * If the on-CPU profiler is disabled, this setting will be false,
+	 * which means that perf sampling events will not be enabled, the attach
+	 * operation will not be executed.
+	 */
+	bool enable_sample;
 
 	/*
 	 * Data distribution processing worker, queues
