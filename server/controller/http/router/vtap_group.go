@@ -63,6 +63,9 @@ func (v *VtapGroup) getVtapGroups() gin.HandlerFunc {
 		if value, ok := c.GetQuery("short_uuid"); ok {
 			args["short_uuid"] = value
 		}
+		if value, ok := c.GetQuery("team_id"); ok {
+			args["team_id"] = value
+		}
 		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Get(args)
 		JsonResponse(c, data, err)

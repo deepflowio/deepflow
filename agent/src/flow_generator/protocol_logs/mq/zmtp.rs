@@ -597,7 +597,7 @@ impl L7ProtocolParserInterface for ZmtpLog {
                 L7ProtocolInfo::ZmtpInfo(info) => info,
                 _ => return,
             };
-            info.cal_rrt(param, None).map(|rtt| {
+            info.cal_rrt(param).map(|rtt| {
                 info.rtt = rtt;
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
             });

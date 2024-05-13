@@ -3333,7 +3333,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			     infer_http_message(infer_buf, count,
 						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_HTTP1;
-				conn_info->infer_reliable = 1;
 				return inferred_message;
 			}
 			break;
@@ -3537,7 +3536,6 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	if ((inferred_message.type =
 #endif
 	     infer_http_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
-		conn_info->infer_reliable = 1;
 		inferred_message.protocol = PROTO_HTTP1;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_REDIS && (inferred_message.type =

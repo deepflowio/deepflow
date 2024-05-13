@@ -846,7 +846,7 @@ impl L7ProtocolParserInterface for PulsarLog {
         for info in &mut vec {
             if let L7ProtocolInfo::PulsarInfo(info) = info {
                 if info.msg_type != LogMessageType::Session {
-                    info.cal_rrt(param, None).map(|rtt| {
+                    info.cal_rrt(param).map(|rtt| {
                         info.rtt = rtt;
                         self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
                     });

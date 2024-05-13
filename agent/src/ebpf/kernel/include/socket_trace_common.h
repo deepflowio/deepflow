@@ -22,7 +22,7 @@
 #ifndef DF_BPF_SOCKET_TRACE_COMMON_H
 #define DF_BPF_SOCKET_TRACE_COMMON_H
 #define CAP_DATA_SIZE 1024		// For no-brust send buffer
-#define BURST_DATA_BUF_SIZE 8192	// For brust send buffer
+#define BURST_DATA_BUF_SIZE  16384	// For brust send buffer
 
 enum endpoint_role {
 	ROLE_UNKNOWN,
@@ -149,11 +149,7 @@ struct trace_key_t {
 } __attribute__((packed));
 
 struct trace_info_t {
-	/*
-	 * Whether traceID is zero ?
-	 * For the client to actively send request, set traceID to zero.
-	 */
-	bool is_trace_id_zero;
+	__u8  reserve;
 	__u32 update_time; // 从系统开机开始到创建/更新时的间隔时间单位是秒
 	__u32 peer_fd;	   // 用于socket之间的关联
 	__u64 thread_trace_id; // 线程追踪ID

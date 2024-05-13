@@ -55,6 +55,7 @@ var pagesIntControl = map[string]int{
 
 type Tencent struct {
 	orgID                int
+	teamID               int
 	name                 string
 	lcuuid               string
 	regionUUID           string
@@ -136,6 +137,7 @@ func NewTencent(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*T
 	return &Tencent{
 		// TODO: display_name后期需要修改为uuid_generate
 		orgID:          orgID,
+		teamID:         domain.TeamID,
 		name:           domain.Name,
 		lcuuid:         domain.Lcuuid,
 		uuidGenerate:   domain.DisplayName,
@@ -297,6 +299,8 @@ func (t *Tencent) GetStatter() statsd.StatsdStatter {
 	}
 
 	return statsd.StatsdStatter{
+		OrgID:      t.orgID,
+		TeamID:     t.teamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(t.cloudStatsd),
 	}

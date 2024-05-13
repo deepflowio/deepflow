@@ -210,11 +210,16 @@ func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMet
 	m.TagValues = s.TagValues
 	m.MetricsFloatNames = s.MetricsFloatNames
 	m.MetricsFloatValues = s.MetricsFloatValues
-	// from deepflow_server
-	if vtapID == 0 {
-		m.OrgId, m.TeamID = ckdb.DEFAULT_ORG_ID, ckdb.DEFAULT_TEAM_ID
-	} else {
-		m.OrgId, m.TeamID = grpc.QueryVtapOrgAndTeamID(vtapID)
+	// if OrgId is set, the set OrgId will be used first.
+	if s.OrgId != 0 {
+		m.OrgId, m.TeamID = uint16(s.OrgId), uint16(s.TeamId)
+	} else { // OrgId not set
+		// from deepflow_server, OrgId set default
+		if vtapID == 0 {
+			m.OrgId, m.TeamID = ckdb.DEFAULT_ORG_ID, ckdb.DEFAULT_TEAM_ID
+		} else { // from deepflow_agent, OrgId get from vtapID
+			m.OrgId, m.TeamID = grpc.QueryVtapOrgAndTeamID(vtapID)
+		}
 	}
 	return m
 }

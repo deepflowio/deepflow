@@ -33,7 +33,7 @@ import (
 
 var log = logging.MustGetLogger("statsd")
 var MetaStatsd *StatsdMonitor
-var dfstatsdClient *stats.UDPClient
+var dfStatsdClient *stats.UDPClient
 
 type StatsdMonitor struct {
 	enable bool
@@ -50,14 +50,14 @@ func NewStatsdMonitor(cfg config.StatsdConfig) {
 	return
 }
 
-func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
+func (s *StatsdMonitor) RegisterStatsdTable(stable Statsdtable) {
 	if !s.enable {
 		return
 	}
 
-	if dfstatsdClient == nil {
+	if dfStatsdClient == nil {
 		var err error
-		dfstatsdClient, err = stats.NewUDPClient(stats.UDPConfig{
+		dfStatsdClient, err = stats.NewUDPClient(stats.UDPConfig{
 			Addr:        fmt.Sprintf("%s:%d", s.host, s.port),
 			PayloadSize: 1400,
 		})
@@ -69,8 +69,9 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 
 	encoder := new(codec.SimpleEncoder)
 
+	statter := stable.GetStatter()
 	keys := []string{}
-	for key := range statter.GetStatter().GlobalTags {
+	for key := range statter.GlobalTags {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -78,9 +79,9 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 	// collect
 	timeStamp := time.Now().Unix()
 	dfStats := &pb.Stats{}
-	for _, e := range statter.GetStatter().Element {
+	for _, e := range statter.Element {
 		for mfName, mfValues := range e.MetricsFloatNameToValues {
-			name := common.DEEPFLOW_STATSD_PREFIX + "_" + e.VirtualTableName
+			name := e.VirtualTableName
 			hostName := os.Getenv(common.NODE_NAME_KEY)
 			tagNames := []string{e.PrivateTagKey, "host"}
 			tagValues := []string{mfName, hostName}
@@ -88,7 +89,7 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 			if e.UseGlobalTag {
 				tagNames = append(tagNames, keys...)
 				for _, k := range keys {
-					tagValues = append(tagValues, statter.GetStatter().GlobalTags[k])
+					tagValues = append(tagValues, statter.GlobalTags[k])
 				}
 			}
 
@@ -114,6 +115,8 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 				continue
 			}
 
+			dfStats.OrgId = uint32(statter.OrgID)
+			dfStats.TeamId = uint32(statter.TeamID)
 			dfStats.Timestamp = uint64(timeStamp)
 			dfStats.Name = name
 			dfStats.TagNames = tagNames
@@ -121,7 +124,7 @@ func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
 			dfStats.MetricsFloatNames = metricsFloatNames
 			dfStats.MetricsFloatValues = metricsFloatValues
 			dfStats.Encode(encoder)
-			dfstatsdClient.Write(encoder.Bytes())
+			dfStatsdClient.Write(encoder.Bytes())
 			encoder.Reset()
 		}
 	}
