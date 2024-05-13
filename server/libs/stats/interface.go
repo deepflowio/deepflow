@@ -84,6 +84,10 @@ func SetHostname(name string) {
 	setHostname(name)
 }
 
+func GetHostname() string {
+	return hostname
+}
+
 func SetProcessName(name string) {
 	setProcessName(name)
 }
