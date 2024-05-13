@@ -50,6 +50,7 @@ func (mn *labelName) getID(str string) (int, bool) {
 }
 
 func (ln *labelName) refresh(args ...interface{}) error {
+	log.Infof("refresh %s", ln.resourceType)
 	ln.lock.Lock()
 	defer ln.lock.Unlock()
 
