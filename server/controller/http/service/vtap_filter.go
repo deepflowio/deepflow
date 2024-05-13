@@ -80,6 +80,9 @@ func GetUnauthorizedTeamIDs(userInfo *UserInfo, fpermitCfg *config.FPermit) (map
 }
 
 func getAgentByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtaps []mysql.VTap) ([]mysql.VTap, error) {
+	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
+		return vtaps, nil
+	}
 	teamIDMap, err := GetUnauthorizedTeamIDs(userInfo, fpermitCfg)
 	if err != nil {
 		return nil, err
@@ -102,6 +105,9 @@ func getAgentByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtaps []mysq
 }
 
 func getAgentGroupByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtapGroups []*mysql.VTapGroup) ([]*mysql.VTapGroup, error) {
+	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
+		return vtapGroups, nil
+	}
 	teamIDMap, err := GetUnauthorizedTeamIDs(userInfo, fpermitCfg)
 	if err != nil {
 		return nil, err
