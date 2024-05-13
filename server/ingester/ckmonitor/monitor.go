@@ -96,13 +96,13 @@ func (m *Monitor) sendStats(name, db, table, partition string, bytesOnDisk, rows
 	dfStats := &pb.Stats{
 		Name:               name,
 		Timestamp:          uint64(time.Now().Unix()),
-		TagNames:           make([]string, 0, 3),
-		TagValues:          make([]string, 0, 3),
+		TagNames:           make([]string, 0, 4),
+		TagValues:          make([]string, 0, 4),
 		MetricsFloatNames:  make([]string, 0, 2),
 		MetricsFloatValues: make([]float64, 0, 2),
 	}
-	dfStats.TagNames = append(dfStats.TagNames, "db", "table", "partition")
-	dfStats.TagValues = append(dfStats.TagValues, db, table, partition)
+	dfStats.TagNames = append(dfStats.TagNames, "host", "db", "table", "partition")
+	dfStats.TagValues = append(dfStats.TagValues, stats.GetHostname(), db, table, partition)
 	dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, "bytes_on_disk", "rows")
 	dfStats.MetricsFloatValues = append(dfStats.MetricsFloatValues, float64(bytesOnDisk), float64(rows))
 
