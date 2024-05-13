@@ -132,7 +132,6 @@ impl SystemLoadGuard {
 pub struct Guard {
     config: EnvironmentAccess,
     log_dir: String,
-    interval: Duration,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
     exception_handler: ExceptionHandler,
@@ -141,17 +140,18 @@ pub struct Guard {
     memory_trim_disabled: bool,
     system: Arc<Mutex<System>>,
     pid: Pid,
+    disable_cgroups: bool,
 }
 
 impl Guard {
     pub fn new(
         config: EnvironmentAccess,
         log_dir: String,
-        interval: Duration,
         exception_handler: ExceptionHandler,
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
         memory_trim_disabled: bool,
+        disable_cgroups: bool,
     ) -> Result<Self, &'static str> {
         let Ok(pid) = get_current_pid() else {
             return Err("get the process' pid failed: {}, deepflow-agent restart...");
@@ -159,7 +159,6 @@ impl Guard {
         Ok(Self {
             config,
             log_dir,
-            interval,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             exception_handler,
@@ -168,6 +167,7 @@ impl Guard {
             memory_trim_disabled,
             system: Arc::new(Mutex::new(System::new())),
             pid,
+            disable_cgroups,
         })
     }
 
@@ -326,7 +326,6 @@ impl Guard {
         let running = self.running.clone();
         let exception_handler = self.exception_handler.clone();
         let log_dir = self.log_dir.clone();
-        let interval = self.interval;
         let mut over_memory_limit = false; // Higher than the limit does not meet expectations
         let mut over_cpu_limit = false; // Higher than the limit does not meet expectations
         let mut under_sys_free_memory_limit = false; // Below the limit, it does not meet expectations
@@ -339,6 +338,7 @@ impl Guard {
         let pid: Pid = self.pid.clone();
         let cgroups_available = is_kernel_available_for_cgroups();
         let in_container = running_in_container();
+        let disable_cgroups = self.disable_cgroups;
         let mut last_exceeded = get_timestamp(0);
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
@@ -377,7 +377,7 @@ impl Guard {
                 }
                 // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroups
                 if !in_container && config.tap_mode != TapMode::Analyzer {
-                    if cgroups_available {
+                    if cgroups_available && !disable_cgroups {
                         if check_cgroup_result {
                             check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
                             if !check_cgroup_result {
@@ -483,7 +483,7 @@ impl Guard {
                 if !*running {
                     break;
                 }
-                running = timer.wait_timeout(running, interval).unwrap().0;
+                running = timer.wait_timeout(running, config.guard_interval).unwrap().0;
                 if !*running {
                     break;
                 }
