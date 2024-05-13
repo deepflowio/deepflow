@@ -71,6 +71,9 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 	if _, ok := filter["short_uuid"]; ok {
 		Db = Db.Where("short_uuid = ?", filter["short_uuid"])
 	}
+	if _, ok := filter["team_id"]; ok {
+		Db = Db.Where("team_id = ?", filter["team_id"])
+	}
 	Db.Order("created_at DESC").Find(&allVTapGroups)
 	vtapGroups, err := getAgentGroupByUser(a.userInfo, &a.cfg.FPermit, allVTapGroups)
 	if err != nil {

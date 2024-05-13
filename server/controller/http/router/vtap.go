@@ -93,6 +93,9 @@ func (v *Vtap) getVtaps() gin.HandlerFunc {
 		if value, ok := c.GetQuery("analyzer_ip"); ok {
 			args["analyzer_ip"] = value
 		}
+		if value, ok := c.GetQuery("team_id"); ok {
+			args["team_id"] = value
+		}
 		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Get(args)
 		JsonResponse(c, data, err)
 	}
