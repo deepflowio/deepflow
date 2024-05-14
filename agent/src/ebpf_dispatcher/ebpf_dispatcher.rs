@@ -37,10 +37,7 @@ use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::{FlowAclListener, FlowAclListenerId, TaggedFlow};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
-use crate::ebpf::{
-    self, set_allow_port_bitmap, set_bypass_port_bitmap, set_profiler_cpu_aggregation,
-    set_profiler_regex, set_protocol_ports_bitmap, start_continuous_profiler,
-};
+use crate::ebpf;
 use crate::exception::ExceptionHandler;
 use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
@@ -461,14 +458,14 @@ impl EbpfCollector {
             let white_list = &config.ebpf.kprobe_whitelist;
             if !white_list.port_list.is_empty() {
                 if let Some(b) = parse_u16_range_list_to_bitmap(&white_list.port_list, false) {
-                    set_allow_port_bitmap(b.get_raw_ptr());
+                    ebpf::set_allow_port_bitmap(b.get_raw_ptr());
                 }
             }
 
             let black_list = &config.ebpf.kprobe_blacklist;
             if !black_list.port_list.is_empty() {
                 if let Some(b) = parse_u16_range_list_to_bitmap(&black_list.port_list, false) {
-                    set_bypass_port_bitmap(b.get_raw_ptr());
+                    ebpf::set_bypass_port_bitmap(b.get_raw_ptr());
                 }
             }
 
@@ -509,7 +506,9 @@ impl EbpfCollector {
                 all_proto_map.remove(&protocol.to_lowercase());
                 let l7_protocol = L7Protocol::from(protocol.clone());
                 let ports = CString::new(port_range.as_str()).unwrap();
-                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {
+                if ebpf::set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr())
+                    != 0
+                {
                     warn!(
                         "Ebpf set_protocol_ports_bitmap error: {} {}",
                         protocol, port_range
@@ -522,7 +521,9 @@ impl EbpfCollector {
             for protocol in all_proto_map.iter() {
                 let l7_protocol = L7Protocol::from(protocol.clone());
                 let ports = CString::new(all_port.as_str()).unwrap();
-                if set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr()) != 0 {
+                if ebpf::set_protocol_ports_bitmap(u8::from(l7_protocol) as i32, ports.as_ptr())
+                    != 0
+                {
                     warn!(
                         "Ebpf set_protocol_ports_bitmap error: {} {}",
                         protocol, all_port
@@ -543,14 +544,30 @@ impl EbpfCollector {
                 return Err(Error::EbpfRunningError);
             }
 
-            let on_cpu_profile_config = &config.ebpf.on_cpu_profile;
-            if !on_cpu_profile_config.disabled {
-                if start_continuous_profiler(
-                    on_cpu_profile_config.frequency as i32,
-                    on_cpu_profile_config.java_symbol_file_max_space_limit as i32,
-                    on_cpu_profile_config
-                        .java_symbol_file_refresh_defer_interval
-                        .as_secs() as i32,
+            let ebpf_conf = &config.ebpf;
+            let on_cpu = &ebpf_conf.on_cpu_profile;
+            let off_cpu = &ebpf_conf.off_cpu_profile;
+
+            let profiler_enabled =
+                !on_cpu.disabled && (cfg!(feature = "off_cpu") && !off_cpu.disabled);
+            if profiler_enabled {
+                if !on_cpu.disabled {
+                    ebpf::enable_oncpu_profiler();
+                } else {
+                    ebpf::disable_oncpu_profiler();
+                }
+
+                #[cfg(feature = "off_cpu")]
+                if !off_cpu.disabled {
+                    ebpf::enable_offcpu_profiler();
+                } else {
+                    ebpf::disable_offcpu_profiler();
+                }
+
+                if ebpf::start_continuous_profiler(
+                    on_cpu.frequency as i32,
+                    ebpf_conf.java_symbol_file_max_space_limit as i32,
+                    ebpf_conf.java_symbol_file_refresh_defer_interval.as_secs() as i32,
                     Self::ebpf_on_cpu_callback,
                 ) != 0
                 {
@@ -558,15 +575,29 @@ impl EbpfCollector {
                     return Err(Error::EbpfInitError);
                 }
 
-                set_profiler_regex(
-                    CString::new(on_cpu_profile_config.regex.as_bytes())
-                        .unwrap()
-                        .as_c_str()
-                        .as_ptr(),
-                );
+                if !on_cpu.disabled {
+                    ebpf::set_profiler_regex(
+                        CString::new(on_cpu.regex.as_bytes())
+                            .unwrap()
+                            .as_c_str()
+                            .as_ptr(),
+                    );
 
-                // CPUID will not be included in the aggregation of stack trace data.
-                set_profiler_cpu_aggregation(on_cpu_profile_config.cpu as i32);
+                    // CPUID will not be included in the aggregation of stack trace data.
+                    ebpf::set_profiler_cpu_aggregation(on_cpu.cpu as i32);
+                }
+
+                #[cfg(feature = "off_cpu")]
+                if !off_cpu.disabled {
+                    ebpf::set_offcpu_profiler_regex(
+                        CString::new(off_cpu.regex.as_bytes())
+                            .unwrap()
+                            .as_c_str()
+                            .as_ptr(),
+                    );
+
+                    ebpf::set_offcpu_minblock_time(off_cpu.min_block.as_micros() as u32);
+                }
             }
 
             ebpf::bpf_tracer_finish();

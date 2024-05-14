@@ -137,6 +137,8 @@ dunce = "0.1.1"
 tonic-build = "0.8.0"
 
 [features]
+enterprise = ["off_cpu"]
+off_cpu = []
 
 [[bench]]
 name = "common"

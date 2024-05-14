@@ -373,9 +373,9 @@ pub struct SK_TRACE_STATS {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
-    pub profiler_type : u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
-    pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,       // User-space process-ID.
+    pub profiler_type: u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
+    pub timestamp: u64,    // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,          // User-space process-ID.
     /*
      * Identified within the eBPF program in kernel space.
      * If the current is a process and not a thread this field(tid) is filled
@@ -657,7 +657,22 @@ extern "C" {
     ) -> c_int;
 
     pub fn enable_oncpu_profiler() -> c_int;
+
     pub fn disable_oncpu_profiler() -> c_int;
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "off_cpu")] {
+            pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
+
+            pub fn enable_offcpu_profiler() -> c_int;
+
+            pub fn disable_offcpu_profiler() -> c_int;
+
+            pub fn set_offcpu_minblock_time(
+                block_time: c_uint,
+            ) -> c_int;
+        }
+    }
 }
 
 #[no_mangle]

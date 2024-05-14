@@ -326,9 +326,6 @@ pub struct OnCpuProfile {
     pub frequency: u16,
     pub cpu: u16,
     pub regex: String,
-    pub java_symbol_file_max_space_limit: u8,
-    #[serde(with = "humantime_serde")]
-    pub java_symbol_file_refresh_defer_interval: Duration,
 }
 
 impl Default for OnCpuProfile {
@@ -338,8 +335,25 @@ impl Default for OnCpuProfile {
             frequency: 99,
             cpu: 0,
             regex: "^deepflow-.*".to_string(),
-            java_symbol_file_max_space_limit: 10,
-            java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct OffCpuProfile {
+    pub disabled: bool,
+    pub regex: String,
+    #[serde(rename = "minblock", with = "humantime_serde")]
+    pub min_block: Duration,
+}
+
+impl Default for OffCpuProfile {
+    fn default() -> Self {
+        OffCpuProfile {
+            disabled: false,
+            regex: "^deepflow-.*".to_string(),
+            min_block: Duration::from_micros(50),
         }
     }
 }
@@ -364,7 +378,11 @@ pub struct EbpfYamlConfig {
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
+    pub java_symbol_file_max_space_limit: u8,
+    #[serde(with = "humantime_serde")]
+    pub java_symbol_file_refresh_defer_interval: Duration,
     pub on_cpu_profile: OnCpuProfile,
+    pub off_cpu_profile: OffCpuProfile,
 }
 
 impl Default for EbpfYamlConfig {
@@ -385,7 +403,10 @@ impl Default for EbpfYamlConfig {
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
+            java_symbol_file_max_space_limit: 10,
+            java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
             on_cpu_profile: OnCpuProfile::default(),
+            off_cpu_profile: OffCpuProfile::default(),
         }
     }
 }
@@ -747,24 +768,20 @@ impl YamlConfig {
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
             c.ebpf.max_trace_entries = 524288;
         }
-        if c.ebpf.on_cpu_profile.java_symbol_file_max_space_limit < 2
-            || c.ebpf.on_cpu_profile.java_symbol_file_max_space_limit > 100
+        if c.ebpf.java_symbol_file_max_space_limit < 2
+            || c.ebpf.java_symbol_file_max_space_limit > 100
         {
-            c.ebpf.on_cpu_profile.java_symbol_file_max_space_limit = 10
+            c.ebpf.java_symbol_file_max_space_limit = 10
         }
-        if c.ebpf
-            .on_cpu_profile
-            .java_symbol_file_refresh_defer_interval
-            < Duration::from_secs(5)
-            || c.ebpf
-                .on_cpu_profile
-                .java_symbol_file_refresh_defer_interval
-                > Duration::from_secs(3600)
+        if c.ebpf.java_symbol_file_refresh_defer_interval < Duration::from_secs(5)
+            || c.ebpf.java_symbol_file_refresh_defer_interval > Duration::from_secs(3600)
         {
-            c.ebpf
-                .on_cpu_profile
-                .java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
+            c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
         }
+        c.ebpf.off_cpu_profile.min_block = c.ebpf.off_cpu_profile.min_block.clamp(
+            Duration::from_micros(1),
+            Duration::from_micros(u32::MAX as u64 - 2),
+        );
 
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {
