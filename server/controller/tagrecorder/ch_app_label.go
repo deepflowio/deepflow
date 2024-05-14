@@ -115,7 +115,7 @@ func (l *ChAPPLabel) generateNameIDData(db *mysql.DB) (map[string]int, map[strin
 		return nil, nil, false
 	}
 
-	err = mysql.Db.Unscoped().Find(&prometheusLabelValues).Error
+	err = db.Unscoped().Find(&prometheusLabelValues).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
