@@ -41,13 +41,13 @@ func (h *HuaWei) getNATGateways() (
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jNGs {
 			jNG := jNGs[i]
-			id := jNG.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jNG.Get("id").MustString())
 			name := jNG.Get("name").MustString()
 			if !cloudcommon.CheckJsonAttributes(jNG, requiredAttrs) {
 				log.Infof("exclude nat_gateway: %s, missing attr", name)
 				continue
 			}
-			routerID := jNG.Get("router_id").MustString()
+			routerID := common.IDGenerateUUID(h.orgID, jNG.Get("router_id").MustString())
 			if routerID == "" {
 				log.Infof("exclude nat_gateway: %s, missing vpc info", name)
 				continue
@@ -120,12 +120,12 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 	requiredAttrs := []string{"id", "nat_gateway_id", "protocol", "floating_ip_address", "external_service_port", "port_id", "internal_service_port"}
 	for i := range jRules {
 		jRule := jRules[i]
-		id := jRule.Get("id").MustString()
+		id := common.IDGenerateUUID(h.orgID, jRule.Get("id").MustString())
 		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
 			log.Infof("exclude nat_gateway: %s, missing attr", id)
 			continue
 		}
-		natGatewayID := jRule.Get("nat_gateway_id").MustString()
+		natGatewayID := common.IDGenerateUUID(h.orgID, jRule.Get("nat_gateway_id").MustString())
 		protocol := strings.ToUpper(jRule.Get("protocol").MustString())
 		if protocol == "ANY" {
 			protocol = cloudcommon.PROTOCOL_ALL
@@ -146,7 +146,8 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 			ipFlag = ":"
 		}
 		var fixedIP string
-		for _, ip := range h.toolDataSet.vinterfaceLcuuidToIPs[jRule.Get("port_id").MustString()] {
+		vinterfaceLcuuid := common.IDGenerateUUID(h.orgID, jRule.Get("port_id").MustString())
+		for _, ip := range h.toolDataSet.vinterfaceLcuuidToIPs[vinterfaceLcuuid] {
 			if strings.Contains(ip, ipFlag) {
 				fixedIP = ip
 				break
@@ -160,7 +161,7 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 				NATGatewayLcuuid: natGatewayID,
 				Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
 				Protocol:         protocol,
-				VInterfaceLcuuid: jRule.Get("port_id").MustString(),
+				VInterfaceLcuuid: vinterfaceLcuuid,
 				FloatingIP:       floatingIP,
 				FloatingIPPort:   floatingIPPort,
 				FixedIP:          fixedIP,
@@ -185,7 +186,7 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 	requiredAttrs := []string{"id", "nat_gateway_id", "floating_ip_address"}
 	for i := range jRules {
 		jRule := jRules[i]
-		id := jRule.Get("id").MustString()
+		id := common.IDGenerateUUID(h.orgID, jRule.Get("id").MustString())
 		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
 			log.Infof("exclude nat_gateway: %s, missing attr", id)
 			continue
@@ -195,12 +196,13 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 			log.Infof("exclude nat_gateway: %s, missing network info", id)
 			continue
 		}
-		fixedIP, ok := h.toolDataSet.networkLcuuidToCIDR[networkID.MustString()]
+
+		fixedIP, ok := h.toolDataSet.networkLcuuidToCIDR[common.IDGenerateUUID(h.orgID, networkID.MustString())]
 		if !ok {
 			log.Infof("exclude nat_gateway: %s, missing fixed ip", id)
 			continue
 		}
-		natGatewayID := jRule.Get("nat_gateway_id").MustString()
+		natGatewayID := common.IDGenerateUUID(h.orgID, jRule.Get("nat_gateway_id").MustString())
 		floatingIP := jRule.Get("floating_ip_address").MustString()
 		natRules = append(
 			natRules,
