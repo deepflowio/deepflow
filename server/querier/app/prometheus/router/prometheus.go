@@ -42,6 +42,7 @@ const _STATUS_SUCCESS = "success"
 func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromQueryParams{}
+		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
 
@@ -51,10 +52,17 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 		args.EndTime = c.Request.FormValue("time")
 		slimit := c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
+		block_team_id := c.Request.FormValue("block-team-id") // when parsed, block all team in query
 		offloading := c.Request.FormValue("operator-offloading")
 		setRouterArgs(slimit, &args.Slimit, config.Cfg.Prometheus.SeriesLimit, strconv.Atoi)
 		setRouterArgs(debug, &args.Debug, config.Cfg.Prometheus.RequestQueryWithDebug, strconv.ParseBool)
 		setRouterArgs(offloading, &args.Offloading, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
+		err := setRouterArgs(block_team_id, &args.BlockTeamID, nil, splitStrings)
+		if err != nil {
+			code, obj := handleError(err)
+			c.JSON(code, obj)
+			return
+		}
 
 		result, err := svc.PromInstantQueryService(&args, c.Request.Context())
 		if err != nil {
@@ -70,6 +78,7 @@ func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := model.PromQueryParams{}
+		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		args.Context = c.Request.Context()
 		args.Promql = c.Request.FormValue("query")
 		args.StartTime = c.Request.FormValue("start")
@@ -77,10 +86,17 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 		args.Step = c.Request.FormValue("step")
 		slimit := c.Request.FormValue("slimit")
 		debug := c.Request.FormValue("debug")
+		block_team_id := c.Request.FormValue("block-team-id")
 		offloading := c.Request.FormValue("operator-offloading")
 		setRouterArgs(slimit, &args.Slimit, config.Cfg.Prometheus.SeriesLimit, strconv.Atoi)
 		setRouterArgs(debug, &args.Debug, config.Cfg.Prometheus.RequestQueryWithDebug, strconv.ParseBool)
 		setRouterArgs(offloading, &args.Offloading, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
+		err := setRouterArgs(block_team_id, &args.BlockTeamID, nil, splitStrings)
+		if err != nil {
+			code, obj := handleError(err)
+			c.JSON(code, obj)
+			return
+		}
 
 		result, err := svc.PromRangeQueryService(&args, c.Request.Context())
 		if err != nil {
@@ -110,7 +126,8 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 		offloading := c.Request.FormValue("operator-offloading")
 		var offloadingArgs bool
 		setRouterArgs(offloading, &offloadingArgs, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
-		resp, err := svc.PromRemoteReadService(&req, c.Request.Context(), offloadingArgs)
+		orgID := c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		resp, err := svc.PromRemoteReadService(&req, c.Request.Context(), offloadingArgs, orgID)
 		if err != nil {
 			code, _ := handleError(err)
 			// remote read use different response, not use `obj`, otherwise it will cause decode response error
@@ -132,11 +149,20 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 
 func promTagValuesReader(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		block_team_id := c.Request.FormValue("block-team-id")
+		block_team_ids, err := splitStrings(block_team_id)
+		if err != nil {
+			code, obj := handleError(err)
+			c.JSON(code, obj)
+			return
+		}
 		args := model.PromMetaParams{
-			LabelName: c.Param("labelName"),
-			StartTime: c.Request.FormValue("start"),
-			EndTime:   c.Request.FormValue("end"),
-			Context:   c.Request.Context(),
+			LabelName:   c.Param("labelName"),
+			StartTime:   c.Request.FormValue("start"),
+			EndTime:     c.Request.FormValue("end"),
+			Context:     c.Request.Context(),
+			BlockTeamID: block_team_ids,
+			OrgID:       c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID),
 		}
 		result, err := svc.PromLabelValuesService(&args, c.Request.Context())
 		if err != nil {
@@ -154,11 +180,19 @@ func promSeriesReader(svc *service.PrometheusService) gin.HandlerFunc {
 			EndTime:   c.Request.FormValue("end"),
 			Matchers:  c.Request.Form["match[]"],
 			Context:   c.Request.Context(),
+			OrgID:     c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID),
 		}
 		debug := c.Request.FormValue("debug")
+		block_team_id := c.Request.FormValue("block-team-id")
 		offloading := c.Request.FormValue("operator-offloading")
 		setRouterArgs(debug, &args.Debug, config.Cfg.Prometheus.RequestQueryWithDebug, strconv.ParseBool)
 		setRouterArgs(offloading, &args.Offloading, config.Cfg.Prometheus.OperatorOffloading, strconv.ParseBool)
+		err := setRouterArgs(block_team_id, &args.BlockTeamID, nil, splitStrings)
+		if err != nil {
+			code, obj := handleError(err)
+			c.JSON(code, obj)
+			return
+		}
 		// should show tags when get `Series`
 		ctx := context.WithValue(c.Request.Context(), service.CtxKeyShowTag{}, true)
 		result, err := svc.PromSeriesQueryService(&args, ctx)
@@ -178,6 +212,7 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 		apps := c.Query("app")
 		from := c.Query("from")
 		to := c.Query("to")
+		orgID := c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 
 		var targetLabels, appLabels []string
 		if targets != "" {
@@ -187,7 +222,7 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 			appLabels = strings.Split(apps, ",")
 		}
 
-		result, err := svc.PromQLAnalysis(c, metric, targetLabels, appLabels, from, to)
+		result, err := svc.PromQLAnalysis(c, metric, targetLabels, appLabels, from, to, orgID)
 		if err != nil {
 			c.JSON(500, result)
 			return
@@ -196,6 +231,7 @@ func promQLAnalysis(svc *service.PrometheusService) gin.HandlerFunc {
 	})
 }
 
+// 提供 PromQL 语法分析，不执行查询
 func promQLParse(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		query := c.Query("query")
@@ -208,6 +244,7 @@ func promQLParse(svc *service.PrometheusService) gin.HandlerFunc {
 	})
 }
 
+// 提供 PromQL 语法分析，不执行查询
 func promQLAddFilters(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		query := c.Query("query")
@@ -258,14 +295,32 @@ func getInnerError(err error) error {
 }
 
 // set args from router query or config
-func setRouterArgs[T any](flag string, target *T, defaultValue T, parser func(string) (T, error)) {
+func setRouterArgs[T any](flag string, target *T, defaultValue T, parser func(string) (T, error)) error {
 	var err error
 	if flag != "" && parser != nil {
 		*target, err = parser(flag)
 		if err != nil {
 			*target = defaultValue
+			return err
 		}
 	} else {
 		*target = defaultValue
 	}
+	return nil
+}
+
+func splitStrings(s string) ([]string, error) {
+	splitStr := strings.Split(s, ",")
+	result := make([]string, 0, len(splitStr))
+	for _, v := range splitStr {
+		trimStr := strings.TrimSpace(v)
+		if len(trimStr) > 0 {
+			num, err := strconv.Atoi(trimStr)
+			if err != nil || num < 0 {
+				return nil, errors.New("illegal params")
+			}
+			result = append(result, trimStr)
+		}
+	}
+	return result, nil
 }

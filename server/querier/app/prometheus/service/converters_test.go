@@ -165,7 +165,7 @@ func TestParseMetric(t *testing.T) {
 
 func TestPromReaderTransToSQL(t *testing.T) {
 	executor := NewPrometheusExecutor(5 * time.Minute)
-	executor.extraLabelCache.Add("k8s_label_k8s_app", "k8s.label/k8s_app")
+	executor.extraLabelCache["1"].Add("k8s_label_k8s_app", "k8s.label/k8s_app")
 	prometheusReader := &prometheusReader{
 		getExternalTagFromCache: executor.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   executor.addExtraLabelsToCache,
@@ -394,9 +394,9 @@ func TestPromReaderTransToSQL(t *testing.T) {
 func TestParsePromQLTag(t *testing.T) {
 	// mock test data
 	executor := &prometheusExecutor{
-		extraLabelCache: lru.NewCache[string, string](1),
+		extraLabelCache: map[string]*lru.Cache[string, string]{"1": lru.NewCache[string, string](1)},
 	}
-	executor.extraLabelCache.Add("app_kubernetes_io_managed_by", "app.kubernetes.io/managed-by")
+	executor.extraLabelCache["1"].Add("app_kubernetes_io_managed_by", "app.kubernetes.io/managed-by")
 	p := &prometheusReader{}
 	p.getExternalTagFromCache = executor.convertExternalTagToQuerierAllowTag
 	tagdescription.TAG_ENUMS["l7_protocol"] = []*tagdescription.TagEnum{{Value: 20, DisplayName: "HTTP"}}
