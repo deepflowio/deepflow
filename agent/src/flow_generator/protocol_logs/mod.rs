@@ -496,7 +496,7 @@ macro_rules! set_captured_byte {
         match $this.msg_type {
             LogMessageType::Request => $this.captured_request_byte = $param.captured_byte as u32,
             LogMessageType::Response => $this.captured_response_byte = $param.captured_byte as u32,
-            LogMessageType::Session => {
+            _ => {
                 match LogMessageType::from($param.direction) {
                     LogMessageType::Request => {
                         $this.captured_request_byte = $param.captured_byte as u32
@@ -507,7 +507,6 @@ macro_rules! set_captured_byte {
                     _ => unimplemented!(),
                 };
             }
-            _ => unimplemented!(),
         }
     };
 }
