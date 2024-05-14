@@ -95,6 +95,7 @@ type QueryHint struct {
 func (q *QueryHint) GetStart() int64 {
 	return q.start
 }
+
 func (q *QueryHint) GetEnd() int64 {
 	return q.end
 }
@@ -174,6 +175,7 @@ type prometheusHint struct {
 func (p *prometheusHint) GetStart() int64 {
 	return p.hints.Start
 }
+
 func (p *prometheusHint) GetEnd() int64 {
 	return p.hints.End
 }

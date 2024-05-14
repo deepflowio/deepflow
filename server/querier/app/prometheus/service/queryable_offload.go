@@ -69,6 +69,8 @@ func NewOffloadQueriable(args *model.PromQueryParams, opts ...OffloadQuerierable
 		startTime:    o.args.StartTime,
 		endTime:      o.args.EndTime,
 		debug:        o.args.Debug,
+		orgID:        o.args.OrgID,
+		blockTeamID:  o.args.BlockTeamID,
 	}
 
 	return o
@@ -183,6 +185,8 @@ type OffloadQuerier struct {
 
 	debug              bool
 	startTime, endTime string
+	orgID              string
+	blockTeamID        []string
 }
 
 func (o *OffloadQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
@@ -197,7 +201,7 @@ func (o *OffloadQuerier) Select(sortSeries bool, hints *storage.SelectHints, mat
 	o.querierable.restoreFunctionAfterQueryFinished()
 	querierSql := o.querierable.reader.parseQueryRequestToSQL(ctx, queryReq, o.querierable.queryType)
 	if querierSql != "" {
-		result, sql, duration, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", o.debug)
+		result, sql, duration, err := queryDataExecute(ctx, querierSql, common.DB_NAME_PROMETHEUS, "", o.orgID, o.debug)
 		if err != nil {
 			log.Error(err)
 			log.Errorf("offload querier sql: %s", querierSql)
