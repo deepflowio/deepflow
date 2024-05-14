@@ -61,7 +61,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 			if !cloudcommon.CheckJsonAttributes(jRDS, []string{"id", "name", "status", "type", "nodes", "datastore", "vpc_id", "subnet_id"}) {
 				continue
 			}
-			id := jRDS.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jRDS.Get("id").MustString())
 			name := jRDS.Get("name").MustString()
 			state, ok := stateStrToInt[jRDS.Get("status").MustString()]
 			if !ok {
@@ -82,7 +82,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 				}
 			}
 
-			networkLcuuid := jRDS.Get("subnet_id").MustString()
+			networkLcuuid := common.IDGenerateUUID(h.orgID, jRDS.Get("subnet_id").MustString())
 			if networkLcuuid == "" {
 				log.Infof("exclude rds_instance: %s, no subnet_id", id)
 				continue
@@ -97,7 +97,7 @@ func (h *HuaWei) getRDSInstances() ([]model.RDSInstance, []model.VInterface, []m
 				Version:      jRDS.Get("datastore").Get("version").MustString(),
 				Series:       seriesStrToInt[jRDS.Get("type").MustString()],
 				Model:        common.RDS_MODEL_PRIMARY,
-				VPCLcuuid:    jRDS.Get("vpc_id").MustString(),
+				VPCLcuuid:    common.IDGenerateUUID(h.orgID, jRDS.Get("vpc_id").MustString()),
 				AZLcuuid:     azLcuuid,
 				RegionLcuuid: regionLcuuid,
 			}

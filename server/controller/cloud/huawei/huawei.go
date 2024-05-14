@@ -127,19 +127,11 @@ func (h *HuaWei) GetCloudData() (model.Resource, error) {
 	resource.VRouters = append(resource.VRouters, vrouters...)
 	resource.RoutingTables = append(resource.RoutingTables, routingTables...)
 
-	sgs, sgRules, err := h.getSecurityGroups()
-	if err != nil {
-		return resource, err
-	}
-	resource.SecurityGroups = append(resource.SecurityGroups, sgs...)
-	resource.SecurityGroupRules = append(resource.SecurityGroupRules, sgRules...)
-
-	vms, vmSGs, vifs, ips, err := h.getVMs()
+	vms, vifs, ips, err := h.getVMs()
 	if err != nil {
 		return resource, err
 	}
 	resource.VMs = append(resource.VMs, vms...)
-	resource.VMSecurityGroups = append(resource.VMSecurityGroups, vmSGs...)
 	resource.VInterfaces = append(resource.VInterfaces, vifs...)
 	resource.IPs = append(resource.IPs, ips...)
 

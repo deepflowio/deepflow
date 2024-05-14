@@ -59,14 +59,15 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 				log.Infof("exclude vinterface: %s, missing attr", mac)
 				continue
 			}
-			id := jPort.Get("id").MustString()
-			network := h.toolDataSet.lcuuidToNetwork[jPort.Get("network_id").MustString()]
+			id := common.IDGenerateUUID(h.orgID, jPort.Get("id").MustString())
+			networkLcuuid := common.IDGenerateUUID(h.orgID, jPort.Get("network_id").MustString())
+			network := h.toolDataSet.lcuuidToNetwork[networkLcuuid]
 			if network.Lcuuid == "" {
 				log.Infof("exclude vinterface: %s, missing network info", mac)
 				continue
 			}
 			var deviceID string
-			deviceID = jPort.Get("device_id").MustString()
+			deviceID = common.IDGenerateUUID(h.orgID, jPort.Get("device_id").MustString())
 			deviceOwner := jPort.Get("device_owner").MustString()
 
 			h.formatVInterfaceRelatedToolDataSet(jPort, deviceID, deviceOwner, network.VPCLcuuid)
@@ -141,7 +142,8 @@ func (h *HuaWei) formatVInterfaceRelatedToolDataSet(jPort *simplejson.Json, devi
 			h.toolDataSet.keyToNATGatewayLcuuid[VPCIPKey{vpcLcuuid, ipAddr}] = deviceID
 		}
 		if strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
-			h.toolDataSet.keyToVMLcuuid[SubnetIPKey{jIP.Get("subnet_id").MustString(), ipAddr}] = deviceID
+			subnetID := common.IDGenerateUUID(h.orgID, jIP.Get("subnet_id").MustString())
+			h.toolDataSet.keyToVMLcuuid[SubnetIPKey{subnetID, ipAddr}] = deviceID
 		}
 	}
 }
