@@ -39,15 +39,16 @@ type LabelSynchronizer struct {
 	statsdCounter *statsd.PrometheusLabelIDsCounter
 }
 
-func NewLabelSynchronizer() *LabelSynchronizer {
+func NewLabelSynchronizer() (*LabelSynchronizer, error) {
+	synchronizer, err := newSynchronizer(1)
+	if err != nil {
+		return nil, err
+	}
 	return &LabelSynchronizer{
-		Synchronizer: Synchronizer{
-			cache:   cache.GetSingleton(),
-			counter: &counter{},
-		},
+		Synchronizer:  synchronizer,
 		grpcurl:       new(GRPCURL),
 		statsdCounter: statsd.NewPrometheusLabelIDsCounter(),
-	}
+	}, nil
 }
 
 func (s *LabelSynchronizer) Sync(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
@@ -120,8 +121,8 @@ func (s *LabelSynchronizer) prepare(toEncode *dataToEncode) error {
 }
 
 func (s *LabelSynchronizer) splitData(req *trident.PrometheusLabelRequest) (*dataToEncode, *dataToUpdate) {
-	toEncode := newDataToEncode()
-	toUpdate := newDataToUpdate()
+	toEncode := newDataToEncode(s.cache)
+	toUpdate := newDataToUpdate(s.cache)
 	for _, m := range req.GetRequestLabels() {
 		mn := m.GetMetricName()
 		toUpdate.appendMetricName(mn)
@@ -459,9 +460,9 @@ type dataToEncode struct {
 	targets                mapset.Set[cache.TargetKey]
 }
 
-func newDataToEncode() *dataToEncode {
+func newDataToEncode(c *cache.Cache) *dataToEncode {
 	return &dataToEncode{
-		cache: cache.GetSingleton(),
+		cache: c,
 
 		metricNames:            mapset.NewSet[string](),
 		labelNames:             mapset.NewSet[string](),
@@ -566,9 +567,9 @@ type dataToUpdate struct {
 	// metricTargetIDs         mapset.Set[int]    // for prometheus_metric_target
 }
 
-func newDataToUpdate() *dataToUpdate {
+func newDataToUpdate(c *cache.Cache) *dataToUpdate {
 	return &dataToUpdate{
-		cache: cache.GetSingleton(),
+		cache: c,
 
 		metricNames:             mapset.NewSet[string](),
 		labelNames:              mapset.NewSet[string](),

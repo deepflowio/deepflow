@@ -86,8 +86,12 @@ func (au *APPLabelLayoutUpdater) Stop() {
 
 func (au *APPLabelLayoutUpdater) refresh() error {
 	log.Info("prometheus app label layout refresh started")
-	td := newToolDataSet()
-	err := td.load()
+	c, err := cache.GetCache(1)
+	if err != nil {
+		return err
+	}
+	td := newToolDataSet(c)
+	err = td.load()
 	if err != nil {
 		return err
 	}
@@ -135,9 +139,9 @@ type toolData struct {
 	layoutKeyToIndex             map[cache.LayoutKey]uint8
 }
 
-func newToolDataSet() *toolData {
+func newToolDataSet(c *cache.Cache) *toolData {
 	return &toolData{
-		cache: cache.GetSingleton(),
+		cache: c,
 
 		metricNameToLabelNames:       make(map[string]mapset.Set[string]),
 		metricNameToTargetLabelNames: make(map[string]mapset.Set[string]),

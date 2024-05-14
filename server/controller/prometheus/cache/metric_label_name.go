@@ -25,6 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type metricLabelNameKey struct {
@@ -44,14 +45,17 @@ func (k metricLabelNameKey) String() string {
 }
 
 type metricLabelName struct {
+	org *common.ORG
+
 	metricNameCache *metricName
 
 	metricNameIDToLabelNameIDs *hashmap.Map[int, mapset.Set[int]]
 	keyToID                    cmap.ConcurrentMap[metricLabelNameKey, int]
 }
 
-func newMetricLabelName(mn *metricName) *metricLabelName {
+func newMetricLabelName(org *common.ORG, mn *metricName) *metricLabelName {
 	return &metricLabelName{
+		org:             org,
 		metricNameCache: mn,
 
 		metricNameIDToLabelNameIDs: hashmap.New[int, mapset.Set[int]](),
@@ -69,13 +73,13 @@ func (ml *metricLabelName) IfLinked(metricID, labelNameID int) bool {
 func (ml *metricLabelName) GetLabelNameIDsByMetricName(metricName string) []int {
 	mni, ok := ml.metricNameCache.GetIDByName(metricName)
 	if !ok {
-		log.Debugf("metric_name: %s id not found", metricName)
+		log.Debug(ml.org.Logf("metric_name: %s id not found", metricName))
 		return nil
 	}
 	if labelNameIDs, ok := ml.metricNameIDToLabelNameIDs.Get(mni); ok {
 		return labelNameIDs.ToSlice()
 	}
-	log.Debugf("metric_name: %s label_ids not found", metricName)
+	log.Debug(ml.org.Logf("metric_name: %s label_ids not found", metricName))
 	return []int{}
 }
 
@@ -121,6 +125,6 @@ func (ml *metricLabelName) refresh(args ...interface{}) error {
 
 func (ml *metricLabelName) load() ([]*mysql.PrometheusMetricLabelName, error) {
 	var items []*mysql.PrometheusMetricLabelName
-	err := mysql.Db.Select("metric_name", "label_name_id", "id").Find(&items).Error
+	err := ml.org.DB.Select("metric_name", "label_name_id", "id").Find(&items).Error
 	return items, err
 }

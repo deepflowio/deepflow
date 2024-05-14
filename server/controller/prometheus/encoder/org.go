@@ -120,6 +120,7 @@ func (e *ORGEncoders) NewEncoderAndInitIfNotExist(orgID int) (*Encoder, error) {
 }
 
 func (e *ORGEncoders) refreshRegularly() error {
+	e.refresh()
 	go func() {
 		ticker := time.NewTicker(time.Duration(e.cfg.EncoderCacheRefreshInterval) * time.Second)
 		defer ticker.Stop()
