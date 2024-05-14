@@ -252,6 +252,7 @@ type OnCpuProfile struct {
 type OffCpuProfile struct {
 	Disabled *bool   `yaml:"disabled,omitempty"`
 	Regex    *string `yaml:"regex,omitempty"`
+	Cpu      *int    `yaml:"cpu,omitempty"`
 	MinBlock *string `yaml:"minblock,omitempty"`
 }
 

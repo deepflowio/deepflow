@@ -344,6 +344,7 @@ impl Default for OnCpuProfile {
 pub struct OffCpuProfile {
     pub disabled: bool,
     pub regex: String,
+    pub cpu: u16,
     #[serde(rename = "minblock", with = "humantime_serde")]
     pub min_block: Duration,
 }
@@ -353,6 +354,7 @@ impl Default for OffCpuProfile {
         OffCpuProfile {
             disabled: false,
             regex: "^deepflow-.*".to_string(),
+            cpu: 0,
             min_block: Duration::from_micros(50),
         }
     }
