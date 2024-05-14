@@ -1327,6 +1327,16 @@ vtap_group_id: g-xxxxxx
     ##   Java processes, the regeneration will be deferred for a period of time.
     #java-symbol-file-refresh-defer-interval: 600s
 
+    ## Maximum size limit for Java symbol file.
+    ## Default: 10. Range: [2, 100]
+    ## Note:
+    ##   Which means it falls within the interval of 2Mi to 100Mi. If the configuration value is outside
+    ##   this range, the default value of 10(10Mi), will be used.
+    ##   All Java symbol files are stored in the '/tmp' directory mounted by the deepflow-agent. To prevent
+    ##   excessive occupation of host node space due to large Java symbol files, a maximum size limit is set
+    ##   for each generated Java symbol file.
+    #java-symbol-file-max-space-limit: 10
+
     ## On-cpu profile configuration
     #on-cpu-profile:
       ## eBPF on-cpu Profile Switch
