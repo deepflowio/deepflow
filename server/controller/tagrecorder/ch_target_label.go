@@ -45,17 +45,17 @@ func (l *ChTargetLabel) generateNewData(db *mysql.DB) (map[PrometheusTargetLabel
 		return nil, false
 	}
 
-	metricNameTargetIDMap, ok := l.generateMetricTargetData()
+	metricNameTargetIDMap, ok := l.generateMetricTargetData(db)
 	if !ok {
 		return nil, false
 	}
 
-	targetLabelNameValueMap, ok := l.generateTargetData()
+	targetLabelNameValueMap, ok := l.generateTargetData(db)
 	if !ok {
 		return nil, false
 	}
 
-	metricLabelNameIDMap, ok := l.generateLabelNameIDData()
+	metricLabelNameIDMap, ok := l.generateLabelNameIDData(db)
 	if !ok {
 		return nil, false
 	}
@@ -100,10 +100,10 @@ func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel)
 	return nil, false
 }
 
-func (l *ChTargetLabel) generateMetricTargetData() (map[string][]int, bool) {
+func (l *ChTargetLabel) generateMetricTargetData(db *mysql.DB) (map[string][]int, bool) {
 	metricNameTargetIDMap := make(map[string][]int)
 	var prometheusMetricTargets []mysql.PrometheusMetricTarget
-	err := mysql.Db.Unscoped().Find(&prometheusMetricTargets).Error
+	err := db.Unscoped().Find(&prometheusMetricTargets).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
@@ -117,10 +117,10 @@ func (l *ChTargetLabel) generateMetricTargetData() (map[string][]int, bool) {
 	return metricNameTargetIDMap, true
 }
 
-func (l *ChTargetLabel) generateTargetData() (map[int]string, bool) {
+func (l *ChTargetLabel) generateTargetData(db *mysql.DB) (map[int]string, bool) {
 	targetLabelNameValueMap := make(map[int]string)
 	var prometheusTargets []mysql.PrometheusTarget
-	err := mysql.Db.Unscoped().Find(&prometheusTargets).Error
+	err := db.Unscoped().Find(&prometheusTargets).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
@@ -135,10 +135,10 @@ func (l *ChTargetLabel) generateTargetData() (map[int]string, bool) {
 	return targetLabelNameValueMap, true
 }
 
-func (l *ChTargetLabel) generateLabelNameIDData() (map[string]int, bool) {
+func (l *ChTargetLabel) generateLabelNameIDData(db *mysql.DB) (map[string]int, bool) {
 	metricLabelNameIDMap := make(map[string]int)
 	var prometheusLabelNames []mysql.PrometheusLabelName
-	err := mysql.Db.Unscoped().Find(&prometheusLabelNames).Error
+	err := db.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
