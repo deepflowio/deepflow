@@ -19,7 +19,7 @@
 
 #define EV_NAME_SIZE			1024
 
-#define BOOT_TIME_UPDATE_PERIOD		60      // 系统启动时间更新周期, 单位：秒
+#define BOOT_TIME_UPDATE_PERIOD		60	// 系统启动时间更新周期, 单位：秒
 
 // eBPF Map Name
 #define MAP_MEMBERS_OFFSET_NAME         "__members_offset"
@@ -68,7 +68,7 @@ enum {
 //thread index for bihash
 enum {
 	THREAD_PROFILER_READER_IDX = 0,
-	THREAD_PROC_ACT_IDX_BASE
+	THREAD_PROC_ACT_IDX_BASE = 2,
 };
 
 /*
@@ -122,7 +122,7 @@ enum {
  * may lead to increased overhead and memory usage, so it is
  * recommended to use it with caution.
  */
-#ifndef PERF_MAX_STACK_DEPTH 
+#ifndef PERF_MAX_STACK_DEPTH
 #define PERF_MAX_STACK_DEPTH		127
 #endif
 
@@ -131,19 +131,19 @@ enum {
  */
 #define MAP_STACK_A_NAME	"__stack_map_a"
 #define MAP_STACK_B_NAME	"__stack_map_b"
-#define MAP_PROFILER_STATE_MAP	"__profiler_state_map"
+#define MAP_PROFILER_STATE_NAME	"__profiler_state_map"
 
 #define STRINGIFIER_STACK_STR_HASH_BUCKETS_NUM	8192
-#define STRINGIFIER_STACK_STR_HASH_MEM_SZ	(1ULL << 30) // 1Gbytes
+#define STRINGIFIER_STACK_STR_HASH_MEM_SZ	(1ULL << 30)	// 1Gbytes
 
 #define SYMBOLIZER_CACHES_HASH_BUCKETS_NUM	8192
-#define SYMBOLIZER_CACHES_HASH_MEM_SZ		(1ULL << 31) // 2Gbytes
+#define SYMBOLIZER_CACHES_HASH_MEM_SZ		(1ULL << 31)	// 2Gbytes
 
 #define STACK_TRACE_MSG_HASH_BUCKETS_NUM	8192
-#define STACK_TRACE_MSG_HASH_MEM_SZ		(1ULL << 32) // 4Gbytes
+#define STACK_TRACE_MSG_HASH_MEM_SZ		(1ULL << 32)	// 4Gbytes
 
-#define PROFILER_READER_EPOLL_TIMEOUT		500 //msecs
-#define EPOLL_SHORT_TIMEOUT			100  //mescs
+#define PROFILER_READER_EPOLL_TIMEOUT		500	//msecs
+#define EPOLL_SHORT_TIMEOUT			100	//mescs
 
 /*
  * Process information recalibration time, this time is the number of seconds
@@ -152,7 +152,7 @@ enum {
  *   The Java process will delay obtaining the symbol table by
  *   'PROC_INFO_VERIFY_TIME' seconds after it starts running.
  */
-#define PROC_INFO_VERIFY_TIME  60 // 60 seconds
+#define PROC_INFO_VERIFY_TIME  60	// 60 seconds
 
 /*
  * This value is used to determine which type of Java agent's so library to
@@ -168,12 +168,12 @@ enum {
  * date the Java symbol table. This is done The purpose is to avoid freque-
  * nt updates of the java symbol table.
  */
-#define JAVA_SYMS_UPDATE_DELAY_DEF 60 // 60 seconds
-#define JAVA_SYMS_UPDATE_DELAY_MIN 5 // 5 seconds
-#define JAVA_SYMS_UPDATE_DELAY_MAX 3600 // 3600 seconds
+#define JAVA_SYMS_UPDATE_DELAY_DEF 60	// 60 seconds
+#define JAVA_SYMS_UPDATE_DELAY_MIN 5	// 5 seconds
+#define JAVA_SYMS_UPDATE_DELAY_MAX 3600	// 3600 seconds
 
 /* Profiler - maximum data push interval time (in nanosecond). */
-#define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */ 
+#define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */
 
 /*
  * timer config
@@ -192,24 +192,24 @@ enum {
  * the data resident in the eBPF buffer. This value is the periodic time, unit
  * is milliseconds.
  */
-#define KICK_KERN_PERIOD 10 // 10 ticks(100 milliseconds)
+#define KICK_KERN_PERIOD 10	// 10 ticks(100 milliseconds)
 
 /*
  * System boot time update cycle time, unit is milliseconds.
  */
-#define SYS_TIME_UPDATE_PERIOD 1000  // 1000 ticks(10 seconds)
+#define SYS_TIME_UPDATE_PERIOD 1000	// 1000 ticks(10 seconds)
 
 /*
  * Check whether the eBPF Map exceeds the maximum value and use it to release
  * stale data (unit is milliseconds).
  */
-#define CHECK_MAP_EXCEEDED_PERIOD 100 // 100 ticks(1 seconds)
+#define CHECK_MAP_EXCEEDED_PERIOD 100	// 100 ticks(1 seconds)
 
 /* 
  * Used to check whether the kernel adaptation is successful, here is the
  * check cycle time (unit is milliseconds).
  */
-#define CHECK_KERN_ADAPT_PERIOD 100 // 100 ticks(1 seconds)
+#define CHECK_KERN_ADAPT_PERIOD 100	// 100 ticks(1 seconds)
 
 /*
  * The maximum space occupied by the Java symbol files in the target POD.
@@ -217,15 +217,15 @@ enum {
  * of 2Mi to 100Mi. If the configuration value is outside this range, the
  * default value of 10(10Mi), will be used.
  */
-#define JAVA_POD_WRITE_FILES_SPACE_MIN 2097152 // 2Mi
-#define JAVA_POD_WRITE_FILES_SPACE_MAX 104857600 // 100Mi
-#define JAVA_POD_WRITE_FILES_SPACE_DEF 10485760 // 10Mi
+#define JAVA_POD_WRITE_FILES_SPACE_MIN 2097152	// 2Mi
+#define JAVA_POD_WRITE_FILES_SPACE_MAX 104857600	// 100Mi
+#define JAVA_POD_WRITE_FILES_SPACE_DEF 10485760	// 10Mi
 /*
  * The `df_java_agent_musl.so` and `df_java_agent.so` files will also be
  * placed in the target POD for loading operations. They occupy less than
  * 300Ki of space.
  */
-#define JAVA_POD_EXTRA_SPACE_MMA 307200 // 300Ki
+#define JAVA_POD_EXTRA_SPACE_MMA 307200	// 300Ki
 
 /*
  * The perf profiler utilizes a perf buffer (per CPUs) for transporting stack data,
@@ -263,6 +263,6 @@ enum {
  * The random value has a maximum limit specified above(measured in seconds). 
  */
 
-#define PROFILER_DEFER_RANDOM_MAX 60 // 60 seconds
+#define PROFILER_DEFER_RANDOM_MAX 60	// 60 seconds
 
 #endif /* DF_EBPF_CONFIG_H */

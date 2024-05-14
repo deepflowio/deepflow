@@ -1,5 +1,6 @@
 # Name                     , DisplayName                , Description
 time_str                   , 触发时间                    ,
+_id                        , UID                        ,
 time                       , 触发时间                    , 将 end_time 取整到秒。
 
 region                     , 区域                       ,

@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package migration
-
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.5.1.31"
-)
+#ifndef DF_PROFILE_EXT_H
+#define DF_PROFILE_EXT_H
+int extended_reader_create(struct bpf_tracer *tracer);
+#endif /* DF_PROFILE_EXT_H */

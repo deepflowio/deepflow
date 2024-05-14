@@ -153,6 +153,15 @@ pub const EVENT_TYPE_PROC_EXEC: u32 = 1 << 5;
 #[allow(dead_code)]
 pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 6;
 
+// Profiler types
+#[allow(dead_code)]
+pub const PROFILER_TYPE_UNKNOWN: u8 = 0;
+#[allow(dead_code)]
+pub const PROFILER_TYPE_ONCPU: u8 = 1;
+#[allow(dead_code)]
+#[cfg(feature = "off_cpu")]
+pub const PROFILER_TYPE_OFFCPU: u8 = 2;
+
 //Process exec/exit events
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -367,8 +376,9 @@ pub struct SK_TRACE_STATS {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
-    pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,       // User-space process-ID.
+    pub profiler_type: u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
+    pub timestamp: u64,    // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,          // User-space process-ID.
     /*
      * Identified within the eBPF program in kernel space.
      * If the current is a process and not a thread this field(tid) is filled
@@ -381,9 +391,10 @@ pub struct stack_profile_data {
     pub k_stack_id: u32, // Kernel space stackID.
     pub cpu: u32,        // The captured stack trace data is generated on which CPU?
     /*
-     * The profiler captures the number of occurrences of the same
+     * The profiler captures the sum of durations of occurrences of the same
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
+     * In microseconds as the unit of time.
      */
     pub count: u32,
     /*
@@ -647,6 +658,24 @@ extern "C" {
         timeout: c_int,
         callback: extern "C" fn(data: *mut c_char, len: c_int),
     ) -> c_int;
+
+    pub fn enable_oncpu_profiler() -> c_int;
+
+    pub fn disable_oncpu_profiler() -> c_int;
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "off_cpu")] {
+            pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
+
+            pub fn enable_offcpu_profiler() -> c_int;
+
+            pub fn disable_offcpu_profiler() -> c_int;
+
+            pub fn set_offcpu_minblock_time(
+                block_time: c_uint,
+            ) -> c_int;
+        }
+    }
 }
 
 #[no_mangle]

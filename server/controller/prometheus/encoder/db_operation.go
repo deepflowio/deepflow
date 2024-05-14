@@ -23,7 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/prometheus/constraint"
 )
 
-func addBatch[T constraint.OperateBatchModel](toAdd []*T, resourceType string) error {
+func addBatch[T constraint.OperateBatchModel](db *mysql.DB, toAdd []*T, resourceType string) error {
 	count := len(toAdd)
 	offset := 1000
 	pages := count/offset + 1
@@ -37,11 +37,11 @@ func addBatch[T constraint.OperateBatchModel](toAdd []*T, resourceType string) e
 			end = count
 		}
 		oneP := toAdd[start:end]
-		err := mysql.Db.Clauses(clause.Returning{}).Create(&oneP).Error
+		err := db.Clauses(clause.Returning{}).Create(&oneP).Error
 		if err != nil {
 			return err
 		}
-		log.Infof("add %d %s success", len(oneP), resourceType)
+		log.Info(db.PreORGID("add %d %s success", len(oneP), resourceType))
 	}
 	return nil
 }

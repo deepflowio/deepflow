@@ -14,9 +14,35 @@
  * limitations under the License.
  */
 
-package migration
+package common
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.5.1.31"
+import (
+	"fmt"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
+
+type ORG struct {
+	ID int       // org id
+	DB *mysql.DB // org database connection
+}
+
+func NewORG(id int) (*ORG, error) {
+	db, err := mysql.GetDB(id)
+	return &ORG{
+		ID: id,
+		DB: db,
+	}, err
+}
+
+func (o *ORG) Logf(format string, a ...any) string {
+	return o.addLogPre(fmt.Sprintf(format, a...))
+}
+
+func (o *ORG) Log(format string) string {
+	return o.addLogPre(format)
+}
+
+func (o *ORG) addLogPre(msg string) string {
+	return fmt.Sprintf("[OID-%d] ", o.ID) + msg
+}

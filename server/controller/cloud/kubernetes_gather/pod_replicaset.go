@@ -66,6 +66,7 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 			log.Infof("replicaset,replicasetcontroller (%s) pod group not found", name)
 			continue
 		}
+		podGroupLcuuid = common.IDGenerateUUID(k.orgID, podGroupLcuuid)
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		labelString := k.GetLabel(metaData.Get("labels").MustMap())
 		if !k.podGroupLcuuids.Contains(podGroupLcuuid) {

@@ -1318,7 +1318,26 @@ vtap_group_id: g-xxxxxx
     ## Note: Only collect IO events with delay exceeding this threshold, the default value is 1ms.
     #io-event-minimal-duration: 1ms
 
-    ## on-cpu profile configuration
+    ## Java compliant update latency time
+    ## Default: 600s. Range: [5, 3600]s
+    ## Note:
+    ##   When deepflow-agent finds that an unresolved function name appears in the function call stack
+    ##   of a Java process, it will trigger the regeneration of the symbol file of the process.
+    ##   Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
+    ##   Java processes, the regeneration will be deferred for a period of time.
+    #java-symbol-file-refresh-defer-interval: 600s
+
+    ## Maximum size limit for Java symbol file.
+    ## Default: 10. Range: [2, 100]
+    ## Note:
+    ##   Which means it falls within the interval of 2Mi to 100Mi. If the configuration value is outside
+    ##   this range, the default value of 10(10Mi), will be used.
+    ##   All Java symbol files are stored in the '/tmp' directory mounted by the deepflow-agent. To prevent
+    ##   excessive occupation of host node space due to large Java symbol files, a maximum size limit is set
+    ##   for each generated Java symbol file.
+    #java-symbol-file-max-space-limit: 10
+
+    ## On-cpu profile configuration
     #on-cpu-profile:
       ## eBPF on-cpu Profile Switch
       ## Default: false
@@ -1342,13 +1361,27 @@ vtap_group_id: g-xxxxxx
       ## Default: ^deepflow-.*
       #regex: ^deepflow-.*
 
-      ## When deepflow-agent finds that an unresolved function name appears in the function call stack
-      ## of a Java process, it will trigger the regeneration of the symbol file of the process.
-      ## Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
-      ## Java processes, the regeneration will be deferred for a period of time.
-      ## Default: 600s. Range: [5, 3600]s
-      ## The unit of measurement used is seconds.
-      #java-symbol-file-refresh-defer-interval: 600s
+    ## Off-cpu profile configuration, Enterprise Edition Only.
+    #off-cpu-profile:
+      ## eBPF off-cpu Profile Switch
+      ## Default: true
+      #disabled: true
+
+      ## Sampling process name
+      ## Default: ^deepflow-.*
+      #regex: ^deepflow-.*
+
+      ## Configure the minimum blocking event time
+      ## Default: 50us. Range: [1, 2^32-1)us
+      ## Note:
+      ##   Scheduler events are still high-frequency events, as their rate may exceed 1 million events
+      ##   per second, so caution should still be exercised.
+      ##   If overhead remains an issue, you can configure the 'minblock' tunable parameter here.
+      ##   If the off-CPU time is less than the value configured in this item, the data will be discarded.
+      ##   If your goal is to trace longer blocking events, increasing this parameter can filter out shorter
+      ##   blocking events, further reducing overhead. Additionally, we will not collect events with a block
+      ##   time exceeding 1 hour.
+      #minblock: 50us
 
   ######################################
   ## Agent Running in Standalone Mode ##
