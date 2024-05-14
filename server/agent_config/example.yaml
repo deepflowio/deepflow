@@ -1327,7 +1327,7 @@ vtap_group_id: g-xxxxxx
     ##   Java processes, the regeneration will be deferred for a period of time.
     #java-symbol-file-refresh-defer-interval: 600s
 
-    ## on-cpu profile configuration
+    ## On-cpu profile configuration
     #on-cpu-profile:
       ## eBPF on-cpu Profile Switch
       ## Default: false
@@ -1351,7 +1351,7 @@ vtap_group_id: g-xxxxxx
       ## Default: ^deepflow-.*
       #regex: ^deepflow-.*
 
-    ## off-cpu profile configuration
+    ## Off-cpu profile configuration, Enterprise Edition Only.
     #off-cpu-profile:
       ## eBPF off-cpu Profile Switch
       ## Default: true
