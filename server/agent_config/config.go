@@ -243,30 +243,36 @@ type EbpfKprobePortlist struct {
 }
 
 type OnCpuProfile struct {
-	Disabled                           *bool   `yaml:"disabled,omitempty"`
-	Frequency                          *int    `yaml:"frequency,omitempty"`
-	Cpu                                *int    `yaml:"cpu,omitempty"`
-	Regex                              *string `yaml:"regex,omitempty"`
-	JavaSymbolFileMaxSpaceLimit        *int    `yaml:"java-symbol-file-max-space-limit,omitempty"`
-	JavaSymbolFileRefreshDeferInterval *string `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
+	Disabled  *bool   `yaml:"disabled,omitempty"`
+	Frequency *int    `yaml:"frequency,omitempty"`
+	Cpu       *int    `yaml:"cpu,omitempty"`
+	Regex     *string `yaml:"regex,omitempty"`
+}
+
+type OffCpuProfile struct {
+	Disabled *bool   `yaml:"disabled,omitempty"`
+	Regex    *string `yaml:"regex,omitempty"`
+	MinBlock *string `yaml:"minblock,omitempty"`
 }
 
 type EbpfConfig struct {
-	Disabled                *bool                              `yaml:"disabled,omitempty"`
-	GlobalEbpfPpsThreshold  *int                               `yaml:"global-ebpf-pps-threshold,omitempty"`
-	UprobeProcessNameRegexs *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
-	KprobeWhitelist         *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
-	KprobeBlacklist         *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`
-	ThreadNum               *int                               `yaml:"thread-num,omitempty"`
-	PerfPagesCount          *int                               `yaml:"perf-pages-count,omitempty"`
-	RingSize                *int                               `yaml:"ring-size,omitempty"`
-	MaxSocketEntries        *int                               `yaml:"max-socket-entries,omitempty"`
-	MaxTraceEntries         *int                               `yaml:"max-trace-entries,omitempty"`
-	SocketMapMaxReclaim     *int                               `yaml:"socket-map-max-reclaim,omitempty"`
-	GoTracingTimeout        *int                               `yaml:"go-tracing-timeout,omitempty"`
-	IOEventCollectMode      *int                               `yaml:"io-event-collect-mode,omitempty"`
-	IOEventMinimalDuration  *string                            `yaml:"io-event-minimal-duration,omitempty"`
-	OnCpuProfile            *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
+	Disabled                           *bool                              `yaml:"disabled,omitempty"`
+	GlobalEbpfPpsThreshold             *int                               `yaml:"global-ebpf-pps-threshold,omitempty"`
+	UprobeProcessNameRegexs            *EbpfUprobeProcessNameRegexsConfig `yaml:"uprobe-process-name-regexs,omitempty"`
+	KprobeWhitelist                    *EbpfKprobePortlist                `yaml:"kprobe-whitelist,omitempty"`
+	KprobeBlacklist                    *EbpfKprobePortlist                `yaml:"kprobe-blacklist,omitempty"`
+	ThreadNum                          *int                               `yaml:"thread-num,omitempty"`
+	PerfPagesCount                     *int                               `yaml:"perf-pages-count,omitempty"`
+	RingSize                           *int                               `yaml:"ring-size,omitempty"`
+	MaxSocketEntries                   *int                               `yaml:"max-socket-entries,omitempty"`
+	MaxTraceEntries                    *int                               `yaml:"max-trace-entries,omitempty"`
+	SocketMapMaxReclaim                *int                               `yaml:"socket-map-max-reclaim,omitempty"`
+	GoTracingTimeout                   *int                               `yaml:"go-tracing-timeout,omitempty"`
+	IOEventCollectMode                 *int                               `yaml:"io-event-collect-mode,omitempty"`
+	IOEventMinimalDuration             *string                            `yaml:"io-event-minimal-duration,omitempty"`
+	JavaSymbolFileRefreshDeferInterval *string                            `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
+	OnCpuProfile                       *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
+	OffCpuProfile                      *OffCpuProfile                     `yaml:"off-cpu-profile,omitempty"`
 }
 
 type OsProcRegex struct {
