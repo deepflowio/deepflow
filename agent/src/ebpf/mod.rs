@@ -388,13 +388,10 @@ pub struct stack_profile_data {
     pub k_stack_id: u32, // Kernel space stackID.
     pub cpu: u32,        // The captured stack trace data is generated on which CPU?
     /*
-     * The profiler captures the number of occurrences of the same
+     * The profiler captures the sum of durations of occurrences of the same
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
-     * Note:
-     * In the sampling scenario, the number of samples is used; in the
-     * non-sampling scenario, real-time intervals (in Microseconds) are
-     * used.
+     * In microseconds as the unit of time.
      */
     pub count: u32,
     /*

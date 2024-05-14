@@ -111,13 +111,10 @@ enum {
  * @cpu
  *   The captured stack trace data is generated on which CPU?
  * @count
- *   The profiler captures the number of occurrences of the same
+ *   The profiler captures the sum of durations of occurrences of the same
  *   data by querying with the quadruple
  *   "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
- *     1.1936h
- *   In the sampling scenario, the number of samples is used; in the
- *   non-sampling scenario, real-time intervals (in Microseconds) are
- *   used. Range: [1, 2^32-1)us
+ *   Real-time intervals (in Microseconds) are used. Range: [1, 2^32-1)us
  * @comm
  *   comm in task_struct(linux kernel), always 16 bytes
  *   If the capture is a process, fill in the process name here.

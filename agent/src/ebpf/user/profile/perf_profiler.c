@@ -550,7 +550,8 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	profiler_context_init(&oncpu_ctx, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
 			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
-			      MAP_STACK_B_NAME, false, false);
+			      MAP_STACK_B_NAME, false, true,
+			      NANOSEC_PER_SEC / freq);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
 
 	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
