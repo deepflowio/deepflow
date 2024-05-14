@@ -188,6 +188,7 @@ type StaticConfig struct {
 	ExternalProfileIntegrationDisabled *bool                       `yaml:"external-profile-integration-disabled,omitempty"`
 	ExternalTraceIntegrationDisabled   *bool                       `yaml:"external-trace-integration-disabled,omitempty"`
 	ExternalMetricIntegrationDisabled  *bool                       `yaml:"external-metric-integration-disabled,omitempty"`
+	ExternalLogIntegrationDisabled     *bool                       `yaml:"external_log_integration_disabled,omitempty"`
 	NtpMaxInterval                     *string                     `yaml:"ntp-max-interval,omitempty"`
 	NtpMinInterval                     *string                     `yaml:"ntp-min-interval,omitempty"`
 	DispatcherQueue                    *bool                       `yaml:"dispatcher-queue,omitempty"`

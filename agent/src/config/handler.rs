@@ -1874,6 +1874,14 @@ impl ConfigHandler {
                 new_config.yaml_config.external_metric_integration_disabled
             );
         }
+        if yaml_config.external_log_integration_disabled
+            != new_config.yaml_config.external_log_integration_disabled
+        {
+            info!(
+                "external_log_integration_disabled set to {}",
+                new_config.yaml_config.external_log_integration_disabled
+            );
+        }
 
         if *yaml_config != new_config.yaml_config {
             *yaml_config = new_config.yaml_config;
