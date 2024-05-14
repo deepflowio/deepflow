@@ -26,9 +26,11 @@ const GO_BIRTHDAY = "2006-01-02 15:04:05"
 const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 const (
-	DEFAULT_ORG_ID  = 1
-	DEFAULT_TEAM_ID = 1
-	ORG_ID_MAX      = 1024
+	DEFAULT_ORG_ID    = 1
+	DEFAULT_USER_TYPE = 1
+	DEFAULT_USER_ID   = 1
+	DEFAULT_TEAM_ID   = 1
+	ORG_ID_MAX        = 1024
 )
 
 const (
@@ -560,12 +562,11 @@ const (
 )
 
 const (
-	DEEPFLOW_STATSD_PREFIX            = "deepflow_server_controller"
-	CLOUD_METRIC_NAME_TASK_COST       = "cloud_task_cost"
-	CLOUD_METRIC_NAME_INFO_COUNT      = "cloud_info_count"
-	CLOUD_METRIC_NAME_API_COUNT       = "cloud_api_count"
-	CLOUD_METRIC_NAME_API_COST        = "cloud_api_cost"
-	GENESIS_METRIC_NAME_K8SINFO_DELAY = "genesis_k8sinfo_delay"
+	CLOUD_METRIC_NAME_TASK_COST       = "controller_cloud_task_cost"
+	CLOUD_METRIC_NAME_INFO_COUNT      = "controller_cloud_info_count"
+	CLOUD_METRIC_NAME_API_COUNT       = "controller_cloud_api_count"
+	CLOUD_METRIC_NAME_API_COST        = "controller_cloud_api_cost"
+	GENESIS_METRIC_NAME_K8SINFO_DELAY = "controller_genesis_k8sinfo_delay"
 )
 
 var (

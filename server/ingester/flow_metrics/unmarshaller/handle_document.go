@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/app"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -166,7 +167,8 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 				t.TagSource |= uint8(flow_metrics.Peer)
 			}
 		}
-		if myRegionID != 0 && t.RegionID1 != 0 {
+		// under multiple Orgs, the Analyzer needs to store data from multiple Regions and only verifies whether the Region of the Default Org is correct.
+		if ckdb.IsDefaultOrgID(t.OrgId) && myRegionID != 0 && t.RegionID1 != 0 {
 			if t.TAPSide == flow_metrics.Server && t.RegionID1 != myRegionID { // 对于双端 的统计值，需要去掉 observation_point 对应的一侧与自身region_id 不匹配的内容。
 				platformData.AddOtherRegion()
 				return fmt.Errorf("My regionID is %d, but document regionID1 is %d", myRegionID, t.RegionID1)
@@ -213,8 +215,8 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 				t.TagSource1 |= uint8(flow_metrics.Peer)
 			}
 		}
-
-		if myRegionID != 0 && t.RegionID != 0 {
+		// under multiple Orgs, the Analyzer needs to store data from multiple Regions and only verifies whether the Region of the Default Org is correct.
+		if ckdb.IsDefaultOrgID(t.OrgId) && myRegionID != 0 && t.RegionID != 0 {
 			if t.Code&EdgeCode == EdgeCode { // 对于双端 的统计值，需要去掉 observation_point 对应的一侧与自身region_id 不匹配的内容。
 				if t.TAPSide == flow_metrics.Client && t.RegionID != myRegionID {
 					platformData.AddOtherRegion()

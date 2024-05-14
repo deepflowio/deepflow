@@ -44,7 +44,7 @@ func HandleOrgIDMiddleware() gin.HandlerFunc {
 		ctx.Set(common.HEADER_KEY_X_ORG_ID, orgID)
 
 		var err error
-		var userType, userID int
+		userType, userID := common.DEFAULT_USER_TYPE, common.DEFAULT_USER_ID
 		userTypeString := ctx.Request.Header.Get(common.HEADER_KEY_X_USER_TYPE)
 		if len(userTypeString) != 0 {
 			userType, err = strconv.Atoi(userTypeString)

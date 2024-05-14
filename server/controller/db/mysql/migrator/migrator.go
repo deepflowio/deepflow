@@ -37,10 +37,7 @@ var log = logging.MustGetLogger("db.mysql.migrator")
 //
 //	and upgrade based the result.
 func Migrate(cfg config.MySqlConfig) error {
-	if err := migrateDatabase(cfg, mysqlcommon.DEFAULT_ORG_ID); err != nil {
-		return err
-	}
-	if err := mysql.InitDefaultDB(cfg); err != nil {
+	if err := migrateDefaultDatabase(cfg); err != nil {
 		return err
 	}
 	orgIDs, err := mysql.GetNonDefaultORGIDs()
@@ -48,30 +45,40 @@ func Migrate(cfg config.MySqlConfig) error {
 		return err
 	}
 	for _, orgID := range orgIDs {
-		if err = migrateDatabase(cfg, orgID); err != nil {
+		if err = migrateNonDefaultDatabase(cfg, orgID); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func migrateDatabase(cfg config.MySqlConfig, orgID int) error {
-	var copiedCfg config.MySqlConfig
-	if orgID == mysqlcommon.DEFAULT_ORG_ID {
-		copiedCfg = cfg
-	} else {
-		copiedCfg = mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)
-	}
-
+func migrateDefaultDatabase(cfg config.MySqlConfig) error {
+	copiedCfg := cfg
 	databaseExisted, err := CreateDatabase(copiedCfg)
 	if err != nil {
 		return err
 	}
 
-	if databaseExisted {
-		if err = table.UpgradeDatabase(copiedCfg); err != nil {
-			return err
-		}
+	if err := mysql.InitDefaultDB(cfg); err != nil {
+		return err
+	}
+
+	return upgradeDatabase(copiedCfg, databaseExisted)
+}
+
+func migrateNonDefaultDatabase(cfg config.MySqlConfig, orgID int) error {
+	copiedCfg := mysqlcommon.ReplaceConfigDatabaseName(cfg, orgID)
+	databaseExisted, err := CreateDatabase(copiedCfg)
+	if err != nil {
+		return err
+	}
+
+	return upgradeDatabase(copiedCfg, databaseExisted)
+}
+
+func upgradeDatabase(cfg config.MySqlConfig, run bool) error {
+	if run {
+		return table.UpgradeDatabase(cfg)
 	}
 	return nil
 }

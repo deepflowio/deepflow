@@ -434,7 +434,6 @@ fn rrt_lru(c: &mut Criterion) {
                     LogCache {
                         msg_type: LogMessageType::Request,
                         time: item.duration.as_micros() as u64,
-                        kafka_info: None,
                         multi_merge_info: None,
                     },
                 );
@@ -461,7 +460,6 @@ fn rrt_lru(c: &mut Criterion) {
                     LogCache {
                         msg_type: LogMessageType::Request,
                         time: item.duration.as_micros() as u64,
-                        kafka_info: None,
                         multi_merge_info: None,
                     },
                 );
@@ -494,7 +492,6 @@ fn rrt_lru(c: &mut Criterion) {
                     LogCache {
                         msg_type: LogMessageType::Request,
                         time: item.duration.as_micros() as u64,
-                        kafka_info: None,
                         multi_merge_info: None,
                     },
                 );

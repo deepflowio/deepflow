@@ -67,7 +67,7 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	}
 	Db, vtapDB := dbInfo.DB, dbInfo.DB
 	for _, param := range []string{
-		"lcuuid", "name", "type", "vtap_group_lcuuid", "controller_ip", "analyzer_ip",
+		"lcuuid", "name", "type", "vtap_group_lcuuid", "controller_ip", "analyzer_ip", "team_id",
 	} {
 		where := fmt.Sprintf("%s = ?", param)
 		if _, ok := filter[param]; ok {

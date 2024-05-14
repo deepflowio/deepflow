@@ -30,8 +30,15 @@ const (
 	ORG_ID_PREFIX_LEN = 5 // length of 'xxxx_'
 )
 
-func OrgDatabasePrefix(orgID uint16) string {
+func IsDefaultOrgID(orgID uint16) bool {
 	if orgID == DEFAULT_ORG_ID || orgID == INVALID_ORG_ID {
+		return true
+	}
+	return false
+}
+
+func OrgDatabasePrefix(orgID uint16) string {
+	if IsDefaultOrgID(orgID) {
 		return ""
 	}
 	// format it as a 4-digit number. If there are less than 4 digits, fill the high bits with 0
@@ -172,34 +179,41 @@ func (t *Table) MakeOrgGlobalTableCreateSQL(orgID uint16) string {
 // database 'xxxx_deepflow_system' adds 'deepflow_system' view pointing to the 'deepflow_system_agent' and 'deepflow_system_server' table
 func (t *Table) MakeViewsCreateSQLForDeepflowSystem(orgID uint16) []string {
 	createViewSqls := []string{}
+	orgDatabase := t.OrgDatabase(orgID)
 	if t.Database == "deepflow_system" && t.GlobalName == "deepflow_system_server" {
-		// recreate table deepflow_system.deepflow_system, for upgrade
-		if orgID == DEFAULT_ORG_ID || orgID == INVALID_ORG_ID {
-			dropTable := "DROP TABLE IF EXISTS deepflow_system.deepflow_system"
-			createViewSqls = append(createViewSqls, dropTable)
+		// recreate table view xxxx_deepflow_system.deepflow_system, for upgrade
+		dropTable := fmt.Sprintf("DROP TABLE IF EXISTS %s.deepflow_system", orgDatabase)
+		createViewSqls = append(createViewSqls, dropTable)
+
+		deepflowSystemServerView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`deepflow_system` AS SELECT * FROM %s.`deepflow_system_agent` UNION ALL SELECT * FROM deepflow_system.deepflow_system_server",
+			orgDatabase, orgDatabase)
+		if !IsDefaultOrgID(orgID) {
+			deepflowSystemServerView += fmt.Sprintf(" UNION ALL SELECT * FROM %s.deepflow_system_server", orgDatabase)
 		}
-		deepflowSystemServerView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`%s` AS SELECT * FROM %s.`%s` UNION ALL SELECT * FROM deepflow_system.deepflow_system_server",
-			t.OrgDatabase(orgID), "deepflow_system", t.OrgDatabase(orgID), "deepflow_system_agent")
 		createViewSqls = append(createViewSqls, deepflowSystemServerView)
 	}
 	if t.Database == "flow_tag" && t.GlobalName == "deepflow_system_server_custom_field" {
-		// recreate table flow_tag.deepflow_system_custom_field, for upgrade
-		if orgID == DEFAULT_ORG_ID || orgID == INVALID_ORG_ID {
-			dropTable := "DROP TABLE IF EXISTS flow_tag.deepflow_system_custom_field"
-			createViewSqls = append(createViewSqls, dropTable)
+		// recreate table xxxx_flow_tag.deepflow_system_custom_field, for upgrade
+		dropTable := fmt.Sprintf("DROP TABLE IF EXISTS %s.deepflow_system_custom_field", orgDatabase)
+		createViewSqls = append(createViewSqls, dropTable)
+
+		flowTagFieldView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`deepflow_system_custom_field` AS SELECT * FROM %s.`deepflow_system_agent_custom_field` UNION ALL SELECT * FROM flow_tag.deepflow_system_server_custom_field",
+			orgDatabase, orgDatabase)
+		if !IsDefaultOrgID(orgID) {
+			flowTagFieldView += fmt.Sprintf(" UNION ALL SELECT * FROM %s.deepflow_system_server_custom_field", orgDatabase)
 		}
-		flowTagFieldView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`%s` AS SELECT * FROM %s.`%s` UNION ALL SELECT * FROM flow_tag.deepflow_system_server_custom_field",
-			OrgDatabasePrefix(orgID)+"flow_tag", "deepflow_system_custom_field", OrgDatabasePrefix(orgID)+"flow_tag", "deepflow_system_agent_custom_field")
 		createViewSqls = append(createViewSqls, flowTagFieldView)
 	}
 	if t.Database == "flow_tag" && t.GlobalName == "deepflow_system_server_custom_field_value" {
-		// recreate table flow_tag.deepflow_system_custom_field_value, for upgrade
-		if orgID == DEFAULT_ORG_ID || orgID == INVALID_ORG_ID {
-			dropTable := "DROP TABLE IF EXISTS flow_tag.deepflow_system_custom_field_value"
-			createViewSqls = append(createViewSqls, dropTable)
+		// recreate table xxxx_flow_tag.deepflow_system_custom_field_value, for upgrade
+		dropTable := fmt.Sprintf("DROP TABLE IF EXISTS %s.deepflow_system_custom_field_value", orgDatabase)
+		createViewSqls = append(createViewSqls, dropTable)
+
+		flowTagFieldValueView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`deepflow_system_custom_field_value` AS SELECT * FROM %s.`deepflow_system_agent_custom_field_value` UNION ALL SELECT * FROM flow_tag.deepflow_system_server_custom_field_value",
+			orgDatabase, orgDatabase)
+		if !IsDefaultOrgID(orgID) {
+			flowTagFieldValueView += fmt.Sprintf(" UNION ALL SELECT * FROM %s.deepflow_system_server_custom_field_value", orgDatabase)
 		}
-		flowTagFieldValueView := fmt.Sprintf("CREATE VIEW IF NOT EXISTS %s.`%s` AS SELECT * FROM %s.`%s` UNION ALL SELECT * FROM flow_tag.deepflow_system_server_custom_field_value",
-			OrgDatabasePrefix(orgID)+"flow_tag", "deepflow_system_custom_field_value", OrgDatabasePrefix(orgID)+"flow_tag", "deepflow_system_agent_custom_field_value")
 		createViewSqls = append(createViewSqls, flowTagFieldValueView)
 	}
 	return createViewSqls

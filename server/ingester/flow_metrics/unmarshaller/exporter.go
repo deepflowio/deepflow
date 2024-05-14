@@ -36,44 +36,97 @@ type ExportDocumentFlow app.DocumentFlow
 type ExportDocumentApp app.DocumentApp
 type ExportDocumentUsage app.DocumentUsage
 
+// flow document
 func (e *ExportDocumentFlow) TimestampUs() int64 {
-	return int64(time.Duration(e.Timestamp) * time.Second / time.Microsecond)
+	d := (*app.DocumentFlow)(e)
+	return int64(time.Duration(d.Timestamp) * time.Second / time.Microsecond)
 }
 
 func (e *ExportDocumentFlow) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
-	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(e)), offset, kind, dataType)
+	d := (*app.DocumentFlow)(e)
+	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(d)), offset, kind, dataType)
 }
 
 func (e *ExportDocumentFlow) Meter() flow_metrics.Meter {
-	return e.Meter()
+	d := (*app.DocumentFlow)(e)
+	return d.Meter()
+}
+
+func (e *ExportDocumentFlow) Release() {
+	d := (*app.DocumentFlow)(e)
+	d.Release()
+}
+
+func (e *ExportDocumentFlow) AddReferenceCount() {
+	d := (*app.DocumentFlow)(e)
+	d.AddReferenceCount()
 }
 
 func (e *ExportDocumentFlow) EncodeTo(protocol config.ExportProtocol, utags *utag.UniversalTagsManager, cfg *config.ExporterCfg) (interface{}, error) {
-	return EncodeTo(e, protocol, utags, cfg)
+	d := (*app.DocumentFlow)(e)
+	return EncodeTo(d, protocol, utags, cfg)
+}
+
+// app document
+func (e *ExportDocumentApp) TimestampUs() int64 {
+	d := (*app.DocumentApp)(e)
+	return int64(time.Duration(d.Timestamp) * time.Second / time.Microsecond)
 }
 
 func (e *ExportDocumentApp) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
-	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(e)), offset, kind, dataType)
+	d := (*app.DocumentApp)(e)
+	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(d)), offset, kind, dataType)
 }
 
 func (e *ExportDocumentApp) Meter() flow_metrics.Meter {
-	return e.Meter()
+	d := (*app.DocumentApp)(e)
+	return d.Meter()
+}
+
+func (e *ExportDocumentApp) Release() {
+	d := (*app.DocumentApp)(e)
+	d.Release()
+}
+
+func (e *ExportDocumentApp) AddReferenceCount() {
+	d := (*app.DocumentApp)(e)
+	d.AddReferenceCount()
 }
 
 func (e *ExportDocumentApp) EncodeTo(protocol config.ExportProtocol, utags *utag.UniversalTagsManager, cfg *config.ExporterCfg) (interface{}, error) {
-	return EncodeTo(e, protocol, utags, cfg)
+	d := (*app.DocumentApp)(e)
+	return EncodeTo(d, protocol, utags, cfg)
+}
+
+// usage document
+func (e *ExportDocumentUsage) TimestampUs() int64 {
+	d := (*app.DocumentUsage)(e)
+	return int64(time.Duration(d.Timestamp) * time.Second / time.Microsecond)
 }
 
 func (e *ExportDocumentUsage) GetFieldValueByOffsetAndKind(offset uintptr, kind reflect.Kind, dataType utils.DataType) interface{} {
-	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(e)), offset, kind, dataType)
+	d := (*app.DocumentUsage)(e)
+	return utils.GetValueByOffsetAndKind(uintptr(unsafe.Pointer(d)), offset, kind, dataType)
 }
 
 func (e *ExportDocumentUsage) Meter() flow_metrics.Meter {
-	return e.Meter()
+	d := (*app.DocumentUsage)(e)
+	return d.Meter()
+}
+
+func (e *ExportDocumentUsage) Release() {
+	d := (*app.DocumentUsage)(e)
+	d.Release()
+}
+
+func (e *ExportDocumentUsage) AddReferenceCount() {
+	d := (*app.DocumentUsage)(e)
+	d.AddReferenceCount()
 }
 
 func (e *ExportDocumentUsage) EncodeTo(protocol config.ExportProtocol, utags *utag.UniversalTagsManager, cfg *config.ExporterCfg) (interface{}, error) {
-	return EncodeTo(e, protocol, utags, cfg)
+	d := (*app.DocumentUsage)(e)
+	return EncodeTo(d, protocol, utags, cfg)
 }
 
 func EncodeTo(e app.Document, protocol config.ExportProtocol, utags *utag.UniversalTagsManager, cfg *config.ExporterCfg) (interface{}, error) {

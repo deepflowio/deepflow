@@ -47,6 +47,7 @@ var GenesisService *Genesis
 var Synchronizer *SynchronizerServer
 
 type Genesis struct {
+	statsdORGID      int
 	mutex            sync.RWMutex
 	grpcPort         string
 	grpcMaxMSGLength int
@@ -115,6 +116,7 @@ func (g *Genesis) Start() {
 
 func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	return statsd.StatsdStatter{
+		OrgID:   g.statsdORGID,
 		Element: statsd.GetGenesisStatsd(g.genesisStatsd),
 	}
 }
@@ -594,6 +596,7 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 	}
 
 	g.mutex.Lock()
+	g.statsdORGID = orgID
 	g.genesisStatsd.K8SInfoDelay = map[string][]float64{}
 	g.genesisStatsd.K8SInfoDelay[clusterID] = []float64{time.Now().Sub(k8sInfo.Epoch).Seconds()}
 	statsd.MetaStatsd.RegisterStatsdTable(g)

@@ -294,7 +294,7 @@ vtap_group_id: g-xxxxxx
 #http_log_span_id: traceparent, sw8
 
 ## Protocol Identification Maximun Packet Length
-## Default: 1024. Bpf Range: [256, 65535], Ebpf Range: [256, 8192]
+## Default: 1024. Bpf Range: [256, 65535], Ebpf Range: [256, 16384]
 ## Note: The maximum data length used for application protocol identification,
 ##   note that the effective value is less than or equal to the value of
 ##   capture_packet_size.
@@ -915,10 +915,18 @@ vtap_group_id: g-xxxxxx
   #################################
   ## sFlow & NetFlow Server Ports
   #xflow-collector:
-    #sflow-ports:
-    #- 6343
-    #netflow-ports:
-    #- 2055
+    ## sFlow Server Ports
+    ## Default: [], means that no sFlow data will be collected.
+    ## Note: This feature is only supported by the Enterprise Edition of Trident.
+    ##   In general, sFlow uses port 6343.
+    #sflow-ports: []
+
+    ## NetFlow Server Ports
+    ## Default: [], means that no NetFlow data will be collected.
+    ## Note: This feature is only supported by the Enterprise Edition of Trident.
+    ##   Additionally, only NetFlow v5 is currently supported. In general, NetFlow
+    ##   uses port 2055.
+    #netflow-ports: []
 
   #########
   ## NPB ##

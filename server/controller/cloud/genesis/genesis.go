@@ -38,6 +38,7 @@ var log = logging.MustGetLogger("cloud.genesis")
 
 type Genesis struct {
 	orgID           int
+	teamID          int
 	ipV4CIDRMaxMask int
 	ipV6CIDRMaxMask int
 	defaultVpc      bool
@@ -69,6 +70,7 @@ func NewGenesis(orgID int, domain mysql.Domain, cfg config.CloudConfig) (*Genesi
 	}
 	return &Genesis{
 		orgID:           orgID,
+		teamID:          domain.TeamID,
 		ipV4CIDRMaxMask: ipV4MaxMask,
 		ipV6CIDRMaxMask: ipV6MaxMask,
 		Name:            domain.Name,
@@ -95,6 +97,8 @@ func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	}
 
 	return statsd.StatsdStatter{
+		OrgID:      g.orgID,
+		TeamID:     g.teamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(g.cloudStatsd),
 	}

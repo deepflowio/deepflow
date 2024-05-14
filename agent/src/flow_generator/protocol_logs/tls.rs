@@ -470,14 +470,14 @@ impl L7ProtocolParserInterface for TlsLog {
         self.parse(payload, &mut info, param)?;
         if info.session_id.is_some() {
             // Triggered by Client Hello and the last Change cipher spec
-            info.cal_rrt(param, None).map(|rtt| {
+            info.cal_rrt(param).map(|rtt| {
                 info.tls_rtt = rtt;
                 self.perf_stats.as_mut().map(|p| p.update_tls_rtt(rtt));
             });
             info.session_id = None;
         }
         if info.msg_type != LogMessageType::Session {
-            info.cal_rrt(param, None).map(|rrt| {
+            info.cal_rrt(param).map(|rrt| {
                 info.rrt = rrt;
                 self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
             });

@@ -1133,6 +1133,7 @@ TRUNCATE TABLE resource_group_extra_info;
 
 CREATE TABLE IF NOT EXISTS npb_policy (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id                INTEGER DEFAULT 1,
     team_id                INTEGER DEFAULT 1,
     name                   CHAR(64),
     state                  INTEGER DEFAULT 1 COMMENT '0-disable; 1-enable',
@@ -1361,7 +1362,7 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.cpu_percent`/`metrics.max_cpus`) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.cpu_percent`/`metrics.max_cpus`) AS `cpu_usage`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"(Min(`metrics.cpu_percent`/`metrics.max_millicpus`)*1000) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"(Min(`metrics.cpu_percent`/`metrics.max_millicpus`)*1000) AS `cpu_usage`\"]}]}",
     "[{\"METRIC_LABEL\":\"cpu_usage\",\"return_field_description\":\"持续 5 分钟 (CPU用量/阈值)\",\"unit\":\"%\"}]", "采集器 CPU 超限",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"cpu_usage\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
 
 set @lcuuid = (select uuid());
@@ -1452,6 +1453,13 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
+    values(1, 1, "过滤项: N/A | 分组项: tag.host, tag.db, tag.table, tag.partition", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_force_delete_clickhouse_data\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.bytes_on_disk`) AS `force_delete_clickhouse_data_bytes_on_disk`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`, `tag.db`, `tag.table`, `tag.partition`\",\"METRICS\":[\"Sum(`metrics.bytes_on_disk`) AS `force_delete_clickhouse_data_bytes_on_disk`\"]}]}",
+    "[{\"METRIC_LABEL\":\"force_delete_clickhouse_data_bytes_on_disk\",\"return_field_description\":\"最近 1 分钟数据节点数据强制删除\",\"unit\":\"字节\"}]", "数据节点数据强制删除",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"force_delete_clickhouse_data_bytes_on_disk\", \"unit\": \"字节\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
+    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
+    threshold_warning, lcuuid)
     values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.kernel_drops`) AS `dispatcher.metrics.kernel_drops`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kernel_drops`) AS `dispatcher.metrics.kernel_drops`\"]}]}",
      "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.kernel_drops\",\"unit\":\"\"}]",
      "采集器数据丢失 (dispatcher.metrics.kernel_drops)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"dispatcher.metrics.kernel_drops\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
@@ -1519,6 +1527,14 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
     values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_map.metrics.drop_by_window\",\"unit\":\"\"}]",
      "采集器数据丢失 (flow_map.metrics.drop_by_window)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_map.metrics.drop_by_window\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
+    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
+    threshold_warning, lcuuid)
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\"]}]}",
+    "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_map.metrics.drop_by_capacity\",\"unit\":\"\"}]",
+     "采集器数据丢失 (flow_map.metrics.drop_by_capacity)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_map.metrics.drop_by_capacity\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
@@ -1699,6 +1715,7 @@ TRUNCATE TABLE vtap_group_configuration;
 
 CREATE TABLE IF NOT EXISTS npb_tunnel (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id             INTEGER DEFAULT 1,
     team_id             INTEGER DEFAULT 1,
     name                CHAR(64) NOT NULL,
     ip                  CHAR(64),

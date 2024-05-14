@@ -16,71 +16,54 @@
 
 use std::{
     env::{self, VarError},
-    fs, io,
+    fs,
     iter::Iterator,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    path::{Path, PathBuf},
+    path::Path,
     thread,
     time::Duration,
 };
-#[cfg(target_os = "windows")]
-use std::{ffi::OsString, os::windows::ffi::OsStringExt, ptr};
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use std::{io::Read, os::unix::fs::MetadataExt};
 
 use bytesize::ByteSize;
-#[cfg(any(target_os = "linux"))]
-use k8s_openapi::api::apps::v1::DaemonSet;
-#[cfg(any(target_os = "linux"))]
-use kube::{api::Api, Client, Config};
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use log::info;
 use log::{error, warn};
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use nom::AsBytes;
 use sysinfo::{DiskExt, System, SystemExt};
-#[cfg(target_os = "windows")]
-use winapi::{
-    shared::minwindef::{DWORD, MAX_PATH},
-    um::libloaderapi::GetModuleFileNameW,
+
+use crate::{
+    common::PROCESS_NAME,
+    config::K8S_CA_CRT_PATH,
+    error::{Error, Result},
+    exception::ExceptionHandler,
+    utils::process::get_process_num_by_name,
 };
 
-use crate::common::PROCESS_NAME;
-use crate::config::K8S_CA_CRT_PATH;
-use crate::error::{Error, Result};
-use crate::exception::ExceptionHandler;
-use public::proto::{common::TridentType, trident::Exception};
+use public::{
+    proto::{common::TridentType, trident::Exception},
+    utils::net::{
+        addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
+        LinkFlags, MacAddr,
+    },
+};
 
-#[cfg(target_os = "windows")]
-use super::process::get_memory_rss;
-use super::process::get_process_num_by_name;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use public::utils::net::get_link_enabled_features;
-use public::utils::net::{
-    addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
-    LinkFlags, MacAddr,
-};
+mod linux;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use linux::*;
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use self::windows::*;
 
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
+const IN_CONTAINER: &str = "IN_CONTAINER";
 // K8S environment node ip environment variable
 const K8S_NODE_IP_FOR_DEEPFLOW: &str = "K8S_NODE_IP_FOR_DEEPFLOW";
 const ENV_INTERFACE_NAME: &str = "CTRL_NETWORK_INTERFACE";
 const K8S_POD_IP_FOR_DEEPFLOW: &str = "K8S_POD_IP_FOR_DEEPFLOW";
-const IN_CONTAINER: &str = "IN_CONTAINER";
-pub const K8S_MEM_LIMIT_FOR_DEEPFLOW: &str = "K8S_MEM_LIMIT_FOR_DEEPFLOW";
-pub const K8S_NODE_NAME_FOR_DEEPFLOW: &str = "K8S_NODE_NAME_FOR_DEEPFLOW";
+const K8S_NODE_NAME_FOR_DEEPFLOW: &str = "K8S_NODE_NAME_FOR_DEEPFLOW";
 const ONLY_WATCH_K8S_RESOURCE: &str = "ONLY_WATCH_K8S_RESOURCE";
 const K8S_NAMESPACE_FOR_DEEPFLOW: &str = "K8S_NAMESPACE_FOR_DEEPFLOW";
 
-const BYTES_PER_MEGABYTE: u64 = 1024 * 1024;
-const MIN_MEMORY_LIMIT_MEGABYTE: u64 = 128; // uint: Megabyte
-const MAX_MEMORY_LIMIT_MEGABYTE: u64 = 100000; // uint: Megabyte
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-const CORE_FILE_CONFIG: &str = "/proc/sys/kernel/core_pattern";
-#[cfg(any(target_os = "linux", target_os = "android"))]
-const CORE_FILE_LIMIT: usize = 3;
 const DNS_HOST_IPV4: IpAddr = IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8));
 const DNS_HOST_IPV6: IpAddr = IpAddr::V6(Ipv6Addr::new(0x240c, 0, 0, 0, 0, 0, 0, 0x6666));
 
@@ -97,91 +80,6 @@ pub fn check(f: Checker) {
         }
         thread::sleep(Duration::from_secs(10));
     }
-}
-
-pub fn kernel_check() {
-    if cfg!(target_os = "windows") {
-        return;
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        use nix::sys::utsname::uname;
-        const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
-        // kernel_version 形如 5.4.0-13格式
-        let sys_uname = uname();
-        if sys_uname
-            .release()
-            .trim()
-            .split_once('-') // `-` 后面数字是修改版本号的次数，可以用 `-` 分隔
-            .unwrap_or_default()
-            .0
-            .ne(RECOMMENDED_KERNEL_VERSION)
-        {
-            warn!(
-                "kernel version is not recommended({})",
-                RECOMMENDED_KERNEL_VERSION
-            );
-        }
-    }
-}
-
-pub fn tap_interface_check(tap_interfaces: &[String]) {
-    if cfg!(target_os = "windows") {
-        return;
-    }
-
-    if tap_interfaces.is_empty() {
-        return error!("static-config: tap-interfaces is none in analyzer-mode");
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    for name in tap_interfaces {
-        let features = match get_link_enabled_features(name) {
-            Ok(f) => f,
-            Err(e) => {
-                warn!("{}, please check rx-vlan-offload manually", e);
-                continue;
-            }
-        };
-        if features.contains("rx-vlan-hw-parse") {
-            warn!(
-                "NIC {} feature rx-vlan-offload is on, turn off if packet has vlan",
-                name
-            );
-        }
-    }
-}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub fn free_memory_check(_required: u64, _exception_handler: &ExceptionHandler) -> Result<()> {
-    return Ok(()); // fixme: The way to obtain free memory is different in earlier versions of Linux, which requires adaptation
-}
-
-#[cfg(target_os = "windows")]
-pub fn free_memory_check(required: u64, exception_handler: &ExceptionHandler) -> Result<()> {
-    get_memory_rss()
-        .map_err(|e| Error::Environment(e.to_string()))
-        .and_then(|memory_usage| {
-            if required < memory_usage {
-                return Ok(());
-            }
-
-            let still_need = required - memory_usage;
-            let mut system = System::new();
-            system.refresh_memory();
-
-            if still_need <= system.available_memory() {
-                exception_handler.clear(Exception::MemNotEnough);
-                Ok(())
-            } else {
-                exception_handler.set(Exception::MemNotEnough);
-                Err(Error::Environment(format!(
-                    "need {} more memory to run",
-                    ByteSize::b(still_need).to_string_as(true)
-                )))
-            }
-        })
 }
 
 pub fn free_memory_checker(required: u64, exception_handler: ExceptionHandler) -> Checker {
@@ -261,141 +159,6 @@ pub fn controller_ip_check(ips: &[String]) {
     crate::utils::notify_exit(-1);
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub fn core_file_check() {
-    let core_path = fs::read(CORE_FILE_CONFIG);
-    if core_path.is_err() {
-        warn!(
-            "Core file read {} error: {}",
-            CORE_FILE_CONFIG,
-            core_path.unwrap_err()
-        );
-        return;
-    }
-    let core_path = String::from_utf8(core_path.unwrap());
-    if core_path.is_err() {
-        warn!(
-            "Core file parse {} error: {}",
-            CORE_FILE_CONFIG,
-            core_path.unwrap_err()
-        );
-        return;
-    }
-    // core_path example:
-    // 1. "|/usr/libexec/abrt-hook-ccpp %s %c %p %u %g %t e %P %I %h"
-    let core_path = core_path.unwrap();
-    if core_path.as_bytes()[0] == '|' as u8 {
-        warn!("The core file is configured with pipeline operation, failed to check.");
-        return;
-    }
-
-    // core_path example:
-    // 1. "/"
-    // 1. "/core"
-    // 1. "/core%/"
-    // 1. "/core/core-%t-%p-%h"
-    let parts = core_path.split("/").collect::<Vec<&str>>();
-    let core_path = if parts.len() <= 1 {
-        "/".to_string()
-    } else {
-        if parts[parts.len() - 1].find("%").is_none() {
-            parts.join("/")
-        } else {
-            parts[..parts.len() - 1].join("/")
-        }
-    };
-
-    info!("Check core-files in dir: {}", core_path);
-
-    let context = fs::read_dir(core_path.clone());
-    if context.is_err() {
-        warn!(
-            "Core file read dir {} error: {}.",
-            core_path,
-            context.unwrap_err()
-        );
-        return;
-    }
-
-    let mut core_files = vec![];
-    // Traverse the directory to get the core file in the directory
-    for entry in context.unwrap() {
-        if entry.is_err() || !entry.as_ref().unwrap().path().is_file() {
-            continue;
-        }
-        let entry = entry.as_ref().unwrap();
-        let file = fs::File::open(entry.path());
-        if file.is_err() {
-            continue;
-        }
-        let mut file = file.unwrap();
-        let mut elf_data = [0u8; 128];
-        let n = file.read(&mut elf_data);
-        if n.is_err() {
-            continue;
-        }
-        let elf_data = &mut elf_data[..n.unwrap()];
-
-        // Check whether the file is a core file
-        let elf_header = elf::file::FileHeader::parse(&mut elf_data.as_bytes());
-        if elf_header.is_err() {
-            continue;
-        }
-        let elf_header = elf_header.unwrap();
-        if elf_header.elftype.0 != elf::gabi::ET_CORE {
-            continue;
-        }
-
-        // Check whether the core file is generated by PROCESS_NAME
-        let mut elf_data = [0u8; 80000];
-        let n = file.read(&mut elf_data);
-        if n.is_err() {
-            continue;
-        }
-        let elf_data = &mut elf_data[..n.unwrap()];
-        unsafe {
-            if String::from_utf8_unchecked(elf_data.to_vec())
-                .find(PROCESS_NAME)
-                .is_none()
-            {
-                continue;
-            }
-        }
-
-        let meta_data = entry.metadata();
-        if meta_data.is_err() {
-            continue;
-        }
-        let meta_data = meta_data.unwrap();
-        let item = {
-            let last_modify_time = meta_data.mtime();
-            let path = entry.file_name();
-            if path.to_str().is_none() {
-                continue;
-            }
-            (
-                last_modify_time,
-                format!("{}/{}", core_path, path.to_str().unwrap().to_string()),
-            )
-        };
-
-        info!("Core file: {} {}.", item.0, item.1);
-        core_files.push(item);
-    }
-
-    if core_files.len() > CORE_FILE_LIMIT {
-        core_files.sort_by(|a, b| b.0.cmp(&a.0));
-        core_files[CORE_FILE_LIMIT..].iter().for_each(|x| {
-            let result = fs::remove_file(&x.1);
-            if result.is_err() {
-                warn!("Remove core file({}) error: {}.", x.1, result.unwrap_err())
-            } else {
-                info!("Remove core file: {} {}.", x.0, x.1)
-            }
-        });
-    }
-}
-
 pub fn trident_process_check(process_threshold: u32) {
     let process_num = get_process_num_by_name(PROCESS_NAME);
 
@@ -471,49 +234,12 @@ pub fn running_in_k8s() -> bool {
     fs::metadata(K8S_CA_CRT_PATH).is_ok()
 }
 
-fn container_mem_limit() -> Option<u64> {
-    let limit_files = [
-        "/sys/fs/cgroup/memory.max", // If the docker image uses cgroups v2
-        "/sys/fs/cgroup/memory/memory.limit_in_bytes", // If the docker image uses cgroups v1
-    ];
-
-    limit_files.iter().find_map(|limit_file| {
-        fs::read_to_string(limit_file)
-            .ok()
-            .and_then(|content| content.trim().parse().ok())
-    })
-}
-
-fn k8s_mem_limit() -> Option<u64> {
-    // Environment variable "K8S_MEM_LIMIT_FOR_DEEPFLOW" is set from container fields
-    // https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/#use-container-fields-as-values-for-environment-variables
-    env::var(K8S_MEM_LIMIT_FOR_DEEPFLOW).ok().and_then(|v| {
-        v.parse::<u64>().ok().and_then(|v| {
-            if v < MIN_MEMORY_LIMIT_MEGABYTE || v > MAX_MEMORY_LIMIT_MEGABYTE {
-                warn!("the K8S_MEM_LIMIT_FOR_DEEPFLOW: {} Mi is out of [{} Mi, {} Mi], use the limit value from server instead", v, MIN_MEMORY_LIMIT_MEGABYTE, MAX_MEMORY_LIMIT_MEGABYTE);
-                None
-            } else {
-                Some(v * BYTES_PER_MEGABYTE)
-            }
-        })
-    })
-}
-
-pub fn get_container_mem_limit() -> Option<u64> {
-    if running_in_k8s() {
-        k8s_mem_limit()
-    } else {
-        container_mem_limit()
-    }
-}
-
 pub fn get_env() -> String {
     let items = vec![
         K8S_NODE_IP_FOR_DEEPFLOW,
         ENV_INTERFACE_NAME,
         K8S_POD_IP_FOR_DEEPFLOW,
         IN_CONTAINER,
-        K8S_MEM_LIMIT_FOR_DEEPFLOW,
         ONLY_WATCH_K8S_RESOURCE,
         K8S_NAMESPACE_FOR_DEEPFLOW,
     ];
@@ -530,90 +256,6 @@ pub fn running_in_only_watch_k8s_mode() -> bool {
 
 pub fn get_k8s_namespace() -> String {
     env::var(K8S_NAMESPACE_FOR_DEEPFLOW).unwrap_or("deepflow".to_owned())
-}
-
-#[cfg(any(target_os = "linux"))]
-pub async fn get_current_k8s_image() -> Option<String> {
-    if !running_in_k8s() {
-        return None;
-    }
-    let Ok(mut config) = Config::infer().await else {
-        warn!("failed to infer kubernetes config");
-        return None;
-    };
-    config.accept_invalid_certs = true;
-
-    let Ok(client) = Client::try_from(config) else {
-        warn!("failed to create kubernetes client");
-        return None;
-    };
-
-    let daemonsets: Api<DaemonSet> = Api::namespaced(client, &get_k8s_namespace());
-
-    let Ok(daemonset) = daemonsets.get(public::consts::DAEMONSET_NAME).await else {
-        warn!("failed to get daemonsets");
-        return None;
-    };
-
-    // Referer: https://kubernetes.io/zh-cn/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container
-    // The deepflow-agent DaemonSet.spec format is as follows:
-    // {
-    //   "spec":{
-    //     "template":{
-    //       "spec":{
-    //         "containers":[{
-    //           "name":"deepflow-agent",
-    //           "image":"deepflow-agent:latest",
-    //         }]
-    //       }
-    //     }
-    //   }
-    // }
-    if let Some(spec) = daemonset.spec {
-        if let Some(s) = spec.template.spec {
-            for container in s.containers {
-                return Some(container.image.unwrap_or_default());
-            }
-        }
-    }
-    None
-}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub fn get_executable_path() -> Result<PathBuf, io::Error> {
-    let possible_paths = vec![
-        "/proc/self/exe".to_owned(),
-        "/proc/curproc/exe".to_owned(),
-        "/proc/curproc/file".to_owned(),
-        format!("/proc/{}/path/a.out", std::process::id()),
-    ];
-    for path in possible_paths {
-        if let Ok(path) = fs::read_link(path) {
-            return Ok(path);
-        }
-    }
-    Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        "executable path not found",
-    ))
-}
-
-#[cfg(target_os = "windows")]
-pub fn get_executable_path() -> Result<PathBuf, io::Error> {
-    let mut buf = Vec::with_capacity(MAX_PATH);
-    unsafe {
-        let ret = GetModuleFileNameW(ptr::null_mut(), buf.as_mut_ptr(), MAX_PATH as DWORD) as usize;
-        if ret > 0 && ret < MAX_PATH {
-            buf.set_len(ret);
-            let s = OsString::from_wide(&buf);
-            Ok(s.into())
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "executable path not found",
-            ))
-        }
-    }
 }
 
 pub fn get_mac_by_name(src_interface: String) -> u32 {

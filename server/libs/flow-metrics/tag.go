@@ -304,9 +304,15 @@ type Field struct {
 	VTAPID     uint16            `json:"agent_id" category:"$tag" sub:"capture_info"`
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'flow_metrics', otherwise stored in '<OrgId>_flow_metrics'.
-	OrgId   uint16           `json:"org_id" category:"$tag"`
-	TeamID  uint16           `json:"team_id" category:"$tag"`
-	TAPPort datatype.TapPort `json:"tap_port" category:"$tag" sub:"capture_info" datasource:"nm|am"`
+	OrgId   uint16 `json:"org_id" category:"$tag"`
+	TeamID  uint16 `json:"team_id" category:"$tag"`
+	TAPPort datatype.TapPort
+	// caculate from TAPPort
+	TapPort     uint32              `json:"capture_nic" category:"$tag" sub:"capture_info" datasource:"nm|am"`
+	TapPortType uint8               `json:"capture_nic_type" category:"$tag" sub:"capture_info" enumfile:"capture_nic_type" datasource:"nm|am"`
+	NatSource   datatype.NATSource  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source" datasource:"nm|am"`
+	TunnelType  datatype.TunnelType `json:"tunnel_type" category:"$tag" sub:"tunnel_info" enumfile:"tunnel_type" datasource:"nm|am"`
+
 	TAPSide TAPSideEnum
 	// only for exporters
 	TAPSideStr   string      `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point" datasource:"nm|am"`
@@ -1286,8 +1292,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 		block.Write(t.TunnelIPID)
 	}
 	if code&TAPPort != 0 {
-		tapPort, tapPortType, natSource, tunnelType := t.TAPPort.SplitToPortTypeTunnel()
-		block.Write(tapPortType, uint8(tunnelType), tapPort, uint8(natSource))
+		block.Write(t.TapPortType, uint8(t.TunnelType), t.TapPort, uint8(t.NatSource))
 	}
 	if code&TAPSide != 0 {
 		block.Write(t.TAPSide.String())
@@ -1367,6 +1372,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.ServerPort = uint16(p.Field.ServerPort)
 	t.VTAPID = uint16(p.Field.VtapId)
 	t.TAPPort = datatype.TapPort(p.Field.TapPort)
+	t.TapPort, t.TapPortType, t.NatSource, t.TunnelType = t.TAPPort.SplitToPortTypeTunnel()
 	t.TAPType = TAPTypeEnum(p.Field.TapType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
 	t.AppService = p.Field.AppService

@@ -884,6 +884,23 @@ impl<'a> MetaPacket<'a> {
         (source as u64) << 48 | socket_id
     }
 
+    pub fn get_captured_byte(&self) -> usize {
+        if self.tap_port.is_from(TapPort::FROM_EBPF) {
+            return self.packet_len as usize - 54;
+        }
+
+        let packet_header_size = self.header_type.min_packet_size()
+            + self.l2_l3_opt_size as usize
+            + self.l4_opt_size as usize;
+        if let Some(raw) = self.raw.as_ref() {
+            if raw.len() > packet_header_size {
+                return raw.len() - packet_header_size;
+            }
+        }
+
+        0
+    }
+
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub unsafe fn from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let data = &mut data.read_unaligned();

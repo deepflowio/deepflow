@@ -61,7 +61,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 	if err != nil {
 		return nil, err
 	}
-	Db := dbInfo.DB
+	Db, vtapDB := dbInfo.DB, dbInfo.DB
 	if _, ok := filter["lcuuid"]; ok {
 		Db = Db.Where("lcuuid = ?", filter["lcuuid"])
 	}
@@ -70,6 +70,9 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 	}
 	if _, ok := filter["short_uuid"]; ok {
 		Db = Db.Where("short_uuid = ?", filter["short_uuid"])
+	}
+	if _, ok := filter["team_id"]; ok {
+		Db = Db.Where("team_id = ?", filter["team_id"])
 	}
 	Db.Order("created_at DESC").Find(&allVTapGroups)
 	vtapGroups, err := getAgentGroupByUser(a.userInfo, &a.cfg.FPermit, allVTapGroups)
@@ -80,7 +83,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupLcuuids = append(vtapGroupLcuuids, vtapGroup.Lcuuid)
 	}
-	mysql.Db.Where("vtap_group_lcuuid IN (?)", vtapGroupLcuuids).Find(&allVTaps)
+	vtapDB.Where("vtap_group_lcuuid IN (?)", vtapGroupLcuuids).Find(&allVTaps)
 	vtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return nil, err
