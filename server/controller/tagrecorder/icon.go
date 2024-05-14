@@ -94,6 +94,7 @@ func ParseIcon(cfg config.ControllerConfig, response *simplejson.Json) (map[stri
 	return domainToIconID, resourceToIconID, nil
 }
 
+// TODO: Icon supports multiple organizations
 // timing
 func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
@@ -110,6 +111,7 @@ func UpdateIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]in
 	return ParseIcon(cfg, response)
 }
 
+// TODO: Icon supports multiple organizations
 // subscriber
 func GetIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
