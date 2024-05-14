@@ -176,6 +176,7 @@ type VTapCache struct {
 	enabledFunctionMonitoring    atomicbool.Bool
 	enabledApplicationMonitoring atomicbool.Bool
 	enabledIndicatorMonitoring   atomicbool.Bool
+	enabledLogMonitoring         atomicbool.Bool
 
 	cachedAt         time.Time
 	expectedRevision *string
@@ -257,6 +258,7 @@ func NewVTapCache(vtap *models.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.enabledFunctionMonitoring = atomicbool.NewBool(false)
 	vTapCache.enabledApplicationMonitoring = atomicbool.NewBool(false)
 	vTapCache.enabledIndicatorMonitoring = atomicbool.NewBool(false)
+	vTapCache.enabledLogMonitoring = atomicbool.NewBool(false)
 
 	vTapCache.cachedAt = time.Now()
 	vTapCache.config = &atomic.Value{}
@@ -303,6 +305,7 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 	c.enabledFunctionMonitoring.Unset()
 	c.enabledApplicationMonitoring.Unset()
 	c.enabledIndicatorMonitoring.Unset()
+	c.enabledLogMonitoring.Unset()
 }
 
 func (c *VTapCache) convertLicenseFunctions() {
@@ -342,6 +345,9 @@ func (c *VTapCache) convertLicenseFunctions() {
 	}
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING) {
 		c.enabledApplicationMonitoring.Set()
+	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_LOG_MONITORING) {
+		c.enabledLogMonitoring.Set()
 	}
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_INDICATOR_MONITORING) {
 		c.enabledIndicatorMonitoring.Set()
@@ -422,6 +428,9 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	if c.EnabledIndicatorMonitoring() == false {
 		yamlConfig.ExternalMetricIntegrationDisabled = proto.Bool(true)
 	}
+	if c.EnabledLogMonitoring() == false {
+		yamlConfig.ExternalLogIntegrationDisabled = proto.Bool(true)
+	}
 
 	b, err := yaml.Marshal(yamlConfig)
 	if err != nil {
@@ -453,6 +462,10 @@ func (c *VTapCache) EnabledApplicationMonitoring() bool {
 
 func (c *VTapCache) EnabledIndicatorMonitoring() bool {
 	return c.enabledIndicatorMonitoring.IsSet()
+}
+
+func (c *VTapCache) EnabledLogMonitoring() bool {
+	return c.enabledLogMonitoring.IsSet()
 }
 
 func (c *VTapCache) updateLicenseFunctions(licenseFunctions string) {
