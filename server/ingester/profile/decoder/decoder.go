@@ -244,7 +244,7 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 func (d *Decoder) filleBPFData(profile *pb.Profile) *pb.Profile {
 	profile.From = uint32(profile.Timestamp / 1e9) // ns to s
 	profile.Until = uint32(time.Now().Unix())
-	profile.Units = string(metadata.SamplesUnits)
+	profile.Units = "microseconds" // agent will calculate real time when captured
 	profile.AggregationType = string(metadata.SumAggregationType)
 	profile.SpyName = "eBPF"
 	return profile

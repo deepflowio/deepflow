@@ -119,7 +119,7 @@ type InProcessProfile struct {
 | alloc_outside_tlab_bytes(java)   | bytes            | byte                                                     |
 | lock_count(java)                 | lock_samples     | count                                                    |
 | lock_duration(java)              | lock_nanoseconds | ns                                                       |
-| on-cpu(eBPF)                     | samples          | cpu time, DeepFlow-Agent as profiler                     |
+| on-cpu(eBPF)                     | microseconds     | cpu time, DeepFlow-Agent as profiler                     |
 */
 
 func ProfileColumns() []*ckdb.Column {
