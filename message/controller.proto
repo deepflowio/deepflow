@@ -285,6 +285,8 @@ message SyncPrometheusRequest {
     repeated PrometheusMetricLabelNameRequest metric_label_names = 6;
     repeated PrometheusMetricTargetRequest metric_targets = 7;
     repeated PrometheusTargetRequest targets = 8;
+
+    optional uint32 org_id = 11;
 }
 
 message SyncPrometheusResponse {
@@ -297,6 +299,8 @@ message SyncPrometheusResponse {
     repeated PrometheusMetricTarget metric_targets = 7;
     repeated PrometheusTarget targets = 8;
     repeated PrometheusMetricLabelName metric_label_names = 9;
+
+    optional uint32 org_id = 11;
 }
 
 service PrometheusDebug {

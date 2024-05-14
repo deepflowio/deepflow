@@ -23,25 +23,28 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type labelValue struct {
+	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
 	strToID      sync.Map
 }
 
-func newLabelValue() *labelValue {
+func newLabelValue(org *common.ORG) *labelValue {
 	return &labelValue{
+		org:          org,
 		resourceType: "label_value",
 	}
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
 	var items []*mysql.PrometheusLabelValue
-	err := mysql.Db.Unscoped().Find(&items).Error
+	err := lv.org.DB.Unscoped().Find(&items).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", lv.resourceType, err)
+		log.Error(lv.org.Logf("db query %s failed: %v", lv.resourceType, err))
 		return err
 	}
 	for _, item := range items {
@@ -68,9 +71,9 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 		return resp, nil
 	}
 
-	err := addBatch(dbToAdd, lv.resourceType)
+	err := addBatch(lv.org.DB, dbToAdd, lv.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", lv.resourceType, err.Error())
+		log.Error(lv.org.Logf("add %s error: %s", lv.resourceType, err.Error()))
 		return nil, err
 	}
 	for i := range dbToAdd {

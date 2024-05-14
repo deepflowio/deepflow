@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type metricLabelNameKey struct {
@@ -39,6 +40,7 @@ func newMetricLabelNameKey(metricNameID, labelNameID int) metricLabelNameKey {
 }
 
 type metricLabelName struct {
+	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
 
@@ -48,8 +50,9 @@ type metricLabelName struct {
 	keys mapset.Set[metricLabelNameKey]
 }
 
-func newMetricLabelName(mn *metricName, l *labelName) *metricLabelName {
+func newMetricLabelName(org *common.ORG, mn *metricName, l *labelName) *metricLabelName {
 	return &metricLabelName{
+		org:               org,
 		resourceType:      "metric_label",
 		metricNameEncoder: mn,
 		labelNameEncoder:  l,
@@ -65,7 +68,7 @@ func (ml *metricLabelName) store(item *mysql.PrometheusMetricLabelName) {
 
 func (ml *metricLabelName) refresh(args ...interface{}) error {
 	var items []*mysql.PrometheusMetricLabelName
-	err := mysql.Db.Find(&items).Error
+	err := ml.org.DB.Find(&items).Error
 	if err != nil {
 		return err
 	}
@@ -120,9 +123,9 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 			})
 		}
 	}
-	err := addBatch(dbToAdd, ml.resourceType)
+	err := addBatch(ml.org.DB, dbToAdd, ml.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", ml.resourceType, err.Error())
+		log.Error(ml.org.Logf("add %s error: %s", ml.resourceType, err.Error()))
 		return resp, err
 	}
 	for _, item := range dbToAdd {

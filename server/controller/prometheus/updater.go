@@ -46,8 +46,9 @@ type APPLabelLayoutUpdater struct {
 
 func GetAPPLabelLayoutUpdater() *APPLabelLayoutUpdater {
 	appLabelLayoutUpdaterOnce.Do(func() {
+		en, _ := encoder.GetEncoder(1)
 		appLabelLayoutUpdater = &APPLabelLayoutUpdater{
-			encoder: encoder.GetSingleton(),
+			encoder: en,
 		}
 	})
 	return appLabelLayoutUpdater

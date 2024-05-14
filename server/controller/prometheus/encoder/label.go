@@ -24,17 +24,20 @@ import (
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type label struct {
+	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
 	labelKeyToID sync.Map
 	labelIDToKey sync.Map
 }
 
-func newLabel() *label {
+func newLabel(org *common.ORG) *label {
 	return &label{
+		org:          org,
 		resourceType: "label",
 	}
 }
@@ -60,7 +63,7 @@ func (l *label) getID(key cache.LabelKey) (int, bool) {
 
 func (l *label) refresh(args ...interface{}) error {
 	var items []*mysql.PrometheusLabel
-	err := mysql.Db.Find(&items).Error
+	err := l.org.DB.Find(&items).Error
 	if err != nil {
 		return err
 	}
@@ -93,9 +96,9 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 		})
 	}
 
-	err := addBatch(dbToAdd, l.resourceType)
+	err := addBatch(l.org.DB, dbToAdd, l.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", l.resourceType, err.Error())
+		log.Error(l.org.Logf("add %s error: %s", l.resourceType, err.Error()))
 		return nil, err
 	}
 	for _, item := range dbToAdd {

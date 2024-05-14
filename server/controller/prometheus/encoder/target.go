@@ -27,23 +27,26 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
+	prometheuscommon "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type target struct {
+	org          *prometheuscommon.ORG
 	lock         sync.Mutex
 	resourceType string
 	keyToID      sync.Map
 	descIDAllocator
 }
 
-func newTarget(max int) *target {
+func newTarget(org *prometheuscommon.ORG, max int) *target {
 	ln := &target{
+		org:          org,
 		resourceType: "target",
 	}
 	// both recorder and prometheus need to insert data into prometheus_target, they equally share the id pool of prometheus_target.
 	// recorder uses ids [1, max/2+max%2], prometheus uses ids [max/2+max%2+1, max].
-	ln.descIDAllocator = newDescIDAllocator(ln.resourceType, max/2+max%2+1, max)
+	ln.descIDAllocator = newDescIDAllocator(org, ln.resourceType, max/2+max%2+1, max)
 	ln.rawDataProvider = ln
 	return ln
 }
@@ -68,7 +71,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 
 	resp := make([]*controller.PrometheusTarget, 0)
 	var dbToAdd []*mysql.PrometheusTarget
-	podClusterIDToDomainInfo, err := getPodClusterIDToDomainInfo()
+	podClusterIDToDomainInfo, err := ln.getPodClusterIDToDomainInfo()
 	for i := range ts {
 		t := ts[i]
 		ins := t.GetInstance()
@@ -107,9 +110,9 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 	for i := range ids {
 		dbToAdd[i].ID = ids[i]
 	}
-	err = addBatch(dbToAdd, ln.resourceType)
+	err = addBatch(ln.org.DB, dbToAdd, ln.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", ln.resourceType, err.Error())
+		log.Error(ln.org.Logf("add %s error: %s", ln.resourceType, err.Error()))
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -129,9 +132,9 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 
 func (ln *target) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusTarget
-	err = mysql.Db.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
+	err = ln.org.DB.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", ln.resourceType, err)
+		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
 		return nil, err
 	}
 
@@ -145,16 +148,16 @@ func (ln *target) load() (ids mapset.Set[int], err error) {
 
 func (ln *target) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusTarget
-	err = mysql.Db.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", ln.resourceType, err)
+		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, item.ID)
 		}
-		log.Infof("%s ids: %+v are in use.", ln.resourceType, inUseIDs)
+		log.Info(ln.org.Logf("%s ids: %+v are in use.", ln.resourceType, inUseIDs))
 	}
 	return
 }
@@ -164,11 +167,11 @@ type domainInfo struct {
 	subDomain string
 }
 
-func getPodClusterIDToDomainInfo() (podClusterIDToDomainInfo map[int]domainInfo, err error) {
+func (ln *target) getPodClusterIDToDomainInfo() (podClusterIDToDomainInfo map[int]domainInfo, err error) {
 	var podClusters []*mysql.PodCluster
-	err = mysql.Db.Unscoped().Find(&podClusters).Error
+	err = ln.org.DB.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		log.Errorf("db query pod cluster failed: %v", err)
+		log.Error(ln.org.Logf("db query pod cluster failed: %v", err))
 		return
 	}
 	podClusterIDToDomainInfo = make(map[int]domainInfo)

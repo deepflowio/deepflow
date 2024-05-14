@@ -18,10 +18,10 @@ package encoder
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type sorter interface {
@@ -36,6 +36,7 @@ type rawDataProvider interface {
 }
 
 type idAllocator struct {
+	org             *common.ORG
 	resourceType    string
 	min             int
 	max             int
@@ -44,8 +45,9 @@ type idAllocator struct {
 	sorter          sorter
 }
 
-func newIDAllocator(resourceType string, min, max int) idAllocator {
+func newIDAllocator(org *common.ORG, resourceType string, min, max int) idAllocator {
 	return idAllocator{
+		org:          org,
 		resourceType: resourceType,
 		min:          min,
 		max:          max,
@@ -55,11 +57,11 @@ func newIDAllocator(resourceType string, min, max int) idAllocator {
 
 func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	if len(ia.usableIDs) == 0 {
-		return nil, errors.New(fmt.Sprintf("%s has no more usable ids, usable ids count: 0", ia.resourceType))
+		return nil, errors.New(ia.org.Logf("%s has no more usable ids, usable ids count: 0", ia.resourceType))
 	}
 
 	if len(ia.usableIDs) < count {
-		return nil, errors.New(fmt.Sprintf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count))
+		return nil, errors.New(ia.org.Logf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count))
 	}
 
 	ids = make([]int, count)
@@ -70,28 +72,28 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 		return
 	}
 	if len(inUseIDs) != 0 {
-		return nil, errors.New(fmt.Sprintf("%s ids: %v are in use", ia.resourceType, inUseIDs))
+		return nil, errors.New(ia.org.Logf("%s ids: %v are in use", ia.resourceType, inUseIDs))
 	}
 
-	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids))
+	log.Info(ia.org.Logf("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids)))
 	ia.usableIDs = ia.usableIDs[count:]
 	return
 }
 
-func (p *idAllocator) recycle(ids []int) {
-	p.sorter.sort(ids)
-	p.usableIDs = append(p.usableIDs, ids...)
-	log.Infof("recycle %s ids: %v", p.resourceType, ids)
+func (ia *idAllocator) recycle(ids []int) {
+	ia.sorter.sort(ids)
+	ia.usableIDs = append(ia.usableIDs, ids...)
+	log.Info(ia.org.Logf("recycle %s ids: %v", ia.resourceType, ids))
 }
 
 func (ia *idAllocator) refresh() error {
-	log.Debugf("refresh %s id pools started", ia.resourceType)
+	log.Debug(ia.org.Logf("refresh %s id pools started", ia.resourceType))
 	inUseIDSet, err := ia.rawDataProvider.load()
 	if err != nil {
 		return err
 	}
 	ia.usableIDs = ia.getSortedUsableIDs(ia.getAllIDSet(), inUseIDSet)
-	log.Debugf("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs))
+	log.Debug(ia.org.Logf("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs)))
 	return nil
 }
 
@@ -133,9 +135,9 @@ type ascIDAllocator struct {
 	idAllocator
 }
 
-func newAscIDAllocator(resourceType string, min, max int) ascIDAllocator {
+func newAscIDAllocator(org *common.ORG, resourceType string, min, max int) ascIDAllocator {
 	ia := ascIDAllocator{
-		idAllocator: newIDAllocator(resourceType, min, max),
+		idAllocator: newIDAllocator(org, resourceType, min, max),
 	}
 	ia.sorter = &ia
 	return ia
@@ -170,9 +172,9 @@ type descIDAllocator struct {
 	idAllocator
 }
 
-func newDescIDAllocator(resourceType string, min, max int) descIDAllocator {
+func newDescIDAllocator(org *common.ORG, resourceType string, min, max int) descIDAllocator {
 	ia := descIDAllocator{
-		idAllocator: newIDAllocator(resourceType, min, max),
+		idAllocator: newIDAllocator(org, resourceType, min, max),
 	}
 	ia.sorter = &ia
 	return ia

@@ -156,7 +156,7 @@ func checkAndStartMasterFunctions(
 				// domain检查及自愈
 				domainChecker.Start()
 
-				prometheus.Encoder.Start()
+				prometheus.Encoders.Start()
 				prometheus.APPLabelLayoutUpdater.Start()
 				prometheus.Clear.Start()
 
@@ -189,7 +189,7 @@ func checkAndStartMasterFunctions(
 
 				recorderResource.IDManagers.Stop()
 
-				prometheus.Encoder.Stop()
+				prometheus.Encoders.Stop()
 				prometheus.APPLabelLayoutUpdater.Stop()
 				prometheus.Clear.Stop()
 
