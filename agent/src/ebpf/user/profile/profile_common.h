@@ -84,12 +84,17 @@ struct profiler_context {
 	bool only_matched_data;
 
 	/*
-	 * In the sampling scenario, the number of samples is used; in the
-	 * non-sampling scenario, real-time intervals (in nanoseconds) are
-	 * used. This setting determines whether to use time intervals,
-	 * with a default value of false.
+	 * This setting determines whether to use time intervals.
+	 * If this value is set to true, real-time intervals (in nanoseconds) are
+	 * used. If this value is false, it will count the number of captured data.
 	 */
 	bool use_delta_time;
+
+	/*
+	 * If using sampling to obtain function call stack data, this setting is
+	 * used to specify the sampling period, measured in nanoseconds.
+	 */
+	u64 sample_period;
 
 	// Record all stack IDs in each iteration for quick retrieval.
 	struct stack_ids_bitmap stack_ids_a;
@@ -153,7 +158,8 @@ int profiler_context_init(struct profiler_context *ctx,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
 			  const char *stack_map_name_b,
-			  bool only_matched, bool use_delta_time);
+			  bool only_matched,
+			  bool use_delta_time, u64 sample_period);
 bool run_conditions_check(void);
 int java_libs_and_tools_install(void);
 void push_and_release_stack_trace_msg(struct profiler_context *ctx,
