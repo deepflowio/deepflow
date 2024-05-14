@@ -42,10 +42,9 @@ type Synchronizer struct {
 	counter *counter
 }
 
-func NewSynchronizer() *Synchronizer {
-	return &Synchronizer{
-		cache: cache.GetSingleton(),
-	}
+func newSynchronizer(orgID int) (Synchronizer, error) {
+	c, err := cache.GetCache(orgID)
+	return Synchronizer{cache: c, counter: &counter{}}, err
 }
 
 func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelResponse, error) {

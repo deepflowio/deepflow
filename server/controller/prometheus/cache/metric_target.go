@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type MetricTargetKey struct {
@@ -43,7 +44,9 @@ type metricNameToTargetIDs struct {
 }
 
 func newMetricNameToTargetIDs() *metricNameToTargetIDs {
-	return &metricNameToTargetIDs{data: make(map[string]mapset.Set[int])}
+	return &metricNameToTargetIDs{
+		data: make(map[string]mapset.Set[int]),
+	}
 }
 
 func (k *metricNameToTargetIDs) Load(id string) (mapset.Set[int], bool) {
@@ -79,6 +82,7 @@ func (k *metricNameToTargetIDs) Coverage(data map[string]mapset.Set[int]) {
 }
 
 type metricTarget struct {
+	org             *common.ORG
 	metricNameCache *metricName
 	targetCache     *target
 
@@ -87,8 +91,9 @@ type metricTarget struct {
 	targetIDToMetricIDs   map[int][]uint32 // only for fully assembled
 }
 
-func newMetricTarget(mn *metricName, t *target) *metricTarget {
+func newMetricTarget(org *common.ORG, mn *metricName, t *target) *metricTarget {
 	return &metricTarget{
+		org:             org,
 		metricNameCache: mn,
 		targetCache:     t,
 
@@ -147,6 +152,6 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 
 func (mt *metricTarget) load() ([]*mysql.PrometheusMetricTarget, error) {
 	var metricTargets []*mysql.PrometheusMetricTarget
-	err := mysql.Db.Find(&metricTargets).Error
+	err := mt.org.DB.Find(&metricTargets).Error
 	return metricTargets, err
 }
