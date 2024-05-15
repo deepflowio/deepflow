@@ -316,7 +316,7 @@ type Field struct {
 	TAPSide TAPSideEnum
 	// only for exporters
 	TAPSideStr   string      `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point" datasource:"nm|am"`
-	TAPType      TAPTypeEnum `json:"capture_netwok_type" category:"$tag" sub:"capture_info"`
+	TAPType      TAPTypeEnum `json:"capture_network_type" category:"$tag" sub:"capture_info"`
 	IsIPv4       uint8       `json:"is_ipv4" category:"$tag" sub:"network_layer"` // (8B) 与IP/IP6是共生字段
 	IsKeyService uint8
 	L7Protocol   datatype.L7Protocol `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol" datasource:"a|am"`

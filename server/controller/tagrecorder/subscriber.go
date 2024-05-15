@@ -255,7 +255,11 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *
 // Delete resource by domain
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message.Metadata) {
 	var chModel CT
-	if err := mysql.Db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
+	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err)
 	}
 }

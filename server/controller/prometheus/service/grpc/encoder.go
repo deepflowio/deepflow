@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	"github.com/deepflowio/deepflow/server/controller/prometheus"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/encoder"
 )
 
 type EncoderEvent struct{}
@@ -31,9 +31,14 @@ func NewEncoderEvent() *EncoderEvent {
 
 func (e *EncoderEvent) Encode(ctx context.Context, in *controller.SyncPrometheusRequest) (*controller.SyncPrometheusResponse, error) {
 	log.Debugf("EncodePrometheusRequest: %+v", in)
-	resp, err := prometheus.GetSingleton().Encoder.Encode(in)
+	en, err := encoder.GetEncoder(int(in.GetOrgId()))
 	if err != nil {
-		log.Errorf("sync error: %+v", err)
+		log.Errorf("encode error: %+v", err)
+		return &controller.SyncPrometheusResponse{}, nil
+	}
+	resp, err := en.Encode(in)
+	if err != nil {
+		log.Errorf("encode error: %+v", err)
 		return &controller.SyncPrometheusResponse{}, nil
 	}
 	log.Debugf("EncodePrometheusResponse: %+v", resp)

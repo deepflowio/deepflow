@@ -158,6 +158,9 @@ pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 6;
 pub const PROFILER_TYPE_UNKNOWN: u8 = 0;
 #[allow(dead_code)]
 pub const PROFILER_TYPE_ONCPU: u8 = 1;
+#[allow(dead_code)]
+#[cfg(feature = "off_cpu")]
+pub const PROFILER_TYPE_OFFCPU: u8 = 2;
 
 //Process exec/exit events
 #[repr(C)]

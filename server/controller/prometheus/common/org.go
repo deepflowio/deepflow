@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,34 +14,35 @@
  * limitations under the License.
  */
 
-package encoder
+package common
 
 import (
-	"gorm.io/gorm/clause"
+	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/prometheus/constraint"
 )
 
-func addBatch[T constraint.OperateBatchModel](db *mysql.DB, toAdd []*T, resourceType string) error {
-	count := len(toAdd)
-	offset := 1000
-	pages := count/offset + 1
-	if count%offset == 0 {
-		pages = count / offset
-	}
-	for i := 0; i < pages; i++ {
-		start := i * offset
-		end := (i + 1) * offset
-		if end > count {
-			end = count
-		}
-		oneP := toAdd[start:end]
-		err := db.Clauses(clause.Returning{}).Create(&oneP).Error
-		if err != nil {
-			return err
-		}
-		log.Info(db.PreORGID("add %d %s success", len(oneP), resourceType))
-	}
-	return nil
+type ORG struct {
+	ID int       // org id
+	DB *mysql.DB // org database connection
+}
+
+func NewORG(id int) (*ORG, error) {
+	db, err := mysql.GetDB(id)
+	return &ORG{
+		ID: id,
+		DB: db,
+	}, err
+}
+
+func (o *ORG) Logf(format string, a ...any) string {
+	return o.addLogPre(fmt.Sprintf(format, a...))
+}
+
+func (o *ORG) Log(format string) string {
+	return o.addLogPre(format)
+}
+
+func (o *ORG) addLogPre(msg string) string {
+	return fmt.Sprintf("[OID-%d] ", o.ID) + msg
 }

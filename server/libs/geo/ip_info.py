@@ -61,7 +61,7 @@ def fixed_name(s):
 
 
 def gen_code(file):
-    with open(FILE_NAME, 'w') as wf:
+    with open(FILE_NAME, 'w', encoding="utf-8") as wf:
         country_encoder = Encoder()
         region_encoder = Encoder()
         isp_encoder = Encoder()

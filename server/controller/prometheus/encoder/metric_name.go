@@ -25,22 +25,25 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type metricName struct {
+	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
 	strToID      *hashmap.Map[string, int]
 	ascIDAllocator
 }
 
-func newMetricName(max int) *metricName {
+func newMetricName(org *common.ORG, max int) *metricName {
 	mn := &metricName{
+		org:          org,
 		resourceType: "metric_name",
 		strToID:      hashmap.New[string, int](),
 	}
-	mn.ascIDAllocator = newAscIDAllocator(mn.resourceType, 1, max)
+	mn.ascIDAllocator = newAscIDAllocator(org, mn.resourceType, 1, max)
 	mn.rawDataProvider = mn
 	return mn
 }
@@ -80,9 +83,9 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 	for i := range dbToAdd {
 		dbToAdd[i].ID = ids[i]
 	}
-	err = addBatch(dbToAdd, mn.resourceType)
+	err = addBatch(mn.org.DB, dbToAdd, mn.resourceType)
 	if err != nil {
-		log.Errorf("add %s error: %s", mn.resourceType, err.Error())
+		log.Error(mn.org.Logf("add %s error: %s", mn.resourceType, err.Error()))
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -96,9 +99,9 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 
 func (mn *metricName) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusMetricName
-	err = mysql.Db.Find(&items).Error
+	err = mn.org.DB.Find(&items).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", mn.resourceType, err)
+		log.Error(mn.org.Logf("db query %s failed: %v", mn.resourceType, err))
 		return nil, err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
@@ -111,16 +114,16 @@ func (mn *metricName) load() (ids mapset.Set[int], err error) {
 
 func (mn *metricName) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusMetricName
-	err = mysql.Db.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err = mn.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Errorf("db query %s failed: %v", mn.resourceType, err)
+		log.Error(mn.org.Logf("db query %s failed: %v", mn.resourceType, err))
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, item.ID)
 		}
-		log.Infof("%s ids: %+v are in use.", mn.resourceType, inUseIDs)
+		log.Info(mn.org.Logf("%s ids: %+v are in use.", mn.resourceType, inUseIDs))
 	}
 	return
 }

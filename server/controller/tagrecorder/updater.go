@@ -145,7 +145,8 @@ func (b *UpdaterComponent[MT, KT]) initDBOperator() {
 
 func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 
-	// 在这里遍历组织, 然后全部更新!!!!!
+	// 遍历组织ID, 在每个组织的数据库中更新资源
+	// Traverse the orgIDs, updating resources in each org's database
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
 		log.Errorf("get org info fail : %s", err)

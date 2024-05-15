@@ -350,7 +350,27 @@ impl EbpfCollector {
         }
     }
 
-    extern "C" fn ebpf_on_cpu_callback(data: *mut ebpf::stack_profile_data) {
+    #[cfg(not(feature = "off_cpu"))]
+    fn get_event_type(_: u8) -> i32 {
+        metric::ProfileEventType::EbpfOnCpu.into()
+    }
+
+    #[cfg(feature = "off_cpu")]
+    fn get_event_type(profiler_type: u8) -> i32 {
+        match profiler_type {
+            ebpf::PROFILER_TYPE_ONCPU => metric::ProfileEventType::EbpfOnCpu.into(),
+            ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
+            _ => {
+                warn!(
+                    "ebpf profile data with invalid event type: {}",
+                    profiler_type
+                );
+                metric::ProfileEventType::EbpfOnCpu.into()
+            }
+        }
+    }
+
+    extern "C" fn ebpf_profiler_callback(data: *mut ebpf::stack_profile_data) {
         unsafe {
             if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
                 return;
@@ -359,7 +379,7 @@ impl EbpfCollector {
             let data = &mut *data;
             profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
             profile.timestamp = data.timestamp;
-            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
+            profile.event_type = Self::get_event_type(data.profiler_type);
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
@@ -568,7 +588,7 @@ impl EbpfCollector {
                     on_cpu.frequency as i32,
                     ebpf_conf.java_symbol_file_max_space_limit as i32,
                     ebpf_conf.java_symbol_file_refresh_defer_interval.as_secs() as i32,
-                    Self::ebpf_on_cpu_callback,
+                    Self::ebpf_profiler_callback,
                 ) != 0
                 {
                     info!("ebpf start_continuous_profiler error.");
