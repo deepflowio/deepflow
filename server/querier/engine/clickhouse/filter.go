@@ -167,11 +167,94 @@ type WhereTag struct {
 	Value string
 }
 
+// k8s.label, k8s.annotation, cloud.tag
+func TransLabelFilter(translator, regexpTranslator, key, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value, key, op, value, key)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, key, "match", value, key) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value, key, "ilike", value, key) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value, key, "in", value, key) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value, key, "=", value, key) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value, key, op, value, key)
+	}
+	return
+}
+
+// k8s.env, os.app
+func TransEnvFilter(translator, regexpTranslator, key, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value, key)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, key) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value, key) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value, key) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value, key) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value, key)
+	}
+	return
+}
+
+// service, chost, chost_hostname, chost_ip, router, dhcpgw, redis, rds, lb_listener,
+// natgw, lb, host, host_hostname, host_ip, pod_node, pod_node_hostname, pod_node_ip,
+// pod_group_type
+func TransChostFilter(translator, regexpTranslator, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value)
+	}
+	return
+}
+
+// pod_ingress, pod_service,
+// x_request_id, syscall_thread, syscall_coroutine, syscall_cap_seq, syscall_trace_id, tcp_seq
+func TransIngressFilter(translator, regexpTranslator, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value, op, value)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, "match", value) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value, "ilike", value) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value, "in", value) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value, "=", value) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value, op, value)
+	}
+	return
+}
+
+// The tag is not in the tagResourceMap
 func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter string, isRemoteRead bool, e *CHEngine) (filter string, err error) {
 	tagItem := &tag.Tag{}
 	ok := false
-	switch whereTag {
-	case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1", "tunnel_tx_mac", "tunnel_rx_mac":
+	noSuffixTag := strings.TrimSuffix(whereTag, "_0")
+	noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
+	noIDTag := strings.TrimSuffix(noSuffixTag, "_id")
+	switch noIDTag {
+	case "mac", "tunnel_tx_mac", "tunnel_rx_mac":
 		macValue := strings.TrimLeft(value, "(")
 		macValue = strings.TrimRight(macValue, ")")
 		macSlice := strings.Split(macValue, ",")
@@ -256,11 +339,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
 				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				}
+				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "k8s.annotation.") {
 			if strings.HasSuffix(tagName, "_0") {
@@ -274,11 +353,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
 				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				}
+				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "k8s.env.") {
 			if strings.HasSuffix(tagName, "_0") {
@@ -292,11 +367,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
 				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix)
-				}
+				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "cloud.tag.") {
 			if strings.HasSuffix(tagName, "_0") {
@@ -310,11 +381,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
 				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				}
+				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "os.app.") {
 			if strings.HasSuffix(tagName, "_0") {
@@ -328,11 +395,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
 				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix)
-				}
+				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "tag.") || strings.HasPrefix(tagName, "attribute.") {
 			if strings.HasPrefix(tagName, "tag.") {
@@ -708,7 +771,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		whereFilter := tagItem.WhereTranslator
 		if whereFilter != "" {
-			switch whereTag {
+			noSuffixTag := strings.TrimSuffix(whereTag, "_0")
+			noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
+			noIDTag := noSuffixTag
+			if whereTag != "_id" {
+				noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
+			}
+			switch noIDTag {
 			case "ip_version":
 				versionValue := strings.TrimLeft(t.Value, "(")
 				versionValue = strings.TrimRight(versionValue, ")")
@@ -728,7 +797,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, versionsStr)
 				}
-			case "is_internet", "is_internet_0", "is_internet_1":
+			case "is_internet":
 				internetValue := strings.TrimLeft(t.Value, "(")
 				internetValue = strings.TrimRight(internetValue, ")")
 				internetSlice := strings.Split(internetValue, ",")
@@ -789,7 +858,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 						}
 					}
 				}
-			case "ip", "ip_0", "ip_1", "tunnel_tx_ip", "tunnel_tx_ip_0", "tunnel_tx_ip_1", "tunnel_rx_ip", "tunnel_rx_ip_0", "tunnel_rx_ip_1", "nat_real_ip", "nat_real_ip_0", "nat_real_ip_1":
+			case "ip", "tunnel_tx_ip", "tunnel_rx_ip", "nat_real_ip":
 				equalFilter := ""
 				ipValues := strings.TrimLeft(t.Value, "(")
 				ipValues = strings.TrimRight(ipValues, ")")
@@ -885,43 +954,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				default:
 					whereFilter = equalFilter
 				}
-			case "pod_service_id", "pod_service_id_0", "pod_service_id_1", "natgw_id", "natgw_id_0", "natgw_id_1", "natgw", "natgw_0", "natgw_1",
-				"lb_id", "lb_id_0", "lb_id_1", "lb", "lb_0", "lb_1", "lb_listener_id", "lb_listener_id_0", "lb_listener_id_1", "lb_listener", "lb_listener_0", "lb_listener_1", "pod_group_type", "pod_group_type_0", "pod_group_type_1":
-				switch strings.ToLower(op) {
-				case "not match":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
-				case "not ilike":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
-				case "not in":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
-				case "!=":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
-				case "match":
-					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
-				default:
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
-				}
-			case "pod_ingress_id", "pod_ingress_id_0", "pod_ingress_id_1", "pod_ingress", "pod_ingress_0", "pod_ingress_1",
-				"pod_service", "pod_service_0", "pod_service_1", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
-				switch strings.ToLower(op) {
-				case "not match":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, "match", t.Value) + ")"
-				case "not ilike":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, "ilike", t.Value) + ")"
-				case "not in":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, "in", t.Value) + ")"
-				case "!=":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, "=", t.Value) + ")"
-				case "match":
-					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
-				default:
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
-				}
-			case "resource_gl0", "resource_gl0_0", "resource_gl0_1", "resource_gl1", "resource_gl1_0", "resource_gl1_1",
-				"resource_gl2", "resource_gl2_0", "resource_gl2_1", "resource_gl0_id", "resource_gl0_id_0", "resource_gl0_id_1",
-				"resource_gl1_id", "resource_gl1_id_0", "resource_gl1_id_1", "resource_gl2_id", "resource_gl2_id_0", "resource_gl2_id_1",
-				"auto_instance", "auto_instance_0", "auto_instance_1", "auto_instance_id", "auto_instance_id_0", "auto_instance_id_1",
-				"auto_service", "auto_service_0", "auto_service_1", "auto_service_id", "auto_service_id_0", "auto_service_id_1":
+			case "service", "chost", "chost_hostname", "chost_ip", "router", "dhcpgw", "redis", "rds", "lb_listener",
+				"natgw", "lb", "host", "host_hostname", "host_ip", "pod_node", "pod_node_hostname", "pod_node_ip",
+				"pod_group_type", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess":
+				whereFilter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
+			case "pod_ingress", "pod_service", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
+				whereFilter = TransIngressFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
+			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 				if strings.Contains(op, "match") {
 					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
 				} else {
