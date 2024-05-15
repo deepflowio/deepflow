@@ -90,6 +90,10 @@ func (d *ChDevice) generateNewData() (map[DeviceKey]mysql.ChDevice, bool) {
 	if !ok {
 		return nil, false
 	}
+	ok = d.generatePodClusterData(keyToItem)
+	if !ok {
+		return nil, false
+	}
 	ok = d.generateProcessData(keyToItem)
 	if !ok {
 		return nil, false
@@ -605,6 +609,42 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 				IP:         podNode.IP,
 				TeamID:     tagrecorder.DomainToTeamID[podNode.Domain],
 				DomainID:   tagrecorder.DomainToDomainID[podNode.Domain],
+			}
+		}
+	}
+	return true
+}
+
+func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
+	var podClusters []mysql.PodCluster
+	err := d.db.Unscoped().Find(&podClusters).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		return false
+	}
+
+	for _, podCluster := range podClusters {
+		key := DeviceKey{
+			DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
+			DeviceID:   podCluster.ID,
+		}
+		if podCluster.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
+				DeviceID:   podCluster.ID,
+				Name:       podCluster.Name + " (deleted)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:     tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podCluster.Domain],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
+				DeviceID:   podCluster.ID,
+				Name:       podCluster.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:     tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID:   tagrecorder.DomainToDomainID[podCluster.Domain],
 			}
 		}
 	}

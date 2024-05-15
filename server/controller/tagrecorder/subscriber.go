@@ -95,6 +95,7 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChPodDevice(c.resourceTypeToIconID),
 		NewChPodGroupDevice(c.resourceTypeToIconID),
 		NewChPodNodeDevice(c.resourceTypeToIconID),
+		NewChPodClusterDevice(c.resourceTypeToIconID),
 		NewChProcessDevice(c.resourceTypeToIconID),
 		NewChOSAppTag(),
 		NewChOSAppTags(),

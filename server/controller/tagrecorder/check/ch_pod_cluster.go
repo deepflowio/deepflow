@@ -29,7 +29,7 @@ type ChPodCluster struct {
 func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	updater := &ChPodCluster{
 		UpdaterBase[mysql.ChPodCluster, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_POD,
+			resourceTypeName: RESOURCE_TYPE_CH_POD_CLUSTER,
 		},
 		resourceTypeToIconID,
 	}

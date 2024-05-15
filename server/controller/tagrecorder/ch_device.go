@@ -853,6 +853,68 @@ func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db
 	}).Create(&targets)
 }
 
+type ChPodClusterDevice struct {
+	SubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, mysql.PodCluster, mysql.ChDevice, DeviceKey]
+	resourceTypeToIconID map[IconKey]int
+}
+
+func NewChPodClusterDevice(resourceTypeToIconID map[IconKey]int) *ChPodClusterDevice {
+	mng := &ChPodClusterDevice{
+		newSubscriberComponent[*message.PodClusterFieldsUpdate, message.PodClusterFieldsUpdate, mysql.PodCluster, mysql.ChDevice, DeviceKey](
+			common.RESOURCE_TYPE_POD_CLUSTER_EN, RESOURCE_TYPE_CH_DEVICE,
+		),
+		resourceTypeToIconID,
+	}
+	mng.subscriberDG = mng
+	return mng
+}
+
+// sourceToTarget implements SubscriberDataGenerator
+func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *mysql.PodCluster) (keys []DeviceKey, targets []mysql.ChDevice) {
+	iconID := c.resourceTypeToIconID[IconKey{
+		NodeType: RESOURCE_TYPE_POD_CLUSTER,
+	}]
+	sourceName := source.Name
+	if source.DeletedAt.Valid {
+		sourceName += " (deleted)"
+	}
+
+	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
+		DeviceID:   source.ID,
+		Name:       sourceName,
+		IconID:     iconID,
+		TeamID:     md.TeamID,
+		DomainID:   md.DomainID,
+	})
+	return
+}
+
+// onResourceUpdated implements SubscriberDataGenerator
+func (c *ChPodClusterDevice) onResourceUpdated(sourceID int, fieldsUpdate *message.PodClusterFieldsUpdate, db *mysql.DB) {
+	updateInfo := make(map[string]interface{})
+	if fieldsUpdate.Name.IsDifferent() {
+		updateInfo["name"] = fieldsUpdate.Name.GetNew()
+	}
+	if len(updateInfo) > 0 {
+		var chItem mysql.ChDevice
+		db.Where("deviceid = ? and devicetype = ?", sourceID, common.VIF_DEVICE_TYPE_POD_NODE).First(&chItem)
+		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
+			DeviceID: sourceID}, db)
+	}
+}
+
+// softDeletedTargetsUpdated implements SubscriberDataGenerator
+func (c *ChPodClusterDevice) softDeletedTargetsUpdated(targets []mysql.ChDevice, db *mysql.DB) {
+
+	db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&targets)
+}
+
 type ChProcessDevice struct {
 	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChDevice, DeviceKey]
 	resourceTypeToIconID map[IconKey]int
