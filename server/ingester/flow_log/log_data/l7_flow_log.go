@@ -477,7 +477,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 	switch datatype.L7Protocol(h.L7Protocol) {
 	case datatype.L7_PROTOCOL_KAFKA:
 		if l.Req != nil {
-			if h.responseCode == 0 && l.Req.ReqType != datatype.KafkaCommandString[datatype.Fetch] {
+			if h.responseCode == 0 && !IsKafkaSupportedCommand(l.Req.ReqType) {
 				h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 				h.ResponseCode = nil
 			}
@@ -487,6 +487,15 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 		// assume protobuf and sofa rpc Always have request_id and maybe equal to 0
 		h.RequestId = &h.requestId
 	}
+}
+
+func IsKafkaSupportedCommand(cmd string) bool {
+	for _, supportedCmd := range []datatype.KafkaCommand{datatype.Fetch, datatype.Produce, datatype.JoinGroup, datatype.LeaveGroup, datatype.SyncGroup} {
+		if cmd == datatype.KafkaCommandString[supportedCmd] {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *L7FlowLog) fillExceptionDesc(l *pb.AppProtoLogsData) {
