@@ -275,19 +275,6 @@ func CreateDomain(userInfo *svc.UserInfo, db *mysql.DB, domainCreate model.Domai
 
 	displayName := common.GetUUID(k8sClusterIDCreate, uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
-	body := map[string]interface{}{
-		"team_id":       domainCreate.TeamID,
-		"owner_user_id": userInfo.ID,
-		"resource_type": common.SET_RESOURCE_TYPE_DOMAIN,
-		"resource_id":   lcuuid,
-	}
-	err := svc.SetReource(http.MethodPost, cfg.FPermit, body, userInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
-
 	domain := mysql.Domain{}
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
@@ -373,6 +360,20 @@ func CreateDomain(userInfo *svc.UserInfo, db *mysql.DB, domainCreate model.Domai
 			domain.ClusterID = "d-" + common.GenerateShortUUID()
 		}
 	}
+
+	body := map[string]interface{}{
+		"team_id":       domainCreate.TeamID,
+		"owner_user_id": userInfo.ID,
+		"resource_type": common.SET_RESOURCE_TYPE_DOMAIN,
+		"resource_id":   lcuuid,
+	}
+	err := svc.SetReource(http.MethodPost, cfg.FPermit, body, userInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
+
 	err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
 	if err != nil {
 		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
