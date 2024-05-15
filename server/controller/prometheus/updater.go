@@ -167,7 +167,7 @@ func (td *toolData) load() error {
 	}
 
 	var layouts []*mysql.PrometheusMetricAPPLabelLayout
-	err := mysql.Db.Find(&layouts).Error
+	err := mysql.DefaultDB.Find(&layouts).Error
 	if err != nil {
 		return err
 	}

@@ -22,9 +22,12 @@ import (
 	"sync"
 	"time"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"golang.org/x/exp/slices"
 
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
@@ -45,13 +48,13 @@ type ORGCaches struct {
 	working         bool
 	refreshInterval time.Duration
 
-	orgIDToCache map[int]*Cache
+	orgIDToCache cmap.ConcurrentMap[int, *Cache]
 }
 
 func GetORGCaches() *ORGCaches {
 	orgCachesOnce.Do(func() {
 		orgCaches = &ORGCaches{
-			orgIDToCache: make(map[int]*Cache),
+			orgIDToCache: cmap.NewWithCustomShardingFunction[int, *Cache](common.ShardingInt),
 		}
 	})
 	return orgCaches
@@ -93,16 +96,16 @@ func (c *ORGCaches) Stop() {
 	}
 	c.mux.Lock()
 	c.working = false
-	c.orgIDToCache = make(map[int]*Cache)
+	c.orgIDToCache.Clear()
 	c.mux.Unlock()
 	log.Info("prometheus caches stopped")
 }
 
 func (c *ORGCaches) NewCacheAndInitIfNotExist(orgID int) (*Cache, error) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	if cache, ok := c.orgIDToCache[orgID]; ok {
+	if orgID == 0 {
+		orgID = ctrlrcommon.DEFAULT_ORG_ID
+	}
+	if cache, ok := c.orgIDToCache.Get(orgID); ok {
 		return cache, nil
 	}
 	cache, err := newCache(orgID)
@@ -113,7 +116,7 @@ func (c *ORGCaches) NewCacheAndInitIfNotExist(orgID int) (*Cache, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.orgIDToCache[orgID] = cache
+	c.orgIDToCache.Set(orgID, cache)
 	return cache, nil
 }
 
@@ -138,8 +141,8 @@ func (c *ORGCaches) refresh() error {
 	if err := c.checkORGs(); err != nil {
 		return err
 	}
-	for _, en := range c.orgIDToCache {
-		en.Refresh()
+	for iter := range c.orgIDToCache.IterBuffered() {
+		iter.Val.Refresh()
 	}
 	return nil
 }
@@ -150,12 +153,14 @@ func (c *ORGCaches) checkORGs() error {
 		return fmt.Errorf("failed to get org ids: %v", err)
 	}
 
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	for orgID := range c.orgIDToCache {
-		if !slices.Contains(orgIDs, orgID) {
-			delete(c.orgIDToCache, orgID)
+	for iter := range c.orgIDToCache.IterBuffered() {
+		if !slices.Contains(orgIDs, iter.Key) {
+			c.orgIDToCache.Remove(iter.Key)
 		}
 	}
 	return nil
+}
+
+func (c *ORGCaches) GetORGIDToCache() cmap.ConcurrentMap[int, *Cache] {
+	return c.orgIDToCache
 }

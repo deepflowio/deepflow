@@ -80,6 +80,10 @@ func newCache(orgID int) (*Cache, error) {
 	return c, nil
 }
 
+func (c *Cache) GetORG() *common.ORG {
+	return c.org
+}
+
 func (c *Cache) Refresh() (err error) {
 LOOP:
 	for {
@@ -101,14 +105,14 @@ func (c *Cache) refresh() error {
 	egRunAhead := &errgroup.Group{}
 	common.AppendErrGroup(egRunAhead, c.MetricName.refresh)
 	common.AppendErrGroup(egRunAhead, c.Label.refresh)
-	common.AppendErrGroup(egRunAhead, c.Target.refresh)
+	// common.AppendErrGroup(egRunAhead, c.Target.refresh) // TODO
 	egRunAhead.Wait()
 	eg := &errgroup.Group{}
 	common.AppendErrGroup(eg, c.LabelName.refresh)
 	common.AppendErrGroup(eg, c.LabelValue.refresh)
 	common.AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
 	common.AppendErrGroup(eg, c.MetricLabelName.refresh)
-	common.AppendErrGroup(eg, c.MetricTarget.refresh)
+	// common.AppendErrGroup(eg, c.MetricTarget.refresh)
 	err := eg.Wait()
 	log.Info(c.org.Log("refresh cache completed"))
 	return err

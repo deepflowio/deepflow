@@ -16,72 +16,72 @@
 
 package prometheus
 
-import (
-	"hash/fnv"
-	"math/rand"
-	"sync/atomic"
-	"time"
+// import (
+// 	"hash/fnv"
+// 	"math/rand"
+// 	"sync/atomic"
+// 	"time"
 
-	"github.com/pkg/errors"
+// 	"github.com/pkg/errors"
 
-	"github.com/deepflowio/deepflow/message/trident"
-)
+// 	"github.com/deepflowio/deepflow/message/trident"
+// )
 
-var (
-	targetCacheVersion = uint32(time.Now().Unix()) + uint32(rand.Intn(10000))
-	targetCacheHash    uint64
-)
+// var (
+// 	targetCacheVersion = uint32(time.Now().Unix()) + uint32(rand.Intn(10000))
+// 	targetCacheHash    uint64
+// )
 
-type TargetSynchronizer struct {
-	Synchronizer
-}
+// type TargetSynchronizer struct {
+// 	Synchronizer
+// }
 
-func NewTargetSynchronizer() (*TargetSynchronizer, error) {
-	synchronizer, err := newSynchronizer(1)
-	if err != nil {
-		return nil, err
-	}
-	return &TargetSynchronizer{synchronizer}, nil
-}
+// func NewTargetSynchronizer() (*TargetSynchronizer, error) {
+// 	synchronizer, err := newSynchronizer(1)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &TargetSynchronizer{synchronizer}, nil
+// }
 
-func (s *TargetSynchronizer) GetTargets(in *trident.PrometheusTargetRequest) (*trident.PrometheusTargetResponse, error) {
-	resp := new(trident.PrometheusTargetResponse)
-	resp.Version = in.Version
-	ts, err := s.refreshVersionIfChanged()
-	if err != nil {
-		return resp, err
-	}
+// func (s *TargetSynchronizer) GetTargets(in *trident.PrometheusTargetRequest) (*trident.PrometheusTargetResponse, error) {
+// 	resp := new(trident.PrometheusTargetResponse)
+// 	resp.Version = in.Version
+// 	ts, err := s.refreshVersionIfChanged()
+// 	if err != nil {
+// 		return resp, err
+// 	}
 
-	version := atomic.LoadUint32(&targetCacheVersion)
-	// if request version is equal to current cache version, return nothing
-	if in.GetVersion() == version {
-		return resp, nil
-	}
-	log.Infof("target version update from %d to %d", in.GetVersion(), version)
+// 	version := atomic.LoadUint32(&targetCacheVersion)
+// 	// if request version is equal to current cache version, return nothing
+// 	if in.GetVersion() == version {
+// 		return resp, nil
+// 	}
+// 	log.Infof("target version update from %d to %d", in.GetVersion(), version)
 
-	resp.ResponseTargetIds = ts
-	resp.Version = &version
-	return resp, nil
-}
+// 	resp.ResponseTargetIds = ts
+// 	resp.Version = &version
+// 	return resp, nil
+// }
 
-func (s *TargetSynchronizer) refreshVersionIfChanged() ([]*trident.TargetResponse, error) {
-	ts, err := s.assembleTargetFully()
-	if err != nil {
-		return nil, errors.Wrap(err, "assembleTargetFully")
-	}
+// func (s *TargetSynchronizer) refreshVersionIfChanged() ([]*trident.TargetResponse, error) {
+// 	ts, err := s.assembleTargetFully()
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "assembleTargetFully")
+// 	}
 
-	resp := &trident.PrometheusTargetResponse{ResponseTargetIds: ts}
-	respBytes, err := resp.Marshal()
-	if err != nil {
-		return nil, errors.Wrap(err, "refreshVersionIfChanged")
-	}
+// 	resp := &trident.PrometheusTargetResponse{ResponseTargetIds: ts}
+// 	respBytes, err := resp.Marshal()
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "refreshVersionIfChanged")
+// 	}
 
-	h64 := fnv.New64()
-	h64.Write(respBytes)
-	newHash := h64.Sum64()
-	if newHash != atomic.LoadUint64(&targetCacheHash) {
-		atomic.AddUint32(&targetCacheVersion, 1)
-		atomic.StoreUint64(&targetCacheHash, newHash)
-	}
-	return ts, nil
-}
+// 	h64 := fnv.New64()
+// 	h64.Write(respBytes)
+// 	newHash := h64.Sum64()
+// 	if newHash != atomic.LoadUint64(&targetCacheHash) {
+// 		atomic.AddUint32(&targetCacheVersion, 1)
+// 		atomic.StoreUint64(&targetCacheHash, newHash)
+// 	}
+// 	return ts, nil
+// }
