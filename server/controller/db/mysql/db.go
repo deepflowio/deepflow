@@ -74,8 +74,20 @@ func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
 	return &DB{db, orgID, copiedCfg.Database}, nil
 }
 
-func (d *DB) PreORGID(format string, a ...any) string { // TODO optimize
-	return fmt.Sprintf("[OID-%d] %s", d.ORGID, fmt.Sprintf(format, a...))
+func (d *DB) GetGORMDB() *gorm.DB {
+	return d.DB
+}
+
+func (d *DB) Logf(format string, a ...any) string { // TODO optimize
+	return d.addLogPre(fmt.Sprintf(format, a...))
+}
+
+func (d *DB) Log(format string) string {
+	return d.addLogPre(format)
+}
+
+func (d *DB) addLogPre(msg string) string {
+	return fmt.Sprintf("[OID-%d] ", d.ORGID) + msg
 }
 
 func (d *DB) GetORGID() int {

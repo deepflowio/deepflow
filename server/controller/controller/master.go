@@ -157,7 +157,7 @@ func checkAndStartMasterFunctions(
 				domainChecker.Start()
 
 				prometheus.Encoders.Start()
-				prometheus.APPLabelLayoutUpdater.Start()
+				// prometheus.APPLabelLayoutUpdater.Start()
 				prometheus.Clear.Start()
 
 				if cfg.DFWebService.Enabled {
@@ -190,7 +190,7 @@ func checkAndStartMasterFunctions(
 				recorderResource.IDManagers.Stop()
 
 				prometheus.Encoders.Stop()
-				prometheus.APPLabelLayoutUpdater.Stop()
+				// prometheus.APPLabelLayoutUpdater.Stop()
 				prometheus.Clear.Stop()
 
 				if cfg.DFWebService.Enabled {
