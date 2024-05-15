@@ -655,7 +655,7 @@ func getRealVTapGroupConfig(config *agent_config.AgentGroupConfigModel) *agent_c
 	return realConfiguration
 }
 
-func GetVTapGroupConfigs(userInfo *UserInfo, fpermitCfg *config.FPermit, filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
+func GetVTapGroupConfigs(userInfo *UserInfo, fpermitCfg *common.FPermit, filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err

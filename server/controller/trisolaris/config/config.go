@@ -33,6 +33,13 @@ type Chrony struct {
 	Timeout uint32 `default:"1" yaml:"timeout"`
 }
 
+type CopyFPermit struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"fpermit" yaml:"host"`
+	Port    int    `default:"20823" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
 type Config struct {
 	ListenPort                     string   `default:"20014" yaml:"listen-port"`
 	LogLevel                       string   `default:"info"`
@@ -61,6 +68,7 @@ type Config struct {
 	ExportersEnabled               bool
 	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
 	NoTeamIDRefused                bool
+	FPermit                        common.FPermit
 }
 
 func (c *Config) Convert() {
@@ -133,4 +141,12 @@ func (c *Config) SetNoTeamIDRefused(refused bool) {
 
 func (c *Config) GetNoTeamIDRefused() bool {
 	return c.NoTeamIDRefused
+}
+
+func (c *Config) SetFPermitConfig(fpermit common.FPermit) {
+	c.FPermit = fpermit
+}
+
+func (c *Config) GetFPermitConfig() common.FPermit {
+	return c.FPermit
 }
