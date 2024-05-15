@@ -406,6 +406,7 @@ const (
 	VIF_DEVICE_TYPE_INTERNET                        = 0
 	VIF_DEVICE_TYPE_POD_GROUP                       = 101
 	VIF_DEVICE_TYPE_SERVICE                         = 102
+	VIF_DEVICE_TYPE_POD_CLUSTER                     = 103
 	VIF_DEVICE_TYPE_GPROCESS                        = 120
 	VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT            = 130
 	VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET           = 131

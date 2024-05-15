@@ -90,6 +90,7 @@ const (
 	RESOURCE_TYPE_CH_POD_INGRESS    = "ch_pod_ingress"
 	RESOURCE_TYPE_CH_POD_NAMESPACE  = "ch_pod_namespace"
 	RESOURCE_TYPE_CH_POD_NODE       = "ch_pod_node"
+	RESOURCE_TYPE_CH_POD_CLUSTER    = "ch_pod_cluster"
 	RESOURCE_TYPE_TAP_TYPE          = "ch_tap_type"
 	RESOURCE_TYPE_CH_VTAP           = "ch_vtap"
 	RESOURCE_TYPE_CH_VTAP_PORT      = "ch_vtap_port"
