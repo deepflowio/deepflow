@@ -14,13 +14,9 @@
  * limitations under the License.
  */
 
-package config
+package common
 
-type Config struct {
-	SynchronizerCacheRefreshInterval int `default:"60" yaml:"synchronizer_cache_refresh_interval"`
-	EncoderCacheRefreshInterval      int `default:"3600" yaml:"encoder_cache_refresh_interval"`
-	ResourceMaxID0                   int `default:"64000" yaml:"resource_max_id_0"`
-	ResourceMaxID1                   int `default:"499999" yaml:"resource_max_id_1"`
-	APPLabelIndexMax                 int `default:"255" yaml:"app_label_index"`
-	DataCleanInterval                int `default:"1440" yaml:"data_clean_interval"`
+// 现在使用此方法的地方，传参实际在 uint32 范围内，使用此方法是为了方便调用 concurrent 库
+func ShardingInt(i int) uint32 {
+	return uint32(i)
 }
