@@ -71,7 +71,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// Use device_map when querying natgw, lb, pod_service.
 
 	tagResourceMap := make(map[string]map[string]*Tag)
-	// 资源:区域，可用区，容器节点，命名空间，工作负载，容器POD，容器集群，子网
+	// 资源:区域，可用区，容器节点，命名空间，工作负载，容器POD，容器集群，子网, 进程
 	for _, resourceStr := range TAG_RESOURCE_TYPE_DEFAULT {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
