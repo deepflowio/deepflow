@@ -82,7 +82,9 @@ func (s *LabelSynchronizer) assembleFully() (*trident.PrometheusLabelResponse, e
 	if err != nil {
 		return nil, errors.Wrap(err, "assembleLabelFully")
 	}
-	resp.ResponseLabels = ls
+	// FIX @zhenya
+	// resp.ResponseLabels = ls
+	ls = ls
 
 	ts, err := s.assembleTargetFully()
 	if err != nil {
