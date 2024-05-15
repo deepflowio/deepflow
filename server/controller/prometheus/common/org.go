@@ -35,6 +35,14 @@ func NewORG(id int) (*ORG, error) {
 	}, err
 }
 
+func (o *ORG) GetDB() *mysql.DB {
+	return o.DB
+}
+
+func (o *ORG) GetID() int {
+	return o.ID
+}
+
 func (o *ORG) Logf(format string, a ...any) string {
 	return o.addLogPre(fmt.Sprintf(format, a...))
 }

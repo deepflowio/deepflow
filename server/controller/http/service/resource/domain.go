@@ -1007,7 +1007,7 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *c
 func forceDelete[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, query interface{}, args ...interface{}) { // TODO common func
 	err := db.Unscoped().Where(query, args...).Delete(new(MT)).Error
 	if err != nil {
-		log.Error(db.PreORGID("mysql delete resource: %v %v failed: %s", query, args, err))
+		log.Error(db.Logf("mysql delete resource: %v %v failed: %s", query, args, err))
 	}
 }
 
@@ -1044,7 +1044,7 @@ func (c *DomainChecker) CheckRegularly() {
 }
 
 func (c *DomainChecker) checkAndAllocateController(db *mysql.DB) {
-	log.Info(db.PreORGID("check domain controller health started"))
+	log.Info(db.Logf("check domain controller health started"))
 	controllerIPToRegionLcuuid := make(map[string]string)
 	var azCConns []*mysql.AZControllerConnection
 	db.Find(&azCConns)
@@ -1081,9 +1081,9 @@ func (c *DomainChecker) checkAndAllocateController(db *mysql.DB) {
 				configStr, _ := json.Marshal(config)
 				domain.Config = string(configStr)
 				db.Save(&domain)
-				log.Info(db.PreORGID("change domain (name: %s) controller ip to %s", domain.Name, domain.ControllerIP))
+				log.Info(db.Logf("change domain (name: %s) controller ip to %s", domain.Name, domain.ControllerIP))
 			}
 		}
 	}
-	log.Info(db.PreORGID("check domain controller health ended"))
+	log.Info(db.Logf("check domain controller health ended"))
 }

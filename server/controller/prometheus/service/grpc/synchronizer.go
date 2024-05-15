@@ -37,7 +37,7 @@ func (e *SynchronizerEvent) GetLabelIDs(ctx context.Context, in *trident.Prometh
 	if len(in.GetRequestLabels()) != 0 || len(in.GetRequestTargets()) != 0 {
 		log.Debugf("PrometheusLabelRequest: %+v", in)
 	}
-	synchronizer, err := prometheus.NewLabelSynchronizer()
+	synchronizer, err := prometheus.NewORGLabelSynchronizer()
 	if err != nil {
 		log.Errorf("new synchronizer error: %+v", err)
 		return &trident.PrometheusLabelResponse{}, nil
@@ -56,16 +56,16 @@ func (e *SynchronizerEvent) GetLabelIDs(ctx context.Context, in *trident.Prometh
 	return resp, err
 }
 
-func (e *SynchronizerEvent) GetPrometheusTargets(ctx context.Context, in *trident.PrometheusTargetRequest) (*trident.PrometheusTargetResponse, error) {
-	synchronizer, err := prometheus.NewTargetSynchronizer()
-	if err != nil {
-		log.Errorf("new synchronizer error: %+v", err)
-		return &trident.PrometheusTargetResponse{}, nil
-	}
-	resp, err := synchronizer.GetTargets(in)
-	if err != nil {
-		log.Errorf("target error: %+v", err)
-		return &trident.PrometheusTargetResponse{}, nil
-	}
-	return resp, err
-}
+// func (e *SynchronizerEvent) GetPrometheusTargets(ctx context.Context, in *trident.PrometheusTargetRequest) (*trident.PrometheusTargetResponse, error) {
+// 	synchronizer, err := prometheus.NewTargetSynchronizer()
+// 	if err != nil {
+// 		log.Errorf("new synchronizer error: %+v", err)
+// 		return &trident.PrometheusTargetResponse{}, nil
+// 	}
+// 	resp, err := synchronizer.GetTargets(in)
+// 	if err != nil {
+// 		log.Errorf("target error: %+v", err)
+// 		return &trident.PrometheusTargetResponse{}, nil
+// 	}
+// 	return resp, err
+// }
