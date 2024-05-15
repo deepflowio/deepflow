@@ -444,22 +444,24 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 	t.updatePrometheusTargets(resp.GetResponseTargetIds())
 
 	if isAll {
-		for _, labelInfo := range resp.GetResponseLabels() {
-			name := labelInfo.GetName()
-			nameId := labelInfo.GetNameId()
-			if name != "" && nameId != 0 {
-				t.labelNameIDs.Set(strings.Clone(name), t.genId(isAll, nameId))
-			} else {
-				t.counter.LabelNameUnknown++
+		for _, orgLabelInfos := range resp.GetOrgResponseLabels() {
+			for _, labelInfo := range orgLabelInfos.GetResponseLabels() {
+				name := labelInfo.GetName()
+				nameId := labelInfo.GetNameId()
+				if name != "" && nameId != 0 {
+					t.labelNameIDs.Set(strings.Clone(name), t.genId(isAll, nameId))
+				} else {
+					t.counter.LabelNameUnknown++
+				}
+				value := labelInfo.GetValue()
+				valueId := labelInfo.GetValueId()
+				if valueId != 0 {
+					t.labelValueIDs.Set(strings.Clone(value), t.genId(isAll, valueId))
+				} else {
+					t.counter.LabelValueUnknown++
+				}
+				t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 			}
-			value := labelInfo.GetValue()
-			valueId := labelInfo.GetValueId()
-			if valueId != 0 {
-				t.labelValueIDs.Set(strings.Clone(value), t.genId(isAll, valueId))
-			} else {
-				t.counter.LabelValueUnknown++
-			}
-			t.labelNameValues.Set(nameValueKey(nameId, valueId), struct{}{})
 		}
 	}
 

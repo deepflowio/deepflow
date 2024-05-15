@@ -990,7 +990,12 @@ message PrometheusLabelRequest {
 message PrometheusLabelResponse {
     repeated MetricLabelResponse response_label_ids = 1;
     repeated TargetResponse response_target_ids = 2;
-    repeated LabelResponse response_labels = 3;  // when requesting all, you need to carry the label value list
+    repeated OrgLabelResponse org_response_labels = 3;  // when requesting all, you need to carry the label value list
+}
+
+message OrgLabelResponse {
+    optional uint32 org_id = 1;
+    repeated LabelResponse response_labels = 2;
 }
 
 message PrometheusTargetRequest {
