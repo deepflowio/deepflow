@@ -30,6 +30,7 @@ const (
 	DEFAULT_USER_TYPE = 1
 	DEFAULT_USER_ID   = 1
 	DEFAULT_TEAM_ID   = 1
+	DEFAULT_APP_KEY   = "8c434f9a48bf1b7e729bde006e0409f8"
 	ORG_ID_MAX        = 1024
 )
 
@@ -683,4 +684,12 @@ const (
 	INGESTER_BODY_ORG_ID   = "org-id"
 	HEADER_KEY_X_USER_TYPE = "X-User-Type"
 	HEADER_KEY_X_USER_ID   = "X-User-Id"
+	HEADER_X_APP_KEY       = "X-App-Key"
 )
+
+const (
+	SET_RESOURCE_TYPE_DOMAIN     = "domain"
+	SET_RESOURCE_TYPE_SUB_DOMAIN = "sub_domain"
+)
+
+const TRISOLARIS_NODE_TYPE_MASTER = "master"

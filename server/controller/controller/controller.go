@@ -157,7 +157,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Prometheus init")
 	prometheus := prometheus.GetSingleton()
-	prometheus.SynchronizerCache.Start(ctx, &cfg.PrometheusCfg)
+	prometheus.SynchronizerCaches.Start(ctx, &cfg.PrometheusCfg)
 	prometheus.Encoders.Init(ctx, cfg.PrometheusCfg)
 	prometheus.Clear.Init(ctx, &cfg.PrometheusCfg)
 	prometheus.APPLabelLayoutUpdater.Init(ctx, &cfg.PrometheusCfg)

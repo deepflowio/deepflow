@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -37,6 +38,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	svc "github.com/deepflowio/deepflow/server/controller/http/service"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
@@ -91,7 +93,7 @@ func getGrpcServerAndPort(db *mysql.DB, controllerIP string, cfg *config.Control
 	}
 }
 
-func GetDomains(orgDB *mysql.DB, filter map[string]interface{}) (resp []model.Domain, err error) {
+func GetDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interface{}) (resp []model.Domain, err error) {
 	var response []model.Domain
 	var domains []mysql.Domain
 	var azs []mysql.AZ
@@ -103,18 +105,30 @@ func GetDomains(orgDB *mysql.DB, filter map[string]interface{}) (resp []model.Do
 	var controllerIPToName map[string]string
 
 	db := orgDB.DB
-	if _, ok := filter["lcuuid"]; ok {
-		db = orgDB.Where("lcuuid = ?", filter["lcuuid"])
+	if fLcuuid, ok := filter["lcuuid"]; ok {
+		db = orgDB.Where("lcuuid = ?", fLcuuid)
 	}
-	if _, ok := filter["name"]; ok {
-		db = orgDB.Where("name = ?", filter["name"])
+	if fName, ok := filter["name"]; ok {
+		db = orgDB.Where("name = ?", fName)
 	}
-	db.Order("created_at DESC").Find(&domains)
+	if fTeamID, ok := filter["team_id"]; ok {
+		db = orgDB.Where("team_id = ?", fTeamID)
+	}
+	if fUserID, ok := filter["user_id"]; ok {
+		db = orgDB.Where("user_id = ?", fUserID)
+	}
+	err = db.Not(map[string]interface{}{"team_id": excludeTeamIDs}).Order("created_at DESC").Find(&domains).Error
+	if err != nil {
+		return response, err
+	}
 
 	for _, domain := range domains {
 		domainLcuuids = append(domainLcuuids, domain.Lcuuid)
 	}
-	db.Where("domain IN (?)", domainLcuuids).Find(&azs)
+	err = orgDB.Where("domain IN (?)", domainLcuuids).Find(&azs).Error
+	if err != nil {
+		return response, err
+	}
 
 	domainToAZLcuuids = make(map[string][]string)
 	domainToRegionLcuuidsToAZLcuuids = make(map[string]map[string][]string)
@@ -129,13 +143,19 @@ func GetDomains(orgDB *mysql.DB, filter map[string]interface{}) (resp []model.Do
 		}
 	}
 
-	db.Find(&controllers)
+	err = orgDB.Find(&controllers).Error
+	if err != nil {
+		return response, err
+	}
 	controllerIPToName = make(map[string]string)
 	for _, controller := range controllers {
 		controllerIPToName[controller.IP] = controller.Name
 	}
 
-	db.Find(&subDomains)
+	err = orgDB.Find(&subDomains).Error
+	if err != nil {
+		return response, err
+	}
 	domainToSubDomainNames := make(map[string][]string)
 	for _, subDomain := range subDomains {
 		domainToSubDomainNames[subDomain.Domain] = append(
@@ -160,6 +180,7 @@ func GetDomains(orgDB *mysql.DB, filter map[string]interface{}) (resp []model.Do
 			ControllerIP: domain.ControllerIP,
 			IconID:       domain.IconID, // 后续与前端沟通icon作为默认配置
 			TeamID:       domain.TeamID,
+			UserID:       domain.UserID,
 			CreatedAt:    domain.CreatedAt.Format(common.GO_BIRTHDAY),
 			SyncedAt:     syncedAt,
 			Lcuuid:       domain.Lcuuid,
@@ -190,11 +211,11 @@ func GetDomains(orgDB *mysql.DB, filter map[string]interface{}) (resp []model.Do
 			}
 		} else {
 			var k8sCluster mysql.KubernetesCluster
-			if err = db.Where("cluster_id = ?", domain.ClusterID).First(&k8sCluster).Error; err == nil {
+			if err = orgDB.Where("cluster_id = ?", domain.ClusterID).First(&k8sCluster).Error; err == nil {
 				v := strings.Split(k8sCluster.Value, "-")
 				if len(v) == 2 {
 					var vtap mysql.VTap
-					if err = db.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
+					if err = orgDB.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
 						domainResp.VTapName = vtap.Name
 						domainResp.VTapCtrlIP = vtap.CtrlIP
 						domainResp.VTapCtrlMAC = vtap.CtrlMac
@@ -223,7 +244,7 @@ func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
 	return info
 }
 
-func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.ControllerConfig) (*model.Domain, error) {
+func CreateDomain(userInfo *svc.UserInfo, db *mysql.DB, domainCreate model.DomainCreate, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
 	db.Model(&mysql.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)
@@ -252,14 +273,13 @@ func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.Con
 		}
 	}
 
-	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
-
-	domain := mysql.Domain{}
 	displayName := common.GetUUID(k8sClusterIDCreate, uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
+	domain := mysql.Domain{}
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
 	domain.TeamID = domainCreate.TeamID
+	domain.UserID = userInfo.ID
 	domain.DisplayName = displayName
 	domain.Type = domainCreate.Type
 	domain.IconID = domainCreate.IconID
@@ -305,6 +325,14 @@ func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.Con
 	// encrypt password/access_key
 	for key := range DOMAIN_PASSWORD_KEYS {
 		if _, ok := domainCreate.Config[key]; ok && cfg != nil {
+
+			// running in standalone mode, not support password encryptKey
+			if common.IsStandaloneRunningMode() {
+				return nil, servicecommon.NewError(
+					httpcommon.SERVER_ERROR, "not support current type domain in standalone mode",
+				)
+			}
+
 			serverIP, grpcServerPort := getGrpcServerAndPort(db, domain.ControllerIP, cfg)
 			encryptKey, err := common.GetEncryptKey(
 				serverIP, grpcServerPort, domainCreate.Config[key].(string),
@@ -332,14 +360,28 @@ func CreateDomain(db *mysql.DB, domainCreate model.DomainCreate, cfg *config.Con
 			domain.ClusterID = "d-" + common.GenerateShortUUID()
 		}
 	}
-	err := db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
+
+	body := map[string]interface{}{
+		"team_id":       domainCreate.TeamID,
+		"owner_user_id": userInfo.ID,
+		"resource_type": common.SET_RESOURCE_TYPE_DOMAIN,
+		"resource_id":   lcuuid,
+	}
+	err := svc.SetReource(http.MethodPost, cfg.FPermit, body, userInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
+
+	err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain).Error
 	if err != nil {
 		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
 	if domainCreate.Type == common.KUBERNETES {
 		createKubernetesRelatedResources(db, domain, regionLcuuid)
 	}
-	response, _ := GetDomains(db, map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetDomains(db, []int{}, map[string]interface{}{"lcuuid": lcuuid})
 	return &response[0], nil
 }
 
@@ -382,9 +424,7 @@ func createKubernetesRelatedResources(db *mysql.DB, domain mysql.Domain, regionL
 	return
 }
 
-func UpdateDomain(
-	lcuuid string, domainUpdate map[string]interface{}, cfg *config.ControllerConfig, db *mysql.DB,
-) (*model.Domain, error) {
+func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *svc.UserInfo, cfg *config.ControllerConfig, db *mysql.DB) (*model.Domain, error) {
 	var domain mysql.Domain
 	var dbUpdateMap = make(map[string]interface{})
 
@@ -394,36 +434,67 @@ func UpdateDomain(
 		)
 	}
 
-	log.Infof("update domain (%s) config (%v)", domain.Name, domainUpdate)
+	err := svc.IsUpdatePermitted(cfg.FPermit, userInfo, domain.TeamID)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceUp := map[string]interface{}{}
+	// team id
+	uTeamID, exist := domainUpdate["TEAM_ID"]
+	if exist {
+		dbUpdateMap["team_id"] = uTeamID
+		resourceUp["team_id"] = uTeamID
+	}
+
+	// user id
+	if uUserID, ok := domainUpdate["USER_ID"]; ok {
+		dbUpdateMap["user_id"] = uUserID
+		resourceUp["owner_user_id"] = uUserID
+	}
+
+	if len(resourceUp) != 0 {
+		body := map[string]interface{}{
+			"resource_where": map[string]interface{}{
+				"resource_type": common.SET_RESOURCE_TYPE_DOMAIN,
+				"resource_id":   lcuuid,
+			},
+			"resource_up": resourceUp,
+		}
+		err := svc.SetReource(http.MethodPatch, cfg.FPermit, body, userInfo)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// 修改名称
-	if _, ok := domainUpdate["NAME"]; ok {
-		dbUpdateMap["name"] = domainUpdate["NAME"]
+	if uName, ok := domainUpdate["NAME"]; ok {
+		dbUpdateMap["name"] = uName
 	}
 
 	// 禁用/启用
-	if _, ok := domainUpdate["ENABLED"]; ok {
-		dbUpdateMap["enabled"] = domainUpdate["ENABLED"]
+	if uEnabled, ok := domainUpdate["ENABLED"]; ok {
+		dbUpdateMap["enabled"] = uEnabled
 	}
 
 	// 图标
-	if _, ok := domainUpdate["ICON_ID"]; ok {
-		dbUpdateMap["icon_id"] = domainUpdate["ICON_ID"]
+	if uIconID, ok := domainUpdate["ICON_ID"]; ok {
+		dbUpdateMap["icon_id"] = uIconID
 	}
 
 	// 控制器IP
-	if _, ok := domainUpdate["CONTROLLER_IP"]; ok {
-		dbUpdateMap["controller_ip"] = domainUpdate["CONTROLLER_IP"]
-		domain.ControllerIP = domainUpdate["CONTROLLER_IP"].(string)
+	if uControllerIP, ok := domainUpdate["CONTROLLER_IP"]; ok {
+		dbUpdateMap["controller_ip"] = uControllerIP
+		domain.ControllerIP = uControllerIP.(string)
 	}
 
 	// config
 	// 注意：密码相关字段因为返回是****，所以不能直接把页面更新入库
-	if _, ok := domainUpdate["CONFIG"]; ok && domainUpdate["CONFIG"] != nil {
+	if fConfig, ok := domainUpdate["CONFIG"]; ok && fConfig != nil {
 		config := make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &config)
 
-		configUpdate := domainUpdate["CONFIG"].(map[string]interface{})
+		configUpdate := fConfig.(map[string]interface{})
 
 		// 如果存在资源同步控制器IP的修改，则需要更新controller_ip字段
 		if controllerIP, ok := configUpdate["controller_ip"]; ok {
@@ -465,12 +536,34 @@ func UpdateDomain(
 		}
 		configStr, _ := json.Marshal(configUpdate)
 		dbUpdateMap["config"] = string(configStr)
+
+		// set vtap
+		var vTapValue string
+		v, ok := configUpdate["vtap_id"]
+		if ok && v != nil {
+			vTapValue = v.(string)
+		}
+		err := KubernetesSetVtap(lcuuid, vTapValue, false, db)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// 更新domain DB
-	db.Model(&domain).Updates(dbUpdateMap)
+	log.Infof("update domain (%s) config (%v)", domain.Name, domainUpdate)
 
-	response, _ := GetDomains(db, map[string]interface{}{"lcuuid": domain.Lcuuid})
+	// 更新domain DB
+	err = db.Model(&domain).Updates(dbUpdateMap).Error
+	if err != nil {
+		return nil, err
+	}
+	if exist {
+		err = db.Model(&mysql.SubDomain{}).Where("domain = ?", domain.Lcuuid).Update("team_id", uTeamID).Error
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	response, _ := GetDomains(db, []int{}, map[string]interface{}{"lcuuid": domain.Lcuuid})
 	return &response[0], nil
 }
 
@@ -503,7 +596,7 @@ func cleanSoftDeletedResource(db *mysql.DB, lcuuid string) {
 	log.Info("clean soft deleted resources completed")
 }
 
-func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB) (map[string]string, error) {
+func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
 	var domain mysql.Domain
 	err1 := db.Where("lcuuid = ?", nameOrUUID).First(&domain).Error
 	var domains []mysql.Domain
@@ -515,7 +608,7 @@ func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB) (map[string]strin
 	}
 	// delete domain by lcuuid
 	if err1 == nil {
-		return deleteDomain(&domain, db)
+		return deleteDomain(&domain, db, userInfo, cfg)
 	}
 
 	if len(domains) > 1 {
@@ -525,7 +618,7 @@ func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB) (map[string]strin
 	}
 	// delete domain by name
 	if err2 == nil && len(domains) > 0 {
-		return deleteDomain(&domains[0], db)
+		return deleteDomain(&domains[0], db, userInfo, cfg)
 	}
 
 	return nil, servicecommon.NewError(
@@ -533,8 +626,22 @@ func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB) (map[string]strin
 	)
 }
 
-func deleteDomain(domain *mysql.Domain, db *mysql.DB) (map[string]string, error) { // TODO whether release resource ids
+func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) { // TODO whether release resource ids
 	log.Infof("delete domain (%s) resources started", domain.Name)
+
+	err := svc.IsDeletePermitted(cfg.FPermit, userInfo, domain.TeamID)
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	body := map[string]interface{}{
+		"resource_type": common.SET_RESOURCE_TYPE_DOMAIN,
+		"resource_ids":  domain.Lcuuid,
+	}
+	err = svc.SetReource(http.MethodDelete, cfg.FPermit, body, userInfo)
+	if err != nil {
+		return nil, err
+	}
 
 	lcuuid := domain.Lcuuid
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.WANIP{}) // TODO use forceDelete func
@@ -708,24 +815,27 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 	return nil
 }
 
-func GetSubDomains(orgDB *mysql.DB, filter map[string]interface{}) ([]*model.SubDomain, error) {
+func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interface{}) ([]*model.SubDomain, error) {
 	var response []*model.SubDomain
 	var subDomains []mysql.SubDomain
 	var vpcs []mysql.VPC
 
 	db := orgDB.DB
-	if _, ok := filter["lcuuid"]; ok {
-		db = db.Where("lcuuid = ?", filter["lcuuid"])
+	if fLcuuid, ok := filter["lcuuid"]; ok {
+		db = db.Where("lcuuid = ?", fLcuuid)
 	}
-	if _, ok := filter["domain"]; ok {
-		db = db.Where("domain = ?", filter["domain"])
+	if fDomain, ok := filter["domain"]; ok {
+		db = db.Where("domain = ?", fDomain)
 	}
-	if _, ok := filter["cluster_id"]; ok {
-		db = db.Where("cluster_id = ?", filter["cluster_id"])
+	if fClusterID, ok := filter["cluster_id"]; ok {
+		db = db.Where("cluster_id = ?", fClusterID)
 	}
-	db.Order("created_at DESC").Find(&subDomains)
+	err := db.Not(map[string]interface{}{"team_id": excludeTeamIDs}).Order("created_at DESC").Find(&subDomains).Error
+	if err != nil {
+		return response, err
+	}
 
-	db.Select("name", "lcuuid").Find(&vpcs)
+	orgDB.Select("name", "lcuuid").Find(&vpcs)
 	lcuuidToVPCName := make(map[string]string)
 	for _, vpc := range vpcs {
 		lcuuidToVPCName[vpc.Lcuuid] = vpc.Name
@@ -761,11 +871,11 @@ func GetSubDomains(orgDB *mysql.DB, filter map[string]interface{}) ([]*model.Sub
 		}
 
 		var k8sCluster mysql.KubernetesCluster
-		if err := db.Where("cluster_id = ?", subDomain.ClusterID).First(&k8sCluster).Error; err == nil {
+		if err := orgDB.Where("cluster_id = ?", subDomain.ClusterID).First(&k8sCluster).Error; err == nil {
 			v := strings.Split(k8sCluster.Value, "-")
 			if len(v) == 2 {
 				var vtap mysql.VTap
-				if err = db.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
+				if err = orgDB.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
 					subDomainResp.Config["vtap_id"] = vtap.Name
 				}
 			}
@@ -773,7 +883,7 @@ func GetSubDomains(orgDB *mysql.DB, filter map[string]interface{}) ([]*model.Sub
 
 		// get domain name
 		var domain mysql.Domain
-		if err := db.Where("lcuuid = ?", subDomain.Domain).First(&domain).Error; err != nil {
+		if err := orgDB.Where("lcuuid = ?", subDomain.Domain).First(&domain).Error; err != nil {
 			log.Error(err)
 		}
 		subDomainResp.DomainName = domain.Name
@@ -783,13 +893,15 @@ func GetSubDomains(orgDB *mysql.DB, filter map[string]interface{}) ([]*model.Sub
 	return response, nil
 }
 
-func CreateSubDomain(db *mysql.DB, subDomainCreate model.SubDomainCreate) (*model.SubDomain, error) {
-	var domainCount int64
-	if err := db.Model(&mysql.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).Count(&domainCount).Error; err != nil {
+func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (*model.SubDomain, error) {
+	var domain mysql.Domain
+	if err := db.Model(&mysql.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).First(&domain).Error; err != nil {
 		return nil, err
 	}
-	if domainCount == 0 {
-		return nil, servicecommon.NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
+
+	err := svc.IsAddPermitted(cfg.FPermit, userInfo, domain.TeamID)
+	if err != nil {
+		return nil, err
 	}
 
 	var count int64
@@ -798,12 +910,24 @@ func CreateSubDomain(db *mysql.DB, subDomainCreate model.SubDomainCreate) (*mode
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))
 	}
 
+	displayName := common.GetUUID("", uuid.Nil)
+	lcuuid := common.GetUUID(displayName, uuid.Nil)
+	body := map[string]interface{}{
+		"team_id":       domain.TeamID,
+		"owner_user_id": userInfo.ID,
+		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
+		"resource_id":   lcuuid,
+	}
+	err = svc.SetReource(http.MethodPost, cfg.FPermit, body, userInfo)
+	if err != nil {
+		return nil, err
+	}
+
 	log.Infof("create sub_domain (%v)", subDomainCreate)
 
 	subDomain := mysql.SubDomain{}
-	displayName := common.GetUUID("", uuid.Nil)
-	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	subDomain.Lcuuid = lcuuid
+	subDomain.TeamID = domain.TeamID
 	subDomain.Name = subDomainCreate.Name
 	subDomain.DisplayName = displayName
 	subDomain.CreateMethod = common.CREATE_METHOD_USER_DEFINE
@@ -813,11 +937,11 @@ func CreateSubDomain(db *mysql.DB, subDomainCreate model.SubDomainCreate) (*mode
 	subDomain.Config = string(configStr)
 	db.Create(&subDomain)
 
-	response, _ := GetSubDomains(db, map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetSubDomains(db, []int{}, map[string]interface{}{"lcuuid": lcuuid})
 	return response[0], nil
 }
 
-func UpdateSubDomain(lcuuid string, db *mysql.DB, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
+func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
 	if _, ok := subDomainUpdate["NAME"]; ok {
 		return nil, errors.New("name field cannot be modified")
 	}
@@ -833,28 +957,60 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, subDomainUpdate map[string]int
 		)
 	}
 
+	err := svc.IsUpdatePermitted(cfg.FPermit, userInfo, subDomain.TeamID)
+	if err != nil {
+		return nil, err
+	}
+
 	log.Infof("update sub_domain (%s) config (%v)", subDomain.Name, subDomainUpdate)
 
 	// config
-	if _, ok := subDomainUpdate["CONFIG"]; ok {
-		configStr, _ := json.Marshal(subDomainUpdate["CONFIG"])
+	fConfig, ok := subDomainUpdate["CONFIG"]
+	if ok {
+		configStr, _ := json.Marshal(fConfig)
 		dbUpdateMap["config"] = string(configStr)
+	}
+
+	var vTapValue string
+	v, ok := fConfig.(map[string]interface{})["vtap_id"]
+	if ok && v != nil {
+		vTapValue = v.(string)
+	}
+
+	err = KubernetesSetVtap(lcuuid, vTapValue, true, db)
+	if err != nil {
+		return nil, err
 	}
 
 	// 更新domain DB
 	db.Model(&subDomain).Updates(dbUpdateMap)
 
-	response, _ := GetSubDomains(db, map[string]interface{}{"lcuuid": lcuuid})
+	response, _ := GetSubDomains(db, []int{}, map[string]interface{}{"lcuuid": lcuuid})
 	return response[0], nil
 }
 
-func DeleteSubDomain(lcuuid string, db *mysql.DB) (map[string]string, error) {
+func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
 	var subDomain mysql.SubDomain
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
 		return nil, servicecommon.NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found", lcuuid),
 		)
 	}
+
+	err := svc.IsDeletePermitted(cfg.FPermit, userInfo, subDomain.TeamID)
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	body := map[string]interface{}{
+		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
+		"resource_ids":  lcuuid,
+	}
+	err = svc.SetReource(http.MethodDelete, cfg.FPermit, body, userInfo)
+	if err != nil {
+		return nil, err
+	}
+
 	log.Infof("delete sub_domain (%s) resources started", subDomain.Name)
 
 	var podCluster mysql.PodCluster

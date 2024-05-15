@@ -41,13 +41,13 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jNetworks {
 			jn := jNetworks[i]
-			id := jn.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jn.Get("id").MustString())
 			name := jn.Get("name").MustString()
 			if !cloudcommon.CheckJsonAttributes(jn, requiredAttrs) {
 				log.Infof("exclude network: %s, missing attr", name)
 				continue
 			}
-			vpcID := jn.Get("vpc_id").MustString()
+			vpcID := common.IDGenerateUUID(h.orgID, jn.Get("vpc_id").MustString())
 			azLcuuid := h.toolDataSet.azNameToAZLcuuid[jn.Get("availability_zone").MustString()]
 			network := model.Network{
 				Lcuuid:         id,

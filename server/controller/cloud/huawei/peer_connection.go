@@ -21,6 +21,7 @@ import (
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
@@ -38,7 +39,7 @@ func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
 			if !cloudcommon.CheckJsonAttributes(jpn, []string{"id", "name", "request_vpc_info", "accept_vpc_info"}) {
 				continue
 			}
-			id := jpn.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jpn.Get("id").MustString())
 			name := jpn.Get("name").MustString()
 			localTenant := jpn.Get("request_vpc_info").Get("tenant_id").MustString()
 			if localTenant == "" {
@@ -56,8 +57,8 @@ func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
 					Lcuuid:             id,
 					Name:               name,
 					Label:              id,
-					LocalVPCLcuuid:     jpn.Get("request_vpc_info").Get("vpc_id").MustString(),
-					RemoteVPCLcuuid:    jpn.Get("accept_vpc_info").Get("vpc_id").MustString(),
+					LocalVPCLcuuid:     common.IDGenerateUUID(h.orgID, jpn.Get("request_vpc_info").Get("vpc_id").MustString()),
+					RemoteVPCLcuuid:    common.IDGenerateUUID(h.orgID, jpn.Get("accept_vpc_info").Get("vpc_id").MustString()),
 					LocalRegionLcuuid:  h.projectNameToRegionLcuuid(localTenant),
 					RemoteRegionLcuuid: h.projectNameToRegionLcuuid(remoteTenant),
 				},

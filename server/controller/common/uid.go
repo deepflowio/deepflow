@@ -76,8 +76,15 @@ func GetUUIDByOrgID(orgID int, s string) string {
 	return GetUUID(s, uuid.Nil)
 }
 
+func GetUUIDByOrgIDAndNamespaceDNS(orgID int, s string) string {
+	if orgID != mysqlcommon.DEFAULT_ORG_ID {
+		s = strconv.Itoa(orgID) + "_" + s
+	}
+	return GetUUID(s, uuid.NamespaceDNS)
+}
+
 func IDGenerateUUID(orgID int, s string) string {
-	if orgID == mysqlcommon.DEFAULT_ORG_ID {
+	if orgID == mysqlcommon.DEFAULT_ORG_ID || len(s) == 0 {
 		return s
 	}
 	return GetUUID(strconv.Itoa(orgID)+"_"+s, uuid.Nil)

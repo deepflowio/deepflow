@@ -17,7 +17,6 @@
 package clickhouse
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -34,7 +33,9 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error) {
+func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, error) {
+	db := e.DB
+	table := e.Table
 	var stmts []Statement
 	selectTag := name
 	if alias != "" {
@@ -128,7 +129,7 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == chCommon.DB_NAME_PROMETHEUS {
-					TagTranslatorStr, labelType, err := GetPrometheusSingleTagTranslator(name, table)
+					TagTranslatorStr, labelType, err := GetPrometheusSingleTagTranslator(name, e)
 					if err != nil {
 						return nil, "", err
 					}
@@ -157,7 +158,7 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			}
 			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
 		} else if name == "tag" && db == chCommon.DB_NAME_PROMETHEUS {
-			tagTranslator, _, err := GetPrometheusAllTagTranslator(table)
+			tagTranslator, _, err := GetPrometheusAllTagTranslator(e)
 			if err != nil {
 				return nil, "", err
 			}
@@ -191,23 +192,24 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 	return stmts, labelType, nil
 }
 
-func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error) {
+func GetPrometheusSingleTagTranslator(tag string, e *CHEngine) (string, string, error) {
+	table := e.Table
 	labelType := ""
 	TagTranslatorStr := ""
 	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
 		return "", "", errors.New(errorMessage)
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -224,15 +226,16 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	return TagTranslatorStr, labelType, nil
 }
 
-func GetPrometheusAllTagTranslator(table string) (string, string, error) {
+func GetPrometheusAllTagTranslator(e *CHEngine) (string, string, error) {
+	table := e.Table
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
 	labelFastTranslatorSlice := []string{}
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
-			if labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+			if labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[appLabel.AppLabelName]; ok {
 				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 				labelFastTranslatorSlice = append(labelFastTranslatorSlice, fmt.Sprintf("app_label_value_id_%d", appLabel.AppLabelColumnIndex))
@@ -253,8 +256,8 @@ func GetPrometheusAllTagTranslator(table string) (string, string, error) {
 	return tagTranslatorStr, labelFastTranslatorStr, nil
 }
 
-func GetMetricsTag(name string, alias string, db string, table string, ctx context.Context) (Statement, error) {
-	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), db, table, ctx)
+func GetMetricsTag(name string, alias string, e *CHEngine) (Statement, error) {
+	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), e.DB, e.Table, e.ORGID)
 	if !ok {
 		return nil, nil
 	}

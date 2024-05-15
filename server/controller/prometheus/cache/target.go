@@ -24,9 +24,9 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/prometheus/common"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 var (
@@ -56,7 +56,9 @@ type keyToTargetID struct {
 }
 
 func newKeyToTargetID() *keyToTargetID {
-	return &keyToTargetID{data: make(map[TargetKey]int)}
+	return &keyToTargetID{
+		data: make(map[TargetKey]int),
+	}
 }
 
 func (k *keyToTargetID) Load(tk TargetKey) (int, bool) {
@@ -135,12 +137,14 @@ func (t *targetIDToLabelNames) Load(id int) []string {
 }
 
 type target struct {
+	org                  *common.ORG
 	keyToTargetID        *keyToTargetID
 	targetIDToLabelNames *targetIDToLabelNames
 }
 
-func newTarget() *target {
+func newTarget(org *common.ORG) *target {
 	return &target{
+		org:                  org,
 		keyToTargetID:        newKeyToTargetID(),
 		targetIDToLabelNames: newTargetIDToLabelNames(),
 	}
@@ -205,14 +209,14 @@ func (t *target) refresh(args ...interface{}) error {
 }
 
 func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
-	lns := []string{TargetLabelInstance, TargetLabelJob}
+	lns := []string{common.TargetLabelInstance, common.TargetLabelJob}
 	for _, l := range strings.Split(tg.OtherLabels, labelJoiner) {
 		if l == "" {
 			continue
 		}
 		parts := strings.Split(l, labelKVJoiner)
 		if len(parts) != 2 {
-			log.Warningf("invalid label: %s", l)
+			log.Warning(t.org.Logf("invalid label: %s", l))
 			continue
 		}
 		lns = append(lns, parts[0])
@@ -221,14 +225,14 @@ func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
 }
 
 func (t *target) load() (recorderTargets, selfTargets []*mysql.PrometheusTarget, err error) {
-	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
+	err = t.org.DB.Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
 	if err != nil {
 		return
 	}
-	err = mysql.Db.Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
+	err = t.org.DB.Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
 	return
 }
 
 func (t *target) dedup(ids []int) error {
-	return mysql.Db.Where("id in (?)", ids).Delete(&mysql.PrometheusTarget{}).Error
+	return t.org.DB.Where("id in (?)", ids).Delete(&mysql.PrometheusTarget{}).Error
 }

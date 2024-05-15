@@ -343,7 +343,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 					}
 				}
 				if db == chCommon.DB_NAME_PROMETHEUS {
-					filter, err = GetPrometheusFilter(tagName, table, op, value)
+					filter, err = GetPrometheusFilter(tagName, table, op, value, e)
 					if err != nil {
 						return filter, err
 					}
@@ -949,15 +949,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 
 }
 
-func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
+func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string, error) {
 	filter := ""
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
@@ -970,7 +970,7 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -1002,12 +1002,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	sql := ""
 	isAppLabel := false
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
@@ -1020,11 +1020,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	}
 	prometheusSubqueryCache := GetPrometheusSubqueryCache()
 	// Determine whether the tag is app_label or target_label
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				cacheFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(originFilter)
+				entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
+				cacheFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(entryKey)
 				if ok {
 					filter = cacheFilter.Filter
 					timeout := cacheFilter.Time
@@ -1035,7 +1036,8 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 				if value == "''" {
 					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.AppLabelColumnIndex, op)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
-					prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
+					entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
+					prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
 					return filter, nil
 				}
 
@@ -1070,7 +1072,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.AppLabelColumnIndex, valueIDFilter)
 				}
 				entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
-				prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
+				prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
 				return filter, nil
 			}
 		}

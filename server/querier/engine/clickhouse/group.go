@@ -30,7 +30,10 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Statement, error) {
+func GetGroup(name string, e *CHEngine) ([]Statement, error) {
+	asTagMap := e.AsTagMap
+	db := e.DB
+	table := e.Table
 	var stmts []Statement
 	if asTagMap[name] == "time" {
 		return stmts, nil
@@ -41,7 +44,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 		if name == "policy_id" && table != chCommon.TABLE_NAME_VTAP_ACL {
 			stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 		} else if db == chCommon.DB_NAME_PROMETHEUS && strings.Contains(name, "tag") {
-			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
+			tagTranslatorStr := GetPrometheusGroup(name, e)
 			if tagTranslatorStr == name {
 				stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
 			} else {
@@ -64,7 +67,7 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 		}
 	} else {
 		if db == chCommon.DB_NAME_PROMETHEUS && strings.Contains(name, "tag.") {
-			tagTranslatorStr := GetPrometheusGroup(name, table, asTagMap)
+			tagTranslatorStr := GetPrometheusGroup(name, e)
 			if tagTranslatorStr == name {
 				stmts = append(stmts, &GroupTag{Value: tagTranslatorStr, AsTagMap: asTagMap})
 			} else {
@@ -90,20 +93,22 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) ([]Stat
 	return stmts, nil
 }
 
-func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
+func GetPrometheusGroup(name string, e *CHEngine) string {
+	table := e.Table
+	asTagMap := e.AsTagMap
 	nameNoPreffix := strings.Trim(name, "`")
 	if nameNoPreffix == "tag" {
-		tagTranslatorStr, _, _ := GetPrometheusAllTagTranslator(table)
+		tagTranslatorStr, _, _ := GetPrometheusAllTagTranslator(e)
 		return tagTranslatorStr
 	}
 	labelName := strings.TrimPrefix(nameNoPreffix, "tag.")
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[labelName]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[labelName]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", labelName)
 		log.Error(errorMessage)
 		return name
 	}
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		log.Error(errorMessage)
@@ -118,7 +123,7 @@ func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 		nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
 		// Determine whether the tag is app_label or target_label
 		isAppLabel := false
-		if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+		if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 			for _, appLabel := range appLabels {
 				if appLabel.AppLabelName == nameNoPreffix {
 					isAppLabel = true
@@ -136,7 +141,9 @@ func GetPrometheusGroup(name, table string, asTagMap map[string]string) string {
 	return tagTranslatorStr
 }
 
-func GetPrometheusNotNullFilter(name, table string, asTagMap map[string]string) (view.Node, bool) {
+func GetPrometheusNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
+	table := e.Table
+	asTagMap := e.AsTagMap
 	nameNoPreffix := strings.Trim(name, "`")
 	preAsTag, ok := asTagMap[name]
 	if ok {
@@ -144,17 +151,17 @@ func GetPrometheusNotNullFilter(name, table string, asTagMap map[string]string) 
 	}
 	nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "tag.")
 	filter := ""
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		return &view.Expr{}, false
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		return &view.Expr{}, false
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -169,15 +176,18 @@ func GetPrometheusNotNullFilter(name, table string, asTagMap map[string]string) 
 	return &view.Expr{Value: "(" + filter + ")"}, true
 }
 
-func GetNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
+func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
+	asTagMap := e.AsTagMap
+	db := e.DB
+	table := e.Table
 	preAsTag, preASOK := asTagMap[name]
 	if preASOK {
 		if db == chCommon.DB_NAME_PROMETHEUS && strings.HasPrefix(preAsTag, "`tag.") {
-			return GetPrometheusNotNullFilter(name, table, asTagMap)
+			return GetPrometheusNotNullFilter(name, e)
 		}
 	} else {
 		if db == chCommon.DB_NAME_PROMETHEUS && strings.HasPrefix(name, "`tag.") {
-			return GetPrometheusNotNullFilter(name, table, asTagMap)
+			return GetPrometheusNotNullFilter(name, e)
 		}
 	}
 

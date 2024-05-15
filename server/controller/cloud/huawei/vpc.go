@@ -45,7 +45,7 @@ func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, 
 				log.Infof("exclude vpc: %s, missing attr", name)
 				continue
 			}
-			id := jv.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jv.Get("id").MustString())
 			vpc := model.VPC{
 				Lcuuid:       id,
 				Name:         name,
@@ -127,7 +127,7 @@ func (h *HuaWei) getPartialRoutingTables(projectName, token string) (routingTabl
 	requiredAttrs := []string{"id", "vpc_id", "destination", "type", "nexthop"}
 	for i := range jRoutes {
 		jR := jRoutes[i]
-		id := jR.Get("id").MustString()
+		id := common.IDGenerateUUID(h.orgID, jR.Get("id").MustString())
 		if !cloudcommon.CheckJsonAttributes(jR, requiredAttrs) {
 			log.Infof("exclude routing_table: %s, missing attr", id)
 			continue
@@ -141,7 +141,7 @@ func (h *HuaWei) getPartialRoutingTables(projectName, token string) (routingTabl
 			routingTables,
 			model.RoutingTable{
 				Lcuuid:        id,
-				VRouterLcuuid: h.toolDataSet.vpcLcuuidToVRouterLcuuid[jR.Get("vpc_id").MustString()],
+				VRouterLcuuid: h.toolDataSet.vpcLcuuidToVRouterLcuuid[common.IDGenerateUUID(h.orgID, jR.Get("vpc_id").MustString())],
 				Destination:   jR.Get("destination").MustString(),
 				NexthopType:   common.ROUTING_TABLE_TYPE_PEER_CONNECTION,
 				Nexthop:       jR.Get("nexthop").MustString(),

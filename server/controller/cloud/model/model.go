@@ -319,6 +319,7 @@ type RDSInstance struct {
 }
 
 type SubDomain struct {
+	TeamID        int    `json:"team_id" binding:"required"`
 	Lcuuid        string `json:"lcuuid" binding:"required"`
 	Name          string `json:"name" binding:"required"`
 	DisplayName   string `json:"display_name" binding:"required"`

@@ -50,7 +50,7 @@ func (h *HuaWei) getLBs() (
 				log.Infof("exclude lb: %s, missing network info", name)
 				continue
 			}
-			id := jLB.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jLB.Get("id").MustString())
 			var lbModel int
 			var vifType int
 			var networkLcuuid string
@@ -148,7 +148,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 			jLB := jLBs.GetIndex(i)
 			id, ok := jLB.CheckGet("id")
 			if ok {
-				lbLcuuid = id.MustString()
+				lbLcuuid = common.IDGenerateUUID(h.orgID, id.MustString())
 			} else {
 				log.Infof("pass, missing id")
 			}
@@ -157,7 +157,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 			log.Infof("exclude lb_listener: %s, missing lb info", name)
 			continue
 		}
-		listenerID := jL.Get("id").MustString()
+		listenerID := common.IDGenerateUUID(h.orgID, jL.Get("id").MustString())
 		protocol := jL.Get("protocol").MustString()
 		if strings.Contains(protocol, "HTTPS") {
 			protocol = "HTTPS"
@@ -185,12 +185,12 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 			}
 			for i := range jTSs {
 				jTS := jTSs[i]
-				tsID := jTS.Get("id").MustString()
+				tsID := common.IDGenerateUUID(h.orgID, jTS.Get("id").MustString())
 				if !cloudcommon.CheckJsonAttributes(jTS, tsRequiredAttrs) {
 					log.Infof("exclude lb_target_server: %s, missing attr", tsID)
 					continue
 				}
-				subnetID := jTS.Get("subnet_id").MustString()
+				subnetID := common.IDGenerateUUID(h.orgID, jTS.Get("subnet_id").MustString())
 				ip := jTS.Get("address").MustString()
 				vmLcuuid, ok := h.toolDataSet.keyToVMLcuuid[SubnetIPKey{subnetID, ip}]
 				if !ok {

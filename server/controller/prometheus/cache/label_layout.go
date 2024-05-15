@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type LayoutKey struct {
@@ -43,12 +44,15 @@ func NewLayoutKey(metricName, labelName string) LayoutKey {
 
 type appLabelNameToValue map[string]string
 type metricAndAPPLabelLayout struct {
+	org *common.ORG
+
 	layoutKeyToIndex sync.Map
 	layoutKeyToID    cmap.ConcurrentMap[LayoutKey, int]
 }
 
-func newMetricAndAPPLabelLayout() *metricAndAPPLabelLayout {
+func newMetricAndAPPLabelLayout(org *common.ORG) *metricAndAPPLabelLayout {
 	return &metricAndAPPLabelLayout{
+		org:           org,
 		layoutKeyToID: cmap.NewStringer[LayoutKey, int](),
 	}
 }
@@ -87,6 +91,6 @@ func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 
 func (mml *metricAndAPPLabelLayout) load() ([]*mysql.PrometheusMetricAPPLabelLayout, error) {
 	var metricAPPLabelLayouts []*mysql.PrometheusMetricAPPLabelLayout
-	err := mysql.Db.Find(&metricAPPLabelLayouts).Error
+	err := mml.org.DB.Find(&metricAPPLabelLayouts).Error
 	return metricAPPLabelLayouts, err
 }

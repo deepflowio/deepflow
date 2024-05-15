@@ -28,8 +28,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	. "github.com/deepflowio/deepflow/server/controller/prometheus/common"
-	"github.com/deepflowio/deepflow/server/controller/prometheus/config"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 var log = logging.MustGetLogger("prometheus.synchronizer.cache")
@@ -40,6 +39,7 @@ var (
 )
 
 type Cache struct {
+	org *common.ORG
 	ctx context.Context
 
 	canRefresh      chan bool
@@ -55,51 +55,32 @@ type Cache struct {
 	MetricTarget            *metricTarget
 }
 
-func GetSingleton() *Cache {
-	cacheOnce.Do(func() {
-		mn := new(metricName)
-		t := newTarget()
-		cacheIns = &Cache{
-			canRefresh:              make(chan bool, 1),
-			MetricName:              mn,
-			LabelName:               newLabelName(),
-			LabelValue:              newLabelValue(),
-			MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(),
-			Target:                  t,
-			Label:                   newLabel(),
-			MetricLabelName:         newMetricLabelName(mn),
-			MetricTarget:            newMetricTarget(mn, t),
-		}
-	})
-	return cacheIns
-}
-
-func (c *Cache) Init(ctx context.Context, cfg *config.Config) {
-	c.ctx = ctx
-	c.refreshInterval = time.Duration(cfg.SynchronizerCacheRefreshInterval) * time.Second
-}
-
-func (c *Cache) Start(ctx context.Context, cfg *config.Config) error {
-	c.Init(ctx, cfg)
-	c.canRefresh <- true
-	if err := c.tryRefresh(); err != nil {
-		return err
+func newCache(orgID int) (*Cache, error) {
+	log.Infof("[OID-%d] new prometheus cache", orgID)
+	org, err := common.NewORG(orgID)
+	if err != nil {
+		log.Errorf("[OID-%d] failed to create org object: %s", orgID, err.Error())
+		return nil, err
 	}
-	go func() {
-		ticker := time.NewTicker(c.refreshInterval)
-		for {
-			select {
-			case <-ticker.C:
-				c.tryRefresh()
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return nil
+	mn := newMetricName(org)
+	t := newTarget(org)
+	c := &Cache{
+		org:                     org,
+		canRefresh:              make(chan bool, 1),
+		MetricName:              mn,
+		LabelName:               newLabelName(org),
+		LabelValue:              newLabelValue(org),
+		MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(org),
+		Target:                  t,
+		Label:                   newLabel(org),
+		MetricLabelName:         newMetricLabelName(org, mn),
+		MetricTarget:            newMetricTarget(org, mn, t),
+	}
+	c.canRefresh <- true
+	return c, nil
 }
 
-func (c *Cache) tryRefresh() (err error) {
+func (c *Cache) Refresh() (err error) {
 LOOP:
 	for {
 		select {
@@ -109,33 +90,33 @@ LOOP:
 			break LOOP
 		default:
 			time.Sleep(time.Second)
-			log.Info("last refresh cache not completed now")
+			log.Info(c.org.Log("last refresh cache not completed now"))
 		}
 	}
 	return
 }
 
 func (c *Cache) refresh() error {
-	log.Info("refresh cache started")
+	log.Info(c.org.Log("refresh cache started"))
 	egRunAhead := &errgroup.Group{}
-	AppendErrGroup(egRunAhead, c.MetricName.refresh)
-	AppendErrGroup(egRunAhead, c.Label.refresh)
-	AppendErrGroup(egRunAhead, c.Target.refresh)
+	common.AppendErrGroup(egRunAhead, c.MetricName.refresh)
+	common.AppendErrGroup(egRunAhead, c.Label.refresh)
+	common.AppendErrGroup(egRunAhead, c.Target.refresh)
 	egRunAhead.Wait()
 	eg := &errgroup.Group{}
-	AppendErrGroup(eg, c.LabelName.refresh)
-	AppendErrGroup(eg, c.LabelValue.refresh)
-	AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
-	AppendErrGroup(eg, c.MetricLabelName.refresh)
-	AppendErrGroup(eg, c.MetricTarget.refresh)
+	common.AppendErrGroup(eg, c.LabelName.refresh)
+	common.AppendErrGroup(eg, c.LabelValue.refresh)
+	common.AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
+	common.AppendErrGroup(eg, c.MetricLabelName.refresh)
+	common.AppendErrGroup(eg, c.MetricTarget.refresh)
 	err := eg.Wait()
-	log.Info("refresh cache completed")
+	log.Info(c.org.Log("refresh cache completed"))
 	return err
 
 }
 
 func GetDebugCache(t controller.PrometheusCacheType) []byte {
-	tempCache := GetSingleton()
+	tempCache, _ := GetCache(1) // TODO add org_id
 	content := make(map[string]interface{})
 
 	marshal := func(v any) string {
@@ -191,7 +172,7 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			temp["layout_key_to_index"].(map[string]interface{})[marshal(key)] = value
 			return true
 		})
-		for iter := range tempCache.MetricAndAPPLabelLayout.layoutKeyToID.Iter() {
+		for iter := range tempCache.MetricAndAPPLabelLayout.layoutKeyToID.IterBuffered() {
 			temp["layout_key_to_id"].(map[string]int)[iter.Key.String()] = iter.Val
 		}
 		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 ||

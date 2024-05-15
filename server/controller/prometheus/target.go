@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
 
 var (
@@ -37,13 +36,12 @@ type TargetSynchronizer struct {
 	Synchronizer
 }
 
-func NewTargetSynchronizer() *TargetSynchronizer {
-	return &TargetSynchronizer{
-		Synchronizer: Synchronizer{
-			cache:   cache.GetSingleton(),
-			counter: &counter{},
-		},
+func NewTargetSynchronizer() (*TargetSynchronizer, error) {
+	synchronizer, err := newSynchronizer(1)
+	if err != nil {
+		return nil, err
 	}
+	return &TargetSynchronizer{synchronizer}, nil
 }
 
 func (s *TargetSynchronizer) GetTargets(in *trident.PrometheusTargetRequest) (*trident.PrometheusTargetResponse, error) {

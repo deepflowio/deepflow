@@ -569,7 +569,7 @@ impl EbpfCollector {
             let off_cpu = &ebpf_conf.off_cpu_profile;
 
             let profiler_enabled =
-                !on_cpu.disabled && (cfg!(feature = "off_cpu") && !off_cpu.disabled);
+                !on_cpu.disabled || (cfg!(feature = "off_cpu") && !off_cpu.disabled);
             if profiler_enabled {
                 if !on_cpu.disabled {
                     ebpf::enable_oncpu_profiler();

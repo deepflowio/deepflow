@@ -44,6 +44,7 @@ const (
 
 type Aws struct {
 	orgID                 int
+	teamID                int
 	name                  string
 	lcuuid                string
 	regionUUID            string
@@ -117,6 +118,7 @@ func NewAws(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, 
 	return &Aws{
 		// TODO: display_name后期需要修改为uuid_generate
 		orgID:            orgID,
+		teamID:           domain.TeamID,
 		name:             domain.Name,
 		lcuuid:           domain.Lcuuid,
 		uuidGenerate:     domain.DisplayName,

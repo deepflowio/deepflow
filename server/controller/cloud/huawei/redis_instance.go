@@ -47,7 +47,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 			if !cloudcommon.CheckJsonAttributes(jRedis, []string{"instance_id", "name", "status", "az_codes", "engine_version", "vpc_id", "subnet_id", "ip", "publicip_address"}) {
 				continue
 			}
-			id := jRedis.Get("instance_id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jRedis.Get("instance_id").MustString())
 			name := jRedis.Get("name").MustString()
 			state, ok := stateStrToInt[jRedis.Get("status").MustString()]
 			if !ok {
@@ -65,7 +65,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 				}
 			}
 
-			networkLcuuid := jRedis.Get("subnet_id").MustString()
+			networkLcuuid := common.IDGenerateUUID(h.orgID, jRedis.Get("subnet_id").MustString())
 			if networkLcuuid == "" {
 				log.Infof("exclude rds_instance: %s, no subnet_id", id)
 				continue
@@ -79,7 +79,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 				Version:      "Redis " + jRedis.Get("engine_version").MustString(),
 				InternalHost: jRedis.Get("ip").MustString(),
 				PublicHost:   jRedis.Get("publicip_address").MustString(),
-				VPCLcuuid:    jRedis.Get("vpc_id").MustString(),
+				VPCLcuuid:    common.IDGenerateUUID(h.orgID, jRedis.Get("vpc_id").MustString()),
 				AZLcuuid:     azLcuuid,
 				RegionLcuuid: regionLcuuid,
 			}
