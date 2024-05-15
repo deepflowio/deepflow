@@ -20,10 +20,9 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/config"
 )
 
-func SetReource(method string, fpermit config.FPermit, body map[string]interface{}, userInfo *UserInfo) error {
+func SetReource(method string, fpermit common.FPermit, body map[string]interface{}, userInfo *UserInfo) error {
 	if !fpermit.Enabled {
 		return nil
 	}

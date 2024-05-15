@@ -21,7 +21,6 @@ import (
 	"net/http"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 )
 
@@ -33,7 +32,7 @@ const (
 	PermitVerifyDelete PermitVerifyMethod = "delete"
 )
 
-func isPermitted(fpermit config.FPermit, userInfo *UserInfo, m PermitVerifyMethod, teamID int) error {
+func isPermitted(fpermit common.FPermit, userInfo *UserInfo, m PermitVerifyMethod, teamID int) error {
 	if !fpermit.Enabled {
 		return nil
 	}
@@ -62,14 +61,14 @@ func isPermitted(fpermit config.FPermit, userInfo *UserInfo, m PermitVerifyMetho
 	return nil
 }
 
-func IsAddPermitted(fpermit config.FPermit, userInfo *UserInfo, teamID int) error {
+func IsAddPermitted(fpermit common.FPermit, userInfo *UserInfo, teamID int) error {
 	return isPermitted(fpermit, userInfo, PermitVerifyAdd, teamID)
 }
 
-func IsUpdatePermitted(fpermit config.FPermit, userInfo *UserInfo, teamID int) error {
+func IsUpdatePermitted(fpermit common.FPermit, userInfo *UserInfo, teamID int) error {
 	return isPermitted(fpermit, userInfo, PermitVerifyUpdate, teamID)
 }
 
-func IsDeletePermitted(fpermit config.FPermit, userInfo *UserInfo, teamID int) error {
+func IsDeletePermitted(fpermit common.FPermit, userInfo *UserInfo, teamID int) error {
 	return isPermitted(fpermit, userInfo, PermitVerifyDelete, teamID)
 }

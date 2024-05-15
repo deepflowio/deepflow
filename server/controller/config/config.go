@@ -25,6 +25,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	shared_common "github.com/deepflowio/deepflow/server/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
@@ -62,13 +63,6 @@ type DFWebService struct {
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
-type FPermit struct {
-	Enabled bool   `default:"false" yaml:"enabled"`
-	Host    string `default:"fpermit" yaml:"host"`
-	Port    int    `default:"20823" yaml:"port"`
-	Timeout int    `default:"30" yaml:"timeout"`
-}
-
 type ControllerConfig struct {
 	LogFile                        string `default:"/var/log/controller.log" yaml:"log-file"`
 	LogLevel                       string `default:"info" yaml:"log-level"`
@@ -89,8 +83,8 @@ type ControllerConfig struct {
 	PodClusterInternalIPToIngester int    `default:"0" yaml:"pod-cluster-internal-ip-to-ingester"`
 	NoTeamIDRefused                bool   `default:"false" yaml:"no-teamid-refused"`
 
-	DFWebService DFWebService `yaml:"df-web-service"`
-	FPermit      FPermit      `yaml:"fpermit"`
+	DFWebService DFWebService   `yaml:"df-web-service"`
+	FPermit      common.FPermit `yaml:"fpermit"`
 
 	MySqlCfg      mysql.MySqlConfig           `yaml:"mysql"`
 	RedisCfg      redis.Config                `yaml:"redis"`
@@ -138,6 +132,7 @@ func (c *Config) Load(path string) {
 	c.ControllerConfig.TrisolarisCfg.SetPodClusterInternalIPToIngester(c.ControllerConfig.PodClusterInternalIPToIngester)
 	c.ControllerConfig.TrisolarisCfg.SetGrpcMaxMessageLength(c.ControllerConfig.GrpcMaxMessageLength)
 	c.ControllerConfig.TrisolarisCfg.SetNoTeamIDRefused(c.ControllerConfig.NoTeamIDRefused)
+	c.ControllerConfig.TrisolarisCfg.SetFPermitConfig(c.ControllerConfig.FPermit)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)

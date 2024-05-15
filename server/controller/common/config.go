@@ -14,16 +14,11 @@
  * limitations under the License.
  */
 
-package rsctask
+package common
 
-import (
-	"context"
-
-	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/redis"
-)
-
-type ResourceTaskManager interface {
-	Start(context.Context, common.FPermit, redis.Config)
-	Stop()
+type FPermit struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"fpermit" yaml:"host"`
+	Port    int    `default:"20823" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
 }
