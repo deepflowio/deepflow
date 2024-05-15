@@ -40,6 +40,7 @@ var log = logging.MustGetLogger("cloud.aws")
 const (
 	REGION_NAME                 = "cn-north-1"
 	EKS_NODE_DESCRIPTION_PREFIX = "aws-K8S-"
+	EKS_NODE_INSTANCE_ID_KEY    = "node.k8s.amazonaws.com/instance_id"
 )
 
 type Aws struct {
