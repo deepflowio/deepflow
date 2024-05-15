@@ -61,6 +61,7 @@ type Config struct {
 	ExportersEnabled               bool
 	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
 	NoTeamIDRefused                bool
+	FPermit                        common.FPermit
 }
 
 func (c *Config) Convert() {
@@ -133,4 +134,12 @@ func (c *Config) SetNoTeamIDRefused(refused bool) {
 
 func (c *Config) GetNoTeamIDRefused() bool {
 	return c.NoTeamIDRefused
+}
+
+func (c *Config) SetFPermitConfig(fpermit common.FPermit) {
+	c.FPermit = fpermit
+}
+
+func (c *Config) GetFPermitConfig() common.FPermit {
+	return c.FPermit
 }

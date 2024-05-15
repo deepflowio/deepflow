@@ -106,16 +106,16 @@ func GetDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interfa
 
 	db := orgDB.DB
 	if fLcuuid, ok := filter["lcuuid"]; ok {
-		db = orgDB.Where("lcuuid = ?", fLcuuid)
+		db = db.Where("lcuuid = ?", fLcuuid)
 	}
 	if fName, ok := filter["name"]; ok {
-		db = orgDB.Where("name = ?", fName)
+		db = db.Where("name = ?", fName)
 	}
 	if fTeamID, ok := filter["team_id"]; ok {
-		db = orgDB.Where("team_id = ?", fTeamID)
+		db = db.Where("team_id = ?", fTeamID)
 	}
 	if fUserID, ok := filter["user_id"]; ok {
-		db = orgDB.Where("user_id = ?", fUserID)
+		db = db.Where("user_id = ?", fUserID)
 	}
 	err = db.Not(map[string]interface{}{"team_id": excludeTeamIDs}).Order("created_at DESC").Find(&domains).Error
 	if err != nil {
@@ -244,7 +244,7 @@ func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
 	return info
 }
 
-func CreateDomain(userInfo *svc.UserInfo, db *mysql.DB, domainCreate model.DomainCreate, cfg *config.ControllerConfig) (*model.Domain, error) {
+func CreateDomain(domainCreate model.DomainCreate, userInfo *svc.UserInfo, db *mysql.DB, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
 	db.Model(&mysql.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)

@@ -29,6 +29,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	cconfig "github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
@@ -225,7 +226,15 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 		Type:  common.DEFAULT_USER_TYPE,
 		ORGID: orgID,
 	}
-	domain, err := resourceservice.CreateDomain(&userInfo, &mysql.DB{k.db, k.GetORGID(), mysqlcommon.ORGIDToDatabaseName(k.GetORGID())}, domainCreate, nil)
+	mysqlDB := mysql.DB{
+		DB:    k.db,
+		ORGID: k.GetORGID(),
+		Name:  mysqlcommon.ORGIDToDatabaseName(k.GetORGID()),
+	}
+	cConfig := cconfig.ControllerConfig{
+		FPermit: k.cfg.FPermit,
+	}
+	domain, err := resourceservice.CreateDomain(domainCreate, &userInfo, &mysqlDB, &cConfig)
 	if err != nil {
 		log.Errorf(k.Logf("create domain failed: %s", err.Error()))
 		return "", err

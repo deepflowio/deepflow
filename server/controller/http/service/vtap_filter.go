@@ -22,7 +22,6 @@ import (
 	"strconv"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/gin-gonic/gin"
 )
@@ -45,7 +44,7 @@ func GetUserInfo(c *gin.Context) *UserInfo {
 	}
 }
 
-func GetUnauthorizedTeamIDs(userInfo *UserInfo, fpermitCfg *config.FPermit) (map[int]struct{}, error) {
+func GetUnauthorizedTeamIDs(userInfo *UserInfo, fpermitCfg *common.FPermit) (map[int]struct{}, error) {
 	if !fpermitCfg.Enabled {
 		return nil, nil
 	}
@@ -79,7 +78,7 @@ func GetUnauthorizedTeamIDs(userInfo *UserInfo, fpermitCfg *config.FPermit) (map
 	return teamIDMap, nil
 }
 
-func getAgentByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtaps []mysql.VTap) ([]mysql.VTap, error) {
+func getAgentByUser(userInfo *UserInfo, fpermitCfg *common.FPermit, vtaps []mysql.VTap) ([]mysql.VTap, error) {
 	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
 		return vtaps, nil
 	}
@@ -104,7 +103,7 @@ func getAgentByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtaps []mysq
 	return results, nil
 }
 
-func getAgentGroupByUser(userInfo *UserInfo, fpermitCfg *config.FPermit, vtapGroups []*mysql.VTapGroup) ([]*mysql.VTapGroup, error) {
+func getAgentGroupByUser(userInfo *UserInfo, fpermitCfg *common.FPermit, vtapGroups []*mysql.VTapGroup) ([]*mysql.VTapGroup, error) {
 	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
 		return vtapGroups, nil
 	}
