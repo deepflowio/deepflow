@@ -781,7 +781,7 @@ impl YamlConfig {
             c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
         }
         c.ebpf.off_cpu_profile.min_block = c.ebpf.off_cpu_profile.min_block.clamp(
-            Duration::from_micros(1),
+            Duration::from_micros(0),
             Duration::from_micros(u32::MAX as u64 - 2),
         );
 
