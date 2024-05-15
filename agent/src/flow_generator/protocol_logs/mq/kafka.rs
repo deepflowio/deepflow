@@ -245,19 +245,25 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
         } else {
             EbpfFlags::NONE.bits()
         };
-        let resource = match (f.api_key, f.msg_type) {
+        let (resource, endpoint) = match (f.api_key, f.msg_type) {
             (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session)
                 if !f.topic_name.is_empty() =>
             {
-                format!("{}-{}:{}", f.topic_name, f.partition, f.offset)
+                (
+                    format!("{}-{}:{}", f.topic_name, f.partition, f.offset),
+                    format!("{}-{}", f.topic_name, f.partition),
+                )
             }
             (KAFKA_PRODUCE, LogMessageType::Response)
             | (KAFKA_PRODUCE, LogMessageType::Session)
                 if !f.topic_name.is_empty() =>
             {
-                format!("{}-{}:{}", f.topic_name, f.partition, f.offset)
+                (
+                    format!("{}-{}:{}", f.topic_name, f.partition, f.offset),
+                    format!("{}-{}", f.topic_name, f.partition),
+                )
             }
-            _ => String::new(),
+            _ => (String::new(), String::new()),
         };
         let mut attributes = vec![];
         if !f.group_id.is_empty() {
@@ -274,7 +280,7 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: String::from(command_str),
                 resource,
-                endpoint: format!("{}-{}", f.topic_name, f.partition),
+                endpoint,
                 domain: f.topic_name,
                 ..Default::default()
             },
@@ -996,7 +1002,14 @@ impl KafkaLog {
             //   group_instance_id => COMPACT_NULLABLE_STRING
             //   reason => COMPACT_NULLABLE_STRING
             4..=5 => {
-                if let Some((group_id, group_id_len)) = Self::decode_compact_string(payload) {
+                // _tagged_fields
+                if payload.len() < 1 {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                offset += 1;
+                if let Some((group_id, group_id_len)) =
+                    Self::decode_compact_string(&payload[offset..])
+                {
                     info.group_id = group_id;
                     offset = group_id_len;
                 }
