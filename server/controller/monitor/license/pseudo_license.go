@@ -38,6 +38,7 @@ var VTAP_LICENSE_FUNCTIONS = []string{
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_FUNCTION_MONITORING),
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING),
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_INDICATOR_MONITORING),
+	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_LOG_MONITORING),
 }
 
 type VTapLicenseAllocation struct {
