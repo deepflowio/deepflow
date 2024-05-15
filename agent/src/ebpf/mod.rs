@@ -671,6 +671,8 @@ extern "C" {
 
             pub fn disable_offcpu_profiler() -> c_int;
 
+            pub fn set_offcpu_cpuid_aggregation(flag: c_int) -> c_int;
+
             pub fn set_offcpu_minblock_time(
                 block_time: c_uint,
             ) -> c_int;

@@ -344,6 +344,7 @@ impl Default for OnCpuProfile {
 pub struct OffCpuProfile {
     pub disabled: bool,
     pub regex: String,
+    pub cpu: u16,
     #[serde(rename = "minblock", with = "humantime_serde")]
     pub min_block: Duration,
 }
@@ -353,6 +354,7 @@ impl Default for OffCpuProfile {
         OffCpuProfile {
             disabled: false,
             regex: "^deepflow-.*".to_string(),
+            cpu: 0,
             min_block: Duration::from_micros(50),
         }
     }
@@ -780,7 +782,7 @@ impl YamlConfig {
             c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
         }
         c.ebpf.off_cpu_profile.min_block = c.ebpf.off_cpu_profile.min_block.clamp(
-            Duration::from_micros(1),
+            Duration::from_micros(0),
             Duration::from_micros(u32::MAX as u64 - 2),
         );
 

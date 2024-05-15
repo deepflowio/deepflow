@@ -1364,16 +1364,27 @@ vtap_group_id: g-xxxxxx
     ## Off-cpu profile configuration, Enterprise Edition Only.
     #off-cpu-profile:
       ## eBPF off-cpu Profile Switch
-      ## Default: true
-      #disabled: true
+      ## Default: false
+      #disabled: false
 
-      ## Sampling process name
+      ## Off-cpu trace process name
       ## Default: ^deepflow-.*
       #regex: ^deepflow-.*
 
+      ## Whether to obtain the value of CPUID and decide whether to participate in aggregation.
+      ## Set to 1:
+      ##    Obtain the value of CPUID and will be included in the aggregation of stack trace data.
+      ## Set to 0:
+      ##    It will not be included in the aggregation. Any other value is considered invalid,
+      ##    the CPU value for stack trace data reporting is a special value (CPU_INVALID:0xfff)
+      ##    used to indicate that it is an invalid value.
+      ## Default: 0
+      #cpu: 0
+
       ## Configure the minimum blocking event time
-      ## Default: 50us. Range: [1, 2^32-1)us
+      ## Default: 50us. Range: [0, 2^32-1)us
       ## Note:
+      ##   If set to 0, there will be no minimum value limitation.
       ##   Scheduler events are still high-frequency events, as their rate may exceed 1 million events
       ##   per second, so caution should still be exercised.
       ##   If overhead remains an issue, you can configure the 'minblock' tunable parameter here.

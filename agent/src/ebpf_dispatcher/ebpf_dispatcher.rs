@@ -616,6 +616,7 @@ impl EbpfCollector {
                             .as_ptr(),
                     );
 
+                    ebpf::set_offcpu_cpuid_aggregation(off_cpu.cpu as i32);
                     ebpf::set_offcpu_minblock_time(off_cpu.min_block.as_micros() as u32);
                 }
             }
