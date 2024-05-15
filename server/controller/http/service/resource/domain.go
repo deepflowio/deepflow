@@ -338,6 +338,14 @@ func CreateDomain(userInfo *svc.UserInfo, db *mysql.DB, domainCreate model.Domai
 	// encrypt password/access_key
 	for key := range DOMAIN_PASSWORD_KEYS {
 		if _, ok := domainCreate.Config[key]; ok && cfg != nil {
+
+			// running in standalone mode, not support password encryptKey
+			if common.IsStandaloneRunningMode() {
+				return nil, servicecommon.NewError(
+					httpcommon.SERVER_ERROR, "not support current type domain in standalone mode",
+				)
+			}
+
 			serverIP, grpcServerPort := getGrpcServerAndPort(db, domain.ControllerIP, cfg)
 			encryptKey, err := common.GetEncryptKey(
 				serverIP, grpcServerPort, domainCreate.Config[key].(string),
