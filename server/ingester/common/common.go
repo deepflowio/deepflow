@@ -24,7 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/stats"
@@ -141,12 +141,14 @@ const (
 	IpType         = 255
 	InternetIpType = 0
 
-	PodType     = 10
-	PodNodeType = 14
+	PodType     = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD)      // 10
+	PodNodeType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_NODE) // 14
 
-	ServiceType = 102
+	ServiceType    = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_SERVICE)     // 102
+	PodClusterType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_CLUSTER) // 103
 
-	ProcessType = 120
+	ProcessType = uint8(trident.AutoServiceType_AUTO_SERVICE_TYPE_PROCESS) // 120
+
 )
 
 func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
@@ -165,15 +167,15 @@ func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType uin
 	return 0, IpType
 }
 
-func GetAutoService(serviceID, podGroupID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
+func GetAutoService(serviceID, podGroupID, gpID, podClusterID, l3DeviceID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
 	if serviceID > 0 {
 		return serviceID, ServiceType
 	} else if podGroupID > 0 {
 		return podGroupID, podGroupType
 	} else if gpID > 0 {
 		return gpID, ProcessType
-	} else if podNodeID > 0 {
-		return podNodeID, PodNodeType
+	} else if podClusterID > 0 {
+		return podClusterID, PodClusterType
 	} else if l3DeviceID > 0 {
 		return l3DeviceID, l3DeviceType
 	} else if l3EpcID == datatype.EPC_FROM_INTERNET {
