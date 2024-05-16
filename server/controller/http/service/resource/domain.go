@@ -434,10 +434,11 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 		)
 	}
 
-	err := svc.IsUpdatePermitted(cfg.FPermit, userInfo, domain.TeamID)
-	if err != nil {
-		return nil, err
-	}
+	// TODO(kangxiang)
+	// err := svc.IsUpdatePermitted(cfg.FPermit, userInfo, domain.TeamID)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	resourceUp := map[string]interface{}{}
 	// team id
@@ -552,7 +553,7 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 	log.Infof("update domain (%s) config (%v)", domain.Name, domainUpdate)
 
 	// 更新domain DB
-	err = db.Model(&domain).Updates(dbUpdateMap).Error
+	err := db.Model(&domain).Updates(dbUpdateMap).Error
 	if err != nil {
 		return nil, err
 	}
@@ -629,16 +630,17 @@ func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB, userInfo *svc.Use
 func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) { // TODO whether release resource ids
 	log.Infof("delete domain (%s) resources started", domain.Name)
 
-	err := svc.IsDeletePermitted(cfg.FPermit, userInfo, domain.TeamID)
-	if err != nil {
-		return map[string]string{}, err
-	}
+	// TODO(kangxiang)
+	// err := svc.IsDeletePermitted(cfg.FPermit, userInfo, domain.TeamID)
+	// if err != nil {
+	// 	return map[string]string{}, err
+	// }
 
 	body := map[string]interface{}{
 		"resource_type": common.SET_RESOURCE_TYPE_DOMAIN,
 		"resource_ids":  domain.Lcuuid,
 	}
-	err = svc.SetReource(http.MethodDelete, cfg.FPermit, body, userInfo)
+	err := svc.SetReource(http.MethodDelete, cfg.FPermit, body, userInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -899,10 +901,11 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 		return nil, err
 	}
 
-	err := svc.IsAddPermitted(cfg.FPermit, userInfo, domain.TeamID)
-	if err != nil {
-		return nil, err
-	}
+	// TODO(kangxiang)
+	// err := svc.IsAddPermitted(cfg.FPermit, userInfo, domain.TeamID)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	var count int64
 	db.Model(&mysql.SubDomain{}).Where("name = ?", subDomainCreate.Name).Count(&count)
@@ -918,7 +921,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
 		"resource_id":   lcuuid,
 	}
-	err = svc.SetReource(http.MethodPost, cfg.FPermit, body, userInfo)
+	err := svc.SetReource(http.MethodPost, cfg.FPermit, body, userInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -957,10 +960,11 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *c
 		)
 	}
 
-	err := svc.IsUpdatePermitted(cfg.FPermit, userInfo, subDomain.TeamID)
-	if err != nil {
-		return nil, err
-	}
+	// TODO(kangxiang)
+	// err := svc.IsUpdatePermitted(cfg.FPermit, userInfo, subDomain.TeamID)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	log.Infof("update sub_domain (%s) config (%v)", subDomain.Name, subDomainUpdate)
 
@@ -977,7 +981,7 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *c
 		vTapValue = v.(string)
 	}
 
-	err = KubernetesSetVtap(lcuuid, vTapValue, true, db)
+	err := KubernetesSetVtap(lcuuid, vTapValue, true, db)
 	if err != nil {
 		return nil, err
 	}
@@ -997,16 +1001,17 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *c
 		)
 	}
 
-	err := svc.IsDeletePermitted(cfg.FPermit, userInfo, subDomain.TeamID)
-	if err != nil {
-		return map[string]string{}, err
-	}
+	// TODO(kangxiang)
+	// err := svc.IsDeletePermitted(cfg.FPermit, userInfo, subDomain.TeamID)
+	// if err != nil {
+	// 	return map[string]string{}, err
+	// }
 
 	body := map[string]interface{}{
 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
 		"resource_ids":  lcuuid,
 	}
-	err = svc.SetReource(http.MethodDelete, cfg.FPermit, body, userInfo)
+	err := svc.SetReource(http.MethodDelete, cfg.FPermit, body, userInfo)
 	if err != nil {
 		return nil, err
 	}

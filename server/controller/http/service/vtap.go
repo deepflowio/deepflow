@@ -42,11 +42,14 @@ import (
 type Agent struct {
 	cfg *config.ControllerConfig
 
-	userInfo *UserInfo
+	resourceAccess *ResourceAccess
 }
 
 func NewAgent(userInfo *UserInfo, cfg *config.ControllerConfig) *Agent {
-	return &Agent{userInfo: userInfo, cfg: cfg}
+	return &Agent{
+		cfg:            cfg,
+		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+	}
 }
 
 const (
@@ -61,7 +64,8 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	var azs []mysql.AZ
 	var vtapRepos []mysql.VTapRepo
 
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	userInfo := a.resourceAccess.userInfo
+	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +122,7 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 		vtapRepoNameToRevision[item.Name] = item.Branch + " " + item.RevCount
 	}
 
-	agents, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
+	agents, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return nil, err
 	}
@@ -237,10 +241,10 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 }
 
 func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
-	if err := IsAddPermitted(a.cfg.FPermit, a.userInfo, vtapCreate.TeamID); err != nil {
+	if err := a.resourceAccess.CanAddResource(vtapCreate.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.Vtap{}, err
 	}
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -292,7 +296,8 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 }
 
 func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	orgID := a.resourceAccess.userInfo.ORGID
+	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -312,7 +317,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	} else {
 		return model.Vtap{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify name or lcuuid")
 	}
-	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.Vtap{}, err
 	}
 
@@ -343,7 +348,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	}
 
 	response, _ := a.Get(map[string]interface{}{"lcuuid": vtap.Lcuuid})
-	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
@@ -392,7 +397,7 @@ func (a *Agent) checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
 }
 
 func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -404,7 +409,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
-	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.Vtap{}, err
 	}
 
@@ -437,7 +442,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 }
 
 func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +503,7 @@ func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (
 }
 
 func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +513,7 @@ func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
-	if err := IsDeletePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+	if err := a.resourceAccess.CanDeleteResource(vtap.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 

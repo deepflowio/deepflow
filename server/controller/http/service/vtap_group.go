@@ -41,11 +41,14 @@ var vtapGroupShortUUIDRegexp, _ = regexp.Compile(`^g-[A-Za-z0-9]{10}$`)
 type AgentGroup struct {
 	cfg *config.ControllerConfig
 
-	userInfo *UserInfo
+	resourceAccess *ResourceAccess
 }
 
 func NewAgentGroup(userInfo *UserInfo, cfg *config.ControllerConfig) *AgentGroup {
-	return &AgentGroup{userInfo: userInfo, cfg: cfg}
+	return &AgentGroup{
+		cfg:            cfg,
+		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+	}
 }
 
 func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
@@ -57,7 +60,8 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 	var groupToPendingVtapLcuuids map[string][]string
 	var groupToDisableVtapLcuuids map[string][]string
 
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	userInfo := a.resourceAccess.userInfo
+	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +79,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 		Db = Db.Where("team_id = ?", filter["team_id"])
 	}
 	Db.Order("created_at DESC").Find(&allVTapGroups)
-	vtapGroups, err := getAgentGroupByUser(a.userInfo, &a.cfg.FPermit, allVTapGroups)
+	vtapGroups, err := getAgentGroupByUser(userInfo, &a.cfg.FPermit, allVTapGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +88,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 		vtapGroupLcuuids = append(vtapGroupLcuuids, vtapGroup.Lcuuid)
 	}
 	vtapDB.Where("vtap_group_lcuuid IN (?)", vtapGroupLcuuids).Find(&allVTaps)
-	vtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
+	vtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return nil, err
 	}
@@ -136,14 +140,15 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 }
 
 func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.VtapGroup, err error) {
-	if err := IsAddPermitted(a.cfg.FPermit, a.userInfo, vtapGroupCreate.TeamID); err != nil {
+	userInfo := a.resourceAccess.userInfo
+	if err := a.resourceAccess.CanAddResource(vtapGroupCreate.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.VtapGroup{}, err
 	}
 
 	cfg := a.cfg
 	var vtapGroupCount int64
 
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return model.VtapGroup{}, err
 	}
@@ -188,7 +193,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 
 	var allVTaps []mysql.VTap
 	db.Where("lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&allVTaps)
-	vtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
+	vtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return model.VtapGroup{}, err
 	}
@@ -197,7 +202,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	}
 
 	response, _ := a.Get(map[string]interface{}{"lcuuid": lcuuid})
-	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
@@ -228,7 +233,8 @@ func verifyGroupID(db *gorm.DB, groupID string) error {
 }
 
 func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	userInfo := a.resourceAccess.userInfo
+	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return model.VtapGroup{}, err
 	}
@@ -239,7 +245,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
-	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.VtapGroup{}, err
 	}
 
@@ -284,12 +290,12 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 		var allOldVtaps []mysql.VTap
 		var allNewVtaps []mysql.VTap
 		db.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&allOldVtaps)
-		oldVtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allOldVtaps)
+		oldVtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allOldVtaps)
 		if err != nil {
 			return model.VtapGroup{}, err
 		}
 		db.Where("lcuuid IN (?)", vtapGroupUpdate["VTAP_LCUUIDS"]).Find(&allNewVtaps)
-		newVtaps, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allNewVtaps)
+		newVtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allNewVtaps)
 		if err != nil {
 			return model.VtapGroup{}, err
 		}
@@ -340,12 +346,13 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 	db.Model(&vtapGroup).Updates(dbUpdateMap)
 
 	response, _ := a.Get(map[string]interface{}{"lcuuid": lcuuid})
-	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
 func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	orgID := a.resourceAccess.userInfo.ORGID
+	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +362,7 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
-	if err := IsDeletePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 
@@ -370,6 +377,6 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 		Updates(map[string]interface{}{"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": defaultVtapGroup.TeamID})
 	db.Delete(&vtapGroup)
 	db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agent_config.AgentGroupConfigModel{})
-	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
