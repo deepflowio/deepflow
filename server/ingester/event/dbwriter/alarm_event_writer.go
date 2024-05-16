@@ -17,6 +17,8 @@
 package dbwriter
 
 import (
+	"sync/atomic"
+
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
@@ -43,6 +45,7 @@ func ReleaseAlarmEventStore(e *AlarmEventStore) {
 
 type AlarmEventStore struct {
 	Time   uint32
+	_id    uint64
 	Lcuuid string
 	User   string
 	UserId uint32
@@ -74,9 +77,16 @@ type AlarmEventStore struct {
 	TeamID                  uint16
 }
 
+func (e *AlarmEventStore) SetId(time, analyzerID uint32) {
+	count := atomic.AddUint32(&EventCounter, 1)
+	// The high 32 bits of time, 23-32 bits represent analyzerId, the low 22 bits are counter
+	e._id = uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
+}
+
 func AlarmEventColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
+		ckdb.NewColumn("_id", ckdb.UInt64),
 		ckdb.NewColumn("lccuid", ckdb.String),
 		ckdb.NewColumn("user", ckdb.LowCardinalityString),
 		ckdb.NewColumn("user_id", ckdb.UInt32),
@@ -111,6 +121,7 @@ func AlarmEventColumns() []*ckdb.Column {
 func (e *AlarmEventStore) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(e.Time)
 	block.Write(
+		e._id,
 		e.Lcuuid,
 		e.User,
 		e.UserId,
