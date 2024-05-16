@@ -535,7 +535,7 @@ func (a *AgentGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_co
 		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
 	}
 
-	if err := a.resourceAccess.CanAddResource(dbGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanAddResource(dbGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 
@@ -568,7 +568,7 @@ func (a *AgentGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*age
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
-	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 
@@ -596,7 +596,7 @@ func (a *AgentGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updat
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
-	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, "", nil); err != nil {
 		return nil, err
 	}
 

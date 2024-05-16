@@ -153,7 +153,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		isShowTagStatement = st
 	}
 	if isShowTagStatement {
-		tagsArray, err := showTags(ctx, db, table, startTime, endTime)
+		tagsArray, err := showTags(ctx, db, table, startTime, endTime, p.orgID)
 		if err != nil {
 			return ctx, "", "", "", "", err
 		}
@@ -354,6 +354,9 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 			metricsArray = append(metricsArray, fmt.Sprintf("%s as %s", tagName, tagAlias))
 		}
 	}
+	if len(p.blockTeamID) > 0 {
+		filters = append(filters, fmt.Sprintf("team_id not in (%s)", strings.Join(p.blockTeamID, ",")))
+	}
 
 	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy, orderBy)
 	return ctx, sql, db, dataPrecision, queryMetric, err
@@ -436,17 +439,17 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 	return
 }
 
-func showTags(ctx context.Context, db string, table string, startTime int64, endTime int64) ([]string, error) {
+func showTags(ctx context.Context, db string, table string, startTime int64, endTime int64, orgID string) ([]string, error) {
 	showTags := "SHOW tags FROM %s.%s WHERE time >= %d AND time <= %d"
 	var data *common.Result
 	var err error
 	var tagsArray []string
 	if db == "" || db == chCommon.DB_NAME_PROMETHEUS {
-		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, startTime, endTime), "", "", false, ctx)
+		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_PROMETHEUS, PROMETHEUS_TABLE, startTime, endTime), "", orgID, false, ctx)
 	} else if db == chCommon.DB_NAME_EXT_METRICS {
-		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, startTime, endTime), "", "", false, ctx)
+		data, err = tagdescription.GetTagDescriptions(chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, fmt.Sprintf(showTags, chCommon.DB_NAME_EXT_METRICS, EXT_METRICS_TABLE, startTime, endTime), "", orgID, false, ctx)
 	} else {
-		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), "", "", false, ctx)
+		data, err = tagdescription.GetTagDescriptions(db, table, fmt.Sprintf(showTags, db, table, startTime, endTime), "", orgID, false, ctx)
 	}
 	if err != nil || data == nil {
 		return tagsArray, err
@@ -1078,6 +1081,9 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 		// only when group by any tag, add `time` group
 		groupBy = append(groupBy, PROMETHEUS_TIME_COLUMNS)
 	}
+	if len(p.blockTeamID) > 0 {
+		filters = append(filters, fmt.Sprintf("team_id not in (%s)", strings.Join(p.blockTeamID, ",")))
+	}
 	sql := parseToQuerierSQL(ctx, chCommon.DB_NAME_PROMETHEUS, queryReq.GetMetric(), selection, filters, groupBy, orderBy)
 	return sql
 }
@@ -1200,8 +1206,8 @@ func formatTagName(tagName string) (newTagName string) {
 
 func (p *prometheusReader) addExternalTagCache(tag string, originTag string) {
 	// we don't need to add all tags into cache
-	if strings.Contains(tag, ".") || strings.Contains(tag, "-") || strings.Contains(tag, "/") {
-		p.addExternalTagToCache(tag, originTag)
+	if strings.Contains(originTag, ".") || strings.Contains(originTag, "-") || strings.Contains(originTag, "/") {
+		p.addExternalTagToCache(p.orgID, tag, originTag)
 	}
 }
 
@@ -1214,7 +1220,7 @@ func appendPrometheusPrefix(tag string) string {
 }
 
 func (p *prometheusReader) convertToQuerierAllowedTagName(matcherName string) (tagName string) {
-	if realTag := p.getExternalTagFromCache(matcherName); realTag != "" {
+	if realTag := p.getExternalTagFromCache(p.orgID, matcherName); realTag != "" {
 		return realTag
 	} else {
 		return matcherName

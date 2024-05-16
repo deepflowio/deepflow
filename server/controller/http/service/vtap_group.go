@@ -141,7 +141,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 
 func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.VtapGroup, err error) {
 	userInfo := a.resourceAccess.userInfo
-	if err := a.resourceAccess.CanAddResource(vtapGroupCreate.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanAddResource(vtapGroupCreate.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.VtapGroup{}, err
 	}
 
@@ -245,7 +245,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
-	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, "", nil); err != nil {
 		return model.VtapGroup{}, err
 	}
 
@@ -362,7 +362,7 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
-	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 

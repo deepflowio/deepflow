@@ -168,14 +168,8 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		// TODO(kangxiang)
-		userInfo := svc.GetUserInfo(c)
-		// err = svc.IsAddPermitted(cfg.FPermit, userInfo, domainCreate.TeamID)
-		// if err != nil {
-		// 	common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
-		// }
 		//create with the user id in the header
-		data, err := resource.CreateDomain(domainCreate, userInfo, db, cfg)
+		data, err := resource.CreateDomain(domainCreate, svc.GetUserInfo(c), db, cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
