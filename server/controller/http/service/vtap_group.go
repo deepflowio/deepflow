@@ -245,7 +245,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtapGroup); ret.Error != nil {
 		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
-	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, "", nil); err != nil {
 		return model.VtapGroup{}, err
 	}
 
