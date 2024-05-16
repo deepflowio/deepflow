@@ -212,15 +212,14 @@ func (s *ServiceDataOP) generateService() {
 		podServiceID := rData.podGroupIDToPodServiceID[podGroup.ID]
 		keyToPorts := make(map[GroupKey][]uint32)
 		for _, port := range ports {
-			if port.PodServiceID != podServiceID {
-				continue
-			}
 			key := GroupKey{
 				protocol:     getProtocol(port.Protocol),
-				podServiceID: port.PodServiceID,
+				podServiceID: podServiceID,
 			}
-			if _, ok := keyToPorts[key]; ok {
-				keyToPorts[key] = append(keyToPorts[key], uint32(port.Port))
+			if ports, ok := keyToPorts[key]; ok {
+				if Find[uint32](ports, uint32(port.Port)) != true {
+					keyToPorts[key] = append(keyToPorts[key], uint32(port.Port))
+				}
 			} else {
 				groupKeys = append(groupKeys, key)
 				keyToPorts[key] = []uint32{uint32(port.Port)}
