@@ -317,7 +317,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	} else {
 		return model.Vtap{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify name or lcuuid")
 	}
-	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.RESOURCE_TYPE_AGENT, "", nil); err != nil {
 		return model.Vtap{}, err
 	}
 
@@ -409,7 +409,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
-	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.RESOURCE_TYPE_AGENT, "", nil); err != nil {
 		return model.Vtap{}, err
 	}
 
