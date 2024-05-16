@@ -58,6 +58,9 @@ func (ra *ResourceAccess) CanAddResource(teamID int, resourceType, resourceUUID 
 	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
 	}
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+		return nil
+	}
 
 	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
 	body := map[string]interface{}{
@@ -74,13 +77,20 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 		return nil
 	}
 	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessUpdate)
-	url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+		url += fmt.Sprintf("&team_id=%s&resource_type=%s", teamID, resourceType)
+	} else {
+		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
+	}
+
 	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
 	}
-	if resourceUp == nil || len(resourceUp) == 0 {
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
+		resourceUp == nil || len(resourceUp) == 0 {
 		return nil
 	}
+
 	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
 	body := map[string]interface{}{
 		"resource_where": map[string]interface{}{
@@ -97,9 +107,17 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 		return nil
 	}
 	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessDelete)
-	url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+		url += fmt.Sprintf("&team_id=%s&resource_type=%s", teamID, resourceType)
+	} else {
+		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
+	}
+
 	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
+	}
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+		return nil
 	}
 
 	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)

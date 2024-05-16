@@ -33,6 +33,14 @@ type UserInfo struct {
 	DatabaseName string
 }
 
+func NewUserInfo(t, id, orgID int) *UserInfo {
+	return &UserInfo{
+		Type:  t,
+		ID:    id,
+		ORGID: orgID,
+	}
+}
+
 func GetUserInfo(c *gin.Context) *UserInfo {
 	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 	userType, _ := c.Get(common.HEADER_KEY_X_USER_TYPE)

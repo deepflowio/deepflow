@@ -690,11 +690,8 @@ const (
 const (
 	SET_RESOURCE_TYPE_DOMAIN     = "domain"
 	SET_RESOURCE_TYPE_SUB_DOMAIN = "sub_domain"
+
+	SET_RESOURCE_TYPE_AGENT = "agent"
 )
 
 const TRISOLARIS_NODE_TYPE_MASTER = "master"
-
-// RESOURCE TYPE used to permission verification.
-const (
-	RESOURCE_TYPE_AGENT = "agent"
-)
