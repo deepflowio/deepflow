@@ -133,7 +133,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	},
 	{
 		Dbs:         []string{"event"},
-		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
+		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local", "alarm_event", "alarm_event_local"},
 		ColumnNames: []string{"_id"},
 		ColumnType:  ckdb.UInt64,
 	},

@@ -443,6 +443,7 @@ func (d *Decoder) handleAlarmEvent(decoder *codec.SimpleDecoder) {
 func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s := dbwriter.AcquireAlarmEventStore()
 	s.Time = event.GetTimestamp()
+	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.Lcuuid = event.GetLcuuid()
 	s.User = event.GetUser()
 	s.UserId = event.GetUserId()
