@@ -251,7 +251,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	}
 
 	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), s.L3EpcID)
-	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(s.ServiceID, s.PodGroupID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
+	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(s.ServiceID, s.PodGroupID, s.GProcessID, uint32(s.PodClusterID), s.L3DeviceID, uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
 
 	s.AppInstance = strconv.Itoa(int(e.Pid))
 
@@ -301,7 +301,7 @@ func uint32ArrayToStr(u32s []uint32) string {
 }
 
 func getAutoInstance(instanceID, instanceType, GProcessID uint32) (uint32, uint8) {
-	if GProcessID == 0 || instanceType == ingestercommon.PodType {
+	if GProcessID == 0 || instanceType == uint32(ingestercommon.PodType) {
 		return instanceID, uint8(instanceType)
 	}
 	return GProcessID, ingestercommon.ProcessType
@@ -406,7 +406,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			s.ServiceID,
 			s.PodGroupID,
 			s.GProcessID,
-			s.PodNodeID,
+			uint32(s.PodClusterID),
 			s.L3DeviceID,
 			s.L3DeviceType,
 			podGroupType,

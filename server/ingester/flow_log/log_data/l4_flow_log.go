@@ -853,10 +853,10 @@ func (k *KnowledgeGraph) fill(
 	}
 
 	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
-	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
+	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, gpID0, uint32(k.PodClusterID0), k.L3DeviceID0, k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
 
 	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
-	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
+	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, uint32(k.PodClusterID1), k.L3DeviceID1, k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
 
 	k.OrgId, k.TeamID = platformData.QueryVtapOrgAndTeamID(vtapId)
 
