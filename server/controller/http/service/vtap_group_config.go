@@ -36,11 +36,14 @@ import (
 type AgentGroupConfig struct {
 	cfg *config.ControllerConfig
 
-	userInfo *UserInfo
+	resourceAccess *ResourceAccess
 }
 
 func NewAgentGroupConfig(userInfo *UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
-	return &AgentGroupConfig{userInfo: userInfo, cfg: cfg}
+	return &AgentGroupConfig{
+		cfg:            cfg,
+		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+	}
 }
 
 func ConvertStrToIntList(convertStr string) ([]int, error) {
@@ -531,7 +534,8 @@ func (a *AgentGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_co
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
 	}
-	if err := IsAddPermitted(a.cfg.FPermit, a.userInfo, dbGroup.TeamID); err != nil {
+
+	if err := a.resourceAccess.CanAddResource(dbGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 
@@ -564,7 +568,7 @@ func (a *AgentGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*age
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
-	if err := IsDeletePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 
@@ -592,7 +596,7 @@ func (a *AgentGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updat
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
-	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtapGroup.TeamID); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 
