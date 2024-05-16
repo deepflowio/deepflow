@@ -115,6 +115,7 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 	t := doc.Tags()
 	t.SetID("") // 由于需要修改Tag增删Field，清空ID避免字段脏
 
+	t.OrgId, t.TeamID = platformData.QueryVtapOrgAndTeamID(t.VTAPID)
 	// vtap_acl 分钟级数据不用填充
 	if doc.Meter().ID() == flow_metrics.ACL_ID &&
 		t.DatabaseSuffixID() == 1 { // 只有acl后缀
@@ -134,7 +135,6 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 		t.Code |= MainAddCode
 	}
 
-	t.OrgId, t.TeamID = platformData.QueryVtapOrgAndTeamID(t.VTAPID)
 	podGroupType, podGroupType1 := uint8(0), uint8(0)
 	if info1 != nil {
 		t.RegionID1 = uint16(info1.RegionID)
