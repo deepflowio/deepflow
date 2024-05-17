@@ -12,6 +12,7 @@
 16      , NAT Gateway             ,
 101     , K8s Workload            ,
 102     , Service                 ,
+103     , K8s Cluster             ,
 120     , Process                 ,
 130     , Deployment              ,
 131     , StatefulSet             ,
