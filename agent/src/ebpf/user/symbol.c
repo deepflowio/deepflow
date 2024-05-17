@@ -536,14 +536,20 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
 		/* Ensure that all tasks are completed before releasing. */
 		if (AO_SUB_F(&p->use, 1) == 0) {
-			if (kv->v.cache != p->syms_cache)
+			if (kv->v.cache != p->syms_cache) {
 				ebpf_warning
-				    ("kv->v.cache 0x%lx p->syms_cache 0x%lx\n",
-				     kv->v.cache, p->syms_cache);
+				    ("Curr pid %d kvp_pid %lu kv->v.cache 0x%lx p->syms_cache 0x%lx\n",
+				     (int)p->pid, kv->k.pid, kv->v.cache,
+				     p->syms_cache);
+			}
 			free_proc_cache(p);
 			kv->v.proc_info_p = 0;
 			kv->v.cache = 0;
 		}
+	} else {
+		if (kv->v.cache != 0)
+			ebpf_warning
+			    ("kv->v.cache 0x%lx proc_info_p 0\n", kv->v.cache);
 	}
 }
 
@@ -558,7 +564,7 @@ static inline void symbol_cache_pids_unlock(void)
 	__atomic_clear(cache_del_pids.lock, __ATOMIC_RELEASE);
 }
 
-static inline bool pid_is_already_existed(int pid)
+static inline bool pid_is_already_existed(struct symbolizer_cache_kvp *kv)
 {
 	/*
 	 * Make sure that there are no duplicate items of 'pid' in
@@ -567,7 +573,22 @@ static inline bool pid_is_already_existed(int pid)
 	 */
 	struct symbolizer_cache_kvp *kv_tmp;
 	vec_foreach(kv_tmp, cache_del_pids.pid_caches) {
-		if ((int)kv_tmp->k.pid == pid) {
+		if ((int)kv_tmp->k.pid == kv->k.pid) {
+			struct symbolizer_proc_info *list_p =
+			    (struct symbolizer_proc_info *)kv_tmp->v.
+			    proc_info_p;
+			struct symbolizer_proc_info *curr_p =
+			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
+			ebpf_warning
+			    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx) cache 0x%lx"
+			     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->) cache 0x%lx\n",
+			     (u64) list_p->pid, kv_tmp->k.pid,
+			     kv_tmp->v.proc_info_p,
+			     kv_tmp->v.proc_info_p !=
+			     0 ? list_p->syms_cache : 0, kv_tmp->v.cache,
+			     (u64) curr_p->pid, kv->k.pid, kv->v.proc_info_p,
+			     kv->v.proc_info_p != 0 ? curr_p->syms_cache : 0,
+			     kv->v.cache);
 			return true;
 		}
 	}
@@ -617,16 +638,6 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 
 static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 {
-	symbol_caches_hash_t *h = &syms_cache_hash;
-	if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *) kv,
-				       0 /* delete */ )) {
-		ebpf_warning
-		    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
-		     (pid_t) kv->k.pid);
-		return -1;
-	} else {
-		__sync_fetch_and_add(&h->hash_elems_count, -1);
-	}
 	free_symbolizer_cache_kvp(kv);
 	return 0;
 }
@@ -643,7 +654,7 @@ void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size)
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		AO_INC(&p->use);	
+		AO_INC(&p->use);
 		if (strlen(p->container_id) > 0) {
 			memcpy_s_inline((void *)id, id_size, p->container_id,
 					sizeof(p->container_id));
@@ -683,20 +694,6 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 		/* To filter out threads. */
 		if (!is_user_process(pid))
 			return;
-
-		kv.k.pid = (u64) pid;
-		kv.v.proc_info_p = 0;
-		kv.v.cache = 0;
-		if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-					      (symbol_caches_hash_kv *) & kv) !=
-		    0) {
-			add_proc_info_to_cache(&kv);
-		} else {
-			if (del_proc_info_from_cache(&kv) == 0)
-				add_proc_info_to_cache(&kv);
-		}
-
-		return;
 	}
 
 	kv.k.pid = (u64) pid;
@@ -715,7 +712,7 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 		}
 
 		symbol_cache_pids_lock();
-		if (pid_is_already_existed((int)kv.k.pid)) {
+		if (pid_is_already_existed(&kv)) {
 			symbol_cache_pids_unlock();
 			return;
 		}
@@ -725,6 +722,14 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 			ebpf_warning("vec add failed.\n");
 		}
 		symbol_cache_pids_unlock();
+
+		if (symbol_caches_hash_add_del
+		    (h, (symbol_caches_hash_kv *) & kv, 0 /* delete */ )) {
+			ebpf_warning("failed.(pid %d)\n", (pid_t) kv.k.pid);
+			return;
+		} else {
+			__sync_fetch_and_add(&h->hash_elems_count, -1);
+		}
 	}
 
 	/* If the profiler is not running, we need to actively clean up the
