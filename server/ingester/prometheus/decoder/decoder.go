@@ -382,6 +382,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			podName = l.Value
 			podNameID = valueID
 		} else if instanceID == 0 && l.Name == model.InstanceLabel {
+			instance = l.Value
 			instanceID = valueID
 		}
 
