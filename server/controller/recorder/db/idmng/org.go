@@ -71,7 +71,7 @@ func (m *IDManagers) Start() error {
 		return fmt.Errorf("failed to get org ids: %v", err)
 	}
 	for _, id := range orgIDs {
-		if _, err := m.NewIDManagerAndInitIfNotExists(id); err != nil {
+		if _, err := m.lazyCreate(id); err != nil {
 			return fmt.Errorf("failed to start id manager for org %d: %v", id, err)
 		}
 	}
@@ -106,6 +106,25 @@ func (m *IDManagers) timedRefresh() {
 			}
 		}
 	}()
+}
+
+func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Error("failed to get db: %v", err)
+		return nil, err
+	}
+	// 仅当组织中存在 domain 时，才创建组织的 IDManager，以避免内存浪费
+	var domain *mysql.Domain
+	if err := db.Find(&domain).Error; err != nil {
+		log.Error(db.PreORGID("failed to get domain: %v", err))
+		return nil, err
+	}
+	if domain == nil {
+		log.Info(db.PreORGID("no domain in db, skip creating id manager"))
+		return nil, nil
+	}
+	return m.NewIDManagerAndInitIfNotExists(orgID)
 }
 
 func (m *IDManagers) NewIDManagerAndInitIfNotExists(orgID int) (*IDManager, error) {
