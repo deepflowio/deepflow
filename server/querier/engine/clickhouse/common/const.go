@@ -25,6 +25,7 @@ const DB_NAME_EVENT = "event"
 const DB_NAME_PROFILE = "profile"
 const DB_NAME_PROMETHEUS = "prometheus"
 const DB_NAME_FLOW_TAG = "flow_tag"
+const DB_NAME_APPLICATION_LOG = "application_log"
 const TABLE_NAME_VTAP_ACL = "traffic_policy"
 const IndexTypeIncremetalId = "incremental-id"
 const FormatHex = "hex"
@@ -41,6 +42,7 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_EVENT:           []string{"event", "perf_event", "alarm_event"},
 	DB_NAME_PROFILE:         []string{"in_process"},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
+	DB_NAME_APPLICATION_LOG: []string{"log"},
 }
 
 var SHOW_TAG_VALUE_MAP = map[string][]string{

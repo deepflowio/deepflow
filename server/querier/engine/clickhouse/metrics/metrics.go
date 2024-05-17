@@ -119,7 +119,7 @@ func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
-	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
+	if db == "ext_metrics" || db == "deepflow_system" || db == ckcommon.DB_NAME_APPLICATION_LOG || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
@@ -304,6 +304,11 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 		case "in_process":
 			return GetInProcessMetrics(), err
 		}
+	case ckcommon.DB_NAME_APPLICATION_LOG:
+		switch table {
+		case "log":
+			return GetLogMetrics(), err
+		}
 	}
 	return map[string]*Metrics{}, err
 }
@@ -368,6 +373,31 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQuery
 		switch table {
 		case "in_process":
 			return GetInProcessMetrics(), err
+		}
+	case ckcommon.DB_NAME_APPLICATION_LOG:
+		switch table {
+		case "log":
+			metrics := make(map[string]*Metrics)
+			loads := GetLogMetrics()
+			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
+			for k, v := range loads {
+				if _, ok := metrics[k]; !ok {
+					metrics[k] = v
+				}
+			}
+			loadsLen := len(loads)
+			for k, v := range exts {
+				if _, ok := metrics[k]; !ok {
+					v.Index += loadsLen
+					metrics[k] = v
+				}
+			}
+			metrics["metrics"] = NewMetrics(
+				len(metrics), "metrics",
+				"metrics", "", METRICS_TYPE_ARRAY,
+				"metrics", []bool{true, true, true}, "", table, "", "",
+			)
+			return metrics, err
 		}
 	case "ext_metrics", "deepflow_system":
 		return GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
@@ -590,7 +620,7 @@ func GetTagDBField(name, db, table, orgID string) (string, error) {
 		}
 	} else {
 		if name == "metrics" {
-			if db == "flow_log" {
+			if db == "flow_log" || db == ckcommon.DB_NAME_APPLICATION_LOG {
 				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
 			} else {
 				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
@@ -705,6 +735,12 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "in_process":
 			metrics = IN_PROCESS_METRICS
 			replaceMetrics = IN_PROCESS_METRICS_REPLACE
+		}
+	case ckcommon.DB_NAME_APPLICATION_LOG:
+		switch table {
+		case "log":
+			metrics = LOG_METRICS
+			replaceMetrics = LOG_METRICS_REPLACE
 		}
 	case ckcommon.DB_NAME_PROMETHEUS:
 		metrics = PROMETHEUS_METRICS

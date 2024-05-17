@@ -151,7 +151,7 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			stmts = append(stmts, &SelectTag{Value: selectTag})
 		} else if name == "metrics" {
 			tagTranslator := ""
-			if db == "flow_log" {
+			if db == "flow_log" || db == chCommon.DB_NAME_APPLICATION_LOG {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
 			} else {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
