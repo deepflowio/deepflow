@@ -2382,6 +2382,9 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (19, '网络-网络策略', 'flow_metrics.traffic_policy', 60, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
+                 VALUES (20, '日志数据', 'application_log.log', 1, 7*24, @lcuuid);
 
 
 CREATE TABLE IF NOT EXISTS license (
