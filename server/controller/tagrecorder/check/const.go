@@ -839,6 +839,7 @@ var RESOURCE_TYPE_TO_NODE_TYPE = map[int]string{
 	common.VIF_DEVICE_TYPE_REDIS_INSTANCE:                  "redis",
 	common.VIF_DEVICE_TYPE_RDS_INSTANCE:                    "rds",
 	common.VIF_DEVICE_TYPE_POD_NODE:                        RESOURCE_TYPE_POD_NODE,
+	common.VIF_DEVICE_TYPE_POD_CLUSTER:                     RESOURCE_TYPE_POD_CLUSTER,
 	common.VIF_DEVICE_TYPE_LB:                              RESOURCE_TYPE_LB,
 	common.VIF_DEVICE_TYPE_NAT_GATEWAY:                     "natgw",
 	common.VIF_DEVICE_TYPE_INTERNET:                        RESOURCE_TYPE_INTERNET_IP,
