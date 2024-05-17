@@ -97,7 +97,7 @@ rrt_max                     , 最大应用时延            , 微秒 ,
 l7_error                    , 应用异常                , 个   ,
 l7_client_error             , 应用客户端异常          , 个   , 根据具体应用协议的响应码判断异常，不同协议的定义见 `l7_flow_log` 中 response_status 字段的说明 
 l7_server_error             , 应用服务端异常          , 个   , 根据具体应用协议的响应码判断异常，不同协议的定义见 `l7_flow_log` 中 response_status 字段的说明
-l7_server_timeout           , 应用服务端超时          , 个   , 发生应用超时的次数（应用超时默认时长：TCP 类应用 1800s；UDP 类应用 150s）
+l7_server_timeout           , 应用服务端超时          , 个   , 应用超时的统计次数（默认配置下：TCP 类应用在 1800s 内未采集到响应，UDP 类应用在 150s 内未采集到响应）
 l7_error_ratio              , 应用异常比例            , %    ,
 l7_client_error_ratio       , 应用客户端异常比例      , %    ,
 l7_server_error_ratio       , 应用服务端异常比例      , %    ,
