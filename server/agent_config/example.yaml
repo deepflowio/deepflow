@@ -1382,7 +1382,7 @@ vtap_group_id: g-xxxxxx
       #cpu: 0
 
       ## Configure the minimum blocking event time
-      ## Default: 50us. Range: [0, 2^32-1)us
+      ## Default: 50us. Range: [0, 3600000000]us
       ## Note:
       ##   If set to 0, there will be no minimum value limitation.
       ##   Scheduler events are still high-frequency events, as their rate may exceed 1 million events
