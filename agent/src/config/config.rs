@@ -783,7 +783,7 @@ impl YamlConfig {
         }
         c.ebpf.off_cpu_profile.min_block = c.ebpf.off_cpu_profile.min_block.clamp(
             Duration::from_micros(0),
-            Duration::from_micros(u32::MAX as u64 - 2),
+            Duration::from_micros(3600000000),
         );
 
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
