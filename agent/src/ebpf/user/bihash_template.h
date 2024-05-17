@@ -360,13 +360,15 @@ static inline int BV(clib_bihash_search_inline_2_with_hash)
 
 	if (PREDICT_FALSE(BV(clib_bihash_bucket_is_empty) (b)))
 		return -1;
-
+#if 0
 	if (PREDICT_FALSE(b->lock)) {
 		volatile BVT(clib_bihash_bucket) * bv = b;
 		while (bv->lock)
 			CLIB_PAUSE();
 	}
-
+#endif
+	// https://cloud.tencent.com/developer/article/2297515
+	BV (clib_bihash_lock_bucket) (b);
 	v = BV(clib_bihash_get_value) (h, b->offset);
 
 	/* If the bucket has unresolvable collisions, use linear search */
@@ -384,12 +386,17 @@ static inline int BV(clib_bihash_search_inline_2_with_hash)
 		if (BV(clib_bihash_key_compare)
 		    (v->kvp[i].key, search_key->key)) {
 			rv = v->kvp[i];
-			if (BV(clib_bihash_is_free) (&rv))
+			if (BV(clib_bihash_is_free) (&rv)) {
+				BV (clib_bihash_unlock_bucket) (b);
 				return -1;
+			}
 			*valuep = rv;
+			BV (clib_bihash_unlock_bucket) (b);
 			return 0;
 		}
 	}
+
+	BV (clib_bihash_unlock_bucket) (b);
 	return -1;
 }
 
