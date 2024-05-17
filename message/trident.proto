@@ -23,6 +23,7 @@ service Synchronizer {
     rpc GetUniversalTagNameMaps(UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
     // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
     rpc RemoteExecute(stream RemoteExecResponse) returns (stream RemoteExecRequest) {}
+    rpc GetOrgIDs(OrgIDsRequest) returns (OrgIDsResponse) {}
 }
 
 // debug service
@@ -115,6 +116,8 @@ message SyncRequest {
 
     optional string kubernetes_cluster_id = 45;    // 仅对容器类型的采集器有意义
     optional string kubernetes_cluster_name = 46;  // 仅对容器类型的采集器有意义
+
+    optional uint32 org_id = 50;  // only used by Ingester
 }
 
 enum Status {
@@ -1020,7 +1023,9 @@ message IdNameMap {
     optional string name = 2;
 }
 
-message UniversalTagNameMapsRequest {}
+message UniversalTagNameMapsRequest {
+    optional uint32 org_id = 1;
+}
 
 message UniversalTagNameMapsResponse {
     optional uint32 version = 1;
@@ -1109,4 +1114,10 @@ message RemoteExecResponse {
     repeated RemoteCommand commands = 2;
     repeated LinuxNamespace linux_namespaces = 3;
     optional CommandResult command_result = 4;
+}
+
+message OrgIDsRequest {}
+
+message OrgIDsResponse {
+    repeated uint32 org_ids = 1;
 }
