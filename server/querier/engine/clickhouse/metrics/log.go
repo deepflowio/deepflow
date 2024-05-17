@@ -14,9 +14,14 @@
  * limitations under the License.
  */
 
-package migration
+package metrics
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.5.1.33"
-)
+var LOG_METRICS = map[string]*Metrics{}
+
+var LOG_METRICS_REPLACE = map[string]*Metrics{
+	"log_count": NewReplaceMetrics("1", ""),
+}
+
+func GetLogMetrics() map[string]*Metrics {
+	return LOG_METRICS
+}

@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
 var EXT_METRICS = map[string]*Metrics{}
@@ -31,7 +32,7 @@ var EXT_METRICS = map[string]*Metrics{}
 func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
 	var err error
-	if db == "ext_metrics" || db == "deepflow_system" || (db == "flow_log" && table == "l7_flow_log") {
+	if db == "ext_metrics" || db == "deepflow_system" || db == common.DB_NAME_APPLICATION_LOG || (db == "flow_log" && table == "l7_flow_log") {
 		// Avoid UT failures
 		if config.Cfg == nil {
 			return nil, nil
