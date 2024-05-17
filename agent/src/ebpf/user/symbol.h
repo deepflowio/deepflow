@@ -176,26 +176,35 @@ struct symbol_tracepoint {
 
 static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
 {
-	return (u64) ((struct symbolizer_proc_info *)kv->v.proc_info_p)->stime;
+	struct symbolizer_proc_info *p = 
+		(struct symbolizer_proc_info *)kv->v.proc_info_p;
+	u64 stime;
+	AO_INC(&p->use);
+	stime = p->stime;
+	AO_DEC(&p->use);
+	return stime;
 }
 
 static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *kv)
 {
-	return (u64) ((struct symbolizer_proc_info *)kv->v.proc_info_p)->
-	    netns_id;
+	struct symbolizer_proc_info *p = 
+		(struct symbolizer_proc_info *)kv->v.proc_info_p;
+	u64 netns_id;
+	AO_INC(&p->use);
+	netns_id = p->netns_id;
+	AO_DEC(&p->use);
+	return netns_id;
 }
 
 static_always_inline void
 copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 {
-	static const int len =
-	    sizeof(((struct symbolizer_proc_info *) kv->v.proc_info_p)->comm);
-
-	strcpy_s_inline(dst, len,
-			((struct symbolizer_proc_info *)kv->v.proc_info_p)->
-			comm,
-			strlen(((struct symbolizer_proc_info *)kv->v.
-				proc_info_p)->comm));
+	struct symbolizer_proc_info *p = 
+		(struct symbolizer_proc_info *)kv->v.proc_info_p;
+	AO_INC(&p->use);
+	static const int len = sizeof(p->comm);
+	strcpy_s_inline(dst, len, p->comm, len);
+	AO_DEC(&p->use);
 }
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
