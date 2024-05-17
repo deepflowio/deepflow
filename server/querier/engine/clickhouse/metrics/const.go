@@ -49,6 +49,7 @@ var METRICS_TYPE_NAME_MAP = map[string]int{
 
 var METRICS_ARRAY_NAME_MAP = map[string][]string{
 	"flow_log":        []string{"metrics_names", "metrics_values"},
+	"application_log": []string{"metrics_names", "metrics_values"},
 	"ext_metrics":     []string{"metrics_float_names", "metrics_float_values"},
 	"deepflow_system": []string{"metrics_float_names", "metrics_float_values"},
 }
