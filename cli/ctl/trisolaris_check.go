@@ -51,6 +51,7 @@ type ParamData struct {
 	Type       string
 	PluginType string
 	PluginName string
+	OrgID      uint32
 }
 
 type SortedAcls []*trident.FlowAcl
@@ -201,10 +202,18 @@ func regiterCommand() []*cobra.Command {
 		},
 	}
 
+	orgIDsCmd := &cobra.Command{
+		Use:   "orgIDs",
+		Short: "get orgIDs from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			orgIDs(cmd)
+		},
+	}
+
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
 		tapTypesCmd, configCmd, segmentsCmd, containersCmd, vpcIPCmd, skipInterfaceCmd,
 		localServersCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, gpidAgentRequestCmd,
-		realGlobalCmd, ripToVipCmd, pluginCmd, agentCacheCmd, allCmd, universalTagNameCmd}
+		realGlobalCmd, ripToVipCmd, pluginCmd, agentCacheCmd, allCmd, universalTagNameCmd, orgIDsCmd}
 	return commands
 }
 
@@ -231,8 +240,10 @@ func RegisterTrisolarisCommand() *cobra.Command {
 
 func getConn(cmd *cobra.Command) *grpc.ClientConn {
 	server := common.GetServerInfo(cmd)
+	orgID := common.GetORGID(cmd)
 	paramData.RpcIP = server.IP
 	paramData.RpcPort = strconv.Itoa(int(server.RpcPort))
+	paramData.OrgID = uint32(orgID)
 	addr := net.JoinHostPort(paramData.RpcIP, paramData.RpcPort)
 	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithMaxMsgSize(1024*1024*200))
 	if err != nil {
@@ -250,6 +261,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	}
 	defer conn.Close()
 	var name, groupID, clusterID, teamID string
+	var orgID uint32
 	switch paramData.Type {
 	case "trident":
 		name = paramData.Type
@@ -258,6 +270,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		teamID = paramData.TeamID
 	case "analyzer":
 		name = paramData.Type
+		orgID = paramData.OrgID
 	default:
 		fmt.Printf("type(%s) muste be in [trident, analyzer]", paramData.Type)
 		return
@@ -271,6 +284,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		KubernetesClusterId: &clusterID,
 		ProcessName:         &name,
 		TeamId:              &teamID,
+		OrgId:               &orgID,
 	}
 	var response *trident.SyncResponse
 	var err error
@@ -299,6 +313,7 @@ func gpidAgentResponse(cmd *cobra.Command) {
 	reqData := &trident.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
+		TeamId:  &paramData.TeamID,
 	}
 	response, err := c.GPIDSync(context.Background(), reqData)
 	if err != nil {
@@ -345,7 +360,9 @@ func gpidGlobalTable(cmd *cobra.Command) {
 	defer conn.Close()
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
 	c := trident.NewDebugClient(conn)
-	reqData := &trident.GPIDSyncRequest{}
+	reqData := &trident.GPIDSyncRequest{
+		TeamId: &paramData.TeamID,
+	}
 	response, err := c.DebugGPIDGlobalData(context.Background(), reqData)
 	if err != nil {
 		fmt.Println(err)
@@ -368,6 +385,7 @@ func gpidAgentRequest(cmd *cobra.Command) {
 	reqData := &trident.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
+		TeamId:  &paramData.TeamID,
 	}
 	response, err := c.DebugGPIDVTapData(context.Background(), reqData)
 	if err != nil {
@@ -410,6 +428,7 @@ func realGlobal(cmd *cobra.Command) {
 	reqData := &trident.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
+		TeamId:  &paramData.TeamID,
 	}
 	response, err := c.DebugRealGlobalData(context.Background(), reqData)
 	if err != nil {
@@ -445,6 +464,7 @@ func ripToVip(cmd *cobra.Command) {
 	reqData := &trident.GPIDSyncRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
+		TeamId:  &paramData.TeamID,
 	}
 	response, err := c.DebugRIPToVIP(context.Background(), reqData)
 	if err != nil {
@@ -468,6 +488,7 @@ func agentCache(cmd *cobra.Command) {
 	reqData := &trident.AgentCacheRequest{
 		CtrlIp:  &paramData.CtrlIP,
 		CtrlMac: &paramData.CtrlMac,
+		TeamId:  &paramData.TeamID,
 	}
 	response, err := c.DebugAgentCache(context.Background(), reqData)
 	if err != nil {
@@ -667,6 +688,7 @@ func plugin(cmd *cobra.Command) {
 	reqData := &trident.PluginRequest{
 		CtrlIp:     &paramData.CtrlIP,
 		CtrlMac:    &paramData.CtrlMac,
+		TeamId:     &paramData.TeamID,
 		PluginType: &pluginType,
 		PluginName: &paramData.PluginName,
 	}
@@ -708,7 +730,8 @@ func universalTagName(cmd *cobra.Command) {
 	defer conn.Close()
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
 	client := trident.NewSynchronizerClient(conn)
-	resp, err := client.GetUniversalTagNameMaps(context.Background(), &trident.UniversalTagNameMapsRequest{})
+	resp, err := client.GetUniversalTagNameMaps(context.Background(),
+		&trident.UniversalTagNameMapsRequest{OrgId: &paramData.OrgID})
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -719,4 +742,20 @@ func universalTagName(cmd *cobra.Command) {
 		fmt.Println(err)
 	}
 	fmt.Println(string(b))
+}
+
+func orgIDs(cmd *cobra.Command) {
+	conn := getConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	client := trident.NewSynchronizerClient(conn)
+	resp, err := client.GetOrgIDs(context.Background(), &trident.OrgIDsRequest{})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(resp)
 }

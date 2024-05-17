@@ -73,7 +73,7 @@ func (e *VTapEvent) getPlugins(vConfig *vtap.VTapConfig) *api.PluginConfig {
 	}
 }
 
-func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTapInfo *vtap.VTapInfo) *api.Config {
+func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTapInfo *vtap.VTapInfo, orgID int) *api.Config {
 	vtapConfig := c.GetVTapConfig()
 	if vtapConfig == nil {
 		return &api.Config{}
@@ -197,10 +197,10 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	}
 
 	if vtapConfig.NatIPEnabled == 1 {
-		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
+		configure.ProxyControllerIp = proto.String(trisolaris.GetORGNodeInfo(orgID).GetControllerNatIP(c.GetControllerIP()))
 		configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
 
-		configure.AnalyzerIp = proto.String(trisolaris.GetGNodeInfo().GetTSDBNatIP(c.GetTSDBIP()))
+		configure.AnalyzerIp = proto.String(trisolaris.GetORGNodeInfo(orgID).GetTSDBNatIP(c.GetTSDBIP()))
 		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	}
 
@@ -218,10 +218,10 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	}
 
 	if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-		configure.AnalyzerIp = proto.String(trisolaris.GetGNodeInfo().GetTSDBPodIP(c.GetTSDBIP()))
+		configure.AnalyzerIp = proto.String(trisolaris.GetORGNodeInfo(orgID).GetTSDBPodIP(c.GetTSDBIP()))
 		configure.AnalyzerPort = proto.Uint32(uint32(trisolaris.GetIngesterPort()))
 
-		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
+		configure.ProxyControllerIp = proto.String(trisolaris.GetORGNodeInfo(orgID).GetControllerPodIP(c.GetControllerIP()))
 		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
 
 	}
@@ -236,7 +236,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
 	}
-	pcapDataRetention := trisolaris.GetGNodeInfo().GetPcapDataRetention()
+	pcapDataRetention := trisolaris.GetORGNodeInfo(orgID).GetPcapDataRetention()
 	if pcapDataRetention != 0 {
 		configure.PcapDataRetention = proto.Uint32(pcapDataRetention)
 	}
@@ -312,7 +312,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	ctrlMac := in.GetCtrlMac()
 	teamIDStr := in.GetTeamId()
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
-	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gVTapInfo == nil {
 		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) org_id %d not found vtapInfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
 		return e.GetFailedResponse(in, gVTapInfo), nil
@@ -441,7 +441,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		tapTypes = gVTapInfo.GetTapTypes()
 	}
 
-	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId(), gVTapInfo)
+	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId(), gVTapInfo, orgID)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
@@ -478,7 +478,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 }
 
 func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Config {
-	vtapConfig := trisolaris.GetGVTapInfo(orgID).GetVTapConfigFromShortID(groupID)
+	vtapConfig := trisolaris.GetORGVTapInfo(orgID).GetVTapConfigFromShortID(groupID)
 	if vtapConfig == nil {
 		return nil
 	}
@@ -570,7 +570,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
 	}
 	configure.LocalConfig = proto.String(
-		trisolaris.GetGVTapInfo(orgID).GetVTapLocalConfigByShortID(groupID))
+		trisolaris.GetORGVTapInfo(orgID).GetVTapLocalConfigByShortID(groupID))
 
 	if vtapConfig.ProxyControllerIP != "" {
 		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
@@ -588,7 +588,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest, orgID int) *api.SyncResp
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 
 	configInfo := e.generateNoVTapCacheConfig(in.GetVtapGroupIdRequest(), orgID)
-	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if in.GetKubernetesClusterId() != "" {
 		tridentType := common.TridentType(VTAP_TYPE_POD_VM)
 		if configInfo == nil {
@@ -648,7 +648,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest, orgID int) *api.SyncResp
 }
 
 func (e *VTapEvent) getVTapCache(in *api.SyncRequest, orgID int) (*vtap.VTapCache, error) {
-	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
@@ -675,7 +675,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespon
 	teamIDStr := in.GetTeamId()
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
-	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gVTapInfo == nil {
 		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) org_id is %d not found  vtapinfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, orgID)
 		return &api.SyncResponse{
@@ -748,7 +748,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespon
 		tapTypes = gVTapInfo.GetTapTypes()
 	}
 
-	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId(), gVTapInfo)
+	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId(), gVTapInfo, orgID)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
