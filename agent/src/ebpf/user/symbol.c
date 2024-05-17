@@ -643,11 +643,12 @@ void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size)
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		AO_INC(&p->use);	
 		if (strlen(p->container_id) > 0) {
 			memcpy_s_inline((void *)id, id_size, p->container_id,
 					sizeof(p->container_id));
 		}
-
+		AO_DEC(&p->use);
 		return;
 	}
 
@@ -707,7 +708,9 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		if (p != NULL) {
+			AO_INC(&p->use);
 			p->is_exit = 1;
+			AO_DEC(&p->use);
 			CLIB_MEMORY_STORE_BARRIER();
 		}
 
@@ -846,7 +849,6 @@ static inline void write_return_value(struct symbolizer_cache_kvp *kv,
 	*stime = cache_process_stime(kv);
 	*netns_id = cache_process_netns_id(kv);
 	*ptr = p;
-	AO_INC(&p->use);
 }
 
 void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
@@ -873,12 +875,14 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 		p = add_proc_info_to_cache(&kv);
 		if (p == NULL)
 			return;
+		AO_INC(&p->use);
 		symbolizer_proc_lock(p);
 		write_return_value(&kv, p, stime, netns_id, name, ptr);
 		symbolizer_proc_unlock(p);
 
 	} else {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		AO_INC(&p->use);
 		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (!p->verified) {
@@ -1032,6 +1036,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
+		AO_INC(&p->use);
 		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (p->verified) {
@@ -1077,26 +1082,31 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 				if (p->is_java) {
 					java_expired_update(h, &kv, p);
 					symbolizer_proc_unlock(p);
+					AO_DEC(&p->use);
 					return (void *)kv.v.cache;
 				} else {
 					void *ret =
 					    symbols_cache_update(h, &kv, p);
 					symbolizer_proc_unlock(p);
+					AO_DEC(&p->use);
 					return ret;
 				}
 			}
 		} else {
 			symbolizer_proc_unlock(p);
+			AO_DEC(&p->use);
 			/* Ensure that newly launched JAVA processes are detected. */
 			return NULL;
 		}
 
 		if (kv.v.cache) {
 			symbolizer_proc_unlock(p);
+			AO_DEC(&p->use);
 			return (void *)kv.v.cache;
 		}
 
 		symbolizer_proc_unlock(p);
+		AO_DEC(&p->use);
 	}
 
 	return NULL;
