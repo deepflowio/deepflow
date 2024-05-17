@@ -36,6 +36,7 @@
 //Program jmp tables
 #define MAP_PROGS_JMP_KP_NAME		"__progs_jmp_kp_map"
 #define MAP_PROGS_JMP_TP_NAME		"__progs_jmp_tp_map"
+#define MAP_PROGS_JMP_PERF_NAME		"__progs_jmp_perf_map"
 
 #define PROG_DATA_SUBMIT_NAME_FOR_KP	"bpf_prog_kp__data_submit"
 #define PROG_DATA_SUBMIT_NAME_FOR_TP	"bpf_prog_tp__data_submit"
@@ -63,6 +64,14 @@ enum {
 	PROG_DATA_SUBMIT_KP_IDX,
 	PROG_OUTPUT_DATA_KP_IDX,
 	PROG_KP_NUM
+};
+
+enum {
+        PROG_BPF_PERF_EVENT_IDX,
+        PROG_PYTHON_FRAME_PTR_IDX,
+        PROG_PYTHON_WALK_STACK_IDX,
+        PROG_PYTHON_PERF_OUTPUT_IDX,
+        PROG_PERF_NUM
 };
 
 //thread index for bihash

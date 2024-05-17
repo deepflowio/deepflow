@@ -43,6 +43,7 @@ void release_stack_str_hash(stack_str_hash_t *h);
 char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
+				      const char *intp_stack_map_name,
 				      stack_str_hash_t *h,
 				      bool new_cache,
 				      char *process_name, void *info_p);
