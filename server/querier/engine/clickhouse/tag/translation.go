@@ -1280,6 +1280,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"policy_name %s %s",
 			"%s(policy_name, %s)",
 		),
+		"icon_id": NewTag(
+			"0",
+			"",
+			"",
+			"",
+		),
+		"node_type": NewTag(
+			"'alarm_policy'",
+			"",
+			"",
+			"",
+		),
 	}
 	tagResourceMap["alarm_policy_id"] = map[string]*Tag{
 		"default": NewTag(
