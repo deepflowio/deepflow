@@ -1007,11 +1007,12 @@ impl KafkaLog {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 offset += 1;
+
                 if let Some((group_id, group_id_len)) =
                     Self::decode_compact_string(&payload[offset..])
                 {
                     info.group_id = group_id;
-                    offset = group_id_len;
+                    offset += group_id_len;
                 }
             }
             _ => return Err(Error::KafkaLogParseFailed),
@@ -1033,11 +1034,23 @@ impl KafkaLog {
             // LeaveGroup Response (Version: 1) => throttle_time_ms error_code
             //   throttle_time_ms => INT32
             //   error_code => INT16
-            1..=5 => {
+            1..=3 => {
                 if 6 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 info.status_code = Some(read_i16_be(&payload[4..]) as i32);
+            }
+            // LeaveGroup Response (Version: 4) => throttle_time_ms error_code
+            //   throttle_time_ms => INT32
+            //   error_code => INT16
+            4..=5 => {
+                // _tagged_field
+                let offset = 1;
+                if offset + 6 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+
+                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
             }
             _ => return Err(Error::KafkaLogParseFailed),
         }
@@ -1074,9 +1087,17 @@ impl KafkaLog {
             //     metadata => COMPACT_BYTES
             //   reason => COMPACT_NULLABLE_STRING
             6..=9 => {
-                if let Some((group_id, group_id_len)) = Self::decode_compact_string(payload) {
+                // _tagged_fields
+                if payload.len() < 1 {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                offset += 1;
+
+                if let Some((group_id, group_id_len)) =
+                    Self::decode_compact_string(&payload[offset..])
+                {
                     info.group_id = group_id;
-                    offset = group_id_len;
+                    offset += group_id_len;
                 }
             }
             _ => return Err(Error::KafkaLogParseFailed),
@@ -1112,11 +1133,30 @@ impl KafkaLog {
             //   members => member_id metadata
             //     member_id => STRING
             //     metadata => BYTES
-            2..=9 => {
+            2..=5 => {
                 if 6 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 info.status_code = Some(read_i16_be(&payload[4..]) as i32);
+            }
+            // JoinGroup Response (Version: 6) => throttle_time_ms error_code generation_id protocol_name leader member_id [members]
+            //   throttle_time_ms => INT32
+            //   error_code => INT16
+            //   generation_id => INT32
+            //   protocol_name => COMPACT_STRING
+            //   leader => COMPACT_STRING
+            //   member_id => COMPACT_STRING
+            //   members => member_id metadata
+            //     member_id => COMPACT_STRING
+            //     group_instance_id => COMPACT_NULLABLE_STRING
+            //     metadata => BYTES
+            6..=9 => {
+                // _tagged_field
+                let offset = 1;
+                if offset + 6 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
             }
             _ => return Err(Error::KafkaLogParseFailed),
         }
@@ -1152,9 +1192,17 @@ impl KafkaLog {
             //     member_id => COMPACT_STRING
             //     assignment => COMPACT_BYTES
             4..=5 => {
-                if let Some((group_id, group_id_len)) = Self::decode_compact_string(payload) {
+                // _tagged_field
+                if 1 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                offset += 1;
+
+                if let Some((group_id, group_id_len)) =
+                    Self::decode_compact_string(&payload[offset..])
+                {
                     info.group_id = group_id;
-                    offset = group_id_len;
+                    offset += group_id_len;
                 }
             }
             _ => return Err(Error::KafkaLogParseFailed),
@@ -1174,17 +1222,31 @@ impl KafkaLog {
                 }
                 info.status_code = Some(read_i16_be(payload) as i32);
             }
-            // SyncGroup Response (Version: [1-5]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
+            // SyncGroup Response (Version: [1-3]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
             //   throttle_time_ms => INT32
             //   error_code => INT16
             //   protocol_type => COMPACT_NULLABLE_STRING
             //   protocol_name => COMPACT_NULLABLE_STRING
             //   assignment => COMPACT_BYTES
-            1..=5 => {
+            1..=3 => {
                 if 6 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 info.status_code = Some(read_i16_be(&payload[4..]) as i32);
+            }
+            // SyncGroup Response (Version: [4-5]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
+            //   throttle_time_ms => INT32
+            //   error_code => INT16
+            //   protocol_type => COMPACT_NULLABLE_STRING
+            //   protocol_name => COMPACT_NULLABLE_STRING
+            //   assignment => COMPACT_BYTES
+            4..=5 => {
+                // _tagged_fields
+                let offset = 1;
+                if offset + 6 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
             }
             _ => return Err(Error::KafkaLogParseFailed),
         }
@@ -1500,6 +1562,9 @@ mod tests {
             ("produce.pcap", "produce.result"),
             ("produce-v9.pcap", "produce-v9.result"),
             ("kafka-sw8.pcap", "kafka-sw8.result"),
+            ("kafka-leave-v4.pcap", "kafka-leave-v4.result"),
+            ("kafka-sync-v5.pcap", "kafka-sync-v5.result"),
+            ("kafka-join-v7.pcap", "kafka-join-v7.result"),
         ];
 
         for item in files.iter() {
