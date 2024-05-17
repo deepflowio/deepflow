@@ -17,6 +17,7 @@
 package vtap
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
@@ -209,6 +210,28 @@ type VTapCache struct {
 	PlatformData *atomic.Value //*PlatformData
 
 	vTapInfo *VTapInfo
+}
+
+func (c *VTapCache) String() string {
+	return fmt.Sprintf(
+		"{id: %d, name: %s, rawHostname: %s, state: %d, enable: %d, vTapType: %d, "+
+			"ctrlIP:%s, ctrlMac:%s, tsdbIP: %s, curTSDBIP: %s, controllerIP: %s, "+
+			"curControllerIP: %s, launchServer: %s, launchServerID: %d, syncedControllerAt: %s, "+
+			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, licenseType: %d, "+
+			"tapMode: %d, teamID: %d, licenseFunctionSet: %s, enabledTrafficDistribution: %v, "+
+			"enabledNetworkMonitoring: %v, enabledCallMonitoring: %v, enabledFunctionMonitoring: %v, "+
+			"enabledApplicationMonitoring: %v, enabledIndicatorMonitoring: %v, enabledLogMonitoring: %v, "+
+			"podDomains: %v, pushVersionPlatformData: %d, pushVersionPolicy: %d, pushVersionGroups: %d, "+
+			"expectedRevision: %s, upgradePackage: %s, podClusterID: %d, VPCID: %d}",
+		c.GetVTapID(), c.GetVTapHost(), c.GetVTapRawHostname(), c.state, c.enable, c.vTapType,
+		c.GetCtrlIP(), c.GetCtrlMac(), c.GetTSDBIP(), c.GetCurTSDBIP(), c.GetControllerIP(),
+		c.GetCurControllerIP(), c.GetLaunchServer(), c.GetLaunchServerID(), c.GetSyncedControllerAt(),
+		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.licenseType,
+		c.tapMode, c.teamID, c.licenseFunctionSet, c.EnabledTrafficDistribution(),
+		c.EnabledNetworkMonitoring(), c.EnabledCallMonitoring(), c.EnabledFunctionMonitoring(),
+		c.EnabledApplicationMonitoring(), c.EnabledIndicatorMonitoring(), c.EnabledLogMonitoring(),
+		c.podDomains, c.pushVersionPlatformData, c.pushVersionPolicy, c.pushVersionGroups,
+		c.GetExpectedRevision(), c.GetUpgradePackage(), c.podClusterID, c.VPCID)
 }
 
 func NewVTapCache(vtap *mysql.VTap, vTapInfo *VTapInfo) *VTapCache {

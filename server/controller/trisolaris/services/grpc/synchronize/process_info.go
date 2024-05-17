@@ -34,7 +34,7 @@ func NewprocessInfoEvent() *ProcessInfoEvent {
 
 func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
 	orgID := trisolaris.GetOrgIDByTeamID(in.GetTeamId())
-	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
+	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gVTapInfo == nil {
 		return EmptyGPIDResponse, nil
 	}
@@ -67,7 +67,7 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 
 func (e *ProcessInfoEvent) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncRequests) (*api.ShareGPIDSyncRequests, error) {
 	log.Infof("receive gpid sync data from server(%s) ORGID(%d)", in.GetServerIp(), in.GetOrgId())
-	processInfo := trisolaris.GetGVTapInfo(int(in.GetOrgId())).GetProcessInfo()
+	processInfo := trisolaris.GetORGVTapInfo(int(in.GetOrgId())).GetProcessInfo()
 	if processInfo == nil {
 		return &api.ShareGPIDSyncRequests{}, nil
 	}
