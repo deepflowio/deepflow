@@ -18,8 +18,8 @@ flow_load                   , 活跃连接                , 连接 , 采集周�
 syn_count                   , SYN 包数                , 包   , SYN 包的总数
 synack_count                , SYN-ACK 包数            , 包   , SYN-ACK 包的总数
 l4_byte                     , 传输层载荷              , 字节 , `发送传输层载荷 + 接收传输层载荷`
-l4_byte_tx                  , 发送传输层载荷          , 字节 , 资源发送的包传输层载荷字节数总和（不含 TCP/UDP 头部）
-l4_byte_rx                  , 接收传输层载荷          , 字节 , 资源接收的包传输层载荷字节数总和（不含 TCP/UDP 头部）
+l4_byte_tx                  , 发送传输层载荷          , 字节 , 资源发送的包传输层载荷字节数总和（不含 TCP/UDP 头）
+l4_byte_rx                  , 接收传输层载荷          , 字节 , 资源接收的包传输层载荷字节数总和（不含 TCP/UDP 头）
 
 retrans_syn                 , SYN 重传                , 包   , SYN 包的重传次数
 retrans_synack              , SYN-ACK 重传            , 包   , SYN-ACK 包的重传次数
