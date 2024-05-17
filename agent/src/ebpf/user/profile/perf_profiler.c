@@ -300,7 +300,6 @@ static int create_profiler(struct bpf_tracer *tracer)
 	ret = create_work_thread("java_update",
 				 &java_syms_update_thread,
 				 (void *)java_syms_update_work, (void *)tracer);
-
 	if (ret) {
 		goto error;
 	}
@@ -353,6 +352,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 		if (ret) {
 			goto error;
 		}
+
 	} else {
 		tracer->enable_sample = false;
 		ebpf_info(LOG_CP_TAG "=== oncpu profiler disabled ===\n");
@@ -522,6 +522,46 @@ static struct tracer_sockopts cpdbg_sockopts = {
 	.get = cpdbg_sockopt_get,
 };
 
+static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
+					const char *map_name,
+					const char *prog_name, int key)
+{
+	struct ebpf_prog *prog;
+	prog = ebpf_obj__get_prog_by_name(tracer->obj, prog_name);
+	if (prog == NULL) {
+		ebpf_error("bpf_obj__get_prog_by_name() not find \"%s\"\n",
+			   prog_name);
+	}
+
+	if (!bpf_table_set_value(tracer, map_name, key, &prog->prog_fd)) {
+		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n",
+			   prog->prog_fd);
+	}
+
+	ebpf_info("Insert into map('%s'), key %d, program name %s\n",
+		  map_name, key, prog_name);
+}
+
+static void insert_perf_event_programs(struct bpf_tracer *tracer)
+{
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_PERF_NAME,
+				    "bpf_perf_event",
+				    PROG_BPF_PERF_EVENT_IDX);
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_PERF_NAME,
+				    "bpf_prog_pe__python_frame_ptr",
+				    PROG_PYTHON_FRAME_PTR_IDX);
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_PERF_NAME,
+				    "bpf_prog_pe__python_walk_stack",
+				    PROG_PYTHON_WALK_STACK_IDX);
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_PERF_NAME,
+				    "bpf_prog_pe__python_perf_output",
+				    PROG_PYTHON_PERF_OUTPUT_IDX);
+}
+
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
@@ -606,6 +646,8 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 			     (void *)callback, freq);
 	if (tracer == NULL)
 		return (-1);
+
+	insert_perf_event_programs(tracer);
 
 	if (sockopt_register(&cpdbg_sockopts) != ETR_OK)
 		return (-1);

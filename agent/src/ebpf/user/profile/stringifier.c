@@ -62,6 +62,7 @@
 
 static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
+static const char *i_err_tag = "[interpreter stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
@@ -400,12 +401,90 @@ failed:
 	return NULL;
 }
 
+static char *build_interpreter_stack_trace_string(struct bpf_tracer *t,
+				      const char *intp_stack_map_name,
+				      pid_t pid,
+				      u64 stack_id)
+{
+	ASSERT(pid >= 0 && stack_id != 0);
+
+	stack_trace_t stack = { 0 };
+	if (!bpf_table_get_value(t, intp_stack_map_name, stack_id, (void *)&stack)) {
+		return NULL;
+	}
+
+	if (stack.len == 0) {
+		return NULL;
+	}
+
+	symbol_t symbols[512];
+	__u32 symbol_ids[512];
+
+	struct ebpf_map *map = ebpf_obj__get_map_by_name(t->obj, "__python_symbols");
+	int fd = map->fd;
+
+	symbol_t key = {};
+	int n = 0;
+	while (bpf_get_next_key(fd, &key, &symbols[n]) == 0) {
+		int ret = bpf_lookup_elem(fd, &symbols[n], &symbol_ids[n]);
+		key = symbols[n];
+		if (ret == 0) {
+			n++;
+		}
+	}
+
+	int folded_size = 0;
+	for (int i = stack.len - 1; i >= 0; i--) {
+		folded_size += 1; // ;
+		__u64 addr = stack.addresses[i];
+		if (addr == 0) {
+			folded_size += strlen("-;");
+			continue;
+		}
+		__u32 symbol_id = addr & 0xFFFF;
+		for (int j = 0; j < n; j++) {
+			if (symbol_ids[j] == symbol_id) {
+				symbol_t *s = &symbols[j];
+				folded_size += strlen(s->class_name) + 2 + strlen(s->method_name);
+			}
+		}
+	}
+
+	char *fold_stack_trace_str =
+	    clib_mem_alloc_aligned("folded_str", folded_size, 0, NULL);
+
+    int offset = 0;
+	for (int i = stack.len - 1; i >= 0; i--) {
+		if (offset != 0) {
+			offset += snprintf(fold_stack_trace_str + offset, folded_size - offset, ";");
+		}
+		__u64 addr = stack.addresses[i];
+		if (addr == 0) {
+			offset += snprintf(fold_stack_trace_str + offset, folded_size - offset, "-");
+			continue;
+		}
+		__u32 symbol_id = addr & 0xFFFF;
+		for (int j = 0; j < n; j++) {
+			if (symbol_ids[j] == symbol_id) {
+				symbol_t *s = &symbols[j];
+				if (strlen(s->class_name) > 0) {
+					offset += snprintf(fold_stack_trace_str + offset, folded_size - offset, "%s::", s->class_name);
+				}
+				offset += snprintf(fold_stack_trace_str + offset, folded_size - offset, "%s", s->method_name);
+			}
+		}
+	}
+
+	return fold_stack_trace_str;
+}
+
 static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       int stack_id,
 				       pid_t pid,
 				       const char *stack_map_name,
+				       const char *intp_stack_map_name,
 				       stack_str_hash_t * h,
-				       bool new_cache, void *info_p, u64 ts)
+				       bool new_cache, void *info_p, u64 ts, u64 intp_stack_id)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -414,6 +493,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	 * stack trace string has already been stored. 
 	 */
 	stack_str_hash_kv kv;
+	// FIXME: hack here: stack id from kernel/user and interpreter may collide, which shouldn't be a problem in demo
 	kv.key = (u64) stack_id;
 	kv.value = 0;
 	if (stack_str_hash_search(h, &kv, &kv) == 0) {
@@ -423,8 +503,13 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 
 	char *str = NULL;
 	int ret_val = 0;
-	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val, info_p, ts);
+	if (intp_stack_id == 0) {
+		str = build_stack_trace_string(t, stack_map_name,
+		                   pid, stack_id,
+					       h, new_cache, &ret_val, info_p, ts);
+	} else {
+		str = build_interpreter_stack_trace_string(t, intp_stack_map_name, pid, intp_stack_id);
+	}
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
@@ -471,6 +556,7 @@ static inline char *alloc_stack_trace_str(int len)
 char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
+				      const char *intp_stack_map_name,
 				      stack_str_hash_t * h,
 				      bool new_cache,
 				      char *process_name, void *info_p)
@@ -491,9 +577,9 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	 */
 
 	/* add separator and '\0' */
-	int len = 2;
-	char *k_trace_str, *u_trace_str, *trace_str;
-	k_trace_str = u_trace_str = trace_str = NULL;
+	int len = 3;
+	char *k_trace_str, *u_trace_str, *i_trace_str, *trace_str;
+	k_trace_str = u_trace_str = i_trace_str = trace_str = NULL;
 
 	/* For processes without configuration, the stack string is in the format
 	   'process name;thread name'. */
@@ -527,9 +613,9 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
-							0, stack_map_name,
+							0, stack_map_name, intp_stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp);
+							v->timestamp, 0);
 		if (k_trace_str == NULL)
 			return NULL;
 	}
@@ -537,67 +623,24 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
-							stack_map_name,
+							stack_map_name, intp_stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp);
+							v->timestamp, 0);
 		if (u_trace_str == NULL)
 			return NULL;
 	}
 
-	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
-	if (v->kernstack >= 0 && v->userstack >= 0) {
-		if (k_trace_str) {
-			len += strlen(k_trace_str);
-		} else {
-			len += strlen(k_err_tag);
-		}
-
-		if (u_trace_str) {
-			len += strlen(u_trace_str);
-		} else {
-			len += strlen(u_err_tag);
-		}
-
-		trace_str = alloc_stack_trace_str(len);
-		if (trace_str == NULL) {
-			ebpf_warning("No available memory space.\n");
+	if (v->intpstack != 0) {
+		i_trace_str = folded_stack_trace_string(t, 0,
+							v->tgid,
+							stack_map_name, intp_stack_map_name,
+							h, new_cache, info_p,
+							v->timestamp, v->intpstack);
+		if (i_trace_str == NULL)
 			return NULL;
-		}
-		snprintf(trace_str, len, "%s;%s",
-			 u_trace_str ? u_trace_str : u_err_tag,
-			 k_trace_str ? k_trace_str : k_err_tag);
+	}
 
-	} else if (v->kernstack >= 0) {
-		if (k_trace_str) {
-			len += strlen(k_trace_str);
-		} else {
-			len += strlen(k_err_tag);
-		}
-
-		trace_str = alloc_stack_trace_str(len);
-		if (trace_str == NULL) {
-			ebpf_warning("No available memory space.\n");
-			return NULL;
-		}
-
-		snprintf(trace_str, len, "%s",
-			 k_trace_str ? k_trace_str : k_err_tag);
-	} else if (v->userstack >= 0) {
-		if (u_trace_str) {
-			len += strlen(u_trace_str);
-		} else {
-			len += strlen(u_err_tag);
-		}
-
-		trace_str = alloc_stack_trace_str(len);
-		if (trace_str == NULL) {
-			ebpf_warning("No available memory space.\n");
-			return NULL;
-		}
-
-		snprintf(trace_str, len, "%s",
-			 u_trace_str ? u_trace_str : u_err_tag);
-	} else {
+	if (v->kernstack < 0 && v->userstack < 0 && v->intpstack == 0) {
 		/* 
 		 * The kernel can indicate the invalidity of a stack ID in two
 		 * different ways:
@@ -621,6 +664,52 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		}
 
 		snprintf(trace_str, len, "%s", lost_tag);
+		return trace_str;
+	}
+
+	if (v->kernstack >= 0) {
+		if (k_trace_str) {
+			len += strlen(k_trace_str);
+		} else {
+			len += strlen(k_err_tag);
+		}
+	}
+
+	if (v->userstack >= 0) {
+		if (u_trace_str) {
+			len += strlen(u_trace_str);
+		} else {
+			len += strlen(u_err_tag);
+		}
+	}
+
+	if (v->intpstack != 0) {
+		if (i_trace_str) {
+			len += strlen(i_trace_str);
+		} else {
+			len += strlen(i_err_tag);
+		}
+	}
+
+	trace_str = alloc_stack_trace_str(len);
+	if (trace_str == NULL) {
+		ebpf_warning("No available memory space.\n");
+		return NULL;
+	}
+
+	int offset = 0;
+	bool last_stack = false;
+
+	if (v->userstack >= 0) {
+		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", u_trace_str ? u_trace_str : u_err_tag);
+		last_stack = true;
+	}
+	if (v->intpstack != 0) {
+		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", i_trace_str ? i_trace_str : i_err_tag);
+		last_stack = true;
+	}
+	if (v->kernstack >= 0) {
+		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", k_trace_str ? k_trace_str : k_err_tag);
 	}
 
 	return trace_str;
