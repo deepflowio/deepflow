@@ -1,13 +1,13 @@
 # Field                     , DisplayName             , Unit , Description
 byte                        , 字节                    , 字节 , `发送字节 + 接收字节`
-byte_tx                     , 发送字节                , 字节 , 客户端发往服务端的字节数总和（含 Ethernet 头） 
-byte_rx                     , 接收字节                , 字节 , 服务端发往客户端的字节数总和（含 Ethernet 头） 
+byte_tx                     , 发送字节                , 字节 , 资源发送的字节数总和（含 Ethernet 头） 
+byte_rx                     , 接收字节                , 字节 , 资源接收的字节数总和（含 Ethernet 头） 
 packet                      , 包数                    , 包   , `发送包数 + 接收包数`
-packet_tx                   , 发送包数                , 包   , 客户端发往服务端的包数总和
-packet_rx                   , 接收包数                , 包   , 服务端发往客户端的包数总和
+packet_tx                   , 发送包数                , 包   , 资源发送的包数总和
+packet_rx                   , 接收包数                , 包   , 资源接收的包数总和
 l3_byte                     , 网络层载荷              , 字节 , `发送网络层载荷 + 接收网络层载荷`
-l3_byte_tx                  , 发送网络层载荷          , 字节 , 客户端发往服务端的网络层载荷字节数总和（不含 IP 头）
-l3_byte_rx                  , 接收网络层载荷          , 字节 , 服务端发往客户端的网络层载荷字节数总和（不含 IP 头）
+l3_byte_tx                  , 发送网络层载荷          , 字节 , 资源发送的网络层载荷字节数总和（不含 IP 头）
+l3_byte_rx                  , 接收网络层载荷          , 字节 , 资源接收的网络层载荷字节数总和（不含 IP 头）
 bpp                         , 平均包长                , 字节 , `字节 / 包数`
 bpp_tx                      , 平均发送包长            , 字节 , `发送字节 / 发送包数`
 bpp_rx                      , 平均接收包长            , 字节 , `接收字节 / 接收包数`
@@ -18,17 +18,17 @@ flow_load                   , 活跃连接                , 连接 , 采集周�
 syn_count                   , SYN 包数                , 包   , SYN 包的总数
 synack_count                , SYN-ACK 包数            , 包   , SYN-ACK 包的总数
 l4_byte                     , 传输层载荷              , 字节 , `发送传输层载荷 + 接收传输层载荷`
-l4_byte_tx                  , 发送传输层载荷          , 字节 , 客户端发往服务端的包传输层载荷字节数总和（不含 TCP/UDP 头部）
-l4_byte_rx                  , 接收传输层载荷          , 字节 , 服务端发往客户端的包传输层载荷字节数总和（不含 TCP/UDP 头部）
+l4_byte_tx                  , 发送传输层载荷          , 字节 , 资源发送的包传输层载荷字节数总和（不含 TCP/UDP 头部）
+l4_byte_rx                  , 接收传输层载荷          , 字节 , 资源接收的包传输层载荷字节数总和（不含 TCP/UDP 头部）
 
 retrans_syn                 , SYN 重传                , 包   , SYN 包的重传次数
 retrans_synack              , SYN-ACK 重传            , 包   , SYN-ACK 包的重传次数
 retrans                     , TCP 重传                , 包   , `TCP 客户端重传 + TCP 服务端重传`
-retrans_tx                  , TCP 客户端重传          , 包   , TCP 连接客户端发往服务端的重传包次数
-retrans_rx                  , TCP 服务端重传          , 包   , TCP 连接服务端发往客户端的重传包次数
+retrans_tx                  , TCP 客户端重传          , 包   , 资源发送的 TCP 重传包次数
+retrans_rx                  , TCP 服务端重传          , 包   , 资源接收的 TCP 重传包次数
 zero_win                    , TCP 零窗                , 包   , `TCP 客户端零窗 + TCP 服务端零窗`
-zero_win_tx                 , TCP 客户端零窗          , 包   , TCP 连接客户端发往服务端的零窗包次数
-zero_win_rx                 , TCP 服务端零窗          , 包   , TCP 连接服务端发往客户端的零窗包次数
+zero_win_tx                 , TCP 客户端零窗          , 包   , 资源发送的 TCP 零窗包次数
+zero_win_rx                 , TCP 服务端零窗          , 包   , 资源接收的 TCP 零窗包次数
 retrans_syn_ratio           , SYN 重传比例            , %    , `TCP SYN 重传 / TCP SYN 包数`
 retrans_synack_ratio        , SYN-ACK 重传比例        , %    , `TCP SYN-ACK 重传 / TCP SYN-ACK 包数` 
 retrans_ratio               , TCP 重传比例            , %    , `TCP 重传 /  包数`
