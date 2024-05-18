@@ -36,10 +36,12 @@
 #include <bcc/bcc_syms.h>
 #include <dirent.h>		// for opendir()
 #include "config.h"
+#include "elf.h"
 #include "log.h"
 #include "common.h"
 #include "symbol.h"
 #include "tracer.h"
+#include "load.h"
 #if defined __x86_64__
 #include "bddisasm/bddisasm.h"
 #include "bddisasm/disasmtypes.h"
@@ -48,6 +50,9 @@
 #include "profile/perf_profiler.h"
 #include "profile/java/df_jattach.h"
 #include "profile/java/gen_syms_file.h"
+#include "bihash_8_8.h"
+#include "profile/stringifier.h"
+#include "profile/profile_common.h"
 
 static u64 add_symcache_count;
 static u64 free_symcache_count;
@@ -63,7 +68,14 @@ static volatile u64 java_syms_fetch_delay;	// In seconds.
  * When a process exits, save the symbol cache pids
  * to be deleted.
  */
-static struct symbol_cache_del_pids cache_del_pids;
+static struct symbol_cache_pids pids_cache;
+
+static struct bcc_symbol_option lazy_opt = {
+	.use_debug_file = false,
+	.check_debug_file_crc = false,
+	.lazy_symbolize = true,
+	.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
+};
 
 static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid);
 
@@ -534,18 +546,19 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 	if (kv->v.proc_info_p) {
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
+		AO_DEC(&p->use);
+		while (AO_GET(&p->use) != 0)
+			CLIB_PAUSE();
 		/* Ensure that all tasks are completed before releasing. */
-		if (AO_SUB_F(&p->use, 1) == 0) {
-			if (kv->v.cache != p->syms_cache) {
-				ebpf_warning
-				    ("Curr pid %d kvp_pid %lu kv->v.cache 0x%lx p->syms_cache 0x%lx\n",
-				     (int)p->pid, kv->k.pid, kv->v.cache,
-				     p->syms_cache);
-			}
-			free_proc_cache(p);
-			kv->v.proc_info_p = 0;
-			kv->v.cache = 0;
+		if (kv->v.cache != p->syms_cache) {
+			ebpf_warning
+			    ("Curr pid %d kvp_pid %lu kv->v.cache 0x%lx p->syms_cache 0x%lx\n",
+			     (int)p->pid, kv->k.pid, kv->v.cache,
+			     p->syms_cache);
 		}
+		free_proc_cache(p);
+		kv->v.proc_info_p = 0;
+		kv->v.cache = 0;
 	} else {
 		if (kv->v.cache != 0)
 			ebpf_warning
@@ -555,16 +568,16 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 
 static inline void symbol_cache_pids_lock(void)
 {
-	while (__atomic_test_and_set(cache_del_pids.lock, __ATOMIC_ACQUIRE))
+	while (__atomic_test_and_set(pids_cache.lock, __ATOMIC_ACQUIRE))
 		CLIB_PAUSE();
 }
 
 static inline void symbol_cache_pids_unlock(void)
 {
-	__atomic_clear(cache_del_pids.lock, __ATOMIC_RELEASE);
+	__atomic_clear(pids_cache.lock, __ATOMIC_RELEASE);
 }
 
-static inline bool pid_is_already_existed(struct symbolizer_cache_kvp *kv)
+static inline bool is_existed_in_exit_cache(struct symbolizer_cache_kvp *kv)
 {
 	/*
 	 * Make sure that there are no duplicate items of 'pid' in
@@ -572,11 +585,43 @@ static inline bool pid_is_already_existed(struct symbolizer_cache_kvp *kv)
 	 * caused by repeated release of occupied memory resources.
 	 */
 	struct symbolizer_cache_kvp *kv_tmp;
-	vec_foreach(kv_tmp, cache_del_pids.pid_caches) {
+	vec_foreach(kv_tmp, pids_cache.exit_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->v.
-			    proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->
+			    v.proc_info_p;
+			struct symbolizer_proc_info *curr_p =
+			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
+			ebpf_warning
+			    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx) cache 0x%lx"
+			     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->) cache 0x%lx\n",
+			     (u64) list_p->pid, kv_tmp->k.pid,
+			     kv_tmp->v.proc_info_p,
+			     kv_tmp->v.proc_info_p !=
+			     0 ? list_p->syms_cache : 0, kv_tmp->v.cache,
+			     (u64) curr_p->pid, kv->k.pid, kv->v.proc_info_p,
+			     kv->v.proc_info_p != 0 ? curr_p->syms_cache : 0,
+			     kv->v.cache);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static inline bool is_existed_in_exec_cache(struct symbolizer_cache_kvp *kv)
+{
+	/*
+	 * Make sure that there are no duplicate items of 'pid' in
+	 * 'cache del pids.pid caches', so as to avoid program crashes
+	 * caused by repeated release of occupied memory resources.
+	 */
+	struct symbolizer_cache_kvp *kv_tmp;
+	vec_foreach(kv_tmp, pids_cache.exec_pids_cache) {
+		if ((int)kv_tmp->k.pid == kv->k.pid) {
+			struct symbolizer_proc_info *list_p =
+			    (struct symbolizer_proc_info *)kv_tmp->
+			    v.proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			ebpf_warning
@@ -619,6 +664,7 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 
 	kv->v.proc_info_p = pointer_to_uword(p);
 	kv->v.cache = 0;
+
 	int ret;
 	if ((ret = symbol_caches_hash_add_del
 	     (h, (symbol_caches_hash_kv *) kv,
@@ -681,7 +727,7 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 	}
 
 	symbol_caches_hash_t *h = &syms_cache_hash;
-	struct symbolizer_cache_kvp kv;
+	struct symbolizer_cache_kvp kv = {};
 
 	if (type == PROC_EXEC) {
 		/* 
@@ -694,6 +740,20 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 		/* To filter out threads. */
 		if (!is_user_process(pid))
 			return;
+
+		int ret = VEC_OK;
+		kv.k.pid = (u64) pid;
+		symbol_cache_pids_lock();
+		if (is_existed_in_exec_cache(&kv)) {
+			symbol_cache_pids_unlock();
+			return;
+		}
+
+		vec_add1(pids_cache.exec_pids_cache, kv, ret);
+		if (ret != VEC_OK) {
+			ebpf_warning("vec add failed.\n");
+		}
+		symbol_cache_pids_unlock();
 	}
 
 	kv.k.pid = (u64) pid;
@@ -712,12 +772,12 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 		}
 
 		symbol_cache_pids_lock();
-		if (pid_is_already_existed(&kv)) {
+		if (is_existed_in_exit_cache(&kv)) {
 			symbol_cache_pids_unlock();
 			return;
 		}
 
-		vec_add1(cache_del_pids.pid_caches, kv, ret);
+		vec_add1(pids_cache.exit_pids_cache, kv, ret);
 		if (ret != VEC_OK) {
 			ebpf_warning("vec add failed.\n");
 		}
@@ -743,29 +803,36 @@ void exec_proc_info_cache_update(void)
 {
 	struct symbolizer_cache_kvp *kv;
 	symbol_cache_pids_lock();
-	vec_foreach(kv, cache_del_pids.pid_caches) {
+	vec_foreach(kv, pids_cache.exit_pids_cache) {
 		del_proc_info_from_cache(kv);
 	}
-	vec_free(cache_del_pids.pid_caches);
+	vec_free(pids_cache.exit_pids_cache);
+
+	vec_foreach(kv, pids_cache.exec_pids_cache) {
+		add_proc_info_to_cache(kv);
+	}
+	vec_free(pids_cache.exec_pids_cache);
+
 	symbol_cache_pids_unlock();
 }
 
 static int init_symbol_cache(const char *name)
 {
 	/*
-	 * Thread-safe for cache_del_pids.pids
+	 * Thread-safe for pids_cache.pids
 	 */
-	cache_del_pids.lock =
+	pids_cache.lock =
 	    clib_mem_alloc_aligned("pids_alloc_lock",
 				   CLIB_CACHE_LINE_BYTES,
 				   CLIB_CACHE_LINE_BYTES, NULL);
-	if (cache_del_pids.lock == NULL) {
-		ebpf_error("cache_del_pids.lock alloc memory failed.\n");
+	if (pids_cache.lock == NULL) {
+		ebpf_error("pids_cache.lock alloc memory failed.\n");
 		return (-1);
 	}
 
-	cache_del_pids.lock[0] = 0;
-	cache_del_pids.pid_caches = NULL;
+	pids_cache.lock[0] = 0;
+	pids_cache.exit_pids_cache = NULL;
+	pids_cache.exec_pids_cache = NULL;
 
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	memset(h, 0, sizeof(*h));
@@ -795,13 +862,6 @@ u64 get_pid_stime(pid_t pid)
 
 	return 0;
 }
-
-static struct bcc_symbol_option lazy_opt = {
-	.use_debug_file = false,
-	.check_debug_file_crc = false,
-	.lazy_symbolize = true,
-	.use_symbol_type = ((1 << STT_FUNC) | (1 << STT_GNU_IFUNC)),
-};
 
 static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 {
@@ -877,14 +937,7 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 	struct symbolizer_proc_info *p = NULL;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) != 0) {
-		p = add_proc_info_to_cache(&kv);
-		if (p == NULL)
-			return;
-		AO_INC(&p->use);
-		symbolizer_proc_lock(p);
-		write_return_value(&kv, p, stime, netns_id, name, ptr);
-		symbolizer_proc_unlock(p);
-
+		return;
 	} else {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		AO_INC(&p->use);
@@ -1187,7 +1240,7 @@ static int __unused free_symbolizer_kvp_cb(symbol_caches_hash_kv * kv,
 
 void release_symbol_caches(void)
 {
-	/* Update symbol_cache hash from cache_del_pids. */
+	/* Update symbol_cache hash from pids_cache. */
 	exec_proc_info_cache_update();
 
 	/*
