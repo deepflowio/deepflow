@@ -1203,6 +1203,8 @@ static void process_events_handle_main(__unused void *arg)
 		go_process_events_handle();
 		ssl_events_handle();
 		check_datadump_timeout();
+		/* check and clean symbol cache */
+		exec_proc_info_cache_update();
 		usleep(LOOP_DELAY_US);
 	}
 }

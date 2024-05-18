@@ -165,4 +165,5 @@ int java_libs_and_tools_install(void);
 void push_and_release_stack_trace_msg(struct profiler_context *ctx,
 				      stack_trace_msg_hash_t * h,
 				      bool is_force);
+bool check_profiler_regex(const char *name);
 #endif /*DF_USER_PROFILE_COMMON_H */

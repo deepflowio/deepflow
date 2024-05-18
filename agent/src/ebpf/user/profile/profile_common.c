@@ -67,6 +67,7 @@
 extern struct bpf_tracer *profiler_tracer;
 extern char *flame_graph_start_time;
 extern int major, minor;
+extern struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 
 static bool java_installed;
 
@@ -823,10 +824,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				set_msg_kvp(&kv, v, stime, (void *)0);
 			else {
 				if (ctx->only_matched_data) {
-					if (__info_p
-					    && AO_SUB_F(&__info_p->use, 1) == 0)
-						free_proc_cache(__info_p);
-
+					if (__info_p)
+						AO_DEC(&__info_p->use);
 					continue;
 				}
 
@@ -834,9 +833,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 		} else {
 			if (ctx->only_matched_data) {
-				if (__info_p
-				    && AO_SUB_F(&__info_p->use, 1) == 0)
-					free_proc_cache(__info_p);
+				if (__info_p)
+					AO_DEC(&__info_p->use);
 				continue;
 			}
 
@@ -860,19 +858,21 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			if (ctx->use_delta_time) {
 				if (ctx->sample_period > 0) {
-					((stack_trace_msg_t *) kv.msg_ptr)->
-					    count += ctx->sample_period / 1000;
+					((stack_trace_msg_t *) kv.
+					 msg_ptr)->count +=
+		   ctx->sample_period / 1000;
 				} else {
 					// Using microseconds for storage.
-					((stack_trace_msg_t *) kv.msg_ptr)->
-					    count += (v->duration_ns / 1000);
+					((stack_trace_msg_t *) kv.
+					 msg_ptr)->count +=
+		   (v->duration_ns / 1000);
 				}
 
 			} else {
 				((stack_trace_msg_t *) kv.msg_ptr)->count++;
 			}
-			if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
-				free_proc_cache(__info_p);
+			if (__info_p)
+				AO_DEC(&__info_p->use);
 			continue;
 		}
 
@@ -905,10 +905,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
 			if (msg == NULL) {
 				clib_mem_free(trace_str);
-				if (__info_p
-				    && AO_SUB_F(&__info_p->use, 1) == 0)
-					free_proc_cache(__info_p);
-
+				if (__info_p)
+					AO_DEC(&__info_p->use);
 				continue;
 			}
 
@@ -946,11 +944,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 		}
 
-		if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
-			free_proc_cache(__info_p);
+		if (__info_p)
+			AO_DEC(&__info_p->use);
 
-		/* check and clean symbol cache */
-		exec_proc_info_cache_update();
 	}
 
 	vec_free(ctx->raw_stack_data);
@@ -1086,4 +1082,26 @@ release_iter:
 
 	/* Push messages and free stack_trace_msg_hash */
 	push_and_release_stack_trace_msg(ctx, &ctx->msg_hash, false);
+}
+
+bool check_profiler_regex(const char *name)
+{
+	bool matched = false;
+	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
+		if (g_ctx_array[i] == NULL)
+			continue;
+		if (g_ctx_array[i]->regex_existed) {
+			profile_regex_lock(g_ctx_array[i]);
+			matched =
+			    (regexec
+			     (&g_ctx_array[i]->profiler_regex, name, 0, NULL, 0)
+			     == 0);
+			profile_regex_unlock(g_ctx_array[i]);
+			if (matched) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
