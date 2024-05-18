@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::fmt;
+use std::fmt::{self, Write};
 
 use log::{debug, warn};
 use nom::{
@@ -34,12 +34,13 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
-            LogMessageType,
+            set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
+            L7ResponseStatus, LogMessageType,
         },
     },
 };
@@ -77,6 +78,11 @@ pub struct MqttInfo {
     captured_response_byte: u32,
 
     rrt: u64,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    endpoint: Option<String>,
 }
 
 impl L7ProtocolInfoInterface for MqttInfo {
@@ -104,15 +110,38 @@ impl L7ProtocolInfoInterface for MqttInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        let endpoint = self.get_endpoint();
-        if endpoint.is_empty() {
-            return None;
+        match self.pkt_type {
+            PacketKind::Publish { .. } => {
+                if let Some(t) = &self.publish_topic {
+                    Some(t.clone())
+                } else {
+                    None
+                }
+            }
+            PacketKind::Unsubscribe | PacketKind::Subscribe => {
+                if let Some(s) = &self.subscribe_topics {
+                    let mut topic_str = String::new();
+                    for i in s {
+                        let _ = write!(&mut topic_str, "{},", i.name);
+                    }
+                    if !topic_str.is_empty() {
+                        topic_str.pop();
+                    }
+                    Some(topic_str)
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
-        Some(endpoint)
     }
 
     fn get_request_domain(&self) -> String {
         self.client_id.clone().unwrap_or_default()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -142,35 +171,13 @@ impl Default for MqttInfo {
             is_tls: false,
             captured_request_byte: 0,
             captured_response_byte: 0,
+            is_on_blacklist: false,
+            endpoint: None,
         }
     }
 }
 
 impl MqttInfo {
-    fn get_endpoint(&self) -> String {
-        let mut topic_str = String::new();
-        match self.pkt_type {
-            PacketKind::Publish { .. } => {
-                if let Some(t) = &self.publish_topic {
-                    return t.clone();
-                }
-            }
-            PacketKind::Unsubscribe | PacketKind::Subscribe => {
-                if let Some(s) = &self.subscribe_topics {
-                    for i in s {
-                        topic_str.push_str(format!("{},", i.name).as_str());
-                    }
-                    if !topic_str.is_empty() {
-                        topic_str.pop();
-                    }
-                    return topic_str;
-                }
-            }
-            _ => {}
-        };
-        return topic_str;
-    }
-
     pub fn merge(&mut self, other: &mut Self) {
         if self.res_msg_size.is_none() {
             self.res_msg_size = other.res_msg_size;
@@ -191,6 +198,10 @@ impl MqttInfo {
             }
             _ => (),
         }
+        swap_if!(self, endpoint, is_none, other);
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
+        }
     }
 
     pub fn get_version_str(&self) -> &'static str {
@@ -201,12 +212,27 @@ impl MqttInfo {
             _ => "",
         }
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::MQTT) {
+            self.is_on_blacklist = t.request_type.is_on_blacklist(self.pkt_type.as_str())
+                || self
+                    .client_id
+                    .as_ref()
+                    .map(|p: &String| t.request_domain.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.request_resource.is_on_blacklist(p) || t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl From<MqttInfo> for L7ProtocolSendLog {
     fn from(f: MqttInfo) -> Self {
         let version = Some(String::from(f.get_version_str()));
-        let topic_str = f.get_endpoint();
         let flags = if f.is_tls {
             EbpfFlags::TLS.bits()
         } else {
@@ -216,14 +242,14 @@ impl From<MqttInfo> for L7ProtocolSendLog {
         L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,
-            version: version,
+            version,
             req_len: f.req_msg_size,
             resp_len: f.res_msg_size,
             req: L7Request {
                 req_type: f.pkt_type.to_string(),
                 domain: f.client_id.unwrap_or_default(),
-                resource: topic_str.clone(),
-                endpoint: topic_str,
+                resource: f.endpoint.clone().unwrap_or_default(),
+                endpoint: f.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -242,8 +268,8 @@ pub struct MqttLog {
     msg_type: LogMessageType,
     status: L7ResponseStatus,
     version: u8,
-
     perf_stats: Option<L7PerfStats>,
+    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for MqttLog {
@@ -263,25 +289,30 @@ impl L7ProtocolParserInterface for MqttLog {
 
         for info in infos.iter_mut() {
             if let L7ProtocolInfo::MqttInfo(info) = info {
-                if self.msg_type != LogMessageType::Session {
-                    // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
-                    info.cal_rrt(param).map(|rrt| {
-                        info.rrt = rrt;
-                        self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                    });
-                }
-
                 info.msg_type = self.msg_type;
                 info.is_tls = param.is_tls();
                 set_captured_byte!(info, param);
-                match param.direction {
-                    PacketDirection::ClientToServer => {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
+                if let Some(config) = param.parse_config {
+                    info.set_is_on_blacklist(config);
+                }
+                if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                    match param.direction {
+                        PacketDirection::ClientToServer => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        PacketDirection::ServerToClient => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
                     }
-                    PacketDirection::ServerToClient => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if self.msg_type != LogMessageType::Session {
+                        // FIXME due to mqtt not parse and handle packet identity correctly, the rrt is incorrect now.
+                        info.cal_rrt(param).map(|rrt| {
+                            info.rrt = rrt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                        });
                     }
                 }
+                self.last_is_on_blacklist = info.is_on_blacklist;
             } else {
                 unreachable!()
             }
@@ -303,6 +334,7 @@ impl L7ProtocolParserInterface for MqttLog {
 
     fn reset(&mut self) {
         let mut s = Self::default();
+        s.last_is_on_blacklist = self.last_is_on_blacklist;
         s.version = self.version;
         s.perf_stats = self.perf_stats.take();
         *self = s;
@@ -448,6 +480,7 @@ impl MqttLog {
             }
 
             info.status = self.status;
+            info.endpoint = info.get_endpoint();
             if parse_log {
                 infos.push(L7ProtocolInfo::MqttInfo(info));
             }
@@ -579,6 +612,27 @@ impl fmt::Display for PacketKind {
 impl Default for PacketKind {
     fn default() -> Self {
         Self::Disconnect
+    }
+}
+
+impl PacketKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Connect => "CONNECT",
+            Self::Connack => "CONNACK",
+            Self::Publish { .. } => "PUBLISH",
+            Self::Puback => "PUBACK",
+            Self::Pubrec => "PUBREC",
+            Self::Pubrel => "PUBREL",
+            Self::Pubcomp => "PUBCOMP",
+            Self::Subscribe => "SUBSCRIBE",
+            Self::Suback => "SUBACK",
+            Self::Unsubscribe => "UNSUBSCRIBE",
+            Self::Unsuback => "UNSUBACK",
+            Self::Pingreq => "PINGREQ",
+            Self::Pingresp => "PINGRESP",
+            Self::Disconnect => "DISCONNECT",
+        }
     }
 }
 
