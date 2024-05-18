@@ -27,7 +27,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
-    config::handler::TraceType,
+    config::handler::{LogParserConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -36,8 +36,8 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
-            LogMessageType,
+            set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
+            L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::{read_i16_be, read_i32_be, read_i64_be, read_u16_be, read_u32_be},
@@ -90,6 +90,14 @@ pub struct KafkaInfo {
     captured_response_byte: u32,
 
     rrt: u64,
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    resource: Option<String>,
+    #[serde(skip)]
+    endpoint: Option<String>,
+    #[serde(skip)]
+    command: Option<String>,
 }
 
 impl L7ProtocolInfoInterface for KafkaInfo {
@@ -120,15 +128,19 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if self.topic_name.is_empty() {
+        if self.topic_name.is_empty() || self.partition < 0 {
             None
         } else {
-            Some(self.topic_name.clone())
+            Some(format!("{}-{}", self.topic_name, self.partition))
         }
     }
 
     fn get_request_resource_length(&self) -> usize {
         self.topic_name.len()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -136,9 +148,7 @@ impl KafkaInfo {
     // https://kafka.apache.org/protocol.html
     const API_KEY_MAX: u16 = 67;
     pub fn merge(&mut self, other: &mut Self) {
-        if self.resp_msg_size.is_none() {
-            self.resp_msg_size = other.resp_msg_size;
-        }
+        swap_if!(self, resp_msg_size, is_none, other);
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }
@@ -153,7 +163,13 @@ impl KafkaInfo {
         }
         self.msg_type = LogMessageType::Session;
         self.captured_response_byte = other.captured_response_byte;
-        crate::flow_generator::protocol_logs::swap_if!(self, topic_name, is_empty, other);
+        swap_if!(self, topic_name, is_empty, other);
+        swap_if!(self, resource, is_none, other);
+        swap_if!(self, endpoint, is_none, other);
+        swap_if!(self, command, is_none, other);
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
+        }
     }
 
     pub fn check(&self) -> bool {
@@ -163,7 +179,7 @@ impl KafkaInfo {
         return self.client_id.len() > 0 && self.client_id.is_ascii();
     }
 
-    pub fn get_command(&self) -> &'static str {
+    pub fn get_command(&self) -> Option<String> {
         let command_str = [
             "Produce",
             "Fetch",
@@ -231,39 +247,39 @@ impl KafkaInfo {
             "AllocateProducerIds",
         ];
         match self.api_key {
-            0..=58 => command_str[self.api_key as usize],
-            _ => "",
+            0..=58 => Some(command_str[self.api_key as usize].to_string()),
+            _ => None,
+        }
+    }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Kafka) {
+            self.is_on_blacklist = self
+                .command
+                .as_ref()
+                .map(|p| t.request_type.is_on_blacklist(p))
+                .unwrap_or_default()
+                || self
+                    .resource
+                    .as_ref()
+                    .map(|p| t.request_resource.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || t.request_domain.is_on_blacklist(&self.topic_name);
         }
     }
 }
 
 impl From<KafkaInfo> for L7ProtocolSendLog {
     fn from(f: KafkaInfo) -> Self {
-        let command_str = f.get_command();
         let flags = if f.is_tls {
             EbpfFlags::TLS.bits()
         } else {
             EbpfFlags::NONE.bits()
-        };
-        let (resource, endpoint) = match (f.api_key, f.msg_type) {
-            (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session)
-                if !f.topic_name.is_empty() =>
-            {
-                (
-                    format!("{}-{}:{}", f.topic_name, f.partition, f.offset),
-                    format!("{}-{}", f.topic_name, f.partition),
-                )
-            }
-            (KAFKA_PRODUCE, LogMessageType::Response)
-            | (KAFKA_PRODUCE, LogMessageType::Session)
-                if !f.topic_name.is_empty() =>
-            {
-                (
-                    format!("{}-{}:{}", f.topic_name, f.partition, f.offset),
-                    format!("{}-{}", f.topic_name, f.partition),
-                )
-            }
-            _ => (String::new(), String::new()),
         };
         let mut attributes = vec![];
         if !f.group_id.is_empty() {
@@ -278,9 +294,9 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
             req: L7Request {
-                req_type: String::from(command_str),
-                resource,
-                endpoint,
+                req_type: f.command.unwrap_or_default(),
+                resource: f.resource.unwrap_or_default(),
+                endpoint: f.endpoint.unwrap_or_default(),
                 domain: f.topic_name,
                 ..Default::default()
             },
@@ -324,6 +340,7 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
 pub struct KafkaLog {
     perf_stats: Option<L7PerfStats>,
     sessions: LruCache<u32, (u16, u16)>,
+    last_is_on_blacklist: bool,
 }
 
 impl Default for KafkaLog {
@@ -331,6 +348,7 @@ impl Default for KafkaLog {
         Self {
             perf_stats: None,
             sessions: LruCache::new(NonZeroUsize::new(Self::MAX_SESSION_PER_FLOW).unwrap()),
+            last_is_on_blacklist: false,
         }
     }
 }
@@ -356,11 +374,47 @@ impl L7ProtocolParserInterface for KafkaLog {
         let mut info = KafkaInfo::default();
         Self::parse(self, payload, param.l4_protocol, param.direction, &mut info)?;
         info.is_tls = param.is_tls();
-        info.cal_rrt(param).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
         set_captured_byte!(info, param);
+        info.resource = match (info.api_key, info.msg_type) {
+            (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session)
+                if !info.topic_name.is_empty() =>
+            {
+                Some(format!(
+                    "{}-{}:{}",
+                    info.topic_name, info.partition, info.offset
+                ))
+            }
+            (KAFKA_PRODUCE, LogMessageType::Response)
+            | (KAFKA_PRODUCE, LogMessageType::Session)
+                if !info.topic_name.is_empty() =>
+            {
+                Some(format!(
+                    "{}-{}:{}",
+                    info.topic_name, info.partition, info.offset
+                ))
+            }
+            _ => None,
+        };
+        info.command = info.get_command();
+        info.endpoint = info.get_endpoint();
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
+        }
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+            }
+            info.cal_rrt(param).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::KafkaInfo(info)))
         } else {
@@ -1493,14 +1547,12 @@ impl KafkaLog {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 self.request(payload, false, info)?;
-                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
                 if payload.len() < KAFKA_RESP_HEADER_LEN {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 self.response(payload, info)?;
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         Ok(())

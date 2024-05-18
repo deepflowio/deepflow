@@ -23,7 +23,7 @@ use crate::common::flow::{L7PerfStats, PacketDirection};
 use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam};
 use crate::common::meta_packet::EbpfFlags;
-use crate::config::handler::L7LogDynamicConfig;
+use crate::config::handler::{L7LogDynamicConfig, LogParserConfig};
 use crate::flow_generator::protocol_logs::{set_captured_byte, value_is_default};
 use crate::flow_generator::{Error, Result};
 use crate::HttpLog;
@@ -101,6 +101,9 @@ pub struct FastCGIInfo {
 
     #[serde(skip)]
     seq_off: u32,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 impl L7ProtocolInfoInterface for FastCGIInfo {
@@ -115,6 +118,9 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
             self.captured_response_byte = info.captured_response_byte;
             super::swap_if!(self, trace_id, is_empty, info);
             super::swap_if!(self, span_id, is_empty, info);
+            if info.is_on_blacklist {
+                self.is_on_blacklist = info.is_on_blacklist;
+            }
         }
 
         Ok(())
@@ -146,6 +152,10 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
 
     fn get_request_resource_length(&self) -> usize {
         self.path.len()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -246,6 +256,19 @@ impl FastCGIInfo {
 
         Ok(())
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::FastCGI) {
+            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.path)
+                || t.request_type.is_on_blacklist(&self.method)
+                || t.request_domain.is_on_blacklist(&self.host)
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl From<FastCGIInfo> for L7ProtocolSendLog {
@@ -326,6 +349,7 @@ impl FastCGIRecord {
 #[derive(Default)]
 pub struct FastCGILog {
     perf_stats: Option<L7PerfStats>,
+    last_is_on_blacklist: bool,
 }
 
 impl FastCGILog {
@@ -334,12 +358,10 @@ impl FastCGILog {
             && status_code <= HTTP_STATUS_CLIENT_ERROR_MAX
         {
             // http客户端请求存在错误
-            self.perf_stats.as_mut().map(|p| p.inc_req_err());
             info.status = L7ResponseStatus::ClientError;
         } else if status_code >= HTTP_STATUS_SERVER_ERROR_MIN
             && status_code <= HTTP_STATUS_SERVER_ERROR_MAX
         {
-            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             info.status = L7ResponseStatus::ServerError;
         } else {
             info.status = L7ResponseStatus::Ok;
@@ -442,7 +464,6 @@ impl L7ProtocolParserInterface for FastCGILog {
                 if info.method.is_empty() {
                     return Err(Error::L7ProtocolUnknown);
                 }
-                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
                 info.msg_type = LogMessageType::Response;
@@ -500,15 +521,33 @@ impl L7ProtocolParserInterface for FastCGILog {
                 if info.status_code.is_none() {
                     return Err(Error::L7ProtocolUnknown);
                 }
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
-        info.cal_rrt(param).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
+        }
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if info.status == L7ResponseStatus::ClientError {
+                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                    } else if info.status == L7ResponseStatus::ServerError {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                    }
+                }
+            }
+            info.cal_rrt(param).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         Ok(L7ParseResult::Single(L7ProtocolInfo::FastCGIInfo(info)))
     }
 
