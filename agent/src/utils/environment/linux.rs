@@ -330,7 +330,7 @@ pub async fn set_docker_resource_limits(
         .map(|_| ())
         .map_err(|e| {
             Error::Environment(format!(
-                "set milli_cpu_limit: {}, set memory_limit: {}bytes, update docker container failed: {:?}",
+                "set cpu_limit: {}, set memory_limit: {}bytes, update docker container failed: {:?}",
                 milli_cpu_limit as f64 / 1000.0, memory_limit, e
             ))
         })

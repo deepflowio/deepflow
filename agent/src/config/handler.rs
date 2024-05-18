@@ -43,7 +43,7 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-use super::config::{ExtraLogFields, OracleParseConfig};
+use super::config::{ExtraLogFields, L7LogBlacklist, OracleParseConfig};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
@@ -84,6 +84,7 @@ use crate::{
 };
 
 use public::bitmap::Bitmap;
+use public::l7_protocol::L7Protocol;
 use public::proto::{
     common::TridentType,
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
@@ -692,6 +693,165 @@ impl From<&HttpEndpointExtraction> for HttpEndpointTrie {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Operator {
+    Equal,
+    Prefix,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BlacklistTrieNode {
+    children: HashMap<char, Box<BlacklistTrieNode>>,
+    operator: Option<Operator>,
+}
+
+impl BlacklistTrieNode {
+    pub fn is_on_blacklist(&self, input: &str) -> bool {
+        if input.is_empty() {
+            return false;
+        }
+        let mut node = self;
+        for c in input.chars() {
+            node = match node.children.get(&c) {
+                Some(child) => child,
+                None => return false,
+            };
+            if let Some(op) = &node.operator {
+                if op == &Operator::Prefix {
+                    return true;
+                }
+            }
+        }
+        // If we've reached the end of the input and the last node has an operator,
+        // it must be because we matched a complete word, not a prefix.
+        if let Some(o) = node.operator {
+            o == Operator::Equal
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BlacklistTrie {
+    pub endpoint: BlacklistTrieNode,
+    pub request_type: BlacklistTrieNode,
+    pub request_domain: BlacklistTrieNode,
+    pub request_resource: BlacklistTrieNode,
+}
+
+impl BlacklistTrie {
+    // Currently, the following field names are supported:
+    const ENDPOINT: &'static str = "endpoint";
+    const REQUEST_TYPE: &'static str = "request_type";
+    const REQUEST_DOMAIN: &'static str = "request_domain";
+    const REQUEST_RESOURCE: &'static str = "request_resource";
+
+    // Currently, the following matching operations are supported:
+    const EQUAL: &'static str = "equal";
+    const PREFIX: &'static str = "prefix";
+
+    pub fn new(blacklists: &Vec<L7LogBlacklist>) -> Option<BlacklistTrie> {
+        if blacklists.is_empty() {
+            return None;
+        }
+
+        let mut b = BlacklistTrie::default();
+        for i in blacklists.iter() {
+            b.insert(i);
+        }
+        Some(b)
+    }
+
+    pub fn insert(&mut self, rule: &L7LogBlacklist) {
+        let mut node = match rule.field_name.to_ascii_lowercase().as_str() {
+            Self::ENDPOINT => &mut self.endpoint,
+            Self::REQUEST_TYPE => &mut self.request_type,
+            Self::REQUEST_DOMAIN => &mut self.request_domain,
+            Self::REQUEST_RESOURCE => &mut self.request_resource,
+            _ => {
+                warn!("Unsupported field_name: {}, only supports endpoint, request_type, request_domain, request_resource.", rule.field_name.as_str());
+                return;
+            }
+        };
+
+        let operator = match rule.operator.to_ascii_lowercase().as_str() {
+            Self::EQUAL => Operator::Equal,
+            Self::PREFIX => Operator::Prefix,
+            _ => {
+                warn!(
+                    "Unsupported operator: {}, only supports equal, prefix.",
+                    rule.operator.as_str()
+                );
+                return;
+            }
+        };
+
+        for ch in rule.value.chars() {
+            node = node
+                .children
+                .entry(ch)
+                .or_insert_with(|| Box::new(BlacklistTrieNode::default()));
+        }
+        node.operator = Some(operator);
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct DnsNxdomainTrieNode {
+    children: HashMap<char, Box<DnsNxdomainTrieNode>>,
+    unconcerned: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DnsNxdomainTrie {
+    root: DnsNxdomainTrieNode,
+}
+
+impl DnsNxdomainTrie {
+    pub fn insert(&mut self, rule: &String) {
+        let mut node = &mut self.root;
+        // the reversal is because what is matched is the suffix of the domain name
+        for ch in rule.chars().rev() {
+            node = node
+                .children
+                .entry(ch)
+                .or_insert_with(|| Box::new(DnsNxdomainTrieNode::default()));
+        }
+        node.unconcerned = true;
+    }
+
+    pub fn is_unconcerned(&self, input: &str) -> bool {
+        if input.is_empty() {
+            return false;
+        }
+        let mut node = &self.root;
+        // the reversal is because what is matched is the suffix of the domain name
+        for c in input.chars().rev() {
+            match node.children.get(&c) {
+                Some(child) => {
+                    if child.unconcerned {
+                        return true;
+                    }
+                    node = child.as_ref();
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        false
+    }
+}
+
+impl From<&Vec<String>> for DnsNxdomainTrie {
+    fn from(v: &Vec<String>) -> Self {
+        let mut t = Self::default();
+        v.iter().for_each(|r| t.insert(r));
+        t
+    }
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
@@ -702,6 +862,8 @@ pub struct LogParserConfig {
     pub http_endpoint_disabled: bool,
     pub http_endpoint_trie: HttpEndpointTrie,
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
+    pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
+    pub unconcerned_dns_nx_domain_trie: DnsNxdomainTrie,
 }
 
 impl Default for LogParserConfig {
@@ -715,6 +877,8 @@ impl Default for LogParserConfig {
             http_endpoint_disabled: false,
             http_endpoint_trie: HttpEndpointTrie::new(),
             obfuscate_enabled_protocols: L7ProtocolBitmap::default(),
+            l7_log_blacklist_trie: HashMap::new(),
+            unconcerned_dns_nx_domain_trie: DnsNxdomainTrie::default(),
         }
     }
 }
@@ -749,6 +913,11 @@ impl fmt::Debug for LogParserConfig {
                         }
                     })
                     .collect::<Vec<_>>(),
+            )
+            .field("l7_log_blacklist_trie", &self.l7_log_blacklist_trie)
+            .field(
+                "unconcerned_dns_nx_domain_trie",
+                &self.unconcerned_dns_nx_domain_trie,
             )
             .finish()
     }
@@ -1458,6 +1627,24 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .yaml_config
                         .l7_protocol_advanced_features
                         .obfuscate_enabled_protocols,
+                ),
+                l7_log_blacklist_trie: {
+                    let mut blacklist_trie = HashMap::new();
+                    for (k, v) in conf.yaml_config.l7_log_blacklist.iter() {
+                        let l7_protocol = L7Protocol::from(k.to_string());
+                        if l7_protocol == L7Protocol::Unknown {
+                            warn!("Unsupported l7_protocol: {:?}", k);
+                            continue;
+                        }
+                        BlacklistTrie::new(v).map(|x| blacklist_trie.insert(l7_protocol, x));
+                    }
+                    blacklist_trie
+                },
+                unconcerned_dns_nx_domain_trie: DnsNxdomainTrie::from(
+                    &conf
+                        .yaml_config
+                        .l7_protocol_advanced_features
+                        .unconcerned_dns_nxdomain_response_suffixes,
                 ),
             },
             debug: DebugConfig {

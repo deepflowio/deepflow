@@ -93,6 +93,9 @@ pub struct MysqlInfo {
 
     trace_id: Option<String>,
     span_id: Option<String>,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 impl L7ProtocolInfoInterface for MysqlInfo {
@@ -122,12 +125,19 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     fn get_request_resource_length(&self) -> usize {
         self.context.len()
     }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
 }
 
 impl MysqlInfo {
     pub fn merge(&mut self, other: &mut Self) {
         if self.protocol_version == 0 {
             self.protocol_version = other.protocol_version
+        }
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
         }
         match other.msg_type {
             LogMessageType::Request => {
@@ -267,6 +277,13 @@ impl MysqlInfo {
             self.statement_id = read_u32_le(payload)
         }
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::MySQL) {
+            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.context)
+                || t.request_type.is_on_blacklist(self.get_command_str());
+        }
+    }
 }
 
 impl From<MysqlInfo> for L7ProtocolSendLog {
@@ -338,6 +355,8 @@ pub struct MysqlLog {
     // This field is extracted in the COM_STMT_PREPARE request and calculate based on SQL statements
     parameter_counter: u32,
     has_request: bool,
+
+    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
@@ -366,12 +385,26 @@ impl L7ProtocolParserInterface for MysqlLog {
             return Ok(L7ParseResult::None);
         }
         set_captured_byte!(info, param);
-        if info.msg_type != LogMessageType::Session {
-            info.cal_rrt(param).map(|rrt| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
         }
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+            }
+            if info.msg_type != LogMessageType::Session {
+                info.cal_rrt(param).map(|rrt| {
+                    info.rrt = rrt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                });
+            }
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
         } else {
@@ -600,7 +633,6 @@ impl MysqlLog {
             COM_PING => {}
             _ => return Err(Error::MysqlLogParseFailed),
         }
-        self.perf_stats.as_mut().map(|p| p.inc_req());
         Ok(msg_type)
     }
 
@@ -678,7 +710,6 @@ impl MysqlLog {
             }
             _ => (),
         }
-        self.perf_stats.as_mut().map(|p| p.inc_resp());
         Ok(())
     }
 

@@ -34,7 +34,7 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, AppProtoHead, LogMessageType,
+            set_captured_byte, swap_if, AppProtoHead, LogMessageType,
         },
     },
     plugin::wasm::{wasm_plugin::NatsMessage as WasmNatsMessage, WasmData},
@@ -221,14 +221,19 @@ pub struct NatsInfo {
 
     captured_request_byte: u32,
     captured_response_byte: u32,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    endpoint: Option<String>,
 }
 
 #[derive(Default)]
 pub struct NatsLog {
     perf_stats: Option<L7PerfStats>,
-
     version: String,
     server_name: String,
+    last_is_on_blacklist: bool,
 }
 
 fn slice_split(slice: &[u8], n: usize) -> Option<(&[u8], &[u8])> {
@@ -688,6 +693,22 @@ impl NatsInfo {
         }
         (trace_id, span_id)
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::NATS) {
+            self.is_on_blacklist = t.request_type.is_on_blacklist(self.get_name())
+                || t.request_domain.is_on_blacklist(&self.server_name)
+                || self
+                    .get_subject()
+                    .map(|p| t.request_resource.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl Default for NatsMessage {
@@ -709,7 +730,6 @@ impl From<NatsInfo> for L7ProtocolSendLog {
             .get_subject()
             .map(|x| x.to_string())
             .unwrap_or_default();
-        let endpoint = info.get_endpoint().unwrap_or_default();
         let log = L7ProtocolSendLog {
             captured_request_byte: info.captured_request_byte,
             captured_response_byte: info.captured_response_byte,
@@ -721,7 +741,7 @@ impl From<NatsInfo> for L7ProtocolSendLog {
                 req_type: name.to_string(),
                 domain: info.server_name,
                 resource: subject,
-                endpoint,
+                endpoint: info.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -770,6 +790,10 @@ impl L7ProtocolInfoInterface for NatsInfo {
                 req.resp_len = rsp.resp_len;
             }
             req.captured_response_byte = rsp.captured_response_byte;
+            swap_if!(req, endpoint, is_none, rsp);
+            if rsp.is_on_blacklist {
+                req.is_on_blacklist = rsp.is_on_blacklist;
+            }
         }
         Ok(())
     }
@@ -784,6 +808,10 @@ impl L7ProtocolInfoInterface for NatsInfo {
 
     fn get_request_domain(&self) -> String {
         self.server_name.clone()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -872,27 +900,33 @@ impl L7ProtocolParserInterface for NatsLog {
 
         for info in &mut vec {
             if let L7ProtocolInfo::NatsInfo(info) = info {
-                if info.msg_type != LogMessageType::Session {
-                    info.cal_rrt(param).map(|rtt| {
-                        info.rtt = rtt;
-                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                    });
-                }
-
                 info.is_tls = param.is_tls();
                 info.version = self.version.clone();
                 info.server_name = self.server_name.clone();
 
                 self.wasm_hook(param, payload, info);
                 set_captured_byte!(info, param);
-                match param.direction {
-                    PacketDirection::ClientToServer => {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
+                info.endpoint = info.get_endpoint();
+                if let Some(config) = param.parse_config {
+                    info.set_is_on_blacklist(config);
+                }
+                if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                    match param.direction {
+                        PacketDirection::ClientToServer => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        PacketDirection::ServerToClient => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
                     }
-                    PacketDirection::ServerToClient => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if info.msg_type != LogMessageType::Session {
+                        info.cal_rrt(param).map(|rtt| {
+                            info.rtt = rtt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                        });
                     }
                 }
+                self.last_is_on_blacklist = info.is_on_blacklist;
             }
         }
 
@@ -921,6 +955,7 @@ impl L7ProtocolParserInterface for NatsLog {
 
     fn reset(&mut self) {
         let mut s = Self::default();
+        s.last_is_on_blacklist = self.last_is_on_blacklist;
         s.version = self.version.clone();
         s.server_name = self.server_name.clone();
         s.perf_stats = self.perf_stats.take();

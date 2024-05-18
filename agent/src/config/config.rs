@@ -490,6 +490,14 @@ pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
     pub obfuscate_enabled_protocols: Vec<String>,
     pub extra_log_fields: ExtraLogFields,
+    pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct L7LogBlacklist {
+    pub field_name: String,
+    pub operator: String,
+    pub value: String,
 }
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -577,6 +585,7 @@ pub struct YamlConfig {
     #[serde(rename = "l7-protocol-ports")]
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
+    pub l7_log_blacklist: HashMap<String, Vec<L7LogBlacklist>>,
     pub npb_port: u16,
     // process and socket scan config
     pub os_proc_root: String,
@@ -781,10 +790,11 @@ impl YamlConfig {
         {
             c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
         }
-        c.ebpf.off_cpu_profile.min_block = c.ebpf.off_cpu_profile.min_block.clamp(
-            Duration::from_micros(0),
-            Duration::from_micros(3600000000),
-        );
+        c.ebpf.off_cpu_profile.min_block = c
+            .ebpf
+            .off_cpu_profile
+            .min_block
+            .clamp(Duration::from_micros(0), Duration::from_micros(3600000000));
 
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {
@@ -979,6 +989,7 @@ impl Default for YamlConfig {
                 (String::from("DNS"), String::from(Self::DEFAULT_DNS_PORTS)),
                 (String::from("TLS"), String::from(Self::DEFAULT_TLS_PORTS)),
             ]),
+            l7_log_blacklist: HashMap::new(),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
             os_proc_root: "/proc".into(),

@@ -24,7 +24,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
-    config::handler::{L7LogDynamicConfig, TraceType},
+    config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -112,6 +112,11 @@ pub struct DubboInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    endpoint: Option<String>,
 }
 
 impl DubboInfo {
@@ -145,6 +150,9 @@ impl DubboInfo {
         }
         if other.captured_response_byte > 0 {
             self.captured_response_byte = other.captured_response_byte;
+        }
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
         }
     }
 
@@ -243,6 +251,19 @@ impl DubboInfo {
             self.attributes.extend(custom.attributes);
         }
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Dubbo) {
+            self.is_on_blacklist =t.request_resource.is_on_blacklist(&self.service_name)
+                || t.request_type.is_on_blacklist(&self.method_name)
+                || t.request_domain.is_on_blacklist(&self.service_name)
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for DubboInfo {
@@ -284,11 +305,14 @@ impl L7ProtocolInfoInterface for DubboInfo {
     fn get_request_resource_length(&self) -> usize {
         self.method_name.len()
     }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
     fn from(f: DubboInfo) -> Self {
-        let endpoint = format!("{}/{}", f.service_name, f.method_name);
         let serial_id_attr = KeyVal {
             key: "serialization_id".into(),
             // reference https://github.com/apache/dubbo/blob/3.2/dubbo-serialization/dubbo-serialization-api/src/main/java/org/apache/dubbo/common/serialize/Constants.java
@@ -334,7 +358,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             req: L7Request {
                 resource: f.service_name.clone(),
                 req_type: f.method_name.clone(),
-                endpoint,
+                endpoint: f.endpoint.unwrap_or_default(),
                 domain: f.service_name.clone(),
             },
             resp: L7Response {
@@ -363,6 +387,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
 #[derive(Default)]
 pub struct DubboLog {
     perf_stats: Option<L7PerfStats>,
+    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for DubboLog {
@@ -393,13 +418,28 @@ impl L7ProtocolParserInterface for DubboLog {
         let mut info = DubboInfo::default();
         self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
         info.is_tls = param.is_tls();
-        info.cal_rrt(param).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
         set_captured_byte!(info, param);
+        info.endpoint = info.get_endpoint();
+        self.wasm_hook(param, payload, &mut info);
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
+        }
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+            }
+            info.cal_rrt(param).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
-            self.wasm_hook(param, payload, &mut info);
             Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
         } else {
             Ok(L7ParseResult::None)
@@ -803,11 +843,9 @@ impl DubboLog {
         match direction {
             PacketDirection::ClientToServer => {
                 self.request(&config, payload, &dubbo_header, info);
-                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
                 self.response(&dubbo_header, info);
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         Ok(())

@@ -1065,6 +1065,21 @@ vtap_group_id: g-xxxxxx
     #"TLS": "443,6443"
     #"Custom": "1-65535" # plugins
 
+  ## l7_flow_log Blacklist
+  ## Example:
+  ##   l7-log-blacklist:
+  ##     HTTP:
+  ##     - field_name: request_resource  # endpoint, request_type, request_domain, request_resource
+  ##       operator: equal  # equal, prefix
+  ##       value: somevalue
+  ## Note: A l7_flow_log blacklist can be configured for each protocol, preventing request logs matching
+  ##   the blacklist from being collected by the agent or included in application performance metrics.
+  ##   It's recommended to only place non-business request logs like heartbeats or health checks in this
+  ##   blacklist. Including business request logs might lead to breaks in the distributed tracing tree.
+  #l7-log-blacklist:
+  #  HTTP: []
+  #  HTTP2: []
+  
   ## L7 Protocol Advanced Features
   #l7-protocol-advanced-features:
 
@@ -1102,6 +1117,16 @@ vtap_group_id: g-xxxxxx
     ## - field-name: "cookie"
     #  http: []
     #  http2: []
+
+    ## Unconcerned DNS NXDOMAIN Responses
+    ## Note: You might not be concerned about certain DNS NXDOMAIN errors and may wish to ignore
+    ##   them. For example, when a K8s Pod tries to resolve an external domain name, it first
+    ##   concatenates it with the internal domain suffix of the cluster and attempts to resolve
+    ##   it. All these attempts will receive an NXDOMAIN reply before it finally requests the
+    ##   original domain name directly, and these errors may not be of concern to you. In such
+    ##   cases, you can configure their `response_result` suffix here, so that the corresponding
+    ##   `response_status` in the l7_flow_log is forcibly set to `Success`.
+    #unconcerned-dns-nxdomain-response-suffixes: []
 
   #oracle-parse-config:
     #is-be: true

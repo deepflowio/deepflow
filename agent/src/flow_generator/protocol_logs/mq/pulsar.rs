@@ -16,6 +16,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::Result,
         protocol_logs::{
@@ -127,6 +128,9 @@ pub struct PulsarInfo {
 
     captured_request_byte: u32,
     captured_response_byte: u32,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 pub struct PulsarLog {
@@ -137,6 +141,8 @@ pub struct PulsarLog {
 
     producer_topic: PulsarTopicMap,
     consumer_topic: PulsarTopicMap,
+
+    last_is_on_blacklist: bool,
 }
 
 impl Default for PulsarLog {
@@ -147,6 +153,7 @@ impl Default for PulsarLog {
             domain: None,
             producer_topic: PulsarTopicMap::new(),
             consumer_topic: PulsarTopicMap::new(),
+            last_is_on_blacklist: false,
         }
     }
 }
@@ -725,6 +732,24 @@ impl PulsarInfo {
         }
         Some((payload, info))
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Pulsar) {
+            self.is_on_blacklist = t
+                .request_type
+                .is_on_blacklist(self.command.r#type().as_str_name())
+                || self
+                    .topic
+                    .as_ref()
+                    .map(|p| t.request_resource.is_on_blacklist(p) || t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .domain
+                    .as_ref()
+                    .map(|p| t.request_domain.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl From<PulsarInfo> for L7ProtocolSendLog {
@@ -788,6 +813,9 @@ impl L7ProtocolInfoInterface for PulsarInfo {
                 req.resp_exception = rsp.resp_exception.clone();
             }
             req.captured_response_byte = rsp.captured_response_byte;
+            if rsp.is_on_blacklist {
+                req.is_on_blacklist = rsp.is_on_blacklist;
+            }
         }
         Ok(())
     }
@@ -806,6 +834,10 @@ impl L7ProtocolInfoInterface for PulsarInfo {
 
     fn get_request_domain(&self) -> String {
         self.domain.clone().unwrap_or_default()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -845,23 +877,28 @@ impl L7ProtocolParserInterface for PulsarLog {
 
         for info in &mut vec {
             if let L7ProtocolInfo::PulsarInfo(info) = info {
-                if info.msg_type != LogMessageType::Session {
-                    info.cal_rrt(param).map(|rtt| {
-                        info.rtt = rtt;
-                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                    });
-                }
-
                 info.is_tls = param.is_tls();
                 set_captured_byte!(info, param);
-                match param.direction {
-                    PacketDirection::ClientToServer => {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
+                if let Some(config) = param.parse_config {
+                    info.set_is_on_blacklist(config);
+                }
+                if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                    match param.direction {
+                        PacketDirection::ClientToServer => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        PacketDirection::ServerToClient => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
                     }
-                    PacketDirection::ServerToClient => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if info.msg_type != LogMessageType::Session {
+                        info.cal_rrt(param).map(|rtt| {
+                            info.rtt = rtt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                        });
                     }
                 }
+                self.last_is_on_blacklist = info.is_on_blacklist;
             }
         }
 
