@@ -218,6 +218,9 @@ pub struct HttpInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 impl HttpInfo {
@@ -334,12 +337,19 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn get_request_resource_length(&self) -> usize {
         self.path.len()
     }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
 }
 
 impl HttpInfo {
     pub fn merge(&mut self, other: &mut Self) -> Result<()> {
         let other_is_grpc = other.is_grpc();
 
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
+        }
         match other.msg_type {
             // merge with request
             LogMessageType::Request => {
@@ -431,6 +441,19 @@ impl HttpInfo {
         }
         None
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&self.proto) {
+            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.path)
+                || t.request_type.is_on_blacklist(self.method.as_str())
+                || t.request_domain.is_on_blacklist(&self.host)
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl From<HttpInfo> for L7ProtocolSendLog {
@@ -519,7 +542,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
 #[derive(Default)]
 pub struct HttpLog {
     proto: L7Protocol,
-    is_tls: bool,
+    last_is_on_blacklist: bool,
     perf_stats: Option<L7PerfStats>,
     http2_req_decoder: Option<Decoder<'static>>,
     http2_resp_decoder: Option<Decoder<'static>>,
@@ -574,7 +597,6 @@ impl L7ProtocolParserInterface for HttpLog {
         let mut info = HttpInfo::default();
         info.proto = self.proto;
         info.is_tls = param.is_tls();
-        self.is_tls = param.is_tls();
 
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
@@ -602,14 +624,68 @@ impl L7ProtocolParserInterface for HttpLog {
             }
             _ => unreachable!(),
         }
-        if param.parse_log {
-            // In uprobe mode, headers are reported in a way different from other modes:
-            // one payload contains one header.
-            // Calling wasm plugin on every payload would be wasted effort,
-            // in this condition the call to the wasm plugin will be skipped.
-            if param.ebpf_type != EbpfType::GoHttp2Uprobe {
-                self.wasm_hook(param, payload, &mut info);
+        // In uprobe mode, headers are reported in a way different from other modes:
+        // one payload contains one header.
+        // Calling wasm plugin on every payload would be wasted effort,
+        // in this condition the call to the wasm plugin will be skipped.
+        if param.ebpf_type != EbpfType::GoHttp2Uprobe {
+            self.wasm_hook(param, payload, &mut info);
+        }
+        info.set_is_on_blacklist(config);
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match self.proto {
+                L7Protocol::Http1 => {
+                    match param.direction {
+                        PacketDirection::ClientToServer => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        PacketDirection::ServerToClient => {
+                            self.set_status(info.status_code, &mut info);
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
+                    }
+                    info.cal_rrt(param).map(|rrt| {
+                        info.rrt = rrt;
+                        self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                    });
+                }
+                L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
+                    EbpfType::GoHttp2Uprobe => {
+                        if info.is_req_end {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        if info.is_resp_end {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
+
+                        info.cal_rrt_for_multi_merge_log(param).map(|rrt| {
+                            info.rrt = rrt;
+                        });
+
+                        if info.is_req_end || info.is_resp_end {
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
+                        }
+                    }
+                    _ => {
+                        match param.direction {
+                            PacketDirection::ClientToServer => {
+                                self.perf_stats.as_mut().map(|p| p.inc_req());
+                            }
+                            PacketDirection::ServerToClient => {
+                                self.perf_stats.as_mut().map(|p| p.inc_resp());
+                            }
+                        }
+                        info.cal_rrt(param).map(|rrt| {
+                            info.rrt = rrt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                        });
+                    }
+                },
+                _ => unreachable!(),
             }
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
+        if param.parse_log {
             if matches!(self.proto, L7Protocol::Http1 | L7Protocol::Http2)
                 && !config.http_endpoint_disabled
                 && info.path.len() > 0
@@ -648,6 +724,7 @@ impl L7ProtocolParserInterface for HttpLog {
             },
             _ => unreachable!(),
         };
+        new_log.last_is_on_blacklist = self.last_is_on_blacklist;
         new_log.perf_stats = self.perf_stats.take();
         new_log.http2_req_decoder = self.http2_req_decoder.take();
         new_log.http2_resp_decoder = self.http2_resp_decoder.take();
@@ -789,21 +866,6 @@ impl HttpLog {
         info: &mut HttpInfo,
     ) -> Result<()> {
         self.check_http2_go_uprobe(config, payload, param, info)?;
-
-        if info.is_req_end {
-            self.perf_stats.as_mut().map(|p| p.inc_req());
-        }
-        if info.is_resp_end {
-            self.perf_stats.as_mut().map(|p| p.inc_resp());
-        }
-
-        info.cal_rrt_for_multi_merge_log(param).map(|rrt| {
-            info.rrt = rrt;
-        });
-
-        if info.is_req_end || info.is_resp_end {
-            self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
-        }
         Ok(())
     }
 
@@ -844,9 +906,6 @@ impl HttpLog {
             info.status_code = status_code;
 
             info.msg_type = LogMessageType::Response;
-
-            self.perf_stats.as_mut().map(|p| p.inc_resp());
-            self.set_status(status_code, info);
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
             let Ok((method, path, version)) = get_http_request_info(first_line) else {
@@ -858,17 +917,8 @@ impl HttpLog {
             info.version = get_http_request_version(version)?;
 
             info.msg_type = LogMessageType::Request;
-            self.perf_stats.as_mut().map(|p| p.inc_req());
         }
 
-        info.cal_rrt(param).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
-
-        if !param.parse_log {
-            return Ok(());
-        }
         let mut content_length: Option<u32> = None;
         for body_line in headers {
             let col_index = body_line.find(':');
@@ -1078,16 +1128,6 @@ impl HttpLog {
         info: &mut HttpInfo,
     ) -> Result<()> {
         self.check_http_v2(payload, param, info)?;
-
-        if param.direction == PacketDirection::ClientToServer {
-            self.perf_stats.as_mut().map(|p| p.inc_req());
-        } else {
-            self.perf_stats.as_mut().map(|p| p.inc_resp());
-        }
-        info.cal_rrt(param).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
         set_captured_byte!(info, param);
         Ok(())
     }

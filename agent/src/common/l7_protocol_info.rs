@@ -421,6 +421,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     fn get_request_resource_length(&self) -> usize {
         0
     }
+
+    fn is_on_blacklist(&self) -> bool {
+        false
+    }
 }
 
 impl L7ProtocolInfo {

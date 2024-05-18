@@ -28,6 +28,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::Result,
         protocol_logs::{
@@ -292,6 +293,13 @@ pub struct AmqpInfo {
     req_len: Option<u32>,
     resp_len: Option<u32>,
     resp_code: Option<i32>,
+
+    #[serde(skip)]
+    req_type: Option<String>,
+    #[serde(skip)]
+    endpoint: Option<String>,
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 fn slice_to_string(slice: &[u8]) -> String {
@@ -682,13 +690,33 @@ impl AmqpInfo {
         };
         Some(slice_to_string(routing_key))
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::AMQP) {
+            self.is_on_blacklist = self
+                .req_type
+                .as_ref()
+                .map(|p| t.request_type.is_on_blacklist(p))
+                .unwrap_or_default()
+                || self
+                    .vhost
+                    .as_ref()
+                    .map(|p| t.request_domain.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p) || t.request_resource.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 #[derive(Default)]
 pub struct AmqpLog {
     perf_stats: Option<L7PerfStats>,
-
     vhost: Option<String>,
+    last_is_on_blacklist: bool,
 }
 
 impl From<AmqpInfo> for L7ProtocolSendLog {
@@ -696,18 +724,6 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
         let flags = match info.is_tls {
             true => EbpfFlags::TLS.bits(),
             false => EbpfFlags::NONE.bits(),
-        };
-        let req_type = info.get_packet_type();
-        let type1_len = info.exchange.as_ref().map_or(0, |r| r.len())
-            + info.routing_key.as_ref().map_or(0, |r| r.len());
-        let endpoint = if type1_len > 0 {
-            format!(
-                "{}.{}",
-                info.exchange.unwrap_or_default(),
-                info.routing_key.unwrap_or_default()
-            )
-        } else {
-            info.queue.unwrap_or_default()
         };
         let log = L7ProtocolSendLog {
             captured_request_byte: info.captured_request_byte,
@@ -717,10 +733,10 @@ impl From<AmqpInfo> for L7ProtocolSendLog {
             req_len: info.req_len,
             resp_len: info.resp_len,
             req: L7Request {
-                req_type,
+                req_type: info.req_type.unwrap_or_default(),
                 domain: info.vhost.unwrap_or_default(),
-                resource: endpoint.clone(),
-                endpoint: endpoint.clone(),
+                resource: info.endpoint.clone().unwrap_or_default(),
+                endpoint: info.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -764,6 +780,15 @@ impl L7ProtocolInfoInterface for AmqpInfo {
             if req.exchange.as_ref().map_or(0, |r| r.len()) == 0 {
                 req.exchange = rsp.exchange.clone();
             }
+            if req.req_type.is_none() {
+                req.resp_code = rsp.raw_method_id.map(|x| x as i32);
+            }
+            if req.endpoint.is_none() {
+                req.resp_code = rsp.raw_method_id.map(|x| x as i32);
+            }
+            if rsp.is_on_blacklist {
+                req.is_on_blacklist = rsp.is_on_blacklist;
+            }
             req.captured_response_byte = rsp.captured_response_byte;
         }
         Ok(())
@@ -779,6 +804,27 @@ impl L7ProtocolInfoInterface for AmqpInfo {
 
     fn get_request_domain(&self) -> String {
         self.vhost.clone().unwrap_or_default()
+    }
+
+    fn get_endpoint(&self) -> Option<String> {
+        let (exchange, exchange_len) = self
+            .exchange
+            .as_ref()
+            .map(|r| (r.as_str(), r.len()))
+            .unwrap_or(("", 0));
+        let (routing_key, routing_key_len) = self
+            .routing_key
+            .as_ref()
+            .map(|r| (r.as_str(), r.len()))
+            .unwrap_or(("", 0));
+        if exchange_len + routing_key_len == 0 {
+            return self.queue.clone();
+        }
+        Some(format!("{}.{}", exchange, routing_key))
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -806,6 +852,10 @@ impl L7ProtocolParserInterface for AmqpLog {
             info.is_protcol_header = true;
             info.is_tls = param.is_tls();
             info.msg_type = info.get_log_message_type();
+            if info.msg_type == LogMessageType::Request {
+                info.req_type = Some(info.get_packet_type());
+                info.endpoint = info.get_endpoint();
+            }
             vec.push(L7ProtocolInfo::AmqpInfo(info));
         }
         loop {
@@ -896,7 +946,11 @@ impl L7ProtocolParserInterface for AmqpLog {
             info.msg_type = info.get_log_message_type();
 
             match info.msg_type {
-                LogMessageType::Request => info.req_len = Some((offset - offset_begin) as u32),
+                LogMessageType::Request => {
+                    info.req_len = Some((offset - offset_begin) as u32);
+                    info.req_type = Some(info.get_packet_type());
+                    info.endpoint = info.get_endpoint();
+                }
                 LogMessageType::Response => info.resp_len = Some((offset - offset_begin) as u32),
                 _ => {}
             }
@@ -904,23 +958,27 @@ impl L7ProtocolParserInterface for AmqpLog {
         }
         for info in &mut vec {
             if let L7ProtocolInfo::AmqpInfo(info) = info {
-                if info.msg_type != LogMessageType::Session {
-                    info.cal_rrt(param).map(|rtt| {
-                        info.rtt = rtt;
-                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                    });
-                }
                 info.is_tls = param.is_tls();
                 set_captured_byte!(info, param);
-                match info.msg_type {
-                    LogMessageType::Request => {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
-                    }
-                    LogMessageType::Response => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
-                    }
-                    _ => {}
+                if let Some(config) = param.parse_config {
+                    info.set_is_on_blacklist(config);
                 }
+                if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                    if info.msg_type == LogMessageType::Request {
+                        self.perf_stats.as_mut().map(|p| p.inc_req());
+                        info.cal_rrt(param).map(|rtt| {
+                            info.rtt = rtt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                        });
+                    } else if info.msg_type == LogMessageType::Response {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        info.cal_rrt(param).map(|rtt| {
+                            info.rtt = rtt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                        });
+                    }
+                }
+                self.last_is_on_blacklist = info.is_on_blacklist;
             }
         }
         if !param.parse_log {
@@ -936,6 +994,7 @@ impl L7ProtocolParserInterface for AmqpLog {
 
     fn reset(&mut self) {
         let mut s = Self::default();
+        s.last_is_on_blacklist = self.last_is_on_blacklist;
         s.vhost = self.vhost.take();
         s.perf_stats = self.perf_stats.take();
         *self = s;

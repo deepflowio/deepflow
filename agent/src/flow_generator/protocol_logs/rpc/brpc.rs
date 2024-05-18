@@ -11,11 +11,12 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, swap_if, AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::read_u32_be,
@@ -49,11 +50,17 @@ pub struct BrpcInfo {
 
     captured_request_byte: u32,
     captured_response_byte: u32,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    endpoint: Option<String>,
 }
 
 #[derive(Default)]
 pub struct BrpcLog {
     perf_stats: Option<L7PerfStats>,
+    last_is_on_blacklist: bool,
 }
 
 impl BrpcInfo {
@@ -79,6 +86,7 @@ impl BrpcInfo {
             info.req_method_name = Some(req.method_name);
             info.req_log_id = req.log_id;
             info.req_len = Some(body_size as u32 + 12);
+            info.endpoint = info.get_endpoint();
             info.msg_type = LogMessageType::Request;
         } else if let Some(resp) = meta.response {
             info.resp_code = resp.error_code;
@@ -130,6 +138,26 @@ impl BrpcInfo {
         */
         self.correlation_id.map(|x| (x >> 32) as u32)
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Brpc) {
+            self.is_on_blacklist = self
+                .req_method_name
+                .as_ref()
+                .map(|p| t.request_type.is_on_blacklist(p))
+                .unwrap_or_default()
+                || self
+                    .req_service_name
+                    .as_ref()
+                    .map(|p| t.request_resource.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl From<BrpcInfo> for L7ProtocolSendLog {
@@ -138,8 +166,6 @@ impl From<BrpcInfo> for L7ProtocolSendLog {
             true => EbpfFlags::TLS.bits(),
             false => EbpfFlags::NONE.bits(),
         };
-
-        let endpoint = info.get_endpoint();
 
         let request_id = info.get_request_id();
 
@@ -152,7 +178,7 @@ impl From<BrpcInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: info.req_method_name.unwrap_or_default(),
                 resource: info.req_service_name.unwrap_or_default(),
-                endpoint: endpoint.unwrap_or_default(),
+                endpoint: info.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -194,6 +220,10 @@ impl L7ProtocolInfoInterface for BrpcInfo {
             if req.resp_exception.is_none() {
                 req.resp_exception = rsp.resp_exception.clone();
             }
+            if rsp.is_on_blacklist {
+                req.is_on_blacklist = rsp.is_on_blacklist;
+            }
+            swap_if!(req, endpoint, is_none, rsp);
         }
         Ok(())
     }
@@ -213,6 +243,10 @@ impl L7ProtocolInfoInterface for BrpcInfo {
             self.req_method_name.as_ref()?
         )
         .into()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -245,23 +279,29 @@ impl L7ProtocolParserInterface for BrpcLog {
 
         for info in &mut vec {
             if let L7ProtocolInfo::BrpcInfo(info) = info {
-                if info.msg_type != LogMessageType::Session {
-                    info.cal_rrt(param).map(|rtt| {
-                        info.rtt = rtt;
-                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                    });
-                }
-
                 info.is_tls = param.is_tls();
                 set_captured_byte!(info, param);
-                match param.direction {
-                    PacketDirection::ClientToServer => {
-                        self.perf_stats.as_mut().map(|p| p.inc_req());
+
+                if let Some(config) = param.parse_config {
+                    info.set_is_on_blacklist(config);
+                }
+                if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                    match param.direction {
+                        PacketDirection::ClientToServer => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        PacketDirection::ServerToClient => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
                     }
-                    PacketDirection::ServerToClient => {
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if info.msg_type != LogMessageType::Session {
+                        info.cal_rrt(param).map(|rtt| {
+                            info.rtt = rtt;
+                            self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                        });
                     }
                 }
+                self.last_is_on_blacklist = info.is_on_blacklist;
             }
         }
 
@@ -290,6 +330,7 @@ impl L7ProtocolParserInterface for BrpcLog {
 
     fn reset(&mut self) {
         let mut s = Self::default();
+        s.last_is_on_blacklist = self.last_is_on_blacklist;
         s.perf_stats = self.perf_stats.take();
         *self = s;
     }
