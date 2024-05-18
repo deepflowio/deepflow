@@ -547,22 +547,11 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
 		AO_DEC(&p->use);
+		/* Ensure that all tasks are completed before releasing. */
 		while (AO_GET(&p->use) != 0)
 			CLIB_PAUSE();
-		/* Ensure that all tasks are completed before releasing. */
-		if (kv->v.cache != p->syms_cache) {
-			ebpf_warning
-			    ("Curr pid %d kvp_pid %lu kv->v.cache 0x%lx p->syms_cache 0x%lx\n",
-			     (int)p->pid, kv->k.pid, kv->v.cache,
-			     p->syms_cache);
-		}
 		free_proc_cache(p);
 		kv->v.proc_info_p = 0;
-		kv->v.cache = 0;
-	} else {
-		if (kv->v.cache != 0)
-			ebpf_warning
-			    ("kv->v.cache 0x%lx proc_info_p 0\n", kv->v.cache);
 	}
 }
 
@@ -593,15 +582,14 @@ static inline bool is_existed_in_exit_cache(struct symbolizer_cache_kvp *kv)
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			ebpf_warning
-			    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx) cache 0x%lx"
-			     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->) cache 0x%lx\n",
+			    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)"
+			     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)\n",
 			     (u64) list_p->pid, kv_tmp->k.pid,
 			     kv_tmp->v.proc_info_p,
 			     kv_tmp->v.proc_info_p !=
-			     0 ? list_p->syms_cache : 0, kv_tmp->v.cache,
-			     (u64) curr_p->pid, kv->k.pid, kv->v.proc_info_p,
-			     kv->v.proc_info_p != 0 ? curr_p->syms_cache : 0,
-			     kv->v.cache);
+			     0 ? list_p->syms_cache : 0, (u64) curr_p->pid,
+			     kv->k.pid, kv->v.proc_info_p,
+			     kv->v.proc_info_p != 0 ? curr_p->syms_cache : 0);
 			return true;
 		}
 	}
@@ -625,15 +613,14 @@ static inline bool is_existed_in_exec_cache(struct symbolizer_cache_kvp *kv)
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			ebpf_warning
-			    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx) cache 0x%lx"
-			     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->) cache 0x%lx\n",
+			    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)"
+			     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)\n",
 			     (u64) list_p->pid, kv_tmp->k.pid,
 			     kv_tmp->v.proc_info_p,
 			     kv_tmp->v.proc_info_p !=
-			     0 ? list_p->syms_cache : 0, kv_tmp->v.cache,
-			     (u64) curr_p->pid, kv->k.pid, kv->v.proc_info_p,
-			     kv->v.proc_info_p != 0 ? curr_p->syms_cache : 0,
-			     kv->v.cache);
+			     0 ? list_p->syms_cache : 0, (u64) curr_p->pid,
+			     kv->k.pid, kv->v.proc_info_p,
+			     kv->v.proc_info_p != 0 ? curr_p->syms_cache : 0);
 			return true;
 		}
 	}
@@ -663,8 +650,6 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 	}
 
 	kv->v.proc_info_p = pointer_to_uword(p);
-	kv->v.cache = 0;
-
 	int ret;
 	if ((ret = symbol_caches_hash_add_del
 	     (h, (symbol_caches_hash_kv *) kv,
@@ -694,7 +679,6 @@ void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size)
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	kv.v.cache = 0;
 	memset(id, 0, id_size);
 	struct symbolizer_proc_info *p = NULL;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
@@ -758,7 +742,6 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		int ret = VEC_OK;
@@ -854,7 +837,6 @@ u64 get_pid_stime(pid_t pid)
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		return cache_process_stime(&kv);
@@ -933,7 +915,6 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	kv.v.cache = 0;
 	struct symbolizer_proc_info *p = NULL;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) != 0) {
@@ -1000,28 +981,19 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 	if (p->is_java && !p->cache_need_update)
 		goto exit;
 
-	if (kv->v.cache)
-		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
+	if (p->syms_cache)
+		bcc_free_symcache((void *)p->syms_cache, kv->k.pid);
 
-	kv->v.cache =
+	p->syms_cache =
 	    pointer_to_uword(bcc_symcache_new((int)kv->k.pid, &lazy_opt));
 
-	if (kv->v.cache <= 0) {
-		kv->v.cache = 0;
+	if (p->syms_cache <= 0) {
+		p->syms_cache = 0;
 		goto exit;
 	}
 
-	if (symbol_caches_hash_add_del(h, (symbol_caches_hash_kv *)
-				       kv, 1 /* is_add */ )) {
-		ebpf_warning
-		    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
-		     (int)kv->k.pid);
-		bcc_free_symcache((void *)kv->v.cache, kv->k.pid);
-		kv->v.cache = 0;
-	} else {
-		ebpf_info("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
-		add_symcache_count++;
-	}
+	ebpf_info("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
+	add_symcache_count++;
 
 exit:
 	p->unknown_syms_found = false;
@@ -1029,10 +1001,9 @@ exit:
 	p->new_java_syms_file = false;
 	p->add_task_list = false;
 	p->cache_need_update = false;
-	p->syms_cache = kv->v.cache;
 	CLIB_MEMORY_STORE_BARRIER();
 
-	return (void *)kv->v.cache;
+	return (void *)p->syms_cache;
 }
 
 static inline void java_expired_update(symbol_caches_hash_t * h,
@@ -1090,7 +1061,6 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	kv.v.cache = 0;
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
@@ -1104,7 +1074,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			 * mbols table of the Java process after a delay.
 			 */
 			if ((p->unknown_syms_found
-			     || (void *)kv.v.cache == NULL)
+			     || (void *)p->syms_cache == NULL)
 			    && p->update_syms_table_time == 0) {
 				/*
 				 * If an exception occurs during the process of generating
@@ -1127,7 +1097,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 				 * generation of Java symbol tables, additional random value
 				 * for each java process's delay.
 				 */
-				if (kv.v.cache == 0
+				if (p->syms_cache == 0
 				    && !p->gen_java_syms_file_err) {
 					p->update_syms_table_time =
 					    generate_random_integer
@@ -1141,7 +1111,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 					java_expired_update(h, &kv, p);
 					symbolizer_proc_unlock(p);
 					AO_DEC(&p->use);
-					return (void *)kv.v.cache;
+					return (void *)p->syms_cache;
 				} else {
 					void *ret =
 					    symbols_cache_update(h, &kv, p);
@@ -1157,10 +1127,10 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			return NULL;
 		}
 
-		if (kv.v.cache) {
+		if (p->syms_cache) {
 			symbolizer_proc_unlock(p);
 			AO_DEC(&p->use);
-			return (void *)kv.v.cache;
+			return (void *)p->syms_cache;
 		}
 
 		symbolizer_proc_unlock(p);
@@ -1208,7 +1178,6 @@ int create_and_init_proc_info_caches(void)
 			}
 
 			sym.v.proc_info_p = pointer_to_uword(p);
-			sym.v.cache = 0;
 			if (symbol_caches_hash_add_del
 			    (h, (symbol_caches_hash_kv *) & sym,
 			     1 /* is_add */ )) {
