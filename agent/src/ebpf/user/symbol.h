@@ -21,22 +21,22 @@
 #include "clib.h"
 #include "mem.h"
 #include "vec.h"
-#include "bihash_8_16.h"
+#include "bihash_8_8.h"
 #include "list.h"
 
 /*
  * symbol_caches_hash_t maps from pid to BCC symbol cache.
  */
 
-#define symbol_caches_hash_t        clib_bihash_8_16_t
-#define symbol_caches_hash_init     clib_bihash_init_8_16
-#define symbol_caches_hash_kv       clib_bihash_kv_8_16_t
-#define print_hash_symbol_caches    print_bihash_8_16
-#define symbol_caches_hash_search   clib_bihash_search_8_16
-#define symbol_caches_hash_add_del  clib_bihash_add_del_8_16
-#define symbol_caches_hash_free     clib_bihash_free_8_16
-#define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_16
-#define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_16
+#define symbol_caches_hash_t        clib_bihash_8_8_t
+#define symbol_caches_hash_init     clib_bihash_init_8_8
+#define symbol_caches_hash_kv       clib_bihash_kv_8_8_t
+#define print_hash_symbol_caches    print_bihash_8_8
+#define symbol_caches_hash_search   clib_bihash_search_8_8
+#define symbol_caches_hash_add_del  clib_bihash_add_del_8_8
+#define symbol_caches_hash_free     clib_bihash_free_8_8
+#define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
+#define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
 
 #define FUNC_RET_MAX 32
 
@@ -112,8 +112,6 @@ struct symbolizer_cache_kvp {
 	struct {
 		/* struct symbolizer_proc_info address */
 		uword proc_info_p;
-		/* memoized bcc symbol caches */
-		uword cache;
 	} v;
 };
 
