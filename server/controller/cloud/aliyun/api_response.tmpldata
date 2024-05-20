@@ -5,8 +5,6 @@
     {"type": "Network", "service": "vpc", "func": "DescribeVSwitches", "request_type": "DescribeVSwitchesRequest", "result_key": "VSwitches", "call_num": "multi"},
     {"type": "VM", "service": "ecs", "func": "DescribeInstances", "request_type": "DescribeInstancesRequest", "result_key": "Instances", "call_num": "multi"},
     {"type": "VMInterface", "service": "ecs", "func": "DescribeNetworkInterfaces", "request_type": "DescribeNetworkInterfacesRequest", "result_key": "NetworkInterfaceSets", "call_num": "multi"},
-    {"type": "SecurityGroup", "service": "ecs", "func": "DescribeSecurityGroups", "request_type": "DescribeSecurityGroupsRequest", "result_key": "SecurityGroups", "call_num": "multi"},
-    {"type": "SecurityGroupAttribute", "service": "ecs", "func": "DescribeSecurityGroupAttribute", "request_type": "DescribeSecurityGroupAttributeRequest", "result_key": "Permissions", "call_num": "once"},
     {"type": "Router", "service": "vpc", "func": "DescribeRouteTableList", "request_type": "DescribeRouteTableListRequest", "result_key": "RouterTableList", "call_num": "multi"},
     {"type": "RouterTable", "service": "vpc", "func": "DescribeRouteEntryList", "request_type": "DescribeRouteEntryListRequest", "result_key": "RouteEntrys", "call_num": "once"},
     {"type": "Redis", "service": "r_kvstore", "func": "DescribeInstances", "request_type": "DescribeInstancesRequest", "result_key": "Instances", "call_num": "multi"},

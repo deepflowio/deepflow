@@ -324,6 +324,9 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 				log.Error(err)
 				break
 			}
+			if len(dictSQL) <= 0 {
+				break
+			}
 			createSQL := CREATE_SQL_MAP[dictName]
 			mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
 			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
@@ -395,6 +398,9 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			if err := ckDb.Select(&viewSQL, showSQL); err != nil {
 				updateViewError = err
 				log.Error(err)
+				break
+			}
+			if len(viewSQL) <= 0 {
 				break
 			}
 			createSQL := CREATE_SQL_MAP[viewName]

@@ -151,12 +151,9 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 	var networks []model.Network
 	var subnets []model.Subnet
 	var vms []model.VM
-	var vmSecurityGroups []model.VMSecurityGroup
 	var vinterfaces []model.VInterface
 	var ips []model.IP
 	var floatingIPs []model.FloatingIP
-	var securityGroups []model.SecurityGroup
-	var securityGroupRules []model.SecurityGroupRule
 	var vrouters []model.VRouter
 	var routingTables []model.RoutingTable
 	var natGateways []model.NATGateway
@@ -204,13 +201,12 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 		subnets = append(subnets, tmpSubnets...)
 
 		// VM及相关资源
-		tmpVMs, tmpVMSecurityGroups, tmpVInterfaces, tmpIPs, tmpFloatingIPs, vmLcuuidToVPCLcuuid, err := a.getVMs(region)
+		tmpVMs, tmpVInterfaces, tmpIPs, tmpFloatingIPs, vmLcuuidToVPCLcuuid, err := a.getVMs(region)
 		if err != nil {
 			log.Errorf("get region (%s) vm data failed", region.Name)
 			return resource, err
 		}
 		vms = append(vms, tmpVMs...)
-		vmSecurityGroups = append(vmSecurityGroups, tmpVMSecurityGroups...)
 		vinterfaces = append(vinterfaces, tmpVInterfaces...)
 		ips = append(ips, tmpIPs...)
 		floatingIPs = append(floatingIPs, tmpFloatingIPs...)
@@ -225,15 +221,6 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 		ips = append(ips, tmpIPs...)
 		floatingIPs = append(floatingIPs, tmpFloatingIPs...)
 		natRules = append(natRules, tmpNATRules...)
-
-		// 安全组及规则
-		tmpSecurityGroups, tmpSecurityGroupRules, err := a.getSecurityGroups(region)
-		if err != nil {
-			log.Errorf("get region (%s) security_group data failed", region.Name)
-			return resource, err
-		}
-		securityGroups = append(securityGroups, tmpSecurityGroups...)
-		securityGroupRules = append(securityGroupRules, tmpSecurityGroupRules...)
 
 		// 路由表及规则
 		tmpVRouters, tmpRoutingTables, err := a.getRouterAndTables(region)
@@ -311,12 +298,9 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 	resource.Networks = networks
 	resource.Subnets = subnets
 	resource.VMs = vms
-	resource.VMSecurityGroups = vmSecurityGroups
 	resource.VInterfaces = vinterfaces
 	resource.IPs = ips
 	resource.FloatingIPs = floatingIPs
-	resource.SecurityGroups = securityGroups
-	resource.SecurityGroupRules = securityGroupRules
 	resource.VRouters = vrouters
 	resource.RoutingTables = routingTables
 	resource.NATGateways = natGateways

@@ -223,9 +223,6 @@ func (c *Cache) Refresh() {
 		c.refreshRoutingTables(vrouterIDs)
 		c.refreshDHCPPorts()
 		c.refreshFloatingIPs()
-		securityGroupIDs := c.refreshSecurityGroups()
-		c.refreshSecurityGroupRules(securityGroupIDs)
-		c.refreshVMSecurityGroups(securityGroupIDs)
 		c.refreshNATGateways()
 		c.refreshNATRules()
 		c.refreshNATVMConnections()
@@ -773,92 +770,6 @@ func (c *Cache) refreshFloatingIPs() {
 	}
 
 	c.AddFloatingIPs(floatingIPs)
-}
-
-func (c *Cache) AddSecurityGroup(item *mysql.SecurityGroup) {
-	c.DiffBaseDataSet.AddSecurityGroup(item, c.Sequence)
-	c.ToolDataSet.AddSecurityGroup(item)
-}
-
-func (c *Cache) AddSecurityGroups(items []*mysql.SecurityGroup) {
-	for _, item := range items {
-		c.AddSecurityGroup(item)
-	}
-}
-
-func (c *Cache) DeleteSecurityGroups(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.DeleteSecurityGroup(lcuuid)
-		c.ToolDataSet.DeleteSecurityGroup(lcuuid)
-	}
-}
-
-func (c *Cache) refreshSecurityGroups() []int {
-	log.Info(c.metadata.LogPre(refreshResource(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN)))
-	var securityGroups []*mysql.SecurityGroup
-	securityGroupIDs := []int{}
-
-	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&securityGroups).Error
-	if err != nil {
-		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, err))
-		return securityGroupIDs
-	}
-
-	for _, item := range securityGroups {
-		securityGroupIDs = append(securityGroupIDs, item.ID)
-		c.AddSecurityGroup(item)
-	}
-	return securityGroupIDs
-}
-
-func (c *Cache) AddSecurityGroupRules(items []*mysql.SecurityGroupRule) {
-	for _, item := range items {
-		c.DiffBaseDataSet.AddSecurityGroupRule(item, c.Sequence)
-	}
-}
-
-func (c *Cache) DeleteSecurityGroupRules(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.DeleteSecurityGroupRule(lcuuid)
-	}
-}
-
-func (c *Cache) refreshSecurityGroupRules(securityGroupIDs []int) {
-	log.Info(c.metadata.LogPre(refreshResource(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN)))
-	var securityGroupRules []*mysql.SecurityGroupRule
-
-	err := c.metadata.DB.Where(map[string]interface{}{"sg_id": securityGroupIDs}).Find(&securityGroupRules).Error
-	if err != nil {
-		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, err))
-		return
-	}
-
-	c.AddSecurityGroupRules(securityGroupRules)
-}
-
-func (c *Cache) AddVMSecurityGroups(items []*mysql.VMSecurityGroup) {
-	for _, item := range items {
-		c.DiffBaseDataSet.AddVMSecurityGroup(item, c.Sequence)
-	}
-}
-
-func (c *Cache) DeleteVMSecurityGroups(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.DeleteVMSecurityGroup(lcuuid)
-	}
-}
-
-func (c *Cache) refreshVMSecurityGroups(securityGroupIDs []int) {
-	log.Info(c.metadata.LogPre(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN)))
-	var vmsg []*mysql.VMSecurityGroup
-
-	err := c.metadata.DB.Where(map[string]interface{}{"sg_id": securityGroupIDs}).Find(&vmsg).Error
-	if err != nil {
-		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, err))
-		return
-	}
-
-	c.AddVMSecurityGroups(vmsg)
 }
 
 func (c *Cache) AddNATGateways(items []*mysql.NATGateway) {
