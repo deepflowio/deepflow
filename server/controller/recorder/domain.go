@@ -192,12 +192,6 @@ func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.Res
 			listener.NewRoutingTable(d.cache)),
 		updater.NewDHCPPort(d.cache, cloudData.DHCPPorts).RegisterListener(
 			listener.NewDHCPPort(d.cache, d.eventQueue)),
-		updater.NewSecurityGroup(d.cache, cloudData.SecurityGroups).RegisterListener(
-			listener.NewSecurityGroup(d.cache)),
-		updater.NewSecurityGroupRule(d.cache, cloudData.SecurityGroupRules).RegisterListener(
-			listener.NewSecurityGroupRule(d.cache)),
-		updater.NewVMSecurityGroup(d.cache, cloudData.VMSecurityGroups).RegisterListener(
-			listener.NewVMSecurityGroup(d.cache)),
 		updater.NewNATGateway(d.cache, cloudData.NATGateways).RegisterListener(
 			listener.NewNATGateway(d.cache, d.eventQueue)),
 		updater.NewNATVMConnection(d.cache, cloudData.NATVMConnections).RegisterListener(

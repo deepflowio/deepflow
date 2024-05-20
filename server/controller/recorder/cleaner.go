@@ -230,7 +230,6 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	deleteExpired[mysql.Network](c.org.DB, expiredAt)
 	deleteExpired[mysql.VRouter](c.org.DB, expiredAt)
 	deleteExpired[mysql.DHCPPort](c.org.DB, expiredAt)
-	deleteExpired[mysql.SecurityGroup](c.org.DB, expiredAt)
 	deleteExpired[mysql.NATGateway](c.org.DB, expiredAt)
 	deleteExpired[mysql.LB](c.org.DB, expiredAt)
 	deleteExpired[mysql.LBListener](c.org.DB, expiredAt)
@@ -255,7 +254,6 @@ func (c *Cleaner) cleanDirtyData() {
 	log.Info(c.org.LogPre("clean dirty data started"))
 	c.cleanNetworkDirty()
 	c.cleanVRouterDirty()
-	c.cleanSecurityGroupDirty()
 	c.cleanPodIngressDirty()
 	c.cleanPodServiceDirty()
 	c.cleanPodNodeDirty()
@@ -284,24 +282,6 @@ func (c *Cleaner) cleanVRouterDirty() {
 		if len(rts) != 0 {
 			c.org.DB.Delete(&rts)
 			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, rts)))
-		}
-	}
-}
-func (c *Cleaner) cleanSecurityGroupDirty() {
-	securityGroupIDs := getIDs[mysql.SecurityGroup](c.org.DB)
-	if len(securityGroupIDs) != 0 {
-		var sgRules []mysql.SecurityGroupRule
-		c.org.DB.Where("sg_id NOT IN ?", securityGroupIDs).Find(&sgRules)
-		if len(sgRules) != 0 {
-			c.org.DB.Delete(&sgRules)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, sgRules)))
-		}
-
-		var vmSGs []mysql.VMSecurityGroup
-		c.org.DB.Where("sg_id NOT IN ?", securityGroupIDs).Find(&vmSGs)
-		if len(vmSGs) != 0 {
-			c.org.DB.Delete(&vmSGs)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, vmSGs)))
 		}
 	}
 }

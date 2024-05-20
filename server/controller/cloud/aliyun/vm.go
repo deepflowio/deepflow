@@ -27,10 +27,9 @@ import (
 )
 
 func (a *Aliyun) getVMs(region model.Region) (
-	[]model.VM, []model.VMSecurityGroup, []model.VInterface, []model.IP, []model.FloatingIP, map[string]string, error,
+	[]model.VM, []model.VInterface, []model.IP, []model.FloatingIP, map[string]string, error,
 ) {
 	var retVMs []model.VM
-	var retVMSecurityGroups []model.VMSecurityGroup
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 	var retFloatingIPs []model.FloatingIP
@@ -41,7 +40,7 @@ func (a *Aliyun) getVMs(region model.Region) (
 	response, err := a.getVMResponse(region.Label, request)
 	if err != nil {
 		log.Error(err)
-		return retVMs, retVMSecurityGroups, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, err
+		return retVMs, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, err
 	}
 
 	for _, r := range response {
@@ -110,19 +109,6 @@ func (a *Aliyun) getVMs(region model.Region) (
 			a.azLcuuidToResourceNum[retVM.AZLcuuid]++
 			a.regionLcuuidToResourceNum[retVM.RegionLcuuid]++
 
-			// VM与安全组关联关系
-			securityGroupIds := vm.Get("SecurityGroupIds").Get("SecurityGroupId").MustStringArray()
-			priority := 0
-			for _, securityGroupId := range securityGroupIds {
-				retSecurityGroup := model.VMSecurityGroup{
-					Lcuuid:              common.GenerateUUIDByOrgID(a.orgID, vmLcuuid+securityGroupId),
-					VMLcuuid:            vmLcuuid,
-					SecurityGroupLcuuid: common.GenerateUUIDByOrgID(a.orgID, securityGroupId),
-					Priority:            priority,
-				}
-				retVMSecurityGroups = append(retVMSecurityGroups, retSecurityGroup)
-			}
-
 			// VM PublicIPs
 			publicIPs := vm.Get("PublicIpAddress").Get("IpAddress").MustStringArray()
 			for _, publicIP := range publicIPs {
@@ -162,7 +148,7 @@ func (a *Aliyun) getVMs(region model.Region) (
 		}
 	}
 	log.Debug("get vms complete")
-	return retVMs, retVMSecurityGroups, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, nil
+	return retVMs, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, nil
 }
 
 func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP, []model.FloatingIP, []model.NATRule, error) {

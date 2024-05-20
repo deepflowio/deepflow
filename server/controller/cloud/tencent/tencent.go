@@ -354,16 +354,6 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 		}
 
-		sgs, sgRules, err := t.getSecurityGroups(region)
-		if err != nil {
-			return model.Resource{}, err
-		}
-		if len(sgs) > 0 || len(sgRules) > 0 {
-			regionFlag = true
-			resource.SecurityGroups = append(resource.SecurityGroups, sgs...)
-			resource.SecurityGroupRules = append(resource.SecurityGroupRules, sgRules...)
-		}
-
 		routers, routerTables, err := t.getRouterAndTables(region)
 		if err != nil {
 			return model.Resource{}, err
@@ -385,14 +375,13 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 			resource.VInterfaces = append(resource.VInterfaces, netVinterfaces...)
 		}
 
-		vms, vmSGs, err := t.getVMs(region)
+		vms, err := t.getVMs(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vms) > 0 || len(vmSGs) > 0 {
+		if len(vms) > 0 {
 			regionFlag = true
 			resource.VMs = append(resource.VMs, vms...)
-			resource.VMSecurityGroups = append(resource.VMSecurityGroups, vmSGs...)
 		}
 
 		vinterfaces, ips, vNatRules, err := t.getVInterfacesAndIPs(region)

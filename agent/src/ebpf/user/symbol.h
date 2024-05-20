@@ -21,22 +21,22 @@
 #include "clib.h"
 #include "mem.h"
 #include "vec.h"
-#include "bihash_8_16.h"
+#include "bihash_8_8.h"
 #include "list.h"
 
 /*
  * symbol_caches_hash_t maps from pid to BCC symbol cache.
  */
 
-#define symbol_caches_hash_t        clib_bihash_8_16_t
-#define symbol_caches_hash_init     clib_bihash_init_8_16
-#define symbol_caches_hash_kv       clib_bihash_kv_8_16_t
-#define print_hash_symbol_caches    print_bihash_8_16
-#define symbol_caches_hash_search   clib_bihash_search_8_16
-#define symbol_caches_hash_add_del  clib_bihash_add_del_8_16
-#define symbol_caches_hash_free     clib_bihash_free_8_16
-#define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_16
-#define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_16
+#define symbol_caches_hash_t        clib_bihash_8_8_t
+#define symbol_caches_hash_init     clib_bihash_init_8_8
+#define symbol_caches_hash_kv       clib_bihash_kv_8_8_t
+#define print_hash_symbol_caches    print_bihash_8_8
+#define symbol_caches_hash_search   clib_bihash_search_8_8
+#define symbol_caches_hash_add_del  clib_bihash_add_del_8_8
+#define symbol_caches_hash_free     clib_bihash_free_8_8
+#define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
+#define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
 
 #define FUNC_RET_MAX 32
 
@@ -44,8 +44,9 @@
 #define TASK_COMM_LEN 16
 #endif
 
-struct symbol_cache_del_pids {
-	struct symbolizer_cache_kvp *pid_caches;
+struct symbol_cache_pids {
+	struct symbolizer_cache_kvp *exec_pids_cache;
+	struct symbolizer_cache_kvp *exit_pids_cache;
 	volatile u32 *lock;
 };
 
@@ -111,8 +112,6 @@ struct symbolizer_cache_kvp {
 	struct {
 		/* struct symbolizer_proc_info address */
 		uword proc_info_p;
-		/* memoized bcc symbol caches */
-		uword cache;
 	} v;
 };
 
@@ -176,8 +175,8 @@ struct symbol_tracepoint {
 
 static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
 {
-	struct symbolizer_proc_info *p = 
-		(struct symbolizer_proc_info *)kv->v.proc_info_p;
+	struct symbolizer_proc_info *p =
+	    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 	u64 stime;
 	AO_INC(&p->use);
 	stime = p->stime;
@@ -185,10 +184,11 @@ static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
 	return stime;
 }
 
-static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *kv)
+static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *
+						kv)
 {
-	struct symbolizer_proc_info *p = 
-		(struct symbolizer_proc_info *)kv->v.proc_info_p;
+	struct symbolizer_proc_info *p =
+	    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 	u64 netns_id;
 	AO_INC(&p->use);
 	netns_id = p->netns_id;
@@ -199,8 +199,8 @@ static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *kv)
 static_always_inline void
 copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
 {
-	struct symbolizer_proc_info *p = 
-		(struct symbolizer_proc_info *)kv->v.proc_info_p;
+	struct symbolizer_proc_info *p =
+	    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 	AO_INC(&p->use);
 	static const int len = sizeof(p->comm);
 	strcpy_s_inline(dst, len, p->comm, len);

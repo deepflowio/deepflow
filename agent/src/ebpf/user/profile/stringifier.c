@@ -158,53 +158,93 @@ static inline char *create_symbol_str(int len, char *src, const char *tag)
 	return dst;
 }
 
+static char *kern_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
+{
+	ASSERT(pid >= 0);
+
+	int len = 0;
+	char *ptr = NULL;
+	len = strlen(sym->name) + strlen(k_sym_prefix);
+	ptr = (char *)sym->name;
+	ptr = create_symbol_str(len, ptr, k_sym_prefix);
+
+	return ptr;
+}
+
+static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
+{
+	ASSERT(pid >= 0);
+
+	int len = 0;
+	char *ptr = NULL;
+	len = strlen(sym->demangle_name) + strlen(u_sym_prefix);
+	ptr = (char *)sym->demangle_name;
+	char *u_prefix = (char *)u_sym_prefix;
+	if (sym->module != NULL && strlen(sym->module) > 0) {
+		if (strstr(sym->module, ".so")) {
+			len += strlen(lib_sym_prefix);
+			u_prefix = (char *)lib_sym_prefix;
+		}
+	}
+
+	ptr = create_symbol_str(len, ptr, (char *)u_prefix);
+	bcc_symbol_free_demangle_name(sym);
+
+	return ptr;
+}
+
 static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
-				   struct bcc_symbol *sym, void *info_p)
+				   struct bcc_symbol *sym, void *info_p,
+				   char **sym_ptr)
 {
 	ASSERT(pid >= 0);
 
 	int ret = -1;
 	if (pid == 0) {
 		ret = bcc_symcache_resolve_no_demangle(resolver, address, sym);
+		if (ret == 0)
+			*sym_ptr = kern_symbol_name_fetch(pid, sym);
 	} else {
 		struct symbolizer_proc_info *p = info_p;
 		if (p) {
-			if (p->is_exit || ((u64) resolver != (u64) p->syms_cache))
+			if (p->is_exit
+			    || ((u64) resolver != (u64) p->syms_cache))
 				return (-1);
 			pthread_mutex_lock(&p->mutex);
 			ret = bcc_symcache_resolve(resolver, address, sym);
+			if (ret == 0) {
+				*sym_ptr = proc_symbol_name_fetch(pid, sym);
+				pthread_mutex_unlock(&p->mutex);
+				return ret;
+			}
+			if (sym->module != NULL && strlen(sym->module) > 0) {
+				/*
+				 * Module is known (from /proc/<pid>/maps), but
+				 * symbol is not known.
+				 * build a string:
+				 * [/lib64/xxx.so]
+				 */
+				char format_str[4096];
+				snprintf(format_str, sizeof(format_str),
+					 "[%s]", sym->module);
+				int len = strlen(format_str);
+				*sym_ptr =
+				    create_symbol_str(len, format_str, "");
+				if (info_p) {
+					struct symbolizer_proc_info *p = info_p;
+					symbolizer_proc_lock(p);
+					if (p->is_java
+					    && strstr(format_str, "perf-")) {
+						p->unknown_syms_found = true;
+					}
+					symbolizer_proc_unlock(p);
+				}
+			}
 			pthread_mutex_unlock(&p->mutex);
 		}
 	}
 
 	return ret;
-}
-
-static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
-{
-	ASSERT(pid >= 0);
-
-	int len = 0;
-	char *ptr = NULL;
-	if (pid > 0) {
-		len = strlen(sym->demangle_name) + strlen(u_sym_prefix);
-		ptr = (char *)sym->demangle_name;
-		char *u_prefix = (char *)u_sym_prefix;
-		if (sym->module != NULL && strlen(sym->module) > 0) {
-			if (strstr(sym->module, ".so")) {
-				len += strlen(lib_sym_prefix);
-				u_prefix = (char *)lib_sym_prefix;
-			}
-		}
-		ptr = create_symbol_str(len, ptr, (char *)u_prefix);
-		bcc_symbol_free_demangle_name(sym);
-	} else if (pid == 0) {
-		len = strlen(sym->name) + strlen(k_sym_prefix);
-		ptr = (char *)sym->name;
-		ptr = create_symbol_str(len, ptr, k_sym_prefix);
-	}
-
-	return ptr;
 }
 
 static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
@@ -221,46 +261,23 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
 	if (resolver == NULL)
 		goto resolver_err;
 
-	int ret = symcache_resolve(pid, resolver, address, &sym, info_p);
-	if (ret == 0) {
-		ptr = symbol_name_fetch(pid, &sym);
-		if (ptr) {
-			char *p = ptr;
-			/*
-			 * If the parsed string contains a semicolon (';'), replace
-			 * it with ':', as the semicolon is a specific delimiter
-			 * we use to separate symbolic strings.
-			 * e.g.: "NioEventLoop;::run" -> "NioEventLoop:::run"
-			 */
-			for (p = ptr; *p != '\0'; p++) {
-				if (*p == ';')
-					*p = ':';
-			}
-
-			goto finish;
-		}
-	}
-
-	if (sym.module != NULL && strlen(sym.module) > 0) {
+	int ret = symcache_resolve(pid, resolver, address, &sym, info_p, &ptr);
+	if (ret == 0 && ptr) {
+		char *p = ptr;
 		/*
-		 * Module is known (from /proc/<pid>/maps), but symbol is not known.
-		 * build a string:
-		 * [/lib64/xxx.so]
+		 * If the parsed string contains a semicolon (';'), replace
+		 * it with ':', as the semicolon is a specific delimiter
+		 * we use to separate symbolic strings.
+		 * e.g.: "NioEventLoop;::run" -> "NioEventLoop:::run"
 		 */
-		char format_str[4096];
-		snprintf(format_str, sizeof(format_str), "[%s]", sym.module);
-		len = strlen(format_str);
-		ptr = create_symbol_str(len, format_str, "");
-		if (info_p) {
-			struct symbolizer_proc_info *p = info_p;
-			symbolizer_proc_lock(p);
-			if (p->is_java && strstr(format_str, "perf-")) {
-				p->unknown_syms_found = true;
-			}
-			symbolizer_proc_unlock(p);
+		for (p = ptr; *p != '\0'; p++) {
+			if (*p == ';')
+				*p = ':';
 		}
-		goto finish;
 	}
+
+	if (ptr)
+		goto finish;
 
 	/*
 	 * If we have reached this point, it means that we have truly obtained

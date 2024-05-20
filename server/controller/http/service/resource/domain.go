@@ -31,7 +31,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm/clause"
 
-	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -371,50 +370,8 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *svc.UserInfo, db *m
 	if err != nil {
 		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("create domain (%s) failed", domainCreate.Name))
 	}
-	if domainCreate.Type == common.KUBERNETES {
-		createKubernetesRelatedResources(db, domain, regionLcuuid)
-	}
 	response, _ := GetDomains(db, []int{}, map[string]interface{}{"lcuuid": lcuuid})
 	return &response[0], nil
-}
-
-func createKubernetesRelatedResources(db *mysql.DB, domain mysql.Domain, regionLcuuid string) {
-	if regionLcuuid == "" {
-		regionLcuuid = common.DEFAULT_REGION
-	}
-	az := mysql.AZ{}
-	az.Lcuuid = cloudcommon.GetAZLcuuidFromUUIDGenerate(db.ORGID, domain.DisplayName)
-	az.Name = domain.Name
-	az.Domain = domain.Lcuuid
-	az.Region = regionLcuuid
-	az.CreateMethod = common.CREATE_METHOD_LEARN
-	err := db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&az).Error
-	if err != nil {
-		log.Errorf("create az failed: %s", err)
-	}
-
-	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, domain.TeamID, domain.ID)
-	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers(common.RESOURCE_TYPE_AZ_EN) {
-		s.OnResourceBatchAdded(metadata, []*mysql.AZ{&az})
-	}
-
-	vpc := mysql.VPC{}
-	vpc.Lcuuid = cloudcommon.GetVPCLcuuidFromUUIDGenerate(db.ORGID, domain.DisplayName)
-	vpc.Name = domain.Name
-	vpc.Domain = domain.Lcuuid
-	vpc.Region = regionLcuuid
-	vpc.CreateMethod = common.CREATE_METHOD_LEARN
-	err = db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&vpc).Error
-	if err != nil {
-		log.Errorf("create vpc failed: %s", err)
-	}
-
-	// pub to tagrecorder
-	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers(common.RESOURCE_TYPE_VPC_EN) {
-		s.OnResourceBatchAdded(metadata, []*mysql.VPC{&vpc})
-	}
-	return
 }
 
 func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *svc.UserInfo, cfg *config.ControllerConfig, db *mysql.DB) (*model.Domain, error) {
