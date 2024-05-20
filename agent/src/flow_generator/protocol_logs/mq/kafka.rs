@@ -871,6 +871,10 @@ impl KafkaLog {
         info.partition = read_i32_be(&payload[offset..]);
         offset += 4;
 
+        if info.status_code.is_some() {
+            return Ok(offset);
+        }
+
         if offset + 2 > payload.len() {
             return Err(Error::KafkaLogParseFailed);
         }
@@ -936,16 +940,26 @@ impl KafkaLog {
             //     high_watermark => INT64
             //     records => RECORDS
             7..=11 => {
-                if 14 > payload.len() {
+                let mut offset = 4;
+                if offset + 2 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let respones_count = read_u32_be(&payload[10..]);
+                info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
+                offset += 2 + 4;
+
+                if offset + 4 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                let respones_count = read_u32_be(&payload[offset..]);
                 if respones_count == 0 {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let topic_name_len = Self::decode_topic_name(&payload[14..], info)?;
+                offset += 4;
 
-                Self::decode_fetch_partition_response(&payload[14 + topic_name_len..], info)?;
+                let topic_name_len = Self::decode_topic_name(&payload[offset..], info)?;
+                offset += topic_name_len;
+
+                Self::decode_fetch_partition_response(&payload[offset..], info)?;
             }
             // Fetch Response (Version: 12) => throttle_time_ms error_code session_id [responses] TAG_BUFFER
             // throttle_time_ms => INT32
@@ -958,21 +972,28 @@ impl KafkaLog {
             //     error_code => INT16
             //     high_watermark => INT64
             12 => {
-                if 10 > payload.len() {
+                let mut offset = 4;
+                if offset + 2 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let (responses_counter, responses_header_len) = Self::decode_varint(&payload[10..]);
+                info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
+                offset += 2 + 4;
+
+                if offset > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                let (responses_counter, responses_header_len) =
+                    Self::decode_varint(&payload[offset..]);
                 // topic name offset: [responses]
                 if responses_counter == 0 {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let topic_name_len =
-                    Self::decode_compact_topic_name(&payload[10 + responses_header_len..], info)?;
+                offset += responses_header_len;
 
-                Self::decode_fetch_partition_response(
-                    &payload[10 + responses_header_len + topic_name_len..],
-                    info,
-                )?;
+                let topic_name_len = Self::decode_compact_topic_name(&payload[offset..], info)?;
+                offset += topic_name_len;
+
+                Self::decode_fetch_partition_response(&payload[offset..], info)?;
             }
             // TODO
             _ => {}
@@ -1565,6 +1586,7 @@ mod tests {
             ("kafka-leave-v4.pcap", "kafka-leave-v4.result"),
             ("kafka-sync-v5.pcap", "kafka-sync-v5.result"),
             ("kafka-join-v7.pcap", "kafka-join-v7.result"),
+            ("kafka-fetch-v12.pcap", "kafka-fetch-v12.result"),
         ];
 
         for item in files.iter() {
