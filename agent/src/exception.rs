@@ -34,6 +34,7 @@ impl ExceptionHandler {
         | Exception::LogFileExceeded as u64
         | Exception::ControllerSocketError as u64
         | Exception::AnalyzerSocketError as u64
+        | Exception::IntegrationSocketError as u64
         | Exception::NpbSocketError as u64;
 
     pub fn set(&self, e: Exception) {
