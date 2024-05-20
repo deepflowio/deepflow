@@ -369,8 +369,8 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 		return resource, err
 	}
 
-	// 虚拟机及关联安全组信息
-	vms, vmSecurityGroups, tmpSubnets, err := q.GetVMs()
+	// 虚拟机信息
+	vms, tmpSubnets, err := q.GetVMs()
 	if err != nil {
 		log.Error("get vm data failed")
 		return resource, err
@@ -381,13 +381,6 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	vinterfaces, ips, err := q.GetVMNics()
 	if err != nil {
 		log.Error("get vm nic data failed")
-		return resource, err
-	}
-
-	// 安全组及规则
-	securityGroups, securityGroupRules, err := q.GetSecurityGroups()
-	if err != nil {
-		log.Error("get security_group and rule data failed")
 		return resource, err
 	}
 
@@ -440,11 +433,8 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	resource.Networks = networks
 	resource.Subnets = subnets
 	resource.VMs = vms
-	resource.VMSecurityGroups = vmSecurityGroups
 	resource.VInterfaces = vinterfaces
 	resource.IPs = ips
-	resource.SecurityGroups = securityGroups
-	resource.SecurityGroupRules = securityGroupRules
 	resource.VRouters = vrouters
 	resource.RoutingTables = routingTables
 	resource.NATGateways = natGateways

@@ -29,9 +29,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
-func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subnet, error) {
+func (q *QingCloud) GetVMs() ([]model.VM, []model.Subnet, error) {
 	var retVMs []model.VM
-	var retVMSecurityGroups []model.VMSecurityGroup
 	var retDefaultVxnetSubnets []model.Subnet
 	var defaultVxnetIDs []string
 	var vxnetIdToSubnetLcuuid map[string]string
@@ -52,7 +51,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 		response, err := q.GetResponse("DescribeInstances", "instance_set", kwargs)
 		if err != nil {
 			log.Error(err)
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 
 		for _, r := range response {
@@ -122,21 +121,6 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				vmIdToVPCLcuuid[vmId] = vpcLcuuid
 				q.azLcuuidToResourceNum[azLcuuid]++
 				q.regionLcuuidToResourceNum[regionLcuuid]++
-
-				// 虚拟机与安全组关联关系
-				securityGroupId := vm.Get("security_group").Get("security_group_id").MustString()
-				if securityGroupId == "" {
-					continue
-				}
-				retVMSecurityGroups = append(
-					retVMSecurityGroups,
-					model.VMSecurityGroup{
-						Lcuuid:              common.GenerateUUIDByOrgID(q.orgID, vmId+securityGroupId),
-						SecurityGroupLcuuid: common.GenerateUUIDByOrgID(q.orgID, securityGroupId),
-						VMLcuuid:            vmLcuuid,
-						Priority:            1,
-					},
-				)
 			}
 		}
 	}
@@ -151,7 +135,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 		q.VxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
 	}
 	log.Info("get vms complete")
-	return retVMs, retVMSecurityGroups, retDefaultVxnetSubnets, nil
+	return retVMs, retDefaultVxnetSubnets, nil
 }
 
 func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson.Json) (
