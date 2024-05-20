@@ -66,7 +66,7 @@ type ApplicationLogStore struct {
 	SpanID     string
 	TraceFlags uint32
 
-	SeverityText   string // numerical value of the severity(also known as log level id)
+	SeverityText   string // value of the severity(also known as log level)
 	SeverityNumber uint8  // numerical value of the severity(also known as log level id)
 
 	Body string
