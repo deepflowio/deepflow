@@ -52,5 +52,5 @@ app_instance               , app_instance              , app_instance           
 trace_id                  , trace_id                  , trace_id                   , string         ,                       , Tracing Info     , 111         , 0
 span_id                   , span_id                   , span_id                    , string         ,                       , Tracing Info     , 111         , 0
 severity_text             , severity_text             , severity_text              , string         ,                       , Tracing Info     , 111         , 0
-severity_number           , severity_number           , severity_number            , int            ,                       , Tracing Info     , 111         , 0
+severity_number           , severity_number           , severity_number            , int_enum       , severity_number       , Tracing Info     , 111         , 0
 body                      , body                      , body                       , string         ,                       , Tracing Info     , 111         , 0
