@@ -257,6 +257,9 @@ func (c *TagRecorder) UpdateChDictionary() {
 								log.Error(err)
 								break
 							}
+							if len(dictSQL) <= 0 {
+								break
+							}
 							createSQL := CREATE_SQL_MAP[dictName]
 							mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
 							createSQL = fmt.Sprintf(createSQL, c.cfg.ClickHouseCfg.Database, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, c.cfg.MySqlCfg.Database, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
@@ -331,6 +334,9 @@ func (c *TagRecorder) UpdateChDictionary() {
 							if err := connect.Select(&viewSQL, showSQL); err != nil {
 								updateViewError = err
 								log.Error(err)
+								break
+							}
+							if len(viewSQL) <= 0 {
 								break
 							}
 							createSQL := CREATE_SQL_MAP[viewName]
