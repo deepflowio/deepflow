@@ -55,18 +55,23 @@ func sendFailed(in api.Synchronizer_UpgradeServer) error {
 	return err
 }
 
-func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision string) (*UpgradeData, error) {
+func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision string, orgID int) (*UpgradeData, error) {
 	if upgradePackage == "" {
 		return nil, fmt.Errorf("image(%s) file does not exist", upgradePackage)
 	}
-	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](trisolaris.GetDB()).GetFromName(upgradePackage)
+	db, err := models.GetDB(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("get vtapRepo(name=%s) failed, %s", upgradePackage, err)
+		return nil, fmt.Errorf("get db(orgID=%d) vtapRepo(name=%s) failed, %s", orgID, upgradePackage, err)
+	}
+
+	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](db.DB).GetFromName(upgradePackage)
+	if err != nil {
+		return nil, fmt.Errorf("get vtapRepo(name=%s, orgID=%d) failed, %s", upgradePackage, orgID, err)
 	}
 	dbRevision := vtapRrepo.RevCount + "-" + vtapRrepo.CommitID
 	if dbRevision != expectedRevision {
-		return nil, fmt.Errorf("get vtapRepo(name=%s) failed, dbRevision(%s) != expectedRevision(%s)",
-			upgradePackage, dbRevision, expectedRevision)
+		return nil, fmt.Errorf("get vtapRepo(name=%s, orgID=%d) failed, dbRevision(%s) != expectedRevision(%s)",
+			upgradePackage, orgID, dbRevision, expectedRevision)
 	}
 	content := vtapRrepo.Image
 	totalLen := uint64(len(content))
@@ -99,7 +104,7 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d cache not found", vtapCacheKey, orgID, teamIDStr, teamIDInt)
 		return sendFailed(in)
 	}
-	upgradeData, err := e.GetUpgradeFile(vtapCache.GetUpgradePackage(), vtapCache.GetExpectedRevision())
+	upgradeData, err := e.GetUpgradeFile(vtapCache.GetUpgradePackage(), vtapCache.GetExpectedRevision(), orgID)
 	if err != nil {
 		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
 		return sendFailed(in)
