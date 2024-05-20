@@ -140,7 +140,6 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize, cacheE
 		counter:         &RequestCounter{},
 	}
 	for i := 0; i < MAX_ORG_COUNT; i++ {
-		t.metricNameIDs[i] = hashmap.New[string, uint64]()
 		t.metricNameIDs[i] = hashmap.New[string, uint64]()     // metricName => metricID
 		t.labelNameIDs[i] = hashmap.New[string, uint64]()      // labelName  => labelNameID
 		t.labelValueIDs[i] = hashmap.New[string, uint64]()     // labelValue => labelValueID
@@ -153,6 +152,14 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize, cacheE
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_LABEL, t)
 	common.RegisterCountableForIngester("prometheus-label-request", t)
 	return t
+}
+
+func (t *PrometheusLabelTable) DropOrg(orgId uint16) {
+	t.metricNameIDs[orgId] = hashmap.New[string, uint64]()
+	t.labelNameIDs[orgId] = hashmap.New[string, uint64]()
+	t.labelValueIDs[orgId] = hashmap.New[string, uint64]()
+	t.labelNameValues[orgId] = hashmap.New[uint64, struct{}]()
+	t.labelColumnIndexs[orgId] = hashmap.New[uint64, uint32]()
 }
 
 func (t *PrometheusLabelTable) RequestLabelIDs(request *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {

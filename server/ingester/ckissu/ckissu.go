@@ -1160,7 +1160,7 @@ func (i *Issu) startOrg(connect *sql.DB, orgIDPrefix string) error {
 }
 
 func (i *Issu) getOrgIDPrefixs(connect *sql.DB) ([]string, error) {
-	checkOrgDatabase := "flow_log"
+	checkOrgDatabase := "event"
 	sql := fmt.Sprintf("SELECT name FROM system.databases WHERE name like '%%%s%%'", checkOrgDatabase)
 	rows, err := connect.Query(sql)
 	if err != nil {
