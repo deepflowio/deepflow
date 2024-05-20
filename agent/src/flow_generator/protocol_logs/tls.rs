@@ -510,15 +510,15 @@ impl TlsLog {
         let mut offset = 0;
         while offset + TlsHeader::HEADER_LEN <= payload.len() {
             let header = TlsHeader::new(&payload[offset..]);
-            if header.is_last() {
-                tls_headers.push(header);
-                break;
-            }
             if header.is_unsupport_content_type() {
                 return Err(Error::TlsLogParseFailed(format!(
                     "Content type unsupport {}",
                     header.content_type()
                 )));
+            }
+            if header.is_last() {
+                tls_headers.push(header);
+                break;
             }
             offset += header.next();
             tls_headers.push(header);
