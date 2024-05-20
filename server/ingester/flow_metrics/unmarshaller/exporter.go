@@ -182,6 +182,11 @@ func getPrometheusLabels(e app.Document, uTags0, uTags1 *utag.UniversalTags, cfg
 			continue
 		}
 
+		//  TimeSeries.Samples have exported `time`, no need to export anymore
+		if structTags.Name == "time" {
+			continue
+		}
+
 		if v, ok := value.(string); ok {
 			valueStr = v
 		} else {
