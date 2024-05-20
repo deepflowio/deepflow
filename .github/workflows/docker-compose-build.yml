@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+      - v6.[1-9]
+      - v7.[1-9]
       - 'feature-**'
     paths:
       - 'manifests/deepflow-docker-compose/**'
@@ -15,10 +17,6 @@ on:
         description: "Why trigger?"
         required: true 
         type: string
-#   release:
-#     branches: 
-#       - main
-#       - release-*
 
 jobs:
   build_docker_compose:
