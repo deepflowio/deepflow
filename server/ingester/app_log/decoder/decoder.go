@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/syslog"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	logging "github.com/op/go-logging"
@@ -47,6 +47,34 @@ const (
 	BUFFER_SIZE = 1024
 	SEPARATOR   = ", "
 )
+
+const (
+	SEVERITY_FATAL uint8 = 2 + iota // value as log/syslog.LOG_CRIT
+	SEVERITY_ERROR                  // value as log/syslog.LOG_ERR
+	SEVERITY_WARN                   // value as log/syslog.LOG_WARN
+	SEVERITY_INFO                   // value as log/syslog.LOG_INFO
+	SEVERITY_DEBUG                  // value as log/syslog.LOG_DEBUG
+	SEVERITY_TRACE
+	SEVERITY_UNKNOWN
+)
+
+func StringToSeverity(str string) uint8 {
+	switch strings.ToUpper(str) {
+	case "FATAL", "CRITICAL":
+		return SEVERITY_FATAL
+	case "ERROR":
+		return SEVERITY_ERROR
+	case "WARNING", "WARN":
+		return SEVERITY_WARN
+	case "INFO":
+		return SEVERITY_INFO
+	case "DEBUG":
+		return SEVERITY_DEBUG
+	case "TRACE":
+		return SEVERITY_TRACE
+	}
+	return SEVERITY_UNKNOWN
+}
 
 type Counter struct {
 	InCount    int64 `statsd:"in-count"`
@@ -173,23 +201,19 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 	s.AttributeValues = append(s.AttributeValues, host)
 	s.AppInstance = host
 
-	severity := syslog.Priority(0)
 	severityText := ""
 	switch string(columns[3]) {
 	case "[INFO]":
-		severity = syslog.LOG_INFO
 		severityText = "INFO"
 	case "[WARN]":
-		severity = syslog.LOG_WARNING
 		severityText = "WARN"
 	case "[ERRO]", "[ERROR]":
-		severity = syslog.LOG_ERR
 		severityText = "ERROR"
 	default:
 		return fmt.Errorf("ignored log level: %s", string(columns[3]))
 	}
 	s.SeverityText = severityText
-	s.SeverityNumber = uint8(severity)
+	s.SeverityNumber = StringToSeverity(severityText)
 	s.Body = string(columns[5])
 
 	s.AttributeNames = append(s.AttributeNames, "module")
@@ -235,16 +259,7 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 
 	s.Body = l.Message
 	s.SeverityText = l.Level
-	severity := syslog.Priority(0)
-	switch l.Level {
-	case "INFO":
-		severity = syslog.LOG_INFO
-	case "WARN":
-		severity = syslog.LOG_WARNING
-	case "ERRO", "ERROR":
-		severity = syslog.LOG_ERR
-	}
-	s.SeverityNumber = uint8(severity)
+	s.SeverityNumber = StringToSeverity(l.Level)
 	s.AppInstance = l.Kubernetes.PodName
 
 	if l.Kubernetes.PodIp != "" {
