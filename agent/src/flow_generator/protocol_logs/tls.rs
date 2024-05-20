@@ -547,8 +547,8 @@ impl TlsLog {
                     if h.is_alert() {
                         self.perf_stats
                             .as_mut()
-                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
-                        info.status = L7ResponseStatus::ServerError;
+                            .map(|p: &mut L7PerfStats| p.inc_req_err());
+                        info.status = L7ResponseStatus::ClientError;
                         info.msg_type = LogMessageType::Session;
                     }
                     if h.is_change_cipher_spec() {
