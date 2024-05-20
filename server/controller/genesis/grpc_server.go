@@ -366,6 +366,12 @@ func (g *SynchronizerServer) PrometheusAPISync(ctx context.Context, request *tri
 	} else {
 		remote = peerIP.Addr.String()
 	}
+
+	// don't handle prometheus api sync message
+	// because all prometheus label will be app label is 6.5 version
+	log.Infof("prometheus api sync ignore message from ip: %s", remote)
+	return &trident.PrometheusAPISyncResponse{}, nil
+
 	vtapID := request.GetVtapId()
 	if vtapID == 0 {
 		log.Warningf("prometheus api sync received message with vtap_id 0 from %s", remote)

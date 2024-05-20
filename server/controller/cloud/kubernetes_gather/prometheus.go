@@ -20,17 +20,19 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/genesis"
+	// "github.com/deepflowio/deepflow/server/controller/genesis"
 )
 
+// TODO:to be deleted
 func (k *KubernetesGather) getPrometheusTargets() ([]model.PrometheusTarget, error) {
 	log.Debug("get prometheus target starting")
 	var prometheusTargets []model.PrometheusTarget
-	pTargets, err := genesis.GenesisService.GetPrometheusResponse(k.orgID, k.ClusterID)
-	if err != nil {
-		log.Warning(err.Error())
-		return prometheusTargets, err
-	}
+	// pTargets, err := genesis.GenesisService.GetPrometheusResponse(k.orgID, k.ClusterID)
+	// if err != nil {
+	// 	log.Warning(err.Error())
+	// 	return prometheusTargets, err
+	// }
+	pTargets := []cloudmodel.PrometheusTarget{}
 	for _, p := range pTargets {
 		var otherLabelsString string
 		if !p.HonorLabelsConfig {
