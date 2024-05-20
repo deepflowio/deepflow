@@ -100,6 +100,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 
 	receiver := receiver.NewReceiver(int(cfg.ListenPort), cfg.UDPReadBuffer, cfg.TCPReadBuffer, cfg.TCPReaderBuffer)
 
+	ingesterOrgHandler := NewOrgHandler(cfg)
 	closers := []io.Closer{}
 
 	if cfg.IngesterEnabled {
@@ -219,6 +220,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			checkError(err)
 			prometheus.Start()
 			closers = append(closers, prometheus)
+			ingesterOrgHandler.SetPromHandler(prometheus)
 
 			// write application log data
 			applicationLog, err := app_log.NewApplicationLogger(applicationLogConfig, receiver, platformDataManager)
@@ -244,6 +246,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志
 	receiver.Start()
 	closers = append(closers, receiver)
+	servercommon.SetOrgHandler(ingesterOrgHandler)
 
 	return closers
 }
