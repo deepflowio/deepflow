@@ -237,8 +237,8 @@ type L7FlowLog struct {
 	DirectionScore   uint8 `json:"direction_score" category:"$metrics" sub:"l4_throughput"`
 
 	// For Packet signal sources, it represents the packet length captured by AF_PACKET, excluding the layer 4 headers; for eBPF signal sources, it indicates the number of bytes for a single system call, and note that when TCP stream reassembly is enabled, it represents the total number of bytes from multiple system calls.
-	CapturedRequestByte  uint32
-	CapturedResponseByte uint32
+	CapturedRequestByte  uint32 `json:"captured_request_byte" category:"$metrics" sub:"throughput"`
+	CapturedResponseByte uint32 `json:"captured_response_byte" category:"$metrics" sub:"throughput"`
 
 	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
 	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
