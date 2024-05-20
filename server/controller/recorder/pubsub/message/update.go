@@ -400,44 +400,6 @@ type VIPUpdate struct {
 	DiffBase[*diffbase.VIP]
 	MySQLData[mysql.VIP]
 }
-type SecurityGroupFieldsUpdate struct {
-	Key
-	Name         fieldDetail[string]
-	Label        fieldDetail[string]
-	RegionLcuuid fieldDetail[string]
-}
-type SecurityGroupUpdate struct {
-	Fields[SecurityGroupFieldsUpdate]
-	CloudItem[cloudmodel.SecurityGroup]
-	DiffBase[*diffbase.SecurityGroup]
-	MySQLData[mysql.SecurityGroup]
-}
-
-type SecurityGroupRuleFieldsUpdate struct {
-	Key
-	Priority        fieldDetail[int]
-	EtherType       fieldDetail[int]
-	RemotePortRange fieldDetail[string]
-	Local           fieldDetail[string]
-	Remote          fieldDetail[string]
-}
-type SecurityGroupRuleUpdate struct {
-	Fields[SecurityGroupRuleFieldsUpdate]
-	CloudItem[cloudmodel.SecurityGroupRule]
-	DiffBase[*diffbase.SecurityGroupRule]
-	MySQLData[mysql.SecurityGroupRule]
-}
-
-type VMSecurityGroupFieldsUpdate struct {
-	Key
-	Priority fieldDetail[int]
-}
-type VMSecurityGroupUpdate struct {
-	Fields[VMSecurityGroupFieldsUpdate]
-	CloudItem[cloudmodel.VMSecurityGroup]
-	DiffBase[*diffbase.VMSecurityGroup]
-	MySQLData[mysql.VMSecurityGroup]
-}
 
 type NATGatewayFieldsUpdate struct {
 	Key

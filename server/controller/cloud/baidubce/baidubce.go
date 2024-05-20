@@ -185,13 +185,6 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 		return resource, err
 	}
 
-	// 安全组及规则（暂不支持对接虚拟机与安全组的关联关系）
-	securityGroups, securityGroupRules, err := b.getSecurityGroups(region, vpcIdToLcuuid)
-	if err != nil {
-		log.Error("get security_group data failed")
-		return resource, err
-	}
-
 	// NAT网关及IP
 	natGateways, tmpVInterfaces, tmpIPs, err := b.getNatGateways(region, vpcIdToLcuuid)
 	if err != nil {
@@ -262,8 +255,6 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	resource.VMs = vms
 	resource.VInterfaces = vinterfaces
 	resource.IPs = ips
-	resource.SecurityGroups = securityGroups
-	resource.SecurityGroupRules = securityGroupRules
 	resource.VRouters = vrouters
 	resource.RoutingTables = routingTables
 	resource.NATGateways = natGateways
