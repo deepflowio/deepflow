@@ -17,6 +17,7 @@
 package common
 
 import (
+	"fmt"
 	"io/ioutil"
 	"time"
 
@@ -73,4 +74,22 @@ func ExportersEnabled(configPath string) bool {
 		}
 	}
 	return false
+}
+
+type OrgHanderInterface interface {
+	DropOrg(orgId uint16) error
+}
+
+var ingesterOrgHander OrgHanderInterface
+
+func SetOrgHandler(orgHandler OrgHanderInterface) {
+	ingesterOrgHander = orgHandler
+}
+
+func DropOrg(orgId uint16) error {
+	log.Info("drop org id:", orgId)
+	if ingesterOrgHander == nil {
+		return fmt.Errorf("ingesterOrgHander is nil, drop org id %d failed", orgId)
+	}
+	return ingesterOrgHander.DropOrg(orgId)
 }
