@@ -269,16 +269,6 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 			resource.VInterfaces = append(resource.VInterfaces, netVinterfaces...)
 		}
 
-		sgs, sgRules, err := a.getSecurityGroups(region)
-		if err != nil {
-			return model.Resource{}, err
-		}
-		if len(sgs) > 0 || len(sgRules) > 0 {
-			regionFlag = true
-			resource.SecurityGroups = append(resource.SecurityGroups, sgs...)
-			resource.SecurityGroupRules = append(resource.SecurityGroupRules, sgRules...)
-		}
-
 		vinterfaces, ips, vNatRules, err := a.getVInterfacesAndIPs(region)
 		if err != nil {
 			return model.Resource{}, err
@@ -290,14 +280,13 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 			resource.NATRules = append(resource.NATRules, vNatRules...)
 		}
 
-		vms, vmSGs, err := a.getVMs(region)
+		vms, err := a.getVMs(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vms) > 0 || len(vmSGs) > 0 {
+		if len(vms) > 0 {
 			regionFlag = true
 			resource.VMs = append(resource.VMs, vms...)
-			resource.VMSecurityGroups = append(resource.VMSecurityGroups, vmSGs...)
 		}
 
 		lbs, lbListeners, lbTargetServers, err := a.getLoadBalances(region)

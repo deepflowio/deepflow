@@ -31,7 +31,6 @@ type Add interface {
 	message.RegionAdd | message.AZAdd | message.SubDomainAdd | message.HostAdd | message.VMAdd |
 		message.VPCAdd | message.NetworkAdd | message.SubnetAdd | message.VRouterAdd | message.RoutingTableAdd |
 		message.DHCPPortAdd | message.VInterfaceAdd | message.WANIPAdd | message.LANIPAdd | message.FloatingIPAdd |
-		message.SecurityGroupAdd | message.SecurityGroupRuleAdd | message.VMSecurityGroupAdd |
 		message.NATGatewayAdd | message.NATRuleAdd | message.NATVMConnectionAdd | message.LBAdd |
 		message.LBListenerAdd | message.LBTargetServerAdd | message.LBVMConnectionAdd | message.CENAdd |
 		message.PeerConnectionAdd | message.RDSInstanceAdd | message.RedisInstanceAdd | message.PodClusterAdd |
@@ -57,7 +56,6 @@ type Update interface {
 	message.RegionUpdate | message.AZUpdate | message.SubDomainUpdate | message.HostUpdate | message.VMUpdate |
 		message.VPCUpdate | message.NetworkUpdate | message.SubnetUpdate | message.VRouterUpdate | message.RoutingTableUpdate |
 		message.DHCPPortUpdate | message.VInterfaceUpdate | message.WANIPUpdate | message.LANIPUpdate | message.FloatingIPUpdate |
-		message.SecurityGroupUpdate | message.SecurityGroupRuleUpdate | message.VMSecurityGroupUpdate |
 		message.NATGatewayUpdate | message.NATRuleUpdate | message.NATVMConnectionUpdate | message.LBUpdate |
 		message.LBListenerUpdate | message.LBTargetServerUpdate | message.LBVMConnectionUpdate | message.CENUpdate |
 		message.PeerConnectionUpdate | message.RDSInstanceUpdate | message.RedisInstanceUpdate | message.PodClusterUpdate |
@@ -81,7 +79,6 @@ type FieldsUpdate interface {
 		message.VMFieldsUpdate | message.VPCFieldsUpdate | message.NetworkFieldsUpdate | message.SubnetFieldsUpdate |
 		message.VRouterFieldsUpdate | message.RoutingTableFieldsUpdate | message.DHCPPortFieldsUpdate |
 		message.VInterfaceFieldsUpdate | message.WANIPFieldsUpdate | message.LANIPFieldsUpdate | message.FloatingIPFieldsUpdate |
-		message.SecurityGroupFieldsUpdate | message.SecurityGroupRuleFieldsUpdate | message.VMSecurityGroupFieldsUpdate |
 		message.NATGatewayFieldsUpdate | message.NATRuleFieldsUpdate | message.NATVMConnectionFieldsUpdate | message.LBFieldsUpdate |
 		message.LBListenerFieldsUpdate | message.LBTargetServerFieldsUpdate | message.LBVMConnectionFieldsUpdate | message.CENFieldsUpdate |
 		message.PeerConnectionFieldsUpdate | message.RDSInstanceFieldsUpdate | message.RedisInstanceFieldsUpdate | message.PodClusterFieldsUpdate |
@@ -104,7 +101,6 @@ type Delete interface {
 	message.RegionDelete | message.AZDelete | message.SubDomainDelete | message.HostDelete | message.VMDelete |
 		message.VPCDelete | message.NetworkDelete | message.SubnetDelete | message.VRouterDelete | message.RoutingTableDelete |
 		message.DHCPPortDelete | message.VInterfaceDelete | message.WANIPDelete | message.LANIPDelete | message.FloatingIPDelete |
-		message.SecurityGroupDelete | message.SecurityGroupRuleDelete | message.VMSecurityGroupDelete |
 		message.NATGatewayDelete | message.NATRuleDelete | message.NATVMConnectionDelete | message.LBDelete |
 		message.LBListenerDelete | message.LBTargetServerDelete | message.LBVMConnectionDelete | message.CENDelete |
 		message.PeerConnectionDelete | message.RDSInstanceDelete | message.RedisInstanceDelete | message.PodClusterDelete |
