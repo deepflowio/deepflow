@@ -179,35 +179,6 @@ type FloatingIP struct {
 	RegionLcuuid  string `json:"region_lcuuid" binding:"required"`
 }
 
-type SecurityGroup struct {
-	Lcuuid       string `json:"lcuuid" binding:"required"`
-	Name         string `json:"name" binding:"required"`
-	Label        string `json:"label"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
-	RegionLcuuid string `json:"region_lcuuid" binding:"required"`
-}
-
-type SecurityGroupRule struct {
-	Lcuuid              string `json:"lcuuid" binding:"required"`
-	SecurityGroupLcuuid string `json:"security_group_lcuuid" binding:"required"`
-	Direction           int    `json:"direction" binding:"required"`
-	EtherType           int    `json:"ether_type" binding:"required"`
-	Protocol            string `json:"protocol"`
-	LocalPortRange      string `json:"local_port_range"`
-	RemotePortRange     string `json:"remote_port_range"`
-	Local               string `json:"local"`
-	Remote              string `json:"remote"`
-	Action              int    `json:"action" binding:"required"`
-	Priority            int    `json:"priority"`
-}
-
-type VMSecurityGroup struct {
-	Lcuuid              string `json:"lcuuid" binding:"required"`
-	VMLcuuid            string `json:"vm_lcuuid" binding:"required"`
-	SecurityGroupLcuuid string `json:"security_group_lcuuid" binding:"required"`
-	Priority            int    `json:"priority" binding:"required"`
-}
-
 type LB struct {
 	Lcuuid       string `json:"lcuuid" binding:"required"`
 	Name         string `json:"name" binding:"required"`
@@ -550,9 +521,6 @@ type Resource struct {
 	VRouters               []VRouter
 	RoutingTables          []RoutingTable
 	DHCPPorts              []DHCPPort
-	SecurityGroups         []SecurityGroup
-	SecurityGroupRules     []SecurityGroupRule
-	VMSecurityGroups       []VMSecurityGroup
 	NATGateways            []NATGateway
 	NATRules               []NATRule
 	NATVMConnections       []NATVMConnection
