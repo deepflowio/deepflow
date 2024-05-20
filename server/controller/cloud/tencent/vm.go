@@ -24,10 +24,9 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
-func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGroup, error) {
+func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
 	log.Debug("get vms starting")
 	var vms []model.VM
-	var vmSGs []model.VMSecurityGroup
 	states := map[string]int{
 		"RUNNING": common.VM_STATE_RUNNING,
 		"STOPPED": common.VM_STATE_STOPPED,
@@ -37,7 +36,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeInstances", region.name, "InstanceSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("vm request tencent api error: (%s)", err.Error())
-		return []model.VM{}, []model.VMSecurityGroup{}, err
+		return []model.VM{}, err
 	}
 	for _, vData := range resp {
 		if !t.checkRequiredAttributes(vData, attrs) {
@@ -80,18 +79,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
 		t.azLcuuidMap[azLcuuid] = 0
-
-		sgIDs := vData.Get("SecurityGroupIds")
-		for s := range sgIDs.MustArray() {
-			sgID := sgIDs.GetIndex(s).MustString()
-			vmSGs = append(vmSGs, model.VMSecurityGroup{
-				Lcuuid:              common.GetUUIDByOrgID(t.orgID, vmLcuuid+sgID),
-				SecurityGroupLcuuid: common.GetUUIDByOrgID(t.orgID, sgID),
-				VMLcuuid:            vmLcuuid,
-				Priority:            s,
-			})
-		}
 	}
 	log.Debug("get vms complete")
-	return vms, vmSGs, nil
+	return vms, nil
 }

@@ -28,7 +28,6 @@ type MySQLModel interface {
 	mysql.Region | mysql.AZ | mysql.SubDomain | mysql.Host | mysql.VM |
 		mysql.VPC | mysql.Network | mysql.Subnet | mysql.VRouter | mysql.RoutingTable |
 		mysql.DHCPPort | mysql.VInterface | mysql.WANIP | mysql.LANIP | mysql.FloatingIP |
-		mysql.SecurityGroup | mysql.SecurityGroupRule | mysql.VMSecurityGroup |
 		mysql.NATGateway | mysql.NATRule | mysql.NATVMConnection | mysql.LB |
 		mysql.LBListener | mysql.LBTargetServer | mysql.LBVMConnection | mysql.CEN |
 		mysql.PeerConnection | mysql.RDSInstance | mysql.RedisInstance | mysql.PodCluster |
@@ -46,7 +45,6 @@ type CloudModel interface {
 	cloudmodel.Region | cloudmodel.AZ | cloudmodel.SubDomain | cloudmodel.Host | cloudmodel.VM |
 		cloudmodel.VPC | cloudmodel.Network | cloudmodel.Subnet | cloudmodel.VRouter | cloudmodel.RoutingTable |
 		cloudmodel.DHCPPort | cloudmodel.VInterface | cloudmodel.IP | cloudmodel.FloatingIP |
-		cloudmodel.SecurityGroup | cloudmodel.SecurityGroupRule | cloudmodel.VMSecurityGroup |
 		cloudmodel.NATGateway | cloudmodel.NATRule | cloudmodel.NATVMConnection | cloudmodel.LB |
 		cloudmodel.LBListener | cloudmodel.LBTargetServer | cloudmodel.LBVMConnection | cloudmodel.CEN |
 		cloudmodel.PeerConnection | cloudmodel.RDSInstance | cloudmodel.RedisInstance | cloudmodel.PodCluster |
@@ -61,7 +59,6 @@ type DiffBase interface {
 	*diffbase.Region | *diffbase.AZ | *diffbase.SubDomain | *diffbase.Host | *diffbase.VM |
 		*diffbase.VPC | *diffbase.Network | *diffbase.Subnet | *diffbase.VRouter | *diffbase.RoutingTable |
 		*diffbase.DHCPPort | *diffbase.VInterface | *diffbase.WANIP | *diffbase.LANIP | *diffbase.FloatingIP |
-		*diffbase.SecurityGroup | *diffbase.SecurityGroupRule | *diffbase.VMSecurityGroup |
 		*diffbase.NATGateway | *diffbase.NATRule | *diffbase.NATVMConnection | *diffbase.LB |
 		*diffbase.LBListener | *diffbase.LBTargetServer | *diffbase.LBVMConnection | *diffbase.CEN |
 		*diffbase.PeerConnection | *diffbase.RDSInstance | *diffbase.RedisInstance | *diffbase.PodCluster |
