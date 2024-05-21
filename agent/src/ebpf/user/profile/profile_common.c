@@ -860,12 +860,12 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				if (ctx->sample_period > 0) {
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
-		   ctx->sample_period / 1000;
+		   				(ctx->sample_period / 1000);
 				} else {
 					// Using microseconds for storage.
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
-		   (v->duration_ns / 1000);
+		 				(v->duration_ns / 1000);
 				}
 
 			} else {
@@ -889,7 +889,6 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 						    stack_str_hash, matched,
 						    process_name, info_p);
-
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
