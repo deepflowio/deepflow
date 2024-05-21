@@ -47,7 +47,7 @@ os.app                     , OS APP                     ,
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,
 
-app_instance               , 应用实例                   ,
+app_service                , 应用服务                   ,
 
 trace_id                  , TraceID                     ,
 span_id                   , SpanID                      ,
