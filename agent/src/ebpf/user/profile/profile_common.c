@@ -72,6 +72,7 @@ extern struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 static bool java_installed;
 
 int profiler_context_init(struct profiler_context *ctx,
+			  const char *name,
 			  const char *tag, u8 type,
 			  bool enable_profiler,
 			  const char *state_map_name,
@@ -81,6 +82,7 @@ int profiler_context_init(struct profiler_context *ctx,
 			  bool use_delta_time, u64 sample_period)
 {
 	memset(ctx, 0, sizeof(struct profiler_context));
+	ctx->name = name;
 	ctx->tag = tag;
 	atomic64_init(&ctx->process_lost_count);
 	if (!enable_profiler)
@@ -1083,12 +1085,18 @@ release_iter:
 	push_and_release_stack_trace_msg(ctx, &ctx->msg_hash, false);
 }
 
-bool check_profiler_regex(const char *name)
+bool check_profiler_regex(struct profiler_context *ctx, const char *name)
 {
 	bool matched = false;
 	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
 		if (g_ctx_array[i] == NULL)
 			continue;
+
+		if (ctx != NULL) {
+			if (strcmp(g_ctx_array[i]->name, ctx->name))
+				continue;
+		}
+
 		if (g_ctx_array[i]->regex_existed) {
 			profile_regex_lock(g_ctx_array[i]);
 			matched =
