@@ -48,8 +48,9 @@ func isInterestedHost(tType tridentcommon.TridentType) bool {
 
 type TridentStats struct {
 	OrgID                           int
+	TeamID                          int
 	VtapID                          uint32
-	TeamID                          string
+	TeamShortLcuuid                 string
 	IP                              string
 	Proxy                           string
 	K8sVersion                      uint64
@@ -70,7 +71,7 @@ type SynchronizerServer struct {
 	k8sQueue                      queue.QueueWriter
 	prometheusQueue               queue.QueueWriter
 	genesisSyncQueue              queue.QueueWriter
-	teamIDToOrgID                 sync.Map
+	teamShortLcuuidToInfo         sync.Map
 	clusterIDToVersion            sync.Map
 	prometheusClusterIDToVersion  sync.Map
 	vtapToVersion                 sync.Map
@@ -128,29 +129,32 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		return &trident.GenesisSyncResponse{Version: &version}, nil
 	}
 
-	var orgID int
-	teamID := request.GetTeamId()
-	if teamID == "" {
+	var orgID, teamID int
+	teamShortLcuuid := request.GetTeamId()
+	if teamShortLcuuid == "" {
 		orgID = mysqlcommon.DEFAULT_ORG_ID
+		teamID = mysqlcommon.DEFAULT_TEAM_ID
 	} else {
-		oID, ok := g.teamIDToOrgID.Load(teamID)
-		if !ok {
-			teamIDToOrgID, err := common.GetTeamIDToOrgID()
-			if err != nil {
-				log.Errorf("genesis sync from %s team_id %s vtap get org id failed: %s", remote, teamID, err.Error())
-				return &trident.GenesisSyncResponse{Version: &version}, nil
-			}
-			oID, ok := teamIDToOrgID[teamID]
-			if !ok {
-				log.Errorf("genesis sync from %s team_id %s not found organization", remote, teamID)
-				return &trident.GenesisSyncResponse{Version: &version}, nil
-			}
-			orgID = oID
-			for k, v := range teamIDToOrgID {
-				g.teamIDToOrgID.Store(k, v)
-			}
+		t, ok := g.teamShortLcuuidToInfo.Load(teamShortLcuuid)
+		if ok {
+			orgID = t.(common.TeamInfo).OrgID
+			teamID = t.(common.TeamInfo).TeamId
 		} else {
-			orgID = oID.(int)
+			teamShortLcuuidToInfo, err := common.GetTeamShortLcuuidToInfo()
+			if err != nil {
+				log.Errorf("genesis sync from %s team_id %s vtap get team info failed: %s", remote, teamShortLcuuid, err.Error())
+				return &trident.GenesisSyncResponse{Version: &version}, nil
+			}
+			teamInfo, ok := teamShortLcuuidToInfo[teamShortLcuuid]
+			if !ok {
+				log.Errorf("genesis sync from %s team_id %s not found team info", remote, teamShortLcuuid)
+				return &trident.GenesisSyncResponse{Version: &version}, nil
+			}
+			orgID = teamInfo.OrgID
+			teamID = teamInfo.TeamId
+			for k, v := range teamShortLcuuidToInfo {
+				g.teamShortLcuuidToInfo.Store(k, v)
+			}
 		}
 	}
 	vtap := fmt.Sprintf("%d-%d", orgID, vtapID)
@@ -187,6 +191,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 				peer:    remote,
 				vtapID:  vtapID,
 				orgID:   orgID,
+				teamID:  uint32(teamID),
 				msgType: common.TYPE_RENEW,
 				message: request,
 			},
@@ -200,6 +205,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 			peer:         remote,
 			vtapID:       vtapID,
 			orgID:        orgID,
+			teamID:       uint32(teamID),
 			k8sClusterID: k8sClusterID,
 			msgType:      common.TYPE_UPDATE,
 			message:      request,
@@ -222,6 +228,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		stats.SyncTridentType = tType
 		stats.SyncLastSeen = time.Now()
 		stats.K8sClusterID = k8sClusterID
+		stats.TeamShortLcuuid = teamShortLcuuid
 		stats.GenesisSyncProcessDataOperation = request.GetProcessData()
 		stats.GenesisSyncDataOperation = platformData
 		g.tridentStatsMap.Store(vtap, stats)
@@ -255,29 +262,32 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	}
 	entries := request.GetEntries()
 
-	var orgID int
-	teamID := request.GetTeamId()
-	if teamID == "" {
+	var orgID, teamID int
+	teamShortLcuuid := request.GetTeamId()
+	if teamShortLcuuid == "" {
 		orgID = mysqlcommon.DEFAULT_ORG_ID
+		teamID = mysqlcommon.DEFAULT_TEAM_ID
 	} else {
-		oID, ok := g.teamIDToOrgID.Load(teamID)
-		if !ok {
-			teamIDToOrgID, err := common.GetTeamIDToOrgID()
-			if err != nil {
-				log.Errorf("kubernetes api sync from %s team_id %s vtap get org id failed: %s", remote, teamID, err.Error())
-				return &trident.KubernetesAPISyncResponse{}, nil
-			}
-			oID, ok := teamIDToOrgID[teamID]
-			if !ok {
-				log.Errorf("kubernetes api sync from %s team_id %s not found organization", remote, teamID)
-				return &trident.KubernetesAPISyncResponse{}, nil
-			}
-			orgID = oID
-			for k, v := range teamIDToOrgID {
-				g.teamIDToOrgID.Store(k, v)
-			}
+		t, ok := g.teamShortLcuuidToInfo.Load(teamShortLcuuid)
+		if ok {
+			orgID = t.(common.TeamInfo).OrgID
+			teamID = t.(common.TeamInfo).TeamId
 		} else {
-			orgID = oID.(int)
+			teamShortLcuuidToInfo, err := common.GetTeamShortLcuuidToInfo()
+			if err != nil {
+				log.Errorf("kubernetes api sync from %s team_id %s vtap get team info failed: %s", remote, teamShortLcuuid, err.Error())
+				return &trident.KubernetesAPISyncResponse{}, nil
+			}
+			teamInfo, ok := teamShortLcuuidToInfo[teamShortLcuuid]
+			if !ok {
+				log.Errorf("kubernetes api sync %s team_id %s not found team info", remote, teamShortLcuuid)
+				return &trident.KubernetesAPISyncResponse{}, nil
+			}
+			orgID = teamInfo.OrgID
+			teamID = teamInfo.TeamId
+			for k, v := range teamShortLcuuidToInfo {
+				g.teamShortLcuuidToInfo.Store(k, v)
+			}
 		}
 	}
 	vtap := fmt.Sprintf("%d-%d", orgID, vtapID)
@@ -296,6 +306,7 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	stats.K8sClusterID = clusterID
 	stats.K8sLastSeen = time.Now()
 	stats.K8sVersion = version
+	stats.TeamShortLcuuid = teamShortLcuuid
 	g.tridentStatsMap.Store(vtap, stats)
 	now := time.Now()
 	if vtapID != 0 {
@@ -371,29 +382,32 @@ func (g *SynchronizerServer) PrometheusAPISync(ctx context.Context, request *tri
 	}
 	entries := request.GetEntries()
 
-	var orgID int
-	teamID := request.GetTeamId()
-	if teamID == "" {
+	var orgID, teamID int
+	teamShortLcuuid := request.GetTeamId()
+	if teamShortLcuuid == "" {
 		orgID = mysqlcommon.DEFAULT_ORG_ID
+		teamID = mysqlcommon.DEFAULT_TEAM_ID
 	} else {
-		oID, ok := g.teamIDToOrgID.Load(teamID)
-		if !ok {
-			teamIDToOrgID, err := common.GetTeamIDToOrgID()
-			if err != nil {
-				log.Errorf("prometheus api sync from %s team_id %s vtap get org id failed: %s", remote, teamID, err.Error())
-				return &trident.PrometheusAPISyncResponse{}, nil
-			}
-			oID, ok := teamIDToOrgID[teamID]
-			if !ok {
-				log.Errorf("prometheus api sync from %s team_id %s not found organization", remote, teamID)
-				return &trident.PrometheusAPISyncResponse{}, nil
-			}
-			orgID = oID
-			for k, v := range teamIDToOrgID {
-				g.teamIDToOrgID.Store(k, v)
-			}
+		t, ok := g.teamShortLcuuidToInfo.Load(teamShortLcuuid)
+		if ok {
+			orgID = t.(common.TeamInfo).OrgID
+			teamID = t.(common.TeamInfo).TeamId
 		} else {
-			orgID = oID.(int)
+			teamShortLcuuidToInfo, err := common.GetTeamShortLcuuidToInfo()
+			if err != nil {
+				log.Errorf("prometheus api sync from %s team_id %s vtap get team info failed: %s", remote, teamShortLcuuid, err.Error())
+				return &trident.PrometheusAPISyncResponse{}, nil
+			}
+			teamInfo, ok := teamShortLcuuidToInfo[teamShortLcuuid]
+			if !ok {
+				log.Errorf("prometheus api sync %s team_id %s not found team info", remote, teamShortLcuuid)
+				return &trident.PrometheusAPISyncResponse{}, nil
+			}
+			orgID = teamInfo.OrgID
+			teamID = teamInfo.TeamId
+			for k, v := range teamShortLcuuidToInfo {
+				g.teamShortLcuuidToInfo.Store(k, v)
+			}
 		}
 	}
 	vtap := fmt.Sprintf("%d-%d", orgID, vtapID)
@@ -410,6 +424,7 @@ func (g *SynchronizerServer) PrometheusAPISync(ctx context.Context, request *tri
 	stats.TeamID = teamID
 	stats.VtapID = vtapID
 	stats.PrometheusClusterID = clusterID
+	stats.TeamShortLcuuid = teamShortLcuuid
 	stats.PrometheusLastSeen = time.Now()
 	stats.PrometheusVersion = version
 	g.tridentStatsMap.Store(vtap, stats)
@@ -641,6 +656,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 			HostIp:              &vData.HostIP,
 			KubernetesClusterId: &vData.KubernetesClusterID,
 			NodeIp:              &vData.NodeIP,
+			TeamId:              &vData.TeamID,
 			LastSeen:            &vLastSeen,
 		}
 		gSyncVinterfaces = append(gSyncVinterfaces, gVinterface)
