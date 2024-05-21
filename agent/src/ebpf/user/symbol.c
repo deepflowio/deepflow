@@ -577,8 +577,8 @@ static inline bool is_existed_in_exit_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exit_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->
-			    v.proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->v.
+			    proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			ebpf_warning
@@ -608,19 +608,23 @@ static inline bool is_existed_in_exec_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exec_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->
-			    v.proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->v.
+			    proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
-			ebpf_warning
-			    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)"
-			     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)\n",
-			     (u64) list_p->pid, kv_tmp->k.pid,
-			     kv_tmp->v.proc_info_p,
-			     kv_tmp->v.proc_info_p !=
-			     0 ? list_p->syms_cache : 0, (u64) curr_p->pid,
-			     kv->k.pid, kv->v.proc_info_p,
-			     kv->v.proc_info_p != 0 ? curr_p->syms_cache : 0);
+			if (curr_p != 0 && list_p != 0) {
+				ebpf_warning
+				    (" At list pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)"
+				     " curr: pid %lu kvp_pid %lu info_p 0x%lx (p->cache 0x%lx)\n",
+				     (u64) list_p->pid, kv_tmp->k.pid,
+				     kv_tmp->v.proc_info_p,
+				     kv_tmp->v.proc_info_p !=
+				     0 ? list_p->syms_cache : 0,
+				     (u64) curr_p->pid, kv->k.pid,
+				     kv->v.proc_info_p,
+				     kv->v.proc_info_p !=
+				     0 ? curr_p->syms_cache : 0);
+			}
 			return true;
 		}
 	}
@@ -714,16 +718,10 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 	struct symbolizer_cache_kvp kv = {};
 
 	if (type == PROC_EXEC) {
-		/* 
-		 * If a profiler exists, this functionality is
-		 * handled by the profiler.
-		 */
-		if (get_profiler_tracer())
-			return;
-
 		/* To filter out threads. */
-		if (!is_user_process(pid))
+		if (!is_user_process(pid)) {
 			return;
+		}
 
 		int ret = VEC_OK;
 		kv.k.pid = (u64) pid;
