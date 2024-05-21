@@ -220,6 +220,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			vIF.LastSeen = epoch
 			vIF.VtapID = vtapID
 			vIF.KubernetesClusterID = k8sClusterID
+			vIF.TeamID = info.teamID
 			VIFs = append(VIFs, vIF)
 		}
 	}
@@ -315,6 +316,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 		vIF.LastSeen = epoch
 		vIF.VtapID = vtapID
 		vIF.KubernetesClusterID = k8sClusterID
+		vIF.TeamID = info.teamID
 		VIFs = append(VIFs, vIF)
 	}
 	return VIFs

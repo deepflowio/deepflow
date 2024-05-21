@@ -417,6 +417,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 				HostIP:              v.GetHostIp(),
 				KubernetesClusterID: v.GetKubernetesClusterId(),
 				NodeIP:              v.GetNodeIp(),
+				TeamID:              v.GetTeamId(),
 				LastSeen:            vpLastSeen,
 			})
 		}

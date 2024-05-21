@@ -325,7 +325,7 @@ func tableVip(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "IF_TYPE", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "AGENT_ID", "CLUSTER_ID", "NETNS_ID", "IP"})
+	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "IF_TYPE", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "AGENT_ID", "CLUSTER_ID", "NETNS_ID", "TEAM_ID", "IP"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -351,6 +351,7 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 			tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 			tableItem = append(tableItem, data.Get("KUBERNETES_CLUSTER_ID").MustString())
 			tableItem = append(tableItem, strconv.Itoa(data.Get("NETNS_ID").MustInt()))
+			tableItem = append(tableItem, strconv.Itoa(data.Get("TEAM_ID").MustInt()))
 			tableItem = append(tableItem, ip)
 			tableItems = append(tableItems, tableItem)
 		}
