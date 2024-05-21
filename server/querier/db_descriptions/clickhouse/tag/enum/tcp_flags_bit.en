@@ -1,0 +1,10 @@
+# Value , DisplayName  (value表示第n位, 值为 1<<n)     , Description
+0    , FIN                                            ,
+1    , SYN                                            ,
+2    , RST                                            ,
+3    , PSH                                            ,
+4    , ACK                                            ,
+5    , URG                                            ,
+6    , ECE                                            ,
+7    , CWR                                            ,
+8    , NS                                             ,

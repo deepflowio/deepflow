@@ -92,9 +92,3 @@ var PodGroupTypeSlice = []string{
 	"deployment", "stateful_set", "replication_controller", "daemon_set",
 	"replica_set_controller", "clone_set",
 }
-
-var NoLanguageTag = []string{
-	"ip_type", "l7_ip_protocol", "server_port", "span_kind", "tcp_flags_bit",
-	"tunnel_tier", "l7_protocol", "eth_type", "protocol", "tunnel_type", "nat_source",
-	"profile_language_type",
-}
