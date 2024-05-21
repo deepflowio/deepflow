@@ -17,6 +17,7 @@
 package cloud
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -25,126 +26,325 @@ import (
 	kubernetes_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 // 合并附属容器集群的资源到云平台资源中
 // 遍历Cloud下所有KubernetesGather的数据，更新部分属性信息，并合并到Cloud的resource中
 func (c *Cloud) getSubDomainData(cResource model.Resource) map[string]model.SubDomainResource {
-
 	subDomainResources := make(map[string]model.SubDomainResource)
 	for lcuuid, kubernetesGatherTask := range c.kubernetesGatherTaskMap {
-		kubernetesGatherResource := kubernetesGatherTask.GetResource()
+		subDomainResources[lcuuid] = c.generateSubDomainResource(lcuuid, kubernetesGatherTask.GetResource(), cResource)
+	}
+	return subDomainResources
+}
 
-		// 容器节点及与虚拟机关联关系
-		podNodes, vmPodNodeConnections := c.getSubDomainPodNodes(lcuuid, cResource, &kubernetesGatherResource)
-		// 如果当前KubernetesGather数据中没有容器节点，则跳过该集群
-		if len(podNodes) == 0 {
-			log.Info("cloud merge subdomain data: k8s gather resource not found pod node")
-			subDomainResources[lcuuid] = model.SubDomainResource{
-				ErrorState:   kubernetesGatherResource.ErrorState,
-				ErrorMessage: kubernetesGatherResource.ErrorMessage,
-			}
-			continue
+func (c *Cloud) getSubDomainDataByLcuuid(lcuuid string, cResource model.Resource) map[string]model.SubDomainResource {
+	kubernetesGatherTask, ok := c.kubernetesGatherTaskMap[lcuuid]
+	if !ok {
+		msg := fmt.Sprintf("domain (%s) not found sub_domain lcuuid (%s)", c.basicInfo.Name, lcuuid)
+		log.Warning(msg)
+		return map[string]model.SubDomainResource{
+			lcuuid: model.SubDomainResource{
+				ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+				ErrorMessage: msg,
+			},
 		}
-		// 取集群中某个容器节点的az信息作为集群的az，当前不支持附属容器集群跨可用区
-		azLcuuid := podNodes[0].AZLcuuid
-
-		// 获取主云平台vm的ip和mac在附属容器中排除，以免重复添加
-		vmLcuuids := map[string]bool{}
-		for _, vm := range cResource.VMs {
-			vmLcuuids[vm.Lcuuid] = false
-		}
-		existMacs := map[string]bool{}
-		vinterfaceLcuuids := map[string]bool{}
-		for _, v := range cResource.VInterfaces {
-			if _, ok := vmLcuuids[v.DeviceLcuuid]; !ok {
-				continue
-			}
-			existMacs[v.Mac] = false
-			vinterfaceLcuuids[v.Lcuuid] = false
-		}
-		existIPs := map[string]bool{}
-		for _, ip := range cResource.IPs {
-			if _, ok := vinterfaceLcuuids[ip.VInterfaceLcuuid]; !ok {
-				continue
-			}
-			existIPs[ip.IP] = false
-		}
-
-		// 容器集群
-		podClusters := c.getSubDomainPodClusters(lcuuid, &kubernetesGatherResource, azLcuuid)
-
-		// 命名空间
-		podNamespaces := c.getSubDomainPodNamespaces(lcuuid, &kubernetesGatherResource, azLcuuid)
-
-		// Ingress及规则
-		podIngresses, podIngressRules, podIngressRuleBackends := c.getSubDomainIngresses(
-			lcuuid, &kubernetesGatherResource, azLcuuid,
-		)
-
-		// 容器服务及规则
-		podServices, podServicePorts := c.getSubDomainPodServices(
-			lcuuid, &kubernetesGatherResource, azLcuuid,
-		)
-
-		// podGroups
-		podGroups, podGroupPorts := c.getSubDomainPodGroups(lcuuid, &kubernetesGatherResource, azLcuuid)
-
-		// podReplicaSets
-		podReplicaSets := c.getSubDomainPodReplicaSets(lcuuid, &kubernetesGatherResource, azLcuuid)
-
-		// pods
-		pods := c.getSubDomainPods(lcuuid, &kubernetesGatherResource, azLcuuid)
-
-		// IP
-		ips, reservedPodSubnetLcuuidToIPNum, updatedVInterfaceLcuuidToNetworkLcuuid :=
-			c.getSubDomainIPs(lcuuid, cResource, &kubernetesGatherResource, existIPs)
-
-		// vinterfaces
-		vinterfaces := c.getSubDomainVInterfaces(
-			lcuuid, &kubernetesGatherResource, updatedVInterfaceLcuuidToNetworkLcuuid, existMacs,
-		)
-
-		// subnets
-		subnets := c.getSubDomainSubnets(
-			lcuuid, &kubernetesGatherResource, reservedPodSubnetLcuuidToIPNum,
-		)
-
-		// networks
-		networks := c.getSubDomainNetworks(lcuuid, &kubernetesGatherResource, azLcuuid)
-
-		// prometheusTargets
-		prometheusTargets := c.getSubDomainPrometheusTargets(lcuuid, &kubernetesGatherResource)
-
-		// 生成SubDomainResource
-		subDomainResource := model.SubDomainResource{
-			Verified:               true,
-			SyncAt:                 time.Now(),
-			ErrorState:             kubernetesGatherResource.ErrorState,
-			ErrorMessage:           kubernetesGatherResource.ErrorMessage,
-			PodClusters:            podClusters,
-			PodNodes:               podNodes,
-			VMPodNodeConnections:   vmPodNodeConnections,
-			PodNamespaces:          podNamespaces,
-			PodIngresses:           podIngresses,
-			PodIngressRules:        podIngressRules,
-			PodIngressRuleBackends: podIngressRuleBackends,
-			PodServices:            podServices,
-			PodServicePorts:        podServicePorts,
-			PodGroups:              podGroups,
-			PodGroupPorts:          podGroupPorts,
-			PodReplicaSets:         podReplicaSets,
-			Pods:                   pods,
-			Networks:               networks,
-			Subnets:                subnets,
-			VInterfaces:            vinterfaces,
-			IPs:                    ips,
-			PrometheusTargets:      prometheusTargets,
-		}
-		subDomainResources[lcuuid] = subDomainResource
 	}
 
-	return subDomainResources
+	return map[string]model.SubDomainResource{
+		lcuuid: c.generateSubDomainResource(lcuuid, kubernetesGatherTask.GetResource(), cResource),
+	}
+}
+
+func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResource kubernetes_model.KubernetesGatherResource, cResource model.Resource) model.SubDomainResource {
+
+	if kubernetesGatherResource.ErrorState != common.RESOURCE_STATE_CODE_SUCCESS {
+		return model.SubDomainResource{
+			ErrorState:   kubernetesGatherResource.ErrorState,
+			ErrorMessage: kubernetesGatherResource.ErrorMessage,
+		}
+	}
+
+	// 容器节点及与虚拟机关联关系
+	podNodes, vmPodNodeConnections := c.getSubDomainPodNodes(lcuuid, cResource, &kubernetesGatherResource)
+	// 如果当前KubernetesGather数据中没有与主云平台相关的容器节点，则跳过该集群
+	if len(podNodes) == 0 {
+		msg := "gather node is not associated with cloud vm"
+		log.Warning(msg)
+		return model.SubDomainResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+			ErrorMessage: msg,
+		}
+	}
+	// 取集群中某个容器节点的az信息作为集群的az，当前不支持附属容器集群跨可用区
+	azLcuuid := podNodes[0].AZLcuuid
+
+	// 获取主云平台vm的ip和mac在附属容器中排除，以免重复添加
+	vmLcuuids := map[string]bool{}
+	for _, vm := range cResource.VMs {
+		vmLcuuids[vm.Lcuuid] = false
+	}
+	existMacs := map[string]bool{}
+	vinterfaceLcuuids := map[string]bool{}
+	for _, v := range cResource.VInterfaces {
+		if _, ok := vmLcuuids[v.DeviceLcuuid]; !ok {
+			continue
+		}
+		existMacs[v.Mac] = false
+		vinterfaceLcuuids[v.Lcuuid] = false
+	}
+	existIPs := map[string]bool{}
+	for _, ip := range cResource.IPs {
+		if _, ok := vinterfaceLcuuids[ip.VInterfaceLcuuid]; !ok {
+			continue
+		}
+		existIPs[ip.IP] = false
+	}
+
+	// 容器集群
+	podClusters := c.getSubDomainPodClusters(lcuuid, &kubernetesGatherResource, azLcuuid)
+
+	// 命名空间
+	podNamespaces := c.getSubDomainPodNamespaces(lcuuid, &kubernetesGatherResource, azLcuuid)
+
+	// Ingress及规则
+	podIngresses, podIngressRules, podIngressRuleBackends := c.getSubDomainIngresses(
+		lcuuid, &kubernetesGatherResource, azLcuuid,
+	)
+
+	// 容器服务及规则
+	podServices, podServicePorts := c.getSubDomainPodServices(
+		lcuuid, &kubernetesGatherResource, azLcuuid,
+	)
+
+	// podGroups
+	podGroups, podGroupPorts := c.getSubDomainPodGroups(lcuuid, &kubernetesGatherResource, azLcuuid)
+
+	// podReplicaSets
+	podReplicaSets := c.getSubDomainPodReplicaSets(lcuuid, &kubernetesGatherResource, azLcuuid)
+
+	// pods
+	pods := c.getSubDomainPods(lcuuid, &kubernetesGatherResource, azLcuuid)
+
+	// IP
+	ips, reservedPodSubnetLcuuidToIPNum, updatedVInterfaceLcuuidToNetworkLcuuid :=
+		c.getSubDomainIPs(lcuuid, cResource, &kubernetesGatherResource, existIPs)
+
+	// vinterfaces
+	vinterfaces := c.getSubDomainVInterfaces(
+		lcuuid, &kubernetesGatherResource, updatedVInterfaceLcuuidToNetworkLcuuid, existMacs,
+	)
+
+	// subnets
+	subnets := c.getSubDomainSubnets(
+		lcuuid, &kubernetesGatherResource, reservedPodSubnetLcuuidToIPNum,
+	)
+
+	// networks
+	networks := c.getSubDomainNetworks(lcuuid, &kubernetesGatherResource, azLcuuid)
+
+	// prometheusTargets
+	prometheusTargets := c.getSubDomainPrometheusTargets(lcuuid, &kubernetesGatherResource)
+
+	// 生成SubDomainResource
+	return model.SubDomainResource{
+		Verified:               true,
+		SyncAt:                 time.Now(),
+		ErrorState:             kubernetesGatherResource.ErrorState,
+		ErrorMessage:           kubernetesGatherResource.ErrorMessage,
+		PodClusters:            podClusters,
+		PodNodes:               podNodes,
+		VMPodNodeConnections:   vmPodNodeConnections,
+		PodNamespaces:          podNamespaces,
+		PodIngresses:           podIngresses,
+		PodIngressRules:        podIngressRules,
+		PodIngressRuleBackends: podIngressRuleBackends,
+		PodServices:            podServices,
+		PodServicePorts:        podServicePorts,
+		PodGroups:              podGroups,
+		PodGroupPorts:          podGroupPorts,
+		PodReplicaSets:         podReplicaSets,
+		Pods:                   pods,
+		Networks:               networks,
+		Subnets:                subnets,
+		VInterfaces:            vinterfaces,
+		IPs:                    ips,
+		PrometheusTargets:      prometheusTargets,
+	}
+}
+
+// 独立更新附属容器集群时，当云平台未同步或同步异常时，从数据库获取所需的已同步的主云平台资源信息
+func (c *Cloud) getOwnDomainResource() model.Resource {
+	oResource := model.Resource{}
+	var vpcs []mysql.VPC
+	err := c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vpcs).Error
+	if err != nil {
+		log.Errorf("get own domain resource vpc failed: (%s)", err.Error())
+		return oResource
+	}
+	vpcIDToLcuuid := map[int]string{}
+	for _, vpc := range vpcs {
+		vpcIDToLcuuid[vpc.ID] = vpc.Lcuuid
+	}
+
+	var vms []mysql.VM
+	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vms).Error
+	if err != nil {
+		log.Errorf("get own domain resource vm failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var vinterfaces []mysql.VInterface
+	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
+	if err != nil {
+		log.Errorf("get own domain resource vinterface failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var wanIPs []mysql.WANIP
+	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&wanIPs).Error
+	if err != nil {
+		log.Errorf("get own domain resource wan ip failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var lanIPs []mysql.LANIP
+	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&lanIPs).Error
+	if err != nil {
+		log.Errorf("get own domain resource lan ip failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var networks []mysql.Network
+	err = c.db.DB.Where("domain = ? AND sub_domain = ''", c.basicInfo.Lcuuid).Find(&networks).Error
+	if err != nil {
+		log.Errorf("get own domain resource network failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var subnets []mysql.Subnet
+	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subnets).Error
+	if err != nil {
+		log.Errorf("get own domain resource subnet failed: (%s)", err.Error())
+		return oResource
+	}
+
+	vmIDToVM := map[int]model.VM{}
+	for _, vm := range vms {
+		vpcLcuuid, ok := vpcIDToLcuuid[vm.VPCID]
+		if !ok || vpcLcuuid == "" {
+			continue
+		}
+		resourceVM := model.VM{
+			Lcuuid:       vm.Lcuuid,
+			Name:         vm.Name,
+			Label:        vm.Label,
+			HType:        vm.HType,
+			State:        vm.State,
+			CreatedAt:    vm.CreatedAt,
+			AZLcuuid:     vm.AZ,
+			RegionLcuuid: vm.Region,
+			VPCLcuuid:    vpcLcuuid,
+		}
+		oResource.VMs = append(oResource.VMs, resourceVM)
+		vmIDToVM[vm.ID] = resourceVM
+	}
+
+	viIDToVI := map[int]model.VInterface{}
+	for _, vi := range vinterfaces {
+		if vi.DeviceType != common.VIF_DEVICE_TYPE_VM {
+			continue
+		}
+		vm, ok := vmIDToVM[vi.DeviceID]
+		if !ok {
+			continue
+		}
+		resourceVInterface := model.VInterface{
+			Lcuuid:       vi.Lcuuid,
+			Type:         vi.Type,
+			Mac:          vi.Mac,
+			DeviceType:   vi.DeviceType,
+			DeviceLcuuid: vm.Lcuuid,
+			VPCLcuuid:    vm.VPCLcuuid,
+			RegionLcuuid: vi.Region,
+		}
+		oResource.VInterfaces = append(oResource.VInterfaces, resourceVInterface)
+		viIDToVI[vi.ID] = resourceVInterface
+	}
+
+	for _, w := range wanIPs {
+		vinterface, ok := viIDToVI[w.VInterfaceID]
+		if !ok {
+			continue
+		}
+		oResource.IPs = append(oResource.IPs, model.IP{
+			Lcuuid:           w.Lcuuid,
+			VInterfaceLcuuid: vinterface.Lcuuid,
+			IP:               w.IP,
+			RegionLcuuid:     vinterface.RegionLcuuid,
+		})
+	}
+
+	for _, l := range lanIPs {
+		vinterface, ok := viIDToVI[l.VInterfaceID]
+		if !ok {
+			continue
+		}
+		oResource.IPs = append(oResource.IPs, model.IP{
+			Lcuuid:           l.Lcuuid,
+			VInterfaceLcuuid: vinterface.Lcuuid,
+			IP:               l.IP,
+			RegionLcuuid:     vinterface.RegionLcuuid,
+		})
+	}
+
+	networkIDToNetwork := map[int]model.Network{}
+	for _, n := range networks {
+		vpcLcuuid, ok := vpcIDToLcuuid[n.VPCID]
+		if !ok || vpcLcuuid == "" {
+			continue
+		}
+		resourceNetwork := model.Network{
+			Lcuuid:         n.Lcuuid,
+			Name:           n.Name,
+			SegmentationID: n.SegmentationID,
+			VPCLcuuid:      vpcLcuuid,
+			Shared:         n.Shared,
+			NetType:        n.NetType,
+			AZLcuuid:       n.AZ,
+			RegionLcuuid:   n.Region,
+		}
+		oResource.Networks = append(oResource.Networks, resourceNetwork)
+		networkIDToNetwork[n.ID] = resourceNetwork
+	}
+
+	for _, s := range subnets {
+		network, ok := networkIDToNetwork[s.NetworkID]
+		if !ok {
+			continue
+		}
+		ip, err := netaddr.ParseIP(s.Prefix)
+		if err != nil {
+			log.Error(err.Error())
+			continue
+		}
+		mask := net.IPMask(net.ParseIP("s.Netmask").To4())
+		maskSize, _ := mask.Size()
+		if maskSize == 0 {
+			log.Errorf("parse netmask (%s) failed", s.Netmask)
+			continue
+		}
+		cidr := netaddr.IPPrefixFrom(ip, uint8(maskSize))
+		oResource.Subnets = append(oResource.Subnets, model.Subnet{
+			Lcuuid:        s.Lcuuid,
+			Name:          s.Name,
+			CIDR:          cidr.String(),
+			NetworkLcuuid: network.Lcuuid,
+			VPCLcuuid:     network.VPCLcuuid,
+		})
+	}
+	return oResource
 }
 
 // - 根据IP查询对应的虚拟机，生成与虚拟机的关联关系
