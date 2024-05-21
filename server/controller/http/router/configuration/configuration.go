@@ -28,5 +28,5 @@ func NewConfiguration() *Configuration {
 }
 
 func (c *Configuration) RegisterTo(e *gin.Engine) {
-	vTapGroupConfigRouter(e)
+	agentGroupConfigRouter(e)
 }
