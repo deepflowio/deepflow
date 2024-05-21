@@ -22,6 +22,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
@@ -50,7 +51,8 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
 	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(d.g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(d.m))
-	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(d.m))
+	e.GET("/v1/sub-domain-info/:lcuuid/", getSubDomainResource(d.m))
+	e.GET("/v1/kubernetes-gather-info/:lcuuid/", getKubernetesGatherResource(d.m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/", getRecorderCache(d.m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/", getRecorderCacheDiffBaseDataSet(d.m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/tool-maps/", getRecorderCacheToolDataSet(d.m))
@@ -90,9 +92,40 @@ func getKubernetesGatherBasicInfos(m *manager.Manager) gin.HandlerFunc {
 	})
 }
 
-func getKubernetesGatherResources(m *manager.Manager) gin.HandlerFunc {
+func getSubDomainResource(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetKubernetesGatherResources(c.Param("lcuuid"), m)
+		db, err := GetContextOrgDB(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			return
+		}
+		subDomainLcuuid := c.Param("lcuuid")
+		var subDomain mysql.SubDomain
+		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		data, err := service.GetSubDomainResource(subDomain.Domain, subDomainLcuuid, m)
+		JsonResponse(c, data, err)
+	})
+}
+
+func getKubernetesGatherResource(m *manager.Manager) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		db, err := GetContextOrgDB(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			return
+		}
+		subDomainLcuuid := c.Param("lcuuid")
+		var subDomain mysql.SubDomain
+		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		data, err := service.GetKubernetesGatherResource(subDomain.Domain, subDomainLcuuid, m)
 		JsonResponse(c, data, err)
 	})
 }

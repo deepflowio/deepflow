@@ -27,7 +27,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	cloudcfg "github.com/deepflowio/deepflow/server/controller/cloud/config"
-	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	gathermodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -91,8 +91,8 @@ func (m *Manager) GetCloudResource(lcuuid string) (model.Resource, error) {
 	return cloudResource, nil
 }
 
-func (m *Manager) GetKubernetesGatherBasicInfos(lcuuid string) ([]kubernetes_gather_model.KubernetesGatherBasicInfo, error) {
-	var k8sGatherBasicInfos []kubernetes_gather_model.KubernetesGatherBasicInfo
+func (m *Manager) GetKubernetesGatherBasicInfos(lcuuid string) ([]gathermodel.KubernetesGatherBasicInfo, error) {
+	var k8sGatherBasicInfos []gathermodel.KubernetesGatherBasicInfo
 
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -107,20 +107,33 @@ func (m *Manager) GetKubernetesGatherBasicInfos(lcuuid string) ([]kubernetes_gat
 	return k8sGatherBasicInfos, nil
 }
 
-func (m *Manager) GetKubernetesGatherResources(lcuuid string) ([]kubernetes_gather_model.KubernetesGatherResource, error) {
-	var k8sGatherResources []kubernetes_gather_model.KubernetesGatherResource
-
+func (m *Manager) GetSubDomainResource(lcuuid, subDomainLcuuid string) (model.SubDomainResource, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	cloudTask, ok := m.taskMap[lcuuid]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("domain (%s) not found", lcuuid))
+		return model.SubDomainResource{}, fmt.Errorf("domain (%s) not found", lcuuid)
 	}
+	cResource := cloudTask.Cloud.GetSubDomainResource(subDomainLcuuid)
+
+	return cResource.SubDomainResources[subDomainLcuuid], nil
+}
+
+func (m *Manager) GetKubernetesGatherResource(lcuuid, subDomainLcuuid string) (gathermodel.KubernetesGatherResource, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	cloudTask, ok := m.taskMap[lcuuid]
+	if !ok {
+		return gathermodel.KubernetesGatherResource{}, fmt.Errorf("domain (%s) not found", lcuuid)
+	}
+
 	k8sGatherTaskMap := cloudTask.Cloud.GetKubernetesGatherTaskMap()
-	for _, k8sGatherTask := range k8sGatherTaskMap {
-		k8sGatherResources = append(k8sGatherResources, k8sGatherTask.GetResource())
+	k8sGather, ok := k8sGatherTaskMap[subDomainLcuuid]
+	if !ok {
+		return gathermodel.KubernetesGatherResource{}, fmt.Errorf("sub domain (%s) not found", subDomainLcuuid)
 	}
-	return k8sGatherResources, nil
+
+	return k8sGather.GetResource(), nil
 }
 
 func (m *Manager) TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid string, version int) error {
