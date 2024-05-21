@@ -225,13 +225,13 @@ int creat_ksyms_cache(void);
 void *get_symbol_cache(pid_t pid, bool new_cache);
 void release_symbol_caches(void);
 u64 get_pid_stime(pid_t pid);
-void exec_proc_info_cache_update(void);
 void set_java_syms_fetch_delay(int delay_secs);
 u64 get_java_syms_fetch_delay(void);
 void free_proc_cache(struct symbolizer_proc_info *p);
 void symbolizer_kernel_lock(void);
 void symbolizer_kernel_unlock(void);
 #endif
+void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
 void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);

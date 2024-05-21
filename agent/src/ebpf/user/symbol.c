@@ -1332,4 +1332,8 @@ int create_and_init_proc_info_caches(void)
 	return 0;
 }
 
+void exec_proc_info_cache_update(void)
+{
+}
+
 #endif /* AARCH64_MUSL */

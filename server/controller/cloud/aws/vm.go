@@ -25,11 +25,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 )
 
-func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, error) {
+func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
 	log.Debug("get vms starting")
 	a.vmIDToPrivateIP = map[string]string{}
 	var vms []model.VM
-	var vmSGs []model.VMSecurityGroup
 	states := map[string]int{
 		"running": common.VM_STATE_RUNNING,
 		"stopped": common.VM_STATE_STOPPED,
@@ -48,7 +47,7 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, err
 		result, err := a.ec2Client.DescribeInstances(context.TODO(), input)
 		if err != nil {
 			log.Errorf("vm request aws api error: (%s)", err.Error())
-			return []model.VM{}, []model.VMSecurityGroup{}, err
+			return []model.VM{}, err
 		}
 		retVMs = append(retVMs, result.Reservations...)
 		if result.NextToken == nil {
@@ -88,17 +87,8 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, []model.VMSecurityGroup, err
 			})
 			a.azLcuuidMap[azLcuuid] = 0
 			a.vmIDToPrivateIP[instanceID] = a.getStringPointerValue(ins.PrivateIpAddress)
-
-			for priority, sg := range ins.SecurityGroups {
-				vmSGs = append(vmSGs, model.VMSecurityGroup{
-					Lcuuid:              common.GetUUIDByOrgID(a.orgID, vmLcuuid+a.getStringPointerValue(sg.GroupId)),
-					SecurityGroupLcuuid: common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(sg.GroupId)),
-					VMLcuuid:            vmLcuuid,
-					Priority:            priority,
-				})
-			}
 		}
 	}
 	log.Debug("get vms complete")
-	return vms, vmSGs, nil
+	return vms, nil
 }

@@ -36,9 +36,6 @@ type DataSet struct {
 	WANIPs                 map[string]*WANIP
 	LANIPs                 map[string]*LANIP
 	FloatingIPs            map[string]*FloatingIP
-	SecurityGroups         map[string]*SecurityGroup
-	SecurityGroupRules     map[string]*SecurityGroupRule
-	VMSecurityGroups       map[string]*VMSecurityGroup
 	NATGateways            map[string]*NATGateway
 	NATVMConnections       map[string]*NATVMConnection
 	NATRules               map[string]*NATRule
@@ -85,9 +82,6 @@ func NewDataSet() *DataSet {
 		WANIPs:                 make(map[string]*WANIP),
 		LANIPs:                 make(map[string]*LANIP),
 		FloatingIPs:            make(map[string]*FloatingIP),
-		SecurityGroups:         make(map[string]*SecurityGroup),
-		SecurityGroupRules:     make(map[string]*SecurityGroupRule),
-		VMSecurityGroups:       make(map[string]*VMSecurityGroup),
 		NATGateways:            make(map[string]*NATGateway),
 		NATVMConnections:       make(map[string]*NATVMConnection),
 		NATRules:               make(map[string]*NATRule),

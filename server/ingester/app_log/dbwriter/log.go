@@ -71,7 +71,7 @@ type ApplicationLogStore struct {
 
 	Body string
 
-	AppInstance string `json:"app_instance" category:"$tag" sub:"service_info"` // service name
+	AppService string `json:"app_service" category:"$tag" sub:"service_info"` // service name
 
 	AgentID      uint16 `json:"agent_id" category:"$tag" sub:"universal_tag"`
 	RegionID     uint16 `json:"region_id" category:"$tag" sub:"universal_tag"`
@@ -121,7 +121,7 @@ func (l *ApplicationLogStore) WriteBlock(block *ckdb.Block) {
 		l.SeverityText,
 		l.SeverityNumber,
 		l.Body,
-		l.AppInstance,
+		l.AppService,
 
 		l.AgentID,
 		l.RegionID,
@@ -192,7 +192,7 @@ func LogColumns() []*ckdb.Column {
 		ckdb.NewColumn("severity_text", ckdb.LowCardinalityString).SetCodec(ckdb.CodecZSTD).SetComment("The severity text (also known as log level)"),
 		ckdb.NewColumn("severity_number", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("numerical value of the severity(also known as log level id)"),
 		ckdb.NewColumn("body", ckdb.String).SetIndex(ckdb.IndexTokenbf).SetCodec(ckdb.CodecZSTD).SetComment("log content"),
-		ckdb.NewColumn("app_instance", ckdb.LowCardinalityString).SetIndex(ckdb.IndexBloomfilter).SetComment("Application Instance (service name)"),
+		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetIndex(ckdb.IndexBloomfilter).SetComment("Application Service (service name)"),
 
 		ckdb.NewColumn("agent_id", ckdb.UInt16).SetComment("Agent ID"),
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("Region ID"),
@@ -232,7 +232,7 @@ func LogColumns() []*ckdb.Column {
 func GenLogCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"_type", "app_instance", timeKey, "timestamp"}
+	orderKeys := []string{"_type", "app_service", timeKey, "timestamp"}
 	partition := DefaultPartition
 
 	return &ckdb.Table{
