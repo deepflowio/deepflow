@@ -58,20 +58,43 @@ const (
 	SEVERITY_UNKNOWN
 )
 
+var SeverityMap = map[string]uint8{
+	"FATAL": SEVERITY_FATAL,
+	"ERROR": SEVERITY_ERROR,
+	"WARN":  SEVERITY_WARN,
+	"INFO":  SEVERITY_INFO,
+	"DEBUG": SEVERITY_DEBUG,
+	"TRACE": SEVERITY_TRACE,
+
+	"FATAL2": SEVERITY_FATAL,
+	"ERROR2": SEVERITY_ERROR,
+	"WARN2":  SEVERITY_WARN,
+	"INFO2":  SEVERITY_INFO,
+	"DEBUG2": SEVERITY_DEBUG,
+	"TRACE2": SEVERITY_TRACE,
+
+	"FATAL3": SEVERITY_FATAL,
+	"ERROR3": SEVERITY_ERROR,
+	"WARN3":  SEVERITY_WARN,
+	"INFO3":  SEVERITY_INFO,
+	"DEBUG3": SEVERITY_DEBUG,
+	"TRACE3": SEVERITY_TRACE,
+
+	"FATAL4": SEVERITY_FATAL,
+	"ERROR4": SEVERITY_ERROR,
+	"WARN4":  SEVERITY_WARN,
+	"INFO4":  SEVERITY_INFO,
+	"DEBUG4": SEVERITY_DEBUG,
+	"TRACE4": SEVERITY_TRACE,
+
+	"CRITICAL": SEVERITY_FATAL,
+	"WARNING":  SEVERITY_WARN,
+}
+
 func StringToSeverity(str string) uint8 {
-	switch strings.ToUpper(str) {
-	case "FATAL", "CRITICAL":
-		return SEVERITY_FATAL
-	case "ERROR":
-		return SEVERITY_ERROR
-	case "WARNING", "WARN":
-		return SEVERITY_WARN
-	case "INFO":
-		return SEVERITY_INFO
-	case "DEBUG":
-		return SEVERITY_DEBUG
-	case "TRACE":
-		return SEVERITY_TRACE
+	upperStr := strings.ToUpper(str)
+	if severity, ok := SeverityMap[upperStr]; ok {
+		return severity
 	}
 	return SEVERITY_UNKNOWN
 }
@@ -199,7 +222,7 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 	host := string(columns[1])
 	s.AttributeNames = append(s.AttributeNames, "host")
 	s.AttributeValues = append(s.AttributeValues, host)
-	s.AppInstance = host
+	s.AppService = host
 
 	severityText := ""
 	switch string(columns[3]) {
@@ -260,11 +283,11 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	s.Body = l.Message
 	s.SeverityText = l.Level
 	s.SeverityNumber = StringToSeverity(l.Level)
-	s.AppInstance = l.Kubernetes.PodName
+	s.AppService = l.ProcessName
 
 	if l.Kubernetes.PodIp != "" {
-		s.AttributeNames = append(s.AttributeNames, "pod_ip")
-		s.AttributeValues = append(s.AttributeValues, l.Kubernetes.PodIp)
+		s.AttributeNames = append(s.AttributeNames, "pod_ip", "pod_name")
+		s.AttributeValues = append(s.AttributeValues, l.Kubernetes.PodIp, l.Kubernetes.PodName)
 	}
 
 	if l.Module != "" {
@@ -368,8 +391,9 @@ type AppLogEntry struct {
 		PodName string `json:"pod_name"`
 		PodIp   string `json:"pod_ip"`
 	} `json:"kubernetes"`
-	Message   string `json:"message"`
-	Timestamp string `json:"timestamp"`
+	Message     string `json:"message"`
+	Timestamp   string `json:"timestamp"`
+	ProcessName string `json:"process_name"`
 }
 
 func (d *Decoder) handleAppLog(agentId uint16, decoder *codec.SimpleDecoder) {
