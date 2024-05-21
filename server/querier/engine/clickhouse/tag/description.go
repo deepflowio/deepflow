@@ -196,9 +196,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
 				enumFile := tag[4].(string)
-				if !common.IsValueInSliceString(enumFile, NoLanguageTag) {
-					enumFile = tag[4].(string) + "." + config.Cfg.Language
-				}
+				enumFile = tag[4].(string) + "." + config.Cfg.Language
 				displayName := tagLanguage[1].(string)
 				des := tagLanguage[2].(string)
 				description := NewTagDescription(
