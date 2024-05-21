@@ -73,6 +73,7 @@ type ApplicationLogStore struct {
 
 	AppService string `json:"app_service" category:"$tag" sub:"service_info"` // service name
 
+	GProcessID   uint32 `json:"gprocess_id" category:"$tag" sub:"universal_tag"`
 	AgentID      uint16 `json:"agent_id" category:"$tag" sub:"universal_tag"`
 	RegionID     uint16 `json:"region_id" category:"$tag" sub:"universal_tag"`
 	AZID         uint16 `json:"az_id" category:"$tag" sub:"universal_tag"`
@@ -123,6 +124,7 @@ func (l *ApplicationLogStore) WriteBlock(block *ckdb.Block) {
 		l.Body,
 		l.AppService,
 
+		l.GProcessID,
 		l.AgentID,
 		l.RegionID,
 		l.AZID,
@@ -194,6 +196,7 @@ func LogColumns() []*ckdb.Column {
 		ckdb.NewColumn("body", ckdb.String).SetIndex(ckdb.IndexTokenbf).SetCodec(ckdb.CodecZSTD).SetComment("log content"),
 		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetIndex(ckdb.IndexBloomfilter).SetComment("Application Service (service name)"),
 
+		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("Global Process ID"),
 		ckdb.NewColumn("agent_id", ckdb.UInt16).SetComment("Agent ID"),
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("Region ID"),
 		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("Availability Zone ID"),
