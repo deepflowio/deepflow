@@ -1,0 +1,4 @@
+#!/bin/sh
+
+pip install numpy==1.26.4 torch==2.2.2
+apt-get update && apt-get install linux-tools-common linux-tools-5.15.0-106-generic nvidia-driver-535-server -y && reboot

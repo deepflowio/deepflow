@@ -6,6 +6,16 @@ default-run = "deepflow-agent"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+
+members = [
+    "crates/profile",
+]
+
+exclude = [
+    "src/ebpf/samples/rust/profiler",
+    "src/ebpf/samples/rust/socket-tracer",
+]
 
 [dependencies]
 ahash = "0.8"
@@ -59,6 +69,7 @@ parking_lot = "0.11"
 pcap_assembler = { path = "plugins/pcap_assembler" }
 pcap-sys = "0.1.3"
 pnet = "^0.29"
+profile = { path = "crates/profile" }
 prost = "0.11"
 public = { path = "crates/public" }
 rand = "0.8.5"

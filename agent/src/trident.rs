@@ -2184,6 +2184,7 @@ impl AgentComponents {
             },
             Countable::Owned(Box::new(counter)),
         );
+        crate::profile::poller::set_profile_sender(profile_sender.clone());
         let profile_uniform_sender = UniformSenderThread::new(
             profile_queue_name,
             Arc::new(profile_receiver),

@@ -40,6 +40,8 @@ mod sender;
 pub mod trident;
 pub mod utils;
 
+extern crate profile;
+
 // for benchmarks
 #[doc(hidden)]
 pub use {

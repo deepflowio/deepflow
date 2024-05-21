@@ -187,19 +187,7 @@ impl Sendable for TelegrafMetric {
     }
 }
 
-/// java profile xxxx
-#[derive(Debug, PartialEq)]
-pub struct Profile(pub metric::Profile);
-
-impl Sendable for Profile {
-    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        self.0.encode(buf).map(|_| self.0.encoded_len())
-    }
-
-    fn message_type(&self) -> SendMessageType {
-        SendMessageType::Profile
-    }
-}
+pub use public::sender::Profile;
 
 fn decode_metric(mut whole_body: impl Buf, headers: &HeaderMap) -> Result<Vec<u8>, GenericError> {
     let metric = if headers

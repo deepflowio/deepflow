@@ -1306,7 +1306,7 @@ int creat_ksyms_cache(void)
 			     strerror(errno));
 		return -1;
 	}
-	u64 test_addr = kallsyms_lookup_name("finish_task_switch");
+	u64 test_addr = kallsyms_lookup_name("finish_task_switch") | kallsyms_lookup_name("finish_task_switch.isra.0");
 	if (test_addr == 0) {
 		ebpf_warning("Symbol 'finish_task_switch', not find.\n");
 		return -1;
@@ -1314,7 +1314,7 @@ int creat_ksyms_cache(void)
 
 	struct bcc_symbol sym = {};
 	bcc_symcache_resolve_no_demangle(k_resolver, test_addr, &sym);
-	if (strcmp(sym.name, "finish_task_switch")) {
+	if (strcmp(sym.name, "finish_task_switch") && strcmp(sym.name, "finish_task_switch.isra.0")) {
 		ebpf_warning
 		    ("address 0x%lx target symbol 'finish_task_switch', "
 		     "but find symbol is %s.\n", test_addr, sym.name);

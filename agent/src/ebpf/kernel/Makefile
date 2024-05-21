@@ -48,6 +48,8 @@ EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -D__BPF_TRACING__ -D GROUP_LEADER_OFFSET_O
         -DSTART_BOOTTIME_OFFSET_OVERRIDE=0      \
         -DSTART_BOOTTIME_VARNAME=real_start_time
 
+socket_trace.bpf.c: uprobe_base.bpf.c go_tls.bpf.c go_http2.bpf.c openssl.bpf.c
+
 %.elf: %.c
 	$(call msg,BPF,$@,$(CORE))	
 	$(Q)$(CLANG) $(EBPF_CLAGS) $(EXTRA_EBPF_CLAGS) -std=gnu99 -Wimplicit-function-declaration \

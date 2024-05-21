@@ -67,10 +67,10 @@ enum {
 };
 
 enum {
-        PROG_BPF_PERF_EVENT_IDX,
         PROG_PYTHON_FRAME_PTR_IDX,
         PROG_PYTHON_WALK_STACK_IDX,
         PROG_PYTHON_PERF_OUTPUT_IDX,
+        PROG_DWARF_UNWIND_IDX,
         PROG_PERF_NUM
 };
 

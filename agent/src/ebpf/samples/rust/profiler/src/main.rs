@@ -24,6 +24,8 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 
+extern crate profile;
+
 lazy_static::lazy_static! {
     static ref SUM: Mutex<u32> = Mutex::new(0);
 }
@@ -190,7 +192,7 @@ fn main() {
         }
 
         set_profiler_regex(
-            CString::new("^(socket_tracer|java|deepflow-.*)$".as_bytes())
+            CString::new("^(socket_tracer|java|deepflow-.*|python3|pt_main_thread|profiler)$".as_bytes())
                 .unwrap()
                 .as_c_str()
                 .as_ptr(),
@@ -215,7 +217,7 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        thread::sleep(Duration::from_secs(150));
+        thread::sleep(Duration::from_secs(600));
         stop_continuous_profiler();
         print!(
             "====== capture count {}, sum {}\n",

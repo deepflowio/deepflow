@@ -130,6 +130,7 @@ enum proc_act_type {
 
 struct symbol {
 	enum uprobe_type type;
+        const char *path;
 	const char *symbol;
 	const char *probe_func;
 	bool is_probe_ret;

@@ -506,6 +506,10 @@ u64 get_process_starttime(pid_t pid)
 	return ((etime_ticks * msecs_per_tick) + sys_boot);
 }
 
+u64 get_sys_boot_time_ns(void) {
+    return sys_boot_time_ns;
+}
+
 u64 current_sys_time_secs(void)
 {
 	if (sys_boot_time_ns)

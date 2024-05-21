@@ -1,0 +1,29 @@
+[package]
+name = "profile"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "uprobe"
+required-features = ["with-libbpf"]
+
+[lib]
+crate_type = ["staticlib", "rlib"]
+
+[dependencies]
+cpp_demangle = "0.4"
+gimli = "0.29"
+libbpf-rs = { version = "0.23", default-features = false }
+libbpf-sys = { version = "1.4.2", default-features = false }
+object = "0.36"
+public = { path = "../public" }
+thiserror = "1.0"
+
+[build-dependencies]
+bindgen = "0.69"
+libbpf-cargo = "0.23"
+
+[features]
+with-libbpf = ["libbpf-sys/vendored-libbpf"]

@@ -52,6 +52,7 @@
 #include "../elf.h"
 #include "../load.h"
 #include "../../kernel/include/perf_profiler.h"
+#include "../../kernel/include/rust_bindings.h"
 #include "../perf_reader.h"
 #include "../table.h"
 #include "../bihash_8_8.h"
@@ -226,8 +227,25 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 				 * [/lib64/xxx.so]
 				 */
 				char format_str[4096];
-				snprintf(format_str, sizeof(format_str),
-					 "[%s]", sym->module);
+				if (strstr(sym->module, "libcu") != NULL) {
+					int dot = strlen(sym->module), slash = 0;
+					for (int i = dot - 1; i >= 0 && slash == 0; i--) {
+						switch (sym->module[i]) {
+						case '.':
+							dot = i;
+							break;
+						case '/':
+							slash = i;
+							break;
+						}
+					}
+					snprintf(format_str, dot - slash + 4,
+						 "[k] %s", sym->module + slash + 1);
+					format_str[dot + 4] = '\0';
+				} else {
+					snprintf(format_str, sizeof(format_str),
+						 "[%s]", sym->module);
+				}
 				int len = strlen(format_str);
 				*sym_ptr =
 				    create_symbol_str(len, format_str, "");
@@ -317,8 +335,10 @@ static int get_stack_ips(struct bpf_tracer *t,
 
 static char *build_stack_trace_string(struct bpf_tracer *t,
 				      const char *stack_map_name,
+				      const char *intp_stack_map_name,
 				      pid_t pid,
 				      int stack_id,
+				      u64 dwarf_stack_id,
 				      stack_str_hash_t * h,
 				      bool new_cache,
 				      int *ret_val, void *info_p, u64 ts)
@@ -337,10 +357,24 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	u64 ips[PERF_MAX_STACK_DEPTH];
 	memset(ips, 0, sizeof(ips));
 	int ret;
-	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips, ts))) {
-		stack_table_data_miss++;
-		*ret_val = ret;
-		return NULL;
+
+	if (dwarf_stack_id != 0) {
+		stack_trace_t stack = { 0 };
+		if (!bpf_table_get_value(t, intp_stack_map_name, dwarf_stack_id, (void *)&stack)) {
+			return NULL;
+		}
+		if (stack.len == 0) {
+			return NULL;
+		}
+		for (int i = 0; i < stack.len && i < PERF_MAX_STACK_DEPTH; i++) {
+			ips[i] = stack.addrs[i];
+		}
+	} else {
+		if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips, ts))) {
+			stack_table_data_miss++;
+			*ret_val = ret;
+			return NULL;
+		}
 	}
 
 	char *str = NULL;
@@ -436,7 +470,7 @@ static char *build_interpreter_stack_trace_string(struct bpf_tracer *t,
 	int folded_size = 0;
 	for (int i = stack.len - 1; i >= 0; i--) {
 		folded_size += 1; // ;
-		__u64 addr = stack.addresses[i];
+		__u64 addr = stack.addrs[i];
 		if (addr == 0) {
 			folded_size += strlen("-;");
 			continue;
@@ -458,7 +492,7 @@ static char *build_interpreter_stack_trace_string(struct bpf_tracer *t,
 		if (offset != 0) {
 			offset += snprintf(fold_stack_trace_str + offset, folded_size - offset, ";");
 		}
-		__u64 addr = stack.addresses[i];
+		__u64 addr = stack.addrs[i];
 		if (addr == 0) {
 			offset += snprintf(fold_stack_trace_str + offset, folded_size - offset, "-");
 			continue;
@@ -484,7 +518,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       const char *stack_map_name,
 				       const char *intp_stack_map_name,
 				       stack_str_hash_t * h,
-				       bool new_cache, void *info_p, u64 ts, u64 intp_stack_id)
+				       bool new_cache, void *info_p, u64 ts, u64 dwarf_stack_id, u64 intp_stack_id)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -494,7 +528,13 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	 */
 	stack_str_hash_kv kv;
 	// FIXME: hack here: stack id from kernel/user and interpreter may collide, which shouldn't be a problem in demo
-	kv.key = (u64) stack_id;
+	if (dwarf_stack_id != 0) {
+		kv.key = dwarf_stack_id;
+	} else if (intp_stack_id != 0) {
+		kv.key = intp_stack_id;
+	} else {
+		kv.key = (u64) stack_id;
+	}
 	kv.value = 0;
 	if (stack_str_hash_search(h, &kv, &kv) == 0) {
 		__sync_fetch_and_add(&h->hit_hash_count, 1);
@@ -504,8 +544,8 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	char *str = NULL;
 	int ret_val = 0;
 	if (intp_stack_id == 0) {
-		str = build_stack_trace_string(t, stack_map_name,
-		                   pid, stack_id,
+		str = build_stack_trace_string(t, stack_map_name, intp_stack_map_name,
+		                   pid, stack_id, dwarf_stack_id,
 					       h, new_cache, &ret_val, info_p, ts);
 	} else {
 		str = build_interpreter_stack_trace_string(t, intp_stack_map_name, pid, intp_stack_id);
@@ -517,7 +557,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	if (str == NULL)
 		return NULL;
 
-	kv.key = (u64) stack_id;
+	kv.key = (u64) stack_id ^ intp_stack_id;
 	kv.value = pointer_to_uword(str);
 	/* memoized stack trace string. Because the stack-ids
 	   are not stable across profiler iterations. */
@@ -615,17 +655,17 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name, intp_stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp, 0);
+							v->timestamp, 0, 0);
 		if (k_trace_str == NULL)
 			return NULL;
 	}
 
-	if (v->userstack >= 0) {
-		u_trace_str = folded_stack_trace_string(t, v->userstack,
+	if (v->userstack >= 0 || v->dwarfstack != 0) {
+		u_trace_str = folded_stack_trace_string(t, v->userstack >= 0 ? v->userstack : 0,
 							v->tgid,
 							stack_map_name, intp_stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp, 0);
+							v->timestamp, v->dwarfstack, 0);
 		if (u_trace_str == NULL)
 			return NULL;
 	}
@@ -635,7 +675,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							v->tgid,
 							stack_map_name, intp_stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp, v->intpstack);
+							v->timestamp, 0, v->intpstack);
 		if (i_trace_str == NULL)
 			return NULL;
 	}
@@ -667,6 +707,14 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		return trace_str;
 	}
 
+	if (v->intpstack != 0) {
+		if (i_trace_str) {
+			len += strlen(i_trace_str) + strlen(";[lost] incomplete python c stack;");
+		} else {
+			len += strlen(i_err_tag);
+		}
+	}
+
 	if (v->kernstack >= 0) {
 		if (k_trace_str) {
 			len += strlen(k_trace_str);
@@ -675,19 +723,11 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		}
 	}
 
-	if (v->userstack >= 0) {
+	if (v->userstack >= 0 || v->dwarfstack != 0) {
 		if (u_trace_str) {
 			len += strlen(u_trace_str);
 		} else {
 			len += strlen(u_err_tag);
-		}
-	}
-
-	if (v->intpstack != 0) {
-		if (i_trace_str) {
-			len += strlen(i_trace_str);
-		} else {
-			len += strlen(i_err_tag);
 		}
 	}
 
@@ -700,16 +740,22 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	int offset = 0;
 	bool last_stack = false;
 
-	if (v->userstack >= 0) {
-		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", u_trace_str ? u_trace_str : u_err_tag);
+	if (i_trace_str && u_trace_str) {
+		merge_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		last_stack = true;
-	}
-	if (v->intpstack != 0) {
-		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", i_trace_str ? i_trace_str : i_err_tag);
-		last_stack = true;
+	} else {
+		if (v->intpstack != 0) {
+			offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", i_trace_str ? i_trace_str : i_err_tag);
+			last_stack = true;
+		}
+		if (v->userstack >= 0 || v->dwarfstack != 0) {
+			offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", u_trace_str ? u_trace_str : u_err_tag);
+			last_stack = true;
+		}
 	}
 	if (v->kernstack >= 0) {
 		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", k_trace_str ? k_trace_str : k_err_tag);
+		last_stack = true;
 	}
 
 	return trace_str;

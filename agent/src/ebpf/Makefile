@@ -75,6 +75,7 @@ OBJS := user/elf.o \
 	user/symbol.o \
 	user/go_tracer.o \
 	user/ssl_tracer.o \
+	user/python_probe.o \
 	user/ring.o \
 	user/btf_vmlinux.o \
 	user/load.o \

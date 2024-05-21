@@ -22,6 +22,11 @@
 #ifndef DF_BPF_PERF_PROFILER_H
 #define DF_BPF_PERF_PROFILER_H
 
+#include <linux/types.h>
+
+#include "common.h"
+#include "rust_bindings.h"
+
 #define STACK_MAP_ENTRIES 65536
 
 /*
@@ -49,9 +54,12 @@ struct stack_trace_key_t {
 	char comm[TASK_COMM_LEN];
 	int kernstack;
 	int userstack;
+	__u64 dwarfstack;
 	__u64 intpstack;
 	__u64 timestamp;
 	__u64 duration_ns;
+	__u64 mem_addr;
+	__u64 mem_size;
 };
 
 typedef struct {
@@ -60,14 +68,11 @@ typedef struct {
 	char path[128];
 } symbol_t;
 
-#define PYTHON_STACK_FRAMES_PER_RUN 16
-#define PYTHON_STACK_PROG_MAX_RUN 5
-#define MAX_STACK_DEPTH (PYTHON_STACK_PROG_MAX_RUN * PYTHON_STACK_FRAMES_PER_RUN)
-
 typedef struct {
-	__u64 len;
-	__u64 addresses[MAX_STACK_DEPTH];
-} stack_trace_t;
+    __u64 ip;
+    __u64 sp;
+    __u64 bp;
+} reg_t;
 
 typedef struct {
 	struct stack_trace_key_t key;
@@ -75,6 +80,8 @@ typedef struct {
 
 	void *thread_state;
 	void *frame_ptr;
+
+	reg_t regs;
 
 	__u32 runs;
 } unwind_state_t;

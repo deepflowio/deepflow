@@ -95,7 +95,7 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 {
 	char msg[MSG_SZ] = {};
 	uint16_t len = 0;
-	uint16_t max = MSG_SZ;
+	int16_t max = MSG_SZ;
 	va_list va;
 
 	if (function_name) {
@@ -130,7 +130,7 @@ void _ebpf_info(char *fmt, ...)
 {
 	char msg[MSG_SZ] = {};
 	uint16_t len = 0;
-	uint16_t max = MSG_SZ;
+	int16_t max = MSG_SZ;
 	va_list va;
 
 	len += snprintf(msg + len, max - len, "[eBPF] INFO ");

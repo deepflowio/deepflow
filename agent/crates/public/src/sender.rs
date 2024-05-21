@@ -18,6 +18,7 @@ use std::fmt;
 use std::fmt::Debug;
 
 use num_enum::IntoPrimitive;
+use prost::Message;
 
 /// A abstraction for sending data and serialize data
 pub trait Sendable: Debug + Send + 'static {
@@ -83,5 +84,19 @@ impl fmt::Display for SendMessageType {
             Self::ApplicationLog => write!(f, "application_log"),
             Self::SyslogDetail => write!(f, "syslog_detail"),
         }
+    }
+}
+
+/// java profile xxxx
+#[derive(Debug, PartialEq)]
+pub struct Profile(pub crate::proto::metric::Profile);
+
+impl Sendable for Profile {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        self.0.encode(buf).map(|_| self.0.encoded_len())
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        SendMessageType::Profile
     }
 }
