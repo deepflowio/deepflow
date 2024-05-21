@@ -72,9 +72,9 @@ MAP_PERARRAY(heap, __u32, unwind_state_t, 1)
 MAP_PERARRAY(python_symbol_index, __u32, __u32, 1)
 MAP_HASH(python_stack, __u64, stack_trace_t, STACK_MAP_ENTRIES)
 
-static inline __attribute__((always_inline)) bool comm_eq(char *a, char *b) {
+static inline __attribute__((always_inline)) bool comm_eq_n(char *a, char *b, int n) {
 #pragma unroll
-	for (int i = 0; i < TASK_COMM_LEN; i++) {
+	for (int i = 0; i < TASK_COMM_LEN && i < n; i++) {
 		if (a[i] == '\0' || b[i] == '\0') {
 			return a[i] == b[i];
 		}
@@ -419,19 +419,22 @@ int bpf_perf_event(struct bpf_perf_event_data *ctx)
 	/*
 	 * CPU idle stacks will not be collected.
 	 */
-	if (key->tgid == key->pid && key->pid == 0)
+	if (key->tgid == key->pid && key->pid == 0) {
 		return 0;
+	}
 
 	key->cpu = bpf_get_smp_processor_id();
 	bpf_get_current_comm(&key->comm, sizeof(key->comm));
 	key->timestamp = bpf_ktime_get_ns();
 
-	if (comm_eq(key->comm, "python3")) {
+	if (comm_eq_n(key->comm, "python3", 7) || comm_eq_n(key->comm, "pt_main", 7)) {
 		bpf_tail_call(ctx, &NAME(progs_jmp_perf_map), PROG_PYTHON_FRAME_PTR_IDX);
 	}
 
 	return get_stack_and_output_perf(ctx, state);
 }
+
+MAP_HASH(python_thread_state_map, __u32, __u64, 65536)
 
 PROGPE(python_frame_ptr)(struct bpf_perf_event_data *ctx) {
 	__u32 zero = 0;
@@ -440,9 +443,20 @@ PROGPE(python_frame_ptr)(struct bpf_perf_event_data *ctx) {
 		return 0;
 	}
 
-	__u64 thread_state_addr = 140737353904984;
+	// __u64 thread_state_addr = 140737353904984;
+	__u64 thread_state_addr = 9851320;
 	if (bpf_probe_read_user(&state->thread_state, sizeof(void *), (void *)thread_state_addr) != 0) {
 		goto finish;
+	}
+	if (state->thread_state != NULL) {
+		python_thread_state_map__update(&state->key.tgid, (__u64 *)&state->thread_state);
+	} else {
+		__u64 *entry = python_thread_state_map__lookup(&state->key.tgid);
+		if (entry) {
+			state->thread_state = (void *)*entry;
+		} else {
+			goto finish;
+		}
 	}
 
 	if (bpf_probe_read_user(&state->key.itid, sizeof(__u32), state->thread_state + py_offsets.py_thread_state.thread_id) != 0) {
@@ -456,7 +470,7 @@ PROGPE(python_frame_ptr)(struct bpf_perf_event_data *ctx) {
 	bpf_tail_call(ctx, &NAME(progs_jmp_perf_map), PROG_PYTHON_WALK_STACK_IDX);
 
 finish:
-	return 0;
+	return get_stack_and_output_perf(ctx, state);
 }
 
 PROGPE(python_walk_stack)(struct bpf_perf_event_data *ctx) {

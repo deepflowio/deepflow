@@ -553,6 +553,58 @@ static inline char *alloc_stack_trace_str(int len)
 	return trace_str;
 }
 
+bool is_python_to_c(char *fname) {
+	return strcmp(fname, "PyCFunction_Call") == 0;
+}
+
+bool is_c_to_python(char *fname) {
+	return strcmp(fname, "PyVectorcall_Call") == 0;
+}
+
+void merge_interpreter_and_user_trace(char *trace_str, int len, char *i_trace, char *u_trace)
+{
+	char *i_sp = NULL, *u_sp = NULL, *i_frame = NULL, *u_frame = NULL;
+	int offset = 0;
+	bool in_c = false, seen_eval_frame = false;
+
+	// ebpf_warning("\n%s\n%s", i_trace, u_trace);
+	// <module>
+	i_frame = strtok_r(i_trace, ";", &i_sp);
+	offset += snprintf(trace_str + offset, len - offset, "%s;", i_frame);
+
+	i_frame = strtok_r(NULL, ";", &i_sp);
+	u_frame = strtok_r(u_trace, ";", &u_sp);
+	while (u_frame) {
+		if (in_c) {
+			if (is_c_to_python(u_frame)) {
+				in_c = false;
+				seen_eval_frame = true;
+			} else {
+				offset += snprintf(trace_str + offset, len - offset, "%s;", u_frame);
+			}
+		} else {
+			if (strcmp(u_frame, "_PyEval_EvalFrameDefault") == 0) {
+				if (seen_eval_frame && i_frame) {
+					offset += snprintf(trace_str + offset, len - offset, "%s;", i_frame);
+					i_frame = strtok_r(NULL, ";", &i_sp);
+				}
+				seen_eval_frame = true;
+			} else if (is_python_to_c(u_frame)) {
+				in_c = true;
+				seen_eval_frame = false;
+			}
+		}
+		u_frame = strtok_r(NULL, ";", &u_sp);
+	}
+	if (in_c) {
+		while (u_frame) {
+			offset += snprintf(trace_str + offset, len - offset, "%s;", u_frame);
+			u_frame = strtok_r(NULL, ";", &u_sp);
+		}
+	}
+	trace_str[offset - 1] = '\0';
+}
+
 char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
@@ -667,6 +719,14 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		return trace_str;
 	}
 
+	if (v->intpstack != 0) {
+		if (i_trace_str) {
+			len += strlen(i_trace_str);
+		} else {
+			len += strlen(i_err_tag);
+		}
+	}
+
 	if (v->kernstack >= 0) {
 		if (k_trace_str) {
 			len += strlen(k_trace_str);
@@ -683,14 +743,6 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		}
 	}
 
-	if (v->intpstack != 0) {
-		if (i_trace_str) {
-			len += strlen(i_trace_str);
-		} else {
-			len += strlen(i_err_tag);
-		}
-	}
-
 	trace_str = alloc_stack_trace_str(len);
 	if (trace_str == NULL) {
 		ebpf_warning("No available memory space.\n");
@@ -700,16 +752,22 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	int offset = 0;
 	bool last_stack = false;
 
-	if (v->userstack >= 0) {
-		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", u_trace_str ? u_trace_str : u_err_tag);
+	if (i_trace_str && u_trace_str) {
+		merge_interpreter_and_user_trace(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		last_stack = true;
-	}
-	if (v->intpstack != 0) {
-		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", i_trace_str ? i_trace_str : i_err_tag);
-		last_stack = true;
+	} else {
+		if (v->intpstack != 0) {
+			offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", i_trace_str ? i_trace_str : i_err_tag);
+			last_stack = true;
+		}
+		if (v->userstack >= 0) {
+			offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", u_trace_str ? u_trace_str : u_err_tag);
+			last_stack = true;
+		}
 	}
 	if (v->kernstack >= 0) {
 		offset += snprintf(trace_str + offset, len - offset, "%s%s", last_stack ? ";" : "", k_trace_str ? k_trace_str : k_err_tag);
+		last_stack = true;
 	}
 
 	return trace_str;

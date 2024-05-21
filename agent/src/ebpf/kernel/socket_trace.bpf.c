@@ -2595,3 +2595,4 @@ PROGTP(io_event) (void *ctx) {
 #include "go_tls.bpf.c"
 #include "go_http2.bpf.c"
 #include "openssl.bpf.c"
+#include "python_uprobe.bpf.c"
