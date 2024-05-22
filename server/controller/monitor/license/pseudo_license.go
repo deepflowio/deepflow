@@ -58,8 +58,16 @@ func NewVTapLicenseAllocation(cfg config.MonitorConfig, ctx context.Context) *VT
 func (v *VTapLicenseAllocation) Start() {
 	log.Info("vtap license allocation and check start")
 	go func() {
-		for range time.Tick(time.Duration(v.cfg.LicenseCheckInterval) * time.Second) {
-			v.allocLicense()
+		ticker := time.NewTicker(time.Duration(v.cfg.LicenseCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				v.allocLicense()
+			case <-v.vCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }
