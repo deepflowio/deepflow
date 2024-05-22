@@ -74,7 +74,7 @@ func (l *LBListener) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBListener) (d
 func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mysql.LBListener, bool) {
 	lbID, exists := l.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
-		log.Error(l.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(l.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.Lcuuid,
 		)))

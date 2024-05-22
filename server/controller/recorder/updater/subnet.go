@@ -75,7 +75,7 @@ func (s *Subnet) getDiffBaseByCloudItem(cloudItem *cloudmodel.Subnet) (diffBase 
 func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subnet, bool) {
 	networkID, exists := s.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {
-		log.Error(s.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(s.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.Lcuuid,
 		)))
@@ -83,7 +83,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 	}
 	prefix, netmask, err := rcommon.CIDRToPreNetMask(cloudItem.CIDR)
 	if err != nil {
-		log.Error(s.metadata.LogPre("convert %s cidr: %s failed: %v", ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.CIDR, err))
+		log.Error(s.metadata.Logf("convert %s cidr: %s failed: %v", ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.CIDR, err))
 		return nil, false
 	}
 

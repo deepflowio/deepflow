@@ -63,9 +63,13 @@ func (m *Metadata) SetSubDomain(subDomain mysql.SubDomain) {
 	m.Logger.SetSubDomainName(subDomain.Name)
 }
 
-// LogPre adds org id, domain info, sub_domain info to logs
-func (m *Metadata) LogPre(format string, a ...any) string {
+// Logf adds org id, domain info, sub_domain info to logs
+func (m *Metadata) Logf(format string, a ...any) string {
 	return m.Logger.AddPre(format, a...)
+}
+
+func (m *Metadata) Log(format string) string {
+	return m.Logger.AddPre(format)
 }
 
 type DomainInfo struct {

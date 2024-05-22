@@ -79,7 +79,7 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 }
 
 func (m *IDManager) Refresh() error {
-	log.Info(m.org.LogPre("refresh id pools"))
+	log.Info(m.org.Logf("refresh id pools"))
 	var result error
 	for _, idPool := range m.resourceTypeToIDPool {
 		err := idPool.refresh()
@@ -93,7 +93,7 @@ func (m *IDManager) Refresh() error {
 func (m *IDManager) AllocateIDs(resourceType string, count int) []int {
 	idPool, ok := m.resourceTypeToIDPool[resourceType]
 	if !ok {
-		log.Error(m.org.LogPre("resource type (%s) does not need to allocate id", resourceType))
+		log.Error(m.org.Logf("resource type (%s) does not need to allocate id", resourceType))
 		return []int{}
 	}
 	ids, _ := idPool.allocate(count)
@@ -103,7 +103,7 @@ func (m *IDManager) AllocateIDs(resourceType string, count int) []int {
 func (m *IDManager) RecycleIDs(resourceType string, ids []int) {
 	idPool, ok := m.resourceTypeToIDPool[resourceType]
 	if !ok {
-		log.Error(m.org.LogPre("resource type (%s) does not need to allocate id", resourceType))
+		log.Error(m.org.Logf("resource type (%s) does not need to allocate id", resourceType))
 		return
 	}
 	idPool.recycle(ids)
@@ -135,7 +135,7 @@ func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *ID
 }
 
 func (p *IDPool[MT]) refresh() error {
-	log.Info(p.org.LogPre("refresh %s id pools started", p.resourceType))
+	log.Info(p.org.Logf("refresh %s id pools started", p.resourceType))
 
 	var items []*MT
 	var err error
@@ -148,7 +148,7 @@ func (p *IDPool[MT]) refresh() error {
 		err = p.org.DB.Unscoped().Select("id").Find(&items).Error
 	}
 	if err != nil {
-		log.Error(p.org.LogPre("db query %s failed: %v", p.resourceType, err))
+		log.Error(p.org.Logf("db query %s failed: %v", p.resourceType, err))
 		return err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
@@ -192,7 +192,7 @@ func (p *IDPool[MT]) refresh() error {
 	}
 	p.usableIDs = usableIDs
 
-	log.Info(p.org.LogPre("refresh %s id pools (usable ids count: %d) completed", p.resourceType, len(p.usableIDs)))
+	log.Info(p.org.Logf("refresh %s id pools (usable ids count: %d) completed", p.resourceType, len(p.usableIDs)))
 	return nil
 }
 
@@ -203,7 +203,7 @@ func (p *IDPool[MT]) allocate(count int) (ids []int, err error) {
 	defer p.mutex.Unlock()
 
 	if len(p.usableIDs) == 0 {
-		log.Error(p.org.LogPre("%s has no more usable ids", p.resourceType))
+		log.Error(p.org.Logf("%s has no more usable ids", p.resourceType))
 		return
 	}
 
@@ -218,7 +218,7 @@ func (p *IDPool[MT]) allocate(count int) (ids []int, err error) {
 	var dbItems []*MT
 	err = p.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Error(p.org.LogPre("db query %s failed: %v", p.resourceType, err))
+		log.Error(p.org.Logf("db query %s failed: %v", p.resourceType, err))
 		return
 	}
 	if len(dbItems) != 0 {
@@ -226,10 +226,10 @@ func (p *IDPool[MT]) allocate(count int) (ids []int, err error) {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, (*item).GetID())
 		}
-		log.Info(p.org.LogPre("%s ids: %+v are in use.", p.resourceType, inUseIDs))
+		log.Info(p.org.Logf("%s ids: %+v are in use.", p.resourceType, inUseIDs))
 		ids = mapset.NewSet(ids...).Difference(mapset.NewSet(inUseIDs...)).ToSlice()
 	}
-	log.Info(p.org.LogPre("allocate %s ids: %v (expected count: %d, true count: %d)", p.resourceType, ids, count, len(ids)))
+	log.Info(p.org.Logf("allocate %s ids: %v (expected count: %d, true count: %d)", p.resourceType, ids, count, len(ids)))
 	return
 }
 
@@ -239,5 +239,5 @@ func (p *IDPool[MT]) recycle(ids []int) {
 
 	sort.IntSlice(ids).Sort()
 	p.usableIDs = append(p.usableIDs, ids...)
-	log.Info(p.org.LogPre("recycle %s ids: %v", p.resourceType, ids))
+	log.Info(p.org.Logf("recycle %s ids: %v", p.resourceType, ids))
 }

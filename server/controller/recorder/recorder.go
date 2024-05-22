@@ -47,7 +47,7 @@ func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *que
 	}
 	var domain mysql.Domain
 	if err := md.DB.Where("lcuuid = ?", domainLcuuid).First(&domain).Error; err != nil {
-		log.Error(md.LogPre("domain lcuuid: %s, failed to get domain from db: %s", domainLcuuid, err.Error()))
+		log.Error(md.Logf("domain lcuuid: %s, failed to get domain from db: %s", domainLcuuid, err.Error()))
 		return nil
 	}
 	md.SetDomain(domain)
