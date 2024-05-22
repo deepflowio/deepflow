@@ -75,7 +75,7 @@ impl Sendable for LogBuffer {
     }
 
     fn message_type(&self) -> SendMessageType {
-        SendMessageType::Syslog
+        SendMessageType::SyslogDetail
     }
 }
 
