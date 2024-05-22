@@ -74,7 +74,7 @@ func (p *PrometheusTarget) getDiffBaseByCloudItem(cloudItem *cloudmodel.Promethe
 func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusTarget) (*mysql.PrometheusTarget, bool) {
 	podClusterID, exists := p.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
-		log.Error(p.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(p.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
 		)))
@@ -82,7 +82,7 @@ func (p *PrometheusTarget) generateDBItemToAdd(cloudItem *cloudmodel.PrometheusT
 	}
 	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(p.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(p.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
 		)))
@@ -127,7 +127,7 @@ func (p *PrometheusTarget) generateUpdateInfo(diffBase *diffbase.PrometheusTarge
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(p.metadata.LogPre(resourceAForResourceBNotFound(
+			log.Error(p.metadata.Logf(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cloudItem.Lcuuid,
 			)))

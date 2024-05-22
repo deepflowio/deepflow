@@ -75,7 +75,7 @@ func (r *VRouter) getDiffBaseByCloudItem(cloudItem *cloudmodel.VRouter) (diffBas
 func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRouter, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(r.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
 		)))
@@ -100,7 +100,7 @@ func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *clou
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+			log.Error(r.metadata.Logf(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
 			)))

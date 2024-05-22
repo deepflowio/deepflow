@@ -74,7 +74,7 @@ func (b *PodIngressRuleBackend) getDiffBaseByCloudItem(cloudItem *cloudmodel.Pod
 func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRuleBackend) (*mysql.PodIngressRuleBackend, bool) {
 	podIngressRuleID, exists := b.cache.ToolDataSet.GetPodIngressRuleIDByLcuuid(cloudItem.PodIngressRuleLcuuid)
 	if !exists {
-		log.Error(b.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(b.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, cloudItem.PodIngressRuleLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, cloudItem.Lcuuid,
 		)))
@@ -82,7 +82,7 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 	}
 	podIngressID, exists := b.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 	if !exists {
-		log.Error(b.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(b.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, cloudItem.Lcuuid,
 		)))
@@ -90,7 +90,7 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 	}
 	podServiceID, exists := b.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
 	if !exists {
-		log.Error(b.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(b.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, cloudItem.Lcuuid,
 		)))

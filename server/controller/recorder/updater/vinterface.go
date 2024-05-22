@@ -85,7 +85,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 				networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 			}
 			if !exists {
-				log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
+				log.Error(i.metadata.Logf(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 				)))
@@ -95,7 +95,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 	}
 	deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
 	if !exists {
-		log.Error(i.metadata.LogPre(
+		log.Error(i.metadata.Logf(
 			"device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
 			cloudItem.DeviceType, cloudItem.DeviceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
@@ -136,7 +136,7 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 					networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 				}
 				if !exists {
-					log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
+					log.Error(i.metadata.Logf(resourceAForResourceBNotFound(
 						ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 						ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
 					)))
