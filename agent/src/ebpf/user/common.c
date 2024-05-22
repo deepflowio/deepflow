@@ -47,6 +47,7 @@
 
 #define MAXLINE 1024
 
+volatile uint64_t sys_boot_time_ns; // System boot time in nanoseconds
 static u64 g_sys_btime_msecs;
 
 bool is_core_kernel(void)
@@ -507,7 +508,11 @@ u64 get_process_starttime(pid_t pid)
 
 u64 current_sys_time_secs(void)
 {
-	return (get_sys_uptime() + (get_sys_btime_msecs() / 1000));
+	if (sys_boot_time_ns)
+		return ((sys_boot_time_ns / NS_IN_SEC) +
+			gettime(CLOCK_MONOTONIC, TIME_TYPE_SEC));
+	else
+		return (get_sys_uptime() + (get_sys_btime_msecs() / 1000));
 }
 
 /*
@@ -587,7 +592,8 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 	uname(&sys_info);
 
 	// e.g.: 3.10.0-940.el7.centos.x86_64, 4.19.17-1.el7.x86_64
-	if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev, num) != 4)
+	if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev, num) !=
+	    4)
 		return ETR_INVAL;
 
 	// Get the real version of Debian
