@@ -171,7 +171,7 @@ func (d *Decoder) Run() {
 			switch d.msgType {
 			case datatype.MESSAGE_TYPE_APPLICATION_LOG:
 				d.handleAppLog(recvBytes.VtapID, decoder)
-			case datatype.MESSAGE_TYPE_SYSLOG:
+			case datatype.MESSAGE_TYPE_SYSLOG, datatype.MESSAGE_TYPE_AGENT_LOG:
 				d.handleAgentLog(recvBytes.VtapID, decoder)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
@@ -259,9 +259,10 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	}
 
 	if l.Message == "" {
-		return fmt.Errorf("application log body is empty")
+		return fmt.Errorf("application log body is empty. agent id: %d, log: %v", agentId, l)
 	}
 
+	s.Body = l.Message
 	s.Type = dbwriter.StringToLogType(l.LogType)
 	s.UserID = uint32(l.UserID)
 
@@ -282,43 +283,28 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 
 	s.L3EpcID = d.platformData.QueryVtapEpc0(agentId)
 
-	var level, message string
-	// 检查并处理字段
-	switch v := l.Message.(type) {
-	case string:
-		s.Body = v
-		// deepflow-server log example: 2024-05-21 19:15:03.488 [ERRO] [tagrecorder] ch_vtap_port.go:620 vtap (464) not found
-		if s.Type == dbwriter.LOG_TYPE_SYSTEM && len(s.Body) > 30 {
-			if StringToSeverity(s.Body[25:29]) != SEVERITY_UNKNOWN {
-				level = s.Body[25:29]
+	if l.Json != nil {
+		switch v := l.Json.(type) {
+		case map[string]interface{}:
+			var strValue string
+			for key, value := range v {
+				if s, ok := value.(string); ok {
+					strValue = s
+				} else {
+					strValue = fmt.Sprintf("%v", value)
+				}
+				s.AttributeNames = append(s.AttributeNames, key)
+				s.AttributeValues = append(s.AttributeValues, strValue)
 			}
-		}
-	case map[string]interface{}:
-		var strValue string
-		for key, value := range v {
-			if s, ok := value.(string); ok {
-				strValue = s
-			} else {
-				strValue = fmt.Sprintf("%v", value)
+		default:
+			if d.counter.ErrorCount == 0 {
+				log.Warningf("parse application log json filed failed. %v", l.Json)
 			}
-			if key == "level" {
-				level = strValue
-			} else if key == "message" {
-				message = strValue
-			}
-			s.AttributeNames = append(s.AttributeNames, key)
-			s.AttributeValues = append(s.AttributeValues, strValue)
+			d.counter.ErrorCount++
 		}
-		if s.Type == dbwriter.LOG_TYPE_AUDIT && message != "" {
-			s.Body = message
-		} else {
-			s.Body = fmt.Sprintf("%v", l.Message)
-		}
-	default:
-		s.Body = fmt.Sprintf("%v", l.Message)
 	}
 
-	s.SeverityNumber = StringToSeverity(level)
+	s.SeverityNumber = StringToSeverity(l.Level)
 	s.AppService = l.AppService
 
 	if l.Kubernetes.PodIp != "" {
@@ -420,7 +406,9 @@ type AppLogEntry struct {
 		PodName string `json:"pod_name"`
 		PodIp   string `json:"pod_ip"`
 	} `json:"kubernetes"`
-	Message    interface{} `json:"message"`
+	Message    string      `json:"message"`
+	Json       interface{} `json:"json"`
+	Level      string      `json:"level"`
 	Timestamp  string      `json:"timestamp"`
 	AppService string      `json:"app_service"`
 }
