@@ -51,6 +51,5 @@ app_service           , Application Service          ,
 
 trace_id              , TraceID                      ,
 span_id               , SpanID                       ,
-severity_text         , Log Level                    ,
-severity_number       , Log Level ID                 ,
+severity_number       , Log Level                    ,
 body                  , Log Content                  ,

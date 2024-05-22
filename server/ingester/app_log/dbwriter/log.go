@@ -66,8 +66,7 @@ type ApplicationLogStore struct {
 	SpanID     string
 	TraceFlags uint32
 
-	SeverityText   string // value of the severity(also known as log level)
-	SeverityNumber uint8  // numerical value of the severity(also known as log level id)
+	SeverityNumber uint8 // numerical value of the severity(also known as log level id)
 
 	Body string
 
@@ -119,7 +118,6 @@ func (l *ApplicationLogStore) WriteBlock(block *ckdb.Block) {
 		l.TraceID,
 		l.SpanID,
 		l.TraceFlags,
-		l.SeverityText,
 		l.SeverityNumber,
 		l.Body,
 		l.AppService,
@@ -191,7 +189,6 @@ func LogColumns() []*ckdb.Column {
 		ckdb.NewColumn("trace_id", ckdb.String).SetCodec(ckdb.CodecZSTD).SetIndex(ckdb.IndexBloomfilter).SetComment("Trace ID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetCodec(ckdb.CodecZSTD).SetIndex(ckdb.IndexBloomfilter).SetComment("Span ID"),
 		ckdb.NewColumn("trace_flags", ckdb.UInt32).SetComment("W3C trace flag, currently not support yet"),
-		ckdb.NewColumn("severity_text", ckdb.LowCardinalityString).SetCodec(ckdb.CodecZSTD).SetComment("The severity text (also known as log level)"),
 		ckdb.NewColumn("severity_number", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("numerical value of the severity(also known as log level id)"),
 		ckdb.NewColumn("body", ckdb.String).SetIndex(ckdb.IndexTokenbf).SetCodec(ckdb.CodecZSTD).SetComment("log content"),
 		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetIndex(ckdb.IndexBloomfilter).SetComment("Application Service (service name)"),
