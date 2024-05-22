@@ -121,7 +121,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchAdded(md *message.Metadata, msg MAPT) {
 	// TODO better log
-	// log.Infof("publish add %#v", msg)
+	log.Debugf("publish add %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceBatchAddedMySQL {
 			for _, sub := range subs {
@@ -132,7 +132,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 }
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishUpdated(md *message.Metadata, msg MUPT) {
-	// log.Infof("publish update %#v", msg)
+	log.Debugf("publish update %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceUpdatedFields {
 			for _, sub := range subs {
@@ -148,7 +148,7 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 }
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchDeleted(md *message.Metadata, msg MDPT, softDelete bool) {
-	// log.Infof("publish delete %#v", msg)
+	log.Debugf("publish delete %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceBatchDeletedLcuuid {
 			for _, sub := range subs {

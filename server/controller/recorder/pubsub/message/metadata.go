@@ -17,15 +17,17 @@
 package message
 
 type Metadata struct {
-	ORGID    int
-	TeamID   int
-	DomainID int
+	ORGID       int
+	TeamID      int
+	DomainID    int
+	SubDomainID int
 }
 
-func NewMetadata(orgID, teamID, domainID int) *Metadata {
+func NewMetadata(orgID, teamID, domainID, subDomainID int) *Metadata {
 	return &Metadata{
-		ORGID:    orgID,
-		TeamID:   teamID,
-		DomainID: domainID,
+		ORGID:       orgID,
+		TeamID:      teamID,
+		DomainID:    domainID,
+		SubDomainID: subDomainID,
 	}
 }
