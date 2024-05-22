@@ -17,12 +17,15 @@
 package mysql
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	l "log"
 	"os"
 	"time"
 
+	mysql_driver "github.com/go-sql-driver/mysql"
 	"github.com/op/go-logging"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -55,8 +58,11 @@ func InitMySQL(cfg MySqlConfig) error {
 }
 
 func Gorm(cfg MySqlConfig) *gorm.DB {
-	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut, false)
-	return GetGormDB(dsn)
+	connector, err := GetConnector(cfg, cfg.Database, cfg.TimeOut, false)
+	if err != nil {
+		return nil
+	}
+	return GetGormDB(connector)
 }
 
 func GetResultSetMax() int {
@@ -64,14 +70,20 @@ func GetResultSetMax() int {
 }
 
 func GetConnectionWithoutDatabase(cfg MySqlConfig) *gorm.DB {
-	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
-	return GetGormDB(dsn)
+	connector, err := GetConnector(cfg, "", cfg.TimeOut, false)
+	if err != nil {
+		return nil
+	}
+	return GetGormDB(connector)
 }
 
 func GetConnectionWithDatabase(cfg MySqlConfig) *gorm.DB {
 	// set multiStatements=true in dsn only when migrating MySQL
-	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut*2, true)
-	return GetGormDB(dsn)
+	connector, err := GetConnector(cfg, cfg.Database, cfg.TimeOut*2, true)
+	if err != nil {
+		return nil
+	}
+	return GetGormDB(connector)
 }
 
 func GetDSN(cfg MySqlConfig, database string, timeout uint32, multiStatements bool) string {
@@ -84,15 +96,44 @@ func GetDSN(cfg MySqlConfig, database string, timeout uint32, multiStatements bo
 		database,
 		timeout,
 	)
+	log.Info(dsn)
 	if multiStatements {
 		dsn += "&multiStatements=true"
 	}
 	return dsn
 }
 
-func GetGormDB(dsn string) *gorm.DB {
+func GetConnector(cfg MySqlConfig, database string, timeout uint32, multiStatements bool) (driver.Connector, error) {
+	location, err := time.LoadLocation("Local")
+	if err != nil {
+		log.Error("Get location failed with error: %v", err.Error())
+		return nil, err
+	}
+
+	config := mysql_driver.Config{
+		User:                 cfg.UserName,
+		Passwd:               cfg.UserPassword,
+		Net:                  "tcp",
+		Addr:                 fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		DBName:               database,
+		AllowNativePasswords: true,
+		Loc:                  location,
+		Timeout:              time.Duration(timeout) * time.Second,
+		ParseTime:            true,
+		MultiStatements:      multiStatements,
+		Params:               map[string]string{"charset": "utf8mb4"},
+	}
+	connector, err := mysql_driver.NewConnector(&config)
+	if err != nil {
+		log.Error("Get mysql connector failed with error: %v", err.Error())
+		return nil, err
+	}
+	return connector, nil
+}
+
+func GetGormDB(connector driver.Connector) *gorm.DB {
 	Db, err := gorm.Open(mysql.New(mysql.Config{
-		DSN:                       dsn,   // DSN data source name
+		Conn:                      sql.OpenDB(connector),
 		DefaultStringSize:         256,   // string 类型字段的默认长度
 		DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
 		DontSupportRenameIndex:    true,  // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引

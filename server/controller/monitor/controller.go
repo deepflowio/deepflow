@@ -59,14 +59,21 @@ func NewControllerCheck(cfg *config.ControllerConfig, ctx context.Context) *Cont
 func (c *ControllerCheck) Start() {
 	log.Info("controller check start")
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
-			// 控制器健康检查
-			c.healthCheck()
-			// 检查没有分配控制器的采集器，并进行分配
-			c.vtapControllerCheck()
-			// check az_controller_connection, delete unused item
-			c.azConnectionCheck()
-
+		ticker := time.NewTicker(time.Duration(c.cfg.HealthCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				// 控制器健康检查
+				c.healthCheck()
+				// 检查没有分配控制器的采集器，并进行分配
+				c.vtapControllerCheck()
+				// check az_controller_connection, delete unused item
+				c.azConnectionCheck()
+			case <-c.cCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 
