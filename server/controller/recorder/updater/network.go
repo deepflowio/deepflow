@@ -74,7 +74,7 @@ func (n *Network) getDiffBaseByCloudItem(cloudItem *cloudmodel.Network) (diffBas
 func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Network, bool) {
 	vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(n.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(n.metadata.Logf(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
 		)))
@@ -104,7 +104,7 @@ func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *clou
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(n.metadata.LogPre(resourceAForResourceBNotFound(
+			log.Error(n.metadata.Logf(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid,
 			)))

@@ -221,7 +221,7 @@ func newCleaner(orgID int) (*Cleaner, error) {
 
 func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	expiredAt := time.Now().Add(time.Duration(-retentionInterval) * time.Hour)
-	log.Info(c.org.LogPre("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(ctrlrcommon.GO_BIRTHDAY)))
+	log.Info(c.org.Logf("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(ctrlrcommon.GO_BIRTHDAY)))
 	deleteExpired[mysql.Region](c.org.DB, expiredAt)
 	deleteExpired[mysql.AZ](c.org.DB, expiredAt)
 	deleteExpired[mysql.Host](c.org.DB, expiredAt)
@@ -247,11 +247,11 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	deleteExpired[mysql.Pod](c.org.DB, expiredAt)
 	deleteExpired[mysql.Process](c.org.DB, expiredAt)
 	deleteExpired[mysql.PrometheusTarget](c.org.DB, expiredAt)
-	log.Info(c.org.LogPre("clean soft deleted resources completed"))
+	log.Info(c.org.Logf("clean soft deleted resources completed"))
 }
 
 func (c *Cleaner) cleanDirtyData() {
-	log.Info(c.org.LogPre("clean dirty data started"))
+	log.Info(c.org.Logf("clean dirty data started"))
 	c.cleanNetworkDirty()
 	c.cleanVRouterDirty()
 	c.cleanPodIngressDirty()
@@ -259,7 +259,7 @@ func (c *Cleaner) cleanDirtyData() {
 	c.cleanPodNodeDirty()
 	c.cleanPodDirty()
 	c.cleanVInterfaceDirty()
-	log.Info(c.org.LogPre("clean dirty data completed"))
+	log.Info(c.org.Logf("clean dirty data completed"))
 }
 
 func (c *Cleaner) cleanNetworkDirty() {
@@ -269,7 +269,7 @@ func (c *Cleaner) cleanNetworkDirty() {
 		c.org.DB.Where("vl2id NOT IN ?", networkIDs).Find(&subnets)
 		if len(subnets) != 0 {
 			c.org.DB.Delete(&subnets)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, subnets)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, subnets)))
 		}
 	}
 }
@@ -281,7 +281,7 @@ func (c *Cleaner) cleanVRouterDirty() {
 		c.org.DB.Where("vnet_id NOT IN ?", vrouterIDs).Find(&rts)
 		if len(rts) != 0 {
 			c.org.DB.Delete(&rts)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, rts)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, rts)))
 		}
 	}
 }
@@ -293,14 +293,14 @@ func (c *Cleaner) cleanPodIngressDirty() {
 		c.org.DB.Where("pod_ingress_id NOT IN ?", podIngressIDs).Find(&podIngressRules)
 		if len(podIngressRules) != 0 {
 			c.org.DB.Delete(&podIngressRules)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRules)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRules)))
 		}
 
 		var podIngressRuleBkds []mysql.PodIngressRuleBackend
 		c.org.DB.Where("pod_ingress_id NOT IN ?", podIngressIDs).Find(&podIngressRuleBkds)
 		if len(podIngressRuleBkds) != 0 {
 			c.org.DB.Delete(&podIngressRuleBkds)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds)))
 		}
 	}
 }
@@ -312,21 +312,21 @@ func (c *Cleaner) cleanPodServiceDirty() {
 		c.org.DB.Where("pod_service_id NOT IN ?", podServiceIDs).Find(&podServicePorts)
 		if len(podServicePorts) != 0 {
 			c.org.DB.Delete(&podServicePorts)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts)))
 		}
 
 		var podGroupPorts []mysql.PodGroupPort
 		c.org.DB.Where("pod_service_id NOT IN ?", podServiceIDs).Find(&podGroupPorts)
 		if len(podGroupPorts) != 0 {
 			c.org.DB.Delete(&podGroupPorts)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts)))
 		}
 
 		var vifs []mysql.VInterface
 		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, vifs)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, vifs)))
 		}
 	}
 }
@@ -338,21 +338,21 @@ func (c *Cleaner) cleanPodNodeDirty() {
 		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vifs)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vifs)))
 		}
 
 		var vmPodNodeConns []mysql.VMPodNodeConnection
 		c.org.DB.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&vmPodNodeConns)
 		if len(vmPodNodeConns) != 0 {
 			c.org.DB.Delete(&vmPodNodeConns)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vmPodNodeConns)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vmPodNodeConns)))
 		}
 
 		var pods []mysql.Pod
 		c.org.DB.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&pods)
 		if len(pods) != 0 {
 			c.org.DB.Delete(&pods)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods)))
 		}
 	}
 }
@@ -364,7 +364,7 @@ func (c *Cleaner) cleanPodDirty() {
 		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD, podIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs)))
 		}
 	}
 }
@@ -376,13 +376,13 @@ func (c *Cleaner) cleanVInterfaceDirty() {
 		c.org.DB.Where("vifid NOT IN ?", vifIDs).Find(&lanIPs)
 		if len(lanIPs) != 0 {
 			c.org.DB.Delete(&lanIPs)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lanIPs)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lanIPs)))
 		}
 		var wanIPs []mysql.WANIP
 		c.org.DB.Where("vifid NOT IN ?", vifIDs).Find(&wanIPs)
 		if len(wanIPs) != 0 {
 			c.org.DB.Delete(&wanIPs)
-			log.Error(c.org.LogPre(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, wanIPs)))
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, wanIPs)))
 		}
 	}
 }

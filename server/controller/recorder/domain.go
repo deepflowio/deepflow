@@ -62,19 +62,19 @@ func newDomain(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue
 }
 
 func (d *domain) Refresh(target string, cloudData cloudmodel.Resource) error {
-	log.Info(d.metadata.LogPre("refresh target: %s", target))
+	log.Info(d.metadata.Logf("refresh target: %s", target))
 	switch target {
 	case RefreshTargetDomain:
-		log.Info(d.metadata.LogPre("refresher started, triggered by ticker/hand"))
+		log.Info(d.metadata.Logf("refresher started, triggered by ticker/hand"))
 		if err := d.refreshDomainExcludeSubDomain(cloudData); err != nil {
 			return err
 		}
 		return d.subDomains.RefreshAll(cloudData.SubDomainResources)
 	case RefreshTargetSubDomain:
-		log.Info(d.metadata.LogPre("refresher started, triggered by hand"))
+		log.Info(d.metadata.Logf("refresher started, triggered by hand"))
 		return d.subDomains.RefreshOne(cloudData.SubDomainResources)
 	default:
-		return errors.New(d.metadata.LogPre("invalid refresh target"))
+		return errors.New(d.metadata.Logf("invalid refresh target"))
 	}
 }
 
@@ -100,7 +100,7 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 		d.cache.ResetRefreshSignal(cache.RefreshSignalCallerDomain)
 		return nil
 	default:
-		log.Info(d.metadata.LogPre("domain refresh is running, does nothing"))
+		log.Info(d.metadata.Logf("domain refresh is running, does nothing"))
 		return RefreshConflictError
 	}
 }
@@ -108,22 +108,22 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
 	if cloudData.Verified {
 		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 {
-			log.Info(d.metadata.LogPre("domain has no networks or vinterfaces, does nothing"))
+			log.Info(d.metadata.Logf("domain has no networks or vinterfaces, does nothing"))
 			return DataMissingError
 		}
 		if len(cloudData.VMs) == 0 && len(cloudData.Pods) == 0 {
-			log.Info(d.metadata.LogPre("domain has no vms and pods, does nothing"))
+			log.Info(d.metadata.Logf("domain has no vms and pods, does nothing"))
 			return DataMissingError
 		}
 	} else {
-		log.Info(d.metadata.LogPre("domain is not verified, does nothing"))
+		log.Info(d.metadata.Logf("domain is not verified, does nothing"))
 		return DataNotVerifiedError
 	}
 	return nil
 }
 
 func (d *domain) refresh(cloudData cloudmodel.Resource) {
-	log.Info(d.metadata.LogPre("domain refresh started"))
+	log.Info(d.metadata.Logf("domain refresh started"))
 
 	// 指定创建及更新操作的资源顺序
 	// 基本原则：无依赖资源优先；实时性需求高资源优先
@@ -135,7 +135,7 @@ func (d *domain) refresh(cloudData cloudmodel.Resource) {
 
 	d.updateSyncedAt(cloudData.SyncAt)
 
-	log.Info(d.metadata.LogPre("domain refresh completed"))
+	log.Info(d.metadata.Logf("domain refresh completed"))
 }
 
 func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.ResourceUpdater {
@@ -251,7 +251,7 @@ func (r *domain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpdater
 func (d *domain) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
 	platformDataChanged := isPlatformDataChanged(updatersInUpdateOrder)
 	if platformDataChanged {
-		log.Info(d.metadata.LogPre("domain data changed, refresh platform data"))
+		log.Info(d.metadata.Logf("domain data changed, refresh platform data"))
 		refresh.RefreshCache(d.metadata.GetORGID(), []common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
 	}
 }
@@ -263,41 +263,41 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	var domain mysql.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
 	if err != nil {
-		log.Error(d.metadata.LogPre("get domain from db failed: %s", err))
+		log.Error(d.metadata.Logf("get domain from db failed: %s", err))
 		return
 	}
 	domain.SyncedAt = &syncAt
 	d.metadata.DB.Save(&domain)
-	log.Debug(d.metadata.LogPre("update domain (%+v)", domain))
+	log.Debug(d.metadata.Logf("update domain (%+v)", domain))
 }
 
 func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
 	var domain mysql.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
 	if err != nil {
-		log.Error(d.metadata.LogPre("get domain from db failed: %s", err))
+		log.Error(d.metadata.Logf("get domain from db failed: %s", err))
 		return
 	}
 	domain.State, domain.ErrorMsg = d.formatStateInfo(cloudData)
 	d.metadata.DB.Save(&domain)
-	log.Debug(d.metadata.LogPre("update domain (%+v)", domain))
+	log.Debug(d.metadata.Logf("update domain (%+v)", domain))
 
 	for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
 		var subDomain mysql.SubDomain
 		err := d.metadata.DB.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
-			log.Error(d.metadata.LogPre("get sub_domain (lcuuid: %s) from db failed: %s", subDomainLcuuid, err))
+			log.Error(d.metadata.Logf("get sub_domain (lcuuid: %s) from db failed: %s", subDomainLcuuid, err))
 			continue
 		}
 		subDomain.State = subDomainResource.ErrorState
 		subDomain.ErrorMsg = subDomainResource.ErrorMessage
 		d.metadata.DB.Save(&subDomain)
-		log.Debug(d.metadata.LogPre("update sub_domain (%+v)", subDomain))
+		log.Debug(d.metadata.Logf("update sub_domain (%+v)", subDomain))
 	}
 }
 
 func (d *domain) formatStateInfo(domainResource cloudmodel.Resource) (state int, errMsg string) {
-	log.Info(d.metadata.LogPre("cloud state info: %d, %s", domainResource.ErrorState, domainResource.ErrorMessage))
+	log.Info(d.metadata.Logf("cloud state info: %d, %s", domainResource.ErrorState, domainResource.ErrorMessage))
 	// 状态优先级 exception > warning > sunccess
 	stateToLevel := map[int]int{
 		common.RESOURCE_STATE_CODE_SUCCESS:   1,
@@ -312,7 +312,7 @@ func (d *domain) formatStateInfo(domainResource cloudmodel.Resource) (state int,
 
 	var subDomainErrMsgs []string
 	for subDomainLcuuid, subDomainResource := range domainResource.SubDomainResources {
-		log.Info(d.metadata.LogPre("cloud sub_domain (%s) state info: %d, %s", subDomainLcuuid, subDomainResource.ErrorState, subDomainResource.ErrorMessage))
+		log.Info(d.metadata.Logf("cloud sub_domain (%s) state info: %d, %s", subDomainLcuuid, subDomainResource.ErrorState, subDomainResource.ErrorMessage))
 		if stateToLevel[subDomainResource.ErrorState] > stateToLevel[state] {
 			state = subDomainResource.ErrorState
 		}
