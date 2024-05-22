@@ -33,6 +33,7 @@ import (
 type VIFRPCMessage struct {
 	orgID        int
 	msgType      int
+	teamID       uint32
 	vtapID       uint32
 	peer         string
 	k8sClusterID string
