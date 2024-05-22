@@ -1568,7 +1568,7 @@ impl FlowMap {
         let last_biz_type = node.tagged_flow.flow.last_biz_type;
         // The original endpoint is inconsistent with new_endpoint
         if let Some(flow_perf_stats) = node.tagged_flow.flow.flow_perf_stats.as_mut() {
-            if node.tagged_flow.flow.last_endpoint.ne(&new_endpoint)
+            if (new_endpoint.is_some() && node.tagged_flow.flow.last_endpoint.ne(&new_endpoint))
                 || last_biz_type.ne(&new_biz_type)
             {
                 let l7_timeout_count = self
