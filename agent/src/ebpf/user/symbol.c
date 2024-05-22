@@ -527,7 +527,6 @@ static bool inline enable_proc_info_cache(void)
 
 void free_proc_cache(struct symbolizer_proc_info *p)
 {
-	symbolizer_proc_lock(p);
 	if (p->is_java) {
 		/* Delete target ns Java files */
 		int pid = (int)p->pid;
@@ -541,8 +540,6 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 		free_symcache_count++;
 	}
 	p->syms_cache = 0;
-	CLIB_MEMORY_STORE_BARRIER();
-	symbolizer_proc_unlock(p);
 	clib_mem_free((void *)p);
 }
 
