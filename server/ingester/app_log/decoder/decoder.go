@@ -240,7 +240,6 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 	default:
 		return fmt.Errorf("ignored log level: %s", string(columns[3]))
 	}
-	s.SeverityText = severityText
 	s.SeverityNumber = StringToSeverity(severityText)
 	s.Body = string(columns[5])
 
@@ -319,7 +318,6 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 		s.Body = fmt.Sprintf("%v", l.Message)
 	}
 
-	s.SeverityText = level
 	s.SeverityNumber = StringToSeverity(level)
 	s.AppService = l.AppService
 
