@@ -316,14 +316,14 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	}
 	p.ProcessID = pid
 	p.ProcessStartTime = stime
-	p.GPID = platformData.QueryProcessInfo(vtapID, pid)
+	p.GPID = platformData.QueryProcessInfo(orgId, vtapID, pid)
 	tagNames = append(tagNames, LabelAppService, LabelLanguageType, LabelTraceID, LabelSpanName, LabelAppInstance)
 	tagValues = append(tagValues, p.AppService, p.ProfileLanguageType, p.TraceID, p.SpanName, p.AppInstance)
 	p.TagNames = tagNames
 	p.TagValues = tagValues
 
-	p.fillResource(vtapID, podID, platformData)
 	p.OrgId, p.TeamID = orgId, teamId
+	p.fillResource(vtapID, podID, platformData)
 }
 
 func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
@@ -332,7 +332,7 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 }
 
 func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformData *grpc.PlatformInfoTable) {
-	vtapInfo := platformData.QueryVtapInfo(vtapID)
+	vtapInfo := platformData.QueryVtapInfo(p.OrgId, vtapID)
 	var vtapPlatformInfo *grpc.Info
 	if vtapInfo != nil {
 		p.L3EpcID = vtapInfo.EpcId
@@ -343,14 +343,14 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 			if ip4 := vtapIP.To4(); ip4 != nil {
 				// fill ip from Vtap first, can be overwritten by podInfo later
 				IP4 := utils.IpToUint32(ip4)
-				vtapPlatformInfo = platformData.QueryIPV4Infos(vtapInfo.EpcId, IP4)
+				vtapPlatformInfo = platformData.QueryIPV4Infos(p.OrgId, vtapInfo.EpcId, IP4)
 				if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 					p.IP4 = IP4
 					p.IsIPv4 = true
 				}
 			} else {
 				IP6 := vtapIP
-				vtapPlatformInfo = platformData.QueryIPV6Infos(vtapInfo.EpcId, IP6)
+				vtapPlatformInfo = platformData.QueryIPV6Infos(p.OrgId, vtapInfo.EpcId, IP6)
 				if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 					p.IP6 = IP6
 					p.IsIPv4 = false
@@ -362,7 +362,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 	var info *grpc.Info
 	// 1. try to find platform info by podID first
 	if podID != 0 {
-		info = platformData.QueryPodIdInfo(podID)
+		info = platformData.QueryPodIdInfo(p.OrgId, podID)
 		if info != nil {
 			// rewirte ip from podInfo
 			p.IsIPv4, p.IP4, p.IP6 = info.IsIPv4, info.IP4, info.IP6
@@ -374,9 +374,9 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 		// app profile: submit IP from agent
 		// ebpf profile with hostnetwork: when PodID get nil infos, try to get info from PodNodeID
 		if p.IsIPv4 {
-			info = platformData.QueryIPV4Infos(p.L3EpcID, p.IP4)
+			info = platformData.QueryIPV4Infos(p.OrgId, p.L3EpcID, p.IP4)
 		} else {
-			info = platformData.QueryIPV6Infos(p.L3EpcID, p.IP6)
+			info = platformData.QueryIPV6Infos(p.OrgId, p.L3EpcID, p.IP6)
 		}
 	}
 
@@ -396,7 +396,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 		p.PodGroupID = info.PodGroupID
 		p.L3DeviceType = uint8(info.DeviceType)
 		p.L3DeviceID = info.DeviceID
-		p.ServiceID = platformData.QueryService(p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
+		p.ServiceID = platformData.QueryService(p.OrgId, p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
 	}
 
 	// fix up when all resource match failed
@@ -410,7 +410,7 @@ func (p *InProcessProfile) fillPodInfo(vtapID uint16, containerID string, platfo
 		log.Debugf("%s-%s uploaded empty containerID by vtapID: %d", p.AppService, p.ProfileEventType, vtapID)
 		return
 	}
-	podInfo := platformData.QueryPodContainerInfo(vtapID, containerID)
+	podInfo := platformData.QueryPodContainerInfo(p.OrgId, vtapID, containerID)
 	if podInfo != nil {
 		p.PodID = podInfo.PodId
 		ip := net.ParseIP(podInfo.Ip)

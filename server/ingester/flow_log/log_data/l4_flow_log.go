@@ -753,14 +753,14 @@ func (k *KnowledgeGraph) fill(
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
 	if gpID0 != 0 && podId0 == 0 {
-		vtapID, podId := platformData.QueryGprocessInfo(gpID0)
+		vtapID, podId := platformData.QueryGprocessInfo(k.OrgId, gpID0)
 		if podId != 0 && vtapID == vtapId {
 			podId0 = podId
 			k.TagSource0 |= uint8(flow_metrics.GpId)
 		}
 	}
 	if gpID1 != 0 && podId1 == 0 {
-		vtapID, podId := platformData.QueryGprocessInfo(gpID1)
+		vtapID, podId := platformData.QueryGprocessInfo(k.OrgId, gpID1)
 		if podId != 0 && vtapID == vtapId {
 			podId1 = podId
 			k.TagSource1 |= uint8(flow_metrics.GpId)
@@ -770,42 +770,42 @@ func (k *KnowledgeGraph) fill(
 	// use podId to match first
 	if podId0 != 0 {
 		k.TagSource0 |= uint8(flow_metrics.PodId)
-		info0 = platformData.QueryPodIdInfo(podId0)
+		info0 = platformData.QueryPodIdInfo(k.OrgId, podId0)
 	}
 	if podId1 != 0 {
 		k.TagSource1 |= uint8(flow_metrics.PodId)
-		info1 = platformData.QueryPodIdInfo(podId1)
+		info1 = platformData.QueryPodIdInfo(k.OrgId, podId1)
 	}
 
 	if info0 == nil {
 		if lookupByMac0 {
 			k.TagSource0 |= uint8(flow_metrics.Mac)
-			info0 = platformData.QueryMacInfo(l3EpcMac0)
+			info0 = platformData.QueryMacInfo(k.OrgId, l3EpcMac0)
 		}
 		if info0 == nil {
 			k.TagSource0 |= uint8(flow_metrics.EpcIP)
-			info0 = common.RegetInfoFromIP(isIPv6, ip60, ip40, l3EpcID0, platformData)
+			info0 = common.RegetInfoFromIP(k.OrgId, isIPv6, ip60, ip40, l3EpcID0, platformData)
 		}
 	}
 
 	if info1 == nil {
 		if lookupByMac1 {
 			k.TagSource1 |= uint8(flow_metrics.Mac)
-			info1 = platformData.QueryMacInfo(l3EpcMac1)
+			info1 = platformData.QueryMacInfo(k.OrgId, l3EpcMac1)
 		}
 		if info1 == nil {
 			k.TagSource1 |= uint8(flow_metrics.EpcIP)
-			info1 = common.RegetInfoFromIP(isIPv6, ip61, ip41, l3EpcID1, platformData)
+			info1 = common.RegetInfoFromIP(k.OrgId, isIPv6, ip61, ip41, l3EpcID1, platformData)
 		}
 	}
 
 	var l2Info0, l2Info1 *grpc.Info
 	if l3EpcID0 > 0 && l3EpcID1 > 0 {
-		l2Info0, l2Info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
+		l2Info0, l2Info1 = platformData.QueryMacInfosPair(k.OrgId, l3EpcMac0, l3EpcMac1)
 	} else if l3EpcID0 > 0 {
-		l2Info0 = platformData.QueryMacInfo(l3EpcMac0)
+		l2Info0 = platformData.QueryMacInfo(k.OrgId, l3EpcMac0)
 	} else if l3EpcID1 > 0 {
-		l2Info1 = platformData.QueryMacInfo(l3EpcMac1)
+		l2Info1 = platformData.QueryMacInfo(k.OrgId, l3EpcMac1)
 	}
 
 	if info0 != nil {
@@ -846,10 +846,10 @@ func (k *KnowledgeGraph) fill(
 
 	// 0端如果是clusterIP或后端podIP需要匹配service_id
 	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType0), k.PodID0, 0) {
-		k.ServiceID0 = platformData.QueryService(k.PodID0, k.PodNodeID0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
+		k.ServiceID0 = platformData.QueryService(k.OrgId, k.PodID0, k.PodNodeID0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
 	}
 	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType1), k.PodID1, k.PodNodeID1) {
-		k.ServiceID1 = platformData.QueryService(k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
+		k.ServiceID1 = platformData.QueryService(k.OrgId, k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
 	}
 
 	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)

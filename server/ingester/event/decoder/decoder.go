@@ -181,6 +181,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.EndTime = int64(time.Duration(e.EndTime) / time.Microsecond)
 	s.Duration = uint64(e.EndTime - e.StartTime)
 	s.PodID = e.PodId
+	s.OrgId, s.TeamID = d.orgId, d.teamId
 
 	if e.EventType == pb.EventType_IoEvent {
 		s.SignalSource = uint8(dbwriter.SIGNAL_SOURCE_IO)
@@ -188,7 +189,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.SignalSource = uint8(e.EventType)
 	}
 
-	s.GProcessID = d.platformData.QueryProcessInfo(vtapId, e.Pid)
+	s.GProcessID = d.platformData.QueryProcessInfo(s.OrgId, vtapId, e.Pid)
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
@@ -199,27 +200,26 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
 	s.VTAPID = vtapId
-	s.OrgId, s.TeamID = d.orgId, d.teamId
-	s.L3EpcID = d.platformData.QueryVtapEpc0(vtapId)
+	s.L3EpcID = d.platformData.QueryVtapEpc0(s.OrgId, vtapId)
 
 	var info *grpc.Info
 	if e.PodId != 0 {
-		info = d.platformData.QueryPodIdInfo(e.PodId)
+		info = d.platformData.QueryPodIdInfo(s.OrgId, e.PodId)
 	}
 
 	// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
 	if info == nil {
-		vtapInfo := d.platformData.QueryVtapInfo(vtapId)
+		vtapInfo := d.platformData.QueryVtapInfo(s.OrgId, vtapId)
 		if vtapInfo != nil {
 			vtapIP := net.ParseIP(vtapInfo.Ip)
 			if vtapIP != nil {
 				if ip4 := vtapIP.To4(); ip4 != nil {
 					s.IsIPv4 = true
 					s.IP4 = utils.IpToUint32(ip4)
-					info = d.platformData.QueryIPV4Infos(vtapInfo.EpcId, s.IP4)
+					info = d.platformData.QueryIPV4Infos(s.OrgId, vtapInfo.EpcId, s.IP4)
 				} else {
 					s.IP6 = vtapIP
-					info = d.platformData.QueryIPV6Infos(vtapInfo.EpcId, s.IP6)
+					info = d.platformData.QueryIPV6Infos(s.OrgId, vtapInfo.EpcId, s.IP6)
 				}
 			}
 		}
@@ -247,10 +247,10 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.IP6 = info.IP6
 		// if it is just Pod Node, there is no need to match the service
 		if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
-			s.ServiceID = d.platformData.QueryService(
+			s.ServiceID = d.platformData.QueryService(s.OrgId,
 				s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 		}
-	} else if baseInfo := d.platformData.QueryEpcIDBaseInfo(s.L3EpcID); baseInfo != nil {
+	} else if baseInfo := d.platformData.QueryEpcIDBaseInfo(s.OrgId, s.L3EpcID); baseInfo != nil {
 		s.RegionID = uint16(baseInfo.RegionID)
 	}
 
@@ -405,7 +405,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
 		s.ServiceID = event.InstanceID
 	} else if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
-		s.ServiceID = d.platformData.QueryService(s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
+		s.ServiceID = d.platformData.QueryService(s.OrgId, s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 	}
 
 	s.AutoServiceID, s.AutoServiceType =

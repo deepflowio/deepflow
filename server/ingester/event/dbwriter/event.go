@@ -186,7 +186,7 @@ func (e *EventStore) EncodeTo(protocol config.ExportProtocol, utags *utag.Univer
 	switch protocol {
 	case config.PROTOCOL_KAFKA:
 		tags := e.QueryUniversalTags(utags)
-		k8sLabels := utags.QueryCustomK8sLabels(e.PodID)
+		k8sLabels := utags.QueryCustomK8sLabels(e.OrgId, e.PodID)
 		return exportercommon.EncodeToJson(e, int(e.DataSource()), cfg, tags, tags, k8sLabels, k8sLabels), nil
 	default:
 		return nil, fmt.Errorf("event unsupport export to %s", protocol)
@@ -194,7 +194,7 @@ func (e *EventStore) EncodeTo(protocol config.ExportProtocol, utags *utag.Univer
 }
 
 func (e *EventStore) QueryUniversalTags(utags *utag.UniversalTagsManager) *utag.UniversalTags {
-	return utags.QueryUniversalTags(
+	return utags.QueryUniversalTags(e.OrgId,
 		e.RegionID, e.AZID, e.HostID, e.PodNSID, e.PodClusterID, e.SubnetID, e.VTAPID,
 		uint8(e.L3DeviceType), e.AutoServiceType, e.AutoInstanceType,
 		e.L3DeviceID, e.AutoServiceID, e.AutoInstanceID, e.PodNodeID, e.PodGroupID, e.PodID, uint32(e.L3EpcID), 0, e.ServiceID,
