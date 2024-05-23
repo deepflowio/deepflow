@@ -329,9 +329,6 @@ func (s *FlowLog) Start() {
 	if s.OtelCompressedLogger != nil {
 		s.OtelCompressedLogger.Start()
 	}
-	if s.Exporters != nil {
-		s.Exporters.Start()
-	}
 }
 
 func (s *FlowLog) Close() error {
@@ -349,9 +346,6 @@ func (s *FlowLog) Close() error {
 	}
 	if s.OtelCompressedLogger != nil {
 		s.OtelCompressedLogger.Close()
-	}
-	if s.Exporters != nil {
-		s.Exporters.Close()
 	}
 	return nil
 }
