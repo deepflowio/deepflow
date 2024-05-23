@@ -58,32 +58,34 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 
 	// eks node vinterface just neet primary ip
 	// get ec2 instance id of eks node
-	// because aws api does not specify, judge by description for now
+	// because aws api does not specify, it can only be obtained through Tag and Description
+	// both Tag and Description are modifiable, use their union to improve accuracy
 	// for example:
+	// types.TagSet[].Key:node.k8s.amazonaws.com/instance_id
+	// types.TagSet[].Value:i-01994fbd5e2d8xxxx
 	// types.NetworkInterface.Description: aws-K8S-i-01994fbd5e2d8xxxx
 	eksNodeInstanceIDs := map[string]bool{}
 	for _, vData := range retVinterfaces {
-		// get it from the Instance ID tag first
-		var instanceID string
-		for idx := range vData.TagSet {
-			if vData.TagSet[idx].Key != nil && *vData.TagSet[idx].Key == EKS_NODE_INSTANCE_ID_KEY {
-				instanceID = *vData.TagSet[idx].Value
+		for _, tag := range vData.TagSet {
+			if a.getStringPointerValue(tag.Key) != EKS_NODE_TAG_INSTANCE_ID_KEY {
+				continue
 			}
-		}
-		if len(instanceID) != 0 {
-			eksNodeInstanceIDs[instanceID] = false
-			continue
+			tInstanceID := a.getStringPointerValue(tag.Value)
+			if tInstanceID != "" {
+				eksNodeInstanceIDs[tInstanceID] = false
+				break
+			}
 		}
 
 		vDescription := a.getStringPointerValue(vData.Description)
 		if !strings.HasPrefix(vDescription, EKS_NODE_DESCRIPTION_PREFIX) {
 			continue
 		}
-		eksNodeInstanceID := vDescription[len(EKS_NODE_DESCRIPTION_PREFIX):]
-		if eksNodeInstanceID == "" {
+		dInstanceID := vDescription[len(EKS_NODE_DESCRIPTION_PREFIX):]
+		if dInstanceID == "" {
 			continue
 		}
-		eksNodeInstanceIDs[eksNodeInstanceID] = false
+		eksNodeInstanceIDs[dInstanceID] = false
 	}
 
 	for _, vData := range retVinterfaces {
