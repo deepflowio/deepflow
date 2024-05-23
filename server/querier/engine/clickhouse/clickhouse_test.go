@@ -141,6 +141,9 @@ var (
 		input:  "select pod_service_0 from l7_flow_log where pod_service_0 !='xx' group by pod_service_0",
 		output: "SELECT dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_service_name = 'xx')))) AND (service_id_0!=0) GROUP BY dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` LIMIT 10000",
 	}, {
+		input:  "select pod_service_id_0 from l7_flow_log where pod_service_id_0 !=3 group by pod_service_id_0",
+		output: "SELECT service_id_0 AS `pod_service_id_0` FROM flow_log.`l7_flow_log` PREWHERE (not(service_id_0 = 3)) AND (service_id_0!=0) GROUP BY service_id_0 AS `pod_service_id_0` LIMIT 10000",
+	}, {
 		input:  "select region_id_0 from l7_flow_log where pod_ingress_0 !='xx' group by region_id_0",
 		output: "SELECT region_id_0 FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')))) GROUP BY `region_id_0` LIMIT 10000",
 	}, {
