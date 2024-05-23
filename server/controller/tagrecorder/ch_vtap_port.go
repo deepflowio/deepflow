@@ -19,15 +19,14 @@ package tagrecorder
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"net"
+	"sort"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/bitly/go-simplejson"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -84,7 +83,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 	for _, chDevice := range chDevices {
 		deviceKeyToIconID[DeviceKey{DeviceID: chDevice.DeviceID, DeviceType: chDevice.DeviceType}] = chDevice.IconID
 	}
-	vtapVIFs, err := GetVTapInterfaces(nil, db.ORGID)
+	vtapVIFs, err := getVTapInterfaces(db.ORGID)
 	if err != nil {
 		log.Error(errors.New("unable to get resource vtap-port"))
 		return nil, false
@@ -137,7 +136,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 		vTapPort, ok := keyToItem[tapMacKey]
 		if ok {
 			vTapPort.MacType = CH_VTAP_PORT_TYPE_TAP_MAC
-			nameSlice := strings.Split(vTapPort.Name, ", ")
+			nameSlice := sortVTapPortJoinedNames(&vTapPort)
 			if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
 				if !strings.Contains(vTapPort.Name, ", ...") {
 					vTapPort.Name = vTapPort.Name + ", ..."
@@ -190,7 +189,8 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 		if tapPort != macPort && macPort != 0 {
 			vTapPort, ok := keyToItem[macKey]
 			if ok {
-				nameSlice := strings.Split(vTapPort.Name, ", ")
+				nameSlice := sortVTapPortJoinedNames(&vTapPort)
+
 				if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
 					if !strings.Contains(vTapPort.Name, ", ...") {
 						vTapPort.Name = vTapPort.Name + ", ..."
@@ -246,7 +246,8 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 		key := VtapPortKey{VtapID: vTapID, TapPort: 0}
 		vTapPort, ok := keyToItem[key]
 		if ok {
-			nameSlice := strings.Split(vTapPort.Name, ", ")
+			nameSlice := sortVTapPortJoinedNames(&vTapPort)
+
 			if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
 				if !strings.Contains(vTapPort.Name, ", ...") {
 					vTapPort.Name = vTapPort.Name + ", ..."
@@ -464,332 +465,17 @@ func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysql.ChVTapPort) (map[
 	return nil, false
 }
 
-func GetVTapInterfaces(filter map[string]interface{}, orgID int) ([]model.VTapInterface, error) {
-	var vtapVIFs []model.VTapInterface
-	db, err := mysql.GetDB(orgID)
-	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", orgID)
-		return nil, err
-	}
-	toolDS, err := newToolDataSet(db)
-	if err != nil {
-		return nil, err
-	}
-	controllerIPToRegionLcuuid := make(map[string]string)
-	var azCConns []*mysql.AZControllerConnection
-	db.Unscoped().Find(&azCConns)
-	for _, c := range azCConns {
-		controllerIPToRegionLcuuid[c.ControllerIP] = c.Region
-	}
-	var controllers []*mysql.Controller
-	db.Unscoped().Find(&controllers)
-	slaveRegionLcuuidToHealthyControllerIPs := make(map[string][]string)
-	for _, c := range controllers {
-		if c.State == common.CONTROLLER_STATE_NORMAL && c.NodeType == common.CONTROLLER_NODE_TYPE_SLAVE {
-			slaveRegionLcuuidToHealthyControllerIPs[controllerIPToRegionLcuuid[c.IP]] = append(
-				slaveRegionLcuuidToHealthyControllerIPs[controllerIPToRegionLcuuid[c.IP]], c.IP,
-			)
-		}
-	}
-
-	masterRegionVVIFs := getRawVTapVinterfacesByRegion(common.LOCALHOST, common.GConfig.HTTPPort) // TODO ORGID will be supported later
-	vtapVIFs = append(vtapVIFs, formatVTapVInterfaces(masterRegionVVIFs, filter, toolDS)...)
-	for slaveRegion, regionControllerIPs := range slaveRegionLcuuidToHealthyControllerIPs {
-		log.Infof("get region (lcuuid: %s) vtap interfaces", slaveRegion)
-		for _, ip := range regionControllerIPs {
-			err := common.IsTCPActive(ip, common.GConfig.HTTPNodePort)
-			if err != nil {
-				log.Error(err.Error())
-			} else {
-				vtapVIFs = append(vtapVIFs, formatVTapVInterfaces(getRawVTapVinterfacesByRegion(ip, common.GConfig.HTTPNodePort), filter, toolDS)...)
-				break
-			}
-		}
-	}
-	return vtapVIFs, nil
+// sortVTapPortJoinedNames sorts the joined names of vtap ports, sets sorted name to ChVTapPort and returns the name slice
+func sortVTapPortJoinedNames(vtapPort *mysql.ChVTapPort) []string {
+	nameSlice := strings.Split(vtapPort.Name, ", ")
+	sort.Strings(nameSlice)
+	vtapPort.Name = strings.Join(nameSlice, ", ")
+	return nameSlice
 }
 
-func getRawVTapVinterfacesByRegion(host string, port int) *simplejson.Json {
-	url := fmt.Sprintf("http://%s/v1/sync/vinterface/", net.JoinHostPort(host, fmt.Sprintf("%d", port)))
-	resp, err := common.CURLPerform("GET", url, nil)
-	if err != nil {
-		log.Errorf("get genesis vinterface failed: %s, %s", err.Error(), url)
-		return simplejson.New()
-	}
-	if len(resp.Get("DATA").MustArray()) == 0 {
-		log.Warningf("no data in curl response: %s", url)
-		return simplejson.New()
-	}
-	log.Debug(url)
-	return resp.Get("DATA")
-}
-
-func formatVTapVInterfaces(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
-	var vtapVIFs []model.VTapInterface
-	for i := range vifs.MustArray() {
-		jVIF := vifs.GetIndex(i)
-		name := jVIF.Get("NAME").MustString()
-		if n, ok := filter["name"]; ok {
-			if n != name {
-				continue
-			}
-		}
-		vtapID := jVIF.Get("VTAP_ID").MustInt()
-		lastSeen, err := time.Parse(time.RFC3339, jVIF.Get("LAST_SEEN").MustString())
-		if err != nil {
-			log.Errorf("parse time (%s) failed: %s", jVIF.Get("LAST_SEEN").MustString(), err.Error())
-		}
-		vtapVIF := model.VTapInterface{
-			ID:       jVIF.Get("ID").MustInt(),
-			Name:     name,
-			MAC:      jVIF.Get("MAC").MustString(),
-			TapName:  jVIF.Get("TAP_NAME").MustString(),
-			TapMAC:   jVIF.Get("TAP_MAC").MustString(),
-			VTapID:   vtapID,
-			HostIP:   jVIF.Get("HOST_IP").MustString(),
-			NodeIP:   jVIF.Get("NODE_IP").MustString(),
-			LastSeen: lastSeen.Format(common.GO_BIRTHDAY),
-		}
-		vtap, ok := toolDS.idToVTap[vtapID]
-		if ok {
-			vtapVIF.VTapLaunchServer = vtap.LaunchServer
-			vtapVIF.VTapLaunchServerID = vtap.LaunchServerID
-			vtapVIF.VTapType = vtap.Type
-			vtapVIF.VTapName = vtap.Name
-
-			macVIFs := toolDS.macToVIFs[vtapVIF.MAC]
-			if len(macVIFs) > 0 {
-				var macVIF *mysql.VInterface
-				if len(macVIFs) == 1 {
-					macVIF = macVIFs[0]
-				} else {
-					// 仅当mac属于host、vm或pod node时，会可能有多个vif，此时需使用与采集器类型匹配的设备类型的vif
-					deviceType, ok := VTAP_TYPE_TO_DEVICE_TYPE[vtapVIF.VTapType]
-					if ok {
-						for _, mv := range macVIFs {
-							if mv.DeviceType == deviceType {
-								macVIF = mv
-								break
-							}
-						}
-					}
-					if macVIF == nil {
-						log.Warningf("vif with mac: %s not found", vtapVIF.MAC)
-						continue
-					}
-				}
-				vtapVIF.DeviceType = macVIF.DeviceType
-				vtapVIF.DeviceID = macVIF.DeviceID
-
-				switch vtapVIF.DeviceType {
-				case common.VIF_DEVICE_TYPE_HOST:
-					vtapVIF.DeviceName = toolDS.hostIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_VM:
-					if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
-						vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
-						vtapVIF.DeviceID = podNodeID
-						vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
-					} else {
-						vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
-					}
-					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceID]]
-					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
-				case common.VIF_DEVICE_TYPE_POD_NODE:
-					vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
-					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[vtapVIF.DeviceID]]]
-					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
-				case common.VIF_DEVICE_TYPE_VROUTER:
-					vtapVIF.DeviceName = toolDS.vrouterIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_DHCP_PORT:
-					vtapVIF.DeviceName = toolDS.dhcpPortIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_NAT_GATEWAY:
-					vtapVIF.DeviceName = toolDS.natGatewayIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_LB:
-					vtapVIF.DeviceName = toolDS.lbIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_RDS_INSTANCE:
-					vtapVIF.DeviceName = toolDS.rdsInstanceIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_REDIS_INSTANCE:
-					vtapVIF.DeviceName = toolDS.redisInstanceIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_POD_SERVICE:
-					vtapVIF.DeviceName = toolDS.podServiceIDToName[vtapVIF.DeviceID]
-				case common.VIF_DEVICE_TYPE_POD:
-					vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
-				}
-			}
-		} else if vtapID != 0 {
-			log.Errorf("vtap (%d) not found", vtapID)
-		}
-		vtapVIFs = append(vtapVIFs, vtapVIF)
-	}
-	return vtapVIFs
-}
-
-type vpToolDataSet struct {
-	idToVTap              map[int]*mysql.VTap
-	macToVIFs             map[string][]*mysql.VInterface
-	hostIDToName          map[int]string
-	hostIPToID            map[string]int
-	vmIDToName            map[int]string
-	vmIDToLaunchServer    map[int]string
-	podNodeIDToName       map[int]string
-	vmIDToPodNodeID       map[int]int
-	podNodeIDToVMID       map[int]int
-	dhcpPortIDToName      map[int]string
-	vrouterIDToName       map[int]string
-	natGatewayIDToName    map[int]string
-	lbIDToName            map[int]string
-	rdsInstanceIDToName   map[int]string
-	redisInstanceIDToName map[int]string
-	podServiceIDToName    map[int]string
-	podIDToName           map[int]string
-}
-
-func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
-	toolDS = &vpToolDataSet{
-		idToVTap:              make(map[int]*mysql.VTap),
-		macToVIFs:             make(map[string][]*mysql.VInterface),
-		hostIDToName:          make(map[int]string),
-		hostIPToID:            make(map[string]int),
-		vmIDToName:            make(map[int]string),
-		vmIDToLaunchServer:    make(map[int]string),
-		podNodeIDToName:       make(map[int]string),
-		vmIDToPodNodeID:       make(map[int]int),
-		podNodeIDToVMID:       make(map[int]int),
-		vrouterIDToName:       make(map[int]string),
-		dhcpPortIDToName:      make(map[int]string),
-		natGatewayIDToName:    make(map[int]string),
-		lbIDToName:            make(map[int]string),
-		rdsInstanceIDToName:   make(map[int]string),
-		redisInstanceIDToName: make(map[int]string),
-		podServiceIDToName:    make(map[int]string),
-		podIDToName:           make(map[int]string),
-	}
-	var vtaps []*mysql.VTap
-	if err = db.Unscoped().Find(&vtaps).Error; err != nil {
-		log.Error(dbQueryResourceFailed("vtap", err))
-		return
-	}
-	for _, vtap := range vtaps {
-		toolDS.idToVTap[vtap.ID] = vtap
-	}
-
-	var vifs []*mysql.VInterface
-	if err = db.Select("mac", "deviceid", "devicetype").Unscoped().Find(&vifs).Error; err != nil {
-		log.Error(dbQueryResourceFailed("vinterface", err))
-		return
-	}
-	for _, vif := range vifs {
-		toolDS.macToVIFs[vif.Mac] = append(toolDS.macToVIFs[vif.Mac], vif)
-	}
-
-	var hosts []*mysql.Host
-	if err = db.Select("id", "name").Unscoped().Find(&hosts).Error; err != nil {
-		log.Error(dbQueryResourceFailed("host_device", err))
-		return
-	}
-	for _, host := range hosts {
-		toolDS.hostIDToName[host.ID] = host.Name
-	}
-
-	var vms []*mysql.VM
-	if err = db.Select("id", "name", "launch_server").Unscoped().Find(&vms).Error; err != nil {
-		log.Error(dbQueryResourceFailed("vm", err))
-		return
-	}
-	for _, vm := range vms {
-		toolDS.vmIDToName[vm.ID] = vm.Name
-		toolDS.vmIDToLaunchServer[vm.ID] = vm.LaunchServer
-	}
-
-	var podNodes []*mysql.PodNode
-	if err = db.Select("id", "name").Unscoped().Find(&podNodes).Error; err != nil {
-		log.Error(dbQueryResourceFailed("pod_node", err))
-		return
-	}
-	for _, podNode := range podNodes {
-		toolDS.podNodeIDToName[podNode.ID] = podNode.Name
-	}
-
-	var vmPodNodeConns []*mysql.VMPodNodeConnection
-	if err = db.Unscoped().Find(&vmPodNodeConns).Error; err != nil {
-		log.Error(dbQueryResourceFailed("vm_pod_node_connection", err))
-		return
-	}
-	for _, conn := range vmPodNodeConns {
-		toolDS.vmIDToPodNodeID[conn.VMID] = conn.PodNodeID
-		toolDS.podNodeIDToVMID[conn.PodNodeID] = conn.VMID
-	}
-
-	var vrouters []*mysql.VRouter
-	if err = db.Select("id", "name").Unscoped().Find(&vrouters).Error; err != nil {
-		log.Error(dbQueryResourceFailed("vrouter", err))
-		return
-	}
-	for _, v := range vrouters {
-		toolDS.vrouterIDToName[v.ID] = v.Name
-	}
-
-	var dhcpPorts []*mysql.DHCPPort
-	if err = db.Select("id", "name").Unscoped().Find(&dhcpPorts).Error; err != nil {
-		log.Error(dbQueryResourceFailed("dhcp_port", err))
-		return
-	}
-	for _, d := range dhcpPorts {
-		toolDS.dhcpPortIDToName[d.ID] = d.Name
-	}
-
-	var ngws []*mysql.NATGateway
-	if err = db.Select("id", "name").Unscoped().Find(&ngws).Error; err != nil {
-		log.Error(dbQueryResourceFailed("nat_gateway", err))
-		return
-	}
-	for _, n := range ngws {
-		toolDS.natGatewayIDToName[n.ID] = n.Name
-	}
-
-	var lbs []*mysql.LB
-	if err = db.Select("id", "name").Unscoped().Find(&lbs).Error; err != nil {
-		log.Error(dbQueryResourceFailed("lb", err))
-		return
-	}
-	for _, lb := range lbs {
-		toolDS.lbIDToName[lb.ID] = lb.Name
-	}
-
-	var rdsInstances []*mysql.RDSInstance
-	if err = db.Select("id", "name").Unscoped().Find(&rdsInstances).Error; err != nil {
-		log.Error(dbQueryResourceFailed("rds_instance", err))
-		return
-	}
-	for _, r := range rdsInstances {
-		toolDS.rdsInstanceIDToName[r.ID] = r.Name
-	}
-
-	var redisInstances []*mysql.RedisInstance
-	if err = db.Select("id", "name").Unscoped().Find(&redisInstances).Error; err != nil {
-		log.Error(dbQueryResourceFailed("redis_instance", err))
-		return
-	}
-	for _, r := range redisInstances {
-		toolDS.redisInstanceIDToName[r.ID] = r.Name
-	}
-
-	var podServices []*mysql.PodService
-	if err = db.Select("id", "name").Unscoped().Find(&podServices).Error; err != nil {
-		log.Error(dbQueryResourceFailed("pod_service", err))
-		return
-	}
-	for _, p := range podServices {
-		toolDS.podServiceIDToName[p.ID] = p.Name
-	}
-
-	var pods []*mysql.Pod
-	if err = db.Select("id", "name").Unscoped().Find(&pods).Error; err != nil {
-		log.Error(dbQueryResourceFailed("pod", err))
-		return
-	}
-	for _, p := range pods {
-		toolDS.podIDToName[p.ID] = p.Name
-	}
-	return
+func getVTapInterfaces(orgID int) (resp []model.VTapInterface, err error) {
+	return vtap.NewVTapInterface(
+		common.FPermit{},
+		httpcommon.NewUserInfo(common.USER_TYPE_SUPER_ADMIN, common.USER_ID_SUPER_ADMIN, orgID),
+	).Get(map[string]interface{}{})
 }

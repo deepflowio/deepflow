@@ -14,14 +14,16 @@
  * limitations under the License.
  */
 
-package service
+package vtap
 
 import (
-	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/model"
-	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
+	"fmt"
+
+	logging "github.com/op/go-logging"
 )
 
-func GetVTapInterfaces(filter map[string]interface{}) (resp []model.VTapInterface, err error) {
-	return tagrecorder.GetVTapInterfaces(filter, mysqlCommon.DEFAULT_ORG_ID) // TODO Give a default ID and process it later.
+var log = logging.MustGetLogger("http.service.vtap")
+
+func dbQueryResourceFailed(resource string, err error) string {
+	return fmt.Sprintf("db query %s failed: %v", resource, err)
 }
