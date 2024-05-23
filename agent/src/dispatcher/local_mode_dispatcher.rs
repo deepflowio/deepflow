@@ -163,7 +163,7 @@ impl LocalModeDispatcher {
 
             // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
 
-            let tunnel_type_bitmap = base.tunnel_type_bitmap.lock().unwrap().clone();
+            let tunnel_type_bitmap = base.tunnel_type_bitmap.read().unwrap().clone();
 
             #[cfg(any(target_os = "linux", target_os = "android"))]
             let decap_length = match BaseDispatcher::decap_tunnel(

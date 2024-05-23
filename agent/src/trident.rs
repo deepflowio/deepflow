@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
-    Arc, Condvar, Mutex, Weak,
+    Arc, Condvar, Mutex, RwLock, Weak,
 };
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -1364,7 +1364,7 @@ pub struct DispatcherComponent {
     pub l7_collector: L7CollectorThread,
     pub packet_sequence_parser: PacketSequenceParser,
     pub pcap_assembler: PcapAssembler,
-    pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    pub handler_builders: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     pub src_link: Link, // The original src_interface
 }
 
@@ -1377,7 +1377,7 @@ impl DispatcherComponent {
         self.packet_sequence_parser.start();
         self.pcap_assembler.start();
         self.handler_builders
-            .lock()
+            .write()
             .unwrap()
             .iter_mut()
             .for_each(|y| {
@@ -1392,7 +1392,7 @@ impl DispatcherComponent {
         self.packet_sequence_parser.stop();
         self.pcap_assembler.stop();
         self.handler_builders
-            .lock()
+            .write()
             .unwrap()
             .iter_mut()
             .for_each(|y| {
@@ -2931,7 +2931,7 @@ fn build_dispatchers(
         id,
     );
 
-    let handler_builders = Arc::new(Mutex::new(vec![
+    let handler_builders = Arc::new(RwLock::new(vec![
         PacketHandlerBuilder::Pcap(mini_packet_sender),
         PacketHandlerBuilder::Npb(NpbBuilder::new(
             id,
@@ -2970,6 +2970,7 @@ fn build_dispatchers(
             libpcap_enabled: yaml_config.libpcap_enabled,
             snap_len: dispatcher_config.capture_packet_size as usize,
             dpdk_enabled: dispatcher_config.dpdk_enabled,
+            dpdk_core_list: dispatcher_config.dpdk_core_list.clone(),
             dispatcher_queue: dispatcher_config.dispatcher_queue,
             packet_fanout_mode: yaml_config.packet_fanout_mode,
             vhost_socket_path: yaml_config.vhost_socket_path.clone(),
