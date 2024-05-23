@@ -38,6 +38,13 @@ func IsDefaultOrgID(orgID uint16) bool {
 	return false
 }
 
+func IsValidOrgID(orgID uint16) bool {
+	if orgID == INVALID_ORG_ID || orgID > MAX_ORG_ID {
+		return false
+	}
+	return true
+}
+
 func OrgDatabasePrefix(orgID uint16) string {
 	if IsDefaultOrgID(orgID) {
 		return ""

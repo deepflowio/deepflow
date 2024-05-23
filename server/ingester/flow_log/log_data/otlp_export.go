@@ -112,8 +112,8 @@ func newAttrName(prefix, name, suffix string) string {
 	return sb.String()
 }
 
-func putK8sLabels(attrs pcommon.Map, podID uint32, universalTagsManager *utag.UniversalTagsManager, suffix string) {
-	labels := universalTagsManager.QueryCustomK8sLabels(podID)
+func putK8sLabels(orgId uint16, attrs pcommon.Map, podID uint32, universalTagsManager *utag.UniversalTagsManager, suffix string) {
+	labels := universalTagsManager.QueryCustomK8sLabels(orgId, podID)
 	if labels != nil {
 		for name, value := range labels {
 			putStrWithoutEmpty(attrs, newAttrName("df.custom_tag.k8s.labels.", name, suffix), value)
@@ -128,10 +128,10 @@ func (l7 *L7FlowLog) EncodeToOtlp(utags *utag.UniversalTagsManager, dataTypeBits
 	resAttrs := resSpan.Resource().Attributes()
 	putUniversalTags(resAttrs, tags0, tags1, dataTypeBits)
 	if dataTypeBits&config.K8S_LABEL != 0 && l7.PodID0 != 0 {
-		putK8sLabels(resAttrs, l7.PodID0, utags, "_0")
+		putK8sLabels(l7.OrgId, resAttrs, l7.PodID0, utags, "_0")
 	}
 	if dataTypeBits&config.K8S_LABEL != 0 && l7.PodID1 != 0 {
-		putK8sLabels(resAttrs, l7.PodID1, utags, "_1")
+		putK8sLabels(l7.OrgId, resAttrs, l7.PodID1, utags, "_1")
 	}
 
 	span := resSpan.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
