@@ -552,6 +552,7 @@ pub struct YamlConfig {
     pub analyzer_raw_packet_block_size: usize,
     pub batched_buffer_size_limit: usize,
     pub dpdk_enabled: bool,
+    pub dpdk_core_list: String,
     pub dispatcher_queue: bool,
     pub libpcap_enabled: bool,
     pub vhost_socket_path: String,
@@ -962,6 +963,7 @@ impl Default for YamlConfig {
             analyzer_raw_packet_block_size: 65536,
             batched_buffer_size_limit: 131072,
             dpdk_enabled: false,
+            dpdk_core_list: "".into(),
             dispatcher_queue: false,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             libpcap_enabled: false,
