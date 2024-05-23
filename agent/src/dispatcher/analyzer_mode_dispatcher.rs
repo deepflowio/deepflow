@@ -28,6 +28,7 @@ use log::{debug, info, warn};
 use packet_dedup::PacketDedupMap;
 
 use super::base_dispatcher::BaseDispatcher;
+use super::Packet;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
@@ -48,7 +49,7 @@ use crate::{
     },
 };
 use public::{
-    buffer::{Allocator, BatchedBuffer},
+    buffer::Allocator,
     debug::QueueDebugger,
     proto::trident::IfMacSource,
     queue::{self, bounded_with_debug, DebugSender, Receiver},
@@ -139,14 +140,6 @@ pub(super) struct AnalyzerPipeline {
     tap_type: TapType,
     handlers: Vec<PacketHandler>,
     timestamp: Duration,
-}
-
-#[derive(Debug)]
-struct Packet {
-    timestamp: Duration,
-    raw: BatchedBuffer<u8>,
-    original_length: u32,
-    raw_length: u32,
 }
 
 pub(super) struct AnalyzerModeDispatcher {
@@ -317,7 +310,7 @@ impl AnalyzerModeDispatcher {
                             let raw_length = (packet.raw_length as usize)
                                 .min(packet.raw.len())
                                 .min(pool_raw_size);
-                            let tunnel_type_bitmap = tunnel_type_bitmap.lock().unwrap().clone();
+                            let tunnel_type_bitmap = tunnel_type_bitmap.read().unwrap().clone();
                             let mut tunnel_info = TunnelInfo::default();
 
                             let (decap_length, tap_type) = match Self::decap_tunnel(
@@ -466,7 +459,7 @@ impl AnalyzerModeDispatcher {
                                         | ((id as u64) << 8)
                                         | (u16::from(tap_type) as u64);
                                     let handlers = handler_builder
-                                        .lock()
+                                        .read()
                                         .unwrap()
                                         .iter()
                                         .map(|b| {
@@ -583,6 +576,7 @@ impl AnalyzerModeDispatcher {
                 raw: buffer,
                 original_length: packet.capture_length as u32,
                 raw_length: packet.data.len() as u32,
+                if_index: 0,
             };
             batch.push(info);
         }
