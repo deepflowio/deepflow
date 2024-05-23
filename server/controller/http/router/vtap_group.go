@@ -48,7 +48,7 @@ func (v *VtapGroup) getVtapGroup() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		args := make(map[string]interface{})
 		args["lcuuid"] = c.Param("lcuuid")
-		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
+		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Get(args)
 		JsonResponse(c, data, err)
 	}
@@ -66,7 +66,7 @@ func (v *VtapGroup) getVtapGroups() gin.HandlerFunc {
 		if value, ok := c.GetQuery("team_id"); ok {
 			args["team_id"] = value
 		}
-		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
+		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Get(args)
 		JsonResponse(c, data, err)
 	}
@@ -87,7 +87,7 @@ func (v *VtapGroup) createVtapGroup() gin.HandlerFunc {
 			vtapGroupCreate.TeamID = common.DEFAULT_TEAM_ID
 		}
 
-		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
+		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Create(vtapGroupCreate)
 		JsonResponse(c, data, err)
 	})
@@ -114,7 +114,7 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 		}
 
 		lcuuid := c.Param("lcuuid")
-		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
+		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Update(lcuuid, patchMap, v.cfg)
 		JsonResponse(c, data, err)
 	})
@@ -125,7 +125,7 @@ func (v *VtapGroup) deleteVtapGroup() gin.HandlerFunc {
 		var err error
 
 		lcuuid := c.Param("lcuuid")
-		agentGroupService := service.NewAgentGroup(service.GetUserInfo(c), v.cfg)
+		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Delete(lcuuid)
 		JsonResponse(c, data, err)
 	}

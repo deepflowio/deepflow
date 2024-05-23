@@ -33,7 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/http/service"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	resourceservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
@@ -221,7 +221,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 		IconID: DomainTypeToIconID[KUBERNETES],
 	}
 
-	userInfo := service.UserInfo{
+	userInfo := httpcommon.UserInfo{
 		ID:    common.DEFAULT_USER_ID,
 		Type:  common.DEFAULT_USER_TYPE,
 		ORGID: orgID,
