@@ -132,7 +132,6 @@ void java_syms_update_main(void *arg)
 
 		if (task != NULL) {
 			struct symbolizer_proc_info *p = task->p;
-			symbolizer_proc_lock(p);
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
 				int ret;
@@ -153,12 +152,8 @@ void java_syms_update_main(void *arg)
 
 				AO_SET(&p->new_java_syms_file, true);
 			}
-			symbolizer_proc_unlock(p);
-			/* Ensure that all tasks are completed before releasing. */
-			if (AO_SUB_F(&p->use, 1) == 0) {
-				free_proc_cache(p);
-			}
 
+			AO_DEC(&p->use);
 			clib_mem_free((void *)task);
 		}
 
