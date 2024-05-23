@@ -66,13 +66,13 @@ type ApplicationLogStore struct {
 	SpanID     string
 	TraceFlags uint32
 
-	SeverityText   string // value of the severity(also known as log level)
-	SeverityNumber uint8  // numerical value of the severity(also known as log level id)
+	SeverityNumber uint8 // numerical value of the severity(also known as log level id)
 
 	Body string
 
 	AppService string `json:"app_service" category:"$tag" sub:"service_info"` // service name
 
+	GProcessID   uint32 `json:"gprocess_id" category:"$tag" sub:"universal_tag"`
 	AgentID      uint16 `json:"agent_id" category:"$tag" sub:"universal_tag"`
 	RegionID     uint16 `json:"region_id" category:"$tag" sub:"universal_tag"`
 	AZID         uint16 `json:"az_id" category:"$tag" sub:"universal_tag"`
@@ -118,11 +118,11 @@ func (l *ApplicationLogStore) WriteBlock(block *ckdb.Block) {
 		l.TraceID,
 		l.SpanID,
 		l.TraceFlags,
-		l.SeverityText,
 		l.SeverityNumber,
 		l.Body,
 		l.AppService,
 
+		l.GProcessID,
 		l.AgentID,
 		l.RegionID,
 		l.AZID,
@@ -189,11 +189,11 @@ func LogColumns() []*ckdb.Column {
 		ckdb.NewColumn("trace_id", ckdb.String).SetCodec(ckdb.CodecZSTD).SetIndex(ckdb.IndexBloomfilter).SetComment("Trace ID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetCodec(ckdb.CodecZSTD).SetIndex(ckdb.IndexBloomfilter).SetComment("Span ID"),
 		ckdb.NewColumn("trace_flags", ckdb.UInt32).SetComment("W3C trace flag, currently not support yet"),
-		ckdb.NewColumn("severity_text", ckdb.LowCardinalityString).SetCodec(ckdb.CodecZSTD).SetComment("The severity text (also known as log level)"),
 		ckdb.NewColumn("severity_number", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("numerical value of the severity(also known as log level id)"),
 		ckdb.NewColumn("body", ckdb.String).SetIndex(ckdb.IndexTokenbf).SetCodec(ckdb.CodecZSTD).SetComment("log content"),
 		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetIndex(ckdb.IndexBloomfilter).SetComment("Application Service (service name)"),
 
+		ckdb.NewColumn("gprocess_id", ckdb.UInt32).SetComment("Global Process ID"),
 		ckdb.NewColumn("agent_id", ckdb.UInt16).SetComment("Agent ID"),
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("Region ID"),
 		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("Availability Zone ID"),
@@ -232,7 +232,7 @@ func LogColumns() []*ckdb.Column {
 func GenLogCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"_type", "app_service", timeKey, "timestamp"}
+	orderKeys := []string{timeKey, "app_service", "timestamp"}
 	partition := DefaultPartition
 
 	return &ckdb.Table{

@@ -590,6 +590,8 @@ ingester:
   #    tables-contain:      # tables name containing the string will be priority-dropped. If it is empty, it means all the tables under the database
   #  - database: flow_metrics
   #    tables-contain: 1s_local
+  #  - database: profile
+  #  - database: application_log
 
   ## ingester模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #ingester-enabled: true

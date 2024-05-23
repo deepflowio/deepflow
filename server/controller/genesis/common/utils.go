@@ -45,6 +45,11 @@ import (
 
 var log = logging.MustGetLogger("genesis.common")
 
+type TeamInfo struct {
+	OrgID  int
+	TeamId int
+}
+
 type VifInfo struct {
 	MaskLen uint32
 	Address string
@@ -499,8 +504,8 @@ func RequestGet(url string, timeout int, queryStrings map[string]string) error {
 	return nil
 }
 
-func GetTeamIDToOrgID() (map[string]int, error) {
-	teamIDToOrgID := map[string]int{}
+func GetTeamShortLcuuidToInfo() (map[string]TeamInfo, error) {
+	teamIDToOrgID := map[string]TeamInfo{}
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
 		return teamIDToOrgID, err
@@ -518,7 +523,10 @@ func GetTeamIDToOrgID() (map[string]int, error) {
 			continue
 		}
 		for _, team := range teams {
-			teamIDToOrgID[team.ShortLcuuid] = orgID
+			teamIDToOrgID[team.ShortLcuuid] = TeamInfo{
+				OrgID:  orgID,
+				TeamId: team.TeamID,
+			}
 		}
 	}
 	return teamIDToOrgID, nil

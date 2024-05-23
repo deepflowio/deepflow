@@ -778,7 +778,7 @@ impl SessionQueue {
     }
 
     fn send(&mut self, item: Box<MetaAppProto>) {
-        if item.l7_info.skip_send() {
+        if item.l7_info.skip_send() || item.l7_info.is_on_blacklist() {
             return;
         }
 

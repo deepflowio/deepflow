@@ -51,6 +51,5 @@ app_service                , 应用服务                   ,
 
 trace_id                  , TraceID                     ,
 span_id                   , SpanID                      ,
-severity_text             , 日志级别                    ,
-severity_number           , 日志级别 ID                 ,
+severity_number           , 日志级别                    ,
 body                      , 日志内容                    ,

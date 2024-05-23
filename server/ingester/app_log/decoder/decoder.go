@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -89,6 +88,10 @@ var SeverityMap = map[string]uint8{
 
 	"CRITICAL": SEVERITY_FATAL,
 	"WARNING":  SEVERITY_WARN,
+	"ERRO":     SEVERITY_ERROR,
+	"DEBU":     SEVERITY_DEBUG,
+	"FATA":     SEVERITY_FATAL,
+	"CRIT":     SEVERITY_FATAL,
 }
 
 func StringToSeverity(str string) uint8 {
@@ -168,7 +171,7 @@ func (d *Decoder) Run() {
 			switch d.msgType {
 			case datatype.MESSAGE_TYPE_APPLICATION_LOG:
 				d.handleAppLog(recvBytes.VtapID, decoder)
-			case datatype.MESSAGE_TYPE_SYSLOG:
+			case datatype.MESSAGE_TYPE_SYSLOG, datatype.MESSAGE_TYPE_AGENT_LOG:
 				d.handleAgentLog(recvBytes.VtapID, decoder)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
@@ -232,10 +235,11 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 		severityText = "WARN"
 	case "[ERRO]", "[ERROR]":
 		severityText = "ERROR"
+	case "[DEBU]", "[DEBUG]":
+		severityText = "DEBUG"
 	default:
 		return fmt.Errorf("ignored log level: %s", string(columns[3]))
 	}
-	s.SeverityText = severityText
 	s.SeverityNumber = StringToSeverity(severityText)
 	s.Body = string(columns[5])
 
@@ -255,13 +259,12 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	}
 
 	if l.Message == "" {
-		return fmt.Errorf("application log body is empty")
+		return fmt.Errorf("application log body is empty. agent id: %d, log: %v", agentId, l)
 	}
 
+	s.Body = l.Message
 	s.Type = dbwriter.StringToLogType(l.LogType)
-	userId, _ := strconv.Atoi(l.UserID)
-	s.UserID = uint32(userId)
-	orgId, _ := strconv.Atoi(l.OrgID)
+	s.UserID = uint32(l.UserID)
 
 	s.Time = uint32(timeObj.Unix())
 	s.Timestamp = timeObj.UnixMicro()
@@ -273,26 +276,40 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	case dbwriter.LOG_TYPE_SYSTEM:
 		s.OrgId, s.TeamID = ckdb.DEFAULT_ORG_ID, ckdb.INVALID_TEAM_ID
 	case dbwriter.LOG_TYPE_AUDIT:
-		s.OrgId, s.TeamID = uint16(orgId), ckdb.INVALID_TEAM_ID
+		s.OrgId, s.TeamID = uint16(l.OrgID), ckdb.INVALID_TEAM_ID
 	default:
 		s.OrgId, s.TeamID = d.platformData.QueryVtapOrgAndTeamID(agentId)
 	}
 
 	s.L3EpcID = d.platformData.QueryVtapEpc0(agentId)
 
-	s.Body = l.Message
-	s.SeverityText = l.Level
+	if l.Json != nil {
+		switch v := l.Json.(type) {
+		case map[string]interface{}:
+			var strValue string
+			for key, value := range v {
+				if s, ok := value.(string); ok {
+					strValue = s
+				} else {
+					strValue = fmt.Sprintf("%v", value)
+				}
+				s.AttributeNames = append(s.AttributeNames, key)
+				s.AttributeValues = append(s.AttributeValues, strValue)
+			}
+		default:
+			if d.counter.ErrorCount == 0 {
+				log.Warningf("parse application log json filed failed. %v", l.Json)
+			}
+			d.counter.ErrorCount++
+		}
+	}
+
 	s.SeverityNumber = StringToSeverity(l.Level)
-	s.AppService = l.ProcessName
+	s.AppService = l.AppService
 
 	if l.Kubernetes.PodIp != "" {
 		s.AttributeNames = append(s.AttributeNames, "pod_ip", "pod_name")
 		s.AttributeValues = append(s.AttributeValues, l.Kubernetes.PodIp, l.Kubernetes.PodName)
-	}
-
-	if l.Module != "" {
-		s.AttributeNames = append(s.AttributeNames, "module")
-		s.AttributeValues = append(s.AttributeValues, l.Module)
 	}
 
 	podName := l.Kubernetes.PodName
@@ -383,17 +400,17 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 
 type AppLogEntry struct {
 	LogType    string `json:"_df_log_type"`
-	UserID     string `json:"user_id"`
-	OrgID      string `json:"org_id"`
-	Level      string `json:"level"`
-	Module     string `json:"module"`
+	UserID     int    `json:"user_id"`
+	OrgID      int    `json:"org_id"`
 	Kubernetes struct {
 		PodName string `json:"pod_name"`
 		PodIp   string `json:"pod_ip"`
 	} `json:"kubernetes"`
-	Message     string `json:"message"`
-	Timestamp   string `json:"timestamp"`
-	ProcessName string `json:"process_name"`
+	Message    string      `json:"message"`
+	Json       interface{} `json:"json"`
+	Level      string      `json:"level"`
+	Timestamp  string      `json:"timestamp"`
+	AppService string      `json:"app_service"`
 }
 
 func (d *Decoder) handleAppLog(agentId uint16, decoder *codec.SimpleDecoder) {

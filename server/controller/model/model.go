@@ -593,6 +593,7 @@ func (GenesisPort) TableName() string {
 }
 
 type GenesisVinterface struct {
+	TeamID              uint32    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 	NetnsID             uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
 	VtapID              uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	Lcuuid              string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
