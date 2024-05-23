@@ -146,7 +146,7 @@ impl MirrorModeDispatcherListener {
             &self.tap_bridge_inner_macs(self.base.src_interface_index),
         );
         #[cfg(any(target_os = "windows", target_os = "android"))]
-        self.on_vm_change_with_bridge_macs(vm_mac_addrs, &vec![]);
+        self.on_vm_change_with_bridge_macs(vm_mac_addrs, gateway_vmac_addrs, &vec![]);
     }
 
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
@@ -201,12 +201,215 @@ impl MirrorModeDispatcherListener {
 }
 
 pub(super) struct MirrorPipeline {
-    handlers: Vec<PacketHandler>,
+    pub handlers: Vec<PacketHandler>,
 }
 
 pub(super) struct LastTimestamps {
+    pub if_index: isize,
+    pub last_timestamp: Duration,
+}
+
+pub fn get_key(
+    vm_mac_set: &Arc<Mutex<HashMap<u32, MacAddr>>>,
+    overlay_packet: &[u8],
+    tunnel_info: TunnelInfo,
+) -> (u32, u32, u32, u32) {
+    let (da_key, sa_key) =
+        if tunnel_info.tier == 0 && overlay_packet.len() >= super::L2_MAC_ADDR_OFFSET {
+            let mut da_mac: [u8; 6] = [0; 6];
+            let mut sa_mac: [u8; 6] = [0; 6];
+            da_mac.copy_from_slice(&overlay_packet[..6]);
+            sa_mac.copy_from_slice(&overlay_packet[6..12]);
+            (
+                MacAddr::from(da_mac).to_lower_32b(),
+                MacAddr::from(sa_mac).to_lower_32b(),
+            )
+        } else {
+            (tunnel_info.mac_dst, tunnel_info.mac_src)
+        };
+
+    let vm_mac_set = vm_mac_set.lock().unwrap();
+    let da_gateway_vmac = vm_mac_set
+        .get(&da_key)
+        .unwrap_or(&MacAddr::ZERO)
+        .to_lower_32b();
+    let sa_gateway_vmac = vm_mac_set
+        .get(&sa_key)
+        .unwrap_or(&MacAddr::ZERO)
+        .to_lower_32b();
+
+    return (da_key, sa_key, da_gateway_vmac, sa_gateway_vmac);
+}
+
+fn get_pipeline<'a>(
+    updated: &'a Arc<AtomicBool>,
+    pipelines: &'a mut HashMap<u32, MirrorPipeline>,
+    key: u32,
+    id: usize,
+    handler_builder: &Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+) -> &'a mut MirrorPipeline {
+    if updated.load(Ordering::Relaxed) {
+        pipelines.clear();
+        pipelines.shrink_to_fit();
+        updated.store(false, Ordering::Relaxed);
+    }
+
+    match pipelines.contains_key(&key) {
+        true => pipelines.get_mut(&key).unwrap(),
+        false => {
+            let handlers = handler_builder
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|b| b.build_with(id, 0, MacAddr::try_from(key as u64).unwrap()))
+                .collect();
+            let value = MirrorPipeline { handlers };
+            pipelines.insert(key, value);
+
+            pipelines.get_mut(&key).unwrap()
+        }
+    }
+}
+
+fn get_meta_packet<'a>(
+    timestamp: Duration,
+    overlay_packet: &'a [u8],
+    counter: &Arc<PacketCounter>,
+    tunnel_info: &'a TunnelInfo,
+    src_local: bool,
+    dst_local: bool,
+    original_length: usize,
+) -> Result<MetaPacket<'a>> {
+    let mut meta_packet = MetaPacket::empty();
+    let offset = Duration::ZERO;
+    if let Err(e) = meta_packet.update(
+        overlay_packet,
+        src_local,
+        dst_local,
+        timestamp + offset,
+        original_length,
+    ) {
+        counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+        return Err(Error::PacketInvalid(format!("with {:?}", e)));
+    }
+
+    if tunnel_info.tunnel_type != TunnelType::None {
+        meta_packet.tunnel = Some(*tunnel_info);
+    }
+
+    Ok(meta_packet)
+}
+
+fn prepare_flow(
+    meta_packet: &mut MetaPacket,
+    tunnel_type: TunnelType,
+    key: u32,
+    queue_hash: u8,
+    trident_type: TridentType,
+    mac: u32,
+    npb_dedup: bool,
+    cloud_gateway_traffic: bool,
+) {
+    let nat_source = meta_packet.lookup_key.get_nat_source();
+    if cloud_gateway_traffic {
+        meta_packet.tap_port = TapPort::from_gateway_mac(tunnel_type, mac);
+    } else {
+        if is_tt_hyper_v_compute(trident_type) {
+            meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, mac);
+        } else {
+            meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, key);
+        }
+    }
+
+    BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash, npb_dedup)
+}
+
+pub fn handler(
+    id: usize,
+    key: u32,
+    src_local: bool,
+    dst_local: bool,
+    overlay_packet: &[u8],
+    timestamp: Duration,
+    original_length: usize,
+    updated: &Arc<AtomicBool>,
+    pipelines: &mut HashMap<u32, MirrorPipeline>,
+    handler_builder: &Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    tunnel_info: &TunnelInfo,
+    config: &Config,
+    flow_map: &mut FlowMap,
+    counter: &Arc<PacketCounter>,
+    trident_type: TridentType,
+    mac: u32,
+    npb_dedup: bool,
+) -> Result<()> {
+    let pipeline = get_pipeline(updated, pipelines, key, id, handler_builder);
+
+    let mut meta_packet = get_meta_packet(
+        timestamp,
+        &overlay_packet,
+        counter,
+        tunnel_info,
+        src_local,
+        dst_local,
+        original_length,
+    )?;
+
+    prepare_flow(
+        &mut meta_packet,
+        tunnel_info.tunnel_type,
+        key,
+        id as u8,
+        trident_type,
+        mac,
+        npb_dedup,
+        config.flow.cloud_gateway_traffic,
+    );
+    // flowProcesser
+    flow_map.inject_meta_packet(&config, &mut meta_packet);
+    let mini_packet = MiniPacket::new(overlay_packet, &meta_packet, 0);
+    for i in pipeline.handlers.iter_mut() {
+        i.handle(&mini_packet);
+    }
+
+    Ok(())
+}
+
+// Ensure that the packets' timestamp obtained by each if_index are incremented in chronological order, otherwise correct them
+pub fn swap_last_timestamp(
+    last_timestamp_array: &mut Vec<LastTimestamps>,
+    counter: &Arc<PacketCounter>,
     if_index: isize,
-    last_timestamp: Duration,
+    timestamp: Duration,
+    cloud_gateway_traffic: bool,
+) -> Result<Duration> {
+    for i in last_timestamp_array.iter_mut() {
+        if if_index == i.if_index {
+            if timestamp + Duration::from_millis(1) < i.last_timestamp {
+                // In the DPDK Gateway scenario, the timestamp of the mirrored packet may be out of order,
+                // which may be due to the collection of multiple NIC or the packet timestamp being
+                // independently calculated by the corresponding virtual NIC.
+                if cloud_gateway_traffic {
+                    return Ok(i.last_timestamp);
+                }
+                // FIXME: just in case
+                counter.retired.fetch_add(1, Ordering::Relaxed);
+                return Err(Error::PacketInvalid("invalid timestamp".to_string()));
+            } else if i.last_timestamp < timestamp {
+                i.last_timestamp = timestamp;
+            }
+            return Ok(i.last_timestamp);
+        }
+    }
+    if last_timestamp_array.len() > IF_INDEX_MAX_SIZE {
+        last_timestamp_array.clear();
+        warn!("too many if_indexes");
+    }
+    last_timestamp_array.push(LastTimestamps {
+        if_index,
+        last_timestamp: timestamp,
+    });
+    Ok(timestamp)
 }
 
 pub(super) struct MirrorModeDispatcher {
@@ -335,57 +538,6 @@ impl MirrorModeDispatcher {
         Ok(meta_packet)
     }
 
-    fn handler(
-        id: usize,
-        key: u32,
-        src_local: bool,
-        dst_local: bool,
-        overlay_packet: &[u8],
-        timestamp: Duration,
-        original_length: usize,
-        updated: &Arc<AtomicBool>,
-        pipelines: &mut HashMap<u32, MirrorPipeline>,
-        handler_builder: &Arc<Mutex<Vec<PacketHandlerBuilder>>>,
-        tunnel_info: &TunnelInfo,
-        config: &Config,
-        flow_map: &mut FlowMap,
-        counter: &Arc<PacketCounter>,
-        trident_type: TridentType,
-        mac: u32,
-        npb_dedup: bool,
-    ) -> Result<()> {
-        let pipeline = Self::get_pipeline(updated, pipelines, key, id, handler_builder);
-
-        let mut meta_packet = Self::get_meta_packet(
-            timestamp,
-            &overlay_packet,
-            counter,
-            tunnel_info,
-            src_local,
-            dst_local,
-            original_length,
-        )?;
-
-        Self::prepare_flow(
-            &mut meta_packet,
-            tunnel_info.tunnel_type,
-            key,
-            id as u8,
-            trident_type,
-            mac,
-            npb_dedup,
-            config.flow.cloud_gateway_traffic,
-        );
-        // flowProcesser
-        flow_map.inject_meta_packet(&config, &mut meta_packet);
-        let mini_packet = MiniPacket::new(overlay_packet, &meta_packet, 0);
-        for i in pipeline.handlers.iter_mut() {
-            i.handle(&mini_packet);
-        }
-
-        Ok(())
-    }
-
     pub(super) fn run(&mut self) {
         info!("Start mirror dispatcher {}", self.base.log_id);
         let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
@@ -440,7 +592,7 @@ impl MirrorModeDispatcher {
             }
             let (mut packet, mut timestamp) = recved.unwrap();
 
-            match Self::swap_last_timestamp(
+            match swap_last_timestamp(
                 &mut self.last_timestamp_array,
                 &self.base.counter,
                 packet.if_index,
@@ -484,7 +636,7 @@ impl MirrorModeDispatcher {
                 continue;
             }
 
-            let (da_key, sa_key, da_gateway_vmac, sa_gateway_vmac) = Self::get_key(
+            let (da_key, sa_key, da_gateway_vmac, sa_gateway_vmac) = get_key(
                 &self.local_vm_mac_set,
                 overlay_packet,
                 self.base.tunnel_info,
@@ -492,7 +644,7 @@ impl MirrorModeDispatcher {
             let trident_type = self.trident_type.lock().unwrap().clone();
             let cloud_gateway_traffic = config.flow.cloud_gateway_traffic;
             if sa_gateway_vmac == 0 && da_gateway_vmac == 0 {
-                let _ = Self::handler(
+                let _ = handler(
                     self.base.id,
                     self.mac, // In order for two-way traffic to be handled by the same pipeline, self.mac is used as the key here
                     false,
@@ -515,7 +667,7 @@ impl MirrorModeDispatcher {
             }
 
             if sa_gateway_vmac > 0 {
-                let _ = Self::handler(
+                let _ = handler(
                     self.base.id,
                     sa_key,
                     true,
@@ -540,7 +692,7 @@ impl MirrorModeDispatcher {
                 );
             }
             if da_gateway_vmac > 0 {
-                let _ = Self::handler(
+                let _ = handler(
                     self.base.id,
                     da_key,
                     false,
@@ -570,67 +722,6 @@ impl MirrorModeDispatcher {
         self.base.terminate_handler();
         self.last_timestamp_array.clear();
         info!("Stopped dispatcher {}", self.base.log_id);
-    }
-
-    pub(super) fn prepare_flow(
-        meta_packet: &mut MetaPacket,
-        tunnel_type: TunnelType,
-        key: u32,
-        queue_hash: u8,
-        trident_type: TridentType,
-        mac: u32,
-        npb_dedup: bool,
-        cloud_gateway_traffic: bool,
-    ) {
-        let nat_source = meta_packet.lookup_key.get_nat_source();
-        if cloud_gateway_traffic {
-            meta_packet.tap_port = TapPort::from_gateway_mac(tunnel_type, mac);
-        } else {
-            if is_tt_hyper_v_compute(trident_type) {
-                meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, mac);
-            } else {
-                meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, key);
-            }
-        }
-
-        BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash, npb_dedup)
-    }
-
-    // Ensure that the packets' timestamp obtained by each if_index are incremented in chronological order, otherwise correct them
-    fn swap_last_timestamp(
-        last_timestamp_array: &mut Vec<LastTimestamps>,
-        counter: &Arc<PacketCounter>,
-        if_index: isize,
-        timestamp: Duration,
-        cloud_gateway_traffic: bool,
-    ) -> Result<Duration> {
-        for i in last_timestamp_array.iter_mut() {
-            if if_index == i.if_index {
-                if timestamp + Duration::from_millis(1) < i.last_timestamp {
-                    // In the DPDK Gateway scenario, the timestamp of the mirrored packet may be out of order,
-                    // which may be due to the collection of multiple NIC or the packet timestamp being
-                    // independently calculated by the corresponding virtual NIC.
-                    if cloud_gateway_traffic {
-                        return Ok(i.last_timestamp);
-                    }
-                    // FIXME: just in case
-                    counter.retired.fetch_add(1, Ordering::Relaxed);
-                    return Err(Error::PacketInvalid("invalid timestamp".to_string()));
-                } else if i.last_timestamp < timestamp {
-                    i.last_timestamp = timestamp;
-                }
-                return Ok(i.last_timestamp);
-            }
-        }
-        if last_timestamp_array.len() > IF_INDEX_MAX_SIZE {
-            last_timestamp_array.clear();
-            warn!("too many if_indexes");
-        }
-        last_timestamp_array.push(LastTimestamps {
-            if_index,
-            last_timestamp: timestamp,
-        });
-        Ok(timestamp)
     }
 
     fn decap_tunnel(

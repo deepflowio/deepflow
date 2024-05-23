@@ -59,12 +59,12 @@ use public::{
 };
 
 #[derive(Debug)]
-struct Packet {
-    timestamp: Duration,
-    raw: BatchedBuffer<u8>,
-    original_length: u32,
-    raw_length: u32,
-    if_index: isize,
+pub struct Packet {
+    pub timestamp: Duration,
+    pub raw: BatchedBuffer<u8>,
+    pub original_length: u32,
+    pub raw_length: u32,
+    pub if_index: isize,
 }
 
 const HANDLER_BATCH_SIZE: usize = 64;

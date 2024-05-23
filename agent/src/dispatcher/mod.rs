@@ -23,6 +23,7 @@ mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
 mod local_plus_mode_dispatcher;
 mod mirror_mode_dispatcher;
+mod mirror_plus_mode_dispatcher;
 
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -49,6 +50,7 @@ use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use local_plus_mode_dispatcher::{LocalPlusModeDispatcher, LocalPlusModeDispatcherListener};
 use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
+use mirror_plus_mode_dispatcher::{MirrorPlusModeDispatcher, MirrorPlusModeDispatcherListener};
 pub use recv_engine::RecvEngine;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use recv_engine::{
@@ -97,6 +99,7 @@ enum DispatcherFlavor {
     Local(LocalModeDispatcher),
     LocalPlus(LocalPlusModeDispatcher),
     Mirror(MirrorModeDispatcher),
+    MirrorPlus(MirrorPlusModeDispatcher),
 }
 
 impl DispatcherFlavor {
@@ -105,6 +108,7 @@ impl DispatcherFlavor {
             DispatcherFlavor::Local(d) => d.base.init(),
             DispatcherFlavor::LocalPlus(d) => d.base.init(),
             DispatcherFlavor::Mirror(d) => d.init(),
+            DispatcherFlavor::MirrorPlus(d) => d.init(),
             DispatcherFlavor::Analyzer(d) => d.base.init(), // Enterprise Edition Feature: analyzer_mode
         }
     }
@@ -114,6 +118,7 @@ impl DispatcherFlavor {
             DispatcherFlavor::Local(d) => d.run(),
             DispatcherFlavor::LocalPlus(d) => d.run(),
             DispatcherFlavor::Mirror(d) => d.run(),
+            DispatcherFlavor::MirrorPlus(d) => d.run(),
             DispatcherFlavor::Analyzer(d) => d.run(), // Enterprise Edition Feature: analyzer_mode
         }
     }
@@ -123,6 +128,7 @@ impl DispatcherFlavor {
             DispatcherFlavor::Local(d) => DispatcherListener::Local(d.listener()),
             DispatcherFlavor::LocalPlus(d) => DispatcherListener::LocalPlus(d.listener()),
             DispatcherFlavor::Mirror(d) => DispatcherListener::Mirror(d.listener()),
+            DispatcherFlavor::MirrorPlus(d) => DispatcherListener::MirrorPlus(d.listener()),
             // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Analyzer(d) => DispatcherListener::Analyzer(d.listener()),
         }
@@ -205,6 +211,7 @@ pub enum DispatcherListener {
     Local(LocalModeDispatcherListener),
     LocalPlus(LocalPlusModeDispatcherListener),
     Mirror(MirrorModeDispatcherListener),
+    MirrorPlus(MirrorPlusModeDispatcherListener),
 }
 
 impl FlowAclListener for DispatcherListener {
@@ -222,6 +229,7 @@ impl FlowAclListener for DispatcherListener {
             DispatcherListener::Local(a) => a.flow_acl_change(),
             DispatcherListener::LocalPlus(a) => a.flow_acl_change(),
             DispatcherListener::Mirror(a) => a.flow_acl_change(),
+            DispatcherListener::MirrorPlus(a) => a.flow_acl_change(),
             DispatcherListener::Analyzer(a) => a.flow_acl_change(),
         }
         Ok(())
@@ -232,6 +240,7 @@ impl FlowAclListener for DispatcherListener {
             DispatcherListener::Local(a) => a.id(),
             DispatcherListener::LocalPlus(a) => a.id(),
             DispatcherListener::Mirror(a) => a.id(),
+            DispatcherListener::MirrorPlus(a) => a.id(),
             DispatcherListener::Analyzer(a) => a.id(),
         };
         u16::from(FlowAclListenerId::Dispatcher) as usize + id
@@ -245,6 +254,7 @@ impl DispatcherListener {
             Self::Local(a) => a.netns(),
             Self::LocalPlus(a) => a.netns(),
             Self::Mirror(a) => a.netns(),
+            Self::MirrorPlus(a) => a.netns(),
             Self::Analyzer(a) => a.netns(),
         }
     }
@@ -254,6 +264,7 @@ impl DispatcherListener {
             Self::Local(a) => a.id(),
             Self::LocalPlus(a) => a.id(),
             Self::Mirror(a) => a.id(),
+            Self::MirrorPlus(a) => a.id(),
             Self::Analyzer(a) => a.id(),
         }
     }
@@ -272,6 +283,7 @@ impl DispatcherListener {
             Self::LocalPlus(l) => l.on_config_change(config),
             Self::Analyzer(l) => l.on_config_change(config), // Enterprise Edition Feature: analyzer_mode
             Self::Mirror(l) => l.on_config_change(config),
+            Self::MirrorPlus(l) => l.on_config_change(config),
         }
     }
 
@@ -282,6 +294,9 @@ impl DispatcherListener {
                 l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
             }
             Self::Mirror(l) => {
+                l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
+            }
+            Self::MirrorPlus(l) => {
                 l.on_vm_change(vm_mac_addrs, gateway_vmac_addrs);
             }
             _ => {}
@@ -344,6 +359,9 @@ impl DispatcherListener {
                 l.on_tap_interface_change(interfaces, if_mac_source);
             }
             Self::Mirror(l) => {
+                l.on_tap_interface_change(interfaces, if_mac_source, trident_type);
+            }
+            Self::MirrorPlus(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source, trident_type);
             }
         }
@@ -572,6 +590,7 @@ pub struct Options {
     pub snap_len: usize,
     pub tap_mode: TapMode,
     pub dpdk_enabled: bool,
+    pub dpdk_core_list: String,
     pub libpcap_enabled: bool,
     pub dispatcher_queue: bool,
     pub tap_mac_script: String,
@@ -1069,23 +1088,52 @@ impl DispatcherBuilder {
                     })
                 }
             }
-            TapMode::Mirror => DispatcherFlavor::Mirror(MirrorModeDispatcher {
-                base,
-                dedup: PacketDedupMap::new(),
-                local_vm_mac_set: Arc::new(Mutex::new(HashMap::new())),
-                local_segment_macs: vec![],
-                tap_bridge_macs: vec![],
-                pipelines: HashMap::new(),
-                #[cfg(target_os = "linux")]
-                poller: Some(platform_poller),
-                updated: Arc::new(AtomicBool::new(false)),
-                trident_type: Arc::new(Mutex::new(
-                    self.trident_type
-                        .ok_or(Error::ConfigIncomplete("no trident_type".into()))?,
-                )),
-                mac: get_mac_by_name(src_interface),
-                last_timestamp_array: vec![],
-            }),
+            TapMode::Mirror => {
+                if dispatcher_queue {
+                    DispatcherFlavor::MirrorPlus(MirrorPlusModeDispatcher {
+                        base,
+                        local_vm_mac_set: Arc::new(Mutex::new(HashMap::new())),
+                        local_segment_macs: vec![],
+                        tap_bridge_macs: vec![],
+                        #[cfg(target_os = "linux")]
+                        poller: Some(platform_poller),
+                        updated: Arc::new(AtomicBool::new(false)),
+                        trident_type: Arc::new(Mutex::new(
+                            self.trident_type
+                                .ok_or(Error::ConfigIncomplete("no trident_type".into()))?,
+                        )),
+                        mac: get_mac_by_name(src_interface),
+                        flow_generator_thread_handler: None,
+                        queue_debugger,
+                        inner_queue_size: self
+                            .analyzer_queue_size
+                            .take()
+                            .ok_or(Error::ConfigIncomplete("no analyzer-queue-size".into()))?,
+                        stats_collector: collector.clone(),
+                        raw_packet_block_size: self.analyzer_raw_packet_block_size.take().ok_or(
+                            Error::ConfigIncomplete("no analyzer-raw-packet-block-size".into()),
+                        )?,
+                    })
+                } else {
+                    DispatcherFlavor::Mirror(MirrorModeDispatcher {
+                        base,
+                        dedup: PacketDedupMap::new(),
+                        local_vm_mac_set: Arc::new(Mutex::new(HashMap::new())),
+                        local_segment_macs: vec![],
+                        tap_bridge_macs: vec![],
+                        pipelines: HashMap::new(),
+                        #[cfg(target_os = "linux")]
+                        poller: Some(platform_poller),
+                        updated: Arc::new(AtomicBool::new(false)),
+                        trident_type: Arc::new(Mutex::new(
+                            self.trident_type
+                                .ok_or(Error::ConfigIncomplete("no trident_type".into()))?,
+                        )),
+                        mac: get_mac_by_name(src_interface),
+                        last_timestamp_array: vec![],
+                    })
+                }
+            }
             TapMode::Analyzer => {
                 #[cfg(target_os = "linux")]
                 {
@@ -1203,7 +1251,12 @@ impl DispatcherBuilder {
                 ));
                 #[cfg(not(target_arch = "s390x"))]
                 {
-                    Ok(RecvEngine::Dpdk(Dpdk::new(None, None, options.snap_len)))
+                    Ok(RecvEngine::Dpdk(Dpdk::new(
+                        None,
+                        None,
+                        options.snap_len,
+                        options.dpdk_core_list.clone(),
+                    )))
                 }
             }
             #[cfg(any(target_os = "linux", target_os = "android"))]
