@@ -44,7 +44,7 @@ type AgentGroup struct {
 	resourceAccess *ResourceAccess
 }
 
-func NewAgentGroup(userInfo *UserInfo, cfg *config.ControllerConfig) *AgentGroup {
+func NewAgentGroup(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *AgentGroup {
 	return &AgentGroup{
 		cfg:            cfg,
 		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},

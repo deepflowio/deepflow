@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 )
@@ -60,7 +61,7 @@ func createVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 		err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
 		if err == nil {
 
-			data, err := service.NewAgentGroupConfig(service.GetUserInfo(c), cfg).CreateVTapGroupConfig(service.GetUserInfo(c).ORGID, vTapGroupConfig)
+			data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateVTapGroupConfig(common.GetUserInfo(c).ORGID, vTapGroupConfig)
 			JsonResponse(c, data, err)
 		} else {
 			JsonResponse(c, nil, err)
@@ -71,7 +72,7 @@ func createVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 func deleteVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		lcuuid := c.Param("lcuuid")
-		data, err := service.NewAgentGroupConfig(service.GetUserInfo(c), cfg).DeleteVTapGroupConfig(service.GetUserInfo(c).ORGID, lcuuid)
+		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).DeleteVTapGroupConfig(common.GetUserInfo(c).ORGID, lcuuid)
 		JsonResponse(c, data, err)
 	}
 }
@@ -82,7 +83,7 @@ func updateVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 		vTapGroupConfig := &agent_config.AgentGroupConfig{}
 		err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
 		if err == nil {
-			data, err := service.NewAgentGroupConfig(service.GetUserInfo(c), cfg).UpdateVTapGroupConfig(service.GetUserInfo(c).ORGID, lcuuid, vTapGroupConfig)
+			data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateVTapGroupConfig(common.GetUserInfo(c).ORGID, lcuuid, vTapGroupConfig)
 			JsonResponse(c, data, err)
 		} else {
 			JsonResponse(c, nil, err)
@@ -96,7 +97,7 @@ func getVTapGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if value, ok := c.GetQuery("vtap_group_id"); ok {
 			args["vtap_group_id"] = value
 		}
-		userInfo := service.GetUserInfo(c)
+		userInfo := common.GetUserInfo(c)
 		data, err := service.GetVTapGroupConfigs(userInfo, &cfg.FPermit, args)
 		JsonResponse(c, data, err)
 	}
@@ -105,13 +106,13 @@ func getVTapGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
 func getVTapGroupDetailedConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
 
-	data, err := service.GetVTapGroupDetailedConfig(service.GetUserInfo(c).ORGID, lcuuid)
+	data, err := service.GetVTapGroupDetailedConfig(common.GetUserInfo(c).ORGID, lcuuid)
 	JsonResponse(c, data, err)
 }
 
 func getVTapGroupAdvancedConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
-	data, err := service.GetVTapGroupAdvancedConfig(service.GetUserInfo(c).ORGID, lcuuid)
+	data, err := service.GetVTapGroupAdvancedConfig(common.GetUserInfo(c).ORGID, lcuuid)
 	JsonResponse(c, data, err)
 }
 
@@ -120,7 +121,7 @@ func updateVTapGroupAdvancedConfig(c *gin.Context) {
 	vTapGroupConfig := &agent_config.AgentGroupConfig{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
 	if err == nil || err == io.EOF {
-		data, err := service.UpdateVTapGroupAdvancedConfig(service.GetUserInfo(c).ORGID, lcuuid, vTapGroupConfig)
+		data, err := service.UpdateVTapGroupAdvancedConfig(common.GetUserInfo(c).ORGID, lcuuid, vTapGroupConfig)
 		JsonResponse(c, data, err)
 	} else {
 		JsonResponse(c, nil, err)
@@ -131,7 +132,7 @@ func createVTapGroupAdvancedConfig(c *gin.Context) {
 	vTapGroupConfig := &agent_config.AgentGroupConfig{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
 	if err == nil {
-		data, err := service.CreateVTapGroupAdvancedConfig(service.GetUserInfo(c).ORGID, vTapGroupConfig)
+		data, err := service.CreateVTapGroupAdvancedConfig(common.GetUserInfo(c).ORGID, vTapGroupConfig)
 		JsonResponse(c, data, err)
 	} else {
 		JsonResponse(c, nil, err)
@@ -143,7 +144,7 @@ func getVTapGroupConfigByFilter(c *gin.Context) {
 	if value, ok := c.GetQuery("vtap_group_id"); ok {
 		args["vtap_group_id"] = value
 	}
-	data, err := service.GetVTapGroupConfigByFilter(service.GetUserInfo(c).ORGID, args)
+	data, err := service.GetVTapGroupConfigByFilter(common.GetUserInfo(c).ORGID, args)
 	JsonResponse(c, data, err)
 }
 
@@ -152,7 +153,7 @@ func deleteVTapGroupConfigByFilter(c *gin.Context) {
 	if value, ok := c.GetQuery("vtap_group_id"); ok {
 		args["vtap_group_id"] = value
 	}
-	data, err := service.DeleteVTapGroupConfigByFilter(service.GetUserInfo(c).ORGID, args)
+	data, err := service.DeleteVTapGroupConfigByFilter(common.GetUserInfo(c).ORGID, args)
 	JsonResponse(c, data, err)
 }
 
@@ -162,6 +163,6 @@ func getVTapGroupExampleConfig(c *gin.Context) {
 }
 
 func getVTapGroupAdvancedConfigs(c *gin.Context) {
-	data, err := service.GetVTapGroupAdvancedConfigs(service.GetUserInfo(c).ORGID)
+	data, err := service.GetVTapGroupAdvancedConfigs(common.GetUserInfo(c).ORGID)
 	JsonResponse(c, data, err)
 }

@@ -19,22 +19,34 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
-	"github.com/deepflowio/deepflow/server/controller/http/service"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/router/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 )
 
-type VTapInterface struct{}
-
-func NewVTapInterface() *VTapInterface {
-	return new(VTapInterface)
+type VTapInterface struct {
+	cfg ctrlrcommon.FPermit
 }
 
-func (vti *VTapInterface) RegisterTo(e *gin.Engine) {
-	e.GET("/v1/vtap-interfaces/", getVTapInterfaces)
+func NewVTapInterface(cfg ctrlrcommon.FPermit) *VTapInterface {
+	return &VTapInterface{cfg: cfg}
 }
 
-func getVTapInterfaces(c *gin.Context) {
-	args := make(map[string]interface{})
-	data, err := service.GetVTapInterfaces(args)
-	JsonResponse(c, data, err)
+func (v *VTapInterface) RegisterTo(e *gin.Engine) {
+	e.GET("/v1/vtap-interfaces/", v.getVTapInterfaces())
+}
+
+func (v *VTapInterface) getVTapInterfaces() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		args := make(map[string]interface{})
+		if value, ok := c.GetQuery("team_id"); ok {
+			args["team_id"] = value
+		}
+		if value, ok := c.GetQuery("user_id"); ok {
+			args["user_id"] = value
+		}
+		data, err := vtap.NewVTapInterface(v.cfg, httpcommon.GetUserInfo(c)).Get(args)
+		common.JsonResponse(c, data, err)
+	}
 }
