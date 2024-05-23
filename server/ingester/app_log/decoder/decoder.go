@@ -230,24 +230,25 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 	s.AttributeNames = append(s.AttributeNames, "host")
 	s.AttributeValues = append(s.AttributeValues, host)
 	s.AppService = host
+	s.OrgId, s.TeamID = d.orgId, d.teamId
 
 	// If it is an old version of the Agent, or when the Agent is just started, the value of agentId will be 0.
 	if agentId != 0 {
 		var info *grpc.Info
-		s.L3EpcID = d.platformData.QueryVtapEpc0(agentId)
+		s.L3EpcID = d.platformData.QueryVtapEpc0(s.OrgId, agentId)
 		// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
-		vtapInfo := d.platformData.QueryVtapInfo(agentId)
+		vtapInfo := d.platformData.QueryVtapInfo(s.OrgId, agentId)
 		if vtapInfo != nil {
 			ip := net.ParseIP(vtapInfo.Ip)
 			if ip != nil {
 				if ip4 := ip.To4(); ip4 != nil {
 					s.IsIPv4 = true
 					s.IP4 = utils.IpToUint32(ip4)
-					info = d.platformData.QueryIPV4Infos(s.L3EpcID, s.IP4)
+					info = d.platformData.QueryIPV4Infos(s.OrgId, s.L3EpcID, s.IP4)
 				} else {
 					s.IsIPv4 = false
 					s.IP6 = ip
-					info = d.platformData.QueryIPV6Infos(s.L3EpcID, s.IP6)
+					info = d.platformData.QueryIPV6Infos(s.OrgId, s.L3EpcID, s.IP6)
 				}
 			}
 		}
@@ -269,10 +270,10 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 			s.SubnetID = uint16(info.SubnetID)
 			// if it is just Pod Node, there is no need to match the service
 			if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
-				s.ServiceID = d.platformData.QueryService(
+				s.ServiceID = d.platformData.QueryService(s.OrgId,
 					s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 			}
-		} else if baseInfo := d.platformData.QueryEpcIDBaseInfo(s.L3EpcID); baseInfo != nil {
+		} else if baseInfo := d.platformData.QueryEpcIDBaseInfo(s.OrgId, s.L3EpcID); baseInfo != nil {
 			s.RegionID = uint16(baseInfo.RegionID)
 		}
 
@@ -299,7 +300,6 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 	s.AttributeNames = append(s.AttributeNames, "module")
 	s.AttributeValues = append(s.AttributeValues, string(columns[4]))
 
-	s.OrgId, s.TeamID = d.orgId, d.teamId
 	d.logWriter.Write(s)
 	return nil
 }
@@ -334,7 +334,7 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 		s.OrgId, s.TeamID = d.orgId, d.teamId
 	}
 
-	s.L3EpcID = d.platformData.QueryVtapEpc0(agentId)
+	s.L3EpcID = d.platformData.QueryVtapEpc0(s.OrgId, agentId)
 
 	if l.Json != nil {
 		switch v := l.Json.(type) {
@@ -371,7 +371,7 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 		ip = net.ParseIP(l.Kubernetes.PodIp)
 	}
 	if podName != "" {
-		podInfo := d.platformData.QueryPodInfo(agentId, podName)
+		podInfo := d.platformData.QueryPodInfo(s.OrgId, agentId, podName)
 		if podInfo != nil {
 			s.PodClusterID = uint16(podInfo.PodClusterId)
 			s.PodID = podInfo.PodId
@@ -388,7 +388,7 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 
 	if ip == nil {
 		// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
-		vtapInfo := d.platformData.QueryVtapInfo(agentId)
+		vtapInfo := d.platformData.QueryVtapInfo(s.OrgId, agentId)
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 		}
@@ -406,12 +406,12 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 
 	var info *grpc.Info
 	if s.PodID != 0 {
-		info = d.platformData.QueryPodIdInfo(s.PodID)
+		info = d.platformData.QueryPodIdInfo(s.OrgId, s.PodID)
 	} else {
 		if s.IsIPv4 && ip != nil {
-			info = d.platformData.QueryIPV4Infos(s.L3EpcID, s.IP4)
+			info = d.platformData.QueryIPV4Infos(s.OrgId, s.L3EpcID, s.IP4)
 		} else {
-			info = d.platformData.QueryIPV6Infos(s.L3EpcID, s.IP6)
+			info = d.platformData.QueryIPV6Infos(s.OrgId, s.L3EpcID, s.IP6)
 		}
 	}
 
@@ -437,10 +437,10 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 		s.IP6 = info.IP6
 		// if it is just Pod Node, there is no need to match the service
 		if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
-			s.ServiceID = d.platformData.QueryService(
+			s.ServiceID = d.platformData.QueryService(s.OrgId,
 				s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 		}
-	} else if baseInfo := d.platformData.QueryEpcIDBaseInfo(s.L3EpcID); baseInfo != nil {
+	} else if baseInfo := d.platformData.QueryEpcIDBaseInfo(s.OrgId, s.L3EpcID); baseInfo != nil {
 		s.RegionID = uint16(baseInfo.RegionID)
 	}
 

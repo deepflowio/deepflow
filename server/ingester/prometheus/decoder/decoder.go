@@ -80,7 +80,7 @@ type PrometheusSamplesBuilder struct {
 	name                string
 	labelTable          *PrometheusLabelTable
 	platformData        *grpc.PlatformInfoTable
-	platformDataVersion uint64
+	platformDataVersion [grpc.MAX_ORG_COUNT]uint64
 	appLabelColumnAlign int
 	ignoreUniversalTag  bool
 
@@ -94,9 +94,9 @@ type PrometheusSamplesBuilder struct {
 	appLabelValueIDsBuffer  []uint32
 
 	// universal tag cache
-	podNameIDToUniversalTag  map[uint32]flow_metrics.UniversalTag
-	instanceIPToUniversalTag map[uint32]flow_metrics.UniversalTag
-	vtapIDToUniversalTag     map[uint16]flow_metrics.UniversalTag
+	podNameIDToUniversalTag  [grpc.MAX_ORG_COUNT]map[uint32]flow_metrics.UniversalTag
+	instanceIPToUniversalTag [grpc.MAX_ORG_COUNT]map[uint32]flow_metrics.UniversalTag
+	vtapIDToUniversalTag     [grpc.MAX_ORG_COUNT]map[uint16]flow_metrics.UniversalTag
 
 	counter *BuilderCounter
 	utils.Closable
@@ -110,16 +110,20 @@ func (d *PrometheusSamplesBuilder) GetCounter() interface{} {
 
 func NewPrometheusSamplesBuilder(name string, index int, platformData *grpc.PlatformInfoTable, labelTable *PrometheusLabelTable, appLabelColumnAlign int, ignoreUniversalTag bool) *PrometheusSamplesBuilder {
 	p := &PrometheusSamplesBuilder{
-		name:                     name,
-		platformData:             platformData,
-		labelTable:               labelTable,
-		podNameIDToUniversalTag:  make(map[uint32]flow_metrics.UniversalTag),
-		instanceIPToUniversalTag: make(map[uint32]flow_metrics.UniversalTag),
-		vtapIDToUniversalTag:     make(map[uint16]flow_metrics.UniversalTag),
-		appLabelColumnAlign:      appLabelColumnAlign,
-		ignoreUniversalTag:       ignoreUniversalTag,
-		counter:                  &BuilderCounter{},
+		name:                name,
+		platformData:        platformData,
+		labelTable:          labelTable,
+		appLabelColumnAlign: appLabelColumnAlign,
+		ignoreUniversalTag:  ignoreUniversalTag,
+		counter:             &BuilderCounter{},
 	}
+
+	for i := 0; i < grpc.MAX_ORG_COUNT; i++ {
+		p.podNameIDToUniversalTag[i] = make(map[uint32]flow_metrics.UniversalTag)
+		p.instanceIPToUniversalTag[i] = make(map[uint32]flow_metrics.UniversalTag)
+		p.vtapIDToUniversalTag[i] = make(map[uint16]flow_metrics.UniversalTag)
+	}
+
 	common.RegisterCountableForIngester("decoder", p, stats.OptionStatTags{
 		"thread":   strconv.Itoa(index),
 		"msg_type": name})
@@ -272,7 +276,7 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 		log.Debugf("decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
 
-	epcId, podClusterId, err := d.samplesBuilder.GetEpcPodClusterId(vtapID)
+	epcId, podClusterId, err := d.samplesBuilder.GetEpcPodClusterId(d.orgId, vtapID)
 	if err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)
@@ -301,9 +305,9 @@ func (d *Decoder) sendPrometheus(vtapID uint16, ts *prompb.TimeSeries, extraLabe
 	d.counter.TimeSeriesOut++
 }
 
-func (b *PrometheusSamplesBuilder) GetEpcPodClusterId(vtapID uint16) (uint16, uint16, error) {
+func (b *PrometheusSamplesBuilder) GetEpcPodClusterId(orgId, vtapID uint16) (uint16, uint16, error) {
 	epcId, podClusterId := int32(0), uint16(0)
-	if vtapInfo := b.platformData.QueryVtapInfo(vtapID); vtapInfo != nil {
+	if vtapInfo := b.platformData.QueryVtapInfo(orgId, vtapID); vtapInfo != nil {
 		epcId, podClusterId = vtapInfo.EpcId, uint16(vtapInfo.PodClusterId)
 	}
 	if epcId == 0 || epcId == datatype.EPC_FROM_INTERNET {
@@ -459,29 +463,29 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 
 func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, podNameID, instanceID uint32, fillWithVtapId bool) {
 	// fast path
-	platformDataVersion := b.platformData.Version()
-	if platformDataVersion != b.platformDataVersion {
-		if b.platformDataVersion != 0 {
+	platformDataVersion := b.platformData.Version(m.OrgId)
+	if platformDataVersion != b.platformDataVersion[m.OrgId] {
+		if b.platformDataVersion[m.OrgId] != 0 {
 			log.Infof("platform data version in prometheus-decoder changed from %d to %d",
 				b.platformDataVersion, platformDataVersion)
 		}
-		b.platformDataVersion = platformDataVersion
-		b.podNameIDToUniversalTag = make(map[uint32]flow_metrics.UniversalTag)
-		b.instanceIPToUniversalTag = make(map[uint32]flow_metrics.UniversalTag)
-		b.vtapIDToUniversalTag = make(map[uint16]flow_metrics.UniversalTag)
+		b.platformDataVersion[m.OrgId] = platformDataVersion
+		b.podNameIDToUniversalTag[m.OrgId] = make(map[uint32]flow_metrics.UniversalTag)
+		b.instanceIPToUniversalTag[m.OrgId] = make(map[uint32]flow_metrics.UniversalTag)
+		b.vtapIDToUniversalTag[m.OrgId] = make(map[uint16]flow_metrics.UniversalTag)
 	} else {
 		if podNameID != 0 {
-			if universalTag, ok := b.podNameIDToUniversalTag[podNameID]; ok {
+			if universalTag, ok := b.podNameIDToUniversalTag[m.OrgId][podNameID]; ok {
 				m.UniversalTag = universalTag
 				return
 			}
 		} else if instanceID != 0 {
-			if universalTag, ok := b.instanceIPToUniversalTag[instanceID]; ok {
+			if universalTag, ok := b.instanceIPToUniversalTag[m.OrgId][instanceID]; ok {
 				m.UniversalTag = universalTag
 				return
 			}
 		} else if fillWithVtapId {
-			if universalTag, ok := b.vtapIDToUniversalTag[vtapID]; ok {
+			if universalTag, ok := b.vtapIDToUniversalTag[m.OrgId][vtapID]; ok {
 				m.UniversalTag = universalTag
 				return
 			}
@@ -493,11 +497,11 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 
 	// update fast path
 	if podName != "" && podNameID != 0 {
-		b.podNameIDToUniversalTag[podNameID] = m.UniversalTag
+		b.podNameIDToUniversalTag[m.OrgId][podNameID] = m.UniversalTag
 	} else if instanceID != 0 {
-		b.instanceIPToUniversalTag[instanceID] = m.UniversalTag
+		b.instanceIPToUniversalTag[m.OrgId][instanceID] = m.UniversalTag
 	} else if fillWithVtapId {
-		b.vtapIDToUniversalTag[vtapID] = m.UniversalTag
+		b.vtapIDToUniversalTag[m.OrgId][vtapID] = m.UniversalTag
 	}
 }
 
@@ -508,7 +512,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	var ip net.IP
 	var hasMatched bool
 	if podName != "" {
-		podInfo := b.platformData.QueryPodInfo(vtapID, podName)
+		podInfo := b.platformData.QueryPodInfo(m.OrgId, vtapID, podName)
 		if podInfo != nil {
 			t.PodClusterID = uint16(podInfo.PodClusterId)
 			t.PodID = podInfo.PodId
@@ -524,7 +528,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 
 	if !hasMatched {
 		if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
-			t.L3EpcID = b.platformData.QueryVtapEpc0(vtapID)
+			t.L3EpcID = b.platformData.QueryVtapEpc0(m.OrgId, vtapID)
 			ip = net.ParseIP(instanceIP)
 			if ip != nil {
 				hasMatched = true
@@ -533,8 +537,8 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	}
 
 	if !hasMatched && fillWithVtapId {
-		t.L3EpcID = b.platformData.QueryVtapEpc0(vtapID)
-		vtapInfo := b.platformData.QueryVtapInfo(vtapID)
+		t.L3EpcID = b.platformData.QueryVtapEpc0(m.OrgId, vtapID)
+		vtapInfo := b.platformData.QueryVtapInfo(m.OrgId, vtapID)
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 			t.PodClusterID = uint16(vtapInfo.PodClusterId)
@@ -554,9 +558,9 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 
 	var info *grpc.Info
 	if t.IsIPv6 == 1 {
-		info = b.platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
+		info = b.platformData.QueryIPV6Infos(m.OrgId, t.L3EpcID, t.IP6)
 	} else {
-		info = b.platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
+		info = b.platformData.QueryIPV4Infos(m.OrgId, t.L3EpcID, t.IP)
 	}
 	podGroupType := uint8(0)
 	if info != nil {
@@ -579,7 +583,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 
 		// if it is just Pod Node, there is no need to match the service
 		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, 0) {
-			t.ServiceID = b.platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
+			t.ServiceID = b.platformData.QueryService(m.OrgId, t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
 		}
 		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, uint32(t.PodClusterID), t.L3DeviceID, uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
