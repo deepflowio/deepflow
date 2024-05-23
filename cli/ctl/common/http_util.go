@@ -135,6 +135,9 @@ func CURLPostFormData(url, contentType string, body *bytes.Buffer, opts ...HTTPO
 	if err != nil {
 		return nil, err
 	}
+	if cfg.ORGID != 0 {
+		req.Header.Set(ctrlcommon.HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
+	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json, text/plain")
 	req.Header.Set("X-User-Id", "1")
