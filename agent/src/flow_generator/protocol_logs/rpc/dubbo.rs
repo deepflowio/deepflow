@@ -254,7 +254,7 @@ impl DubboInfo {
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
         if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Dubbo) {
-            self.is_on_blacklist =t.request_resource.is_on_blacklist(&self.service_name)
+            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.service_name)
                 || t.request_type.is_on_blacklist(&self.method_name)
                 || t.request_domain.is_on_blacklist(&self.service_name)
                 || self

@@ -845,7 +845,9 @@ func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Res
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
 	e.Model.DB = e.DB
-	e.ORGID = common.DEFAULT_ORG_ID
+	if e.ORGID == "" {
+		e.ORGID = common.DEFAULT_ORG_ID
+	}
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {

@@ -499,7 +499,12 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 }
 
 #ifndef AARCH64_MUSL
-static symbol_caches_hash_t syms_cache_hash;	// for user process symbol caches
+/**
+ * @brief Symbol table caches of process information.
+ * 
+ * You can obtain process information using the process PID.
+ */
+symbol_caches_hash_t syms_cache_hash;
 static void *k_resolver;	// for kernel symbol cache
 static volatile u32 k_resolver_lock;
 static u64 sys_btime_msecs;	// system boot time(milliseconds)
@@ -522,7 +527,6 @@ static bool inline enable_proc_info_cache(void)
 
 void free_proc_cache(struct symbolizer_proc_info *p)
 {
-	symbolizer_proc_lock(p);
 	if (p->is_java) {
 		/* Delete target ns Java files */
 		int pid = (int)p->pid;
@@ -536,8 +540,6 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 		free_symcache_count++;
 	}
 	p->syms_cache = 0;
-	CLIB_MEMORY_STORE_BARRIER();
-	symbolizer_proc_unlock(p);
 	clib_mem_free((void *)p);
 }
 
@@ -577,8 +579,8 @@ static inline bool is_existed_in_exit_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exit_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->v.
-			    proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->
+			    v.proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			ebpf_warning
@@ -608,8 +610,8 @@ static inline bool is_existed_in_exec_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exec_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->v.
-			    proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->
+			    v.proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			if (curr_p != 0 && list_p != 0) {
@@ -665,14 +667,24 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 			     pid, ret);
 		free_symbolizer_cache_kvp(kv);
 		return NULL;
-	} else
+	} else {
+		/* Extended handling associated with process execute event. */
+		extended_proc_event_handler(pid, p->comm, PROC_EXEC);
 		__sync_fetch_and_add(&h->hash_elems_count, 1);
+	}
 
 	return p;
 }
 
 static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 {
+	if (kv->v.proc_info_p) {
+		struct symbolizer_proc_info *p;
+		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
+		/* Extended handling associated with process exit event. */
+		extended_proc_event_handler((int)kv->k.pid, p->comm, PROC_EXIT);
+	}
+
 	free_symbolizer_cache_kvp(kv);
 	return 0;
 }

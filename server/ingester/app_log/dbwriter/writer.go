@@ -17,6 +17,8 @@
 package dbwriter
 
 import (
+	"fmt"
+
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/ingester/app_log/config"
@@ -53,7 +55,7 @@ func NewAppLogWriter(index int, msgType datatype.MessageType, config *config.Con
 	}
 
 	table := LOG_TABLE
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(index, table+"-"+msgType.String(), LOG_DB, config.TTL, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(index, fmt.Sprintf("%s-%s-%d", table+msgType.String(), index), LOG_DB, config.TTL, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
 	if err != nil {
 		return nil, err
 	}

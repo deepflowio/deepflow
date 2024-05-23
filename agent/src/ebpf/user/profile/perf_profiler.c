@@ -51,6 +51,7 @@
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
+#define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
 
 struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
@@ -547,7 +548,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 		return (-1);
 
 	memset(g_ctx_array, 0, sizeof(g_ctx_array));
-	profiler_context_init(&oncpu_ctx, LOG_CP_TAG,
+	profiler_context_init(&oncpu_ctx, ONCPU_PROFILER_NAME, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
 			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
 			      MAP_STACK_B_NAME, false, true,
