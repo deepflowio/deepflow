@@ -569,7 +569,7 @@ ingester:
 
   ## app log database data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
-  #application-log-ttl-hour: 168
+  #application-log-ttl-hour: 720
 
   #ck-disk-monitor:
   #  check-interval: 180 # check time interval (unit: seconds)
