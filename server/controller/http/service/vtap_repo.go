@@ -33,38 +33,47 @@ const (
 	IMAGE_MAX_COUNT = 20
 )
 
-func CreateVtapRepo(vtapRepoCreate *mysql.VTapRepo) (*model.VtapRepo, error) {
+func CreateVtapRepo(orgID int, vtapRepoCreate *mysql.VTapRepo) (*model.VtapRepo, error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	var vtapRepoFirst mysql.VTapRepo
-	if err := mysql.Db.Where("name = ?", vtapRepoCreate.Name).First(&vtapRepoFirst).Error; err != nil {
+	if err := db.Where("name = ?", vtapRepoCreate.Name).First(&vtapRepoFirst).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, NewError(httpcommon.SERVER_ERROR,
 				fmt.Sprintf("fail to query vtap_repo by name(%s), error: %s", vtapRepoCreate.Name, err))
 		}
 
 		var count int64
-		mysql.Db.Model(&mysql.VTapRepo{}).Count(&count)
+		db.Model(&mysql.VTapRepo{}).Count(&count)
 		if count >= IMAGE_MAX_COUNT {
 			return nil, fmt.Errorf("the number of image can not exceed %d", IMAGE_MAX_COUNT)
 		}
-		if err = mysql.Db.Create(&vtapRepoCreate).Error; err != nil {
+		if err = db.Create(&vtapRepoCreate).Error; err != nil {
 			return nil, err
 		}
-		vtapRepoes, _ := GetVtapRepo(map[string]interface{}{"name": vtapRepoCreate.Name})
+		vtapRepoes, _ := GetVtapRepo(orgID, map[string]interface{}{"name": vtapRepoCreate.Name})
 		return &vtapRepoes[0], nil
 	}
 
 	// update by name
-	if err := mysql.Db.Model(&mysql.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).
+	if err := db.Model(&mysql.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).
 		Updates(vtapRepoCreate).Error; err != nil {
 		return nil, err
 	}
-	vtapRepoes, _ := GetVtapRepo(map[string]interface{}{"name": vtapRepoCreate.Name})
+	vtapRepoes, _ := GetVtapRepo(orgID, map[string]interface{}{"name": vtapRepoCreate.Name})
 	return &vtapRepoes[0], nil
 }
 
-func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
+func GetVtapRepo(orgID int, filter map[string]interface{}) ([]model.VtapRepo, error) {
 	var vtapRepoes []mysql.VTapRepo
-	db := mysql.Db
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	if _, ok := filter["name"]; ok {
 		db = db.Where("name = ?", filter["name"])
 	}
@@ -88,13 +97,18 @@ func GetVtapRepo(filter map[string]interface{}) ([]model.VtapRepo, error) {
 	return resp, nil
 }
 
-func DeleteVtapRepo(name string) error {
+func DeleteVtapRepo(orgID int, name string) error {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return err
+	}
+	db := dbInfo.DB
 	var vtapRepo mysql.VTapRepo
-	if err := mysql.Db.Where("name = ?", name).Select("name", "id").First(&vtapRepo).Error; err != nil {
+	if err := db.Where("name = ?", name).Select("name", "id").First(&vtapRepo).Error; err != nil {
 		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_repo (name: %s) not found", name))
 	}
 
-	if err := mysql.Db.Where("name = ?", name).Delete(&mysql.VTapRepo{}).Error; err != nil {
+	if err := db.Where("name = ?", name).Delete(&mysql.VTapRepo{}).Error; err != nil {
 		return NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete vtap_repo (name: %s) failed", name))
 	}
 	return nil
