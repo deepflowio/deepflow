@@ -242,7 +242,7 @@ func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
 	return info
 }
 
-func CreateDomain(domainCreate model.DomainCreate, userInfo *svc.UserInfo, db *mysql.DB, cfg *config.ControllerConfig) (*model.Domain, error) {
+func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo, db *mysql.DB, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
 	db.Model(&mysql.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)
@@ -374,7 +374,7 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *svc.UserInfo, db *m
 	return &response[0], nil
 }
 
-func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *svc.UserInfo, cfg *config.ControllerConfig, db *mysql.DB) (*model.Domain, error) {
+func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig, db *mysql.DB) (*model.Domain, error) {
 	var domain mysql.Domain
 	var dbUpdateMap = make(map[string]interface{})
 
@@ -532,7 +532,7 @@ func cleanSoftDeletedResource(db *mysql.DB, lcuuid string) {
 	log.Info("clean soft deleted resources completed")
 }
 
-func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
+func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
 	var domain mysql.Domain
 	err1 := db.Where("lcuuid = ?", nameOrUUID).First(&domain).Error
 	var domains []mysql.Domain
@@ -562,7 +562,7 @@ func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB, userInfo *svc.Use
 	)
 }
 
-func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) { // TODO whether release resource ids
+func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) { // TODO whether release resource ids
 	log.Infof("delete domain (%s) resources started", domain.Name)
 
 	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanDeleteResource(domain.TeamID, common.SET_RESOURCE_TYPE_DOMAIN, domain.Lcuuid)
@@ -820,7 +820,7 @@ func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]inte
 	return response, nil
 }
 
-func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (*model.SubDomain, error) {
+func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (*model.SubDomain, error) {
 	var domain mysql.Domain
 	if err := db.Model(&mysql.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).First(&domain).Error; err != nil {
 		return nil, err
@@ -860,7 +860,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 	return response[0], nil
 }
 
-func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
+func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
 	if _, ok := subDomainUpdate["NAME"]; ok {
 		return nil, errors.New("name field cannot be modified")
 	}
@@ -911,7 +911,7 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *c
 	return response[0], nil
 }
 
-func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
+func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
 	var subDomain mysql.SubDomain
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
 		return nil, servicecommon.NewError(

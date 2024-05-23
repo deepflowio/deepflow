@@ -72,7 +72,7 @@ func (v *Vtap) getVtap() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		args := make(map[string]interface{})
 		args["lcuuid"] = c.Param("lcuuid")
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Get(args)
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Get(args)
 		JsonResponse(c, data, err)
 	}
 }
@@ -96,7 +96,7 @@ func (v *Vtap) getVtaps() gin.HandlerFunc {
 		if value, ok := c.GetQuery("team_id"); ok {
 			args["team_id"] = value
 		}
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Get(args)
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Get(args)
 		JsonResponse(c, data, err)
 	}
 }
@@ -113,7 +113,7 @@ func (v *Vtap) createVtap() gin.HandlerFunc {
 			return
 		}
 
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Create(vtapCreate)
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Create(vtapCreate)
 		JsonResponse(c, data, err)
 	}
 }
@@ -137,7 +137,7 @@ func (v *Vtap) updateVtap() gin.HandlerFunc {
 
 		lcuuid := c.Param("lcuuid")
 		name := c.Param("name")
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Update(lcuuid, name, patchMap)
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Update(lcuuid, name, patchMap)
 		JsonResponse(c, data, err)
 	}
 }
@@ -163,7 +163,7 @@ func (v *Vtap) batchUpdateVtap() gin.HandlerFunc {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
 		}
 
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).BatchUpdate(updateMap["DATA"])
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).BatchUpdate(updateMap["DATA"])
 		JsonResponse(c, data, err)
 	}
 }
@@ -186,7 +186,7 @@ func (v *Vtap) updateVtapLicenseType() gin.HandlerFunc {
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).UpdateVtapLicenseType(lcuuid, patchMap)
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).UpdateVtapLicenseType(lcuuid, patchMap)
 		JsonResponse(c, data, err)
 	}
 }
@@ -212,7 +212,7 @@ func (v *Vtap) batchUpdateVtapLicenseType() gin.HandlerFunc {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, "No DATA in request body")
 		}
 
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).BatchUpdateVtapLicenseType(updateMap["DATA"])
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).BatchUpdateVtapLicenseType(updateMap["DATA"])
 		JsonResponse(c, data, err)
 	}
 }
@@ -222,7 +222,7 @@ func (v *Vtap) deleteVtap() gin.HandlerFunc {
 		var err error
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Delete(lcuuid)
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Delete(lcuuid)
 		JsonResponse(c, data, err)
 	}
 }
@@ -241,7 +241,7 @@ func (v *Vtap) batchDeleteVtap() gin.HandlerFunc {
 			return
 		}
 
-		data, err := service.NewAgent(service.GetUserInfo(c), v.cfg).BatchDelete(deleteMap["DATA"])
+		data, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).BatchDelete(deleteMap["DATA"])
 		JsonResponse(c, data, err)
 	}
 }
@@ -303,7 +303,7 @@ func (v *Vtap) getVtapCSV() gin.HandlerFunc {
 			return
 		}
 
-		vtaps, err := service.NewAgent(service.GetUserInfo(c), v.cfg).Get(nil)
+		vtaps, err := service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).Get(nil)
 		if err != nil {
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, "get vtaps failed")
 			return

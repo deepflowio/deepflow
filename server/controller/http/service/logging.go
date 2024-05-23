@@ -17,7 +17,13 @@
 package service
 
 import (
+	"fmt"
+
 	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("service")
+
+func dbQueryResourceFailed(resource string, err error) string {
+	return fmt.Sprintf("db query %s failed: %v", resource, err)
+}

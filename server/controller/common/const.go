@@ -686,6 +686,9 @@ const (
 	HEADER_KEY_X_USER_TYPE = "X-User-Type"
 	HEADER_KEY_X_USER_ID   = "X-User-Id"
 	HEADER_X_APP_KEY       = "X-App-Key"
+
+	USER_TYPE_SUPER_ADMIN = 1
+	USER_ID_SUPER_ADMIN   = 1
 )
 
 const (
