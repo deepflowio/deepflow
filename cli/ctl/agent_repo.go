@@ -55,7 +55,7 @@ func RegisterRepoCommand() *cobra.Command {
 }
 
 var repoAgentCreateExample = `deepflow-ctl repo agent create --arch x86 --image deepflow-agent
-deepflow-ctl repo agent create --arch x86 --version-image /root/deepflow-agent --image deepflow-agent.exe 
+deepflow-ctl repo agent create --arch x86 --version-image /root/deepflow-agent --image deepflow-agent.exe
 deepflow-ctl repo agent create --arch x86 --version-image /root/deepflow-agent --k8s-image registry.cn-beijing.aliyuncs.com/deepflow-ce/deepflowio-agent:latest`
 
 func registerAgentCommand() *cobra.Command {
@@ -175,7 +175,7 @@ func createRepoAgent(cmd *cobra.Command, arch, image, versionImage, k8sImage str
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-repo/", server.IP, server.Port)
-	resp, err := common.CURLPostFormData(url, contentType, bodyBuf, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	resp, err := common.CURLPostFormData(url, contentType, bodyBuf, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func getAgentInfo(s string) (branch, revCount, commitID string) {
 func listRepoAgent(cmd *cobra.Command) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-repo/", server.IP, server.Port)
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -264,7 +264,7 @@ func deleteRepoAgent(cmd *cobra.Command, args []string) error {
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-repo/", server.IP, server.Port)
-	_, err := common.CURLPerform("DELETE", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	_, err := common.CURLPerform("DELETE", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return err
 	}
