@@ -175,13 +175,15 @@ func createRepoAgent(cmd *cobra.Command, arch, image, versionImage, k8sImage str
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtap-repo/", server.IP, server.Port)
-	resp, err := common.CURLPostFormData(url, contentType, bodyBuf, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
+	orgID := common.GetORGID(cmd)
+	resp, err := common.CURLPostFormData(url, contentType, bodyBuf, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(orgID)}...)
 	if err != nil {
 		return err
 	}
 	data := resp.Get("DATA")
-	fmt.Printf("created successfully, os: %s, branch: %s, rev_count: %s, commit_id: %s\n", data.Get("OS").MustString(),
-		data.Get("BRANCH").MustString(), data.Get("REV_COUNT").MustString(), data.Get("COMMIT_ID").MustString())
+	fmt.Printf("ORGID-%d: created successfully, os: %s, branch: %s, rev_count: %s, commit_id: %s\n",
+		orgID, data.Get("OS").MustString(), data.Get("BRANCH").MustString(),
+		data.Get("REV_COUNT").MustString(), data.Get("COMMIT_ID").MustString())
 	return nil
 }
 
