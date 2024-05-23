@@ -418,6 +418,8 @@ impl From<TlsInfo> for L7ProtocolSendLog {
             });
         }
         let log = L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             req: L7Request {
                 resource: f.request_resource,
                 domain: f.request_domain,
