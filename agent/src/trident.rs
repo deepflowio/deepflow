@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
-    Arc, Condvar, Mutex, Weak,
+    Arc, Condvar, Mutex, RwLock, Weak,
 };
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -1250,7 +1250,7 @@ pub struct AgentComponents {
     pub proc_event_uniform_sender: UniformSenderThread<BoxedProcEvents>,
     pub exception_handler: ExceptionHandler,
     pub npb_bps_limit: Arc<LeakyBucket>,
-    pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
+    pub handler_builders: Vec<Arc<RwLock<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread<OpenTelemetryCompressed>,
     pub pcap_assemblers: Vec<PcapAssembler>,
     pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
@@ -2029,7 +2029,7 @@ impl AgentComponents {
             );
             pcap_assemblers.push(pcap_assembler);
 
-            let handler_builder = Arc::new(Mutex::new(vec![
+            let handler_builder = Arc::new(RwLock::new(vec![
                 PacketHandlerBuilder::Pcap(mini_packet_sender),
                 PacketHandlerBuilder::Npb(NpbBuilder::new(
                     i,
@@ -2094,6 +2094,11 @@ impl AgentComponents {
                         .dispatcher
                         .capture_packet_size as usize,
                     dpdk_enabled: config_handler.candidate_config.dispatcher.dpdk_enabled,
+                    dpdk_core_list: config_handler
+                        .candidate_config
+                        .dispatcher
+                        .dpdk_core_list
+                        .clone(),
                     dispatcher_queue: config_handler.candidate_config.dispatcher.dispatcher_queue,
                     packet_fanout_mode: yaml_config.packet_fanout_mode,
                     ..Default::default()
@@ -2660,7 +2665,7 @@ impl AgentComponents {
             self.pcap_batch_uniform_sender.start();
         }
         self.handler_builders.iter().for_each(|x| {
-            x.lock().unwrap().iter_mut().for_each(|y| {
+            x.write().unwrap().iter_mut().for_each(|y| {
                 y.start();
             })
         });
@@ -2748,7 +2753,7 @@ impl AgentComponents {
             join_handles.push(h);
         }
         self.handler_builders.iter().for_each(|x| {
-            x.lock().unwrap().iter_mut().for_each(|y| {
+            x.write().unwrap().iter_mut().for_each(|y| {
                 if let Some(h) = y.notify_stop() {
                     join_handles.push(h);
                 }
