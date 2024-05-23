@@ -65,10 +65,10 @@ type Decoder struct {
 	config           *config.Config
 
 	// universal tag cache
-	podNameToUniversalTag    map[string]*flow_metrics.UniversalTag
-	instanceIPToUniversalTag map[string]*flow_metrics.UniversalTag
-	vtapIDToUniversalTag     map[uint16]*flow_metrics.UniversalTag
-	platformDataVersion      uint64
+	podNameToUniversalTag    [grpc.MAX_ORG_COUNT]map[string]*flow_metrics.UniversalTag
+	instanceIPToUniversalTag [grpc.MAX_ORG_COUNT]map[string]*flow_metrics.UniversalTag
+	vtapIDToUniversalTag     [grpc.MAX_ORG_COUNT]map[uint16]*flow_metrics.UniversalTag
+	platformDataVersion      [grpc.MAX_ORG_COUNT]uint64
 
 	orgId, teamId uint16
 
@@ -83,19 +83,22 @@ func NewDecoder(
 	extMetricsWriter *dbwriter.ExtMetricsWriter,
 	config *config.Config,
 ) *Decoder {
-	return &Decoder{
-		index:                    index,
-		msgType:                  msgType,
-		platformData:             platformData,
-		inQueue:                  inQueue,
-		debugEnabled:             log.IsEnabledFor(logging.DEBUG),
-		extMetricsWriter:         extMetricsWriter,
-		config:                   config,
-		podNameToUniversalTag:    make(map[string]*flow_metrics.UniversalTag),
-		instanceIPToUniversalTag: make(map[string]*flow_metrics.UniversalTag),
-		vtapIDToUniversalTag:     make(map[uint16]*flow_metrics.UniversalTag),
-		counter:                  &Counter{},
+	d := &Decoder{
+		index:            index,
+		msgType:          msgType,
+		platformData:     platformData,
+		inQueue:          inQueue,
+		debugEnabled:     log.IsEnabledFor(logging.DEBUG),
+		extMetricsWriter: extMetricsWriter,
+		config:           config,
+		counter:          &Counter{},
 	}
+	for i := 0; i < grpc.MAX_ORG_COUNT; i++ {
+		d.podNameToUniversalTag[i] = make(map[string]*flow_metrics.UniversalTag)
+		d.instanceIPToUniversalTag[i] = make(map[string]*flow_metrics.UniversalTag)
+		d.vtapIDToUniversalTag[i] = make(map[uint16]*flow_metrics.UniversalTag)
+	}
+	return d
 }
 
 func (d *Decoder) GetCounter() interface{} {
@@ -231,21 +234,21 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	var universalTag *flow_metrics.UniversalTag
 
 	// fast path
-	platformDataVersion := d.platformData.Version()
-	if platformDataVersion != d.platformDataVersion {
-		if d.platformDataVersion != 0 {
+	platformDataVersion := d.platformData.Version(m.OrgId)
+	if platformDataVersion != d.platformDataVersion[m.OrgId] {
+		if d.platformDataVersion[m.OrgId] != 0 {
 			log.Infof("platform data version in ext-metrics-decoder %s-#%d changed from %d to %d",
 				d.msgType, d.index, d.platformDataVersion, platformDataVersion)
 		}
-		d.platformDataVersion = platformDataVersion
-		d.podNameToUniversalTag = make(map[string]*flow_metrics.UniversalTag)
-		d.instanceIPToUniversalTag = make(map[string]*flow_metrics.UniversalTag)
-		d.vtapIDToUniversalTag = make(map[uint16]*flow_metrics.UniversalTag)
+		d.platformDataVersion[m.OrgId] = platformDataVersion
+		d.podNameToUniversalTag[m.OrgId] = make(map[string]*flow_metrics.UniversalTag)
+		d.instanceIPToUniversalTag[m.OrgId] = make(map[string]*flow_metrics.UniversalTag)
+		d.vtapIDToUniversalTag[m.OrgId] = make(map[uint16]*flow_metrics.UniversalTag)
 	} else {
 		if podName != "" {
-			universalTag, _ = d.podNameToUniversalTag[podName]
+			universalTag, _ = d.podNameToUniversalTag[m.OrgId][podName]
 		} else if fillWithVtapId {
-			universalTag, _ = d.vtapIDToUniversalTag[vtapID]
+			universalTag, _ = d.vtapIDToUniversalTag[m.OrgId][vtapID]
 		}
 		if universalTag != nil {
 			m.UniversalTag = *universalTag
@@ -260,9 +263,9 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	universalTag = &flow_metrics.UniversalTag{} // Since the cache dictionary will be cleaned up by GC, no need to use a pool here.
 	*universalTag = m.UniversalTag
 	if podName != "" {
-		d.podNameToUniversalTag[podName] = universalTag
+		d.podNameToUniversalTag[m.OrgId][podName] = universalTag
 	} else if fillWithVtapId {
-		d.vtapIDToUniversalTag[vtapID] = universalTag
+		d.vtapIDToUniversalTag[m.OrgId][vtapID] = universalTag
 	}
 }
 
@@ -272,7 +275,7 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 	t.L3EpcID = datatype.EPC_FROM_INTERNET
 	var ip net.IP
 	if podName != "" {
-		podInfo := d.platformData.QueryPodInfo(vtapID, podName)
+		podInfo := d.platformData.QueryPodInfo(m.OrgId, vtapID, podName)
 		if podInfo != nil {
 			t.PodClusterID = uint16(podInfo.PodClusterId)
 			t.PodID = podInfo.PodId
@@ -280,8 +283,8 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 			ip = net.ParseIP(podInfo.Ip)
 		}
 	} else if fillWithVtapId {
-		t.L3EpcID = d.platformData.QueryVtapEpc0(vtapID)
-		vtapInfo := d.platformData.QueryVtapInfo(vtapID)
+		t.L3EpcID = d.platformData.QueryVtapEpc0(m.OrgId, vtapID)
+		vtapInfo := d.platformData.QueryVtapInfo(m.OrgId, vtapID)
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
 			t.PodClusterID = uint16(vtapInfo.PodClusterId)
@@ -302,9 +305,9 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 
 	var info *grpc.Info
 	if t.IsIPv6 == 1 {
-		info = d.platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
+		info = d.platformData.QueryIPV6Infos(m.OrgId, t.L3EpcID, t.IP6)
 	} else {
-		info = d.platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
+		info = d.platformData.QueryIPV4Infos(m.OrgId, t.L3EpcID, t.IP)
 	}
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
@@ -325,7 +328,7 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 		}
 
 		if common.IsPodServiceIP(t.L3DeviceType, t.PodID, t.PodNodeID) {
-			t.ServiceID = d.platformData.QueryService(t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
+			t.ServiceID = d.platformData.QueryService(m.OrgId, t.PodID, t.PodNodeID, uint32(t.PodClusterID), t.PodGroupID, t.L3EpcID, t.IsIPv6 == 1, t.IP, t.IP6, 0, 0)
 		}
 		t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 		t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, uint32(t.PodClusterID), t.L3DeviceID, uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
