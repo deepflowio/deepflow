@@ -40,6 +40,7 @@ type IDManager struct {
 }
 
 func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
+	log.Infof("create id manager for org: %d", orgID)
 	org, err := common.NewORG(orgID)
 	if err != nil {
 		log.Errorf("failed to create org object: %s", err.Error())

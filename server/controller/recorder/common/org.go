@@ -17,6 +17,8 @@
 package common
 
 import (
+	"fmt"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
@@ -38,4 +40,8 @@ func NewORG(id int) (*ORG, error) {
 // LogPre adds org id, domain info, sub_domain info to logs
 func (o *ORG) LogPre(format string, a ...any) string {
 	return o.Logger.AddPre(format, a...)
+}
+
+func FmtORGID(id int) string {
+	return fmt.Sprintf("[OID-%d] ", id)
 }
