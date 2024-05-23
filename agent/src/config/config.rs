@@ -494,6 +494,7 @@ pub struct L7ProtocolAdvancedFeatures {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct L7LogBlacklist {
     pub field_name: String,
     pub operator: String,
