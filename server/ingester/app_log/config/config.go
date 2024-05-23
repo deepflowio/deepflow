@@ -31,7 +31,7 @@ var log = logging.MustGetLogger("event.config")
 const (
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 16384
-	DefaultTTL               = 168 // hour
+	DefaultTTL               = 720 // hour
 )
 
 type Config struct {
