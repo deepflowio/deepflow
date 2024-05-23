@@ -6,10 +6,6 @@ ENV IN_CONTAINER yes
 ENV RUST_BACKTRACE 1
 ARG TARGETARCH
 RUN --mount=target=/tmp-mount \
-    chmod 600 /etc/passwd; \
-    echo "deepflow:x:1000:1000::/home/deepflow:/bin/bash" >> /etc/passwd; \
-    echo "root:root" | chpasswd; \
-    chmod 000 /etc/passwd; \
     mkdir -p /lib64 && \
     apt-get update && apt-get upgrade -y && apt-get install \
     --no-install-suggests  --no-install-recommends -y \
@@ -17,6 +13,7 @@ RUN --mount=target=/tmp-mount \
     iproute2 \
     bridge-utils \
     busybox && \
+    apt-get install --only-upgrade --no-install-suggests  --no-install-recommends -y libc6 libc-bin && \
     /bin/cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime && \
     AGENT_BUILD_ARCH=$(echo ${TARGETARCH}|sed 's|amd64|x86_64|'|sed 's|arm64|aarch64|') && \
     cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/release/deepflow-agent /bin/  && \
