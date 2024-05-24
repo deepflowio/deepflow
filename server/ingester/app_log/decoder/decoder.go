@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -152,6 +153,7 @@ func (d *Decoder) GetCounter() interface{} {
 func (d *Decoder) Run() {
 	log.Infof("application log (%s-%d) decoder run", d.msgType.String(), d.index)
 	ingestercommon.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
+		"thread":   strconv.Itoa(d.index),
 		"msg_type": d.msgType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
