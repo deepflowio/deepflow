@@ -93,6 +93,13 @@ func (a *Aliyun) getVMs(region model.Region) (
 				}
 			}
 
+			cloudTags := map[string]string{}
+			vmTags := vm.GetPath("Tags", "Tag")
+			for t := range vmTags.MustArray() {
+				tag := vmTags.GetIndex(t)
+				cloudTags[tag.Get("TagKey").MustString()] = tag.Get("TagValue").MustString()
+			}
+
 			retVM := model.VM{
 				Lcuuid:       vmLcuuid,
 				Name:         vmName,
@@ -101,6 +108,7 @@ func (a *Aliyun) getVMs(region model.Region) (
 				VPCLcuuid:    VPCLcuuid,
 				State:        vmState,
 				IP:           pIP,
+				CloudTags:    cloudTags,
 				CreatedAt:    createdAt,
 				AZLcuuid:     common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+zoneId),
 				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
