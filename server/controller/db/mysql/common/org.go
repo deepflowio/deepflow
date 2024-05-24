@@ -28,7 +28,7 @@ var log = logging.MustGetLogger("db.mysql.common")
 
 // ORGIDToDatabaseName convert organization id to database name, format: 0002_deepflow
 func ORGIDToDatabaseName(id int) string {
-	return fmt.Sprintf(DATABASE_PREFIX_ALIGNMENT, id) + DATABASE_SUFFIX
+	return fmt.Sprintf(DATABASE_PREFIX_ALIGNMENT, id) + NONE_DEFAULT_ORG_DATABASE_SUFFIX
 }
 
 func ReplaceConfigDatabaseName(cfg config.MySqlConfig, orgID int) config.MySqlConfig {
