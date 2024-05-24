@@ -181,5 +181,5 @@ func (s *service) RemoteExecute(in api.Synchronizer_RemoteExecuteServer) error {
 }
 
 func (s *service) GetOrgIDs(ctx context.Context, in *api.OrgIDsRequest) (*api.OrgIDsResponse, error) {
-	return nil, nil
+	return s.tsdbEvent.GetOrgIDs(ctx, in)
 }

@@ -1093,7 +1093,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					Password: config.Cfg.Clickhouse.Password,
 					DB:       "flow_tag",
 				}
-				appLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				appLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, ORGID: e.ORGID})
 				if err != nil {
 					return "", err
 				}

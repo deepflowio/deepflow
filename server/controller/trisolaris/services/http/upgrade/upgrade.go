@@ -94,7 +94,7 @@ func Upgrade(c *gin.Context) {
 		return
 	}
 	key := vtap.CtrlIP + "-" + vtap.CtrlMac
-	vTapCache := trisolaris.GetGVTapInfo(orgIDInt).GetVTapCache(key)
+	vTapCache := trisolaris.GetORGVTapInfo(orgIDInt).GetVTapCache(key)
 	if vTapCache == nil {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, not found vtap cache", orgIDInt)))
 		return

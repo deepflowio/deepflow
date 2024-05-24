@@ -218,6 +218,20 @@ func (c *Cloud) GetResource() model.Resource {
 	return cResource
 }
 
+func (c *Cloud) GetSubDomainResource(lcuuid string) model.Resource {
+	sResource := model.Resource{}
+	if c.basicInfo.Type == common.KUBERNETES {
+		return sResource
+	}
+	cResource := c.resource
+	if !cResource.Verified {
+		cResource = c.getOwnDomainResource()
+	}
+	sResource.SubDomainResources = c.getSubDomainDataByLcuuid(lcuuid, cResource)
+	sResource = c.appendResourceProcess(sResource)
+	return sResource
+}
+
 func (c *Cloud) GetKubernetesGatherTaskMap() map[string]*KubernetesGatherTask {
 	return c.kubernetesGatherTaskMap
 }
@@ -593,7 +607,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 			StartTime:   sProcess.StartTime,
 			OSAPPTags:   sProcess.OSAPPTags,
 		}
-		if lcuuid == "" {
+		if resource.Verified && lcuuid == "" {
 			resource.Processes = append(resource.Processes, process)
 			continue
 		}
