@@ -1258,6 +1258,10 @@ pub struct RuntimeConfig {
     pub epc_id: u32,
     #[serde(skip)]
     pub vtap_id: u16,
+    #[serde(skip)]
+    pub team_id: u32,
+    #[serde(skip)]
+    pub organize_id: u32,
     #[serde(deserialize_with = "to_socket_type")]
     pub collector_socket_type: trident::SocketType,
     #[serde(deserialize_with = "to_socket_type")]
@@ -1377,6 +1381,8 @@ impl RuntimeConfig {
             proxy_controller_port: 30035,
             epc_id: 3302,
             vtap_id: 3302,
+            team_id: 0,
+            organize_id: 0,
             collector_socket_type: trident::SocketType::File,
             npb_socket_type: trident::SocketType::RawUdp,
             trident_type: common::TridentType::TtProcess,
@@ -1583,6 +1589,8 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             proxy_controller_port: conf.proxy_controller_port() as u16,
             epc_id: conf.epc_id(),
             vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
+            team_id: conf.team_id(),
+            organize_id: conf.organize_id(),
             collector_socket_type: conf.collector_socket_type(),
             npb_socket_type: conf.npb_socket_type(),
             trident_type: conf.trident_type(),
