@@ -45,7 +45,7 @@ use tokio::{
 };
 
 use super::{Session, RPC_RETRY_INTERVAL};
-use crate::trident::AgentId;
+use crate::{exception::ExceptionHandler, trident::AgentId};
 
 use public::{
     netns::{reset_netns, set_netns},
@@ -173,23 +173,18 @@ impl From<NetNsInfo> for pb::LinuxNamespace {
 struct Interior {
     agent_id: Arc<RwLock<AgentId>>,
     session: Arc<Session>,
+    exc: ExceptionHandler,
     running: Arc<AtomicBool>,
 }
 
 impl Interior {
     async fn run(&mut self) {
-        let mut server_responded = true;
         while self.running.load(Ordering::Relaxed) {
-            if !server_responded {
-                // sleep here to avoid flooding server without RemoteExec implemented
-                tokio::time::sleep(RPC_RETRY_INTERVAL).await;
-            }
-            server_responded = false;
-
             let (sender, receiver) = mpsc::channel(1);
             let responser = Responser::new(self.agent_id.clone(), receiver);
 
             self.session.update_current_server().await;
+            let session_version = self.session.get_version();
             let client = match self.session.get_client() {
                 Some(c) => c,
                 None => {
@@ -207,6 +202,7 @@ impl Interior {
                 Ok(stream) => stream,
                 Err(e) => {
                     warn!("remote_execute failed: {:?}", e);
+                    self.exc.set(pb::Exception::ControllerSocketError);
                     tokio::time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
@@ -215,9 +211,22 @@ impl Interior {
             trace!("remote_execute initial receive");
             debug!("remote_execute latency {:?}ms", now.elapsed().as_millis());
 
-            while let Ok(Some(message)) = stream.message().await {
-                server_responded = true;
-                if !self.running.load(Ordering::Relaxed) {
+            while self.running.load(Ordering::Relaxed) {
+                let message = stream.message().await;
+                let message = match message {
+                    Ok(Some(message)) => message,
+                    Ok(None) => {
+                        debug!("server closed stream");
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("remote_execute failed: {:?}", e);
+                        self.exc.set(pb::Exception::ControllerSocketError);
+                        break;
+                    }
+                };
+                if session_version != self.session.get_version() {
+                    info!("grpc server changed");
                     break;
                 }
                 if message.exec_type.is_none() {
@@ -246,6 +255,7 @@ pub struct Executor {
     agent_id: Arc<RwLock<AgentId>>,
     session: Arc<Session>,
     runtime: Arc<Runtime>,
+    exc: ExceptionHandler,
 
     running: Arc<AtomicBool>,
 }
@@ -255,11 +265,13 @@ impl Executor {
         agent_id: Arc<RwLock<AgentId>>,
         session: Arc<Session>,
         runtime: Arc<Runtime>,
+        exc: ExceptionHandler,
     ) -> Self {
         Self {
             agent_id,
             session,
             runtime,
+            exc,
             running: Default::default(),
         }
     }
@@ -271,6 +283,7 @@ impl Executor {
         let mut interior = Interior {
             agent_id: self.agent_id.clone(),
             session: self.session.clone(),
+            exc: self.exc.clone(),
             running: self.running.clone(),
         };
         self.runtime.spawn(async move {
