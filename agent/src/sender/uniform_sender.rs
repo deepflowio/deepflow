@@ -83,21 +83,19 @@ struct Header {
     frame_size: u32, // tcp发送时，需要按此长度收齐数据后，再decode (FrameSize总长度，包含了 BaseHeader的长度)
     msg_type: SendMessageType,
 
-    version: u32,  // 用来校验encode和decode是否配套
-    sequence: u64, // 依次递增，接收方用来判断是否有丢包(UDP发送时)
-    vtap_id: u16,  // roze用来上报server活跃的VTAP信息
+    version: u32, // 用来校验encode和decode是否配套
+    team_id: u32,
+    organize_id: u32,
+    vtap_id: u16, // roze用来上报server活跃的VTAP信息
 }
 
 impl Header {
     fn encode(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(self.frame_size.to_be_bytes().as_slice());
         buffer.push(self.msg_type.into());
-        // syslog header is 5 bytes
-        if matches!(self.msg_type, SendMessageType::Syslog) {
-            return;
-        }
         buffer.extend_from_slice(self.version.to_le_bytes().as_slice());
-        buffer.extend_from_slice(self.sequence.to_le_bytes().as_slice());
+        buffer.extend_from_slice(self.team_id.to_le_bytes().as_slice());
+        buffer.extend_from_slice(self.organize_id.to_le_bytes().as_slice());
         buffer.extend_from_slice(self.vtap_id.to_le_bytes().as_slice());
     }
 }
@@ -120,7 +118,8 @@ impl<T: Sendable> Encoder<T> {
                 msg_type,
                 frame_size: 0,
                 version: 0,
-                sequence: 0,
+                team_id: 0,
+                organize_id: 0,
                 vtap_id,
             },
             _marker: PhantomData,
@@ -152,7 +151,6 @@ impl<T: Sendable> Encoder<T> {
     }
 
     fn add_header(&mut self) {
-        self.header.sequence += 1;
         self.header.encode(&mut self.buffer);
     }
 
@@ -161,8 +159,11 @@ impl<T: Sendable> Encoder<T> {
         self.buffer[0..4].copy_from_slice(frame_size.to_be_bytes().as_slice());
     }
 
-    pub fn update_header_vtap_id(&mut self, vtap_id: u16) {
-        self.header.vtap_id = vtap_id;
+    pub fn update_header(&mut self, config: &SenderAccess) {
+        let config = config.load();
+        self.header.vtap_id = config.vtap_id;
+        self.header.team_id = config.team_id;
+        self.header.organize_id = config.organize_id;
     }
 
     pub fn buffer_len(&self) -> usize {
@@ -601,8 +602,7 @@ impl<T: Sendable> UniformSender<T> {
         if !self.cached || self.encoder.buffer_len() > Encoder::<T>::BUFFER_LEN {
             self.check_or_register_counterable(self.encoder.header.msg_type);
             self.update_dst_ip_and_port();
-            self.encoder
-                .update_header_vtap_id(self.config.load().vtap_id);
+            self.encoder.update_header(&self.config);
             self.flush_encoder();
         }
         Ok(())
