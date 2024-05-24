@@ -68,7 +68,9 @@ func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
 		db, err = common.GetSession(copiedCfg)
 	}
 	if err != nil {
-		log.Errorf("failed to create db session: %s, config: %v", err.Error(), copiedCfg)
+		logConfig := copiedCfg
+		logConfig.UserPassword = "******"
+		log.Errorf("failed to create db session: %s, config: %#v", err.Error(), logConfig)
 		return nil, err
 	}
 	return &DB{db, orgID, copiedCfg.Database}, nil

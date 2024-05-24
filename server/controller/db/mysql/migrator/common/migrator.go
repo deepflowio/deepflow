@@ -29,6 +29,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration/script"
@@ -91,19 +92,54 @@ func CreateDatabaseIfNotExists(dc *DBConfig) (bool, error) {
 
 func InitCETables(dc *DBConfig) error {
 	log.Info(LogDBName(dc.Config.Database, "initialize CE tables"))
-	log.Infof("%#v", dc.DB)
+
+	// 先初始化所有组织需要的 CE 表，再判断数据库是否是 default 组织，如果是 default 组织，初始化仅 default 组织所需数据。
+	err := initCEORGTables(dc)
+	if err != nil {
+		return err
+	}
+
+	// 通过判断数据库名称后缀，判断数据库是否是 default 组织。
+	if !strings.HasSuffix(dc.Config.Database, common.NONE_DEFAULT_ORG_DATABASE_SUFFIX) {
+		if err := initCEDefaultORGTables(dc); err != nil {
+			return err
+		}
+	}
+
+	log.Info(LogDBName(dc.Config.Database, "initialized CE tables successfully"))
+	return nil
+}
+
+func initCEORGTables(dc *DBConfig) error {
+	log.Info(LogDBName(dc.Config.Database, "initialize CE org tables"))
 	initSQL, err := os.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
 	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to read sql file: %s", err.Error()))
+		log.Error(LogDBName(dc.Config.Database, "failed to read CE org sql file: %s", err.Error()))
 		return err
 	}
 	err = dc.DB.Exec(string(initSQL)).Error
 	if err != nil {
-		log.Error(LogDBName(dc.Config.Database, "failed to initialize db tables: %s", err.Error()))
+		log.Error(LogDBName(dc.Config.Database, "failed to initialize CE org tables: %s", err.Error()))
 		return err
 	}
-	log.Info(LogDBName(dc.Config.Database, "initialized CE tables successfully"))
-	return err
+	log.Info(LogDBName(dc.Config.Database, "initialized CE org tables successfully"))
+	return nil
+}
+
+func initCEDefaultORGTables(dc *DBConfig) error {
+	log.Info(LogDBName(dc.Config.Database, "initialize CE default org tables"))
+	initSQL, err := os.ReadFile(fmt.Sprintf("%s/default_init.sql", SQL_FILE_DIR))
+	if err != nil {
+		log.Error(LogDBName(dc.Config.Database, "failed to read CE default org sql file: %s", err.Error()))
+		return err
+	}
+	err = dc.DB.Exec(string(initSQL)).Error
+	if err != nil {
+		log.Error(LogDBName(dc.Config.Database, "failed to initialize CE default org tables: %s", err.Error()))
+		return err
+	}
+	log.Info(LogDBName(dc.Config.Database, "initialized CE default org tables successfully"))
+	return nil
 }
 
 func InitDBVersion(dc *DBConfig) error {
