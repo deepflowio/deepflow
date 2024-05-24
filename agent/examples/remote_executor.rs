@@ -31,6 +31,7 @@ fn main() {
         .unwrap()
         .start()
         .unwrap();
+    let exc = ExceptionHandler::default();
 
     let stats_collector = Arc::new(stats::Collector::new("localhost", Default::default()));
     let session = Arc::new(Session::new(
@@ -39,7 +40,7 @@ fn main() {
         DEFAULT_TIMEOUT,
         "".to_owned(),
         vec!["127.0.0.1".to_owned()],
-        ExceptionHandler::default(),
+        exc.clone(),
         &stats_collector,
     ));
 
@@ -57,7 +58,7 @@ fn main() {
         team_id: "example-team".to_owned(),
     }));
 
-    let executor = Executor::new(agent_id, session, runtime);
+    let executor = Executor::new(agent_id, session, runtime, exc);
     executor.start();
 
     loop {}
