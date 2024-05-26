@@ -3142,12 +3142,20 @@ typedef struct __attribute__ ((packed)) {
 static __inline enum message_type
 infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 {
+	/*
+	 * When reading data over TLS, it first reads 5 bytes of content and then
+	 * reads the remaining data. We save the initial 5 bytes and combine them
+	 * with the subsequently read data. Then, we use the combined data for
+	 * further processing.
+	 */
+	static const int advance_bytes = 5;
+
 	tls_handshake_t handshake = { 0 };
 
-	if (conn_info->prev_count == 5)
-		count += 5;
+	if (conn_info->prev_count == advance_bytes)
+		count += advance_bytes;
 
-	if (count == 5) {
+	if (count == advance_bytes) {
 		handshake.content_type = buf[0];
 		handshake.version = __bpf_ntohs(*(__u16 *) & buf[1]);
 		goto check;
@@ -3156,7 +3164,7 @@ infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 	if (count < 6)
 		return MSG_UNKNOWN;
 
-	if (conn_info->prev_count == 5) {
+	if (conn_info->prev_count == advance_bytes) {
 		handshake.content_type = conn_info->prev_buf[0];
 		handshake.version =
 		    __bpf_ntohs(*(__u16 *) & conn_info->prev_buf[1]);
@@ -3187,6 +3195,11 @@ check:
 	if (!(handshake.version >= 0x301 && handshake.version <= 0x304))
 		return MSG_UNKNOWN;
 
+	if (count == advance_bytes) {
+		save_prev_data_from_kern(buf, conn_info, advance_bytes);
+		return MSG_PRESTORE;
+	}
+
 	/*
 	 * Encrypted Alert unidirectional transmission, retain tracking information
 	 * without removal.
@@ -3199,11 +3212,8 @@ check:
 		if (handshake.content_type != 0x15 &&
 		    conn_info->socket_info_ptr->tls_end)
 			return MSG_UNKNOWN;
-	}
-
-	if (count == 5) {
-		save_prev_data_from_kern(buf, conn_info, 5);
-		return MSG_PRESTORE;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	/*
