@@ -571,13 +571,29 @@ static __inline enum message_type infer_http2_message(const char *buf_kern,
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
 		is_first = false;
+	}
+
+	enum message_type ret =
+	    parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
+				      conn_info, is_first);
+
+	/*
+	 * When performing data merging at the eBPF layer, the data needs to be
+	 * temporarily stored (this data will become part of the subsequent data
+	 * and will be merged later). The pre-stored data cannot be pushed to the
+	 * upper layer for reassembly; this needs to be done at the eBPF layer.
+	 * Therefore, this must be prioritized before the ‘conn_info->enable_reasm’
+	 * check.
+	 */
+	if (ret == MSG_PRESTORE)
+		return MSG_PRESTORE;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->enable_reasm)
 			return MSG_REQUEST;
 	}
 
-	return parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
-					 conn_info, is_first);
-
+	return ret;
 }
 
 static __inline enum message_type infer_http_message(const char *buf,
@@ -626,8 +642,8 @@ static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 		    conn_info->socket_info_ptr->direction) {
 			bpf_probe_read_kernel(conn_info->prev_buf,
 					      sizeof(conn_info->prev_buf),
-					      conn_info->socket_info_ptr->
-					      prev_data);
+					      conn_info->
+					      socket_info_ptr->prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
 			/*
@@ -3290,7 +3306,8 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 				 * for reassembly).
 				 */
 				if (conn_info->socket_info_ptr->reasm_bytes >=
-				    trace_conf->data_limit_max || conn_info->prev_count > 0)
+				    trace_conf->data_limit_max
+				    || conn_info->prev_count > 0)
 					conn_info->enable_reasm = false;
 			} else {
 				conn_info->socket_info_ptr->reasm_bytes = 0;
