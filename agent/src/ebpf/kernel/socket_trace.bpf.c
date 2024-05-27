@@ -102,6 +102,14 @@ MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
 
+/**
+ * @brief Record which protocols allow data segmentation
+ * reassembly processing.
+ *
+ * key: protocol id, value: is protocol allowed?, size: PROTO_NUM
+ */
+MAP_ARRAY(allow_reasm_protos_map, int, bool, PROTO_NUM)
+
 // 0: allow bitmap; 1: bypass bitmap
 MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2)
 
@@ -122,8 +130,8 @@ BPF_HASH(active_write_args_map, __u64, struct data_args_t)
 BPF_HASH(active_read_args_map, __u64, struct data_args_t)
 
 // socket_info_map, 这是个hash表，用于记录socket信息，
-// Key is {pid + fd}. value is struct socket_info_t
-BPF_HASH(socket_info_map, __u64, struct socket_info_t)
+// Key is {pid + fd}. value is struct socket_info_s
+BPF_HASH(socket_info_map, __u64, struct socket_info_s)
 
 // socket_info lifecycle is inconsistent with socket. If the role information
 // is saved to the socket_info_map, it will affect the generation of syscall
@@ -157,8 +165,14 @@ static __inline bool is_protocol_enabled(int protocol)
 	return (enabled) ? (*enabled) : (0);
 }
 
+static __inline bool is_proto_reasm_enabled(int protocol)
+{
+	bool *enabled = allow_reasm_protos_map__lookup(&protocol);
+	return (enabled) ? (*enabled) : false;
+}
+
 static __inline void delete_socket_info(__u64 conn_key,
-					struct socket_info_t *socket_info_ptr)
+					struct socket_info_s *socket_info_ptr)
 {
 	if (socket_info_ptr == NULL)
 		return;
@@ -584,14 +598,12 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.rcv_saddr, 16,
 					      sk +
-					      offset->
-					      struct_sock_ip6saddr_offset);
+					      offset->struct_sock_ip6saddr_offset);
 		}
 		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.daddr, 16,
 					      sk +
-					      offset->
-					      struct_sock_ip6daddr_offset);
+					      offset->struct_sock_ip6daddr_offset);
 		}
 		v->tuple.addr_len = 16;
 		break;
@@ -970,7 +982,7 @@ do { \
 #define TRACE_MAP_ACT_NEW   1
 #define TRACE_MAP_ACT_DEL   2
 
-static __inline void trace_process(struct socket_info_t *socket_info_ptr,
+static __inline void trace_process(struct socket_info_s *socket_info_ptr,
 				   struct conn_info_s *conn_info,
 				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
@@ -1108,7 +1120,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	__u32 tcp_seq = args->tcp_seq;
 	__u64 thread_trace_id = 0;
 	__u32 k0 = 0;
-	struct socket_info_t sk_info = { 0 };
+	struct socket_info_s sk_info = { 0 };
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
 	if (trace_conf == NULL)
 		return SUBMIT_INVALID;
@@ -1128,7 +1140,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			  true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
-	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
+	struct socket_info_s *socket_info_ptr = conn_info->socket_info_ptr;
 	// 'socket_id' used to resolve non-tracing between the same socket
 	__u64 socket_id = 0;
 	if (!is_socket_info_valid(socket_info_ptr)) {
@@ -1165,7 +1177,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info.uid = trace_conf->socket_id + 1;
 		trace_conf->socket_id++;	// Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
+		//Confirm whether data reassembly is required for this socket.
+		if (is_proto_reasm_enabled(conn_info->protocol))
+			sk_info.allow_reassembly = true;
 		sk_info.direction = conn_info->direction;
+		sk_info.pre_direction = conn_info->direction;
 		sk_info.role = conn_info->role;
 		sk_info.msg_type = conn_info->message_type;
 		sk_info.update_time = time_stamp / NS_PER_SEC;
@@ -1197,6 +1213,21 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	    conn_info->message_type == MSG_RECONFIRM)
 		return SUBMIT_INVALID;
 
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		return SUBMIT_INVALID;
+
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
+
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+		return SUBMIT_INVALID;
+
+	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+	if (get_socket_info(v, conn_info->sk, conn_info) == false)
+		return SUBMIT_INVALID;
+
+	__u32 send_reasm_bytes = 0;
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
 
@@ -1222,8 +1253,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
-							      socket_info_ptr->peer_fd);
-			struct socket_info_t *peer_socket_info_ptr =
+							      socket_info_ptr->
+							      peer_fd);
+			struct socket_info_s *peer_socket_info_ptr =
 			    socket_info_map__lookup(&peer_conn_key);
 			if (is_socket_info_valid(peer_socket_info_ptr))
 				peer_socket_info_ptr->trace_id =
@@ -1235,21 +1267,22 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 			socket_info_ptr->trace_id = 0;
 		}
+
+		/*
+		 * Below, confirm the actual size of the data to be transmitted after
+		 * enabling data reassembly. The data transmission size is limited by
+		 * the maximum transmission configuration value.
+		 */
+		if (conn_info->enable_reasm
+		    && socket_info_ptr->reasm_bytes < data_max_sz) {
+			__u32 remain_bytes =
+			    data_max_sz - socket_info_ptr->reasm_bytes;
+			send_reasm_bytes =
+			    (syscall_len >
+			     remain_bytes ? remain_bytes : syscall_len);
+			socket_info_ptr->reasm_bytes += send_reasm_bytes;
+		}
 	}
-
-	struct __socket_data_buffer *v_buff =
-	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (!v_buff)
-		return SUBMIT_INVALID;
-
-	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
-		return SUBMIT_INVALID;
-
-	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-	if (get_socket_info(v, conn_info->sk, conn_info) == false)
-		return SUBMIT_INVALID;
 
 	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 	v->tuple.dport = conn_info->tuple.dport;
@@ -1287,27 +1320,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
 		 */
 		v->tcp_seq = tcp_seq;
-		if (tcp_seq == 0 && conn_info->fd > 0) {
-			if (conn_info->direction == T_INGRESS) {
-				tcp_seq =
-				    get_tcp_read_seq_from_fd(conn_info->fd);
-				/*
-				 * If the current state is TCPF_CLOSE_WAIT, the FIN
-				 * frame already has been received.
-				 * Since tcp_sock->copied_seq has done such an operation +1,
-				 * need to fix the value of tcp_seq.
-				 */
-				if ((1 << conn_info->skc_state) &
-				    TCPF_CLOSE_WAIT) {
-					tcp_seq--;
-				}
-			} else {
-				tcp_seq =
-				    get_tcp_write_seq_from_fd(conn_info->fd);
-			}
-
-			v->tcp_seq = tcp_seq - syscall_len;
-		}
 	}
 
 	v->thread_trace_id = thread_trace_id;
@@ -1362,6 +1374,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
+	context->push_reassembly_bytes = send_reasm_bytes;
 	context->vecs = (bool) vecs;
 	context->is_close = false;
 	context->dir = conn_info->direction;
@@ -1964,7 +1977,7 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	if (sock_addr) {
 		__u64 id = bpf_get_current_pid_tgid();
 		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
-		struct socket_info_t *socket_info_ptr =
+		struct socket_info_s *socket_info_ptr =
 		    socket_info_map__lookup(&conn_key);
 		if (socket_info_ptr != NULL) {
 			if (socket_info_ptr->uid) {
@@ -2105,7 +2118,7 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	struct trace_key_t key = get_trace_key(0, true);
 	struct trace_info_t *trace = trace_map__lookup(&key);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32) fd) {
-		struct socket_info_t sk_info = { 0 };
+		struct socket_info_s sk_info = { 0 };
 		sk_info.peer_fd = trace->peer_fd;
 		sk_info.trace_id = trace->thread_trace_id;
 		__u64 conn_key = gen_conn_key_id(id >> 32, fd);
@@ -2168,6 +2181,7 @@ static __inline int output_data_common(void *ctx)
 	bool is_close = false;
 	__u32 k0 = 0;
 	char *buffer = NULL;
+	__u32 reassembly_bytes = 0;
 
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
@@ -2188,6 +2202,7 @@ static __inline int output_data_common(void *ctx)
 	vecs = context->vecs;
 	is_close = context->is_close;
 	max_size = context->max_size_limit;
+	reassembly_bytes = context->push_reassembly_bytes;
 
 	struct data_args_t *args;
 	if (dir == T_INGRESS)
@@ -2218,6 +2233,13 @@ static __inline int output_data_common(void *ctx)
 	}
 
 	__u32 __len = v->syscall_len > max_size ? max_size : v->syscall_len;
+
+	/*
+	 * If data reassembly is enabled, the amount of data pushed must not
+	 * exceed the reassembly transmission limit.
+	 */
+	if (reassembly_bytes > 0)
+		__len = reassembly_bytes;
 
 	/*
 	 * the bitwise AND operation will set the range of possible values for

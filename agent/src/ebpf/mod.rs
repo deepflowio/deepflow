@@ -435,6 +435,7 @@ extern "C" {
     pub fn set_allow_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn set_bypass_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
+    pub fn enable_ebpf_seg_reasm_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
     /*
      * Configuring application layer protocol ports

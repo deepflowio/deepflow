@@ -139,12 +139,12 @@ protocol_port_check_2(enum traffic_protocol proto,
 	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_2);
 }
 
-static __inline bool is_socket_info_valid(struct socket_info_t *sk_info)
+static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
 {
 	return (sk_info != NULL && sk_info->uid != 0);
 }
 
-static __inline bool is_infer_socket_valid(struct socket_info_t *sk_info)
+static __inline bool is_infer_socket_valid(struct socket_info_s *sk_info)
 {
 	return (sk_info != NULL && sk_info->uid != 0
 		&& sk_info->l7_proto != PROTO_TLS);
@@ -165,6 +165,17 @@ static __inline void save_prev_data_from_kern(const char *buf,
 		/*
 		 * This piece of data needs to be merged with subsequent data, so
 		 * the direction of the previous piece of data needs to be saved here.
+		 *
+		 * For example:
+		 * A  --> out
+		 * B1 <-- in
+		 * B2 <-- in
+		 *
+		 * The data of 'B1' and 'B2' will be merged into a single data stream,
+		 * meaning that the data from B1 will be merged into 'B2' for transmission.
+		 * Therefore, the direction of the previously merged data from B2 will be
+		 * the same as the direction of 'A' (out), rather than the direction of 'B1'.
+		 * This is saved using 'pre_direction'.
 		 */
 		conn_info->socket_info_ptr->pre_direction =
 		    conn_info->socket_info_ptr->direction;
@@ -562,9 +573,27 @@ static __inline enum message_type infer_http2_message(const char *buf_kern,
 		is_first = false;
 	}
 
-	return parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
-					 conn_info, is_first);
+	enum message_type ret =
+	    parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
+				      conn_info, is_first);
 
+	/*
+	 * When performing data merging at the eBPF layer, the data needs to be
+	 * temporarily stored (this data will become part of the subsequent data
+	 * and will be merged later). The pre-stored data cannot be pushed to the
+	 * upper layer for reassembly; this needs to be done at the eBPF layer.
+	 * Therefore, this must be prioritized before the ‘conn_info->enable_reasm’
+	 * check.
+	 */
+	if (ret == MSG_PRESTORE)
+		return MSG_PRESTORE;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
+	}
+
+	return ret;
 }
 
 static __inline enum message_type infer_http_message(const char *buf,
@@ -585,6 +614,9 @@ static __inline enum message_type infer_http_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
 			return MSG_UNKNOWN;
+
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	if (is_http_response(buf)) {
@@ -610,14 +642,19 @@ static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 		    conn_info->socket_info_ptr->direction) {
 			bpf_probe_read_kernel(conn_info->prev_buf,
 					      sizeof(conn_info->prev_buf),
-					      conn_info->socket_info_ptr->
-					      prev_data);
+					      conn_info->
+					      socket_info_ptr->prev_data);
 			conn_info->prev_count =
 			    conn_info->socket_info_ptr->prev_data_len;
 			/*
 			 * When data is merged, that is, when two or more data with the same
 			 * direction are merged together and processed as one data, the previously
 			 * saved direction needs to be restored.
+			 * 
+			 * At the beginning of the inference stage, 'socket_info_ptr->direction'
+			 * represents the direction of the previously sent data. During the final
+			 * data transmission stage, it will be updated to reflect the direction of
+			 * the current data.
 			 */
 			conn_info->socket_info_ptr->direction =
 			    conn_info->socket_info_ptr->pre_direction;
@@ -668,6 +705,8 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	if (!conn_info->sk)
@@ -877,6 +916,8 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 		char tag = infer_buf[0];
 		/* *INDENT-OFF* */
 		switch (tag) {
@@ -928,6 +969,8 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_ORACLE)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	char pkt_type = buf[4];
@@ -1024,6 +1067,8 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 		goto out;
 	}
 	// code for remoting command (Heartbeat, RpcRequest, RpcResponse)
@@ -1161,6 +1206,8 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	bool update_tcp_dns_prev_count = false;
@@ -1271,6 +1318,8 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_REDIS)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	const char first_byte = buf[0];
@@ -1371,9 +1420,12 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if (!protocol_port_check_1(PROTO_MQTT, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_infer_socket_valid(conn_info->socket_info_ptr))
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MQTT)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
+	}
 
 	int mqtt_type;
 	if (!mqtt_decoding_message_type((__u8 *) buf, &mqtt_type))
@@ -1759,6 +1811,8 @@ static __inline enum message_type infer_openwire_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_OPENWIRE)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 		conn_info->encoding_type =
 		    conn_info->socket_info_ptr->encoding_type;
 	}
@@ -1868,6 +1922,8 @@ static __inline enum message_type infer_nats_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_NATS)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	} else {
 		char buffer[2];
 		bpf_probe_read_user(buffer, 2, ptr + infer_len - 2);
@@ -2110,6 +2166,8 @@ static __inline enum message_type infer_pulsar_message(const char *ptr,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_PULSAR)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	char buffer[4];
@@ -2191,6 +2249,8 @@ static __inline enum message_type infer_brpc_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_BRPC)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 	// PRPC
 	if (buf[0] != 'P' || buf[1] != 'R' || buf[2] != 'P' || buf[3] != 'C')
@@ -2420,6 +2480,8 @@ static __inline enum message_type infer_zmtp_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_ZMTP)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 		if (check_zmtp_greeting(buf, count, conn_info)
 		    || check_zmtp_segment(buf, count, syscall_infer_addr,
 					  syscall_infer_len, false)) {
@@ -2522,6 +2584,8 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DUBBO)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	struct dubbo_header *dubbo_hdr = (struct dubbo_header *)buf;
@@ -2690,6 +2754,8 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_KAFKA)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 
 		conn_info->need_reconfirm =
 		    conn_info->socket_info_ptr->need_reconfirm;
@@ -2816,6 +2882,8 @@ infer_fastcgi_message(const char *buf, size_t count,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_FASTCGI)
 			return MSG_UNKNOWN;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 		if (header->type == FCGI_BEGIN_REQUEST
 		    || header->type == FCGI_PARAMS)
 			return MSG_REQUEST;
@@ -2909,6 +2977,11 @@ infer_mongo_message(const char *buf, size_t count,
 	    && conn_info->direction == T_INGRESS) {
 		save_prev_data_from_kern(buf, conn_info, sizeof(*header));
 		return MSG_PRESTORE;
+	}
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	if (header->request_id < 0) {
@@ -3069,12 +3142,20 @@ typedef struct __attribute__ ((packed)) {
 static __inline enum message_type
 infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 {
+	/*
+	 * When reading data over TLS, it first reads 5 bytes of content and then
+	 * reads the remaining data. We save the initial 5 bytes and combine them
+	 * with the subsequently read data. Then, we use the combined data for
+	 * further processing.
+	 */
+	static const int advance_bytes = 5;
+
 	tls_handshake_t handshake = { 0 };
 
-	if (conn_info->prev_count == 5)
-		count += 5;
+	if (conn_info->prev_count == advance_bytes)
+		count += advance_bytes;
 
-	if (count == 5) {
+	if (count == advance_bytes) {
 		handshake.content_type = buf[0];
 		handshake.version = __bpf_ntohs(*(__u16 *) & buf[1]);
 		goto check;
@@ -3083,7 +3164,7 @@ infer_tls_message(const char *buf, size_t count, struct conn_info_s *conn_info)
 	if (count < 6)
 		return MSG_UNKNOWN;
 
-	if (conn_info->prev_count == 5) {
+	if (conn_info->prev_count == advance_bytes) {
 		handshake.content_type = conn_info->prev_buf[0];
 		handshake.version =
 		    __bpf_ntohs(*(__u16 *) & conn_info->prev_buf[1]);
@@ -3114,6 +3195,11 @@ check:
 	if (!(handshake.version >= 0x301 && handshake.version <= 0x304))
 		return MSG_UNKNOWN;
 
+	if (count == advance_bytes) {
+		save_prev_data_from_kern(buf, conn_info, advance_bytes);
+		return MSG_PRESTORE;
+	}
+
 	/*
 	 * Encrypted Alert unidirectional transmission, retain tracking information
 	 * without removal.
@@ -3126,11 +3212,8 @@ check:
 		if (handshake.content_type != 0x15 &&
 		    conn_info->socket_info_ptr->tls_end)
 			return MSG_UNKNOWN;
-	}
-
-	if (count == 5) {
-		save_prev_data_from_kern(buf, conn_info, 5);
-		return MSG_PRESTORE;
+		if (conn_info->enable_reasm)
+			return MSG_REQUEST;
 	}
 
 	/*
@@ -3194,6 +3277,54 @@ static __inline bool drop_msg_by_comm(void)
 	}
 
 	return false;
+}
+
+static __inline void check_and_set_data_reassembly(struct conn_info_s
+						   *conn_info)
+{
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		conn_info->prev_direction =
+		    conn_info->socket_info_ptr->direction;
+		/*
+		 * If data reassembly is enabled, subsequent contiguous data of the
+		 * same direction will be pushed until the data changes direction or
+		 * reaches the maximum data limit ('trace_conf->data_limit_max').
+		 *
+		 * In the initial stage of data protocol inference, determine and
+		 * confirm whether data reassembly needs to be continued.
+		 */
+		if (conn_info->socket_info_ptr->allow_reassembly) {
+			if (conn_info->prev_direction == conn_info->direction) {
+				conn_info->enable_reasm = true;
+				__u32 k0 = 0;
+				struct trace_conf_t *trace_conf =
+				    trace_conf_map__lookup(&k0);
+				if (trace_conf == NULL)
+					return;
+				/*
+				 * Here, the length is checked, and if it has already reached
+				 * the configured limit, assembly will not proceed.
+				 *
+				 * Additionally, if the current data and the previous data are in
+				 * the process of being merged (meaning these two pieces of data
+				 * need to be combined into one, which we refer to as data merging),
+				 * the data reassembly function will not be initiated at this time.
+				 * This is because data reassembly is completed at a higher level,
+				 * while data merging is performed at the eBPF layer. We need to wait
+				 * for the data merging to complete before deciding whether data
+				 * reassembly is needed (whether to decide to push to the upper layer
+				 * for reassembly).
+				 */
+				if (conn_info->socket_info_ptr->reasm_bytes >=
+				    trace_conf->data_limit_max
+				    || conn_info->prev_count > 0)
+					conn_info->enable_reasm = false;
+			} else {
+				conn_info->socket_info_ptr->reasm_bytes = 0;
+				conn_info->enable_reasm = false;
+			}
+		}
+	}
 }
 
 static __inline struct protocol_message_t
@@ -3269,6 +3400,9 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	conn_info->syscall_infer_len = syscall_infer_len;
 
 	check_and_fetch_prev_data(conn_info);
+
+	// In the initial stage of data protocol inference, reassembly check.
+	check_and_set_data_reassembly(conn_info);
 
 	/*
 	 * TLS protocol datas cause other L7 protocols inference misjudgment,

@@ -50,6 +50,17 @@ struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 // eBPF protocol filter.
 int ebpf_config_protocol_filter[PROTO_NUM];
 
+/**
+ * @brief Store the protocols that can perform segmentation reassembly
+ *
+ * In scenarios where reading and writing of Header and Payload are completed by
+ * two system calls, we can rely on the out-of-order reassembly mechanism to
+ * aggregate eBPF data in user space, improving the analysis effect. This array
+ * is used to store which protocols allow data aggregation, and the set content
+ * will notify the eBPF program to handle it."
+ */
+bool allow_seg_reasm_protos[PROTO_NUM];
+
 struct kprobe_port_bitmap allow_port_bitmap;
 struct kprobe_port_bitmap bypass_port_bitmap;
 
@@ -231,14 +242,13 @@ int release_bpf_tracer(const char *name)
 }
 
 /**
- * Activate a tracer reader to start working.
+ * @brief Activate a tracer reader to start working.
  *
- * @prefix_name Thread name prefix.
- * @idx The index within the thread array.
- * @tracer Activated tracer
- * @fn callback for reader read ebpf ring-buffer data.
- *
- * @returns 0(ETR_OK) on success, < 0 on error
+ * @param prefix_name Thread name prefix.
+ * @param idx The index within the thread array.
+ * @param tracer Activated tracer
+ * @param fn callback for reader read ebpf ring-buffer data.
+ * @return 0(ETR_OK) on success, < 0 on error
  */
 int enable_tracer_reader_work(const char *prefix_name, int idx,
 			      struct bpf_tracer *tracer, void *fn)
@@ -275,22 +285,20 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 }
 
 /**
- * setup_bpf_tracer - create a eBPF tracer
+ * @brief setup_bpf_tracer - create a eBPF tracer
  *
- * @name Tracer name
- * @load_name eBPF load buffer name
- * @bpf_bin_buffer load eBPF buffer address
- * @buffer_sz eBPF buffer size
- * @tps Tracer configuration information
- * @workers_nr How many threads process the queues
- * @free_cb The callback interface for releasing tracer resources.
- * @create_cb The callback interface for create tracer.
- * @handle The upper callback function address
- * @sample_freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- *    only type is TRACER_TYPE_PERF_EVENT.
- *
- * @returns
- *      Return struct bpf_tracer pointer on success, NULL otherwise.
+ * @param name Tracer name
+ * @param load_name eBPF load buffer name
+ * @param bpf_bin_buffer load eBPF buffer address
+ * @param buffer_sz eBPF buffer size
+ * @param tps Tracer configuration information
+ * @param workers_nr How many threads process the queues
+ * @param free_cb The callback interface for releasing tracer resources.
+ * @param create_cb The callback interface for create tracer.
+ * @param handle The upper callback function address
+ * @param sample_freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+ * only type is TRACER_TYPE_PERF_EVENT.
+ * @return struct bpf_tracer pointer on success, NULL otherwise.
  */
 struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    char *load_name,
@@ -418,17 +426,16 @@ void free_all_readers(struct bpf_tracer *t)
 }
 
 /**
- * create a perf buffer reader.
- * @t tracer
- * @map_name perf buffer map name
- * @raw_cb perf reader raw data callback
- * @lost_cb perf reader data lost callback
- * @pages_cnt How many memory pages are used for ring-buffer
+ * @brief create a perf buffer reader.
+ * @param t Tracer address
+ * @param The map_name Perf buffer map name
+ * @param The raw_cb Perf reader raw data callback
+ * @param Lost_cb perf reader data lost callback
+ * @param Pages_cnt How many memory pages are used for ring-buffer
  *            (system page size * pages_cnt)
- * @thread_nr The number of threads required for the reader's work
- * @epoll_timeout perf epoll timeout
- *
- * @returns perf_reader address on success, NULL on error
+ * @param Thread_nr The number of threads required for the reader's work
+ * @param Epoll_timeout perf epoll timeout
+ * @return Perf_reader address on success, NULL on error
  */
 struct bpf_perf_reader *create_perf_buffer_reader(struct bpf_tracer *t,
 						  const char *map_name,
@@ -1510,6 +1517,15 @@ int enable_ebpf_protocol(int protocol)
 {
 	if (protocol < PROTO_NUM) {
 		ebpf_config_protocol_filter[protocol] = true;
+		return 0;
+	}
+	return ETR_INVAL;
+}
+
+int enable_ebpf_seg_reasm_protocol(int protocol)
+{
+	if (protocol < PROTO_NUM) {
+		allow_seg_reasm_protos[protocol] = true;
 		return 0;
 	}
 	return ETR_INVAL;
