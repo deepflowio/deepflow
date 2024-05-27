@@ -17,6 +17,7 @@
 package synchronize
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,41 +37,60 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 		}
 	}()
 
-	ctx := stream.Context()
 	manager := &service.CMDManager{}
 	initDone := make(chan struct{})
-	go func() {
-		for {
-			resp, err := stream.Recv()
-			if resp == nil {
-				continue
-			}
-			if resp.AgentId == nil {
-				log.Warningf("recevie agent info from remote command is nil")
-				continue
-			}
-			key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
-			if _, ok := service.AgentRemoteExecMap[key]; !ok {
-				manager = service.AddSteamToManager(key)
-				log.Infof("add agent(key:%s) to cmd manager", key)
-				initDone <- struct{}{}
-			}
 
-			if err != nil {
-				if err == io.EOF {
-					handleResponse(resp)
-					log.Infof("agent(key: %s) command exec get response finish", key)
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("recovered in RemoteExecute: %v", r)
+			}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				log.Infof("context done")
+				return
+			default:
+				resp, err := stream.Recv()
+				if resp == nil {
+					continue
+				}
+				if resp.AgentId == nil {
+					log.Warningf("recevie agent info from remote command is nil")
+					continue
+				}
+				key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
+				if _, ok := service.AgentRemoteExecMap[key]; !ok {
+					manager = service.AddSteamToManager(key)
+					log.Infof("add agent(key:%s) to cmd manager", key)
+					initDone <- struct{}{}
+				}
+				// heartbeat
+				if resp.CommandResult == nil && resp.LinuxNamespaces == nil && resp.Commands == nil {
+					manager.ExecCH <- &api.RemoteExecRequest{}
+				}
+
+				if err != nil {
+					if err == io.EOF {
+						handleResponse(resp)
+						log.Infof("agent(key: %s) command exec get response finish", key)
+						continue
+					}
+
+					err := fmt.Errorf("agent(key: %s) command stream error: %v", key, err)
+					log.Error(err)
 					continue
 				}
 
-				err := fmt.Errorf("agent(key: %s) command stream error: %v", key, err)
-				log.Error(err)
-				continue
-			}
-
-			err = handleResponse(resp)
-			if err != nil {
-				log.Error(err)
+				err = handleResponse(resp)
+				if err != nil {
+					log.Error(err)
+				}
 			}
 		}
 	}()
@@ -79,18 +99,14 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	for {
 		select {
 		case <-ctx.Done():
-			log.Error(ctx.Err())
-			if _, ok := service.AgentRemoteExecMap[key]; ok {
-				delete(service.AgentRemoteExecMap, key)
-				log.Infof("delete agent(key:%s) in manager", key)
-			}
-			return ctx.Err()
+			log.Infof("context done")
+			return nil
 		case req := <-manager.ExecCH:
 			b, _ := json.Marshal(req)
 			log.Infof("agent(key: %s) request: %s", key, string(b))
 			if err := stream.Send(req); err != nil {
 				log.Errorf("send cmd to agent error: %s, req: %#v", err.Error(), req)
-				continue
+				return err
 			}
 		}
 	}
