@@ -283,7 +283,7 @@ func (p *InProcessProfile) Clone() *InProcessProfile {
 
 func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	platformData *grpc.PlatformInfoTable,
-	vtapID uint16,
+	vtapID, orgId, teamId uint16,
 	podID uint32,
 	profileName string,
 	eventType string,
@@ -323,7 +323,7 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.TagValues = tagValues
 
 	p.fillResource(vtapID, podID, platformData)
-	p.OrgId, p.TeamID = platformData.QueryVtapOrgAndTeamID(vtapID)
+	p.OrgId, p.TeamID = orgId, teamId
 }
 
 func genID(time uint32, counter *uint32, vtapID uint16) uint64 {

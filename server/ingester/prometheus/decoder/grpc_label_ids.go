@@ -32,7 +32,6 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -42,7 +41,7 @@ import (
 const (
 	METRICID_OFFSET = 32 // when generate columnIndexKey/metricTargetPairKey, high32 is metricID, low32 can be labelNameID/targetID
 
-	MAX_ORG_COUNT = ckwriter.MAX_ORGANIZATINON_ID + 1
+	MAX_ORG_COUNT = ckdb.MAX_ORG_ID + 1
 )
 
 func uint64ToFloat64(i uint64) float64 {

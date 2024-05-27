@@ -67,6 +67,8 @@ type Decoder struct {
 	debugEnabled      bool
 	config            *config.Config
 
+	orgId, teamId uint16
+
 	counter *Counter
 	utils.Closable
 }
@@ -143,6 +145,7 @@ func (d *Decoder) Run() {
 					continue
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+				d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
 				d.handlePerfEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			case common.ALARM_EVENT:
@@ -161,6 +164,7 @@ func (d *Decoder) Run() {
 					continue
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+				d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
 				d.handleK8sEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			}
@@ -195,7 +199,7 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	}
 	s.VTAPID = vtapId
-	s.OrgId, s.TeamID = d.platformData.QueryVtapOrgAndTeamID(vtapId)
+	s.OrgId, s.TeamID = d.orgId, d.teamId
 	s.L3EpcID = d.platformData.QueryVtapEpc0(vtapId)
 
 	var info *grpc.Info
@@ -403,6 +407,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	} else if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
 		s.ServiceID = d.platformData.QueryService(s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 	}
+
 	s.AutoServiceID, s.AutoServiceType =
 		ingestercommon.GetAutoService(
 			s.ServiceID,

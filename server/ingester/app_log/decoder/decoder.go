@@ -118,6 +118,7 @@ type Decoder struct {
 	debugEnabled      bool
 	config            *config.Config
 	appLogEntrysCache []AppLogEntry
+	orgId, teamId     uint16
 
 	counter *Counter
 	utils.Closable
@@ -170,6 +171,7 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+			d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
 			switch d.msgType {
 			case datatype.MESSAGE_TYPE_APPLICATION_LOG:
 				d.handleAppLog(recvBytes.VtapID, decoder)
@@ -248,7 +250,7 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 	s.AttributeNames = append(s.AttributeNames, "module")
 	s.AttributeValues = append(s.AttributeValues, string(columns[4]))
 
-	s.OrgId, s.TeamID = d.platformData.QueryVtapOrgAndTeamID(agentId)
+	s.OrgId, s.TeamID = d.orgId, d.teamId
 	d.logWriter.Write(s)
 	return nil
 }
@@ -280,7 +282,7 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	case dbwriter.LOG_TYPE_AUDIT:
 		s.OrgId, s.TeamID = uint16(l.OrgID), ckdb.INVALID_TEAM_ID
 	default:
-		s.OrgId, s.TeamID = d.platformData.QueryVtapOrgAndTeamID(agentId)
+		s.OrgId, s.TeamID = d.orgId, d.teamId
 	}
 
 	s.L3EpcID = d.platformData.QueryVtapEpc0(agentId)
