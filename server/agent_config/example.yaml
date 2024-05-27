@@ -1069,7 +1069,7 @@ vtap_group_id: g-xxxxxx
   ## Example:
   ##   l7-log-blacklist:
   ##     HTTP:
-  ##     - field_name: request_resource  # endpoint, request_type, request_domain, request_resource
+  ##     - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
   ##       operator: equal  # equal, prefix
   ##       value: somevalue
   ## Note: A l7_flow_log blacklist can be configured for each protocol, preventing request logs matching
@@ -1079,6 +1079,25 @@ vtap_group_id: g-xxxxxx
   #l7-log-blacklist:
   #  HTTP: []
   #  HTTP2: []
+  #  Dubbo: []
+  #  Grpc: []
+  #  SofaRPC: []
+  #  FastCGI: []
+  #  Brpc: []
+  #  MySQL: []
+  #  PostgreSQL: []
+  #  Oracle: []
+  #  Redis: []
+  #  MongoDB: []
+  #  Kafka: []
+  #  MQTT: []
+  #  AMQP: []
+  #  OpenWire: []
+  #  NATS: []
+  #  Pulsar: []
+  #  ZMTP: []
+  #  DNS: []
+  #  TLS: []
   
   ## L7 Protocol Advanced Features
   #l7-protocol-advanced-features:

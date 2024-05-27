@@ -1861,6 +1861,7 @@ CREATE TABLE IF NOT EXISTS genesis_vinterface (
     last_seen             DATETIME,
     vtap_id               INTEGER,
     kubernetes_cluster_id CHAR(64),
+    team_id               INTEGER DEFAULT 1,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vinterface;

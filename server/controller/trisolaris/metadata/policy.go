@@ -194,30 +194,25 @@ func (p *Policy) initVersion(version uint64) {
 	p.pcapVersion = version + 200
 }
 
-func (p *Policy) setVersion(other *Policy) bool {
-	changed := false
+func (p *Policy) setVersion(other *Policy) {
 	if p.allDataHash != other.allDataHash {
 		log.Infof(p.Logf("vtap(vtapID = %d) Flow acl version changed to %d", p.vtapID, other.version+1))
 		p.version = other.version + 1
-		changed = true
 	} else {
 		p.version = other.version
 	}
 	if p.npbDataHash != other.npbDataHash {
 		log.Infof(p.Logf("vtap(vtapID = %d) Flow acl npb version changed to %d", p.vtapID, other.npbVersion+1))
 		p.npbVersion = other.npbVersion + 1
-		changed = true
 	} else {
 		p.npbVersion = other.npbVersion
 	}
 	if p.pcapDataHash != other.pcapDataHash {
 		log.Infof(p.Logf("vtap(vtapID = %d) Flow acl pcap version changed to %d", p.vtapID, other.pcapVersion+1))
 		p.pcapVersion = other.pcapVersion + 1
-		changed = true
 	} else {
 		p.pcapVersion = other.pcapVersion
 	}
-	return changed
 }
 
 func (p *Policy) merger(other *Policy) {
@@ -278,7 +273,6 @@ type PolicyDataOP struct {
 	init          bool
 	billingMethod string
 
-	nodifyIngesterDataChanged func()
 	ORGID
 }
 
@@ -300,16 +294,6 @@ func newPolicyDaTaOP(metaData *MetaData, billingMethod string) *PolicyDataOP {
 		init:               false,
 		billingMethod:      billingMethod,
 		ORGID:              metaData.ORGID,
-	}
-}
-
-func (op *PolicyDataOP) RegisteNotifyIngesterDatachanged(notify func()) {
-	op.nodifyIngesterDataChanged = notify
-}
-
-func (op *PolicyDataOP) notifyDataChanged() {
-	if op.nodifyIngesterDataChanged != nil {
-		op.nodifyIngesterDataChanged()
 	}
 }
 
@@ -841,7 +825,6 @@ func (op *PolicyDataOP) checkNewPolicies(vtapIDToPolicy map[int]*Policy,
 		op.updateAllVTapSharePolicy(allVTapSharePolicy)
 		op.updateDropletPolicy(dropletPolicy)
 		op.init = true
-		op.notifyDataChanged()
 		return
 	}
 	oldVTapIDToPolicy := op.getVTapIDToPolicy()
@@ -862,12 +845,9 @@ func (op *PolicyDataOP) checkNewPolicies(vtapIDToPolicy map[int]*Policy,
 		}
 	}
 	allVTapSharePolicy.setVersion(oldAllVTapSharePolicy)
-	changned := dropletPolicy.setVersion(oldDropletPolicy)
+	dropletPolicy.setVersion(oldDropletPolicy)
 	op.updateVTapIDToPolicy(vtapIDToPolicy)
 	op.updateAllVTapSharePolicy(allVTapSharePolicy)
 	op.updateDropletPolicy(dropletPolicy)
-	if changned == true {
-		op.notifyDataChanged()
-	}
 	log.Debug(op.Logf("%s", op))
 }

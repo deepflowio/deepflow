@@ -63,6 +63,18 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 	// types.NetworkInterface.Description: aws-K8S-i-01994fbd5e2d8xxxx
 	eksNodeInstanceIDs := map[string]bool{}
 	for _, vData := range retVinterfaces {
+		// get it from the Instance ID tag first
+		var instanceID string
+		for idx := range vData.TagSet {
+			if vData.TagSet[idx].Key != nil && *vData.TagSet[idx].Key == EKS_NODE_INSTANCE_ID_KEY {
+				instanceID = *vData.TagSet[idx].Value
+			}
+		}
+		if len(instanceID) != 0 {
+			eksNodeInstanceIDs[instanceID] = false
+			continue
+		}
+
 		vDescription := a.getStringPointerValue(vData.Description)
 		if !strings.HasPrefix(vDescription, EKS_NODE_DESCRIPTION_PREFIX) {
 			continue

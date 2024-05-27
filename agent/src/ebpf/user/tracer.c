@@ -42,8 +42,8 @@ int major, minor, revision, rev_num;
 char linux_release[128];	// Record the contents of 'uname -r'
 
 volatile uint32_t *tracers_lock;
-volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
-volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
+extern volatile uint64_t sys_boot_time_ns;	// System boot time in nanoseconds
+volatile uint64_t prev_sys_boot_time_ns;	// The last updated system boot time, in nanoseconds
 
 struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 

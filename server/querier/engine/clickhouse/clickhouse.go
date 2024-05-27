@@ -431,6 +431,7 @@ func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*comm
 		Callbacks:       callbacks,
 		QueryUUID:       query_uuid,
 		ColumnSchemaMap: columnSchemaMap,
+		ORGID:           args.ORGID,
 	}
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
@@ -845,7 +846,9 @@ func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Res
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
 	e.Model.DB = e.DB
-	e.ORGID = common.DEFAULT_ORG_ID
+	if e.ORGID == "" {
+		e.ORGID = common.DEFAULT_ORG_ID
+	}
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
@@ -1002,7 +1005,7 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 			Password: config.Cfg.Clickhouse.Password,
 			DB:       "flow_tag",
 		}
-		targetLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+		targetLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, ORGID: e.ORGID})
 		if err != nil {
 			return expr, err
 		}

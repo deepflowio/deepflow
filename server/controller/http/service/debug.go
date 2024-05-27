@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	gathermodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
@@ -61,14 +61,16 @@ func TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid string, version int,
 	return m.TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid, version)
 }
 
-func GetKubernetesGatherBasicInfos(lcuuid string, m *manager.Manager) (resp []kubernetes_gather_model.KubernetesGatherBasicInfo, err error) {
-	response, err := m.GetKubernetesGatherBasicInfos(lcuuid)
-	return response, err
+func GetKubernetesGatherBasicInfos(lcuuid string, m *manager.Manager) (resp []gathermodel.KubernetesGatherBasicInfo, err error) {
+	return m.GetKubernetesGatherBasicInfos(lcuuid)
 }
 
-func GetKubernetesGatherResources(lcuuid string, m *manager.Manager) (resp []kubernetes_gather_model.KubernetesGatherResource, err error) {
-	response, err := m.GetKubernetesGatherResources(lcuuid)
-	return response, err
+func GetSubDomainResource(lcuuid, subDomainLcuuid string, m *manager.Manager) (resp cloudmodel.SubDomainResource, err error) {
+	return m.GetSubDomainResource(lcuuid, subDomainLcuuid)
+}
+
+func GetKubernetesGatherResource(lcuuid, subDomainLcuuid string, m *manager.Manager) (resp gathermodel.KubernetesGatherResource, err error) {
+	return m.GetKubernetesGatherResource(lcuuid, subDomainLcuuid)
 }
 
 func GetRecorderDomainCache(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp cache.Cache, err error) {

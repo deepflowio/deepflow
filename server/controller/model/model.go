@@ -19,6 +19,7 @@ package model
 import (
 	"time"
 
+	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/agent_config"
 )
 
@@ -593,6 +594,7 @@ func (GenesisPort) TableName() string {
 }
 
 type GenesisVinterface struct {
+	TeamID              uint32    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 	NetnsID             uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
 	VtapID              uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	Lcuuid              string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
@@ -740,4 +742,17 @@ type MailServer struct {
 	NtlmName     string `json:"NTLM_NAME"`
 	NtlmPassword string `json:"NTLM_PASSWORD"`
 	Lcuuid       string `json:"LCUUID"`
+}
+
+type RemoteExecReq struct {
+	trident.RemoteExecRequest
+
+	OutputFormat   *trident.OutputFormat `json:"output_format"` // 0: "TEXT", 1: "BINARY"
+	OutputFilename string                `json:"output_filename"`
+}
+
+type RemoteExecResp struct {
+	Content        string                    `json:"content,omitempty"`          // RUN_COMMAND
+	RemoteCommand  []*trident.RemoteCommand  `json:"remote_commands,omitempty"`  // LIST_COMMAND
+	LinuxNamespace []*trident.LinuxNamespace `json:"linux_namespaces,omitempty"` // LIST_NAMESPACE
 }

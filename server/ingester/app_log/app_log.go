@@ -34,10 +34,11 @@ import (
 )
 
 type ApplicationLogger struct {
-	Config    *config.Config
-	Ckwriter  *ckwriter.CKWriter
-	SysLogger *Logger
-	AppLogger *Logger
+	Config      *config.Config
+	Ckwriter    *ckwriter.CKWriter
+	SysLogger   *Logger
+	AgentLogger *Logger
+	AppLogger   *Logger
 }
 
 type Logger struct {
@@ -61,27 +62,34 @@ func NewApplicationLogger(
 	if err != nil {
 		return nil, err
 	}
+	agentLogger, err := NewLogger(datatype.MESSAGE_TYPE_AGENT_LOG, config, manager, recv, platformDataManager, ckwriter)
+	if err != nil {
+		return nil, err
+	}
 	appLogger, err := NewLogger(datatype.MESSAGE_TYPE_APPLICATION_LOG, config, manager, recv, platformDataManager, ckwriter)
 	if err != nil {
 		return nil, err
 	}
 
 	return &ApplicationLogger{
-		Config:    config,
-		Ckwriter:  ckwriter,
-		SysLogger: sysLogger,
-		AppLogger: appLogger,
+		Config:      config,
+		Ckwriter:    ckwriter,
+		SysLogger:   sysLogger,
+		AgentLogger: agentLogger,
+		AppLogger:   appLogger,
 	}, nil
 }
 
 func (l *ApplicationLogger) Start() {
 	l.Ckwriter.Run()
 	l.SysLogger.Start()
+	l.AgentLogger.Start()
 	l.AppLogger.Start()
 }
 
 func (l *ApplicationLogger) Close() error {
 	l.SysLogger.Close()
+	l.AgentLogger.Close()
 	l.AppLogger.Close()
 	l.Ckwriter.Close()
 	return nil

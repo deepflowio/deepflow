@@ -78,7 +78,7 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 	}
 	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessUpdate)
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
-		url += fmt.Sprintf("&team_id=%s&resource_type=%s", teamID, resourceType)
+		url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
 	} else {
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
 	}
@@ -108,7 +108,7 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 	}
 	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessDelete)
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
-		url += fmt.Sprintf("&team_id=%s&resource_type=%s", teamID, resourceType)
+		url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
 	} else {
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
 	}

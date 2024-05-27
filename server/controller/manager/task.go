@@ -24,7 +24,6 @@ import (
 	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud"
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
@@ -132,11 +131,7 @@ func (t *Task) startSubDomainRefreshMonitor() {
 						signal.Get()
 						log.Infof("task (%s) sub_domain (%s) call recorder refresh", t.DomainName, lcuuid)
 
-						// TODO cloud 提供接口获取附属容器集群数据
-						resource := cloudmodel.Resource{
-							SubDomainResources: map[string]cloudmodel.SubDomainResource{lcuuid: t.Cloud.GetResource().SubDomainResources[lcuuid]},
-						}
-						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, resource); err != nil {
+						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, t.Cloud.GetSubDomainResource(lcuuid)); err != nil {
 							if errors.Is(err, recorder.RefreshConflictError) {
 								log.Warningf("task (%s) sub_domain (%s) refresh conflict, retry after 5 seconds", t.DomainName, lcuuid)
 								signal.Put(struct{}{})

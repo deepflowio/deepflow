@@ -40,7 +40,7 @@ func (vr *VtapRepo) RegisterTo(e *gin.Engine) {
 }
 
 func getVtapRepo(c *gin.Context) {
-	data, err := service.GetVtapRepo(nil)
+	data, err := service.GetVtapRepo(service.GetUserInfo(c).ORGID, nil)
 	JsonResponse(c, data, err)
 }
 
@@ -72,7 +72,7 @@ func createVtapRepo(c *gin.Context) {
 		}
 	}
 
-	data, err := service.CreateVtapRepo(vtapRepo)
+	data, err := service.CreateVtapRepo(service.GetUserInfo(c).ORGID, vtapRepo)
 	JsonResponse(c, data, err)
 }
 
@@ -88,5 +88,5 @@ func deleteVtapRepo(c *gin.Context) {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
 		return
 	}
-	JsonResponse(c, nil, service.DeleteVtapRepo(vtapRepo.ImageName))
+	JsonResponse(c, nil, service.DeleteVtapRepo(service.GetUserInfo(c).ORGID, vtapRepo.ImageName))
 }

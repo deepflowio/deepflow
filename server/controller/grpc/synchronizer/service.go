@@ -177,9 +177,9 @@ func (s *service) GetUniversalTagNameMaps(ctx context.Context, in *api.Universal
 }
 
 func (s *service) RemoteExecute(in api.Synchronizer_RemoteExecuteServer) error {
-	return nil
+	return s.vTapEvent.RemoteExecute(in)
 }
 
 func (s *service) GetOrgIDs(ctx context.Context, in *api.OrgIDsRequest) (*api.OrgIDsResponse, error) {
-	return nil, nil
+	return s.tsdbEvent.GetOrgIDs(ctx, in)
 }

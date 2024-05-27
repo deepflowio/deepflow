@@ -116,11 +116,12 @@ func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
 	}
 	// 仅当组织中存在 domain 时，才创建组织的 IDManager，以避免内存浪费
 	var domain *mysql.Domain
-	if err := db.Find(&domain).Error; err != nil {
+	result := db.Limit(1).Find(&domain)
+	if result.Error != nil {
 		log.Error(db.Logf("failed to get domain: %v", err))
 		return nil, err
 	}
-	if domain == nil {
+	if result.RowsAffected == 0 {
 		log.Info(db.Logf("no domain in db, skip creating id manager"))
 		return nil, nil
 	}

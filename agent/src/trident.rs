@@ -540,6 +540,7 @@ impl Trident {
             synchronizer.agent_id.clone(),
             session.clone(),
             runtime.clone(),
+            exception_handler.clone(),
         );
         #[cfg(any(target_os = "linux", target_os = "android"))]
         remote_executor.start();

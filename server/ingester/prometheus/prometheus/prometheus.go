@@ -141,3 +141,7 @@ func (m *PrometheusHandler) Close() error {
 	}
 	return nil
 }
+
+func (m *PrometheusHandler) DropOrg(orgId uint16) {
+	m.prometheusLabelTable.DropOrg(orgId)
+}

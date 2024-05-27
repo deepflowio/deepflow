@@ -5,4 +5,4 @@
 5               , INFO           ,
 6               , DEBUG          ,
 7               , TRACE          ,
-8               , UNKNOWN        ,
+8               , UNKNOW         ,
