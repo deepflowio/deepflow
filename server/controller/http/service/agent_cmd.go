@@ -142,10 +142,11 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 	cmdReq := &trident.RemoteExecRequest{ExecType: trident.ExecutionType_LIST_COMMAND.Enum()}
 	manager.ExecCH <- cmdReq
 
+	timeout := time.After(agentCommandTimeout)
 	resp := &model.RemoteExecResp{}
 	for {
 		select {
-		case <-time.After(agentCommandTimeout):
+		case <-timeout:
 			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", agentCommandTimeout.Seconds())
 		case <-manager.RemoteCMDDoneCH:
 			resp.RemoteCommand = manager.GetCommands()
