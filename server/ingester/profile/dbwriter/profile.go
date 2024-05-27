@@ -131,14 +131,14 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("ip6", ckdb.IPv6).SetComment("IPV6地址"),
 		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetComment("是否为IPv4地址").SetIndex(ckdb.IndexMinmax),
 
-		ckdb.NewColumn("app_service", ckdb.String).SetComment("应用名称, 用户配置上报"),
+		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetComment("应用名称, 用户配置上报"),
 		ckdb.NewColumn("profile_location_str", ckdb.String).SetComment("单次 profile 堆栈"),
 		ckdb.NewColumn("profile_value", ckdb.Int64).SetComment("profile self value"),
-		ckdb.NewColumn("profile_value_unit", ckdb.String).SetComment("profile value 的单位"),
-		ckdb.NewColumn("profile_event_type", ckdb.String).SetComment("剖析类型"),
+		ckdb.NewColumn("profile_value_unit", ckdb.LowCardinalityString).SetComment("profile value 的单位"),
+		ckdb.NewColumn("profile_event_type", ckdb.LowCardinalityString).SetComment("剖析类型"),
 		ckdb.NewColumn("profile_create_timestamp", ckdb.DateTime64us).SetIndex(ckdb.IndexSet).SetComment("client 端聚合时间"),
 		ckdb.NewColumn("profile_in_timestamp", ckdb.DateTime64us).SetComment("DeepFlow 的写入时间，同批上报的批次数据具备相同的值"),
-		ckdb.NewColumn("profile_language_type", ckdb.String).SetComment("语言类型"),
+		ckdb.NewColumn("profile_language_type", ckdb.LowCardinalityString).SetComment("语言类型"),
 		ckdb.NewColumn("profile_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 span_id"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 trace_id"),
 		ckdb.NewColumn("span_name", ckdb.String).SetComment("含义等同 l7_flow_log 的 endpoint"),
@@ -269,6 +269,16 @@ func ReleaseInProcess(p *InProcessProfile) {
 	p.TagNames = tagNames
 	p.TagValues = tagValues
 	poolInProcess.Put(p)
+}
+
+func (p *InProcessProfile) Clone() *InProcessProfile {
+	c := AcquireInProcess()
+	*c = *p
+	c.TagNames = make([]string, len(p.TagNames))
+	copy(p.TagNames, p.TagNames)
+	c.TagValues = make([]string, len(p.TagValues))
+	copy(p.TagValues, p.TagValues)
+	return c
 }
 
 func (p *InProcessProfile) FillProfile(input *storage.PutInput,
