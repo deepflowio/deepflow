@@ -524,6 +524,9 @@ ingester:
   ## profile compression algorithm, default is zstd, empty string for not compress
   #profile-compression-algorithm: "zstd"
 
+  ## off-cpu pofile splitting granularity, 0 mean disable splitting (unit: second)
+  #profile-off-cpu-splitting-granularity: 1
+
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
 

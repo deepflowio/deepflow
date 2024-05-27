@@ -82,6 +82,7 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 			i,
 			msgType,
 			*config.CompressionAlgorithm,
+			config.OffCpuSplittingGranularity,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			profileWriter,

@@ -26,10 +26,16 @@ import (
 
 	"github.com/deepflowio/deepflow/server/ingester/profile/common"
 	"github.com/deepflowio/deepflow/server/ingester/profile/dbwriter"
+	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/klauspost/compress/zstd"
 	"github.com/pyroscope-io/pyroscope/pkg/storage"
+)
+
+const (
+	// the maximum duration of off-cpu profile is 1h + <1s
+	MAX_OFF_CPU_PROFILE_SPLIT_COUNT = 4000
 )
 
 type Parser struct {
@@ -39,7 +45,8 @@ type Parser struct {
 	podID       uint32
 
 	// profileWriter.Write
-	callBack func(interface{})
+	callBack                   func([]interface{})
+	offCpuSplittingGranularity int
 
 	platformData    *grpc.PlatformInfoTable
 	inTimestamp     time.Time
@@ -75,7 +82,7 @@ func (p *Parser) Evaluate(i *storage.PutInput) (storage.SampleObserver, bool) {
 	return p.observer, true
 }
 
-func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value uint64) *dbwriter.InProcessProfile {
+func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value uint64) []interface{} {
 	labels := input.Key.Labels()
 	tagNames := make([]string, 0, len(labels))
 	tagValues := make([]string, 0, len(labels))
@@ -105,9 +112,9 @@ func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value
 	location := compress(onelineStack, p.compressionAlgo)
 	atomic.AddInt64(&p.Counter.CompressedSize, int64(len(location)))
 
-	profileValue := value
+	profileValueUs := int64(value)
 	if p.processTracer != nil {
-		profileValue = uint64(p.value)
+		profileValueUs = int64(p.value)
 		pid = p.processTracer.pid
 		stime = p.processTracer.stime
 		eventType = p.processTracer.eventType
@@ -122,7 +129,7 @@ func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value
 		eventType,
 		location,
 		p.compressionAlgo,
-		int64(profileValue),
+		profileValueUs,
 		p.inTimestamp,
 		spyMap[input.SpyName],
 		pid,
@@ -130,7 +137,43 @@ func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value
 		tagNames,
 		tagValues)
 
-	return ret
+	var writeItems []interface{}
+	granularityUs := int64(p.offCpuSplittingGranularity) * int64(time.Second/time.Microsecond)
+	// each off-cpu profile data represents the function call stack within a long period of time (perhaps up to one hour).
+	// It is inappropriate to use a single end_time to express a period of time.
+	if ret.ProfileEventType == eBPFEventType[pb.ProfileEventType_EbpfOffCpu] {
+		if p.offCpuSplittingGranularity > 0 &&
+			profileValueUs > granularityUs {
+
+			splitCount := (profileValueUs + granularityUs - 1) / granularityUs
+			// prevent abnormal data from causing excessive writing
+			if splitCount > MAX_OFF_CPU_PROFILE_SPLIT_COUNT {
+				splitCount = MAX_OFF_CPU_PROFILE_SPLIT_COUNT
+			}
+
+			writeItems = make([]interface{}, 0, splitCount)
+			for i := int64(0); i < splitCount-1; i++ {
+				splitItem := ret.Clone()
+				// the time for data reporting is the end_time
+				splitItem.Time = splitItem.Time - uint32(i)*uint32(p.offCpuSplittingGranularity)
+				splitItem.ProfileCreateTimestamp = splitItem.ProfileCreateTimestamp - i*granularityUs
+				splitItem.ProfileValue = granularityUs
+				writeItems = append(writeItems, splitItem)
+			}
+			atomic.AddInt64(&p.Counter.OffCpuSplitCount, 1)
+			atomic.AddInt64(&p.Counter.OffCpuSplitIntoCount, int64(splitCount))
+
+			// set last split item from ret itself
+			ret.Time = ret.Time - uint32(splitCount-1)*uint32(p.offCpuSplittingGranularity)
+			ret.ProfileCreateTimestamp = ret.ProfileCreateTimestamp - (splitCount-1)*granularityUs
+			ret.ProfileValue = profileValueUs - (splitCount-1)*granularityUs
+		} else {
+			atomic.AddInt64(&p.Counter.OffCputNotSplitCount, 1)
+		}
+	}
+	writeItems = append(writeItems, ret)
+
+	return writeItems
 }
 
 type observer struct {
