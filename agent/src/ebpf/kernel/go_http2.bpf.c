@@ -334,7 +334,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 
 	// Update and get socket_id
 	__u64 conn_key;
-	struct socket_info_t *socket_info_ptr;
+	struct socket_info_s *socket_info_ptr;
 	conn_key = gen_conn_key_id((__u64) tgid, (__u64) data->fd);
 	socket_info_ptr = socket_info_map__lookup(&conn_key);
 	if (is_socket_info_valid(socket_info_ptr)) {
@@ -343,7 +343,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 		send_buffer->socket_id = trace_conf->socket_id + 1;
 		trace_conf->socket_id++;
 
-		struct socket_info_t sk_info = {
+		struct socket_info_s sk_info = {
 			.uid = send_buffer->socket_id,
 		};
 
@@ -1046,7 +1046,7 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 
 	// Update and get socket_id
 	__u64 conn_key;
-	struct socket_info_t *socket_info_ptr;
+	struct socket_info_s *socket_info_ptr;
 	conn_key = gen_conn_key_id((__u64) tgid, (__u64) fd);
 	socket_info_ptr = socket_info_map__lookup(&conn_key);
 	if (is_socket_info_valid(socket_info_ptr)) {
@@ -1055,7 +1055,7 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 		send_buffer->socket_id = trace_conf->socket_id + 1;
 		trace_conf->socket_id++;
 
-		struct socket_info_t sk_info = {
+		struct socket_info_s sk_info = {
 			.uid = send_buffer->socket_id,
 		};
 

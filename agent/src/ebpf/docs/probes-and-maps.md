@@ -80,7 +80,7 @@
 |__trace_stats_map|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct trace_stats|用于统计`trace_map` `__socket_info_map` 的当前容量，用于老化处理（资源回收）|
 |__active_write_args_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct data_args_t|write() syscall's input argument.|
 |__active_read_args_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct data_args_t|read() syscall's input argument.|
-|__socket_info_map|BPF_MAP_TYPE_HASH|__u64 {pid + fd}|struct socket_info_t|用于记录socket信息|
+|__socket_info_map|BPF_MAP_TYPE_HASH|__u64 {pid + fd}|struct socket_info_s|用于记录socket信息|
 |__trace_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct trace_info_t|用于记录追踪信息|
 |__progs_jmp_kp_map|BPF_MAP_TYPE_PROG_ARRAY|__u32|__u32|Tail Calls jmp table for [k/u]probe|
 |__progs_jmp_tp_map|BPF_MAP_TYPE_PROG_ARRAY|__u32|__u32|Tail Calls jmp table for tracepoint|
@@ -96,3 +96,4 @@
 |go_ancerstor_map|BPF_MAP_TYPE_LRU_HASH|struct go_key|ancerstor goid|保存父子协程的映射关系|
 |__proto_infer_cache_map|BPF_MAP_TYPE_ARRAY|__u32|struct proto_infer_cache_t|Fast matching cache, used to speed up protocol inference. Suitable for Linux5.2+|
 |__io_event_buffer|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct __io_event_buffer|IO 事件内容通过 struct __socket_data_buffer 格式上报, data 部分保存在这个 map 中,并复制到 __data_buf map|
+|__allow_reasm_protos_map|BPF_MAP_TYPE_ARRAY|int|bool|Record which protocols allow data segmentation reassembly processing.|

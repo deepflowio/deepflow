@@ -1009,7 +1009,7 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 
 	uint64_t conn_key, next_conn_key;
 	uint32_t sockets_reclaim_count = 0;
-	struct socket_info_t value;
+	struct socket_info_s value;
 	conn_key = 0;
 	uint32_t uptime = get_sys_uptime();
 	uint32_t curr_socket_count = 0;
@@ -1236,7 +1236,7 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	 * A separate correction is made here.
 	 */
 	if (strstr(linux_release, "tlinux3"))
-		offset.struct_files_private_data_offset = 0xc0;	
+		offset.struct_files_private_data_offset = 0xc0;
 
 	offset.struct_file_f_inode_offset = 0x20;
 	offset.struct_inode_i_mode_offset = 0x0;
@@ -1340,7 +1340,8 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    kernel_struct_field_offset(obj, "sock_common", "skc_num");
 	int struct_sock_skc_state_offset =
 	    kernel_struct_field_offset(obj, "sock_common", "skc_state");
-	int struct_sock_common_ipv6only_offset = struct_sock_skc_state_offset + 1;
+	int struct_sock_common_ipv6only_offset =
+	    struct_sock_skc_state_offset + 1;
 
 	if (copied_seq_offs < 0 || write_seq_offs < 0 || files_offs < 0 ||
 	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
@@ -1429,6 +1430,27 @@ static void update_protocol_filter_array(struct bpf_tracer *tracer)
 	for (int idx = 0; idx < PROTO_NUM; ++idx) {
 		bpf_table_set_value(tracer, MAP_PROTO_FILTER_NAME, idx,
 				    &ebpf_config_protocol_filter[idx]);
+	}
+}
+
+static void update_allow_reasm_protos_array(struct bpf_tracer *tracer)
+{
+	for (int idx = 0; idx < PROTO_NUM; ++idx) {
+		bool ret;
+		ret = bpf_table_set_value(tracer,
+					  MAP_ALLOW_REASM_PROTOS_NAME,
+					  idx, &allow_seg_reasm_protos[idx]);
+		if (ret) {
+			if (allow_seg_reasm_protos[idx]) {
+				ebpf_info
+				    ("Allow proto %s(%d) segment reassembly\n",
+				     get_proto_name(idx), idx);
+			}
+		} else {
+			ebpf_warning("Set proto %s(%d) to map '%s' failed\n",
+				     get_proto_name(idx), idx,
+				     MAP_ALLOW_REASM_PROTOS_NAME);
+		}
 	}
 }
 
@@ -2087,6 +2109,9 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	// Update protocol filter array
 	update_protocol_filter_array(tracer);
+
+	// Update '__allow_reasm_protos_map'
+	update_allow_reasm_protos_array(tracer);
 
 	update_kprobe_port_bitmap(tracer);
 
