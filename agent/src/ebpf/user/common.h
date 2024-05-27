@@ -285,6 +285,14 @@ int parse_num_range(const char *config_str, int bytes_count,
 int parse_num_range_disorder(const char *config_str,
 			     int bytes_count, bool ** mask);
 int generate_random_integer(int max_value);
+/**
+ * @brief Find the address through kernel symbols.
+ *
+ * @param[in] name Kernel symbol name
+ * @return 0 indicates that the kernel symbol name was not found, while
+ * a non-zero value represents the address of the kernel symbol.
+ */
+u64 kallsyms_lookup_name(const char *name);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */

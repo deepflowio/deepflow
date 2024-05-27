@@ -47,7 +47,7 @@
 
 #define MAXLINE 1024
 
-volatile uint64_t sys_boot_time_ns; // System boot time in nanoseconds
+volatile uint64_t sys_boot_time_ns;	// System boot time in nanoseconds
 static u64 g_sys_btime_msecs;
 
 bool is_core_kernel(void)
@@ -1123,6 +1123,33 @@ int generate_random_integer(int max_value)
 	clock_gettime(CLOCK_REALTIME, &ts);
 	srand(ts.tv_nsec);
 	return (rand() % max_value);
+}
+
+u64 kallsyms_lookup_name(const char *name)
+{
+	FILE *f = fopen("/proc/kallsyms", "r");
+	char func[256], buf[256];
+	char symbol;
+	void *addr;
+
+	if (!f)
+		return -ENOENT;
+
+	while (!feof(f)) {
+		if (!fgets(buf, sizeof(buf), f))
+			break;
+		if (sscanf(buf, "%p %c %s", &addr, &symbol, func) != 3)
+			break;
+		if (!addr)
+			continue;
+		if (strcmp(func, name) == 0) {
+			fclose(f);
+			return (u64) addr;
+		}
+	}
+
+	fclose(f);
+	return 0;
 }
 
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
