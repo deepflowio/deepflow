@@ -101,8 +101,17 @@ struct trace_stats {
 	__u64 trace_map_count;     // 对同一进程/线程的多次转发表进行统计
 };
 
-struct socket_info_t {
-	__u64 l7_proto;
+struct socket_info_s {
+	__u16 l7_proto;
+
+	/*
+	 * Indicate whether this socket is allowed for reassembly,
+	 * determined by the configuration of protocol reassembly.
+	 */
+	__u16 allow_reassembly: 1;
+	__u16 unused_bits: 15; 
+ 	__u32 reasm_bytes; // The amount of data bytes that have been reassembled.
+
 	/*
 	 * The serial number of the socket read and write data, used to
 	 * correct out-of-sequence.

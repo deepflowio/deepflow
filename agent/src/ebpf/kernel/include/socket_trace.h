@@ -130,7 +130,8 @@ struct conn_info_s {
 	__u16 skc_family;	/* PF_INET, PF_INET6... */
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only:1;
-	__u8 reserved:1;
+	__u8 enable_reasm:1;	/* Is data restructuring allowed? */
+
 	/*
 	 * Whether the socket l7 protocol type needs
 	 * to be confirmed again.
@@ -192,7 +193,7 @@ struct conn_info_s {
 	char prev_buf[EBPF_CACHE_SIZE];
 	char *syscall_infer_addr;
 	void *sk;
-	struct socket_info_t *socket_info_ptr;	/* lookup __socket_info_map */
+	struct socket_info_s *socket_info_ptr;	/* lookup __socket_info_map */
 };
 
 struct process_data_extra {
@@ -224,6 +225,7 @@ struct tail_calls_context {
 	 */
 	char private_data[sizeof(struct infer_data_s)];
 	int max_size_limit;		// The maximum size of the socket data that can be transferred.
+	__u32 push_reassembly_bytes;	// The number of bytes pushed after enabling data reassembly.
 	enum traffic_direction dir;	// Data flow direction.
 	__u8 vecs: 1;			// Whether a memory vector is used ? (for specific syscall)
 	__u8 is_close: 1;		// Is it a close() systemcall ?

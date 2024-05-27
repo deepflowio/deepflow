@@ -128,6 +128,7 @@ extern struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 extern int ebpf_config_protocol_filter[PROTO_NUM];
 extern struct kprobe_port_bitmap allow_port_bitmap;
 extern struct kprobe_port_bitmap bypass_port_bitmap;
+extern bool allow_seg_reasm_protos[PROTO_NUM];
 
 /* *INDENT-OFF* */
 #define probes_set_enter_symbol(t, fn)						\
@@ -579,17 +580,19 @@ void free_probe_from_tracer(struct probe *pb);
 int tracer_hooks_process(struct bpf_tracer *tracer,
 			 enum tracer_hook_type type, int *probes_count);
 int tracer_uprobes_update(struct bpf_tracer *tracer);
+
 /**
- * create a perf buffer reader.
- * @t tracer
- * @map_name perf buffer map name
- * @raw_cb perf reader raw data callback
- * @lost_cb perf reader data lost callback
- * @pages_cnt How many memory pages are used for ring-buffer
- *            (system page size * pages_cnt)
- * @thread_nr The number of threads required for the reader's work 
- * @epoll_timeout perf epoll timeout
- * @returns perf_reader address on success, NULL on error
+ * @brief Create a perf buffer reader.
+ *
+ * @param t tracer
+ * @param map_name perf buffer map name
+ * @param raw_cb perf reader raw data callback
+ * @param lost_cb perf reader data lost callback
+ * @param pages_cnt How many memory pages are used for ring-buffer
+ * (system page size * pages_cnt)
+ * @param thread_nr The number of threads required for the reader's work 
+ * @param epoll_timeout perf epoll timeout
+ * @return perf_reader address on success, NULL on error
  */
 struct bpf_perf_reader*
 create_perf_buffer_reader(struct bpf_tracer *t,
@@ -605,4 +608,11 @@ void free_all_readers(struct bpf_tracer *t);
 int enable_tracer_reader_work(const char *name, int idx,
 			      struct bpf_tracer *tracer,
 			      void *fn);
+/**
+ * @brief Enable eBPF segmentation reassembly for the specified protocol.
+ * 
+ * @param protocol Protocols for segmentation reassembly
+ * @return 0 on success, non-zero on error
+ */
+int enable_ebpf_seg_reasm_protocol(int protocol);
 #endif /* DF_USER_TRACER_H */
