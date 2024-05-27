@@ -56,7 +56,7 @@ func NewAnalyzerCheck(cfg *config.ControllerConfig, ctx context.Context) *Analyz
 	}
 }
 
-func (c *AnalyzerCheck) Start() {
+func (c *AnalyzerCheck) Start(sCtx context.Context) {
 	log.Info("analyzer check start")
 	go func() {
 		ticker := time.NewTicker(time.Duration(c.cfg.HealthCheckInterval) * time.Second)
@@ -71,6 +71,8 @@ func (c *AnalyzerCheck) Start() {
 				c.vtapAnalyzerCheck()
 				// check az_analyzer_connection, delete unused item
 				c.azConnectionCheck()
+			case <-sCtx.Done():
+				break LOOP
 			case <-c.cCtx.Done():
 				break LOOP
 			}

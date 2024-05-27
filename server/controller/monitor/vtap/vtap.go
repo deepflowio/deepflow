@@ -47,20 +47,40 @@ func NewVTapCheck(cfg config.MonitorConfig, ctx context.Context) *VTapCheck {
 	}
 }
 
-func (v *VTapCheck) Start() {
+func (v *VTapCheck) Start(sCtx context.Context) {
 	log.Info("controller check start")
 	go func() {
-		for range time.Tick(time.Duration(v.cfg.VTapCheckInterval) * time.Second) {
-			// check launch_server resource if exist
-			v.launchServerCheck()
-			// check vtap type
-			v.typeCheck()
+		ticker := time.NewTicker(time.Duration(v.cfg.VTapCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP1:
+		for {
+			select {
+			case <-ticker.C:
+				// check launch_server resource if exist
+				v.launchServerCheck()
+				// check vtap type
+				v.typeCheck()
+			case <-sCtx.Done():
+				break LOOP1
+			case <-v.vCtx.Done():
+				break LOOP1
+			}
 		}
 	}()
 
 	go func() {
-		for range time.Tick(time.Second * time.Duration(v.cfg.VTapAutoDeleteInterval)) {
-			v.deleteLostVTap()
+		ticker := time.NewTicker(time.Duration(v.cfg.VTapAutoDeleteInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP2:
+		for {
+			select {
+			case <-ticker.C:
+				v.deleteLostVTap()
+			case <-sCtx.Done():
+				break LOOP2
+			case <-v.vCtx.Done():
+				break LOOP2
+			}
 		}
 	}()
 }

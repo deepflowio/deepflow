@@ -51,14 +51,17 @@ func (c *TagRecorder) run() {
 	c.refresh(domainToIconID, resourceToIconID)
 }
 
-func (c *TagRecorder) StartChDictionaryUpdate() {
+func (c *TagRecorder) StartChDictionaryUpdate(sCtx context.Context) {
 	go func() {
 		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
+		defer ticker.Stop()
 	LOOP:
 		for {
 			select {
 			case <-ticker.C:
 				c.UpdateChDictionary()
+			case <-sCtx.Done():
+				break LOOP
 			case <-c.tCtx.Done():
 				break LOOP
 			}
@@ -66,7 +69,8 @@ func (c *TagRecorder) StartChDictionaryUpdate() {
 	}()
 }
 
-func (c *TagRecorder) Start() {
+func (c *TagRecorder) Start(sCtx context.Context) {
+	log.Info("tagrecorder start")
 	go func() {
 		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
 		defer ticker.Stop()
@@ -75,6 +79,8 @@ func (c *TagRecorder) Start() {
 			select {
 			case <-ticker.C:
 				c.run()
+			case <-sCtx.Done():
+				break LOOP
 			case <-c.tCtx.Done():
 				break LOOP
 			}

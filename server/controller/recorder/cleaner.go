@@ -51,15 +51,15 @@ func (c *Cleaner) Init(cfg *RecorderConfig) {
 	c.cfg = cfg
 }
 
-func (c *Cleaner) Start() {
+func (c *Cleaner) Start(sContext context.Context) {
 	log.Info("resource clean started")
 	// 定时清理软删除资源数据
 	// timed clean soft deleted resource data
-	c.timedCleanDeletedData(int(c.cfg.DeletedResourceCleanInterval), int(c.cfg.DeletedResourceRetentionTime))
+	c.timedCleanDeletedData(sContext, int(c.cfg.DeletedResourceCleanInterval), int(c.cfg.DeletedResourceRetentionTime))
 	// 定时删除所属上级资源已不存在（被彻底清理或软删除）的资源数据，并记录异常日志
 	// timed clean the resource data of the parent resource that does not exist (means it is completely deleted or soft deleted)
 	// and record error logs
-	c.timedCleanDirtyData()
+	c.timedCleanDirtyData(sContext)
 }
 
 func (c *Cleaner) Stop() {
@@ -69,7 +69,7 @@ func (c *Cleaner) Stop() {
 	log.Info("resource clean stopped")
 }
 
-func (c *Cleaner) timedCleanDeletedData(cleanInterval, retentionInterval int) {
+func (c *Cleaner) timedCleanDeletedData(sContext context.Context, cleanInterval, retentionInterval int) {
 	c.cleanDeletedData(retentionInterval)
 	go func() {
 		ticker := time.NewTicker(time.Duration(cleanInterval) * time.Hour)
@@ -79,6 +79,8 @@ func (c *Cleaner) timedCleanDeletedData(cleanInterval, retentionInterval int) {
 			select {
 			case <-ticker.C:
 				c.cleanDeletedData(retentionInterval)
+			case <-sContext.Done():
+				break LOOP
 			case <-c.ctx.Done():
 				break LOOP
 			}
@@ -135,7 +137,7 @@ func getIDs[MT constraint.MySQLModel]() (ids []int) {
 	return
 }
 
-func (c *Cleaner) timedCleanDirtyData() {
+func (c *Cleaner) timedCleanDirtyData(sContext context.Context) {
 	c.cleanDirtyData()
 	go func() {
 		ticker := time.NewTicker(time.Duration(50) * time.Minute)
@@ -145,6 +147,8 @@ func (c *Cleaner) timedCleanDirtyData() {
 			select {
 			case <-ticker.C:
 				c.cleanDirtyData()
+			case <-sContext.Done():
+				break LOOP
 			case <-c.ctx.Done():
 				break LOOP
 			}

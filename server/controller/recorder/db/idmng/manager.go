@@ -55,7 +55,6 @@ func GetSingleton() *IDManager {
 
 func (m *IDManager) Init(cfg *RecorderConfig) *IDManager {
 	log.Info("init id mananger")
-	idMNG.ctx, idMNG.cancel = context.WithCancel(context.Background())
 	idMNG.resourceTypeToIDPool = map[string]IDPoolUpdater{
 		ctrlrcommon.RESOURCE_TYPE_REGION_EN:        &IDPool[mysql.Region]{resourceType: ctrlrcommon.RESOURCE_TYPE_REGION_EN, max: cfg.ResourceMaxID0},
 		ctrlrcommon.RESOURCE_TYPE_AZ_EN:            &IDPool[mysql.AZ]{resourceType: ctrlrcommon.RESOURCE_TYPE_AZ_EN, max: cfg.ResourceMaxID0},
@@ -87,11 +86,13 @@ func (m *IDManager) Init(cfg *RecorderConfig) *IDManager {
 	return m
 }
 
-func (m *IDManager) Start() error {
+func (m *IDManager) Start(ctx context.Context) error {
 	if m.inUse {
 		return nil
 	}
 	m.inUse = true
+	m.ctx, m.cancel = context.WithCancel(ctx)
+
 	log.Info("resource id manager started")
 	for _, idPool := range m.resourceTypeToIDPool {
 		err := idPool.refresh()
