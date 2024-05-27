@@ -28,7 +28,6 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/pcap/config"
 	"github.com/deepflowio/deepflow/server/ingester/pcap/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
-	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
@@ -78,6 +77,8 @@ type Decoder struct {
 	inQueue    queue.QueueReader
 	pcapWriter *dbwriter.PcapWriter
 	config     *config.Config
+
+	orgId, teamId uint16
 
 	counter *Counter
 	utils.Closable
@@ -135,6 +136,7 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+			d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
 			d.handlePcap(recvBytes.VtapID, decoder, encoder, pcapHeader, pcapBatch)
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
@@ -159,12 +161,12 @@ func (d *Decoder) handlePcap(vtapID uint16, decoder *codec.SimpleDecoder, encode
 		pcapHeader.Encode(encoder)
 		for _, pcap := range pcapBatch.Batches {
 			d.counter.OutCount++
-			d.pcapWriter.Write(pcapToStore(vtapID, encoder.Bytes(), pcap))
+			d.pcapWriter.Write(d.pcapToStore(vtapID, encoder.Bytes(), pcap))
 		}
 	}
 }
 
-func pcapToStore(vtapID uint16, pcapHeader []byte, pcap *trident.Pcap) *dbwriter.PcapStore {
+func (d *Decoder) pcapToStore(vtapID uint16, pcapHeader []byte, pcap *trident.Pcap) *dbwriter.PcapStore {
 	s := dbwriter.AcquirePcapStore()
 	s.Time = uint32(time.Duration(pcap.GetEndTime()) / time.Second)
 	s.StartTime = int64(pcap.GetStartTime() / uint64(time.Microsecond))
@@ -177,6 +179,6 @@ func pcapToStore(vtapID uint16, pcapHeader []byte, pcap *trident.Pcap) *dbwriter
 	for _, id := range pcap.GetAclGids() {
 		s.AclGids = append(s.AclGids, uint16(id))
 	}
-	s.OrgId, s.TeamID = grpc.QueryVtapOrgAndTeamID(vtapID)
+	s.OrgId, s.TeamID = d.orgId, d.teamId
 	return s
 }

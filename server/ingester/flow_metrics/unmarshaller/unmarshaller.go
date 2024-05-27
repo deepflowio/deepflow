@@ -234,6 +234,8 @@ func (u *Unmarshaller) QueueProcess() {
 						log.Warningf("Decode failed, bytes len=%d err=%s", len([]byte(bytes)), err)
 						break
 					}
+					doc.Tags().TeamID = uint16(recvBytes.TeamID)
+					doc.Tags().OrgId = uint16(recvBytes.OrgID)
 					u.isGoodDocument(int64(doc.Time()))
 
 					// 秒级数据是否写入

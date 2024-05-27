@@ -857,9 +857,6 @@ func (k *KnowledgeGraph) fill(
 
 	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
 	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, uint32(k.PodClusterID1), k.L3DeviceID1, k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
-
-	k.OrgId, k.TeamID = platformData.QueryVtapOrgAndTeamID(vtapId)
-
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
@@ -1070,10 +1067,11 @@ func genID(time uint32, counter *uint32, analyzerID uint32) uint64 {
 	return uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
 }
 
-func TaggedFlowToL4FlowLog(f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *L4FlowLog {
+func TaggedFlowToL4FlowLog(orgId, teamId uint16, f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *L4FlowLog {
 	isIPV6 := f.Flow.EthType == uint32(layers.EthernetTypeIPv6)
 
 	s := AcquireL4FlowLog()
+	s.OrgId, s.TeamID = orgId, teamId
 	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, platformData.QueryAnalyzerID())
 	s.DataLinkLayer.Fill(f.Flow)
 	s.NetworkLayer.Fill(f.Flow, isIPV6)
