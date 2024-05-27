@@ -992,9 +992,17 @@ func (c *DomainChecker) Stop() {
 
 func (c *DomainChecker) CheckRegularly() {
 	go func() {
-		for range time.Tick(time.Duration(5) * time.Minute) {
-			for _, db := range mysql.GetDBs().All() {
-				c.checkAndAllocateController(db)
+		ticker := time.NewTicker(time.Duration(5) * time.Minute)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				for _, db := range mysql.GetDBs().All() {
+					c.checkAndAllocateController(db)
+				}
+			case <-c.ctx.Done():
+				break LOOP
 			}
 		}
 	}()

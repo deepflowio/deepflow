@@ -59,12 +59,20 @@ func NewVTapLicenseAllocation(cfg config.MonitorConfig, ctx context.Context) *VT
 func (v *VTapLicenseAllocation) Start() {
 	log.Info("vtap license allocation and check start")
 	go func() {
-		for range time.Tick(time.Duration(v.cfg.LicenseCheckInterval) * time.Second) {
-			if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
-				v.allocLicense(db)
-				return nil
-			}); err != nil {
-				log.Error(err)
+		ticker := time.NewTicker(time.Duration(v.cfg.LicenseCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+					v.allocLicense(db)
+					return nil
+				}); err != nil {
+					log.Error(err)
+				}
+			case <-v.vCtx.Done():
+				break LOOP
 			}
 		}
 	}()
