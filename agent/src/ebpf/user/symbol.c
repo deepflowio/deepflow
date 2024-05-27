@@ -1267,33 +1267,6 @@ void release_symbol_caches(void)
 #endif
 }
 
-static u64 kallsyms_lookup_name(const char *name)
-{
-	FILE *f = fopen("/proc/kallsyms", "r");
-	char func[256], buf[256];
-	char symbol;
-	void *addr;
-
-	if (!f)
-		return -ENOENT;
-
-	while (!feof(f)) {
-		if (!fgets(buf, sizeof(buf), f))
-			break;
-		if (sscanf(buf, "%p %c %s", &addr, &symbol, func) != 3)
-			break;
-		if (!addr)
-			continue;
-		if (strcmp(func, name) == 0) {
-			fclose(f);
-			return (u64) addr;
-		}
-	}
-
-	fclose(f);
-	return 0;
-}
-
 int creat_ksyms_cache(void)
 {
 	errno = 0;
