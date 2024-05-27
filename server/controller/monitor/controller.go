@@ -64,29 +64,39 @@ func NewControllerCheck(cfg *config.ControllerConfig, ctx context.Context) *Cont
 func (c *ControllerCheck) Start() {
 	log.Info("controller check start")
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second) {
-			c.SyncDefaultOrgData()
+		ticker := time.NewTicker(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP1:
+		for {
+			select {
+			case <-ticker.C:
+				c.SyncDefaultOrgData()
+			case <-c.cCtx.Done():
+				break LOOP1
+			}
 		}
 	}()
 
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second) {
-			c.SyncDefaultOrgData()
-		}
-	}()
-
-	go func() {
-		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
-			if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
-				// 控制器健康检查
-				c.healthCheck(db)
-				// 检查没有分配控制器的采集器，并进行分配
-				c.vtapControllerCheck(db)
-				// check az_controller_connection, delete unused item
-				c.azConnectionCheck(db)
-				return nil
-			}); err != nil {
-				log.Error(err)
+		ticker := time.NewTicker(time.Duration(c.cfg.HealthCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP2:
+		for {
+			select {
+			case <-ticker.C:
+				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+					// 控制器健康检查
+					c.healthCheck(db)
+					// 检查没有分配控制器的采集器，并进行分配
+					c.vtapControllerCheck(db)
+					// check az_controller_connection, delete unused item
+					c.azConnectionCheck(db)
+					return nil
+				}); err != nil {
+					log.Error(err)
+				}
+			case <-c.cCtx.Done():
+				break LOOP2
 			}
 		}
 	}()

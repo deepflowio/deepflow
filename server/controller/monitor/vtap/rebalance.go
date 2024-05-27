@@ -50,12 +50,20 @@ func (r *RebalanceCheck) Start() {
 			return
 		}
 
-		for range time.Tick(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second) {
-			for _, db := range mysql.GetDBs().All() {
-				r.controllerRebalance(db)
-				if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-					r.analyzerRebalance(db)
+		ticker := time.NewTicker(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				for _, db := range mysql.GetDBs().All() {
+					r.controllerRebalance(db)
+					if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
+						r.analyzerRebalance(db)
+					}
 				}
+			case <-r.vCtx.Done():
+				break LOOP
 			}
 		}
 	}()
@@ -65,11 +73,21 @@ func (r *RebalanceCheck) Start() {
 			return
 		}
 
-		if r.cfg.IngesterLoadBalancingConfig.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
-			duration := r.cfg.IngesterLoadBalancingConfig.DataDuration
-			r.analyzerRebalanceByTraffic(duration)
-			for range time.Tick(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second) {
+		if r.cfg.IngesterLoadBalancingConfig.Algorithm != common.ANALYZER_ALLOC_BY_INGESTED_DATA {
+			return
+		}
+
+		duration := r.cfg.IngesterLoadBalancingConfig.DataDuration
+		r.analyzerRebalanceByTraffic(duration)
+
+		ticker := time.NewTicker(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second)
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
 				r.analyzerRebalanceByTraffic(duration)
+			case <-r.vCtx.Done():
+				break LOOP
 			}
 		}
 	}()
