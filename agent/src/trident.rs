@@ -123,7 +123,7 @@ use public::{
 
 const MINUTE: Duration = Duration::from_secs(60);
 const COMMON_DELAY: u64 = 5; // Potential delay from other processing steps in flow_map
-const QG_PROCESS_MAX_DELAY: u64 = 1; // Potential delay from processing steps in qg
+const QG_PROCESS_MAX_DELAY: u64 = 5; // FIXME: Potential delay from processing steps in qg, it is an estimated value and is not accurate; the data processing capability of the quadruple_generator should be optimized.
 
 #[derive(Debug, Default)]
 pub struct ChangedConfig {
