@@ -73,13 +73,13 @@ func (p *ProfileWriter) GetCounter() interface{} {
 	return counter
 }
 
-func (p *ProfileWriter) Write(m interface{}) {
-	inProcess := m.(*InProcessProfile)
+func (p *ProfileWriter) Write(m []interface{}) {
+	inProcess := m[0].(*InProcessProfile)
 	inProcess.GenerateFlowTags(p.flowTagWriter.Cache)
 	p.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 
-	atomic.AddInt64(&p.counter.ProfilesCount, 1)
-	p.ckWriter.Put(m)
+	atomic.AddInt64(&p.counter.ProfilesCount, int64(len(m)))
+	p.ckWriter.Put(m...)
 }
 
 func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *config.Config) (*ProfileWriter, error) {
