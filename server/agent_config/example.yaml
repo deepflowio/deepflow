@@ -1615,6 +1615,10 @@ vtap_group_id: g-xxxxxx
   ##   When it is false, it supports the integration of metrics data of Prometheus, InfluxDB and other protocols
   #external-metric-integration-disabled: false
 
+  ## Note:
+  ##   When it is false, it supports the integration of log data from Vector
+  # external-log-integration-disabled: false
+
   #######################
   ## NTP Configuration ##
   #######################
