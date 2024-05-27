@@ -166,6 +166,7 @@ type VTapCache struct {
 	licenseType        int
 	tapMode            int
 	teamID             int
+	organizeID         int
 	lcuuid             *string
 	licenseFunctions   *string
 	licenseFunctionSet mapset.Set
@@ -218,7 +219,7 @@ func (c *VTapCache) String() string {
 			"ctrlIP:%s, ctrlMac:%s, tsdbIP: %s, curTSDBIP: %s, controllerIP: %s, "+
 			"curControllerIP: %s, launchServer: %s, launchServerID: %d, syncedControllerAt: %s, "+
 			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, licenseType: %d, "+
-			"tapMode: %d, teamID: %d, licenseFunctionSet: %s, enabledTrafficDistribution: %v, "+
+			"tapMode: %d, teamID: %d, organizeID: %d, licenseFunctionSet: %s, enabledTrafficDistribution: %v, "+
 			"enabledNetworkMonitoring: %v, enabledCallMonitoring: %v, enabledFunctionMonitoring: %v, "+
 			"enabledApplicationMonitoring: %v, enabledIndicatorMonitoring: %v, enabledLogMonitoring: %v, "+
 			"podDomains: %v, pushVersionPlatformData: %d, pushVersionPolicy: %d, pushVersionGroups: %d, "+
@@ -227,7 +228,7 @@ func (c *VTapCache) String() string {
 		c.GetCtrlIP(), c.GetCtrlMac(), c.GetTSDBIP(), c.GetCurTSDBIP(), c.GetControllerIP(),
 		c.GetCurControllerIP(), c.GetLaunchServer(), c.GetLaunchServerID(), c.GetSyncedControllerAt(),
 		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.licenseType,
-		c.tapMode, c.teamID, c.licenseFunctionSet, c.EnabledTrafficDistribution(),
+		c.tapMode, c.teamID, c.organizeID, c.licenseFunctionSet, c.EnabledTrafficDistribution(),
 		c.EnabledNetworkMonitoring(), c.EnabledCallMonitoring(), c.EnabledFunctionMonitoring(),
 		c.EnabledApplicationMonitoring(), c.EnabledIndicatorMonitoring(), c.EnabledLogMonitoring(),
 		c.podDomains, c.pushVersionPlatformData, c.pushVersionPolicy, c.pushVersionGroups,
@@ -272,6 +273,7 @@ func NewVTapCache(vtap *mysql.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.tapMode = vtap.TapMode
 	vTapCache.teamID = vtap.TeamID
+	vTapCache.organizeID = vTapInfo.GetORGID()
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
 	vTapCache.licenseFunctionSet = mapset.NewSet()
@@ -863,6 +865,14 @@ func (c *VTapCache) GetTeamID() int {
 
 func (c *VTapCache) updateTeamID(teamID int) {
 	c.teamID = teamID
+}
+
+func (c *VTapCache) updateOrganizeID(organizeID int) {
+	c.organizeID = organizeID
+}
+
+func (c *VTapCache) GetOrganizeID() int {
+	return c.organizeID
 }
 
 func (c *VTapCache) UpdateRevision(revision string) {

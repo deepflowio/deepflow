@@ -184,6 +184,9 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
 		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
 		SystemLoadCircuitBreakerMetric:    &loadMetric,
+
+		TeamId:     proto.Uint32(uint32(c.GetTeamID())),
+		OrganizeId: proto.Uint32(uint32(c.GetOrganizeID())),
 	}
 
 	cacheTSBIP := c.GetTSDBIP()
