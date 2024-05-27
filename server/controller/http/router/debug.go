@@ -18,6 +18,7 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/manager"
+	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 type Debug struct {
@@ -241,7 +243,42 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 		case "ip":
 			data = ret.IPLastSeens
 		case "vinterface":
-			data = ret.Vinterfaces
+			teamIDList := map[uint32]bool{}
+			teamIDs, _ := c.GetQueryArray("team_id")
+			for _, t := range teamIDs {
+				teamID, err := strconv.Atoi(t)
+				if err != nil {
+					log.Warningf(err.Error())
+					continue
+				}
+				teamIDList[uint32(teamID)] = false
+			}
+
+			filterType := c.Query("team_id_filter")
+			switch filterType {
+			case "":
+				data = ret.Vinterfaces
+			case "whitelist":
+				retVinterfaces := []model.GenesisVinterface{}
+				for _, v := range ret.Vinterfaces {
+					if _, ok := teamIDList[v.TeamID]; !ok {
+						continue
+					}
+					retVinterfaces = append(retVinterfaces, v)
+				}
+				data = retVinterfaces
+			case "blacklist":
+				retVinterfaces := []model.GenesisVinterface{}
+				for _, v := range ret.Vinterfaces {
+					if _, ok := teamIDList[v.TeamID]; ok {
+						continue
+					}
+					retVinterfaces = append(retVinterfaces, v)
+				}
+				data = retVinterfaces
+			default:
+				err = fmt.Errorf("invalid team_id_filter (%s) for vinterface", filterType)
+			}
 		case "process":
 			data = ret.Processes
 		case "vip":
