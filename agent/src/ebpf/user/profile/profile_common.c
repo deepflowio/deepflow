@@ -1092,7 +1092,7 @@ bool check_profiler_regex(struct profiler_context *ctx, const char *name)
 		if (g_ctx_array[i] == NULL)
 			continue;
 
-		if (ctx != NULL) {
+		if (ctx != NULL && ctx->name != NULL) {
 			if (strcmp(g_ctx_array[i]->name, ctx->name))
 				continue;
 		}
