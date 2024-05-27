@@ -620,11 +620,22 @@ static struct probe *create_probe(struct bpf_tracer *tracer,
 {
 	struct probe *pb;
 	struct ebpf_prog *prog;
-	int fd = bpf_get_program_fd(tracer->obj, func_name, (void **)&prog);
+	char find_name[PROBE_NAME_SZ], *isra_p;
+	snprintf(find_name, sizeof(find_name), "%s", func_name);
+	/*
+	 * If the kernel compilation optimizes hook point names to forms
+	 * like 'xxx.isra.0', while our eBPF program defines interface names
+	 * without the 'isra.0' suffix, the following handling is required
+	 * during the query process.
+	 */
+	if ((isra_p = strstr(find_name, ".isra")))
+		*isra_p = '\0';
+
+	int fd = bpf_get_program_fd(tracer->obj, find_name, (void **)&prog);
 	if (fd < 0) {
 		ebpf_warning
-		    ("fun: %s, bpf_get_program_fd failed, func_name:%s.\n",
-		     __func__, func_name);
+		    ("fun: %s, bpf_get_program_fd failed, find_name:%s.\n",
+		     __func__, find_name);
 		return NULL;
 	}
 
@@ -872,8 +883,8 @@ static int tracepoint_detach(struct tracepoint *tp)
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_fun)(struct probe * p) = NULL;
-	int (*tracepoint_fun)(struct tracepoint * p) = NULL;
+	int (*probe_fun) (struct probe * p) = NULL;
+	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
 	if (type == HOOK_ATTACH) {
 		probe_fun = probe_attach;
 		tracepoint_fun = tracepoint_attach;
@@ -973,21 +984,18 @@ perf_event:
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
 				errno = 0;
 				int ret =
-				    program__attach_perf_event(obj->progs[i].
-							       prog_fd,
+				    program__attach_perf_event(obj->
+							       progs[i].prog_fd,
 							       PERF_TYPE_SOFTWARE,
 							       PERF_COUNT_SW_CPU_CLOCK,
 							       0,	/* sample_period */
-							       tracer->
-							       sample_freq,
+							       tracer->sample_freq,
 							       -1,	/* pid, current process */
 							       -1,	/* cpu, no binding */
 							       -1,	/* new event group is created */
-							       tracer->
-							       per_cpu_fds,
+							       tracer->per_cpu_fds,
 							       ARRAY_SIZE
-							       (tracer->
-								per_cpu_fds));
+							       (tracer->per_cpu_fds));
 				if (!ret) {
 					ebpf_info
 					    ("tracer \"%s\" attach perf event prog successful.\n",
@@ -1439,7 +1447,7 @@ static int tracer_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			      void **out, size_t *outsize)
+			      void **out, size_t * outsize)
 {
 	*outsize = sizeof(struct bpf_tracer_param_array) +
 	    sizeof(struct bpf_tracer_param) * tracers_count;
