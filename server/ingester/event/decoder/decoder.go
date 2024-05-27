@@ -400,6 +400,8 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 
 	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
 		s.ServiceID = event.InstanceID
+	} else if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
+		s.ServiceID = d.platformData.QueryService(s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 	}
 	s.AutoServiceID, s.AutoServiceType =
 		ingestercommon.GetAutoService(
