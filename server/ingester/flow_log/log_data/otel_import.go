@@ -36,7 +36,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) []*L7FlowLog {
+func OTelTracesDataToL7FlowLogs(vtapID, orgId, teamId uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) []*L7FlowLog {
 	ret := []*L7FlowLog{}
 	for _, resourceSpan := range l.GetResourceSpans() {
 		var resAttributes []*v11.KeyValue
@@ -46,17 +46,17 @@ func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *g
 		}
 		for _, scopeSpan := range resourceSpan.GetScopeSpans() {
 			for _, span := range scopeSpan.GetSpans() {
-				ret = append(ret, spanToL7FlowLog(vtapID, span, resAttributes, platformData, cfg))
+				ret = append(ret, spanToL7FlowLog(vtapID, orgId, teamId, span, resAttributes, platformData, cfg))
 			}
 		}
 	}
 	return ret
 }
 
-func spanToL7FlowLog(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
+func spanToL7FlowLog(vtapID, orgId, teamId uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
 	h := AcquireL7FlowLog()
 	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
-	h.VtapID = vtapID
+	h.VtapID, h.OrgId, h.TeamID = vtapID, orgId, teamId
 	h.FillOTel(span, resAttributes, platformData, cfg)
 	return h
 }
