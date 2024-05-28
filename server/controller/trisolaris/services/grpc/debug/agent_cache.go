@@ -18,13 +18,20 @@ package synchronize
 
 import (
 	"encoding/json"
-	"fmt"
+	"time"
 
+	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
 
 type AgentCacheDebug struct {
-	RawData string `json:"DATA"`
+	BootTime             string `json:"boot_time"`
+	SyncedControllerTime string `json:"synced_controller_time"`
+	SyncedTSDBTime       string `json:"synced_tsdb_time"`
+	ControllerIP         string `json:"controller_ip"`
+	CurControllerIP      string `json:"cur_controller_ip"`
+	TSDBIP               string `json:"tsdb_ip"`
+	CurTSDBIP            string `json:"cur_tsdb_ip"`
 }
 
 func (a *AgentCacheDebug) Marshal() []byte {
@@ -41,7 +48,26 @@ func (a *AgentCacheDebug) Marshal() []byte {
 }
 
 func NewAgentCacheDebug(vtapCache *vtap.VTapCache) *AgentCacheDebug {
+	var syncedControllerStr, syncedTSDBStr, bootTimeStr string
+	syncedController := vtapCache.GetSyncedControllerAt()
+	if syncedController != nil {
+		syncedControllerStr = syncedController.Format(GO_BIRTHDAY)
+	}
+	syncedTSDB := vtapCache.GetSyncedTSDBAt()
+	if syncedTSDB != nil {
+		syncedTSDBStr = syncedTSDB.Format(GO_BIRTHDAY)
+	}
+	bootTime := vtapCache.GetBootTime()
+	if bootTime != 0 {
+		bootTimeStr = time.Unix(int64(bootTime), 0).Format(GO_BIRTHDAY)
+	}
 	return &AgentCacheDebug{
-		RawData: fmt.Sprintf("%s", vtapCache),
+		BootTime:             bootTimeStr,
+		SyncedControllerTime: syncedControllerStr,
+		SyncedTSDBTime:       syncedTSDBStr,
+		ControllerIP:         vtapCache.GetControllerIP(),
+		TSDBIP:               vtapCache.GetTSDBIP(),
+		CurControllerIP:      vtapCache.GetCurControllerIP(),
+		CurTSDBIP:            vtapCache.GetCurTSDBIP(),
 	}
 }
