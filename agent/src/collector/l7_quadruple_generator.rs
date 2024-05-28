@@ -293,6 +293,11 @@ impl SubQuadGen {
                 let (is_active_host0, is_active_host1) =
                     check_active(time_in_second.as_secs(), possible_host, &flow);
                 for meter in meters.drain(..) {
+                    // meter.app_meter.traffic.request and meter.app_meter.traffic.response are 0, there is no need to save
+                    if meter.app_meter.traffic.request == 0 && meter.app_meter.traffic.response == 0
+                    {
+                        continue;
+                    }
                     let boxed_app_meter = Box::new(AppMeterWithFlow {
                         app_meter: meter.app_meter,
                         flow: flow.clone(),

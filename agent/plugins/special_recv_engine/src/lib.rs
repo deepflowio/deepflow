@@ -62,4 +62,8 @@ impl Dpdk {
     pub unsafe fn read(&mut self) -> Result<packet::Packet> {
         unimplemented!();
     }
+
+    pub fn get_counter_handle(&self) -> Arc<dyn counter::RefCountable> {
+        unimplemented!();
+    }
 }

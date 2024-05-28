@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -136,7 +137,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		vTapPort, ok := keyToItem[tapMacKey]
 		if ok {
 			vTapPort.MacType = CH_VTAP_PORT_TYPE_TAP_MAC
-			nameSlice := strings.Split(vTapPort.Name, ", ")
+			nameSlice := sortVTapPortJoinedNames(&vTapPort)
 			if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
 				if !strings.Contains(vTapPort.Name, ", ...") {
 					vTapPort.Name = vTapPort.Name + ", ..."
@@ -187,7 +188,8 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		if tapPort != macPort && macPort != 0 {
 			vTapPort, ok := keyToItem[macKey]
 			if ok {
-				nameSlice := strings.Split(vTapPort.Name, ", ")
+				nameSlice := sortVTapPortJoinedNames(&vTapPort)
+
 				if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
 					if !strings.Contains(vTapPort.Name, ", ...") {
 						vTapPort.Name = vTapPort.Name + ", ..."
@@ -241,7 +243,8 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		key := VtapPortKey{VtapID: vTapID, TapPort: 0}
 		vTapPort, ok := keyToItem[key]
 		if ok {
-			nameSlice := strings.Split(vTapPort.Name, ", ")
+			nameSlice := sortVTapPortJoinedNames(&vTapPort)
+
 			if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
 				if !strings.Contains(vTapPort.Name, ", ...") {
 					vTapPort.Name = vTapPort.Name + ", ..."
@@ -776,4 +779,12 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.podIDToName[p.ID] = p.Name
 	}
 	return
+}
+
+// sortVTapPortJoinedNames sorts the joined names of vtap ports, sets sorted name to ChVTapPort and returns the name slice
+func sortVTapPortJoinedNames(vtapPort *mysql.ChVTapPort) []string {
+	nameSlice := strings.Split(vtapPort.Name, ", ")
+	sort.Strings(nameSlice)
+	vtapPort.Name = strings.Join(nameSlice, ", ")
+	return nameSlice
 }

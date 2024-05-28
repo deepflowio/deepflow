@@ -1139,6 +1139,17 @@ vtap_group_id: g-xxxxxx
     ## Default: 4096. Unit: B. Range: [4096, 4194304]
     #values-limit: 4096
 
+  ##################################
+  ## eBPF Collector Configuration ##
+  ##################################
+  ## Queue Size of eBPF Collector
+  ## Default: 65536. Range: [4096, +oo)
+  ## Note: the length of the following queues:
+  ##   - 0-ebpf-to-ebpf-collector
+  ##   - 1-proc-event-to-sender
+  ##   - 1-profile-to-sender
+  #ebpf-collector-queue-size: 65535
+
   ########################
   ## eBPF Configuration ##
   ########################

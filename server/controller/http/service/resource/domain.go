@@ -889,8 +889,16 @@ func (c *DomainChecker) Stop() {
 func (c *DomainChecker) TimedCheck() {
 	c.checkAndAllocateController()
 	go func() {
-		for range time.Tick(time.Duration(5) * time.Minute) {
-			c.checkAndAllocateController()
+		ticker := time.NewTicker(time.Duration(5) * time.Minute)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.checkAndAllocateController()
+			case <-c.ctx.Done():
+				break LOOP
+			}
 		}
 	}()
 }

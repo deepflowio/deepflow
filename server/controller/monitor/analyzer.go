@@ -59,13 +59,21 @@ func NewAnalyzerCheck(cfg *config.ControllerConfig, ctx context.Context) *Analyz
 func (c *AnalyzerCheck) Start() {
 	log.Info("analyzer check start")
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
-			// 数据节点健康检查
-			c.healthCheck()
-			// 检查没有分配数据节点的采集器，并进行分配
-			c.vtapAnalyzerCheck()
-			// check az_analyzer_connection, delete unused item
-			c.azConnectionCheck()
+		ticker := time.NewTicker(time.Duration(c.cfg.HealthCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				// 数据节点健康检查
+				c.healthCheck()
+				// 检查没有分配数据节点的采集器，并进行分配
+				c.vtapAnalyzerCheck()
+				// check az_analyzer_connection, delete unused item
+				c.azConnectionCheck()
+			case <-c.cCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 

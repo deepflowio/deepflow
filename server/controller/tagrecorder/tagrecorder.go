@@ -53,16 +53,31 @@ func (c *TagRecorder) run() {
 
 func (c *TagRecorder) StartChDictionaryUpdate() {
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
-			c.UpdateChDictionary()
+		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.UpdateChDictionary()
+			case <-c.tCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }
 
 func (c *TagRecorder) Start() {
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
-			c.run()
+		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.run()
+			case <-c.tCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }

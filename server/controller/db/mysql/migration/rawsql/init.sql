@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS vl2_net (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     prefix              CHAR(64) DEFAULT '',
     netmask             CHAR(64) DEFAULT '',
-    vl2id               INTEGER REFERENCES vl2(id),
+    vl2id               INTEGER DEFAULT 0,
     net_index           INTEGER DEFAULT 0,
     name                VARCHAR(256) DEFAULT '',
     label               VARCHAR(64) DEFAULT '',
@@ -353,12 +353,12 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
     netmask             CHAR(64) DEFAULT '',
     gateway             CHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
-    vl2id               INTEGER REFERENCES vl2(id),
+    vl2id               INTEGER DEFAULT 0,
     vl2_net_id          INTEGER DEFAULT 0,
     net_index           INTEGER DEFAULT 0,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    vifid               INTEGER REFERENCES vinterface(id),
+    vifid               INTEGER DEFAULT 0,
     isp                 INTEGER DEFAULT 0 COMMENT 'Used for multi-ISP access',
     lcuuid              CHAR(64) DEFAULT '',
     PRIMARY KEY (id)
@@ -1488,6 +1488,14 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
     values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_map.metrics.drop_by_window\",\"unit\":\"\"}]",
      "采集器数据丢失 (flow_map.metrics.drop_by_window)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_map.metrics.drop_by_window\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
+
+set @lcuuid = (select uuid());
+INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
+    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
+    threshold_warning, lcuuid)
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\"]}]}",
+    "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_map.metrics.drop_by_capacity\",\"unit\":\"\"}]",
+     "采集器数据丢失 (flow_map.metrics.drop_by_capacity)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_map.metrics.drop_by_capacity\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
