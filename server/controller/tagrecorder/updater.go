@@ -45,11 +45,19 @@ func (u *UpdaterManager) Init(ctx context.Context, cfg config.ControllerConfig) 
 	u.tCtx, u.tCancel = context.WithCancel(ctx)
 }
 
-func (c *UpdaterManager) Start() {
+func (c *UpdaterManager) Start(sCtx context.Context) {
 	log.Info("tagrecorder updater manager started")
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
-			c.run()
+		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.run()
+			case <-sCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }
