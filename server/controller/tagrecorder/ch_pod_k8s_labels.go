@@ -65,7 +65,13 @@ func (c *ChPodK8sLabels) sourceToTarget(md *message.Metadata, item *mysql.Pod) (
 		return
 	}
 	labels, _ := common.StrToJsonAndMap(item.Label)
-	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{ID: item.ID, Labels: labels, TeamID: md.TeamID, DomainID: md.DomainID}}
+	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodK8sLabels{{
+		ID:          item.ID,
+		Labels:      labels,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
+	}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

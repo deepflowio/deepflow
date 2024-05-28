@@ -102,11 +102,12 @@ func (c *ChPodServiceK8sLabel) sourceToTarget(md *message.Metadata, source *mysq
 	for k, v := range labelMap {
 		keys = append(keys, K8sLabelKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodServiceK8sLabel{
-			ID:       source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			ID:          source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return

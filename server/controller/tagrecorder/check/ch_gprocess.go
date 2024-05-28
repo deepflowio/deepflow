@@ -49,23 +49,25 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 	for _, process := range processes {
 		if process.DeletedAt.Valid {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:       process.ID,
-				Name:     process.Name + " (deleted)",
-				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				CHostID:  process.VMID,
-				L3EPCID:  process.VPCID,
-				TeamID:   tagrecorder.DomainToTeamID[process.Domain],
-				DomainID: tagrecorder.DomainToDomainID[process.Domain],
+				ID:          process.ID,
+				Name:        process.Name + " (deleted)",
+				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				CHostID:     process.VMID,
+				L3EPCID:     process.VPCID,
+				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		} else {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
-				ID:       process.ID,
-				Name:     process.Name,
-				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				CHostID:  process.VMID,
-				L3EPCID:  process.VPCID,
-				TeamID:   tagrecorder.DomainToTeamID[process.Domain],
-				DomainID: tagrecorder.DomainToDomainID[process.Domain],
+				ID:          process.ID,
+				Name:        process.Name,
+				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				CHostID:     process.VMID,
+				L3EPCID:     process.VPCID,
+				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		}
 	}

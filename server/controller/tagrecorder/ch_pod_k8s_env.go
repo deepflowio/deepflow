@@ -102,11 +102,12 @@ func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysql.Pod) (k
 	for k, v := range envMap {
 		keys = append(keys, K8sEnvKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sEnv{
-			ID:       source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			ID:          source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return

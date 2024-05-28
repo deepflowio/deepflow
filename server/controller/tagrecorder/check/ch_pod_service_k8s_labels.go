@@ -66,12 +66,13 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 				ID: podService.ID,
 			}
 			keyToItem[key] = mysql.ChPodServiceK8sLabels{
-				ID:       podService.ID,
-				Labels:   string(labelsStr),
-				L3EPCID:  podService.VPCID,
-				PodNsID:  podService.PodNamespaceID,
-				TeamID:   tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID: tagrecorder.DomainToDomainID[podService.Domain],
+				ID:          podService.ID,
+				Labels:      string(labelsStr),
+				L3EPCID:     podService.VPCID,
+				PodNsID:     podService.PodNamespaceID,
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		}
 	}

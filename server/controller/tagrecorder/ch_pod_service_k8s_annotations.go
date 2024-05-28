@@ -79,6 +79,7 @@ func (c *ChPodServiceK8sAnnotations) sourceToTarget(md *message.Metadata, item *
 		Annotations: annotations,
 		TeamID:      md.TeamID,
 		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	}}
 }
 
