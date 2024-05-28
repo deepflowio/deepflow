@@ -28,7 +28,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/agent_config"

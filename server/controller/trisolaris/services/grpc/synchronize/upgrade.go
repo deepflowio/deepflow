@@ -94,7 +94,7 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 	teamIDStr := r.GetTeamId()
 	log.Infof("vtap(%s) teamID(%s) starts to upgrade", vtapCacheKey, teamIDStr)
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
-	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
+	gVTapInfo := trisolaris.GetGVTapInfo(orgID)
 	if gVTapInfo == nil {
 		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d info not found", vtapCacheKey, orgID, teamIDStr, teamIDInt)
 		return sendFailed(in)
@@ -139,6 +139,6 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		}
 	}
 
-	log.Infof("vtap(%s) orgID:%d teamID:%s-%d finishes the upgrade", vtapCacheKey, orgID, teamIDStr, teamIDInt)
+	log.Infof("vtap(%s) orgID:%s teamID:%s-%d finishes the upgrade", vtapCacheKey, orgID, teamIDStr, teamIDInt)
 	return err
 }

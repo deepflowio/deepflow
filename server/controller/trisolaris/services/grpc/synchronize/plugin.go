@@ -24,7 +24,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	api "github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 )
@@ -44,23 +44,19 @@ func NewPluginEvent() *PluginEvent {
 	return &PluginEvent{}
 }
 
-func (p *PluginEvent) GetPluginData(r *api.PluginRequest, orgID int) (*PluginData, error) {
+func (p *PluginEvent) GetPluginData(r *api.PluginRequest) (*PluginData, error) {
 	if r.GetPluginType() == 0 || r.GetPluginName() == "" {
-		return nil, fmt.Errorf("ORGID-%d: the plugin request data type(%d) or name(%s) is empty",
-			orgID, r.GetPluginType(), r.GetPluginName())
+		return nil, fmt.Errorf("the plugin request data type(%d) or name(%s) is empty",
+			r.GetPluginType(), r.GetPluginName())
 	}
-	db, err := mysql.GetDB(orgID)
-	if err != nil {
-		return nil, fmt.Errorf("ORGID-%d: get db failed", orgID)
-	}
-	pluginDbMgr := dbmgr.DBMgr[mysql.Plugin](db.DB)
+	pluginDbMgr := dbmgr.DBMgr[models.Plugin](trisolaris.GetDB())
 	plugin, err := pluginDbMgr.GetByOption(
 		pluginDbMgr.WithName(r.GetPluginName()),
 		pluginDbMgr.WithType(int(r.GetPluginType())),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ORGID-%d: get plugin(type=%s, name=%s) from db failed, %s",
-			orgID, r.GetPluginType(), r.GetPluginName(), err)
+		return nil, fmt.Errorf("get plugin(type=%s, name=%s) from db failed, %s",
+			r.GetPluginType(), r.GetPluginName(), err)
 	}
 	content := plugin.Image
 	totalLen := uint64(len(content))
@@ -91,14 +87,14 @@ func (p *PluginEvent) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginSer
 	vtapCacheKey := r.GetCtrlIp() + "-" + r.GetCtrlMac()
 	teamID := r.GetTeamId()
 	orgID := trisolaris.GetOrgIDByTeamID(teamID)
-	vtapCache := trisolaris.GetORGVTapInfo(orgID).GetVTapCache(vtapCacheKey)
+	vtapCache := trisolaris.GetGVTapInfo(orgID).GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
 		log.Errorf("agent(%s team_id=%s org_id=%d) cache not found", vtapCacheKey, teamID, orgID)
 		return sendPluginFailed(in)
 	}
 	log.Infof("receive agent(%s team_id=%s org_id=%d) plugin request", vtapCacheKey, teamID, orgID)
 
-	pluginData, err := p.GetPluginData(r, orgID)
+	pluginData, err := p.GetPluginData(r)
 	if err != nil {
 		log.Error(err)
 		return sendPluginFailed(in)

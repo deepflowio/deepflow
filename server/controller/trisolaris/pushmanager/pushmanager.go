@@ -23,8 +23,8 @@ import (
 )
 
 type PushManager struct {
-	orgToagentC    [utils.ORG_ID_INDEX_MAX]*sync.Cond
-	orgToingesterC [utils.ORG_ID_INDEX_MAX]*sync.Cond
+	orgToagentC [utils.ORG_ID_INDEX_MAX]*sync.Cond
+	ingesterC   *sync.Cond
 }
 
 var pushManager *PushManager = NewPushManager()
@@ -34,13 +34,9 @@ func NewPushManager() *PushManager {
 	for index, _ := range orgToagentC {
 		orgToagentC[index] = sync.NewCond(&sync.Mutex{})
 	}
-	orgToingesterC := [utils.ORG_ID_INDEX_MAX]*sync.Cond{}
-	for index, _ := range orgToingesterC {
-		orgToingesterC[index] = sync.NewCond(&sync.Mutex{})
-	}
 	return &PushManager{
-		orgToagentC:    orgToagentC,
-		orgToingesterC: orgToingesterC,
+		orgToagentC: orgToagentC,
+		ingesterC:   sync.NewCond(&sync.Mutex{}),
 	}
 }
 
@@ -50,8 +46,8 @@ func Broadcast(orgID int) {
 	}
 }
 
-func IngesterBroadcast(orgID int) {
-	pushManager.orgToingesterC[orgID].Broadcast()
+func IngesterBroadcast() {
+	pushManager.ingesterC.Broadcast()
 }
 
 func Wait(orgID int) {
@@ -63,11 +59,8 @@ func Wait(orgID int) {
 	}
 }
 
-func IngesterWait(orgID int) {
-	if utils.CheckOrgID(orgID) {
-		ingesterC := pushManager.orgToingesterC[orgID]
-		ingesterC.L.Lock()
-		ingesterC.Wait()
-		ingesterC.L.Unlock()
-	}
+func IngesterWait() {
+	pushManager.ingesterC.L.Lock()
+	pushManager.ingesterC.Wait()
+	pushManager.ingesterC.L.Unlock()
 }
