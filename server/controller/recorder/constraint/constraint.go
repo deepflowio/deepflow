@@ -80,4 +80,7 @@ type MySQLSoftDeleteModel interface {
 		mysql.RedisInstance | mysql.PodCluster | mysql.PodNode | mysql.PodNamespace |
 		mysql.PodIngress | mysql.PodService | mysql.PodGroup | mysql.PodReplicaSet | mysql.Pod |
 		mysql.Process | mysql.PrometheusTarget
+
+	GetDomainLcuuid() string
+	GetSubDomainLcuuid() string
 }
