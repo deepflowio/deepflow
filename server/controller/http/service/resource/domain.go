@@ -957,6 +957,13 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *svc.UserInfo, cfg *c
 	if err != nil {
 		return nil, err
 	}
+
+	// pub to tagrecorder
+	metadata := message.NewMetadata(db.ORGID, 0, 0, message.MetadataSubDomainID(subDomain.ID))
+	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
+		s.OnSubDomainDeleted(metadata)
+	}
+
 	log.Infof("delete sub_domain (%s) resources completed", subDomain.Name)
 	return map[string]string{"LCUUID": lcuuid}, nil
 }

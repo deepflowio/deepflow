@@ -60,6 +60,7 @@ func (c *ChPodGroup) sourceToTarget(md *message.Metadata, source *mysql.PodGroup
 		PodNsID:      source.PodNamespaceID,
 		TeamID:       md.TeamID,
 		DomainID:     md.DomainID,
+		SubDomainID:  md.SubDomainID,
 	})
 	return
 }

@@ -102,11 +102,12 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysql.Process)
 	for k, v := range osAppTagsMap {
 		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
 		targets = append(targets, mysql.ChOSAppTag{
-			PID:      source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			PID:         source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return
