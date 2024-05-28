@@ -978,9 +978,9 @@ func NewDomainCheck(ctx context.Context) *DomainChecker {
 	return &DomainChecker{ctx: cCtx, cancel: cCancel}
 }
 
-func (c *DomainChecker) Start() {
+func (c *DomainChecker) Start(sCtx context.Context) {
 	log.Info("domain check started")
-	c.CheckRegularly()
+	c.CheckRegularly(sCtx)
 }
 
 func (c *DomainChecker) Stop() {
@@ -990,7 +990,7 @@ func (c *DomainChecker) Stop() {
 	log.Info("domain check stopped")
 }
 
-func (c *DomainChecker) CheckRegularly() {
+func (c *DomainChecker) CheckRegularly(sCtx context.Context) {
 	go func() {
 		ticker := time.NewTicker(time.Duration(5) * time.Minute)
 		defer ticker.Stop()
@@ -1001,6 +1001,8 @@ func (c *DomainChecker) CheckRegularly() {
 				for _, db := range mysql.GetDBs().All() {
 					c.checkAndAllocateController(db)
 				}
+			case <-sCtx.Done():
+				break LOOP
 			case <-c.ctx.Done():
 				break LOOP
 			}

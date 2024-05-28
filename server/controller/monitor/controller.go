@@ -61,7 +61,7 @@ func NewControllerCheck(cfg *config.ControllerConfig, ctx context.Context) *Cont
 	}
 }
 
-func (c *ControllerCheck) Start() {
+func (c *ControllerCheck) Start(sCtx context.Context) {
 	log.Info("controller check start")
 	go func() {
 		ticker := time.NewTicker(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second)
@@ -71,6 +71,8 @@ func (c *ControllerCheck) Start() {
 			select {
 			case <-ticker.C:
 				c.SyncDefaultOrgData()
+			case <-sCtx.Done():
+				break LOOP1
 			case <-c.cCtx.Done():
 				break LOOP1
 			}
@@ -95,6 +97,8 @@ func (c *ControllerCheck) Start() {
 				}); err != nil {
 					log.Error(err)
 				}
+			case <-sCtx.Done():
+				break LOOP2
 			case <-c.cCtx.Done():
 				break LOOP2
 			}

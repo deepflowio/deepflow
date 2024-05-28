@@ -56,7 +56,7 @@ func NewAnalyzerCheck(cfg *config.ControllerConfig, ctx context.Context) *Analyz
 	}
 }
 
-func (c *AnalyzerCheck) Start() {
+func (c *AnalyzerCheck) Start(sCtx context.Context) {
 	log.Info("analyzer check start")
 	go func() {
 		ticker := time.NewTicker(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second)
@@ -66,6 +66,8 @@ func (c *AnalyzerCheck) Start() {
 			select {
 			case <-ticker.C:
 				c.SyncDefaultOrgData()
+			case <-sCtx.Done():
+				break LOOP1
 			case <-c.cCtx.Done():
 				break LOOP1
 			}
@@ -90,6 +92,8 @@ func (c *AnalyzerCheck) Start() {
 				}); err != nil {
 					log.Error(err)
 				}
+			case <-sCtx.Done():
+				break LOOP2
 			case <-c.cCtx.Done():
 				break LOOP2
 			}

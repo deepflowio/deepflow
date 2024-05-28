@@ -61,10 +61,18 @@ func (c *Dictionary) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
 }
 
-func (c *Dictionary) Start() {
+func (c *Dictionary) Start(sCtx context.Context) {
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
-			c.Update()
+		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.Update()
+			case <-sCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }

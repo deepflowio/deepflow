@@ -43,7 +43,7 @@ func NewRebalanceCheck(cfg config.MonitorConfig, ctx context.Context) *Rebalance
 	}
 }
 
-func (r *RebalanceCheck) Start() {
+func (r *RebalanceCheck) Start(sCtx context.Context) {
 	log.Info("rebalance check start")
 	go func() {
 		if !r.cfg.AutoRebalanceVTap {
@@ -52,7 +52,7 @@ func (r *RebalanceCheck) Start() {
 
 		ticker := time.NewTicker(time.Duration(r.cfg.RebalanceCheckInterval) * time.Second)
 		defer ticker.Stop()
-	LOOP:
+	LOOP1:
 		for {
 			select {
 			case <-ticker.C:
@@ -62,8 +62,10 @@ func (r *RebalanceCheck) Start() {
 						r.analyzerRebalance(db)
 					}
 				}
+			case <-sCtx.Done():
+				break LOOP1
 			case <-r.vCtx.Done():
-				break LOOP
+				break LOOP1
 			}
 		}
 	}()
@@ -81,13 +83,16 @@ func (r *RebalanceCheck) Start() {
 		r.analyzerRebalanceByTraffic(duration)
 
 		ticker := time.NewTicker(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second)
-	LOOP:
+		defer ticker.Stop()
+	LOOP2:
 		for {
 			select {
 			case <-ticker.C:
 				r.analyzerRebalanceByTraffic(duration)
+			case <-sCtx.Done():
+				break LOOP2
 			case <-r.vCtx.Done():
-				break LOOP
+				break LOOP2
 			}
 		}
 	}()
