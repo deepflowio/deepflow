@@ -22,7 +22,10 @@
 #ifndef DF_BPF_COMMON_H
 #define DF_BPF_COMMON_H
 
-// 消息类型
+/*
+ * Message type
+ * Note: The maximum value is 15 because 'struct conn_info_s' uses 4 bits to store it.
+ */
 enum message_type {
 	MSG_UNKNOWN,
 	// L7协议推断数据类型是请求
@@ -34,6 +37,11 @@ enum message_type {
 	MSG_REQUEST_END,
 	// HTTP2 response message end marker
 	MSG_RESPONSE_END,
+
+	// Data reassembly begins
+	MSG_REASM_START,
+	// Segment of data reassembled
+	MSG_REASM_SEG,
 
 	// 无法推断协议类型，先在map中存储等下一次的数据
 	// 获取后两者合并，再进行判断。主要场景用于MySQL，Kafka

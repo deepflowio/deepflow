@@ -181,7 +181,11 @@ struct conn_info_s {
 	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
 	enum traffic_protocol protocol;
 	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
-	enum message_type message_type;
+	__u32 message_type: 4;
+	// Is this segment of data reassembled?
+	__u32 is_reasm_seg: 1;
+	__u32 reserved: 27;
+
 	union {
 		__u8  encoding_type;    // Currently used for OpenWire encoding inference
 		__s32 correlation_id;	// Currently used for Kafka determination

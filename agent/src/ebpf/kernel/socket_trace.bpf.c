@@ -1047,7 +1047,15 @@ static __inline void trace_process(struct socket_info_s *socket_info_ptr,
 		*thread_trace_id = trace_info.thread_trace_id =
 		    (pre_trace_id ==
 		     0 ? ++trace_conf->thread_trace_id : pre_trace_id);
-		if (conn_info->message_type == MSG_REQUEST)
+		/*
+		 * For NGINX tracing, 'MSG_REQUEST' and 'MSG_RESPONSE' are used
+		 * as judgment conditions. After enabling data segment reassembly,
+		 * the reassembled segments are set to 'MSG_REQUEST'. Here, we need
+		 * to correct it so that only the beginning of the segment data can
+		 * be judged. It should be 'MSG_REASM_START', not is 'MSG_REASM_SEG'.
+		 */
+		if (conn_info->message_type == MSG_REQUEST &&
+		    !conn_info->is_reasm_seg)
 			trace_info.peer_fd = conn_info->fd;
 		else if (conn_info->message_type == MSG_RESPONSE) {
 			if (is_socket_info_valid(socket_info_ptr) &&
@@ -1183,7 +1191,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info.direction = conn_info->direction;
 		sk_info.pre_direction = conn_info->direction;
 		sk_info.role = conn_info->role;
-		sk_info.msg_type = conn_info->message_type;
 		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
 		sk_info.correlation_id = conn_info->correlation_id;
@@ -1230,14 +1237,17 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	__u32 send_reasm_bytes = 0;
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
+		sk_info.allow_reassembly = socket_info_ptr->allow_reassembly;
 
 		/*
 		 * The kernel syscall interface determines that it is the TLS
 		 * handshake protocol, and for the uprobe program, it needs to
 		 * be re inferred to determine the upper layer protocol of TLS.
 		 */
-		if (socket_info_ptr->l7_proto == PROTO_TLS)
+		if (socket_info_ptr->l7_proto == PROTO_TLS ||
+		    socket_info_ptr->l7_proto == PROTO_UNKNOWN)
 			socket_info_ptr->l7_proto = conn_info->protocol;
+
 
 		/*
 		 * Ensure that the accumulation operation of capturing the
@@ -1247,7 +1257,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
 		sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
-		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
 		if (socket_info_ptr->peer_fd != 0
 		    && conn_info->direction == T_INGRESS) {
@@ -1306,6 +1315,13 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;
+
+	// Reassembly modification type
+	if (sk_info.allow_reassembly) {
+		v->msg_type = MSG_REASM_START;
+		if (conn_info->is_reasm_seg)
+			v->msg_type = MSG_REASM_SEG;
+	}
 	v->tcp_seq = 0;
 
 	if ((extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
