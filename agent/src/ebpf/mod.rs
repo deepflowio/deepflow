@@ -146,6 +146,12 @@ pub const MSG_RESPONSE: u8 = 2;
 pub const MSG_REQUEST_END: u8 = 3;
 #[allow(dead_code)]
 pub const MSG_RESPONSE_END: u8 = 4;
+// The start of data reassembly.
+#[allow(dead_code)]
+pub const MSG_REASM_START: u8 = 5;
+// The segment of data reassembly.
+#[allow(dead_code)]
+pub const MSG_REASM_SEG: u8 = 6;
 
 //Register event types
 #[allow(dead_code)]
