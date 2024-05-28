@@ -59,13 +59,12 @@ func GetORGEncoders() *ORGEncoders {
 
 func (e *ORGEncoders) Init(ctx context.Context, cfg prometheuscfg.Config) {
 	log.Infof("init prometheus encoder")
-	e.ctx, e.cancel = context.WithCancel(ctx)
 	e.cfg = cfg
 	e.orgIDToEncoder = make(map[int]*Encoder)
 	return
 }
 
-func (e *ORGEncoders) Start() error {
+func (e *ORGEncoders) Start(sCtx context.Context) error {
 	log.Info("prometheus encoders started")
 	e.mux.Lock()
 	if e.working {
@@ -74,6 +73,7 @@ func (e *ORGEncoders) Start() error {
 	}
 	e.working = true
 	e.mux.Unlock()
+	e.ctx, e.cancel = context.WithCancel(sCtx)
 
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {

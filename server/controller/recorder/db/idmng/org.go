@@ -60,11 +60,12 @@ func (m *IDManagers) Init(ctx context.Context, cfg config.RecorderConfig) {
 	m.orgIDToIDMng = make(map[int]*IDManager)
 }
 
-func (m *IDManagers) Start() error {
+func (m *IDManagers) Start(ctx context.Context) error {
 	if m.inUse {
 		return nil
 	}
 	m.inUse = true
+	m.ctx, m.cancel = context.WithCancel(ctx)
 
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
