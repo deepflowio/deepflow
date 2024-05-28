@@ -221,6 +221,9 @@ pub struct HttpInfo {
 
     #[serde(skip)]
     is_on_blacklist: bool,
+
+    #[serde(skip)]
+    service_name: Option<String>,
 }
 
 impl HttpInfo {
@@ -359,6 +362,7 @@ impl HttpInfo {
                 super::swap_if!(self, user_agent, is_none, other);
                 super::swap_if!(self, referer, is_none, other);
                 super::swap_if!(self, endpoint, is_none, other);
+                super::swap_if!(self, service_name, is_none, other);
                 // 下面用于判断是否结束
                 // ================
                 // determine whether request is end
@@ -444,8 +448,14 @@ impl HttpInfo {
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
         if let Some(t) = config.l7_log_blacklist_trie.get(&self.proto) {
-            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.path)
-                || t.request_type.is_on_blacklist(self.method.as_str())
+            self.is_on_blacklist = if self.is_grpc() {
+                self.service_name
+                    .as_ref()
+                    .map(|p| t.request_resource.is_on_blacklist(p))
+                    .unwrap_or_default()
+            } else {
+                t.request_resource.is_on_blacklist(&self.path)
+            } || t.request_type.is_on_blacklist(self.method.as_str())
                 || t.request_domain.is_on_blacklist(&self.host)
                 || self
                     .endpoint
@@ -459,19 +469,13 @@ impl HttpInfo {
 impl From<HttpInfo> for L7ProtocolSendLog {
     fn from(f: HttpInfo) -> Self {
         let is_grpc = f.is_grpc();
-        let service_name = if let Some((package, service)) = f.grpc_package_service_name() {
-            let svc_name = format!("{}.{}", package, service);
-            Some(svc_name)
-        } else {
-            None
-        };
 
         // grpc protocol special treatment
         let (req_type, resource, domain, endpoint) = if is_grpc {
             // server endpoint = req_type
             (
                 String::from("POST"), // grpc method always post, reference https://chromium.googlesource.com/external/github.com/grpc/grpc/+/HEAD/doc/PROTOCOL-HTTP2.md
-                service_name.clone().unwrap_or_default(),
+                f.service_name.clone().unwrap_or_default(),
                 f.host,
                 f.path,
             )
@@ -523,7 +527,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 client_ip: f.client_ip,
                 user_agent: f.user_agent,
                 referer: f.referer,
-                rpc_service: service_name,
+                rpc_service: f.service_name,
                 attributes: {
                     if f.attributes.is_empty() {
                         None
@@ -631,6 +635,20 @@ impl L7ProtocolParserInterface for HttpLog {
         if param.ebpf_type != EbpfType::GoHttp2Uprobe {
             self.wasm_hook(param, payload, &mut info);
         }
+        info.service_name = if let Some((package, service)) = info.grpc_package_service_name() {
+            let svc_name = format!("{}.{}", package, service);
+            Some(svc_name)
+        } else {
+            None
+        };
+        if !config.http_endpoint_disabled && info.path.len() > 0 {
+            // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
+            let path = match info.endpoint.as_ref() {
+                Some(p) if !p.is_empty() => p,
+                _ => &info.path,
+            };
+            info.endpoint = Some(handle_endpoint(config, path));
+        }
         info.set_is_on_blacklist(config);
         if !info.is_on_blacklist && !self.last_is_on_blacklist {
             match self.proto {
@@ -686,17 +704,6 @@ impl L7ProtocolParserInterface for HttpLog {
         }
         self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
-            if matches!(self.proto, L7Protocol::Http1 | L7Protocol::Http2)
-                && !config.http_endpoint_disabled
-                && info.path.len() > 0
-            {
-                // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
-                let path = match info.endpoint.as_ref() {
-                    Some(p) if !p.is_empty() => p,
-                    _ => &info.path,
-                };
-                info.endpoint = Some(handle_endpoint(config, path));
-            }
             Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
         } else {
             Ok(L7ParseResult::None)
