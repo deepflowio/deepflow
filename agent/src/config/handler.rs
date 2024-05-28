@@ -864,8 +864,10 @@ pub struct LogParserConfig {
     pub http_endpoint_disabled: bool,
     pub http_endpoint_trie: HttpEndpointTrie,
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
+    pub l7_log_blacklist: HashMap<String, Vec<L7LogBlacklist>>,
     pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
-    pub unconcerned_dns_nx_domain_trie: DnsNxdomainTrie,
+    pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
+    pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
 }
 
 impl Default for LogParserConfig {
@@ -879,8 +881,10 @@ impl Default for LogParserConfig {
             http_endpoint_disabled: false,
             http_endpoint_trie: HttpEndpointTrie::new(),
             obfuscate_enabled_protocols: L7ProtocolBitmap::default(),
+            l7_log_blacklist: HashMap::new(),
             l7_log_blacklist_trie: HashMap::new(),
-            unconcerned_dns_nx_domain_trie: DnsNxdomainTrie::default(),
+            unconcerned_dns_nxdomain_response_suffixes: vec![],
+            unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
         }
     }
 }
@@ -916,10 +920,10 @@ impl fmt::Debug for LogParserConfig {
                     })
                     .collect::<Vec<_>>(),
             )
-            .field("l7_log_blacklist_trie", &self.l7_log_blacklist_trie)
+            .field("l7_log_blacklist_trie", &self.l7_log_blacklist)
             .field(
-                "unconcerned_dns_nx_domain_trie",
-                &self.unconcerned_dns_nx_domain_trie,
+                "unconcerned_dns_nxdomain_trie",
+                &self.unconcerned_dns_nxdomain_response_suffixes,
             )
             .finish()
     }
@@ -1237,7 +1241,7 @@ impl Default for TraceType {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct L7LogDynamicConfig {
     // in lowercase
     pub proxy_client: String,
@@ -1251,6 +1255,28 @@ pub struct L7LogDynamicConfig {
     span_set: HashSet<String>,
     pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
     pub extra_log_fields: ExtraLogFields,
+}
+
+impl fmt::Debug for L7LogDynamicConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("L7LogDynamicConfig")
+            .field("proxy_client", &self.proxy_client)
+            .field("x_request_id", &self.x_request_id)
+            .field("trace_types", &self.trace_types)
+            .field("span_types", &self.span_types)
+            .field("trace_set", &self.trace_set)
+            .field("span_set", &self.span_set)
+            .field(
+                "expected_headers_set",
+                &self
+                    .expected_headers_set
+                    .iter()
+                    .map(|v| String::from_utf8_lossy(v).to_string())
+                    .collect::<HashSet<_>>(),
+            )
+            .field("extra_log_fields", &self.extra_log_fields)
+            .finish()
+    }
 }
 
 impl PartialEq for L7LogDynamicConfig {
@@ -1632,6 +1658,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .l7_protocol_advanced_features
                         .obfuscate_enabled_protocols,
                 ),
+                l7_log_blacklist: conf.yaml_config.l7_log_blacklist.clone(),
                 l7_log_blacklist_trie: {
                     let mut blacklist_trie = HashMap::new();
                     for (k, v) in conf.yaml_config.l7_log_blacklist.iter() {
@@ -1644,7 +1671,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     }
                     blacklist_trie
                 },
-                unconcerned_dns_nx_domain_trie: DnsNxdomainTrie::from(
+                unconcerned_dns_nxdomain_response_suffixes: conf
+                    .yaml_config
+                    .l7_protocol_advanced_features
+                    .unconcerned_dns_nxdomain_response_suffixes
+                    .clone(),
+                unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::from(
                     &conf
                         .yaml_config
                         .l7_protocol_advanced_features
