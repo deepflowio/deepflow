@@ -66,10 +66,11 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 				PID: process.ID,
 			}
 			keyToItem[key] = mysql.ChOSAppTags{
-				PID:       process.ID,
-				OSAPPTags: string(osAppTagsStr),
-				TeamID:    tagrecorder.DomainToTeamID[process.Domain],
-				DomainID:  tagrecorder.DomainToDomainID[process.Domain],
+				PID:         process.ID,
+				OSAPPTags:   string(osAppTagsStr),
+				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		}
 	}

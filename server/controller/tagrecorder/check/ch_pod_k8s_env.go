@@ -57,13 +57,14 @@ func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysql.ChPodK8sEnv, bool) 
 					Key: envInfo[0],
 				}
 				keyToItem[key] = mysql.ChPodK8sEnv{
-					ID:       pod.ID,
-					Key:      envInfo[0],
-					Value:    envInfo[1],
-					L3EPCID:  pod.VPCID,
-					PodNsID:  pod.PodNamespaceID,
-					TeamID:   tagrecorder.DomainToTeamID[pod.Domain],
-					DomainID: tagrecorder.DomainToDomainID[pod.Domain],
+					ID:          pod.ID,
+					Key:         envInfo[0],
+					Value:       envInfo[1],
+					L3EPCID:     pod.VPCID,
+					PodNsID:     pod.PodNamespaceID,
+					TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+					DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+					SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 				}
 			}
 		}

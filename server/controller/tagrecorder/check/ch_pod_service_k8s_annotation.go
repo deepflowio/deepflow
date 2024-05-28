@@ -57,13 +57,14 @@ func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysq
 					Key: annotationInfo[0],
 				}
 				keyToItem[key] = mysql.ChPodServiceK8sAnnotation{
-					ID:       podService.ID,
-					Key:      annotationInfo[0],
-					Value:    annotationInfo[1],
-					L3EPCID:  podService.VPCID,
-					PodNsID:  podService.PodNamespaceID,
-					TeamID:   tagrecorder.DomainToTeamID[podService.Domain],
-					DomainID: tagrecorder.DomainToDomainID[podService.Domain],
+					ID:          podService.ID,
+					Key:         annotationInfo[0],
+					Value:       annotationInfo[1],
+					L3EPCID:     podService.VPCID,
+					PodNsID:     podService.PodNamespaceID,
+					TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+					DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+					SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 				}
 			}
 		}

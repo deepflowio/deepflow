@@ -53,11 +53,12 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 			networkName += " (deleted)"
 		}
 		keyToItem[IDKey{ID: network.ID}] = mysql.ChNetwork{
-			ID:       network.ID,
-			Name:     networkName,
-			IconID:   n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
-			TeamID:   tagrecorder.DomainToTeamID[network.Domain],
-			DomainID: tagrecorder.DomainToDomainID[network.Domain],
+			ID:          network.ID,
+			Name:        networkName,
+			IconID:      n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
+			TeamID:      tagrecorder.DomainToTeamID[network.Domain],
+			DomainID:    tagrecorder.DomainToDomainID[network.Domain],
+			SubDomainID: tagrecorder.SubDomainToSubDomainID[network.SubDomain],
 		}
 	}
 	return keyToItem, true

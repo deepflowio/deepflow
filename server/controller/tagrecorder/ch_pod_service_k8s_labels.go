@@ -70,10 +70,11 @@ func (c *ChPodServiceK8sLabels) sourceToTarget(md *message.Metadata, item *mysql
 	}
 	labels, _ := common.StrToJsonAndMap(item.Label)
 	return []K8sLabelsKey{{ID: item.ID}}, []mysql.ChPodServiceK8sLabels{{
-		ID:       item.ID,
-		Labels:   labels,
-		TeamID:   md.TeamID,
-		DomainID: md.DomainID,
+		ID:          item.ID,
+		Labels:      labels,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	}}
 }
 
