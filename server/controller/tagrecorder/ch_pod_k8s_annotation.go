@@ -102,11 +102,12 @@ func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysql.
 	for k, v := range annotationMap {
 		keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sAnnotation{
-			ID:       source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			ID:          source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return

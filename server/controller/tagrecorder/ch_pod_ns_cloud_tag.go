@@ -98,11 +98,12 @@ func (c *ChPodNSCloudTag) sourceToTarget(md *message.Metadata, source *mysql.Pod
 	for k, v := range source.CloudTags {
 		keys = append(keys, CloudTagKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodNSCloudTag{
-			ID:       source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			ID:          source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return

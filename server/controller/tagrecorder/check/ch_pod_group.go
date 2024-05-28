@@ -57,6 +57,7 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				PodNsID:      podGroup.PodNamespaceID,
 				TeamID:       tagrecorder.DomainToTeamID[podGroup.Domain],
 				DomainID:     tagrecorder.DomainToDomainID[podGroup.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podGroup.SubDomain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
@@ -68,6 +69,7 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 				PodNsID:      podGroup.PodNamespaceID,
 				TeamID:       tagrecorder.DomainToTeamID[podGroup.Domain],
 				DomainID:     tagrecorder.DomainToDomainID[podGroup.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podGroup.SubDomain],
 			}
 		}
 	}
