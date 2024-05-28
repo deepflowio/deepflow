@@ -62,7 +62,7 @@ func (c *Cleaners) Init(ctx context.Context, cfg config.RecorderConfig) {
 	return
 }
 
-func (c *Cleaners) Start() error {
+func (c *Cleaners) Start(sContext context.Context) error {
 	log.Info("resource clean started")
 
 	orgIDs, err := mysql.GetORGIDs()
@@ -80,11 +80,11 @@ func (c *Cleaners) Start() error {
 
 	// 定时清理软删除资源数据
 	// timed clean soft deleted resource data
-	c.timedCleanDeletedData()
+	c.timedCleanDeletedData(sContext)
 	// 定时删除所属上级资源已不存在（被彻底清理或软删除）的资源数据，并记录异常日志
 	// timed clean the resource data of the parent resource that does not exist (means it is completely deleted or soft deleted)
 	// and record error logs
-	c.timedCleanDirtyData()
+	c.timedCleanDirtyData(sContext)
 
 	return nil
 }
@@ -98,7 +98,7 @@ func (c *Cleaners) Stop() {
 	log.Info("resource clean stopped")
 }
 
-func (c *Cleaners) timedCleanDeletedData() {
+func (c *Cleaners) timedCleanDeletedData(sContext context.Context) {
 	c.cleanDeletedData()
 	go func() {
 		ticker := time.NewTicker(time.Duration(int(c.cfg.DeletedResourceCleanInterval)) * time.Hour)
@@ -112,6 +112,8 @@ func (c *Cleaners) timedCleanDeletedData() {
 					continue
 				}
 				c.cleanDeletedData()
+			case <-sContext.Done():
+				break LOOP
 			case <-c.ctx.Done():
 				break LOOP
 			}
@@ -141,7 +143,7 @@ func (c *Cleaners) cleanDeletedData() {
 	}
 }
 
-func (c *Cleaners) timedCleanDirtyData() {
+func (c *Cleaners) timedCleanDirtyData(sContext context.Context) {
 	c.cleanDirtyData()
 	go func() {
 		ticker := time.NewTicker(time.Duration(int(c.cfg.CacheRefreshInterval)+50) * time.Minute)
@@ -154,6 +156,8 @@ func (c *Cleaners) timedCleanDirtyData() {
 					continue
 				}
 				c.cleanDirtyData()
+			case <-sContext.Done():
+				break LOOP
 			case <-c.ctx.Done():
 				break LOOP
 			}
