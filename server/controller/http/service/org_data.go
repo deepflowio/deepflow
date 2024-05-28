@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/bitly/go-simplejson"
+	servercommon "github.com/deepflowio/deepflow/server/common"
 	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -70,7 +71,10 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig
 func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 	log.Infof("delete org (id: %d) data", orgID)
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
-	return migrator.DropDatabase(cfg)
+	if err = migrator.DropDatabase(cfg); err != nil {
+		return err
+	}
+	return servercommon.DropOrg(uint16(orgID))
 }
 
 func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
