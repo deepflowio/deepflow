@@ -58,7 +58,7 @@ func (au *APPLabelLayoutUpdater) Init(ctx context.Context, cfg *prometheuscfg.Co
 	au.refreshInterval = time.Duration(cfg.SynchronizerCacheRefreshInterval) * time.Second
 }
 
-func (e *APPLabelLayoutUpdater) Start() error {
+func (e *APPLabelLayoutUpdater) Start(sCtx context.Context) error {
 	log.Info("prometheus app label layout updater started")
 	// it depends on cache module data, so it should not be refresh immediately.
 	go func() {
@@ -67,6 +67,8 @@ func (e *APPLabelLayoutUpdater) Start() error {
 		for {
 			select {
 			case <-e.ctx.Done():
+				return
+			case <-sCtx.Done():
 				return
 			case <-ticker.C:
 				e.refresh()

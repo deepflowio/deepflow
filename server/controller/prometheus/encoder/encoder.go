@@ -61,11 +61,8 @@ func GetSingleton() *Encoder {
 	return encoder
 }
 
-func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
+func (e *Encoder) Init(cfg *prometheuscfg.Config) {
 	log.Infof("init prometheus encoder")
-	mCtx, mCancel := context.WithCancel(ctx)
-	e.ctx = mCtx
-	e.cancel = mCancel
 	e.metricName = newMetricName(cfg.ResourceMaxID1)
 	e.labelName = newLabelName(cfg.ResourceMaxID0)
 	e.labelValue = newLabelValue()
@@ -78,7 +75,7 @@ func (e *Encoder) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	return
 }
 
-func (e *Encoder) Start() error {
+func (e *Encoder) Start(ctx context.Context) error {
 	e.mux.Lock()
 	if e.working {
 		e.mux.Unlock()
@@ -86,6 +83,7 @@ func (e *Encoder) Start() error {
 	}
 	e.working = true
 	e.mux.Unlock()
+	e.ctx, e.cancel = context.WithCancel(ctx)
 
 	log.Info("prometheus encoder started")
 	e.refresh()

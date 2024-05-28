@@ -66,7 +66,7 @@ func (c *Cleaner) Init(ctx context.Context, cfg *prometheuscfg.Config) {
 	c.canClean <- struct{}{}
 }
 
-func (c *Cleaner) Start() error {
+func (c *Cleaner) Start(sCtx context.Context) error {
 	log.Info("prometheus data cleaner started")
 	go func() {
 		ticker := time.NewTicker(c.interval)
@@ -74,6 +74,8 @@ func (c *Cleaner) Start() error {
 		for {
 			select {
 			case <-c.ctx.Done():
+				return
+			case <-sCtx.Done():
 				return
 			case <-ticker.C:
 				c.clear(time.Time{})

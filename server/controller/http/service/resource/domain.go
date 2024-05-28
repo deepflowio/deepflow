@@ -874,9 +874,9 @@ func NewDomainCheck(ctx context.Context) *DomainChecker {
 	return &DomainChecker{ctx: cCtx, cancel: cCancel}
 }
 
-func (c *DomainChecker) Start() {
+func (c *DomainChecker) Start(sCtx context.Context) {
 	log.Info("domain check startted")
-	c.TimedCheck()
+	c.TimedCheck(sCtx)
 }
 
 func (c *DomainChecker) Stop() {
@@ -886,7 +886,7 @@ func (c *DomainChecker) Stop() {
 	log.Info("domain check stopped")
 }
 
-func (c *DomainChecker) TimedCheck() {
+func (c *DomainChecker) TimedCheck(sCtx context.Context) {
 	c.checkAndAllocateController()
 	go func() {
 		ticker := time.NewTicker(time.Duration(5) * time.Minute)
@@ -896,6 +896,8 @@ func (c *DomainChecker) TimedCheck() {
 			select {
 			case <-ticker.C:
 				c.checkAndAllocateController()
+			case <-sCtx.Done():
+				break LOOP
 			case <-c.ctx.Done():
 				break LOOP
 			}
