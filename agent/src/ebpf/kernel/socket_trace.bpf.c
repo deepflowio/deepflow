@@ -1186,8 +1186,12 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		trace_conf->socket_id++;	// Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
 		//Confirm whether data reassembly is required for this socket.
-		if (is_proto_reasm_enabled(conn_info->protocol))
+		if (is_proto_reasm_enabled(conn_info->protocol)) {
 			sk_info.allow_reassembly = true;
+			sk_info.reasm_bytes =
+			    syscall_len >
+			    data_max_sz ? data_max_sz : syscall_len;
+		}
 		sk_info.direction = conn_info->direction;
 		sk_info.pre_direction = conn_info->direction;
 		sk_info.role = conn_info->role;
@@ -1277,12 +1281,15 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			socket_info_ptr->trace_id = 0;
 		}
 
+		if (!conn_info->is_reasm_seg)
+			socket_info_ptr->reasm_bytes = 0;
+
 		/*
 		 * Below, confirm the actual size of the data to be transmitted after
 		 * enabling data reassembly. The data transmission size is limited by
 		 * the maximum transmission configuration value.
 		 */
-		if (conn_info->enable_reasm
+		if (sk_info.allow_reassembly
 		    && socket_info_ptr->reasm_bytes < data_max_sz) {
 			__u32 remain_bytes =
 			    data_max_sz - socket_info_ptr->reasm_bytes;
@@ -1321,6 +1328,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		v->msg_type = MSG_REASM_START;
 		if (conn_info->is_reasm_seg)
 			v->msg_type = MSG_REASM_SEG;
+		else
+			send_reasm_bytes = 0;
 	}
 	v->tcp_seq = 0;
 
