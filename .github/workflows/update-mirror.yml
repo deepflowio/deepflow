@@ -1,0 +1,49 @@
+on: 
+  push:
+    branches:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
+
+name: update mirror
+
+env:
+  SSH_KEY: "${{ secrets.SSH_KEY_TO_GITEE_MIRROR }}"
+
+jobs:
+  update_mirror:
+    name: update mirror
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: repo-basename
+        run: |
+          echo "REPO_NAME=$(basename ${{ github.repository }})" >> $GITHUB_ENV
+
+      - name: clone repo
+        run: |
+          rm -rf ${{ env.REPO_NAME }}
+          mkdir ${{ env.REPO_NAME }}
+          cd ${{ env.REPO_NAME }}
+          git clone --bare https://github.com/deepflowio/${{ env.REPO_NAME }}.git .git
+          git config --unset core.bare
+          git reset --hard
+
+      - name: push to mirror
+        run: |
+          cd ${{ env.REPO_NAME }}
+          mkdir -p ~/.ssh/
+          echo "${{ env.SSH_KEY}}" >  ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan gitee.com >> ~/.ssh/known_hosts
+          git remote add gitee  git@gitee.com:deepflowce/${{ env.REPO_NAME }}.git
+          git push --no-verify --all gitee -u -f
+          git push -u gitee --tags -f
