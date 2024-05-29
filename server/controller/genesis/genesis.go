@@ -78,8 +78,8 @@ func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 func (g *Genesis) Start() {
 	ctx := context.Context(context.Background())
 	genesisSyncDataChan := make(chan GenesisSyncData)
-	kubernetesDataChan := make(chan map[string]KubernetesInfo)
-	prometheusDataChan := make(chan map[string]PrometheusInfo)
+	kubernetesDataChan := make(chan KubernetesInfo)
+	prometheusDataChan := make(chan PrometheusInfo)
 	sQueue := queue.NewOverwriteQueue("genesis sync data", g.cfg.QueueLengths)
 	kQueue := queue.NewOverwriteQueue("genesis k8s data", g.cfg.QueueLengths)
 	pQueue := queue.NewOverwriteQueue("genesis prometheus data", g.cfg.QueueLengths)
@@ -466,13 +466,11 @@ func (g *Genesis) getServerIPs() ([]string, error) {
 	return serverIPs, nil
 }
 
-func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
+func (g *Genesis) receiveKubernetesData(kChan chan KubernetesInfo) {
 	for {
 		select {
 		case k := <-kChan:
-			for key, value := range k {
-				g.kubernetesData.Store(key, value)
-			}
+			g.kubernetesData.Store(k.ClusterID, k)
 		}
 	}
 }
@@ -572,13 +570,11 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 	return k8sResp, nil
 }
 
-func (g *Genesis) receivePrometheusData(pChan chan map[string]PrometheusInfo) {
+func (g *Genesis) receivePrometheusData(pChan chan PrometheusInfo) {
 	for {
 		select {
 		case p := <-pChan:
-			for k, v := range p {
-				g.prometheusData.Store(k, v)
-			}
+			g.prometheusData.Store(p.ClusterID, p)
 		}
 	}
 }
