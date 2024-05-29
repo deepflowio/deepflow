@@ -500,8 +500,7 @@ func (t *toolData) load(db *mysql.DB) error {
 		return err
 	}
 	for _, subDomain := range subDomains {
-		md := message.NewMetadata(db.ORGID, subDomain.TeamID, domainLcuuidToID[subDomain.Domain])
-		md.SetSubDomainID(subDomain.ID)
+		md := message.NewMetadata(db.ORGID, subDomain.TeamID, domainLcuuidToID[subDomain.Domain], message.MetadataSubDomainID(subDomain.ID))
 		t.subDomainLcuuidToMsgMetadata[subDomain.Lcuuid] = md
 	}
 	return nil
