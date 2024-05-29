@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::any::Any;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
@@ -63,6 +64,7 @@ use public::{
     buffer::BatchedBuffer,
     utils::net::{is_unicast_link_local, MacAddr},
 };
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use reorder::{CacheItem, Downcast};
 
 #[derive(Clone, Debug)]
@@ -1145,6 +1147,7 @@ impl<'a> fmt::Display for MetaPacket<'a> {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl Downcast for MetaPacket<'static> {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
@@ -1155,6 +1158,7 @@ impl Downcast for MetaPacket<'static> {
     }
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl CacheItem for MetaPacket<'static> {
     fn get_id(&self) -> u64 {
         self.generate_ebpf_flow_id()
