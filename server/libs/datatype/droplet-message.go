@@ -144,10 +144,11 @@ const (
 )
 
 const (
-	FLOW_VERSION_OFFSET  = 0
-	FLOW_SEQUENCE_OFFSET = FLOW_VERSION_OFFSET + 4
-	FLOW_VTAPID_OFFSET   = FLOW_SEQUENCE_OFFSET + 8
-	FLOW_HEADER_LEN      = FLOW_VTAPID_OFFSET + 2
+	FLOW_VERSION_OFFSET = 0
+	FLOW_TEAMID_OFFSET  = FLOW_VERSION_OFFSET + 4
+	FLOW_ORGID_OFFSET   = FLOW_TEAMID_OFFSET + 4
+	FLOW_VTAPID_OFFSET  = FLOW_ORGID_OFFSET + 4
+	FLOW_HEADER_LEN     = FLOW_VTAPID_OFFSET + 2
 )
 
 type BaseHeader struct {
@@ -183,18 +184,21 @@ func (h *BaseHeader) Decode(buf []byte) error {
 
 // 多个document和taggeflow encode时共用一个header
 type FlowHeader struct {
-	Version  uint32 // 用来校验encode和decode是否配套
-	Sequence uint64 // udp发送时，用来校验是否丢包
-	VTAPID   uint16 // trident的ID
+	Version uint32 // 用来校验encode和decode是否配套
+	TeamID  uint32
+	OrgID   uint32
+	VTAPID  uint16 // trident的ID
 }
 
 func (h *FlowHeader) Encode(chunk []byte) {
 	binary.LittleEndian.PutUint32(chunk[FLOW_VERSION_OFFSET:], h.Version)
-	binary.LittleEndian.PutUint64(chunk[FLOW_SEQUENCE_OFFSET:], h.Sequence)
+	binary.LittleEndian.PutUint32(chunk[FLOW_TEAMID_OFFSET:], h.TeamID)
+	binary.LittleEndian.PutUint32(chunk[FLOW_ORGID_OFFSET:], h.OrgID)
 	binary.LittleEndian.PutUint16(chunk[FLOW_VTAPID_OFFSET:], h.VTAPID)
 }
 func (h *FlowHeader) Decode(buf []byte) {
 	h.Version = binary.LittleEndian.Uint32(buf[FLOW_VERSION_OFFSET:])
-	h.Sequence = binary.LittleEndian.Uint64(buf[FLOW_SEQUENCE_OFFSET:])
+	h.TeamID = binary.LittleEndian.Uint32(buf[FLOW_TEAMID_OFFSET:])
+	h.OrgID = binary.LittleEndian.Uint32(buf[FLOW_ORGID_OFFSET:])
 	h.VTAPID = binary.LittleEndian.Uint16(buf[FLOW_VTAPID_OFFSET:])
 }

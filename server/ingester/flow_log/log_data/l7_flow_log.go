@@ -652,8 +652,9 @@ func ReleaseL7FlowLog(l *L7FlowLog) {
 
 var L7FlowLogCounter uint32
 
-func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
+func ProtoLogToL7FlowLog(orgId, teamId uint16, l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
 	h := AcquireL7FlowLog()
+	h.OrgId, h.TeamID = orgId, teamId
 	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
 	h.Fill(l, platformData, cfg)
 	return h

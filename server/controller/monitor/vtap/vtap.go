@@ -47,21 +47,31 @@ func NewVTapCheck(cfg config.MonitorConfig, ctx context.Context) *VTapCheck {
 	}
 }
 
-func (v *VTapCheck) Start() {
+func (v *VTapCheck) Start(sCtx context.Context) {
 	log.Info("vtap check start")
 	go func() {
-		for range time.Tick(time.Duration(v.cfg.VTapCheckInterval) * time.Second) {
-			mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
-				// check launch_server resource if exist
-				v.launchServerCheck(db)
-				// check vtap type
-				v.typeCheck(db)
-				// check vtap lost time
-				if v.cfg.VTapAutoDelete.Enabled {
-					v.deleteLostVTap(db)
-				}
-				return nil
-			})
+		ticker := time.NewTicker(time.Duration(v.cfg.VTapCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+					// check launch_server resource if exist
+					v.launchServerCheck(db)
+					// check vtap type
+					v.typeCheck(db)
+					// check vtap lost time
+					if v.cfg.VTapAutoDelete.Enabled {
+						v.deleteLostVTap(db)
+					}
+					return nil
+				})
+			case <-sCtx.Done():
+				break LOOP
+			case <-v.vCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }

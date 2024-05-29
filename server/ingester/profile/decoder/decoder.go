@@ -98,6 +98,8 @@ type Decoder struct {
 
 	offCpuSplittingGranularity int
 
+	orgId, teamId uint16
+
 	counter *Counter
 	utils.Closable
 }
@@ -148,6 +150,7 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+			d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
 			if d.msgType == datatype.MESSAGE_TYPE_PROFILE {
 				d.handleProfileData(recvBytes.VtapID, decoder)
 			}
@@ -168,6 +171,8 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 
 		parser := &Parser{
 			vtapID:                     vtapID,
+			orgId:                      d.orgId,
+			teamId:                     d.teamId,
 			inTimestamp:                time.Now(),
 			callBack:                   d.profileWriter.Write,
 			platformData:               d.platformData,

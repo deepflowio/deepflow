@@ -17,6 +17,8 @@
 package synchronize
 
 import (
+	"fmt"
+
 	api "github.com/deepflowio/deepflow/message/trident"
 	context "golang.org/x/net/context"
 
@@ -39,6 +41,7 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 	clusterID, err := common.GenerateKuberneteClusterIDByMD5(in.GetCaMd5())
 	if err != nil {
 		errorMsg := err.Error()
+		log.Error(errorMsg)
 		return &api.KubernetesClusterIDResponse{ErrorMsg: &errorMsg}, nil
 	}
 	if !trisolaris.GetConfig().DomainAutoRegister {
@@ -47,6 +50,11 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 
 	// cache clusterID & create kubernetes domain
 	kubernetesInfo := trisolaris.GetGKubernetesInfo(in.GetTeamId())
+	if kubernetesInfo == nil {
+		errorMsg := fmt.Sprintf("failed to get kubernetes info for team_id: %d", in.GetTeamId())
+		log.Error(errorMsg)
+		return &api.KubernetesClusterIDResponse{ErrorMsg: &errorMsg}, nil
+	}
 	kubernetesInfo.CacheClusterID(in.GetTeamId(), clusterID, in.GetKubernetesClusterName())
 
 	log.Infof("response kubernetes cluster_id: %s to ip: %s", clusterID, remote)
