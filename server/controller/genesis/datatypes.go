@@ -57,6 +57,7 @@ type PrometheusMessage struct {
 }
 
 type KubernetesInfo struct {
+	ORGID     int
 	ClusterID string
 	ErrorMSG  string
 	Version   uint64
@@ -65,6 +66,7 @@ type KubernetesInfo struct {
 }
 
 type PrometheusInfo struct {
+	ORGID     int
 	ClusterID string
 	ErrorMSG  string
 	Epoch     time.Time
