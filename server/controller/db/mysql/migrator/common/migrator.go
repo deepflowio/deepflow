@@ -100,7 +100,7 @@ func InitCETables(dc *DBConfig) error {
 	}
 
 	// 通过判断数据库名称后缀，判断数据库是否是 default 组织。
-	if !strings.HasSuffix(dc.Config.Database, common.NONE_DEFAULT_ORG_DATABASE_SUFFIX) {
+	if !strings.HasSuffix(dc.Config.Database, common.NON_DEFAULT_ORG_DATABASE_SUFFIX) {
 		if err := initCEDefaultORGTables(dc); err != nil {
 			return err
 		}

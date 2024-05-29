@@ -23,11 +23,14 @@ type Metadata struct {
 	SubDomainID int
 }
 
-func NewMetadata(orgID, teamID, domainID, subDomainID int) *Metadata {
+func NewMetadata(orgID, teamID, domainID int) *Metadata {
 	return &Metadata{
-		ORGID:       orgID,
-		TeamID:      teamID,
-		DomainID:    domainID,
-		SubDomainID: subDomainID,
+		ORGID:    orgID,
+		TeamID:   teamID,
+		DomainID: domainID,
 	}
+}
+
+func (m *Metadata) SetSubDomainID(subDomainID int) {
+	m.SubDomainID = subDomainID
 }
