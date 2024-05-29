@@ -649,7 +649,7 @@ func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *svc.UserInfo, cf
 	db.Delete(&domain)
 
 	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, domain.TeamID, domain.ID, 0)
+	metadata := message.NewMetadata(db.ORGID, domain.TeamID, domain.ID)
 	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("domain") {
 		s.OnDomainDeleted(metadata)
 	}
