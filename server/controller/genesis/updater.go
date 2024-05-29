@@ -363,9 +363,13 @@ func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []mo
 
 func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, peer, natIP string, vtapID uint32) GenesisSyncDataOperation {
 	hostName := strings.Trim(info.message.GetPlatformData().GetRawHostname(), " \n")
+	if hostName == "" {
+		log.Error("get sync data (raw hostname) empty")
+		return GenesisSyncDataOperation{}
+	}
 	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
-		log.Errorf("get sync data (raw ip addrs) empty")
+		log.Error("get sync data (raw ip addrs) empty")
 		return GenesisSyncDataOperation{}
 	}
 	interfaces, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddrs[0], " "))

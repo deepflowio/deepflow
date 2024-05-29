@@ -139,12 +139,16 @@ func (g *GenesisSyncTypeOperation[T]) Renew(data map[int][]T, timestamp time.Tim
 		for _, item := range items {
 			tData := reflect.ValueOf(&item).Elem()
 			itemLcuuid := tData.FieldByName("Lcuuid").String()
-			g.lastSeen[orgID][itemLcuuid] = timestamp
+			if oLastSeen, ok := g.lastSeen[orgID]; ok {
+				oLastSeen[itemLcuuid] = timestamp
+			}
 
 			dataLastTime := tData.FieldByName("LastSeen")
 			if dataLastTime.IsValid() && dataLastTime.CanSet() {
 				dataLastTime.Set(reflect.ValueOf(timestamp))
-				g.dataDict[orgID][itemLcuuid] = item
+				if oDataDict, ok := g.dataDict[orgID]; ok {
+					oDataDict[itemLcuuid] = item
+				}
 			}
 		}
 	}
@@ -158,8 +162,16 @@ func (g *GenesisSyncTypeOperation[T]) Update(data map[int][]T, timestamp time.Ti
 		for _, item := range items {
 			tData := reflect.ValueOf(&item).Elem()
 			itemLcuuid := tData.FieldByName("Lcuuid").String()
-			g.lastSeen[orgID][itemLcuuid] = timestamp
-			g.dataDict[orgID][itemLcuuid] = item
+			if oLastSeen, ok := g.lastSeen[orgID]; ok {
+				oLastSeen[itemLcuuid] = timestamp
+			} else {
+				g.lastSeen[orgID] = map[string]time.Time{itemLcuuid: timestamp}
+			}
+			if oDataDict, ok := g.dataDict[orgID]; ok {
+				oDataDict[itemLcuuid] = item
+			} else {
+				g.dataDict[orgID] = map[string]T{itemLcuuid: item}
+			}
 		}
 	}
 }
