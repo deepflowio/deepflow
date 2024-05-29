@@ -132,6 +132,7 @@ func GetGNodeInfo() *node.NodeInfo {
 
 func TeamIDToTrisolaris(teamID string) *Trisolaris {
 	if trisolarisManager == nil {
+		log.Errorf("failed to get trisolaris manager")
 		return nil
 	}
 	return trisolarisManager.orgToTrisolaris[GetOrgIDByTeamID(teamID)]
@@ -140,6 +141,7 @@ func TeamIDToTrisolaris(teamID string) *Trisolaris {
 func GetGKubernetesInfo(teamID string) *kubernetes.KubernetesInfo {
 	tri := TeamIDToTrisolaris(teamID)
 	if tri == nil {
+		log.Errorf("failed to get kubernetes info for teamID: %s", teamID)
 		return nil
 	}
 	return tri.kubernetesInfo

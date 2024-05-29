@@ -120,8 +120,8 @@ func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(teamUID, clusterID, cl
 }
 
 func (k *KubernetesInfo) checkClusterID(clusterID string) (bool, error) {
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
+	k.mutex.RLock()
+	defer k.mutex.RUnlock()
 	_, dok := k.clusterIDToDomain[clusterID]
 	_, sdok := k.clusterIDToSubDomain[clusterID]
 	ok := dok || sdok
