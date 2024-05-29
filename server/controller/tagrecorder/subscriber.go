@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
@@ -68,13 +70,20 @@ func (c *SubscriberManager) Start() (err error) {
 }
 
 func (m *SubscriberManager) GetSubscribers(subResourceType string) []Subscriber {
+	ss := make([]Subscriber, 0)
 	if subResourceType == pubsub.PubSubTypeDomain {
 		return m.subscribers
-	}
-	ss := make([]Subscriber, 0)
-	for _, s := range m.subscribers {
-		if s.GetSubResourceType() == subResourceType {
-			ss = append(ss, s)
+	} else if subResourceType == pubsub.PubSubTypeSubDomain {
+		for _, s := range m.subscribers {
+			if slices.Contains(SUB_DOMAIN_RESOURCE_TYPES, s.GetSubResourceType()) {
+				ss = append(ss, s)
+			}
+		}
+	} else {
+		for _, s := range m.subscribers {
+			if s.GetSubResourceType() == subResourceType {
+				ss = append(ss, s)
+			}
 		}
 	}
 	return ss
@@ -151,6 +160,7 @@ type Subscriber interface {
 	pubsub.ResourceUpdatedSubscriber
 	pubsub.ResourceBatchDeletedSubscriber
 	OnDomainDeleted(md *message.Metadata)
+	OnSubDomainDeleted(md *message.Metadata)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
@@ -261,6 +271,18 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message
 		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
 	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
+		log.Error(err)
+	}
+}
+
+// Delete resource by sub domain
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *message.Metadata) {
+	var chModel CT
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
+	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err)
 	}
 }

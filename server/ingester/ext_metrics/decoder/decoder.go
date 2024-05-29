@@ -70,6 +70,8 @@ type Decoder struct {
 	vtapIDToUniversalTag     map[uint16]*flow_metrics.UniversalTag
 	platformDataVersion      uint64
 
+	orgId, teamId uint16
+
 	counter *Counter
 	utils.Closable
 }
@@ -123,6 +125,7 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+			d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
 			if d.msgType == datatype.MESSAGE_TYPE_TELEGRAF {
 				d.handleTelegraf(recvBytes.VtapID, decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_DFSTATS || d.msgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
@@ -217,8 +220,8 @@ func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMet
 		// from deepflow_server, OrgId set default
 		if vtapID == 0 {
 			m.OrgId, m.TeamID = ckdb.DEFAULT_ORG_ID, ckdb.DEFAULT_TEAM_ID
-		} else { // from deepflow_agent, OrgId get from vtapID
-			m.OrgId, m.TeamID = grpc.QueryVtapOrgAndTeamID(vtapID)
+		} else { // from deepflow_agent, OrgId Get from header first, then from vtapID
+			m.OrgId, m.TeamID = d.orgId, d.teamId
 		}
 	}
 	return m
@@ -335,7 +338,7 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 	m.MsgType = datatype.MESSAGE_TYPE_TELEGRAF
 	tableName := string(point.Name())
 	m.VTableName = VTABLE_PREFIX_TELEGRAF + tableName
-	m.OrgId, m.TeamID = d.platformData.QueryVtapOrgAndTeamID(vtapID)
+	m.OrgId, m.TeamID = d.orgId, d.teamId
 	podName := ""
 	for _, tag := range point.Tags() {
 		tagName := string(tag.Key)

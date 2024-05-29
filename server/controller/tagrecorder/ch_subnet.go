@@ -55,8 +55,9 @@ func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *mysql.Network) 
 		IconID: c.resourceTypeToIconID[IconKey{
 			NodeType: RESOURCE_TYPE_VL2,
 		}],
-		TeamID:   md.TeamID,
-		DomainID: md.DomainID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }

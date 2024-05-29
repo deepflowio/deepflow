@@ -28,6 +28,7 @@ const (
 	INVALID_TEAM_ID   = 0
 	ORG_ID_LEN        = 4 // length of 'xxxx'
 	ORG_ID_PREFIX_LEN = 5 // length of 'xxxx_'
+	MAX_ORG_ID        = 1024
 )
 
 func IsDefaultOrgID(orgID uint16) bool {

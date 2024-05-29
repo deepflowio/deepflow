@@ -61,10 +61,18 @@ func (c *Dictionary) Init(cfg config.ControllerConfig) {
 	c.cfg = cfg
 }
 
-func (c *Dictionary) Start() {
+func (c *Dictionary) Start(sCtx context.Context) {
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
-			c.Update()
+		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.Update()
+			case <-sCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }
@@ -247,8 +255,8 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		}
 
 		sort.Strings(databases)
-		databaseIndex := sort.SearchStrings(databases, ckDatabaseName)
-		if len(databases) == 0 || databaseIndex == len(databases) || databases[databaseIndex] != ckDatabaseName {
+		databaseIndex := sort.SearchStrings(databases, strings.Trim(ckDatabaseName, "`"))
+		if len(databases) == 0 || databaseIndex == len(databases) || databases[databaseIndex] != strings.Trim(ckDatabaseName, "`") {
 			log.Infof("create database %s", ckDatabaseName)
 			sql := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", ckDatabaseName)
 			_, err = ckDb.Exec(sql)
@@ -358,7 +366,6 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 
 		// Get the current view in the database
 		views := []string{}
-		log.Infof("SHOW TABLES FROM %s LIKE '%%view'", ckDatabaseName)
 		if err := ckDb.Select(&views, fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", ckDatabaseName)); err != nil {
 			log.Error(err)
 			return
@@ -392,7 +399,6 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		var updateViewError error
 		for _, view := range checkViews.ToSlice() {
 			viewName := view.(string)
-			log.Info(viewName)
 			showSQL := fmt.Sprintf("SHOW CREATE TABLE %s.%s", ckDatabaseName, viewName)
 			viewSQL := make([]string, 0)
 			if err := ckDb.Select(&viewSQL, showSQL); err != nil {

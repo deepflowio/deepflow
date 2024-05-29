@@ -75,7 +75,13 @@ func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, item *mysql.PodN
 		log.Error(err)
 		return
 	}
-	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChPodNSCloudTags{{ID: item.ID, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}
+	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChPodNSCloudTags{{
+		ID:          item.ID,
+		CloudTags:   string(bytes),
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
+	}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

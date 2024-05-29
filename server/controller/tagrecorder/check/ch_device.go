@@ -449,12 +449,13 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 			}
 			keyToItem[podServiceKey] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 
 			// service
@@ -463,12 +464,13 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 			}
 			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  CH_DEVICE_TYPE_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		} else {
 			// pod_service
@@ -477,12 +479,13 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 			}
 			keyToItem[podServiceKey] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 
 			// service
@@ -491,12 +494,13 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 			}
 			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  CH_DEVICE_TYPE_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		}
 	}
@@ -518,21 +522,23 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 		}
 		if pod.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD,
-				DeviceID:   pod.ID,
-				Name:       pod.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-				TeamID:     tagrecorder.DomainToTeamID[pod.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[pod.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD,
+				DeviceID:    pod.ID,
+				Name:        pod.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD,
-				DeviceID:   pod.ID,
-				Name:       pod.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-				TeamID:     tagrecorder.DomainToTeamID[pod.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[pod.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD,
+				DeviceID:    pod.ID,
+				Name:        pod.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		}
 	}
@@ -554,21 +560,23 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 		}
 		if podGroup.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				DeviceID:   podGroup.ID,
-				Name:       podGroup.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-				TeamID:     tagrecorder.DomainToTeamID[podGroup.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podGroup.Domain],
+				DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
+				DeviceID:    podGroup.ID,
+				Name:        podGroup.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				TeamID:      tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podGroup.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podGroup.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				DeviceID:   podGroup.ID,
-				Name:       podGroup.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-				TeamID:     tagrecorder.DomainToTeamID[podGroup.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podGroup.Domain],
+				DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
+				DeviceID:    podGroup.ID,
+				Name:        podGroup.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				TeamID:      tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podGroup.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podGroup.SubDomain],
 			}
 		}
 	}
@@ -590,25 +598,27 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 		}
 		if podNode.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-				DeviceID:   podNode.ID,
-				Name:       podNode.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				Hostname:   podNode.Hostname,
-				IP:         podNode.IP,
-				TeamID:     tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podNode.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_NODE,
+				DeviceID:    podNode.ID,
+				Name:        podNode.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				Hostname:    podNode.Hostname,
+				IP:          podNode.IP,
+				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-				DeviceID:   podNode.ID,
-				Name:       podNode.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				Hostname:   podNode.Hostname,
-				IP:         podNode.IP,
-				TeamID:     tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podNode.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_NODE,
+				DeviceID:    podNode.ID,
+				Name:        podNode.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				Hostname:    podNode.Hostname,
+				IP:          podNode.IP,
+				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		}
 	}
@@ -630,21 +640,23 @@ func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysql.ChDevice
 		}
 		if podCluster.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
-				DeviceID:   podCluster.ID,
-				Name:       podCluster.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
-				TeamID:     tagrecorder.DomainToTeamID[podCluster.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podCluster.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
+				DeviceID:    podCluster.ID,
+				Name:        podCluster.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:      tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podCluster.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
-				DeviceID:   podCluster.ID,
-				Name:       podCluster.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
-				TeamID:     tagrecorder.DomainToTeamID[podCluster.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podCluster.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
+				DeviceID:    podCluster.ID,
+				Name:        podCluster.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:      tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podCluster.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
 			}
 		}
 	}
@@ -689,21 +701,23 @@ func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) b
 		}
 		if process.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_GPROCESS,
-				DeviceID:   process.ID,
-				Name:       process.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				TeamID:     tagrecorder.DomainToTeamID[process.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[process.Domain],
+				DeviceType:  CH_DEVICE_TYPE_GPROCESS,
+				DeviceID:    process.ID,
+				Name:        process.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_GPROCESS,
-				DeviceID:   process.ID,
-				Name:       process.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				TeamID:     tagrecorder.DomainToTeamID[process.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[process.Domain],
+				DeviceType:  CH_DEVICE_TYPE_GPROCESS,
+				DeviceID:    process.ID,
+				Name:        process.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		}
 	}

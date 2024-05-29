@@ -305,9 +305,11 @@ func (e *VTapEvent) GetFailedResponse(in *api.SyncRequest, gVTapInfo *vtap.VTapI
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	if trisolaris.GetConfig().DomainAutoRegister && in.GetKubernetesClusterId() != "" {
 		gKubernetesInfo := trisolaris.GetGKubernetesInfo(in.GetTeamId())
-		exists := gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetTeamId(), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
-		if !exists {
-			log.Infof("call me from ip: %s with team_id: %s, cluster_id: %s, cluster_name: %s", getRemote(ctx), in.GetTeamId(), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+		if gKubernetesInfo != nil {
+			exists := gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetTeamId(), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+			if !exists {
+				log.Infof("call me from ip: %s with team_id: %s, cluster_id: %s, cluster_name: %s", getRemote(ctx), in.GetTeamId(), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+			}
 		}
 	}
 

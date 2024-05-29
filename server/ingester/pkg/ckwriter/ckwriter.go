@@ -41,9 +41,8 @@ import (
 var log = logging.MustGetLogger("ckwriter")
 
 const (
-	FLUSH_TIMEOUT        = 10 * time.Second
-	SQL_LOG_LENGTH       = 256
-	MAX_ORGANIZATINON_ID = 1024
+	FLUSH_TIMEOUT  = 10 * time.Second
+	SQL_LOG_LENGTH = 256
 )
 
 type CKWriter struct {
@@ -298,7 +297,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 
 	rawItems := make([]interface{}, 1024)
 	var cache *Cache
-	orgCaches := make([]*Cache, MAX_ORGANIZATINON_ID+1)
+	orgCaches := make([]*Cache, ckdb.MAX_ORG_ID+1)
 	for i := range orgCaches {
 		orgCaches[i] = new(Cache)
 		orgCaches[i].items = make([]CKItem, 0)
@@ -312,7 +311,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 			item := rawItems[i]
 			if ck, ok := item.(CKItem); ok {
 				orgID := ck.OrgID()
-				if orgID > MAX_ORGANIZATINON_ID {
+				if orgID > ckdb.MAX_ORG_ID {
 					if w.counters[queueID].OrgInvalidCount == 0 {
 						log.Warningf("writer queue (%s) item wrong orgID %d", w.name, orgID)
 					}

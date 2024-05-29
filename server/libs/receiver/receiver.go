@@ -33,6 +33,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/cache"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/pool"
@@ -66,6 +67,8 @@ type RecvBuffer struct {
 	Buffer     []byte
 	IP         net.IP // 保存消息的发送方IP
 	VtapID     uint16
+	TeamID     uint32
+	OrgID      uint32
 	SocketType ServerType
 }
 
@@ -663,6 +666,24 @@ func (r *Receiver) logTCPReceiveInvalidData(str string) {
 	log.Warningf("%s, already drop log count %d", str, r.dropLogCount)
 }
 
+func (r *Receiver) parseOrgIdTeamId(flowHeader *datatype.FlowHeader) (uint32, uint32) {
+	orgID, teamID := flowHeader.OrgID, flowHeader.TeamID
+	if teamID == ckdb.INVALID_TEAM_ID {
+		teamID = ckdb.DEFAULT_TEAM_ID
+	}
+
+	if orgID == ckdb.INVALID_ORG_ID {
+		orgID = ckdb.DEFAULT_ORG_ID
+	} else if orgID > ckdb.MAX_ORG_ID {
+		if r.counter.Invalid == 0 {
+			log.Warningf("the org id (%d) in the header of the received agent message is illegal", orgID)
+		}
+		atomic.AddUint64(&r.counter.Invalid, 1)
+		orgID = ckdb.DEFAULT_ORG_ID
+	}
+	return orgID, teamID
+}
+
 func (r *Receiver) ProcessUDPServer() {
 	defer r.UDPConn.Close()
 	baseHeader := &datatype.BaseHeader{}
@@ -701,7 +722,7 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint32(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
 			headerLen += datatype.FLOW_HEADER_LEN
@@ -716,14 +737,15 @@ func (r *Receiver) ProcessUDPServer() {
 			}
 
 			vtapID = flowHeader.VTAPID
-			sequence = flowHeader.Sequence
+			teamID, orgID = r.parseOrgIdTeamId(flowHeader)
+
 			if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS {
 				metricsTimestamp = r.getMetricsTimestamp(recvBuffer.Buffer[headerLen:])
 				r.updateCounter(metricsTimestamp)
-				r.DropDetection.Detect(getIpHash(remoteAddr.IP), flowHeader.Sequence, metricsTimestamp)
+				r.DropDetection.Detect(getIpHash(remoteAddr.IP), 0, metricsTimestamp)
 			}
 		}
-		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, remoteAddr.IP, sequence, metricsTimestamp, UDP)
+		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, remoteAddr.IP, 0, metricsTimestamp, UDP)
 
 		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
 		if r.handlers[baseHeader.Type] == nil {
@@ -737,6 +759,8 @@ func (r *Receiver) ProcessUDPServer() {
 			}
 			recvBuffer.IP = remoteAddr.IP
 			recvBuffer.VtapID = vtapID
+			recvBuffer.TeamID = teamID
+			recvBuffer.OrgID = orgID
 			r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}
@@ -855,7 +879,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint32(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			if err := ReadN(reader, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
@@ -879,7 +903,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 				}
 			}
 			vtapID = flowHeader.VTAPID
-			sequence = flowHeader.Sequence
+			orgID, teamID = r.parseOrgIdTeamId(flowHeader)
 		}
 
 		dataLen := int(baseHeader.FrameSize) - headerLen
@@ -902,7 +926,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			metricsTimestamp = r.getMetricsTimestamp(recvBuffer.Buffer)
 			r.updateCounter(metricsTimestamp)
 		}
-		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, ip, sequence, metricsTimestamp, TCP)
+		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, ip, 0, metricsTimestamp, TCP)
 		atomic.AddUint64(&r.counter.RxPackets, 1)
 
 		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
@@ -914,6 +938,8 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			recvBuffer.End = int(baseHeader.FrameSize) - headerLen
 			recvBuffer.IP = ip
 			recvBuffer.VtapID = vtapID
+			recvBuffer.TeamID = teamID
+			recvBuffer.OrgID = orgID
 			r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}

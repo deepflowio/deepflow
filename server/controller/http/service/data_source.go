@@ -96,7 +96,7 @@ func GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Sp
 		return nil, err
 	}
 
-	if err := db.Find(&baseDataSources).Error; err != nil {
+	if err := dbInfo.Find(&baseDataSources).Error; err != nil {
 		return nil, err
 	}
 	idToDisplayName := make(map[int]string)

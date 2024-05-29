@@ -67,7 +67,13 @@ func (c *ChOSAppTags) sourceToTarget(md *message.Metadata, item *mysql.Process) 
 		return
 	}
 	osAppTags, _ := common.StrToJsonAndMap(item.OSAPPTags)
-	return []OSAPPTagsKey{{PID: item.ID}}, []mysql.ChOSAppTags{{PID: item.ID, OSAPPTags: osAppTags, TeamID: md.TeamID, DomainID: md.DomainID}}
+	return []OSAPPTagsKey{{PID: item.ID}}, []mysql.ChOSAppTags{{
+		PID:         item.ID,
+		OSAPPTags:   osAppTags,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
+	}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

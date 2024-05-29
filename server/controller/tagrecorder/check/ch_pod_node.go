@@ -49,19 +49,21 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 	for _, podNode := range podNodes {
 		if podNode.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
-				ID:       podNode.ID,
-				Name:     podNode.Name + " (deleted)",
-				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				TeamID:   tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID: tagrecorder.DomainToDomainID[podNode.Domain],
+				ID:          podNode.ID,
+				Name:        podNode.Name + " (deleted)",
+				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
-				ID:       podNode.ID,
-				Name:     podNode.Name,
-				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				TeamID:   tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID: tagrecorder.DomainToDomainID[podNode.Domain],
+				ID:          podNode.ID,
+				Name:        podNode.Name,
+				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		}
 	}
