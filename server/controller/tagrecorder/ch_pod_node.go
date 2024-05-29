@@ -52,11 +52,12 @@ func (c *ChPodNode) sourceToTarget(md *message.Metadata, source *mysql.PodNode) 
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChPodNode{
-		ID:       source.ID,
-		Name:     sourceName,
-		IconID:   iconID,
-		TeamID:   md.TeamID,
-		DomainID: md.DomainID,
+		ID:          source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }

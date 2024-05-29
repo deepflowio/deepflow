@@ -65,7 +65,13 @@ func (c *ChPodK8sEnvs) sourceToTarget(md *message.Metadata, item *mysql.Pod) (ke
 		return
 	}
 	envs, _ := common.StrToJsonAndMap(item.ENV)
-	return []K8sEnvsKey{{ID: item.ID}}, []mysql.ChPodK8sEnvs{{ID: item.ID, Envs: envs, TeamID: md.TeamID, DomainID: md.DomainID}}
+	return []K8sEnvsKey{{ID: item.ID}}, []mysql.ChPodK8sEnvs{{
+		ID:          item.ID,
+		Envs:        envs,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
+	}}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

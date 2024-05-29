@@ -61,10 +61,11 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSClou
 				ID: podNamespace.ID,
 			}
 			keyToItem[key] = mysql.ChPodNSCloudTags{
-				ID:        podNamespace.ID,
-				CloudTags: string(cloudTagsStr),
-				TeamID:    tagrecorder.DomainToTeamID[podNamespace.Domain],
-				DomainID:  tagrecorder.DomainToDomainID[podNamespace.Domain],
+				ID:          podNamespace.ID,
+				CloudTags:   string(cloudTagsStr),
+				TeamID:      tagrecorder.DomainToTeamID[podNamespace.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podNamespace.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNamespace.SubDomain],
 			}
 		}
 	}

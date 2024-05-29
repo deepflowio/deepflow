@@ -610,24 +610,26 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *mysql.
 	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
 		DeviceID: source.ID})
 	targets = append(targets, mysql.ChDevice{
-		DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-		DeviceID:   source.ID,
-		Name:       sourceName,
-		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		DeviceType:  common.VIF_DEVICE_TYPE_POD_SERVICE,
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 
 	// service
 	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_SERVICE,
 		DeviceID: source.ID})
 	targets = append(targets, mysql.ChDevice{
-		DeviceType: CH_DEVICE_TYPE_SERVICE,
-		DeviceID:   source.ID,
-		Name:       sourceName,
-		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		DeviceType:  CH_DEVICE_TYPE_SERVICE,
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }
@@ -685,12 +687,13 @@ func (c *ChPodDevice) sourceToTarget(md *message.Metadata, source *mysql.Pod) (k
 	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD,
 		DeviceID: source.ID})
 	targets = append(targets, mysql.ChDevice{
-		DeviceType: common.VIF_DEVICE_TYPE_POD,
-		DeviceID:   source.ID,
-		Name:       sourceName,
-		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		DeviceType:  common.VIF_DEVICE_TYPE_POD,
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }
@@ -748,12 +751,13 @@ func (c *ChPodGroupDevice) sourceToTarget(md *message.Metadata, source *mysql.Po
 	keys = append(keys, DeviceKey{DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
 		DeviceID: source.ID})
 	targets = append(targets, mysql.ChDevice{
-		DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
-		DeviceID:   source.ID,
-		Name:       sourceName,
-		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[source.Type],
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }
@@ -812,14 +816,15 @@ func (c *ChPodNodeDevice) sourceToTarget(md *message.Metadata, source *mysql.Pod
 	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
 		DeviceID: source.ID})
 	targets = append(targets, mysql.ChDevice{
-		DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-		DeviceID:   source.ID,
-		Name:       sourceName,
-		IconID:     iconID,
-		Hostname:   source.Hostname,
-		IP:         source.IP,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		DeviceType:  common.VIF_DEVICE_TYPE_POD_NODE,
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		Hostname:    source.Hostname,
+		IP:          source.IP,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }
@@ -882,12 +887,13 @@ func (c *ChPodClusterDevice) sourceToTarget(md *message.Metadata, source *mysql.
 	keys = append(keys, DeviceKey{DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
 		DeviceID: source.ID})
 	targets = append(targets, mysql.ChDevice{
-		DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
-		DeviceID:   source.ID,
-		Name:       sourceName,
-		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }
@@ -944,12 +950,13 @@ func (c *ChProcessDevice) sourceToTarget(md *message.Metadata, source *mysql.Pro
 	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_GPROCESS,
 		DeviceID: source.ID})
 	targets = append(targets, mysql.ChDevice{
-		DeviceType: CH_DEVICE_TYPE_GPROCESS,
-		DeviceID:   source.ID,
-		Name:       sourceName,
-		IconID:     iconID,
-		TeamID:     md.TeamID,
-		DomainID:   md.DomainID,
+		DeviceType:  CH_DEVICE_TYPE_GPROCESS,
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }

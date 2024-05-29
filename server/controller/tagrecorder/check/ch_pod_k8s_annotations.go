@@ -72,6 +72,7 @@ func (k *ChPodK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChP
 				PodNsID:     pod.PodNamespaceID,
 				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
 				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		}
 	}

@@ -52,13 +52,14 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysql.Process)
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChGProcess{
-		ID:       source.ID,
-		Name:     sourceName,
-		CHostID:  source.VMID,
-		L3EPCID:  source.VPCID,
-		IconID:   iconID,
-		TeamID:   md.TeamID,
-		DomainID: md.DomainID,
+		ID:          source.ID,
+		Name:        sourceName,
+		CHostID:     source.VMID,
+		L3EPCID:     source.VPCID,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
 	})
 	return
 }

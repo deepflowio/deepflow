@@ -22,12 +22,19 @@ import (
 
 var DomainToTeamID map[string]int
 var DomainToDomainID map[string]int
+var SubDomainToSubDomainID map[string]int
 var VTapIDToTeamID map[int]int
 
 func GetTeamInfo(db *mysql.DB) {
 	var domains []mysql.Domain
+	var subDomains []mysql.SubDomain
 	var vTaps []mysql.VTap
 	err := db.Unscoped().Find(&domains).Error
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	err = db.Unscoped().Find(&subDomains).Error
 	if err != nil {
 		log.Error(err)
 		return
@@ -39,11 +46,16 @@ func GetTeamInfo(db *mysql.DB) {
 	}
 	domainToTeamID := map[string]int{}
 	domainToDomainID := map[string]int{}
+	subDomainToSubDomainID := map[string]int{}
 	vTapIDToTeamID := map[int]int{}
 	// domain
 	for _, domain := range domains {
 		domainToTeamID[domain.Lcuuid] = domain.TeamID
 		domainToDomainID[domain.Lcuuid] = domain.ID
+	}
+	// sub_domain
+	for _, subDomain := range subDomains {
+		subDomainToSubDomainID[subDomain.Lcuuid] = subDomain.ID
 	}
 	// vtap
 	for _, vTap := range vTaps {
@@ -51,5 +63,6 @@ func GetTeamInfo(db *mysql.DB) {
 	}
 	DomainToTeamID = domainToTeamID
 	DomainToDomainID = domainToDomainID
+	SubDomainToSubDomainID = subDomainToSubDomainID
 	VTapIDToTeamID = vTapIDToTeamID
 }

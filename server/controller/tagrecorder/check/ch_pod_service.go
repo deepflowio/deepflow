@@ -53,6 +53,7 @@ func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
 				PodNsID:      podService.PodNamespaceID,
 				TeamID:       tagrecorder.DomainToTeamID[podService.Domain],
 				DomainID:     tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podService.ID}] = mysql.ChPodService{
@@ -62,6 +63,7 @@ func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
 				PodNsID:      podService.PodNamespaceID,
 				TeamID:       tagrecorder.DomainToTeamID[podService.Domain],
 				DomainID:     tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		}
 	}
