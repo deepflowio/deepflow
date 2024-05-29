@@ -334,12 +334,12 @@ type KubernetesStorage struct {
 	cfg            config.GenesisConfig
 	kCtx           context.Context
 	kCancel        context.CancelFunc
-	channel        chan map[int]map[string]KubernetesInfo
+	channel        chan KubernetesInfo
 	kubernetesData map[int]map[string]KubernetesInfo
 	mutex          sync.Mutex
 }
 
-func NewKubernetesStorage(port, nPort int, cfg config.GenesisConfig, kChan chan map[int]map[string]KubernetesInfo, ctx context.Context) *KubernetesStorage {
+func NewKubernetesStorage(port, nPort int, cfg config.GenesisConfig, kChan chan KubernetesInfo, ctx context.Context) *KubernetesStorage {
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesStorage{
 		listenPort:     port,
@@ -379,9 +379,8 @@ func (k *KubernetesStorage) Add(orgID int, newInfo KubernetesInfo) {
 			newInfo.ClusterID: newInfo,
 		}
 	}
+	k.fetch()
 	k.mutex.Unlock()
-
-	k.channel <- k.fetch()
 
 	if !unTriggerFlag {
 		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
@@ -391,8 +390,12 @@ func (k *KubernetesStorage) Add(orgID int, newInfo KubernetesInfo) {
 	}
 }
 
-func (k *KubernetesStorage) fetch() map[int]map[string]KubernetesInfo {
-	return k.kubernetesData
+func (k *KubernetesStorage) fetch() {
+	for _, k8sDatas := range k.kubernetesData {
+		for _, kData := range k8sDatas {
+			k.channel <- kData
+		}
+	}
 }
 
 func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, version uint64) error {
@@ -468,9 +471,8 @@ func (k *KubernetesStorage) run() {
 				delete(kubernetesData, key)
 			}
 		}
+		k.fetch()
 		k.mutex.Unlock()
-
-		k.channel <- k.fetch()
 	}
 }
 
@@ -488,12 +490,12 @@ type PrometheusStorage struct {
 	cfg            config.GenesisConfig
 	kCtx           context.Context
 	kCancel        context.CancelFunc
-	channel        chan map[int]map[string]PrometheusInfo
+	channel        chan PrometheusInfo
 	prometheusData map[int]map[string]PrometheusInfo
 	mutex          sync.Mutex
 }
 
-func NewPrometheusStorage(cfg config.GenesisConfig, pChan chan map[int]map[string]PrometheusInfo, ctx context.Context) *PrometheusStorage {
+func NewPrometheusStorage(cfg config.GenesisConfig, pChan chan PrometheusInfo, ctx context.Context) *PrometheusStorage {
 	pCtx, pCancel := context.WithCancel(ctx)
 	return &PrometheusStorage{
 		cfg:            cfg,
@@ -514,6 +516,7 @@ func (p *PrometheusStorage) Clear() {
 
 func (p *PrometheusStorage) Add(orgID int, isUpdate bool, newInfo PrometheusInfo) {
 	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	prometheusData, ok := p.prometheusData[orgID]
 	if ok {
 		if oldInfo, ok := prometheusData[newInfo.ClusterID]; ok && !isUpdate {
@@ -528,13 +531,15 @@ func (p *PrometheusStorage) Add(orgID int, isUpdate bool, newInfo PrometheusInfo
 			newInfo.ClusterID: newInfo,
 		}
 	}
-	p.mutex.Unlock()
-
-	p.channel <- p.fetch()
+	p.fetch()
 }
 
-func (p *PrometheusStorage) fetch() map[int]map[string]PrometheusInfo {
-	return p.prometheusData
+func (p *PrometheusStorage) fetch() {
+	for _, prometheusDatas := range p.prometheusData {
+		for _, pData := range prometheusDatas {
+			p.channel <- pData
+		}
+	}
 }
 
 func (p *PrometheusStorage) run() {
@@ -550,8 +555,8 @@ func (p *PrometheusStorage) run() {
 				delete(prometheusData, key)
 			}
 		}
+		p.fetch()
 		p.mutex.Unlock()
-		p.channel <- p.fetch()
 	}
 }
 
