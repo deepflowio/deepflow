@@ -70,7 +70,7 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 			} else {
 				podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(info.PodGroupID)
 				if !ok {
-					log.Error(p.metadata.LogPre(fmt.Sprintf("db pod_group type(id: %d) not found", info.PodGroupID)))
+					log.Error(p.metadata.Logf(fmt.Sprintf("db pod_group type(id: %d) not found", info.PodGroupID)))
 				}
 
 				opts = append(opts, []eventapi.TagFieldOption{
@@ -146,7 +146,7 @@ func (p *Process) ProduceByDelete(lcuuids []string) {
 		var name string
 		processInfo, exists := p.ToolDataSet.GetProcessInfoByLcuuid(lcuuid)
 		if !exists {
-			log.Error(p.metadata.LogPre("process info not fount, lcuuid: %s", lcuuid))
+			log.Error(p.metadata.Logf("process info not fount, lcuuid: %s", lcuuid))
 		} else {
 			id = processInfo.ID
 			name = processInfo.Name

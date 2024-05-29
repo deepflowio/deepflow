@@ -524,7 +524,7 @@ impl DnsLog {
             let mut is_unconcerned = false;
             if let Some(config) = param.parse_config {
                 is_unconcerned = config
-                    .unconcerned_dns_nx_domain_trie
+                    .unconcerned_dns_nxdomain_trie
                     .is_unconcerned(&info.answers);
             }
             if !is_unconcerned {

@@ -88,6 +88,14 @@ type Process struct {
 	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
+func (p Process) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p Process) GetSubDomainLcuuid() string {
+	return p.SubDomain
+}
+
 type Domain struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	OperatedTime `gorm:"embedded" mapstructure:",squash"`
@@ -134,6 +142,14 @@ type Region struct {
 	Latitude       float64 `gorm:"column:latitude;type:double(7,4);default:null" json:"LATITUDE" mapstructure:"LATITUDE"`
 }
 
+func (r Region) GetDomainLcuuid() string {
+	return ""
+}
+
+func (r Region) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type AZ struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -146,6 +162,14 @@ type AZ struct {
 
 func (AZ) TableName() string {
 	return "az"
+}
+
+func (a AZ) GetDomainLcuuid() string {
+	return a.Domain
+}
+
+func (a AZ) GetSubDomainLcuuid() string {
+	return ""
 }
 
 type Host struct {
@@ -175,6 +199,14 @@ func (Host) TableName() string {
 	return "host_device"
 }
 
+func (h Host) GetDomainLcuuid() string {
+	return h.Domain
+}
+
+func (h Host) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type VM struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -200,16 +232,20 @@ func (VM) TableName() string {
 	return "vm"
 }
 
+func (v VM) GetDomainLcuuid() string {
+	return v.Domain
+}
+
+func (v VM) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type VMPodNodeConnection struct {
 	Base      `gorm:"embedded" mapstructure:",squash"`
 	VMID      int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
 	PodNodeID int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	Domain    string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	SubDomain string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-}
-
-func (VMPodNodeConnection) TableName() string {
-	return "vm_pod_node_connection"
 }
 
 type VMSecurityGroup struct {
@@ -271,6 +307,14 @@ func (VPC) TableName() string {
 	return "epc"
 }
 
+func (v VPC) GetDomainLcuuid() string {
+	return v.Domain
+}
+
+func (v VPC) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type Network struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -296,6 +340,14 @@ type Network struct {
 
 func (Network) TableName() string {
 	return "vl2"
+}
+
+func (n Network) GetDomainLcuuid() string {
+	return n.Domain
+}
+
+func (n Network) GetSubDomainLcuuid() string {
+	return n.SubDomain
 }
 
 type Subnet struct {
@@ -332,6 +384,14 @@ func (VRouter) TableName() string {
 	return "vnet"
 }
 
+func (v VRouter) GetDomainLcuuid() string {
+	return v.Domain
+}
+
+func (v VRouter) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type RoutingTable struct {
 	Base        `gorm:"embedded" mapstructure:",squash"`
 	VRouterID   int    `gorm:"column:vnet_id;type:int;default:null" json:"VNET_ID" mapstructure:"VNET_ID"`
@@ -353,6 +413,14 @@ type DHCPPort struct {
 
 func (DHCPPort) TableName() string {
 	return "dhcp_port"
+}
+
+func (d DHCPPort) GetDomainLcuuid() string {
+	return d.Domain
+}
+
+func (d DHCPPort) GetSubDomainLcuuid() string {
+	return ""
 }
 
 type VInterface struct {
@@ -450,6 +518,14 @@ type SecurityGroup struct {
 	Topped         int    `gorm:"column:topped;type:int;default:0" json:"TOPPED" mapstructure:"TOPPED"`
 }
 
+func (s SecurityGroup) GetDomainLcuuid() string {
+	return s.Domain
+}
+
+func (s SecurityGroup) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type SecurityGroupRule struct {
 	Base            `gorm:"embedded" mapstructure:",squash"`
 	SecurityGroupID int    `gorm:"column:sg_id;type:int;not null" json:"SG_ID" mapstructure:"SG_ID"`
@@ -480,6 +556,14 @@ type NATGateway struct {
 
 func (NATGateway) TableName() string {
 	return "nat_gateway"
+}
+
+func (n NATGateway) GetDomainLcuuid() string {
+	return n.Domain
+}
+
+func (n NATGateway) GetSubDomainLcuuid() string {
+	return ""
 }
 
 type NATRule struct {
@@ -528,6 +612,14 @@ func (LB) TableName() string {
 	return "lb"
 }
 
+func (l LB) GetDomainLcuuid() string {
+	return l.Domain
+}
+
+func (l LB) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type LBListener struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -543,6 +635,14 @@ type LBListener struct {
 
 func (LBListener) TableName() string {
 	return "lb_listener"
+}
+
+func (l LBListener) GetDomainLcuuid() string {
+	return l.Domain
+}
+
+func (l LBListener) GetSubDomainLcuuid() string {
+	return ""
 }
 
 type LBTargetServer struct {
@@ -586,6 +686,14 @@ type PeerConnection struct {
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
+func (p PeerConnection) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PeerConnection) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type CEN struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -598,6 +706,14 @@ type CEN struct {
 
 func (CEN) TableName() string {
 	return "cen"
+}
+
+func (c CEN) GetDomainLcuuid() string {
+	return c.Domain
+}
+
+func (c CEN) GetSubDomainLcuuid() string {
+	return ""
 }
 
 type RDSInstance struct {
@@ -621,6 +737,14 @@ func (RDSInstance) TableName() string {
 	return "rds_instance"
 }
 
+func (r RDSInstance) GetDomainLcuuid() string {
+	return r.Domain
+}
+
+func (r RDSInstance) GetSubDomainLcuuid() string {
+	return ""
+}
+
 type RedisInstance struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -635,6 +759,14 @@ type RedisInstance struct {
 	InternalHost   string `gorm:"column:internal_host;type:varchar(128);default:''" json:"INTERNAL_HOST" mapstructure:"INTERNAL_HOST"`
 	PublicHost     string `gorm:"column:public_host;type:varchar(128);default:''" json:"PUBLIC_HOST" mapstructure:"PUBLIC_HOST"`
 	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
+}
+
+func (r RedisInstance) GetDomainLcuuid() string {
+	return r.Domain
+}
+
+func (r RedisInstance) GetSubDomainLcuuid() string {
+	return ""
 }
 
 type VIP struct {
@@ -661,6 +793,14 @@ type PodCluster struct {
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
+func (p PodCluster) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PodCluster) GetSubDomainLcuuid() string {
+	return p.SubDomain
+}
+
 type PodNamespace struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -672,6 +812,14 @@ type PodNamespace struct {
 	SubDomain      string            `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain         string            `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	CloudTags      map[string]string `gorm:"column:cloud_tags;type:text;default:'';serializer:json" json:"CLOUD_TAGS" mapstructure:"CLOUD_TAGS"`
+}
+
+func (p PodNamespace) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PodNamespace) GetSubDomainLcuuid() string {
+	return p.SubDomain
 }
 
 type PodNode struct {
@@ -694,6 +842,14 @@ type PodNode struct {
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
+func (p PodNode) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PodNode) GetSubDomainLcuuid() string {
+	return p.SubDomain
+}
+
 type PodIngress struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -705,6 +861,14 @@ type PodIngress struct {
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+}
+
+func (p PodIngress) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PodIngress) GetSubDomainLcuuid() string {
+	return p.SubDomain
 }
 
 type PodIngressRule struct {
@@ -748,6 +912,14 @@ type PodService struct {
 	Domain           string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
+func (p PodService) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PodService) GetSubDomainLcuuid() string {
+	return p.SubDomain
+}
+
 type PodServicePort struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
@@ -774,6 +946,14 @@ type PodGroup struct {
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+}
+
+func (p PodGroup) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PodGroup) GetSubDomainLcuuid() string {
+	return p.SubDomain
 }
 
 type PodGroupPort struct {
@@ -807,6 +987,14 @@ func (PodReplicaSet) TableName() string {
 	return "pod_rs"
 }
 
+func (p PodReplicaSet) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PodReplicaSet) GetSubDomainLcuuid() string {
+	return p.SubDomain
+}
+
 type PrometheusTarget struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
@@ -823,6 +1011,14 @@ type PrometheusTarget struct {
 
 func (PrometheusTarget) TableName() string {
 	return "prometheus_target"
+}
+
+func (p PrometheusTarget) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p PrometheusTarget) GetSubDomainLcuuid() string {
+	return p.SubDomain
 }
 
 type Pod struct {
@@ -846,4 +1042,12 @@ type Pod struct {
 	Region          string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain       string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain          string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+}
+
+func (p Pod) GetDomainLcuuid() string {
+	return p.Domain
+}
+
+func (p Pod) GetSubDomainLcuuid() string {
+	return p.SubDomain
 }

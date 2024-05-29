@@ -45,25 +45,25 @@ func (v *VM) DeleteBatch(lcuuids []string) ([]*mysql.VM, bool) {
 	var vmPodNodeConns []*mysql.VMPodNodeConnection
 	err := v.metadata.DB.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN vm On vm_pod_node_connection.vm_id = vm.id").Where("vm.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
 	if err != nil {
-		log.Error(v.metadata.LogPre("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err))
+		log.Error(v.metadata.Logf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err))
 		return nil, false
 	} else {
 		for _, con := range vmPodNodeConns {
 			err = v.metadata.DB.Delete(con).Error
 			if err != nil {
-				log.Error(v.metadata.LogPre("delete %s (info: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con, err))
+				log.Error(v.metadata.Logf("delete %s (info: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con, err))
 				continue
 			}
-			log.Info(v.metadata.LogPre("delete %s (info: %+v) success", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con))
+			log.Info(v.metadata.Logf("delete %s (info: %+v) success", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con))
 		}
 	}
 
 	var dbItems []*mysql.VM
 	err = v.metadata.DB.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
-		log.Error(v.metadata.LogPre("delete %s (lcuuids: %v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err))
+		log.Error(v.metadata.Logf("delete %s (lcuuids: %v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err))
 		return nil, false
 	}
-	log.Info(v.metadata.LogPre("delete %s (lcuuids: %v) success", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids))
+	log.Info(v.metadata.Logf("delete %s (lcuuids: %v) success", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids))
 	return dbItems, true
 }

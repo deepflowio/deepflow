@@ -17,8 +17,8 @@
 package common
 
 const (
-	DATABASE_SUFFIX           = "_deepflow"
-	DATABASE_PREFIX_ALIGNMENT = "%04d"
+	NONE_DEFAULT_ORG_DATABASE_SUFFIX = "_deepflow"
+	DATABASE_PREFIX_ALIGNMENT        = "%04d"
 )
 
 const (

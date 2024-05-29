@@ -37,9 +37,13 @@ func NewORG(id int) (*ORG, error) {
 	}, err
 }
 
-// LogPre adds org id, domain info, sub_domain info to logs
-func (o *ORG) LogPre(format string, a ...any) string {
+// Logf adds org id, domain info, sub_domain info to logs
+func (o *ORG) Logf(format string, a ...any) string {
 	return o.Logger.AddPre(format, a...)
+}
+
+func (o *ORG) Log(format string) string {
+	return o.Logger.AddPre(format)
 }
 
 func FmtORGID(id int) string {
