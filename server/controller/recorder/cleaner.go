@@ -496,7 +496,7 @@ func (t *toolData) load(db *mysql.DB) error {
 	domainLcuuidToID := make(map[string]int)
 	for _, domain := range domains {
 		domainLcuuidToID[domain.Lcuuid] = domain.ID
-		t.domainLcuuidToMsgMetadata[domain.Lcuuid] = message.NewMetadata(db.ORGID, domain.TeamID, domain.ID, 0)
+		t.domainLcuuidToMsgMetadata[domain.Lcuuid] = message.NewMetadata(db.ORGID, domain.TeamID, domain.ID)
 	}
 	var subDomains []*mysql.SubDomain
 	if err := db.Find(&subDomains).Error; err != nil {
@@ -504,7 +504,7 @@ func (t *toolData) load(db *mysql.DB) error {
 		return err
 	}
 	for _, subDomain := range subDomains {
-		t.subDomainLcuuidToMsgMetadata[subDomain.Lcuuid] = message.NewMetadata(db.ORGID, subDomain.TeamID, domainLcuuidToID[subDomain.Domain], subDomain.ID)
+		t.subDomainLcuuidToMsgMetadata[subDomain.Lcuuid] = message.NewMetadata(db.ORGID, subDomain.TeamID, domainLcuuidToID[subDomain.Domain], message.MetadataSubDomainID(subDomain.ID))
 	}
 	return nil
 }
