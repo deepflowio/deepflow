@@ -387,7 +387,7 @@ type FlowInfo struct {
 	TapPortType  uint8  `json:"capture_nic_type" category:"$tag" sub:"capture_info" enumfile:"capture_nic_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
 	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
 	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
-	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
+	VtapID       uint32 `json:"agent_id" category:"$tag" sub:"capture_info"`
 	L2End0       bool   `json:"l2_end_0" category:"$tag" sub:"capture_info"`
 	L2End1       bool   `json:"l2_end_1" category:"$tag" sub:"capture_info"`
 	L3End0       bool   `json:"l3_end_0" category:"$tag" sub:"capture_info"`
@@ -723,7 +723,7 @@ func (k *KnowledgeGraph) fill(
 	ip60, ip61 net.IP,
 	mac0, mac1 uint64,
 	gpID0, gpID1 uint32,
-	vtapId uint16, podId0, podId1 uint32,
+	vtapId uint32, podId0, podId1 uint32,
 	port uint16,
 	tapSide uint32,
 	protocol layers.IPProtocol) {
@@ -868,7 +868,7 @@ func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.Plat
 		f.FlowKey.Ip6Src, f.FlowKey.Ip6Dst,
 		f.FlowKey.MacSrc, f.FlowKey.MacDst,
 		f.MetricsPeerSrc.Gpid, f.MetricsPeerDst.Gpid,
-		uint16(f.FlowKey.VtapId), 0, 0,
+		f.FlowKey.VtapId, 0, 0,
 		uint16(f.FlowKey.PortDst),
 		f.TapSide,
 		layers.IPProtocol(f.FlowKey.Proto))
@@ -897,7 +897,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.TapPort, i.TapPortType, natSource, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
 	i.NatSource = uint8(natSource)
 	i.TapSide = flow_metrics.TAPSideEnum(f.TapSide).String()
-	i.VtapID = uint16(f.FlowKey.VtapId)
+	i.VtapID = f.FlowKey.VtapId
 
 	i.L2End0 = f.MetricsPeerSrc.IsL2End == 1
 	i.L2End1 = f.MetricsPeerDst.IsL2End == 1

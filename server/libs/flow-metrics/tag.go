@@ -306,7 +306,7 @@ type Field struct {
 	Role       uint8             `json:"role" category:"$tag" sub:"capture_info" enumfile:"role" datasource:"n|a"`
 	Protocol   layers.IPProtocol `json:"protocol" category:"$tag" sub:"network_layer" enumfile:"protocol"`
 	ServerPort uint16            `json:"server_port" category:"$tag" sub:"transport_layer"`
-	VTAPID     uint16            `json:"agent_id" category:"$tag" sub:"capture_info"`
+	VTAPID     uint32            `json:"agent_id" category:"$tag" sub:"capture_info"`
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'flow_metrics', otherwise stored in '<OrgId>_flow_metrics'.
 	OrgId   uint16 `json:"org_id" category:"$tag"`
@@ -1375,7 +1375,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.Protocol = layers.IPProtocol(p.Field.Protocol)
 	t.ACLGID = uint16(p.Field.AclGid)
 	t.ServerPort = uint16(p.Field.ServerPort)
-	t.VTAPID = uint16(p.Field.VtapId)
+	t.VTAPID = p.Field.VtapId
 	t.TAPPort = datatype.TapPort(p.Field.TapPort)
 	t.TapPort, t.TapPortType, t.NatSource, t.TunnelType = t.TAPPort.SplitToPortTypeTunnel()
 	t.TAPType = TAPTypeEnum(p.Field.TapType)

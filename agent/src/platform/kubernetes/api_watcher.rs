@@ -647,7 +647,7 @@ impl ApiWatcher {
             KubernetesApiSyncRequest {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
-                vtap_id: Some(config_guard.vtap_id as u32),
+                vtap_id: Some(config_guard.vtap_id),
                 source_ip: Some(id.ip.to_string()),
                 team_id: Some(id.team_id.clone()),
                 error_msg: Some(
@@ -784,7 +784,7 @@ impl ApiWatcher {
                         KubernetesApiSyncRequest {
                             cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                             version: Some(context.version.load(Ordering::SeqCst)),
-                            vtap_id: Some(config_guard.vtap_id as u32),
+                            vtap_id: Some(config_guard.vtap_id),
                             source_ip: Some(id.ip.to_string()),
                             team_id: Some(id.team_id.clone()),
                             error_msg: Some(e.to_string()),

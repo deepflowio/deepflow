@@ -251,7 +251,7 @@ impl Synchronizer {
                         version: Some(args.version),
                         trident_type: Some(config.trident_type as i32),
                         source_ip: Some(ctrl_ip.clone()),
-                        vtap_id: Some(config.vtap_id as u32),
+                        vtap_id: Some(config.vtap_id),
                         kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
                         team_id: Some(team_id.clone()),
                         ..Default::default()
@@ -262,7 +262,7 @@ impl Synchronizer {
                         version: Some(args.version),
                         trident_type: Some(config.trident_type as i32),
                         source_ip: Some(ctrl_ip.clone()),
-                        vtap_id: Some(config.vtap_id as u32),
+                        vtap_id: Some(config.vtap_id),
                         kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
                         team_id: Some(team_id.clone()),
                         ..querier.generate_message(&config)

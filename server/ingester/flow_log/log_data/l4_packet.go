@@ -31,7 +31,7 @@ type L4Packet struct {
 	StartTime int64
 	EndTime   int64
 	FlowID    uint64
-	VtapID    uint16
+	VtapID    uint32
 
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database 'flow_log', otherwise stored in '<OrgId>_flow_log'.
@@ -96,7 +96,7 @@ func ReleaseL4Packet(l *L4Packet) {
 	poolL4Packet.Put(l)
 }
 
-func DecodePacketSequence(vtapID, orgId, teamId uint16, decoder *codec.SimpleDecoder) (*L4Packet, error) {
+func DecodePacketSequence(vtapID uint32, orgId, teamId uint16, decoder *codec.SimpleDecoder) (*L4Packet, error) {
 	l4Packet := AcquireL4Packet()
 	l4Packet.VtapID = vtapID
 	blockSize := decoder.ReadU32()

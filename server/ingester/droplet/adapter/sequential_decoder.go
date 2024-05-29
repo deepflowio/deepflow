@@ -362,7 +362,7 @@ func (d *SequentialDecoder) decodeL4(meta *MetaPacket) {
 	d.decodePacket(meta)
 }
 
-func (d *SequentialDecoder) DecodeHeader(frameSize uint16) (bool, uint16) {
+func (d *SequentialDecoder) DecodeHeader(frameSize uint16) (bool, uint32) {
 	if frameSize <= COMPRESS_HEADER_SIZE {
 		return true, 0
 	}
@@ -371,7 +371,7 @@ func (d *SequentialDecoder) DecodeHeader(frameSize uint16) (bool, uint16) {
 	if version != _VERSION {
 		return true, 0
 	}
-	vtapId := d.U16()
+	vtapId := d.U32()
 	d.seq = d.U64()
 	indexAndTimestamp := d.U64()
 	index := uint8(indexAndTimestamp >> 56)

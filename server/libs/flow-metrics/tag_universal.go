@@ -49,7 +49,7 @@ type UniversalTag struct {
 	AutoInstanceType uint8
 	AutoServiceType  uint8
 
-	VTAPID uint16
+	VTAPID uint32
 	//SignalSource uint16
 }
 

@@ -1266,7 +1266,7 @@ pub struct RuntimeConfig {
     #[serde(skip)]
     pub epc_id: u32,
     #[serde(skip)]
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     #[serde(skip)]
     pub team_id: u32,
     #[serde(skip)]
@@ -1597,7 +1597,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             proxy_controller_ip: conf.proxy_controller_ip().to_owned(),
             proxy_controller_port: conf.proxy_controller_port() as u16,
             epc_id: conf.epc_id(),
-            vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
+            vtap_id: (conf.vtap_id() & 0xFFFFFFFF),
             team_id: conf.team_id(),
             organize_id: conf.organize_id(),
             collector_socket_type: conf.collector_socket_type(),

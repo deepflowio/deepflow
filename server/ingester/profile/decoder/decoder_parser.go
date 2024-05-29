@@ -40,7 +40,7 @@ const (
 
 type Parser struct {
 	profileName   string
-	vtapID        uint16
+	vtapID        uint32
 	orgId, teamId uint16
 	IP            net.IP
 	podID         uint32

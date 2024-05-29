@@ -229,7 +229,7 @@ impl SocketSynchronizer {
                         ctrl_ip: Some(ctrl_ip),
                         ctrl_mac: Some(ctrl_mac),
                         team_id: Some(team_id),
-                        vtap_id: Some(conf_guard.vtap_id as u32),
+                        vtap_id: Some(conf_guard.vtap_id),
                         entries: sock_entries
                             .into_iter()
                             .filter_map(|sock| {

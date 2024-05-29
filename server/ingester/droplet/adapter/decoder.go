@@ -45,7 +45,7 @@ type decoder struct {
 	cacheSize uint64
 
 	instancesLock sync.Mutex // 仅用于droplet-ctl打印trident信息
-	instances     [math.MaxUint16 + 1]*tridentInstance
+	instances     [math.MaxUint32 + 1]*tridentInstance
 }
 
 func (r *decoder) GetStatsCounter() *PacketCounter {
@@ -85,7 +85,7 @@ func (r *decoder) deleteInstance(ip net.IP) {
 	r.instancesLock.Unlock()
 }
 
-func (r *decoder) addInstance(vtapId uint16, instance *tridentInstance) {
+func (r *decoder) addInstance(vtapId uint32, instance *tridentInstance) {
 	instance.inTable = true
 	r.instancesLock.Lock()
 	r.instances[vtapId] = instance

@@ -112,7 +112,7 @@ pub struct FlowMapRuntimeConfig {
 
 #[derive(Clone)]
 pub struct FlowMapConfig {
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub trident_type: TridentType,
     pub cloud_gateway_traffic: bool,
     pub collector_enabled: bool,

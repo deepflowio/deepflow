@@ -86,7 +86,7 @@ struct Header {
     version: u32, // 用来校验encode和decode是否配套
     team_id: u32,
     organize_id: u32,
-    vtap_id: u16, // roze用来上报server活跃的VTAP信息
+    vtap_id: u32, // roze用来上报server活跃的VTAP信息
 }
 
 impl Header {
@@ -110,7 +110,7 @@ struct Encoder<T> {
 
 impl<T: Sendable> Encoder<T> {
     const BUFFER_LEN: usize = 8192;
-    pub fn new(id: usize, msg_type: SendMessageType, vtap_id: u16) -> Self {
+    pub fn new(id: usize, msg_type: SendMessageType, vtap_id: u32) -> Self {
         Self {
             id,
             buffer: Vec::with_capacity(Self::BUFFER_LEN),

@@ -36,7 +36,7 @@ type ExtMetrics struct {
 
 	VTableName string
 
-	AgentID uint16
+	AgentID uint32
 
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database '<DatabaseName()>', otherwise stored in '<OrgId>_<DatabaseName()>'.

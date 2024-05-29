@@ -143,7 +143,7 @@ pub struct CollectorConfig {
     pub l4_log_ignore_tap_sides: [bool; TapSide::MAX as usize + 1],
     pub l7_metrics_enabled: bool,
     pub trident_type: TridentType,
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub cloud_gateway_traffic: bool,
     pub packet_delay: Duration,
 }
@@ -213,7 +213,7 @@ pub struct EnvironmentConfig {
 pub struct SenderConfig {
     pub mtu: u32,
     pub dest_ip: String,
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub team_id: u32,
     pub organize_id: u32,
     pub dest_port: u16,
@@ -287,7 +287,7 @@ pub struct PlatformConfig {
     pub prometheus_http_api_addresses: Vec<String>,
     pub libvirt_xml_path: PathBuf,
     pub kubernetes_poller_type: KubernetesPollerType,
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub enabled: bool,
     pub trident_type: TridentType,
     pub epc_id: u32,
@@ -318,7 +318,7 @@ pub struct DispatcherConfig {
     pub l7_log_packet_size: u32,
     pub tunnel_type_bitmap: TunnelTypeBitmap,
     pub trident_type: TridentType,
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub capture_socket_type: CaptureSocketType,
     #[cfg(target_os = "linux")]
     pub extra_netns_regex: String,
@@ -420,7 +420,7 @@ impl PluginConfig {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct FlowConfig {
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub trident_type: TridentType,
     pub cloud_gateway_traffic: bool,
     pub collector_enabled: bool,
@@ -470,7 +470,7 @@ impl From<&RuntimeConfig> for FlowConfig {
     fn from(conf: &RuntimeConfig) -> Self {
         let flow_config = &conf.yaml_config.flow;
         FlowConfig {
-            vtap_id: conf.vtap_id as u16,
+            vtap_id: conf.vtap_id,
             trident_type: conf.trident_type,
             cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
             collector_enabled: conf.collector_enabled,
@@ -931,7 +931,7 @@ impl fmt::Debug for LogParserConfig {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DebugConfig {
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub enabled: bool,
     pub controller_ips: Vec<IpAddr>,
     pub controller_port: u16,
@@ -967,7 +967,7 @@ pub struct EbpfConfig {
     // 动态配置
     pub collector_enabled: bool,
     pub l7_metrics_enabled: bool,
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub epc_id: u32,
     pub l7_log_packet_size: usize,
     // 静态配置
@@ -1458,7 +1458,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
                 trident_type: conf.trident_type,
-                vtap_id: conf.vtap_id as u16,
+                vtap_id: conf.vtap_id,
                 capture_socket_type: conf.capture_socket_type,
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.extra_netns_regex.to_string(),
@@ -1484,7 +1484,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             sender: SenderConfig {
                 mtu: conf.mtu,
                 dest_ip: dest_ip.clone(),
-                vtap_id: conf.vtap_id as u16,
+                vtap_id: conf.vtap_id,
                 team_id: conf.team_id,
                 organize_id: conf.organize_id,
                 dest_port: conf.analyzer_port,
@@ -1523,7 +1523,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold,
                 l7_metrics_enabled: conf.l7_metrics_enabled,
                 trident_type: conf.trident_type,
-                vtap_id: conf.vtap_id as u16,
+                vtap_id: conf.vtap_id,
                 l4_log_store_tap_types: {
                     let mut tap_types = [false; 256];
                     for &t in conf.l4_log_store_tap_types.iter() {
@@ -1556,7 +1556,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 kubernetes_cluster_id: static_config.kubernetes_cluster_id.clone(),
                 libvirt_xml_path: conf.libvirt_xml_path.parse().unwrap_or_default(),
                 kubernetes_poller_type: conf.yaml_config.kubernetes_poller_type,
-                vtap_id: conf.vtap_id as u16,
+                vtap_id: conf.vtap_id,
                 enabled: conf.platform_enabled,
                 trident_type: conf.trident_type,
                 epc_id: conf.epc_id,
@@ -1684,7 +1684,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 ),
             },
             debug: DebugConfig {
-                vtap_id: conf.vtap_id as u16,
+                vtap_id: conf.vtap_id,
                 enabled: conf.debug_enabled,
                 controller_ips: static_config
                     .controller_ips
@@ -1715,7 +1715,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             ebpf: EbpfConfig {
                 collector_enabled: conf.collector_enabled,
                 l7_metrics_enabled: conf.l7_metrics_enabled,
-                vtap_id: conf.vtap_id as u16,
+                vtap_id: conf.vtap_id,
                 epc_id: conf.epc_id,
                 l7_log_session_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
                 l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size as usize),

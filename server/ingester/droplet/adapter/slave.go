@@ -48,7 +48,7 @@ func (s *slave) prepareItem(count, index uint8) {
 	}
 }
 
-func (s *slave) decode(hash uint8, vtapId uint16, decoder *SequentialDecoder) {
+func (s *slave) decode(hash uint8, vtapId uint32, decoder *SequentialDecoder) {
 	tapType, tapPort, index := decoder.tapType, decoder.tapPort, decoder.tridentDispatcherIndex
 
 	i := uint8(0) // 使用a.block.Count, 因为i一定为0，直接赋值0

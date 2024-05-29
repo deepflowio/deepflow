@@ -86,7 +86,8 @@ type Decoder struct {
 	cfg           *config.Config
 	debugEnabled  bool
 
-	agentId, orgId, teamId uint16
+	agentId       uint32
+	orgId, teamId uint16
 
 	fieldsBuf      []interface{}
 	fieldValuesBuf []interface{}

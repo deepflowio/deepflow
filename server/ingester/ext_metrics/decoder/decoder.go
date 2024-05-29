@@ -67,7 +67,7 @@ type Decoder struct {
 	// universal tag cache
 	podNameToUniversalTag    map[string]*flow_metrics.UniversalTag
 	instanceIPToUniversalTag map[string]*flow_metrics.UniversalTag
-	vtapIDToUniversalTag     map[uint16]*flow_metrics.UniversalTag
+	vtapIDToUniversalTag     map[uint32]*flow_metrics.UniversalTag
 	platformDataVersion      uint64
 
 	orgId, teamId uint16
@@ -93,7 +93,7 @@ func NewDecoder(
 		config:                   config,
 		podNameToUniversalTag:    make(map[string]*flow_metrics.UniversalTag),
 		instanceIPToUniversalTag: make(map[string]*flow_metrics.UniversalTag),
-		vtapIDToUniversalTag:     make(map[uint16]*flow_metrics.UniversalTag),
+		vtapIDToUniversalTag:     make(map[uint32]*flow_metrics.UniversalTag),
 		counter:                  &Counter{},
 	}
 }
@@ -136,7 +136,7 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) handleTelegraf(vtapID uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleTelegraf(vtapID uint32, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {
@@ -160,7 +160,7 @@ func (d *Decoder) handleTelegraf(vtapID uint16, decoder *codec.SimpleDecoder) {
 	}
 }
 
-func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
+func (d *Decoder) sendTelegraf(vtapID uint32, point models.Point) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv telegraf point: %v", d.index, vtapID, point)
 	}
@@ -176,7 +176,7 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 	d.counter.OutCount++
 }
 
-func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleDeepflowStats(vtapID uint32, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		pbStats := &pb.Stats{}
 		bytes := decoder.ReadBytes()
@@ -203,7 +203,7 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 	}
 }
 
-func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
+func (d *Decoder) StatsToExtMetrics(vtapID uint32, s *pb.Stats) *dbwriter.ExtMetrics {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(s.Timestamp)
 	m.UniversalTag.VTAPID = vtapID
@@ -227,7 +227,7 @@ func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMet
 	return m
 }
 
-func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName string, fillWithVtapId bool) {
+func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint32, podName string, fillWithVtapId bool) {
 	var universalTag *flow_metrics.UniversalTag
 
 	// fast path
@@ -240,7 +240,7 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 		d.platformDataVersion = platformDataVersion
 		d.podNameToUniversalTag = make(map[string]*flow_metrics.UniversalTag)
 		d.instanceIPToUniversalTag = make(map[string]*flow_metrics.UniversalTag)
-		d.vtapIDToUniversalTag = make(map[uint16]*flow_metrics.UniversalTag)
+		d.vtapIDToUniversalTag = make(map[uint32]*flow_metrics.UniversalTag)
 	} else {
 		if podName != "" {
 			universalTag, _ = d.podNameToUniversalTag[podName]
@@ -266,7 +266,7 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	}
 }
 
-func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, podName string, fillWithVtapId bool) {
+func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint32, podName string, fillWithVtapId bool) {
 	t := &m.UniversalTag
 	t.VTAPID = vtapID
 	t.L3EpcID = datatype.EPC_FROM_INTERNET
@@ -332,7 +332,7 @@ func (d *Decoder) fillExtMetricsBaseSlow(m *dbwriter.ExtMetrics, vtapID uint16, 
 	}
 }
 
-func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwriter.ExtMetrics, error) {
+func (d *Decoder) PointToExtMetrics(vtapID uint32, point models.Point) (*dbwriter.ExtMetrics, error) {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(point.Time().Unix())
 	m.MsgType = datatype.MESSAGE_TYPE_TELEGRAF

@@ -161,7 +161,7 @@ pub struct AppProtoLogsBaseInfo {
     #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
     pub signal_source: SignalSource,
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub tap_type: TapType,
     pub tap_side: TapSide,
     pub biz_type: u8,
@@ -279,7 +279,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             end_time: f.end_time.as_nanos() as u64,
             flow_id: f.flow_id,
             tap_port: f.tap_port.0,
-            vtap_id: f.vtap_id as u32,
+            vtap_id: f.vtap_id,
             tap_type: u16::from(f.tap_type) as u32,
             is_ipv6: f.ip_src.is_ipv6() as u32,
             tap_side: f.tap_side as u32,

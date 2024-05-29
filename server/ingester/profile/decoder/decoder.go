@@ -160,7 +160,7 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleProfileData(vtapID uint32, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		profile := &pb.Profile{}
 		decoder.ReadPB(profile)

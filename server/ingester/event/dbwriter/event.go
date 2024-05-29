@@ -80,7 +80,7 @@ type EventStore struct {
 	L3DeviceType uint8  `json:"l3_device_type" category:"$tag" sub:"universal_tag"`
 	L3DeviceID   uint32 `json:"l3_device_id" category:"$tag" sub:"universal_tag"`
 	ServiceID    uint32 `json:"service_id" category:"$tag" sub:"universal_tag"`
-	VTAPID       uint16 `json:"agent_id" category:"$tag" sub:"universal_tag"`
+	VTAPID       uint32 `json:"agent_id" category:"$tag" sub:"universal_tag"`
 	SubnetID     uint16 `json:"subnet_id" category:"$tag" sub:"universal_tag"`
 	IsIPv4       bool   `json:"is_ipv4" category:"$tag" sub:"network_layer"`
 	IP4          uint32 `json:"ip4" category:"$tag" sub:"network_layer" to_string:"IPv4String"`

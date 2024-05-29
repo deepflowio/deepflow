@@ -183,7 +183,7 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) handleAgentLog(agentId uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleAgentLog(agentId uint32, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {
@@ -205,7 +205,7 @@ func (d *Decoder) handleAgentLog(agentId uint16, decoder *codec.SimpleDecoder) {
 	}
 }
 
-func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
+func (d *Decoder) WriteAgentLog(agentId uint32, bs []byte) error {
 	s := dbwriter.AcquireApplicationLogStore()
 
 	log.Debugf("recv agentId: %d, syslog %s", agentId, bs)
@@ -255,7 +255,7 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 	return nil
 }
 
-func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
+func (d *Decoder) WriteAppLog(agentId uint32, l *AppLogEntry) error {
 	s := dbwriter.AcquireApplicationLogStore()
 	timeObj, err := time.Parse(time.RFC3339, l.Timestamp)
 	if err != nil {
@@ -417,7 +417,7 @@ type AppLogEntry struct {
 	AppService string      `json:"app_service"`
 }
 
-func (d *Decoder) handleAppLog(agentId uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleAppLog(agentId uint32, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {

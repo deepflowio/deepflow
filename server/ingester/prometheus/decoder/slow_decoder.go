@@ -48,7 +48,7 @@ type SlowCounter struct {
 }
 
 type SlowItem struct {
-	vtapId       uint16
+	vtapId       uint32
 	epcId        uint16
 	podClusterId uint16
 	orgId        uint16
@@ -60,7 +60,7 @@ var slowItemPool = pool.NewLockFreePool(func() interface{} {
 	return &SlowItem{}
 })
 
-func AcquireSlowItem(vtapId, epcId, podClusterId, orgId, teamId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
+func AcquireSlowItem(vtapId uint32, epcId, podClusterId, orgId, teamId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
 	s := slowItemPool.Get().(*SlowItem)
 	s.vtapId = vtapId
 	s.epcId = epcId
@@ -269,7 +269,7 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, epcId, p
 	return labelReq
 }
 
-func (d *SlowDecoder) sendPrometheusSamples(vtapID, epcId, podClusterId, orgId, teamId uint16, ts *prompb.TimeSeries) {
+func (d *SlowDecoder) sendPrometheusSamples(vtapID uint32, epcId, podClusterId, orgId, teamId uint16, ts *prompb.TimeSeries) {
 	if d.debugEnabled {
 		log.Debugf("slow decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}

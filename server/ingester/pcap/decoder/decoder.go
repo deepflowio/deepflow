@@ -143,7 +143,7 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) handlePcap(vtapID uint16, decoder *codec.SimpleDecoder, encoder *codec.SimpleEncoder, pcapHeader *PcapHeader, pcapBatch *trident.PcapBatch) {
+func (d *Decoder) handlePcap(vtapID uint32, decoder *codec.SimpleDecoder, encoder *codec.SimpleEncoder, pcapHeader *PcapHeader, pcapBatch *trident.PcapBatch) {
 	var err error
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
@@ -166,7 +166,7 @@ func (d *Decoder) handlePcap(vtapID uint16, decoder *codec.SimpleDecoder, encode
 	}
 }
 
-func (d *Decoder) pcapToStore(vtapID uint16, pcapHeader []byte, pcap *trident.Pcap) *dbwriter.PcapStore {
+func (d *Decoder) pcapToStore(vtapID uint32, pcapHeader []byte, pcap *trident.Pcap) *dbwriter.PcapStore {
 	s := dbwriter.AcquirePcapStore()
 	s.Time = uint32(time.Duration(pcap.GetEndTime()) / time.Second)
 	s.StartTime = int64(pcap.GetStartTime() / uint64(time.Microsecond))

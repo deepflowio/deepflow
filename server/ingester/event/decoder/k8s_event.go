@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
-func (d *Decoder) WriteK8sEvent(vtapId uint16, e *pb.KubernetesEvent) {
+func (d *Decoder) WriteK8sEvent(vtapId uint32, e *pb.KubernetesEvent) {
 	s := dbwriter.AcquireEventStore()
 	s.HasMetrics = false
 	s.Time = uint32(time.Duration(e.FirstTimestamp) / time.Millisecond) // us -> s
@@ -118,7 +118,7 @@ func (d *Decoder) WriteK8sEvent(vtapId uint16, e *pb.KubernetesEvent) {
 	d.eventWriter.Write(s)
 }
 
-func (d *Decoder) handleK8sEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleK8sEvent(vtapId uint32, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {

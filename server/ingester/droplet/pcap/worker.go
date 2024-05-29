@@ -27,7 +27,7 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/libs/datatype"
-	"github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
@@ -47,7 +47,7 @@ func getWriterIpv6Key(ip net.IP, aclGID uint16, tapType flow_metrics.TAPTypeEnum
 	return WriterKey((uint64(ipHash) << 32) | (uint64(aclGID) << 16) | uint64(tapType))
 }
 
-func getWriterKey(tapPort uint32, vtapId, aclGID uint16) WriterKey {
+func getWriterKey(tapPort, vtapId uint32, aclGID uint16) WriterKey {
 	return WriterKey((uint64(tapPort) << 32) | (uint64(aclGID) << 16) | uint64(aclGID))
 }
 
@@ -60,7 +60,7 @@ type WrappedWriter struct {
 
 	tapPort uint32
 	aclGID  uint16
-	vtapId  uint16
+	vtapId  uint32
 	tapType flow_metrics.TAPTypeEnum
 }
 
@@ -133,7 +133,7 @@ func formatDuration(d time.Duration) string {
 	return time.Unix(0, int64(d)).Format(TIME_FORMAT)
 }
 
-func getTempFilename(tapType flow_metrics.TAPTypeEnum, tapPort uint32, firstPacketTime time.Duration, index uint16) string {
+func getTempFilename(tapType flow_metrics.TAPTypeEnum, tapPort uint32, firstPacketTime time.Duration, index uint32) string {
 	return fmt.Sprintf("%s_%s_0_%s_.%d.pcap.temp", tapTypeToString(tapType), tapPortToMacString(tapPort), formatDuration(firstPacketTime), index)
 }
 

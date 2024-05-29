@@ -34,7 +34,7 @@ type PcapStore struct {
 	StartTime   int64
 	EndTime     int64
 	FlowID      uint64
-	VtapID      uint16
+	VtapID      uint32
 	PacketCount uint32
 	PacketBatch []byte
 	AclGids     []uint16

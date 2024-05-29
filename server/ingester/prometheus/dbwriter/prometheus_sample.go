@@ -55,7 +55,7 @@ type PrometheusSample struct {
 
 type PrometheusSampleMini struct {
 	Timestamp uint32 // s
-	VtapId    uint16
+	VtapId    uint32
 	MetricID  uint32
 	TargetID  uint32
 

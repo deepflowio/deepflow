@@ -108,7 +108,7 @@ impl Default for CloseType {
 
 #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub struct FlowKey {
-    pub vtap_id: u16,
+    pub vtap_id: u32,
     pub tap_type: TapType,
     #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
@@ -183,7 +183,7 @@ impl From<FlowKey> for flow_log::FlowKey {
             _ => panic!("FlowKey({:?}) ip_src,ip_dst type mismatch", &f),
         };
         flow_log::FlowKey {
-            vtap_id: f.vtap_id as u32,
+            vtap_id: f.vtap_id,
             tap_type: u16::from(f.tap_type) as u32,
             tap_port: f.tap_port.0,
             mac_src: f.mac_src.into(),

@@ -69,7 +69,7 @@ type FlowTagInfo struct {
 	Table      string // Represents virtual_table_name in ext_metrics
 	FieldName  string
 	FieldValue string
-	VtapId     uint16
+	VtapId     uint32
 
 	// IDs only for prometheus
 	TableId      uint32

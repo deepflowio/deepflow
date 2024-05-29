@@ -172,7 +172,7 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
+func (d *Decoder) WritePerfEvent(vtapId uint32, e *pb.ProcEvent) {
 	s := dbwriter.AcquireEventStore()
 	s.HasMetrics = true
 	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
@@ -270,7 +270,7 @@ func (d *Decoder) export(item exporterscommon.ExportItem) {
 	d.exporters.Put(d.eventType.DataSource(), d.index, item)
 }
 
-func (d *Decoder) handlePerfEvent(vtapId uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handlePerfEvent(vtapId uint32, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {

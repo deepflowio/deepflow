@@ -67,7 +67,7 @@ type L7Base struct {
 	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
 	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
 	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
-	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
+	VtapID       uint32 `json:"agent_id" category:"$tag" sub:"capture_info"`
 	ReqTcpSeq    uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
 	RespTcpSeq   uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
 	StartTime    int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
@@ -584,7 +584,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	}
 	b.TunnelType = uint8(tunnelType)
 	b.TapSide = flow_metrics.TAPSideEnum(l.TapSide).String()
-	b.VtapID = uint16(l.VtapId)
+	b.VtapID = l.VtapId
 	b.ReqTcpSeq = l.ReqTcpSeq
 	b.RespTcpSeq = l.RespTcpSeq
 	b.StartTime = int64(l.StartTime) / int64(time.Microsecond)
@@ -622,7 +622,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,
 		l.Gpid_0, l.Gpid_1,
-		uint16(l.VtapId), l.PodId_0, l.PodId_1,
+		l.VtapId, l.PodId_0, l.PodId_1,
 		uint16(l.PortDst),
 		l.TapSide,
 		protocol,

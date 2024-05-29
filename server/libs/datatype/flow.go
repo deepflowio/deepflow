@@ -226,7 +226,7 @@ const (
 )
 
 type FlowKey struct {
-	VtapId  uint16
+	VtapId  uint32
 	TapType TapType
 	TapPort TapPort // 采集端口信息类型 + 采集端口信息
 	/* L2 */
@@ -343,7 +343,7 @@ func (_ *FlowKey) SequentialMerge(_ *FlowKey) {
 }
 
 func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
-	p.VtapId = uint32(f.VtapId)
+	p.VtapId = f.VtapId
 	p.TapType = uint32(f.TapType)
 	p.TapPort = uint64(f.TapPort)
 	p.MacSrc = uint64(f.MACSrc)

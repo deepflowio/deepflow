@@ -66,7 +66,7 @@ type RecvBuffer struct {
 	End        int
 	Buffer     []byte
 	IP         net.IP // 保存消息的发送方IP
-	VtapID     uint16
+	VtapID     uint32
 	TeamID     uint32
 	OrgID      uint32
 	SocketType ServerType
@@ -174,7 +174,7 @@ func (s ServerType) String() string {
 
 type Status struct {
 	msgType              datatype.MessageType
-	VTAPID               uint16
+	VTAPID               uint32
 	serverType           ServerType
 	ip                   net.IP
 	lastSeq              uint64
@@ -185,7 +185,7 @@ type Status struct {
 	firstLocalTimestamp  uint32 // 第一次收到数据时的本地时间
 }
 
-func NewStatus(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) *Status {
+func NewStatus(now uint32, msgType datatype.MessageType, vtapID uint32, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) *Status {
 	return &Status{
 		msgType:              msgType,
 		serverType:           serverType,
@@ -200,7 +200,7 @@ func NewStatus(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.I
 	}
 }
 
-func (s *Status) update(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+func (s *Status) update(now uint32, msgType datatype.MessageType, vtapID uint32, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
 	s.msgType = msgType
 	s.VTAPID = vtapID
 	s.ip = ip
@@ -217,22 +217,22 @@ type AdapterStatus struct {
 	TCPMetrisStatus []*Status
 	UDPStatusLocks  [datatype.MESSAGE_TYPE_MAX]sync.Mutex
 	TCPStatusLocks  [datatype.MESSAGE_TYPE_MAX]sync.RWMutex
-	UDPStatusFlow   [datatype.MESSAGE_TYPE_MAX]map[uint16]*Status
-	TCPStatusFlow   [datatype.MESSAGE_TYPE_MAX]map[uint16]*Status // vtapID非0, 使用vtapID作为key: 遥测数据，l4流日志数据，l7-http-dns流日志数据
+	UDPStatusFlow   [datatype.MESSAGE_TYPE_MAX]map[uint32]*Status
+	TCPStatusFlow   [datatype.MESSAGE_TYPE_MAX]map[uint32]*Status // vtapID非0, 使用vtapID作为key: 遥测数据，l4流日志数据，l7-http-dns流日志数据
 	UDPStatusOthers [datatype.MESSAGE_TYPE_MAX]map[string]*Status
 	TCPStatusOthers [datatype.MESSAGE_TYPE_MAX]map[string]*Status // vtapID为0, 使用IP作为key: pcap数据，系统日志数据，statd统计数据
 }
 
 func (s *AdapterStatus) init() {
 	for i := 0; i < int(datatype.MESSAGE_TYPE_MAX); i++ {
-		s.TCPStatusFlow[i] = make(map[uint16]*Status)
-		s.UDPStatusFlow[i] = make(map[uint16]*Status)
+		s.TCPStatusFlow[i] = make(map[uint32]*Status)
+		s.UDPStatusFlow[i] = make(map[uint32]*Status)
 		s.TCPStatusOthers[i] = make(map[string]*Status)
 		s.UDPStatusOthers[i] = make(map[string]*Status)
 	}
 }
 
-func (s *AdapterStatus) Update(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+func (s *AdapterStatus) Update(now uint32, msgType datatype.MessageType, vtapID uint32, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
 	if serverType == UDP { // UDP大部分时间无锁，只有在更新map时加锁, 防止调试命令读取时可能导致异常
 		if vtapID != 0 {
 			if status, ok := s.UDPStatusFlow[msgType][vtapID]; ok {
@@ -722,7 +722,7 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint32(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint32(0), uint32(0), uint32(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
 			headerLen += datatype.FLOW_HEADER_LEN
@@ -879,7 +879,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint32(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint32(0), uint32(0), uint32(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			if err := ReadN(reader, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)

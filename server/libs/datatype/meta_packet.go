@@ -71,7 +71,7 @@ type MetaPacket struct {
 
 	PacketLen     uint16
 	RawHeaderSize uint16
-	VtapId        uint16
+	VtapId        uint32
 	TapType       TapType // (8B)
 	TapPort       uint32
 	L2End0        bool

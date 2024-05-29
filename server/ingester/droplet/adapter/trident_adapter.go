@@ -50,7 +50,7 @@ type packetBuffer struct {
 	bufferLength int
 	decoder      SequentialDecoder
 	tridentIp    net.IP
-	vtapId       uint16
+	vtapId       uint32
 	hash         uint8
 }
 
@@ -87,7 +87,7 @@ func (p *packetBuffer) init() {
 	p.decoder.initSequentialDecoder(p.buffer)
 }
 
-func (p *packetBuffer) calcHash(vtapId uint16) uint8 {
+func (p *packetBuffer) calcHash(vtapId uint32) uint8 {
 	hash := uint8(vtapId) ^ uint8(vtapId>>8) ^ uint8(p.decoder.tridentDispatcherIndex)
 	p.hash = (hash >> 6) ^ (hash >> 4) ^ (hash >> 2) ^ hash
 	p.vtapId = vtapId

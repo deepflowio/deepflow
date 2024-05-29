@@ -100,7 +100,7 @@ type AppProtoLogsBaseInfo struct {
 	EndTime   time.Duration // 结束时间, 初始化时等于开始时间
 	FlowId    uint64        // 对应flow的ID
 	TapPort   TapPort
-	VtapId    uint16
+	VtapId    uint32
 	TapType   uint16
 	IsIPv6    bool
 	TapSide   uint8
@@ -260,7 +260,7 @@ func (l *AppProtoLogsBaseInfo) WriteToPB(p *pb.AppProtoLogsBaseInfo) {
 	p.EndTime = uint64(l.EndTime)
 	p.FlowId = l.FlowId
 	p.TapPort = uint64(l.TapPort)
-	p.VtapId = uint32(l.VtapId)
+	p.VtapId = l.VtapId
 	p.TapType = uint32(l.TapType)
 	p.IsIpv6 = utils.Bool2UInt32(l.IsIPv6)
 	p.TapSide = uint32(l.TapSide)

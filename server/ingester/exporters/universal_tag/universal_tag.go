@@ -189,7 +189,7 @@ type UniversalTagMaps struct {
 	l3EpcMap       map[uint32]string
 	subnetMap      map[uint16]string
 	gprocessMap    map[uint32]string
-	vtapMap        map[uint16]string
+	vtapMap        map[uint32]string
 }
 
 func (u *UniversalTagsManager) QueryRegion(regionID uint16) string {
@@ -240,7 +240,7 @@ func (u *UniversalTagsManager) QueryGProcess(gprocessID uint32) string {
 	return u.universalTagMaps.gprocessMap[gprocessID]
 }
 
-func (u *UniversalTagsManager) QueryVtap(agentID uint16) string {
+func (u *UniversalTagsManager) QueryVtap(agentID uint32) string {
 	return u.universalTagMaps.vtapMap[agentID]
 }
 
@@ -249,7 +249,7 @@ func (u *UniversalTagsManager) QueryAuto(autoType uint8, autoID uint32, isIPv4 b
 }
 
 func (u *UniversalTagsManager) QueryUniversalTags(
-	regionID, azID, hostID, podNsID, podClusterID, subnetID, agentID uint16,
+	regionID, azID, hostID, podNsID, podClusterID, subnetID uint16, agentID uint32,
 	l3DeviceType, autoServiceType, autoInstanceType uint8,
 	l3DeviceID, autoServiceID, autoInstanceID, podNodeID, podGroupID, podID, l3EpcID, gprocessID, serviceID uint32,
 	isIPv4 bool, ip4 uint32, ip6 net.IP,
@@ -452,7 +452,7 @@ func (u *UniversalTagsManager) GetUniversalTagMaps(response *trident.UniversalTa
 	tagMaps.l3EpcMap = u.genU32KeyMap(response.GetL3EpcMap())
 	tagMaps.subnetMap = u.genU16KeyMap(response.GetSubnetMap())
 	tagMaps.gprocessMap = u.genU32KeyMap(response.GetGprocessMap())
-	tagMaps.vtapMap = u.genU16KeyMap(response.GetVtapMap())
+	tagMaps.vtapMap = u.genU32KeyMap(response.GetVtapMap())
 
 	return tagMaps
 }

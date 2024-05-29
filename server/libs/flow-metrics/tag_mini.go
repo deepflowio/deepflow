@@ -55,7 +55,7 @@ type MiniField struct {
 	Protocol   layers.IPProtocol // (8B)
 	ACLGID     uint16
 	ServerPort uint16
-	VTAPID     uint16
+	VTAPID     uint32
 	TAPPort    datatype.TapPort
 	TAPType    TAPTypeEnum
 	L7Protocol datatype.L7Protocol

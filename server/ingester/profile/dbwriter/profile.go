@@ -71,7 +71,7 @@ type InProcessProfile struct {
 	GPID             uint32
 
 	// Universal Tag
-	VtapID       uint16
+	VtapID       uint32
 	RegionID     uint16
 	AZID         uint16
 	SubnetID     uint16
@@ -283,7 +283,7 @@ func (p *InProcessProfile) Clone() *InProcessProfile {
 
 func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	platformData *grpc.PlatformInfoTable,
-	vtapID, orgId, teamId uint16,
+	vtapID uint32, orgId, teamId uint16,
 	podID uint32,
 	profileName string,
 	eventType string,
@@ -326,12 +326,12 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.OrgId, p.TeamID = orgId, teamId
 }
 
-func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
+func genID(time uint32, counter *uint32, vtapID uint32) uint64 {
 	count := atomic.AddUint32(counter, 1)
 	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
 }
 
-func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformData *grpc.PlatformInfoTable) {
+func (p *InProcessProfile) fillResource(vtapID uint32, podID uint32, platformData *grpc.PlatformInfoTable) {
 	vtapInfo := platformData.QueryVtapInfo(vtapID)
 	var vtapPlatformInfo *grpc.Info
 	if vtapInfo != nil {
@@ -405,7 +405,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 	}
 }
 
-func (p *InProcessProfile) fillPodInfo(vtapID uint16, containerID string, platformData *grpc.PlatformInfoTable) {
+func (p *InProcessProfile) fillPodInfo(vtapID uint32, containerID string, platformData *grpc.PlatformInfoTable) {
 	if containerID == "" {
 		log.Debugf("%s-%s uploaded empty containerID by vtapID: %d", p.AppService, p.ProfileEventType, vtapID)
 		return

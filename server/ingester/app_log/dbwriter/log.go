@@ -73,7 +73,7 @@ type ApplicationLogStore struct {
 	AppService string `json:"app_service" category:"$tag" sub:"service_info"` // service name
 
 	GProcessID   uint32 `json:"gprocess_id" category:"$tag" sub:"universal_tag"`
-	AgentID      uint16 `json:"agent_id" category:"$tag" sub:"universal_tag"`
+	AgentID      uint32 `json:"agent_id" category:"$tag" sub:"universal_tag"`
 	RegionID     uint16 `json:"region_id" category:"$tag" sub:"universal_tag"`
 	AZID         uint16 `json:"az_id" category:"$tag" sub:"universal_tag"`
 	L3EpcID      int32  `json:"l3_epc_id" category:"$tag" sub:"universal_tag"`
