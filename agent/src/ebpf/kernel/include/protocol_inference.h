@@ -146,8 +146,20 @@ static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
 
 static __inline bool is_infer_socket_valid(struct socket_info_s *sk_info)
 {
+	/*
+	 * Since the kernel collects TLS handshake data, the socket type is set
+	 * to 'PROTO_TLS' during this process. UPROBE-collected TLS plaintext data
+	 * needs to be re-evaluated, so here we specify that a socket type of
+	 * 'PROTO_TLS' is invalid and requires re-evaluation.
+	 *
+	 * Additionally, 'PROTO_UNKNOWN' also needs to be re-evaluated. This situation
+	 * is common when pre-storing some data, which establishes socket information
+	 * but sets 'l7_proto' to 'PROTO_UNKNOWN'. The data needs to be combined with
+	 * the next segment to be re-evaluated as a whole.
+	 */
 	return (sk_info != NULL && sk_info->uid != 0
-		&& sk_info->l7_proto != PROTO_TLS);
+		&& sk_info->l7_proto != PROTO_TLS
+		&& sk_info->l7_proto != PROTO_UNKNOWN);
 }
 
 // When calling this function, count must be a constant, and at this time, the
@@ -577,22 +589,6 @@ static __inline enum message_type infer_http2_message(const char *buf_kern,
 	    parse_http2_headers_frame(buf_kern, syscall_len, buf_src, count,
 				      conn_info, is_first);
 
-	/*
-	 * When performing data merging at the eBPF layer, the data needs to be
-	 * temporarily stored (this data will become part of the subsequent data
-	 * and will be merged later). The pre-stored data cannot be pushed to the
-	 * upper layer for reassembly; this needs to be done at the eBPF layer.
-	 * Therefore, this must be prioritized before the ‘conn_info->enable_reasm’
-	 * check.
-	 */
-	if (ret == MSG_PRESTORE)
-		return MSG_PRESTORE;
-
-	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
-	}
-
 	return ret;
 }
 
@@ -614,9 +610,6 @@ static __inline enum message_type infer_http_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
 			return MSG_UNKNOWN;
-
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	if (is_http_response(buf)) {
@@ -705,8 +698,6 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	if (!conn_info->sk)
@@ -916,8 +907,6 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 		char tag = infer_buf[0];
 		/* *INDENT-OFF* */
 		switch (tag) {
@@ -969,8 +958,6 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_ORACLE)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	char pkt_type = buf[4];
@@ -1067,8 +1054,6 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 		goto out;
 	}
 	// code for remoting command (Heartbeat, RpcRequest, RpcResponse)
@@ -1206,8 +1191,6 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	bool update_tcp_dns_prev_count = false;
@@ -1318,8 +1301,6 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_REDIS)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	const char first_byte = buf[0];
@@ -1423,8 +1404,6 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MQTT)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	int mqtt_type;
@@ -1811,8 +1790,6 @@ static __inline enum message_type infer_openwire_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_OPENWIRE)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 		conn_info->encoding_type =
 		    conn_info->socket_info_ptr->encoding_type;
 	}
@@ -1922,8 +1899,6 @@ static __inline enum message_type infer_nats_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_NATS)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	} else {
 		char buffer[2];
 		bpf_probe_read_user(buffer, 2, ptr + infer_len - 2);
@@ -2166,8 +2141,6 @@ static __inline enum message_type infer_pulsar_message(const char *ptr,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_PULSAR)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	char buffer[4];
@@ -2249,8 +2222,6 @@ static __inline enum message_type infer_brpc_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_BRPC)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 	// PRPC
 	if (buf[0] != 'P' || buf[1] != 'R' || buf[2] != 'P' || buf[3] != 'C')
@@ -2480,8 +2451,6 @@ static __inline enum message_type infer_zmtp_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_ZMTP)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 		if (check_zmtp_greeting(buf, count, conn_info)
 		    || check_zmtp_segment(buf, count, syscall_infer_addr,
 					  syscall_infer_len, false)) {
@@ -2584,8 +2553,6 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DUBBO)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	struct dubbo_header *dubbo_hdr = (struct dubbo_header *)buf;
@@ -2754,8 +2721,6 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_KAFKA)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 
 		conn_info->need_reconfirm =
 		    conn_info->socket_info_ptr->need_reconfirm;
@@ -2882,8 +2847,6 @@ infer_fastcgi_message(const char *buf, size_t count,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_FASTCGI)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 		if (header->type == FCGI_BEGIN_REQUEST
 		    || header->type == FCGI_PARAMS)
 			return MSG_REQUEST;
@@ -2977,11 +2940,6 @@ infer_mongo_message(const char *buf, size_t count,
 	    && conn_info->direction == T_INGRESS) {
 		save_prev_data_from_kern(buf, conn_info, sizeof(*header));
 		return MSG_PRESTORE;
-	}
-
-	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	if (header->request_id < 0) {
@@ -3212,8 +3170,6 @@ check:
 		if (handshake.content_type != 0x15 &&
 		    conn_info->socket_info_ptr->tls_end)
 			return MSG_UNKNOWN;
-		if (conn_info->enable_reasm)
-			return MSG_REQUEST;
 	}
 
 	/*
@@ -3860,6 +3816,16 @@ infer_protocol_2(const char *infer_buf, size_t count,
 		    infer_mongo_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MONGO;
+	}
+
+	if (conn_info->enable_reasm) {
+		if (inferred_message.type == MSG_UNKNOWN) {
+			inferred_message.type = MSG_REQUEST;
+			if (conn_info->socket_info_ptr)
+				inferred_message.protocol =
+				    conn_info->socket_info_ptr->l7_proto;
+			conn_info->is_reasm_seg = true;
+		}
 	}
 
 	return inferred_message;

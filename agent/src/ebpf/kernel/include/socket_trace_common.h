@@ -65,7 +65,7 @@ struct __socket_data {
 	/* 追踪数据信息 */
 	__u64 timestamp;     // 数据捕获时间戳
 	__u8 direction: 1;  // bits[0]: 方向，值为T_EGRESS(0), T_INGRESS(1)
-	__u8 msg_type:  6;  // bits[1-7]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 msg_type:  6;  // bits[1-6]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
 	__u8 is_tls: 1;
 
 	__u64 syscall_len;   // 本次系统调用读、写数据的总长度
@@ -129,7 +129,7 @@ struct socket_info_s {
 	__u8 prev_data[EBPF_CACHE_SIZE];
 	__u8 direction: 1;
 	__u8 pre_direction: 1;
-	__u8 msg_type: 2;	// Store data type, values are MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 unused: 2;
 	__u8 role: 3;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
 	__u8 tls_end: 1;	// Use the Identity TLS protocol to infer whether it has been completed
 	bool need_reconfirm;    // L7 protocol inference requiring confirmation.
