@@ -948,6 +948,7 @@ func (k *KubernetesRpcUpdater) run() {
 		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion())
 		// 更新和保存内存数据
 		k.storage.Add(info.orgID, KubernetesInfo{
+			ORGID:     info.orgID,
 			Epoch:     time.Now(),
 			ClusterID: info.message.GetClusterId(),
 			ErrorMSG:  info.message.GetErrorMsg(),
@@ -1103,6 +1104,7 @@ func (p *PrometheusRpcUpdater) run() {
 		log.Debugf("prometheus from %s vtap_id %v received cluster_id %s version %v,  error message (%s)", info.peer, info.vtapID, clusterID, version, errMSG)
 
 		p.storage.Add(info.orgID, parseFlag, PrometheusInfo{
+			ORGID:     info.orgID,
 			ClusterID: clusterID,
 			Entries:   entries,
 			Epoch:     time.Now(),
