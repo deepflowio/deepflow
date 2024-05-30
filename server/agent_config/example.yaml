@@ -1438,51 +1438,63 @@ vtap_group_id: g-xxxxxx
       ##   time exceeding 1 hour.
       #minblock: 50us
 
-    ## Ebpf reorder cache size
+    ## eBPF OOOR (Out-Of-Order-Reassembly) Cache Size
     ## Default: 16. Range: [8, 128]
+    ## Note: When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size` eBPF
+    ##   socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached in each TCP/UDP
+    ##   flow to prevent out-of-order events from impacting application protocol parsing. Since eBPF socket
+    ##   events are sent to user space in batches, out-of-order scenarios mainly occur when requests and responses
+    ##   within a single session are processed by different CPUs, causing the response to reach user space before the request.
     #syscall-out-of-order-cache-size: 16
 
-    ## List of Application Protocols
-    ## Note: After enabling the l7 protocol, the agent will perform sorting.
-    #syscall-out-of-order-reassembly:
-    #- HTTP
-    #- HTTP2 ## for both HTTP2 and gRPC
-    #- SofaRPC
-    #- FastCGI
-    #- Dubbo
-    #- MySQL
-    #- PostgreSQL
-    #- Redis
-    #- MongoDB
-    #- Kafka
-    #- MQTT
-    #- AMQP
-    #- OpenWire
-    #- NATS
-    #- DNS
-    #- TLS
-    #- Custom ## custom protocol from plugin
+    ## eBPF OOOR (Out-Of-Order-Reassembly) Enabled Application Protocols
+    ## Note: When this capability is enabled for a specific application protocol, the agent will add out-of-order-reassembly
+    ##   processing for it. Note that the agent will consume more memory in this case, so please adjust the
+    ##   syscall-out-of-order-cache-size accordingly and monitor the agent's memory usage.
+    ## Supported Protocols:
+    ##   - HTTP
+    ##   - HTTP2 ## for both HTTP2 and gRPC
+    ##   - SofaRPC
+    ##   - FastCGI
+    ##   - Dubbo
+    ##   - MySQL
+    ##   - PostgreSQL
+    ##   - Redis
+    ##   - MongoDB
+    ##   - Kafka
+    ##   - MQTT
+    ##   - AMQP
+    ##   - OpenWire
+    ##   - NATS
+    ##   - DNS
+    ##   - TLS
+    ##   - Custom ## custom protocol from plugin
+    #syscall-out-of-order-reassembly: []
 
-    ## List of Application Protocols
-    ## Note: After enabling the protocol, the agent will perform segmented aggregation
-    #syscall-segmentation-reassembly:
-    #- HTTP
-    #- HTTP2 ## for both HTTP2 and gRPC
-    #- SofaRPC
-    #- FastCGI
-    #- Dubbo
-    #- MySQL
-    #- PostgreSQL
-    #- Redis
-    #- MongoDB
-    #- Kafka
-    #- MQTT
-    #- AMQP
-    #- OpenWire
-    #- NATS
-    #- DNS
-    #- TLS
-    #- Custom ## custom protocol from plugin
+    ## eBPF SR (Segmentation-Reassembly) Enabled Application Protocols
+    ## Note: When this capability is enabled for a specific application protocol, the agent will add
+    ##   segmentation-reassembly processing to merge application protocol content spread across multiple
+    ##   syscalls before parsing it. This enhances the success rate of application protocol parsing.
+    ##   Note that `syscall-out-of-order-reassembly` must also be enabled for this feature to be effective.
+    ## Supported Protocols:
+    ##   - HTTP
+    ##   - HTTP2 ## for both HTTP2 and gRPC
+    ##   - SofaRPC
+    ##   - FastCGI
+    ##   - Dubbo
+    ##   - MySQL
+    ##   - PostgreSQL
+    ##   - Redis
+    ##   - MongoDB
+    ##   - Kafka
+    ##   - MQTT
+    ##   - AMQP
+    ##   - OpenWire
+    ##   - NATS
+    ##   - DNS
+    ##   - TLS
+    ##   - Custom ## custom protocol from plugin
+    #syscall-segmentation-reassembly: []
 
   ######################################
   ## Agent Running in Standalone Mode ##
