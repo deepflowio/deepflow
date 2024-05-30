@@ -67,6 +67,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 			Sql:     timeSql,
 			Debug:   strconv.FormatBool(args.Debug),
 			Context: args.Context,
+			ORGID:   args.OrgID,
 		}
 		timeEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
 		timeEngine.Init()
@@ -109,6 +110,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		Sql:     sql,
 		Debug:   strconv.FormatBool(args.Debug),
 		Context: args.Context,
+		ORGID:   args.OrgID,
 	}
 	// XXX: change to streaming read, reduce memory
 	querierResult, querierDebug, err := ckEngine.ExecuteQuery(&querierArgs)
@@ -158,6 +160,16 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 			profileLocationStr := ""
 			if profileLocation, ok := valueSlice[profileLocationStrIndex].(string); ok {
 				profileLocationStr = profileLocation
+				// XXX: reuse dst for every profileLocationStr
+				dst := make([]byte, 0, len(profileLocationStr))
+				profileLocationStrByte, _ := ingester_common.ZstdDecompress(dst, []byte(profileLocationStr))
+				// XXX: reuse the memory of profileLocationStrByte
+				profileLocationStr = string(profileLocationStrByte)
+				// clip kernel function
+				if *args.MaxKernelStackDepth != common.MAX_KERNEL_STACK_DEPTH_DEFAULT && args.ProfileLanguageType == common.LANGUAGE_TYPE_EBPF {
+					profileLocationStrSlice := strings.Split(profileLocationStr, ";")
+					profileLocationStr = ClipKernelFunction(profileLocationStrSlice, *args.MaxKernelStackDepth)
+				}
 			}
 			profileValue := 0
 			if profileValueInt, ok := valueSlice[profileValueIndex].(int); ok {
@@ -174,11 +186,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	// step 2: merge function stacks to profile tree
 	rootTotalValue := 0
 	for profileLocationStr, profileValue := range stackMap {
-		// XXX: reuse dst for every profileLocationStr
-		dst := make([]byte, 0, len(profileLocationStr))
-		profileLocationStrByte, _ := ingester_common.ZstdDecompress(dst, []byte(profileLocationStr))
-		// XXX: reuse the memory of profileLocationStrByte
-		profileLocationStrSlice := strings.Split(string(profileLocationStrByte), ";")
+		profileLocationStrSlice := strings.Split(profileLocationStr, ";")
 		for profileLocationIndex := range profileLocationStrSlice {
 			nodeProfileValue := 0
 			if profileLocationIndex == len(profileLocationStrSlice)-1 {
@@ -207,6 +215,10 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	}
 
 	if len(NodeIDToProfileTree) == 0 {
+		formatEndTime := int64(time.Since(formatStartTime))
+		formatTime := fmt.Sprintf("%.9fs", float64(formatEndTime)/1e9)
+		debugs.FormatTime = formatTime
+		debug = debugs
 		return
 	}
 
@@ -255,4 +267,23 @@ func UpdateNodeTotalValue(node *model.ProfileTreeNode, parentNode *model.Profile
 	if ok {
 		UpdateNodeTotalValue(node, newParentNode, NodeIDToProfileTree)
 	}
+}
+
+func ClipKernelFunction(profileLocationStrSlice []string, maxKernelStackDepth int) string {
+	kernelFuncs := []string{}
+	newProfileLocationStrSlice := []string{}
+	for _, FuncStr := range profileLocationStrSlice {
+		if strings.HasPrefix(FuncStr, "[k]") {
+			kernelFuncs = append(kernelFuncs, FuncStr)
+		} else {
+			newProfileLocationStrSlice = append(newProfileLocationStrSlice, FuncStr)
+		}
+	}
+	kernelFuncIndex := maxKernelStackDepth
+	if len(kernelFuncs) < maxKernelStackDepth {
+		kernelFuncIndex = len(kernelFuncs)
+	}
+	newProfileLocationStrSlice = append(newProfileLocationStrSlice, kernelFuncs[:kernelFuncIndex]...)
+	profileLocationStr := strings.Join(newProfileLocationStrSlice, ";")
+	return profileLocationStr
 }
