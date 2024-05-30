@@ -88,7 +88,7 @@ func applyDomainAdditionalResource(cmd *cobra.Command, args []string, filename s
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/domain-additional-resources/", server.IP, server.Port)
-	_, err = common.CURLPerform("PUT", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	_, err = common.CURLPerform("PUT", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
@@ -227,7 +227,7 @@ peer_connections:{{ range .PEER_CONNECTIONS }}
 func listDomainAdditionalResource(cmd *cobra.Command, resourceType, resourceName string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/domain-additional-resources/?type=%s&name=%s", server.IP, server.Port, resourceType, resourceName)
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
