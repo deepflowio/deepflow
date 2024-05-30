@@ -213,6 +213,7 @@ type VTapGroup struct {
 	Lcuuid    string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 	ShortUUID string    `gorm:"column:short_uuid;type:char(32);default:null" json:"SHORT_UUID"`
 	TeamID    int       `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID"`
+	UserID    int       `gorm:"column:user_id;type:int;default:null" json:"USER_ID"`
 }
 
 func (VTapGroup) TableName() string {
