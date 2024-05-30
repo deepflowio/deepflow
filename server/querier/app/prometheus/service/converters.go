@@ -319,12 +319,12 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		if len(value) > 1 {
 			tmpFilters := make([]string, 0, len(value))
 			for _, v := range value {
-				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, v))
+				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(v)))
 			}
 			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
 		} else {
 			// () with only ONE condition in it will cause error
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, value[0]))
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0])))
 		}
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
@@ -988,11 +988,11 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 		if len(value) > 1 {
 			tmpFilters := make([]string, 0, len(value))
 			for _, v := range value {
-				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, v))
+				tmpFilters = append(tmpFilters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(v)))
 			}
 			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
 		} else {
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, value[0]))
+			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0])))
 		}
 
 		if isDeepFlowTag && cap(groupBy) == 0 {
@@ -1188,6 +1188,7 @@ func formatEnumTag(tagName string) (string, bool) {
 	_, exists := tagdescription.TAG_ENUMS[enumFile]
 	if !exists {
 		enumFile = fmt.Sprintf("%s.%s", enumFile, config.Cfg.Language)
+		_, exists = tagdescription.TAG_ENUMS[enumFile]
 	}
 	if exists {
 		return fmt.Sprintf("Enum(%s)", tagName), exists
@@ -1233,4 +1234,8 @@ func removeDeepFlowPrefix(tag string) string {
 
 func removeTagPrefix(tag string) string {
 	return strings.Replace(tag, "tag_", "", 1)
+}
+
+func escapeSingleQuote(v string) string {
+	return strings.Replace(v, "'", "''", -1)
 }
