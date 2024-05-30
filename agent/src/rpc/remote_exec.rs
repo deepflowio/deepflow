@@ -80,7 +80,7 @@ fn all_supported_commands() -> Vec<Command> {
             command_type: CommandType::Linux,
         },
         Command {
-            cmdline: "top -b -n 1 -c",
+            cmdline: "top -b -n 1 -c -w",
             output_format: OutputFormat::Text,
             desc: "top",
             command_type: CommandType::Linux,
@@ -302,6 +302,8 @@ impl Executor {
 
 #[derive(Default)]
 struct CommandResult {
+    request_id: Option<u64>,
+
     errno: i32,
     output: VecDeque<u8>,
     total_len: usize,
@@ -315,9 +317,14 @@ struct Responser {
     heartbeat: Interval,
     msg_recv: Receiver<pb::RemoteExecRequest>,
 
-    pending_lsns: Option<BoxFuture<'static, Vec<pb::LinuxNamespace>>>,
+    // request id, future
+    pending_lsns: Option<(
+        Option<u64>,
+        BoxFuture<'static, Result<Vec<pb::LinuxNamespace>, String>>,
+    )>,
 
-    pending_command: Option<(usize, Option<File>, BoxFuture<'static, IoResult<Output>>)>,
+    // request id, command id, future
+    pending_command: Option<(Option<u64>, usize, BoxFuture<'static, IoResult<Output>>)>,
     result: CommandResult,
 }
 
@@ -363,6 +370,7 @@ impl Responser {
 
     fn command_failed_helper<'a, S: Into<Cow<'a, str>>>(
         &self,
+        request_id: Option<u64>,
         code: Option<i32>,
         msg: S,
     ) -> Poll<Option<pb::RemoteExecResponse>> {
@@ -370,9 +378,10 @@ impl Responser {
         warn!("{}", msg);
         Poll::Ready(Some(pb::RemoteExecResponse {
             agent_id: Some(self.agent_id.read().deref().into()),
+            request_id,
+            errmsg: Some(msg.into_owned()),
             command_result: Some(pb::CommandResult {
                 errno: code,
-                errmsg: Some(msg.into_owned()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -401,46 +410,31 @@ impl Stream for Responser {
                 );
                 return Poll::Ready(Some(pb::RemoteExecResponse {
                     agent_id: Some(self.agent_id.read().deref().into()),
+                    request_id: self.result.request_id,
                     command_result: Some(batch),
                     ..Default::default()
                 }));
             }
 
-            if let Some((id, ns_fp, future)) = self.pending_command.as_mut() {
+            if let Some((_, id, future)) = self.pending_command.as_mut() {
                 trace!("poll pending command '{}'", get_cmdline(*id).unwrap());
-                if let Some(f) = ns_fp {
-                    if let Err(e) = set_netns(f) {
-                        warn!(
-                            "set_netns failed when executing {}: {}",
-                            get_cmdline(*id).unwrap(),
-                            e
-                        );
-                    }
-                }
                 let p = future.as_mut().poll(ctx);
-                if ns_fp.is_some() {
-                    if let Err(e) = reset_netns() {
-                        warn!(
-                            "reset_netns failed when executing {}: {}",
-                            get_cmdline(*id).unwrap(),
-                            e
-                        );
-                    }
-                }
 
                 if let Poll::Ready(res) = p {
-                    let (id, _, _) = self.pending_command.take().unwrap();
+                    let (request_id, id, _) = self.pending_command.take().unwrap();
                     match res {
                         Ok(output) if output.status.success() => {
                             debug!("command '{}' succeeded", get_cmdline(id).unwrap());
                             if output.stdout.is_empty() {
                                 return Poll::Ready(Some(pb::RemoteExecResponse {
                                     agent_id: Some(self.agent_id.read().deref().into()),
+                                    request_id: request_id,
                                     command_result: Some(pb::CommandResult::default()),
                                     ..Default::default()
                                 }));
                             }
                             let r = &mut self.result;
+                            r.request_id = request_id;
                             r.errno = 0;
                             r.output = output.stdout.into();
                             r.total_len = r.output.len();
@@ -450,6 +444,7 @@ impl Stream for Responser {
                         Ok(output) => {
                             if let Some(code) = output.status.code() {
                                 return self.command_failed_helper(
+                                    request_id,
                                     Some(code),
                                     format!(
                                         "command '{}' failed with {}",
@@ -459,6 +454,7 @@ impl Stream for Responser {
                                 );
                             } else {
                                 return self.command_failed_helper(
+                                    request_id,
                                     None,
                                     format!(
                                         "command '{}' execute terminated without errno",
@@ -469,6 +465,7 @@ impl Stream for Responser {
                         }
                         Err(e) => {
                             return self.command_failed_helper(
+                                request_id,
                                 None,
                                 format!(
                                     "command '{}' execute failed: {}",
@@ -481,16 +478,30 @@ impl Stream for Responser {
                 }
             }
 
-            if let Some(future) = self.pending_lsns.as_mut() {
+            if let Some((_, future)) = self.pending_lsns.as_mut() {
                 trace!("poll pending lsns");
-                if let Poll::Ready(namespaces) = future.as_mut().poll(ctx) {
-                    debug!("list namespace completed with {} entries", namespaces.len());
-                    self.pending_lsns.take();
-                    return Poll::Ready(Some(pb::RemoteExecResponse {
-                        agent_id: Some(self.agent_id.read().deref().into()),
-                        linux_namespaces: namespaces,
-                        ..Default::default()
-                    }));
+                if let Poll::Ready(result) = future.as_mut().poll(ctx) {
+                    let (request_id, _) = self.pending_lsns.take().unwrap();
+                    match result {
+                        Ok(namespaces) => {
+                            debug!("list namespace completed with {} entries", namespaces.len());
+                            return Poll::Ready(Some(pb::RemoteExecResponse {
+                                agent_id: Some(self.agent_id.read().deref().into()),
+                                request_id,
+                                linux_namespaces: namespaces,
+                                ..Default::default()
+                            }));
+                        }
+                        Err(e) => {
+                            warn!("list namespace failed: {}", e);
+                            return Poll::Ready(Some(pb::RemoteExecResponse {
+                                agent_id: Some(self.agent_id.read().deref().into()),
+                                request_id,
+                                errmsg: Some(e),
+                                ..Default::default()
+                            }));
+                        }
+                    }
                 }
             }
 
@@ -544,13 +555,14 @@ impl Stream for Responser {
                             debug!("list command returning {} entries", commands.len());
                             return Poll::Ready(Some(pb::RemoteExecResponse {
                                 agent_id: Some(self.agent_id.read().deref().into()),
+                                request_id: msg.request_id,
                                 commands,
                                 ..Default::default()
                             }));
                         }
                         pb::ExecutionType::ListNamespace => {
                             trace!("pending list namespace");
-                            self.pending_lsns = Some(Box::pin(lsns()));
+                            self.pending_lsns = Some((msg.request_id, Box::pin(lsns())));
                             continue;
                         }
                         pb::ExecutionType::RunCommand => {
@@ -561,6 +573,7 @@ impl Stream for Responser {
                                 msg.command_id.and_then(|id| get_cmdline(id as usize))
                             else {
                                 return self.command_failed_helper(
+                                    msg.request_id,
                                     None,
                                     "command_id not specified or invalid in run command request",
                                 );
@@ -569,6 +582,7 @@ impl Stream for Responser {
                                 Params(&msg.params[..msg.params.len().min(max_param_nums())]);
                             if !params.is_valid() {
                                 return self.command_failed_helper(
+                                    msg.request_id,
                                     None,
                                     format!(
                                         "rejected run command '{}' with invalid params: {:?}",
@@ -585,6 +599,7 @@ impl Stream for Responser {
                                         Ok(fp) => Some(fp),
                                         Err(e) => {
                                             return self.command_failed_helper(
+                                                msg.request_id,
                                                 None,
                                                 format!(
                                                     "open namespace file {} failed: {}",
@@ -621,6 +636,7 @@ impl Stream for Responser {
                                         }
                                         None => {
                                             return self.command_failed_helper(
+                                                msg.request_id,
                                                 None,
                                                 format!(
                                                     "parameter {} not found in command '{}'",
@@ -633,10 +649,21 @@ impl Stream for Responser {
                                     cmd.arg(arg);
                                 }
                             }
+                            if let Some(f) = nsfile_fp.as_ref() {
+                                if let Err(e) = set_netns(f) {
+                                    warn!("set_netns failed when executing {}: {}", cmdline, e);
+                                }
+                            }
+                            let output = cmd.output();
+                            if nsfile_fp.is_some() {
+                                if let Err(e) = reset_netns() {
+                                    warn!("reset_netns failed when executing {}: {}", cmdline, e);
+                                }
+                            }
                             self.pending_command = Some((
+                                msg.request_id,
                                 msg.command_id.unwrap() as usize,
-                                nsfile_fp,
-                                Box::pin(cmd.output()),
+                                Box::pin(output),
                             ));
                             continue;
                         }
@@ -656,7 +683,7 @@ impl Stream for Responser {
     }
 }
 
-async fn lsns() -> Vec<pb::LinuxNamespace> {
+async fn lsns() -> Result<Vec<pb::LinuxNamespace>, String> {
     let output = TokioCommand::new("lsns")
         .args([
             "--list",
@@ -671,13 +698,11 @@ async fn lsns() -> Vec<pb::LinuxNamespace> {
     let output = match output {
         Ok(o) => o,
         Err(e) => {
-            warn!("command failed: {}", e);
-            return vec![];
+            return Err(format!("command failed: {}", e));
         }
     };
     if !output.status.success() {
-        warn!("lsns failed with {}", output.status);
-        return vec![];
+        return Err(format!("lsns failed with {}", output.status));
     }
     let mut namespaces = vec![];
     for line in output.stdout.split(|c| *c == b'\n') {
@@ -703,7 +728,7 @@ async fn lsns() -> Vec<pb::LinuxNamespace> {
             ns_type: Some("net".to_owned()),
         });
     }
-    namespaces
+    Ok(namespaces)
 }
 
 struct Params<'a>(&'a [pb::Parameter]);
