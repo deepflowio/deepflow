@@ -227,6 +227,7 @@ type VtapGroup struct {
 	ShortUUID          string   `json:"SHORT_UUID"`
 	Lcuuid             string   `json:"LCUUID"`
 	TeamID             int      `json:"TEAM_ID"`
+	UserID             int      `json:"USER_ID"`
 	VtapLcuuids        []string `json:"VTAP_LCUUIDS"`
 	DisableVtapLcuuids []string `json:"DISABLE_VTAP_LCUUIDS"`
 	PendingVtapLcuuids []string `json:"PENDING_VTAP_LCUUIDS"`

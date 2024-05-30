@@ -19,7 +19,6 @@ package synchronize
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 
@@ -87,10 +86,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					continue
 				}
 
-				err = handleResponse(resp)
-				if err != nil {
-					log.Error(err)
-				}
+				handleResponse(resp)
 			}
 		}
 	}()
@@ -112,8 +108,6 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	}
 }
 
-var ErrEndRecv = errors.New("end receive")
-
 func handleResponse(resp *trident.RemoteExecResponse) error {
 	key := resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 	manager, ok := service.AgentRemoteExecMap[key]
@@ -133,7 +127,7 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 			manager.AppendNamespaces(resp.LinuxNamespaces)
 		}
 		manager.LinuxNamespaceDoneCH <- struct{}{}
-		return ErrEndRecv
+		return nil
 	case len(resp.Commands) > 0:
 		if len(manager.GetCommands()) > 0 {
 			manager.InitCommands(resp.Commands)
@@ -141,7 +135,7 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 			manager.AppendCommands(resp.Commands)
 		}
 		manager.RemoteCMDDoneCH <- struct{}{}
-		return ErrEndRecv
+		return nil
 	default:
 		log.Infof("agent(key: %s) command response", key)
 		result := resp.CommandResult
@@ -156,14 +150,14 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 				key, *result.Errmsg)
 			manager.AppendErr(result.Errmsg)
 			manager.ExecDoneCH <- struct{}{}
-			return ErrEndRecv
+			return nil
 		}
 		if result.Content != nil {
 			manager.AppendContent(result.Content)
 		}
 		if result.Md5 != nil {
 			manager.ExecDoneCH <- struct{}{}
-			return ErrEndRecv
+			return nil
 		}
 	}
 	return nil
