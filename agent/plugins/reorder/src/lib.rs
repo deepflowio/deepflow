@@ -36,6 +36,7 @@ pub trait CacheItem: Downcast {
     // Time in seconds
     fn get_timestmap(&self) -> u64;
     fn get_l7_protocol(&self) -> L7Protocol;
+    fn is_segment_start(&self) -> bool;
 }
 
 #[derive(Default)]
@@ -43,7 +44,8 @@ pub struct ReorderCounter {
     drop_before_window: AtomicU64,
     drop_out_of_order: AtomicU64,
     flow_counter: AtomicU64,
-    packet_couter: AtomicU64,
+    packet_counter: AtomicU64,
+    max_seq_gap: AtomicU64,
     closed: AtomicBool,
 }
 
@@ -80,7 +82,12 @@ impl counter::OwnedCountable for StatsReorderCounter {
             (
                 "packet-counter",
                 counter::CounterType::Counted,
-                counter::CounterValue::Unsigned(self.0.packet_couter.load(Relaxed)),
+                counter::CounterValue::Unsigned(self.0.packet_counter.load(Relaxed)),
+            ),
+            (
+                "max-seq-gap",
+                counter::CounterType::Counted,
+                counter::CounterValue::Unsigned(self.0.max_seq_gap.swap(0, Relaxed)),
             ),
         ]
     }

@@ -1175,6 +1175,10 @@ impl CacheItem for MetaPacket<'static> {
     fn get_l7_protocol(&self) -> L7Protocol {
         self.l7_protocol_from_ebpf
     }
+
+    fn is_segment_start(&self) -> bool {
+        self.segment_flags == SegmentFlags::Start
+    }
 }
 
 #[derive(Clone, Debug, Default)]
