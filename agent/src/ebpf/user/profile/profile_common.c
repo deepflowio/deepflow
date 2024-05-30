@@ -47,6 +47,7 @@
 #include "java/config.h"
 #include "java/df_jattach.h"
 #include "profile_common.h"
+#include "../proc.h"
 
 /*
  * This section is for symbolization of Java addresses, and we need

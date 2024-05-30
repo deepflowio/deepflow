@@ -24,6 +24,7 @@
 #include "../../vec.h"
 #include "../../tracer.h"
 #include "../../socket.h"
+#include "../../proc.h"
 #include "gen_syms_file.h"
 #include "config.h"
 #include "df_jattach.h"
