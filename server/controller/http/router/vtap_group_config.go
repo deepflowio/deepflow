@@ -79,15 +79,14 @@ func deleteVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 func updateVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		lcuuid := c.Param("lcuuid")
 		vTapGroupConfig := &agent_config.AgentGroupConfig{}
-		err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
-		if err == nil {
-			data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).UpdateVTapGroupConfig(common.GetUserInfo(c).ORGID, lcuuid, vTapGroupConfig)
-			JsonResponse(c, data, err)
-		} else {
-			JsonResponse(c, nil, err)
+		if err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON); err != nil {
+			BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+			return
 		}
+		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).
+			UpdateVTapGroupConfig(common.GetUserInfo(c).ORGID, c.Param("lcuuid"), vTapGroupConfig)
+		JsonResponse(c, data, err)
 	}
 }
 

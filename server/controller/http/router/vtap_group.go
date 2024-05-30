@@ -66,6 +66,9 @@ func (v *VtapGroup) getVtapGroups() gin.HandlerFunc {
 		if value, ok := c.GetQuery("team_id"); ok {
 			args["team_id"] = value
 		}
+		if value, ok := c.GetQuery("user_id"); ok {
+			args["user_id"] = value
+		}
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Get(args)
 		JsonResponse(c, data, err)
@@ -98,7 +101,6 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 		var err error
 		var vtapGroupUpdate model.VtapGroupUpdate
 
-		// 参数校验
 		err = c.ShouldBindBodyWith(&vtapGroupUpdate, binding.JSON)
 		if err != nil {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
@@ -108,14 +110,13 @@ func (v *VtapGroup) updateVtapGroup() gin.HandlerFunc {
 		// 接收参数
 		// 避免struct会有默认值，这里转为map作为函数入参
 		patchMap := map[string]interface{}{}
-		c.ShouldBindBodyWith(&patchMap, binding.JSON)
-		if _, ok := patchMap["TEAM_ID"]; !ok {
-			patchMap["TEAM_ID"] = 1
+		if err := c.ShouldBindBodyWith(&patchMap, binding.JSON); err != nil {
+			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+			return
 		}
 
-		lcuuid := c.Param("lcuuid")
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
-		data, err := agentGroupService.Update(lcuuid, patchMap, v.cfg)
+		data, err := agentGroupService.Update(c.Param("lcuuid"), patchMap, v.cfg)
 		JsonResponse(c, data, err)
 	})
 }
