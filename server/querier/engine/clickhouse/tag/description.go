@@ -195,6 +195,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
 				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
+
 				enumFile := tag[4].(string)
 				enumFile = tag[4].(string) + "." + config.Cfg.Language
 				displayName := tagLanguage[1].(string)
@@ -218,7 +219,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 			tagStringEnums := []*TagEnum{}
 			// 根据tagEnumFile获取tagTypeToOperators
 			tagType, _ := enumFileToTagType[tagEnumFile]
-
+			if tagType == "" {
+				tagType, _ = enumFileToTagType[tagEnumFile+"."+config.Cfg.Language]
+			}
 			for _, enumValue := range enumData.([][]interface{}) {
 				// 如果是int/int_enum，则将value转为interface
 				if tagType == "int" || tagType == "int_enum" || tagType == "bit_enum" {
@@ -906,15 +909,23 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 	if !isEnumOK {
+		_, isEnumOK = TAG_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
+	}
+	if !isEnumOK {
 		return GetTagResourceValues(db, table, sql)
 	}
-
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
+	if !isStringEnumOK {
+		_, isStringEnumOK = TAG_STRING_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
+	}
 	if isStringEnumOK {
 		table = "string_enum_map"
 		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 	}
 	_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
+	if !isIntEnumOK {
+		_, isIntEnumOK = TAG_INT_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
+	}
 	if isIntEnumOK {
 		table = "int_enum_map"
 		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
