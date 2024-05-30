@@ -24,6 +24,7 @@
 #include <linux/version.h>
 #include "clib.h"
 #include "symbol.h"
+#include "proc.h"
 #include "tracer.h"
 #include "probe.h"
 #include "table.h"
@@ -417,6 +418,10 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	params->datadump_enable = datadump_enable;
 	params->datadump_pid = datadump_pid;
 	params->datadump_proto = datadump_proto;
+
+	params->proc_exec_event_count = get_proc_exec_event_count();
+	params->proc_exit_event_count = get_proc_exit_event_count();
+
 	safe_buf_copy(params->datadump_file_path,
 		      sizeof(params->datadump_file_path),
 		      (void *)datadump_file_path, sizeof(datadump_file_path));
@@ -1445,9 +1450,9 @@ static void update_allow_reasm_protos_array(struct bpf_tracer *tracer)
 				     get_proto_name(idx), idx);
 			}
 		} else {
-			ebpf_warning("Set proto %s(%d) to map '%s' failed\n",
+			ebpf_warning("Set proto %s(%d) to map '%s' failed, %s\n",
 				     get_proto_name(idx), idx,
-				     MAP_ALLOW_REASM_PROTOS_NAME);
+				     MAP_ALLOW_REASM_PROTOS_NAME, strerror(errno));
 		}
 	}
 }
