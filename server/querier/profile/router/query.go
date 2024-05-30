@@ -43,6 +43,11 @@ func profileTracing(cfg *config.QuerierConfig) gin.HandlerFunc {
 			return
 		}
 		profileTracing.Context = c.Request.Context()
+		profileTracing.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		if profileTracing.MaxKernelStackDepth == nil {
+			var maxKernelStackDepth = common.MAX_KERNEL_STACK_DEPTH_DEFAULT
+			profileTracing.MaxKernelStackDepth = &maxKernelStackDepth
+		}
 		result, debug, err := service.Tracing(profileTracing, cfg)
 		if err == nil && !profileTracing.Debug {
 			debug = nil
