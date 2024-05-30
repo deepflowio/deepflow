@@ -46,6 +46,7 @@ type DataSet struct {
 	hostLcuuidToID map[string]int
 
 	vmLcuuidToID map[string]int
+	vmIDToLcuuid map[int]string
 
 	vpcLcuuidToID map[string]int
 	vpcIDToLcuuid map[int]string
@@ -116,6 +117,7 @@ func NewDataSet() *DataSet {
 		hostLcuuidToID: make(map[string]int),
 
 		vmLcuuidToID: make(map[string]int),
+		vmIDToLcuuid: make(map[int]string),
 
 		vpcLcuuidToID: make(map[string]int),
 		vpcIDToLcuuid: make(map[int]string),
@@ -252,6 +254,7 @@ func (t *DataSet) UpdateHost(cloudItem *cloudmodel.Host) {
 
 func (t *DataSet) AddVM(item *mysql.VM) {
 	t.vmLcuuidToID[item.Lcuuid] = item.ID
+	t.vmIDToLcuuid[item.ID] = item.Lcuuid
 	t.vmIDToInfo[item.ID] = &vmInfo{
 		Name:  item.Name,
 		VPCID: item.VPCID,
@@ -297,6 +300,7 @@ func (t *DataSet) UpdateVM(cloudItem *cloudmodel.VM) {
 func (t *DataSet) DeleteVM(lcuuid string) {
 	id, _ := t.GetVMIDByLcuuid(lcuuid)
 	delete(t.vmIDToIPNetworkIDMap, id)
+	delete(t.vmIDToLcuuid, id)
 	delete(t.vmLcuuidToID, lcuuid)
 	delete(t.vmIDToInfo, id)
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid))
@@ -1038,6 +1042,23 @@ func (t *DataSet) GetVMIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetVMLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.vmIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
+	var vm mysql.VM
+	result := mysql.Db.Where("lcuuid = ?", id).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.AddVM(&vm)
+		return vm.Lcuuid, true
+	} else {
+		log.Error(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
+		return lcuuid, false
 	}
 }
 
