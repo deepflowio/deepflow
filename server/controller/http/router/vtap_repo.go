@@ -22,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
@@ -40,7 +41,7 @@ func (vr *VtapRepo) RegisterTo(e *gin.Engine) {
 }
 
 func getVtapRepo(c *gin.Context) {
-	data, err := service.GetVtapRepo(service.GetUserInfo(c).ORGID, nil)
+	data, err := service.GetVtapRepo(httpcommon.GetUserInfo(c).ORGID, nil)
 	JsonResponse(c, data, err)
 }
 
@@ -72,7 +73,7 @@ func createVtapRepo(c *gin.Context) {
 		}
 	}
 
-	data, err := service.CreateVtapRepo(service.GetUserInfo(c).ORGID, vtapRepo)
+	data, err := service.CreateVtapRepo(httpcommon.GetUserInfo(c).ORGID, vtapRepo)
 	JsonResponse(c, data, err)
 }
 
@@ -88,5 +89,5 @@ func deleteVtapRepo(c *gin.Context) {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
 		return
 	}
-	JsonResponse(c, nil, service.DeleteVtapRepo(service.GetUserInfo(c).ORGID, vtapRepo.ImageName))
+	JsonResponse(c, nil, service.DeleteVtapRepo(httpcommon.GetUserInfo(c).ORGID, vtapRepo.ImageName))
 }

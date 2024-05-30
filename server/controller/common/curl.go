@@ -27,8 +27,13 @@ import (
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
+)
 
-	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+var (
+	SUCCESS = "SUCCESS"
+
+	ErrorFail    = errors.New("FAIL")
+	ErrorPending = errors.New("PENDING")
 )
 
 // 功能：获取用于API调用的IP地址
@@ -110,13 +115,13 @@ func CURLPerform(method string, url string, body map[string]interface{}, options
 	}
 
 	optStatus := response.Get("OPT_STATUS").MustString()
-	if optStatus != "" && optStatus != httpcommon.SUCCESS {
+	if optStatus != "" && optStatus != SUCCESS {
 		description := response.Get("DESCRIPTION").MustString()
 		log.Errorf("curl: %s failed, (%s)", url, description)
-		e := httpcommon.ErrorFail
+		e := ErrorFail
 		// PENDING used for api /v1/rpmod/
 		if optStatus == "PENDING" {
-			e = httpcommon.ErrorPending
+			e = ErrorPending
 		}
 		return errResponse, fmt.Errorf("%w, %s", e, description)
 	}

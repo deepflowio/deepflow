@@ -39,10 +39,10 @@ var (
 
 type ResourceAccess struct {
 	fpermit  common.FPermit
-	userInfo *UserInfo
+	userInfo *httpcommon.UserInfo
 }
 
-func NewResourceAccess(fpermit common.FPermit, userInfo *UserInfo) *ResourceAccess {
+func NewResourceAccess(fpermit common.FPermit, userInfo *httpcommon.UserInfo) *ResourceAccess {
 	return &ResourceAccess{
 		fpermit:  fpermit,
 		userInfo: userInfo,
@@ -128,7 +128,7 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 	return resourceVerify(url, http.MethodDelete, ra.userInfo, teamID, body)
 }
 
-func permitVerify(url string, userInfo *UserInfo, teamID int) error {
+func permitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
 	response, err := common.CURLPerform(
 		http.MethodGet,
 		url,
@@ -152,7 +152,7 @@ func permitVerify(url string, userInfo *UserInfo, teamID int) error {
 	return nil
 }
 
-func resourceVerify(url, httpMethod string, userInfo *UserInfo, teamID int, body map[string]interface{}) error {
+func resourceVerify(url, httpMethod string, userInfo *httpcommon.UserInfo, teamID int, body map[string]interface{}) error {
 	_, err := common.CURLPerform(
 		httpMethod,
 		url,

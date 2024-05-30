@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
@@ -39,7 +40,7 @@ type AgentGroupConfig struct {
 	resourceAccess *ResourceAccess
 }
 
-func NewAgentGroupConfig(userInfo *UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
+func NewAgentGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
 	return &AgentGroupConfig{
 		cfg:            cfg,
 		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
@@ -659,7 +660,7 @@ func getRealVTapGroupConfig(config *agent_config.AgentGroupConfigModel) *agent_c
 	return realConfiguration
 }
 
-func GetVTapGroupConfigs(userInfo *UserInfo, fpermitCfg *common.FPermit, filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
+func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err

@@ -1185,8 +1185,10 @@ func formatEnumTag(tagName string) (string, bool) {
 	// parse when query client/server side enum tag
 	enumFile := strings.TrimSuffix(tagName, "_0")
 	enumFile = strings.TrimSuffix(enumFile, "_1")
-	enumFile = fmt.Sprintf("%s.%s", enumFile, config.Cfg.Language)
 	_, exists := tagdescription.TAG_ENUMS[enumFile]
+	if !exists {
+		enumFile = fmt.Sprintf("%s.%s", enumFile, config.Cfg.Language)
+	}
 	if exists {
 		return fmt.Sprintf("Enum(%s)", tagName), exists
 	}
