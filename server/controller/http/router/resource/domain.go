@@ -380,7 +380,13 @@ func applyDomainAddtionalResource(c *gin.Context) {
 		return
 	}
 
-	err = resource.ApplyDomainAddtionalResource(data)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
+	err = resource.ApplyDomainAddtionalResource(data, db)
 	common.JsonResponse(c, map[string]interface{}{}, err)
 }
 
@@ -399,7 +405,13 @@ func listDomainAddtionalResource(c *gin.Context) {
 		return
 	}
 
-	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
+	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName, db)
 	common.JsonResponse(c, data, err)
 }
 
@@ -409,14 +421,20 @@ func GetDomainAdditionalResourceExample(c *gin.Context) {
 }
 
 func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
 	data := &model.AdditionalResource{}
-	err := c.ShouldBindBodyWith(&data, binding.YAML)
+	err = c.ShouldBindBodyWith(&data, binding.YAML)
 	if err == nil || err == io.EOF {
-		if err = resource.ApplyDomainAddtionalResource(*data); err != nil {
+		if err = resource.ApplyDomainAddtionalResource(*data, db); err != nil {
 			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
 			return
 		}
-		d, err := resource.GetDomainAdditionalResource("", "")
+		d, err := resource.GetDomainAdditionalResource("", "", db)
 		if err != nil {
 			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
 			return
@@ -434,7 +452,13 @@ func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
 }
 
 func getDomainAddtionalResourceAdvanced(c *gin.Context) {
-	d, err := resource.GetDomainAdditionalResource("", "")
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
+	d, err := resource.GetDomainAdditionalResource("", "", db)
 	if err != nil {
 		common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
 		return
