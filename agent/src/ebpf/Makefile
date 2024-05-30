@@ -73,6 +73,7 @@ LIBTRACE := libtrace.a
 OBJS := user/elf.o \
 	user/common.o \
 	user/symbol.o \
+	user/proc.o \
 	user/go_tracer.o \
 	user/ssl_tracer.o \
 	user/ring.o \

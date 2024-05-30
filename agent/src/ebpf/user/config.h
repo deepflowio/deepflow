@@ -146,6 +146,9 @@ enum {
 #define PROFILER_READER_EPOLL_TIMEOUT		500	//msecs
 #define EPOLL_SHORT_TIMEOUT			100	//mescs
 
+// The queue size for managing process execution/exit events.
+#define PROC_RING_SZ 16384
+
 /*
  * Process information recalibration time, this time is the number of seconds
  * lost from the process startup time to the current time.
