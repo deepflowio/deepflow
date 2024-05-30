@@ -45,6 +45,7 @@
 #include "java/config.h"
 #include "java/df_jattach.h"
 #include "profile_common.h"
+#include "../proc.h"
 
 #include "../perf_profiler_bpf_common.c"
 
