@@ -175,16 +175,16 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// process execute
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
+	// process exit
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
 	// clear trace connection
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
 	// fetch close info
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_close");
-
-	// Used for process offsets management
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
 	tps->tps_nr = index;
 
