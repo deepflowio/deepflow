@@ -95,13 +95,6 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					continue
 				}
 
-				err = handleResponse(resp)
-				if errors.Is(err, ErrMultiPackage) {
-					continue
-				}
-				if err != nil {
-					log.Error(err)
-				}
 				handleResponse(resp)
 			}
 		}
@@ -127,11 +120,12 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	}
 }
 
-func handleResponse(resp *trident.RemoteExecResponse) error {
+func handleResponse(resp *trident.RemoteExecResponse) {
 	key := resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 	manager, ok := service.AgentRemoteExecMap[key]
 	if !ok {
-		return fmt.Errorf("agent(key: %s) remote exec map not found", key)
+		log.Errorf("agent(key: %s) remote exec map not found", key)
+		return
 	}
 	b, _ := json.Marshal(resp)
 	log.Infof("agent(key: %s) resp: %s", key, string(b))
@@ -148,7 +142,6 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 			manager.AppendNamespaces(resp.LinuxNamespaces)
 		}
 		manager.LinuxNamespaceDoneCH <- struct{}{}
-		return nil
 	case len(resp.Commands) > 0:
 		if len(manager.GetCommands()) > 0 {
 			manager.InitCommands(resp.Commands)
@@ -156,11 +149,10 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 			manager.AppendCommands(resp.Commands)
 		}
 		manager.RemoteCMDDoneCH <- struct{}{}
-		return nil
 	default:
 		result := resp.CommandResult
 		if resp.CommandResult == nil {
-			return nil
+			return
 		}
 
 		if resp.Errmsg != nil {
@@ -168,15 +160,14 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 				key, *resp.Errmsg)
 			manager.AppendErr(resp.Errmsg)
 			manager.ExecDoneCH <- struct{}{}
-			return nil
+			return
 		}
 		if result.Content != nil {
 			manager.AppendContent(result.Content)
 		}
 		if result.Md5 != nil {
 			manager.ExecDoneCH <- struct{}{}
-			return nil
+			return
 		}
 	}
-	return nil
 }
