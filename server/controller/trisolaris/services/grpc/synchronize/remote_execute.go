@@ -21,10 +21,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"runtime"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"google.golang.org/protobuf/proto"
 )
 
 func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) error {
@@ -45,7 +47,9 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Errorf("recovered in RemoteExecute: %v", r)
+				buf := make([]byte, 2048)
+				n := runtime.Stack(buf, false)
+				log.Errorf("recovered in RemoteExecute: %s", buf[:n])
 			}
 		}()
 
@@ -65,12 +69,17 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				}
 				key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 				if _, ok := service.AgentRemoteExecMap[key]; !ok {
-					manager = service.AddSteamToManager(key)
+					requestID := uint64(0)
+					if resp.RequestId != nil {
+						requestID = *resp.RequestId
+					}
+					manager = service.AddSteamToManager(key, requestID)
 					log.Infof("add agent(key:%s) to cmd manager", key)
 					initDone <- struct{}{}
 				}
 				// heartbeat
-				if resp.CommandResult == nil && resp.LinuxNamespaces == nil && resp.Commands == nil {
+				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
+					resp.Commands == nil && resp.Errmsg == nil {
 					manager.ExecCH <- &api.RemoteExecRequest{}
 				}
 
@@ -86,6 +95,13 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					continue
 				}
 
+				err = handleResponse(resp)
+				if errors.Is(err, ErrMultiPackage) {
+					continue
+				}
+				if err != nil {
+					log.Error(err)
+				}
 				handleResponse(resp)
 			}
 		}
@@ -98,6 +114,9 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 			log.Infof("context done")
 			return nil
 		case req := <-manager.ExecCH:
+			if req.ExecType != nil {
+				req.RequestId = proto.Uint64(manager.GetRequestID() + 1)
+			}
 			b, _ := json.Marshal(req)
 			log.Infof("agent(key: %s) request: %s", key, string(b))
 			if err := stream.Send(req); err != nil {
@@ -112,12 +131,14 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 	key := resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 	manager, ok := service.AgentRemoteExecMap[key]
 	if !ok {
-		err := fmt.Errorf("agent(key: %s) remote exec map not found", key)
-		log.Error(err)
-		return err
+		return fmt.Errorf("agent(key: %s) remote exec map not found", key)
 	}
 	b, _ := json.Marshal(resp)
 	log.Infof("agent(key: %s) resp: %s", key, string(b))
+
+	if resp.RequestId != nil {
+		manager.SetRequestID(*resp.RequestId)
+	}
 
 	switch {
 	case len(resp.LinuxNamespaces) > 0:
@@ -137,18 +158,15 @@ func handleResponse(resp *trident.RemoteExecResponse) error {
 		manager.RemoteCMDDoneCH <- struct{}{}
 		return nil
 	default:
-		log.Infof("agent(key: %s) command response", key)
 		result := resp.CommandResult
 		if resp.CommandResult == nil {
 			return nil
 		}
-		b, _ := json.Marshal(resp.CommandResult)
-		log.Infof("agent(key: %s) resp command result: %s", key, string(b))
 
-		if result.Errmsg != nil {
+		if resp.Errmsg != nil {
 			log.Errorf("agent(key: %s) run command error: %s",
-				key, *result.Errmsg)
-			manager.AppendErr(result.Errmsg)
+				key, *resp.Errmsg)
+			manager.AppendErr(resp.Errmsg)
 			manager.ExecDoneCH <- struct{}{}
 			return nil
 		}
