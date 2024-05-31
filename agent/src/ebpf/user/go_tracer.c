@@ -997,10 +997,6 @@ static void process_exit_handle(int pid, struct bpf_tracer *tracer)
 static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
 				     uint8_t type)
 {
-	// Uprobe's hook points are only for user processes
-	if (!is_user_process(pid))
-		return;
-
 	char *path = get_elf_path_by_pid(pid);
 	if (path == NULL) {
 		return;
