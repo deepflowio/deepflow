@@ -150,7 +150,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 		}
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
-			log.Info(u.metadata.Logf("to add (cloud item: %#v)", cloudItem))
+			log.Info(u.metadata.Logf("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), cloudItem))
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)
 			if ok {
 				dbItemsToAdd = append(dbItemsToAdd, dbItem)
@@ -159,7 +159,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 			diffBase.SetSequence(u.cache.GetSequence())
 			structInfo, mapInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
-				log.Info(u.metadata.Logf("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase))
+				log.Info(u.metadata.Logf("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase))
 				u.update(&cloudItem, diffBase, mapInfo, structInfo)
 			}
 		}
@@ -173,7 +173,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	lcuuidsOfBatchToDelete := []string{}
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
-			log.Info(u.metadata.Logf("to delete (diff base item: %#v)", diffBase))
+			log.Info(u.metadata.Logf("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase))
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}

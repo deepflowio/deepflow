@@ -410,7 +410,7 @@ func formatLogDeleteABecauseBHasGone[MT constraint.MySQLModel](a, b string, item
 	for _, item := range items {
 		str += fmt.Sprintf("%+v ", item)
 	}
-	return fmt.Sprintf("delete %s: %s because %s has gone", a, str, b)
+	return fmt.Sprintf("%s: %+v because %s has gone", common.LogDelete(a), str, b)
 }
 
 func deleteExpired[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time) []*MT {
