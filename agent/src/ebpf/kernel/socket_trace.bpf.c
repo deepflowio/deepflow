@@ -2385,6 +2385,8 @@ static __inline int data_submit(void *ctx)
 	conn_info = &__conn_info;
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+	if (!conn_info->is_reasm_seg && conn_info->socket_info_ptr)
+		conn_info->socket_info_ptr->finish_reasm = false;
 
 	struct data_args_t *args;
 	if (conn_info->direction == T_INGRESS)
