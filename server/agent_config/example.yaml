@@ -1439,7 +1439,7 @@ vtap_group_id: g-xxxxxx
       #minblock: 50us
 
     ## eBPF OOOR (Out-Of-Order-Reassembly) Cache Size
-    ## Default: 16. Range: [8, 128]
+    ## Default: 16. Range: [8, 1024]
     ## Note: When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size` eBPF
     ##   socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached in each TCP/UDP
     ##   flow to prevent out-of-order events from impacting application protocol parsing. Since eBPF socket

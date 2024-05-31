@@ -346,7 +346,8 @@ pub struct ParseParam<'a> {
     // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam<'a>>,
     // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
-    pub packet_seq: u64,
+    pub packet_start_seq: u64,
+    pub packet_end_seq: u64,
     pub time: u64, // micro second
     pub parse_perf: bool,
     pub parse_log: bool,
@@ -397,7 +398,8 @@ impl<'a> ParseParam<'a> {
 
             direction: packet.lookup_key.direction,
             ebpf_type: packet.ebpf_type,
-            packet_seq: packet.cap_seq,
+            packet_start_seq: packet.cap_start_seq,
+            packet_end_seq: packet.cap_end_seq,
             ebpf_param: None,
             time: packet.lookup_key.timestamp.as_micros() as u64,
             parse_perf,
