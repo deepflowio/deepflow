@@ -24,6 +24,7 @@ import (
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
@@ -314,6 +315,6 @@ func (c *Cleaner) cleanVInterfaceDirty() {
 
 func logErrorDeleteResourceTypeABecauseResourceTypeBHasGone[MT constraint.MySQLModel](a, b string, items []MT) {
 	for _, item := range items {
-		log.Errorf("delete %s: %+v because %s has gone", a, item, b)
+		log.Errorf("%s: %+v because %s has gone", common.LogDelete(a), item, b)
 	}
 }
