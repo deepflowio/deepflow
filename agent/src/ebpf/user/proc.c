@@ -380,12 +380,6 @@ void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 
 	if (type == PROC_EXEC) {
 		__sync_fetch_and_add(&proc_exec_event_count, 1);
-
-		/* To filter out threads. */
-		if (!is_user_process(pid)) {
-			return;
-		}
-
 		if (add_proc_ev_info_to_ring(type, &kv) < 0) {
 			int ret = VEC_OK;
 			symbol_cache_pids_lock();
