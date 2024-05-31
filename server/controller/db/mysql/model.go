@@ -506,3 +506,8 @@ type Team struct {
 	ShortLcuuid string `gorm:"column:short_lcuuid;type:char(64);default:''" json:"SHORT_LCUUID"`
 	ORGID       int    `gorm:"column:org_id;type:int;default:0" json:"ORG_ID"`
 }
+
+type User struct {
+	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	UserName string `gorm:"column:username;type:char(128)" json:"USERNAME"`
+}

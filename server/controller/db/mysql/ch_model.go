@@ -603,3 +603,8 @@ type ChAlarmPolicy struct {
 func (ChAlarmPolicy) TableName() string {
 	return "ch_alarm_policy"
 }
+
+type ChUser struct {
+	ID   int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+}
