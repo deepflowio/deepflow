@@ -32,6 +32,8 @@
 #define PORT_NUM_MAX	65536
 #define NS_IN_SEC       1000000000ULL
 #define NS_IN_MSEC      1000000ULL
+#define US_IN_SEC	1000000ULL
+#define MS_IN_SEC       1000ULL
 #define TIME_TYPE_NAN   1
 #define TIME_TYPE_SEC   0
 
@@ -293,6 +295,7 @@ int generate_random_integer(int max_value);
  * a non-zero value represents the address of the kernel symbol.
  */
 u64 kallsyms_lookup_name(const char *name);
+char *get_timestamp_from_us(u64 microseconds);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
