@@ -318,7 +318,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString("`")
-		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString(strings.ReplaceAll(f.Alias, "`", ""))
 		buf.WriteString("`")
 	}
 

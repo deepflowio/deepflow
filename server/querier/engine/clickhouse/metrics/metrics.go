@@ -116,6 +116,90 @@ func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	return GetMetrics(field, db, table, orgID)
 }
 
+func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]*Metrics, db, table, orgID string) error {
+	for _, tagValue := range tagDescriptions.Values {
+		tagSlice := tagValue.([]interface{})
+		name := tagSlice[0].(string)
+		clientName := tagSlice[1].(string)
+		serverName := tagSlice[2].(string)
+		displayName := tagSlice[3].(string)
+		tagType := tagSlice[4].(string)
+		permissions := tagSlice[7].([]bool)
+
+		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
+			continue
+		}
+		if db == ckcommon.DB_NAME_FLOW_TAG {
+			continue
+		}
+		if name == "lb_listener" || name == "pod_ingress" {
+			continue
+		}
+		if len(tagSlice) >= 12 {
+			notSupportedOperators := tagSlice[11].([]string)
+			// not support select
+			if slices.Contains(notSupportedOperators, "select") {
+				continue
+			}
+		}
+		nameDBField, err := GetTagDBField(name, db, table, orgID)
+		if err != nil {
+			return err
+		}
+		clientNameDBField, err := GetTagDBField(clientName, db, table, orgID)
+		if err != nil {
+			return err
+		}
+		serverNameDBField, err := GetTagDBField(serverName, db, table, orgID)
+		if err != nil {
+			return err
+		}
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
+			if serverName == clientName {
+				clientNameMetric := NewMetrics(
+					0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", tagType,
+				)
+				newAllMetrics[clientName] = clientNameMetric
+			} else {
+				var (
+					serverDisplayName = displayName
+					clientDisplayName = displayName
+				)
+				if config.Cfg.Language == "en" {
+					serverDisplayName = ckcommon.TagServerEnPrefix + " " + displayName
+					clientDisplayName = ckcommon.TagClientEnPrefix + " " + displayName
+				} else if config.Cfg.Language == "ch" {
+					if letterRegexp.MatchString(serverName) {
+						serverDisplayName = ckcommon.TagServerChPrefix + " " + displayName
+						clientDisplayName = ckcommon.TagClientChPrefix + " " + displayName
+					} else {
+						serverDisplayName = ckcommon.TagServerChPrefix + displayName
+						clientDisplayName = ckcommon.TagClientChPrefix + displayName
+					}
+				}
+				serverNameMetric := NewMetrics(
+					0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", tagType,
+				)
+				clientNameMetric := NewMetrics(
+					0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", tagType,
+				)
+				newAllMetrics[serverName] = serverNameMetric
+				newAllMetrics[clientName] = clientNameMetric
+			}
+		} else {
+			nameMetric := NewMetrics(
+				0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+				"Tag", permissions, "", table, "", tagType,
+			)
+			newAllMetrics[name] = nameMetric
+		}
+	}
+	return nil
+}
+
 func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
@@ -154,111 +238,12 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	}
 
 	// tag metrics
-	dbData, ok := DB_DESCRIPTIONS["clickhouse"]
-	if !ok {
+	tagDescriptions, err := tag.GetTagDescriptions(db, table, "", "", orgID, true, context.Background())
+	if err != nil {
+		log.Error("Failed to get tag type metrics")
 		return nil, false
 	}
-	dbDataMap := dbData.(map[string]interface{})
-	if tagData, ok := dbDataMap["tag"]; ok {
-		dbTagMap := tagData.(map[string]interface{})
-		if dbTag, ok := dbTagMap[db]; ok {
-			tableTagMap := dbTag.(map[string]interface{})
-			newTable := table
-			if db == ckcommon.DB_NAME_PROMETHEUS {
-				newTable = "samples"
-			} else if db == ckcommon.DB_NAME_EXT_METRICS {
-				newTable = "ext_common"
-			} else if db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM {
-				newTable = "deepflow_system_common"
-			}
-			if tableTag, ok := tableTagMap[newTable]; ok {
-				tabletagSlice := tableTag.([][]interface{})
-				for i, tagSlice := range tabletagSlice {
-					tagType := tagSlice[3].(string)
-					if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
-						continue
-					}
-					if db == ckcommon.DB_NAME_FLOW_TAG {
-						continue
-					}
-					name := tagSlice[0].(string)
-					if name == "lb_listener" || name == "pod_ingress" {
-						continue
-					}
-					notSupportedOperators := []string{}
-					if len(tagSlice) >= 9 {
-						notSupportedOperators = ckcommon.ParseNotSupportedOperator(tagSlice[8])
-						// not support select
-						if slices.Contains(notSupportedOperators, "select") {
-							continue
-						}
-					}
-					clientName := tagSlice[1].(string)
-					serverName := tagSlice[2].(string)
-					tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
-					displayName := tagLanguage[1].(string)
-					permissions, err := ckcommon.ParsePermission("111")
-					if err != nil {
-						return nil, false
-					}
-					nameDBField, err := GetTagDBField(name, db, table, orgID)
-					if err != nil {
-						return nil, false
-					}
-					clientNameDBField, err := GetTagDBField(clientName, db, table, orgID)
-					if err != nil {
-						return nil, false
-					}
-					serverNameDBField, err := GetTagDBField(serverName, db, table, orgID)
-					if err != nil {
-						return nil, false
-					}
-					if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
-						if serverName == clientName {
-							clientNameMetric := NewMetrics(
-								0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "", tagType,
-							)
-							newAllMetrics[clientName] = clientNameMetric
-						} else {
-							var (
-								serverDisplayName = displayName
-								clientDisplayName = displayName
-							)
-							if config.Cfg.Language == "en" {
-								serverDisplayName = ckcommon.TagServerEnPrefix + " " + displayName
-								clientDisplayName = ckcommon.TagClientEnPrefix + " " + displayName
-							} else if config.Cfg.Language == "ch" {
-								if letterRegexp.MatchString(serverName) {
-									serverDisplayName = ckcommon.TagServerChPrefix + " " + displayName
-									clientDisplayName = ckcommon.TagClientChPrefix + " " + displayName
-								} else {
-									serverDisplayName = ckcommon.TagServerChPrefix + displayName
-									clientDisplayName = ckcommon.TagClientChPrefix + displayName
-								}
-							}
-							serverNameMetric := NewMetrics(
-								0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "", tagType,
-							)
-							clientNameMetric := NewMetrics(
-								0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "", tagType,
-							)
-							newAllMetrics[serverName] = serverNameMetric
-							newAllMetrics[clientName] = clientNameMetric
-						}
-					} else {
-						nameMetric := NewMetrics(
-							0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-							"Tag", permissions, "", table, "", tagType,
-						)
-						newAllMetrics[name] = nameMetric
-					}
-				}
-			}
-		}
-	}
+	GetTagTypeMetrics(tagDescriptions, newAllMetrics, db, table, orgID)
 	metric, ok := newAllMetrics[field]
 	return metric, ok
 }
