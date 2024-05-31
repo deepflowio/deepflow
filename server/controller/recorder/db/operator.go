@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 )
@@ -63,8 +64,8 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 
 	err := mysql.Db.Create(&itemsToAdd).Error
 	if err != nil {
-		log.Errorf("add %s batch failed: %v", o.resourceTypeName, err)
-		log.Errorf("add %s (lcuuids: %v) failed", o.resourceTypeName, lcuuidsToAdd)
+		log.Errorf("%s batch failed: %v", rcommon.LogAdd(o.resourceTypeName), err)
+		log.Errorf("%s (lcuuids: %v) failed", rcommon.LogAdd(o.resourceTypeName), lcuuidsToAdd)
 
 		if o.allocateID && len(allocatedIDs) > 0 {
 			idmng.ReleaseIDs(o.resourceTypeName, allocatedIDs)
@@ -84,7 +85,7 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	}
 
 	for _, item := range itemsToAdd {
-		log.Infof("add %s (detail: %+v) success", o.resourceTypeName, item)
+		log.Infof("%s (detail: %+v) success", rcommon.LogAdd(o.resourceTypeName), item)
 	}
 
 	return itemsToAdd, true
@@ -94,10 +95,10 @@ func (o *OperatorBase[MT]) Update(lcuuid string, updateInfo map[string]interface
 	dbItem := new(MT)
 	err := mysql.Db.Model(dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
 	if err != nil {
-		log.Errorf("update %s (lcuuid: %s, detail: %+v) failed: %s", o.resourceTypeName, lcuuid, updateInfo, err.Error())
+		log.Errorf("%s (lcuuid: %s, detail: %+v) failed: %s", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, err.Error())
 		return dbItem, false
 	}
-	log.Infof("update %s (lcuuid: %s, detail: %+v) success", o.resourceTypeName, lcuuid, updateInfo)
+	log.Infof("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo)
 	return dbItem, true
 }
 
@@ -105,13 +106,13 @@ func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) bool {
 	var deletedItems []*MT
 	err := mysql.Db.Clauses(clause.Returning{}).Where("lcuuid IN ?", lcuuids).Delete(&deletedItems).Error
 	if err != nil {
-		log.Errorf("delete %s (lcuuids: %v) failed: %v", o.resourceTypeName, lcuuids, err)
+		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err)
 		return false
 	}
 	if o.softDelete {
-		log.Infof("update %s (lcuuids: %v) deleted_at success", o.resourceTypeName, lcuuids)
+		log.Infof("%s (lcuuids: %v) deleted_at success", rcommon.LogUpdate(o.resourceTypeName), lcuuids)
 	} else {
-		log.Infof("delete %s (lcuuids: %v) success", o.resourceTypeName, lcuuids)
+		log.Infof("%s (lcuuids: %v) success", rcommon.LogDelete(o.resourceTypeName), lcuuids)
 	}
 
 	o.returnUsedIDs(deletedItems)
@@ -179,7 +180,7 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v, one detail: %#v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs, dupItems[0])
 			err = mysql.Db.Unscoped().Delete(&dupItems).Error
 			if err != nil {
-				log.Errorf("delete duplicated data failed: %+v", err)
+				log.Errorf("%s duplicated data failed: %+v", rcommon.LogDelete(o.resourceTypeName), err)
 				return items, lcuuids, false
 			}
 		} else {

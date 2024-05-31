@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 var log = logging.MustGetLogger("recorder.cache.tool")
@@ -45,15 +47,15 @@ func cacheIDByLcuuidNotFound(resource string, lcuuid string) string {
 }
 
 func addToToolMap(resource, lcuuid string) string {
-	return fmt.Sprintf("cache tool map add %s (lcuuid: %s) success", resource, lcuuid)
+	return fmt.Sprintf("%s (lcuuid: %s) success", common.LogAdd(resource), lcuuid)
 }
 
 func updateToolMap(resource, lcuuid string) string {
-	return fmt.Sprintf("cache tool map update %s (lcuuid: %s) success", resource, lcuuid)
+	return fmt.Sprintf("%s (lcuuid: %s) success", common.LogUpdate(resource), lcuuid)
 }
 
 func deleteFromToolMap(resource, lcuuid string) string {
-	return fmt.Sprintf("cache tool map delete %s (lcuuid: %s) success", resource, lcuuid)
+	return fmt.Sprintf("%s (lcuuid: %s) success", common.LogDelete(resource), lcuuid)
 }
 
 func refreshResource(resource string) string {

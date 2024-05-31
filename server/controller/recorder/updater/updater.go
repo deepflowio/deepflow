@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
@@ -78,7 +79,7 @@ func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 		}
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
-			log.Infof("to add (cloud item: %#v)", cloudItem)
+			log.Infof("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), cloudItem)
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)
 			if ok {
 				dbItemsToAdd = append(dbItemsToAdd, dbItem)
@@ -87,7 +88,7 @@ func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 			diffBase.SetSequence(u.cache.GetSequence())
 			updateInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
-				log.Infof("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase)
+				log.Infof("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase)
 				u.update(&cloudItem, diffBase, updateInfo)
 			}
 		}
@@ -101,7 +102,7 @@ func (u *UpdaterBase[CT, MT, BT]) HandleDelete() {
 	lcuuidsOfBatchToDelete := []string{}
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
-			log.Infof("to delete (diff base item: %#v)", diffBase)
+			log.Infof("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase)
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}
