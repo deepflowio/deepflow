@@ -3241,6 +3241,9 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		conn_info->prev_direction =
 		    conn_info->socket_info_ptr->direction;
+		if (conn_info->socket_info_ptr->finish_reasm)
+			return;
+
 		/*
 		 * If data reassembly is enabled, subsequent contiguous data of the
 		 * same direction will be pushed until the data changes direction or
@@ -3276,7 +3279,6 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 				    || conn_info->prev_count > 0)
 					conn_info->enable_reasm = false;
 			} else {
-				conn_info->socket_info_ptr->reasm_bytes = 0;
 				conn_info->enable_reasm = false;
 			}
 		}
@@ -3821,9 +3823,11 @@ infer_protocol_2(const char *infer_buf, size_t count,
 	if (conn_info->enable_reasm) {
 		if (inferred_message.type == MSG_UNKNOWN) {
 			inferred_message.type = MSG_REQUEST;
-			if (conn_info->socket_info_ptr)
+			if (conn_info->socket_info_ptr) {
 				inferred_message.protocol =
 				    conn_info->socket_info_ptr->l7_proto;
+				conn_info->socket_info_ptr->finish_reasm = true;
+			}
 			conn_info->is_reasm_seg = true;
 		}
 	}
