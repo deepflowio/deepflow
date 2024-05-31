@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+#include <linux/bpf_perf_event.h>
 #include "config.h"
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
@@ -2070,63 +2071,6 @@ exit:
 	return 0;
 }
 
-// /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
-// Here, the tracepoint is used to periodically send the data residing in the cache but not
-// yet transmitted to the user-level receiving program for processing.
-TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
-	// Only pre-specified Pid is allowed to trigger.
-	if (!check_pid_validity())
-		return 0;
-
-	int k0 = 0;
-	struct __socket_data_buffer *v_buff =
-	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (v_buff) {
-		if (v_buff->events_num > 0) {
-			struct __socket_data *v =
-			    (struct __socket_data *)&v_buff->data[0];
-			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) >
-			    NS_PER_SEC) {
-				__u32 buf_size =
-				    (v_buff->len +
-				     offsetof(typeof
-					      (struct __socket_data_buffer),
-					      data))
-				    & (sizeof(*v_buff) - 1);
-				/* 
-				 * Note that when 'buf_size == 0', it indicates that the data being
-				 * sent is at its maximum value (sizeof(*v_buff)), and it should
-				 * be sent accordingly.
-				 */
-				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
-					/* 
-					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
-					 * (Linux 4.14.x) length checks.
-					 */
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      buf_size + 1);
-				} else {
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      sizeof(*v_buff));
-				}
-
-				v_buff->events_num = 0;
-				v_buff->len = 0;
-			}
-		}
-	}
-
-	return 0;
-}
-
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_socket/format
 TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
@@ -2635,6 +2579,63 @@ PROGTP(io_event) (void *ctx) {
 		trace_io_event_common(ctx, data_args, T_EGRESS, id);
 		active_write_args_map__delete(&id);
 		return 0;
+	}
+
+	return 0;
+}
+
+/*
+ * Here, the perf event is used to periodically send the data residing in
+ * the cache but not yet transmitted to the user-level receiving program
+ * for processing.
+ */
+SEC("perf_event")
+int bpf_push_socket_data(struct bpf_perf_event_data *ctx)
+{
+	int k0 = 0;
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (v_buff) {
+		if (v_buff->events_num > 0) {
+			struct __socket_data *v =
+			    (struct __socket_data *)&v_buff->data[0];
+			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) >
+			    NS_PER_SEC) {
+				__u32 buf_size =
+				    (v_buff->len +
+				     offsetof(typeof
+					      (struct __socket_data_buffer),
+					      data))
+				    & (sizeof(*v_buff) - 1);
+				/* 
+				 * Note that when 'buf_size == 0', it indicates that the data being
+				 * sent is at its maximum value (sizeof(*v_buff)), and it should
+				 * be sent accordingly.
+				 */
+				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+					/* 
+					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+					 * (Linux 4.14.x) length checks.
+					 */
+					bpf_perf_event_output(ctx,
+							      &NAME
+							      (socket_data),
+							      BPF_F_CURRENT_CPU,
+							      v_buff,
+							      buf_size + 1);
+				} else {
+					bpf_perf_event_output(ctx,
+							      &NAME
+							      (socket_data),
+							      BPF_F_CURRENT_CPU,
+							      v_buff,
+							      sizeof(*v_buff));
+				}
+
+				v_buff->events_num = 0;
+				v_buff->len = 0;
+			}
+		}
 	}
 
 	return 0;
