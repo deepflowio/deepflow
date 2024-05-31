@@ -18,9 +18,8 @@ use std::{
     borrow::Cow,
     cell::OnceCell,
     collections::VecDeque,
-    fmt,
+    fmt::{self, Write},
     fs::File,
-    io::Result as IoResult,
     ops::Deref,
     path::PathBuf,
     pin::Pin,
@@ -33,10 +32,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::{future::BoxFuture, stream::Stream};
+use futures::{future::BoxFuture, stream::Stream, TryFutureExt};
+use k8s_openapi::api::core::v1::{Event, Pod};
+use kube::{
+    api::{ListParams, LogParams},
+    Api, Client, Config,
+};
 use log::{debug, info, trace, warn};
 use md5::{Digest, Md5};
 use parking_lot::RwLock;
+use thiserror::Error;
 use tokio::{
     process::Command as TokioCommand,
     runtime::Runtime,
@@ -54,16 +59,26 @@ use public::{
 
 const MIN_BATCH_LEN: usize = 1024;
 
+#[derive(Clone, Copy)]
 enum OutputFormat {
     Text,
     Binary,
 }
 
-enum CommandType {
-    Linux,
-    Kubernetes,
+#[derive(Clone, Copy, PartialEq)]
+enum KubeCmd {
+    DescribePod,
+    Log,
+    LogPrevious,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum CommandType {
+    Linux,
+    Kubernetes(KubeCmd),
+}
+
+#[derive(Clone, Copy)]
 struct Command {
     cmdline: &'static str,
     output_format: OutputFormat,
@@ -80,7 +95,7 @@ fn all_supported_commands() -> Vec<Command> {
             command_type: CommandType::Linux,
         },
         Command {
-            cmdline: "top -b -n 1 -c -w",
+            cmdline: "top -b -n 1 -c -w 512",
             output_format: OutputFormat::Text,
             desc: "top",
             command_type: CommandType::Linux,
@@ -101,19 +116,19 @@ fn all_supported_commands() -> Vec<Command> {
             cmdline: "kubectl -n $ns describe pod $pod",
             output_format: OutputFormat::Text,
             desc: "",
-            command_type: CommandType::Kubernetes,
+            command_type: CommandType::Kubernetes(KubeCmd::DescribePod),
         },
         Command {
             cmdline: "kubectl -n $ns logs --tail=10000 $pod",
             output_format: OutputFormat::Text,
             desc: "",
-            command_type: CommandType::Kubernetes,
+            command_type: CommandType::Kubernetes(KubeCmd::Log),
         },
         Command {
             cmdline: "kubectl -n $ns logs --tail=10000 -p $pod",
             output_format: OutputFormat::Text,
             desc: "",
-            command_type: CommandType::Kubernetes,
+            command_type: CommandType::Kubernetes(KubeCmd::LogPrevious),
         },
     ]
 }
@@ -127,6 +142,13 @@ fn get_cmdline(id: usize) -> Option<&'static str> {
     SUPPORTED_COMMANDS.with(|cell| {
         let cs = cell.get_or_init(|| all_supported_commands());
         cs.get(id).map(|c| c.cmdline)
+    })
+}
+
+fn get_cmd(id: usize) -> Option<Command> {
+    SUPPORTED_COMMANDS.with(|cell| {
+        let cs = cell.get_or_init(|| all_supported_commands());
+        cs.get(id).copied()
     })
 }
 
@@ -150,6 +172,22 @@ fn max_param_nums() -> usize {
         })
     })
 }
+
+#[derive(Error, Debug)]
+enum Error {
+    #[error("command `{0}` execution failed")]
+    CmdExecFailed(#[from] std::io::Error),
+    #[error("command `{0}` failed with code {1:?}")]
+    CmdFailed(String, Option<i32>),
+    #[error("param `{0}` not found")]
+    ParamNotFound(String),
+    #[error("kubernetes failed with {0}")]
+    KubeError(#[from] kube::Error),
+    #[error("serialize failed with {0}")]
+    SerializeError(#[from] serde_json::Error),
+}
+
+type Result<T> = std::result::Result<T, Error>;
 
 struct NetNsInfo {
     id: u64,
@@ -320,11 +358,11 @@ struct Responser {
     // request id, future
     pending_lsns: Option<(
         Option<u64>,
-        BoxFuture<'static, Result<Vec<pb::LinuxNamespace>, String>>,
+        BoxFuture<'static, Result<Vec<pb::LinuxNamespace>>>,
     )>,
 
     // request id, command id, future
-    pending_command: Option<(Option<u64>, usize, BoxFuture<'static, IoResult<Output>>)>,
+    pending_command: Option<(Option<u64>, usize, BoxFuture<'static, Result<Output>>)>,
     result: CommandResult,
 }
 
@@ -497,7 +535,7 @@ impl Stream for Responser {
                             return Poll::Ready(Some(pb::RemoteExecResponse {
                                 agent_id: Some(self.agent_id.read().deref().into()),
                                 request_id,
-                                errmsg: Some(e),
+                                errmsg: Some(e.to_string()),
                                 ..Default::default()
                             }));
                         }
@@ -545,7 +583,7 @@ impl Stream for Responser {
                                             CommandType::Linux => {
                                                 Some(pb::CommandType::Linux as i32)
                                             }
-                                            CommandType::Kubernetes => {
+                                            CommandType::Kubernetes(_) => {
                                                 Some(pb::CommandType::Kubernetes as i32)
                                             }
                                         },
@@ -569,15 +607,21 @@ impl Stream for Responser {
                             if let Some(batch_len) = msg.batch_len {
                                 self.batch_len = MIN_BATCH_LEN.max(batch_len as usize);
                             }
-                            let Some(cmdline) =
-                                msg.command_id.and_then(|id| get_cmdline(id as usize))
-                            else {
+                            let Some(cmd_id) = msg.command_id else {
+                                return self.command_failed_helper(
+                                    msg.request_id,
+                                    None,
+                                    "command_id not specified",
+                                );
+                            };
+                            let Some(cmd) = get_cmd(cmd_id as usize) else {
                                 return self.command_failed_helper(
                                     msg.request_id,
                                     None,
                                     "command_id not specified or invalid in run command request",
                                 );
                             };
+                            let cmdline = &cmd.cmdline;
                             let params =
                                 Params(&msg.params[..msg.params.len().min(max_param_nums())]);
                             if !params.is_valid() {
@@ -619,6 +663,26 @@ impl Stream for Responser {
                                 msg.linux_ns_pid,
                                 params
                             );
+
+                            match cmd.command_type {
+                                CommandType::Kubernetes(kcmd) => {
+                                    match kubectl_execute(kcmd, &params) {
+                                        Ok(future) => {
+                                            self.pending_command =
+                                                Some((msg.request_id, cmd_id as usize, future));
+                                            continue;
+                                        }
+                                        Err(e) => {
+                                            return self.command_failed_helper(
+                                                msg.request_id,
+                                                None,
+                                                e.to_string(),
+                                            )
+                                        }
+                                    }
+                                }
+                                _ => (),
+                            }
 
                             // split the whole command line to enable PATH lookup
                             let mut args = cmdline.split_whitespace();
@@ -662,8 +726,8 @@ impl Stream for Responser {
                             }
                             self.pending_command = Some((
                                 msg.request_id,
-                                msg.command_id.unwrap() as usize,
-                                Box::pin(output),
+                                cmd_id as usize,
+                                Box::pin(output.map_err(|e| e.into())),
                             ));
                             continue;
                         }
@@ -683,7 +747,7 @@ impl Stream for Responser {
     }
 }
 
-async fn lsns() -> Result<Vec<pb::LinuxNamespace>, String> {
+async fn lsns() -> Result<Vec<pb::LinuxNamespace>> {
     let output = TokioCommand::new("lsns")
         .args([
             "--list",
@@ -694,15 +758,9 @@ async fn lsns() -> Result<Vec<pb::LinuxNamespace>, String> {
             "NS,PID,USER,COMMAND",
         ])
         .output()
-        .await;
-    let output = match output {
-        Ok(o) => o,
-        Err(e) => {
-            return Err(format!("command failed: {}", e));
-        }
-    };
+        .await?;
     if !output.status.success() {
-        return Err(format!("lsns failed with {}", output.status));
+        return Err(Error::CmdFailed("lsns".to_owned(), output.status.code()));
     }
     let mut namespaces = vec![];
     for line in output.stdout.split(|c| *c == b'\n') {
@@ -778,4 +836,112 @@ impl fmt::Debug for Params<'_> {
         }
         write!(f, "}}")
     }
+}
+
+fn kubectl_execute<'a>(
+    cmd: KubeCmd,
+    params: &Params<'a>,
+) -> Result<BoxFuture<'static, Result<Output>>> {
+    // requires `ns` and `pod`
+    let mut ns = None;
+    let mut pod = None;
+    for p in params.0.iter() {
+        if let Some(key) = p.key.as_ref() {
+            if key == "ns" {
+                ns = p.value.clone();
+            } else if key == "pod" {
+                pod = p.value.clone();
+            }
+        }
+    }
+    let Some(ns) = ns else {
+        return Err(Error::ParamNotFound("ns".to_owned()));
+    };
+    let Some(pod) = pod else {
+        return Err(Error::ParamNotFound("pod".to_owned()));
+    };
+    Ok(match cmd {
+        KubeCmd::DescribePod => Box::pin(kubectl_describe_pod(ns, pod)),
+        KubeCmd::Log => Box::pin(kubectl_log(ns, pod, false)),
+        KubeCmd::LogPrevious => Box::pin(kubectl_log(ns, pod, true)),
+    })
+}
+
+#[derive(Default, serde::Serialize)]
+struct DescribePod {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pod: Option<Pod>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    events: Vec<Event>,
+}
+
+async fn kubectl_describe_pod(namespace: String, pod_name: String) -> Result<Output> {
+    let mut config = Config::infer()
+        .map_err(|e| kube::Error::InferConfig(e))
+        .await?;
+    config.accept_invalid_certs = true;
+    info!("api server url is: {}", config.cluster_url);
+    let client = Client::try_from(config)?;
+
+    let pod = Api::<Pod>::namespaced(client.clone(), &namespace)
+        .get(&pod_name)
+        .await;
+
+    let mut field_selector =
+        format!("involvedObject.name={pod_name},involvedObject.namespace={namespace}");
+    if let Some(uid) = pod.as_ref().ok().and_then(|p| p.metadata.uid.as_ref()) {
+        let _ = write!(&mut field_selector, ",involvedObject.uid={uid}");
+    }
+    let events = Api::<Event>::namespaced(client, &namespace)
+        .list(&ListParams::default().fields(&field_selector))
+        .await;
+
+    let dp = match pod {
+        Ok(pod) => DescribePod {
+            pod: Some(pod),
+            events: events.ok().map(|e| e.items).unwrap_or_default(),
+        },
+        Err(e) => match events {
+            Ok(events) => DescribePod {
+                events: events.items,
+                ..Default::default()
+            },
+            Err(_) => {
+                return Err(e.into());
+            }
+        },
+    };
+
+    Ok(Output {
+        status: Default::default(),
+        stdout: serde_json::to_vec_pretty(&dp)?,
+        stderr: vec![],
+    })
+}
+
+const LOG_LINES: usize = 10000;
+
+async fn kubectl_log(namespace: String, pod: String, previous: bool) -> Result<Output> {
+    let mut config = Config::infer()
+        .map_err(|e| kube::Error::InferConfig(e))
+        .await?;
+    config.accept_invalid_certs = true;
+    info!("api server url is: {}", config.cluster_url);
+    let client = Client::try_from(config)?;
+
+    let logs = Api::<Pod>::namespaced(client, &namespace)
+        .logs(
+            &pod,
+            &LogParams {
+                previous,
+                tail_lines: Some(LOG_LINES as i64),
+                ..Default::default()
+            },
+        )
+        .await?;
+    Ok(Output {
+        status: Default::default(),
+        stdout: logs.into_bytes(),
+        stderr: vec![],
+    })
 }
