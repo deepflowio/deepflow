@@ -102,6 +102,9 @@ func (c *UpdaterManager) refresh() {
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))
 	}
+	if c.cfg.FPermit.Enabled {
+		updaters = append(updaters, NewChUser())
+	}
 	for _, updater := range updaters {
 		updater.SetConfig(c.cfg)
 		updater.Refresh()

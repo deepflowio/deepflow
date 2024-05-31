@@ -1301,6 +1301,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+	//User
+	tagResourceMap["user"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(flow_tag.user_map, 'name', (toUInt64(user_id)))",
+			"",
+			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE name %s %s)",
+			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE %s(name,%s))",
+		),
+	}
 
 	return tagResourceMap
 }
