@@ -69,11 +69,15 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig
 }
 
 func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
-	log.Infof("delete org (id: %d) data", orgID)
+	log.Infof("drop org (id: %d) data", orgID)
+	defer log.Infof("drop org (id: %d) data, dropped", orgID)
+
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
+	log.Infof("drop org, replaced database name: %s", cfg.Database)
 	if err = migrator.DropDatabase(cfg); err != nil {
 		return err
 	}
+	log.Infof("drop org, database dropped")
 	return servercommon.DropOrg(uint16(orgID))
 }
 

@@ -58,24 +58,28 @@ func (dc *DBConfig) SetConfig(c config.MySqlConfig) {
 }
 
 func LogDBName(databaseName string, format string, a ...any) string {
-	return fmt.Sprintf("db: %s, ", databaseName) + fmt.Sprintf(format, a...)
+	return fmt.Sprintf("[DBName-%s] ", databaseName) + fmt.Sprintf(format, a...)
 }
 
 func DropDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "drop database"))
+	defer log.Infof(LogDBName(dc.Config.Database, "dropped database"))
+
 	var databaseName string
+	log.Infof(LogDBName(dc.Config.Database, "drop database, check if database exists"))
 	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
 	if databaseName == dc.Config.Database {
+		log.Infof(LogDBName(dc.Config.Database, "drop database, database exists"))
 		return dc.DB.Exec(fmt.Sprintf("DROP DATABASE %s", dc.Config.Database)).Error
 	} else {
-		log.Infof(LogDBName(dc.Config.Database, "database doesn't exist"))
+		log.Infof(LogDBName(dc.Config.Database, "drop database, database doesn't exist"))
 		return nil
 	}
 }
 
 func CreateDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "create database"))
-	log.Infof("%#v", dc.DB)
+	defer log.Infof(LogDBName(dc.Config.Database, "created database"))
 	return dc.DB.Exec(fmt.Sprintf("CREATE DATABASE %s", dc.Config.Database)).Error
 }
 
@@ -118,6 +122,7 @@ func initCEORGTables(dc *DBConfig) error {
 		return err
 	}
 	err = dc.DB.Exec(string(initSQL)).Error
+	log.Info(LogDBName(dc.Config.Database, "read CE org file successfully"))
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to initialize CE org tables: %s", err.Error()))
 		return err

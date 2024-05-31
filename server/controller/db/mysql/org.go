@@ -18,12 +18,12 @@ package mysql
 
 import (
 	"fmt"
-	"reflect"
+	// "reflect"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	// "gorm.io/gorm"
+	// "gorm.io/gorm/clause"
 )
 
 const ORG_TABLE = "org"
@@ -72,60 +72,60 @@ func SyncDefaultOrgData[T any](data []T) error {
 		return nil
 	}
 
-	// get fields to update
-	dataType := reflect.TypeOf(data[0])
-	var fields []string
-	for i := 0; i < dataType.NumField(); i++ {
-		field := dataType.Field(i)
-		dbTag := field.Tag.Get("gorm")
-		if dbTag != "" {
-			columnName := GetColumnNameFromTag(dbTag)
-			if columnName != "" {
-				fields = append(fields, columnName)
-			}
-		}
-	}
+	// // get fields to update
+	// dataType := reflect.TypeOf(data[0])
+	// var fields []string
+	// for i := 0; i < dataType.NumField(); i++ {
+	// 	field := dataType.Field(i)
+	// 	dbTag := field.Tag.Get("gorm")
+	// 	if dbTag != "" {
+	// 		columnName := GetColumnNameFromTag(dbTag)
+	// 		if columnName != "" {
+	// 			fields = append(fields, columnName)
+	// 		}
+	// 	}
+	// }
 
-	for orgID, db := range dbs.orgIDToDB {
-		if orgID == DefaultDB.ORGID {
-			continue
-		}
+	// for orgID, db := range dbs.orgIDToDB {
+	// 	if orgID == DefaultDB.ORGID {
+	// 		continue
+	// 	}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
-			// delete
-			var existingIDs []int
-			var t T
-			if err := db.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
-				return err
-			}
-			existingIDMap := make(map[int]bool)
-			for _, id := range existingIDs {
-				existingIDMap[id] = true
-			}
-			for _, item := range data {
-				id := reflect.ValueOf(item).FieldByName("ID").Int()
-				existingIDMap[int(id)] = false
-			}
-			for id, exists := range existingIDMap {
-				if exists {
-					if err := db.Where("id = ?", id).Delete(&t).Error; err != nil {
-						return err
-					}
-				}
-			}
+	// 	err := db.Transaction(func(tx *gorm.DB) error {
+	// 		// delete
+	// 		var existingIDs []int
+	// 		var t T
+	// 		if err := db.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
+	// 			return err
+	// 		}
+	// 		existingIDMap := make(map[int]bool)
+	// 		for _, id := range existingIDs {
+	// 			existingIDMap[id] = true
+	// 		}
+	// 		for _, item := range data {
+	// 			id := reflect.ValueOf(item).FieldByName("ID").Int()
+	// 			existingIDMap[int(id)] = false
+	// 		}
+	// 		for id, exists := range existingIDMap {
+	// 			if exists {
+	// 				if err := db.Where("id = ?", id).Delete(&t).Error; err != nil {
+	// 					return err
+	// 				}
+	// 			}
+	// 		}
 
-			// add or update
-			if err := db.Clauses(clause.OnConflict{
-				DoUpdates: clause.AssignmentColumns(fields), // `UpdateAll: true,` can not update time
-			}).Save(&data).Error; err != nil {
-				return fmt.Errorf("failed to sync data: %v", err)
-			}
-			return nil
-		})
-		if err != nil {
-			log.Errorf("org(id:%d, name:%s) error: %s", db.ORGID, db.Name, err.Error())
-		}
-	}
+	// 		// add or update
+	// 		if err := db.Clauses(clause.OnConflict{
+	// 			DoUpdates: clause.AssignmentColumns(fields), // `UpdateAll: true,` can not update time
+	// 		}).Save(&data).Error; err != nil {
+	// 			return fmt.Errorf("failed to sync data: %v", err)
+	// 		}
+	// 		return nil
+	// 	})
+	// 	if err != nil {
+	// 		log.Errorf("org(id:%d, name:%s) error: %s", db.ORGID, db.Name, err.Error())
+	// 	}
+	// }
 	return nil
 }
 

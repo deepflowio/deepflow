@@ -84,10 +84,12 @@ func upgradeDatabase(cfg config.MySqlConfig, run bool) error {
 }
 
 func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
+	log.Infof(common.LogDBName(cfg.Database, "create database, get db session without name"))
 	db, err := common.GetSessionWithoutName(cfg)
 	if err != nil {
 		return
 	}
+	log.Infof(common.LogDBName(cfg.Database, "create database, got db session without name"))
 	dc := common.NewDBConfig(db, cfg)
 	databaseExisted, err = common.CreateDatabaseIfNotExists(dc)
 	if err != nil {
@@ -95,10 +97,12 @@ func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
 		return
 	}
 	if !databaseExisted {
+		log.Infof(common.LogDBName(cfg.Database, "create database, get db session with name %s", cfg.Database))
 		db, err = common.GetSessionWithName(cfg)
 		if err != nil {
 			return
 		}
+		log.Infof(common.LogDBName(cfg.Database, "create database, got db session with name %s", cfg.Database))
 		dc.SetDB(db)
 		err = table.DropDatabaseIfInitTablesFailed(dc)
 	}
@@ -106,9 +110,11 @@ func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
 }
 
 func DropDatabase(cfg config.MySqlConfig) error {
+	log.Infof("drop database, get db session with name %s", cfg.Database)
 	db, err := common.GetSessionWithName(cfg)
 	if err != nil {
 		return err
 	}
+	log.Infof("drop database, got db session with name %s", cfg.Database)
 	return common.DropDatabase(common.NewDBConfig(db, cfg))
 }
