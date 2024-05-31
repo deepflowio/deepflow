@@ -216,9 +216,19 @@ func (obj *_DBMgr[M]) InsertBulk(data []*M) (err error) {
 	return
 }
 
-func (obj *_DBMgr[M]) UpdateBulk(data []*M) (err error) {
+func (obj *_DBMgr[M]) AgentUpdateBulk(data []*M) (err error) {
 	for _, d := range data {
-		err = obj.DB.WithContext(obj.ctx).Save(&d).Error
+		err = obj.DB.WithContext(obj.ctx).Model(&d).Omit("id", "enable", "name",
+			"analyzer_ip", "controller_ip", "launch_server", "launch_server_id",
+			"az", "region", "vtap_group_lcuuid", "license_type", "license_functions", "expected_revision").Select("*").Updates(d).Error
+	}
+	return
+}
+
+func (obj *_DBMgr[M]) AnalyzerUpdateBulk(data []*M) (err error) {
+	for _, d := range data {
+		err = obj.DB.WithContext(obj.ctx).Model(&d).Omit("id", "state", "nat_ip",
+			"vtap_max").Select("*").Updates(d).Error
 	}
 	return
 }

@@ -183,12 +183,13 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 		if filter == true {
 			updateTSDB = append(updateTSDB, dbTSDB)
 		}
+
 		cacheTSDB.unsetSyncFlag()
 	}
 
 	if len(updateTSDB) > 0 {
 		mgr := dbmgr.DBMgr[models.Analyzer](n.db)
-		err := mgr.UpdateBulk(updateTSDB)
+		err := mgr.AnalyzerUpdateBulk(updateTSDB)
 		if err != nil {
 			log.Error(err)
 		}
