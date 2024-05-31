@@ -1279,15 +1279,7 @@ static void ctrl_main(__unused void *arg)
 	/* return NULL; */
 }
 
-/*
- * ============================================================
- * 周期性事件处理：
- *
- * 1、周期性kick内核，实现kernel burst方式发送数据的超时检查。
- * 2、周期性检查BPF MAP
- *
- * ===========================================================
- */
+// Periodic event handling
 static void period_events_process(void)
 {
 	period_event_ticks++;
@@ -1354,10 +1346,6 @@ int set_period_event_invalid(const char *name)
 	return ETR_OK;
 }
 
-/*
- * kernel采用捆绑burst发送数据到用户的形式，
- * 下面的方法实现所有CPU触发超时检查把驻留在eBPF buffer中数据发送上来。
- */
 static inline void cpu_ebpf_data_timeout_check(int cpu_id)
 {
 	cpu_set_t cpuset;
@@ -1368,14 +1356,12 @@ static inline void cpu_ebpf_data_timeout_check(int cpu_id)
 		return;
 	}
 
-	syscall(__NR_getppid);
-
 	if (all_probes_ready)
 		RUN_ONCE(ready_flag_cpus[cpu_id], extra_waiting_process,
 			 EXTRA_TYPE_CLIENT);
 }
 
-static int cpus_kick_kern(void)
+static int trigger_kern_adapt(void)
 {
 	int i;
 	for (i = 0; i < sys_cpus_count; i++) {
@@ -1408,11 +1394,11 @@ static void period_process_main(__unused void *arg)
 	adapt_kern_uid =
 	    (uint64_t) getpid() << 32 | (uint32_t) syscall(__NR_gettid);
 
-	// 确保所有tracer都运行了，之后触发kick内核操作
+	// Ensure all tracers have run, then trigger the kernel adaptation operation
 	while (all_probes_ready == 0)
 		usleep(LOOP_DELAY_US);
 
-	// 确保server类型的extra_waiting_process先执行
+	// Ensure the extra_waiting_process of the server type executes first.
 	sleep(1);
 
 	ebpf_info("cpus_kick begin !!!\n");
@@ -1696,8 +1682,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		return ETR_INVAL;
 	}
 
-	if (register_period_event_op("kick_kern", cpus_kick_kern,
-				     KICK_KERN_PERIOD))
+	if (register_period_event_op("trigger_kern_adapt",
+				     trigger_kern_adapt,
+				     TRIG_KERN_ADAPT_PERIOD))
 		return ETR_INVAL;
 
 	/*
