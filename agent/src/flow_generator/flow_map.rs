@@ -860,7 +860,7 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &mut MetaPacket,
     ) -> bool {
-        node.last_cap_seq = meta_packet.cap_seq as u32;
+        node.last_cap_seq = meta_packet.cap_end_seq as u32;
         // For short connections, in order to quickly get the node flush of the closed socket out, set a short timeout
         // FIXME: At present, the purpose of flush is to set the timeout, and different node type may be set in the future.
         if meta_packet.ebpf_type == EbpfType::SocketCloseEvent {
@@ -1242,7 +1242,7 @@ impl FlowMap {
         node.meta_flow_log = None;
         node.next_tcp_seq0 = 0;
         node.next_tcp_seq1 = 0;
-        node.last_cap_seq = meta_packet.cap_seq as u32;
+        node.last_cap_seq = meta_packet.cap_end_seq as u32;
         node.policy_data_cache = Default::default();
         node.endpoint_data_cache = Default::default();
         node.packet_sequence_block = None; // Enterprise Edition Feature: packet-sequence

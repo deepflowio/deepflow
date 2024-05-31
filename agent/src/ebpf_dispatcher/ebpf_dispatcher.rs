@@ -224,7 +224,7 @@ impl EbpfDispatcher {
 
             if last.generate_ebpf_flow_id() == p.generate_ebpf_flow_id()
                 && last.segment_flags == SegmentFlags::Start
-                && last.cap_seq + 1 == p.cap_seq
+                && last.cap_end_seq + 1 == p.cap_start_seq
                 && count < Self::MERGE_COUNT_MAX
             {
                 last.merge(&mut p);

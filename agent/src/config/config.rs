@@ -802,7 +802,7 @@ impl YamlConfig {
             .off_cpu_profile
             .min_block
             .clamp(Duration::from_micros(0), Duration::from_micros(3600000000));
-        if !(8..=128).contains(&c.ebpf.syscall_out_of_order_cache_size) {
+        if !(8..=1024).contains(&c.ebpf.syscall_out_of_order_cache_size) {
             c.ebpf.syscall_out_of_order_cache_size = 16;
         }
 
