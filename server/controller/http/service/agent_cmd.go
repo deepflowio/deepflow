@@ -30,23 +30,24 @@ import (
 
 var (
 	AgentRemoteExecMap  = make(map[string]*CMDManager)
-	agentCommandTimeout = time.Second * 5
+	agentCommandTimeout = time.Minute
 )
 
-func AddSteamToManager(key string) *CMDManager {
-	m := initCMDManager()
+func AddSteamToManager(key string, requestID uint64) *CMDManager {
+	m := initCMDManager(requestID)
 	AgentRemoteExecMap[key] = m
 	return m
 }
 
-func initCMDManager() *CMDManager {
+func initCMDManager(requestID uint64) *CMDManager {
 	m := &CMDManager{
 		ExecCH:               make(chan *trident.RemoteExecRequest, 1),
 		ExecDoneCH:           make(chan struct{}, 1),
 		RemoteCMDDoneCH:      make(chan struct{}, 1),
 		LinuxNamespaceDoneCH: make(chan struct{}, 1),
 
-		resp: &model.RemoteExecResp{},
+		requestID: requestID,
+		resp:      &model.RemoteExecResp{},
 	}
 	return m
 }
@@ -59,7 +60,8 @@ type CMDManager struct {
 	RemoteCMDDoneCH      chan struct{}
 	LinuxNamespaceDoneCH chan struct{}
 
-	resp *model.RemoteExecResp
+	requestID uint64
+	resp      *model.RemoteExecResp
 
 	stream trident.Synchronizer_RemoteExecuteServer
 }
@@ -69,6 +71,18 @@ func (m *CMDManager) ResetResp() {
 	defer m.mu.Unlock()
 	m.resp = &model.RemoteExecResp{}
 
+}
+
+func (m *CMDManager) GetRequestID() uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.requestID
+}
+
+func (m *CMDManager) SetRequestID(requestID uint64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.requestID = requestID
 }
 
 func (m *CMDManager) AppendCommands(data []*trident.RemoteCommand) {
