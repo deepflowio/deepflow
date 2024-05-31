@@ -233,6 +233,75 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	return rst, debug.Get(), err
 }
 
+func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string) {
+	for _, tagValue := range tagDescriptions.Values {
+		tagSlice := tagValue.([]interface{})
+		name := tagSlice[0].(string)
+		clientName := tagSlice[1].(string)
+		serverName := tagSlice[2].(string)
+		displayName := tagSlice[3].(string)
+		tagType := tagSlice[4].(string)
+		permissions := tagSlice[7].([]bool)
+		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
+			continue
+		}
+		if db == chCommon.DB_NAME_FLOW_TAG {
+			continue
+		}
+		if name == "lb_listener" || name == "pod_ingress" {
+			continue
+		}
+		if len(tagSlice) >= 12 {
+			notSupportedOperators := tagSlice[11].([]string)
+			// not support select
+			if slices.Contains(notSupportedOperators, "select") {
+				continue
+			}
+		}
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
+			if serverName == clientName {
+				clientNameMetric := []interface{}{
+					clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+				}
+				result.Values = append(result.Values, clientNameMetric)
+			} else {
+				var (
+					serverDisplayName = displayName
+					clientDisplayName = displayName
+				)
+				if config.Cfg.Language == "en" {
+					serverDisplayName = chCommon.TagServerEnPrefix + " " + displayName
+					clientDisplayName = chCommon.TagClientEnPrefix + " " + displayName
+				} else if config.Cfg.Language == "ch" {
+					if letterRegexp.MatchString(serverName) {
+						serverDisplayName = chCommon.TagServerChPrefix + " " + displayName
+						clientDisplayName = chCommon.TagClientChPrefix + " " + displayName
+					} else {
+						serverDisplayName = chCommon.TagServerChPrefix + displayName
+						clientDisplayName = chCommon.TagClientChPrefix + displayName
+					}
+				}
+				serverNameMetric := []interface{}{
+					serverName, true, serverDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+				}
+				clientNameMetric := []interface{}{
+					clientName, true, clientDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+				}
+				result.Values = append(result.Values, serverNameMetric, clientNameMetric)
+			}
+		} else {
+			nameMetric := []interface{}{
+				name, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
+				"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
+			}
+			result.Values = append(result.Values, nameMetric)
+		}
+	}
+}
+
 func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common.Result, []string, bool, error) {
 	sqlSplit := strings.Fields(sql)
 	if strings.ToLower(sqlSplit[0]) != "show" {
@@ -284,98 +353,12 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 			}
 
 			// tag metrics
-			dbData, ok := metrics.DB_DESCRIPTIONS["clickhouse"]
-			if !ok {
+			tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context)
+			if err != nil {
+				log.Error("Failed to get tag type metrics")
 				return nil, []string{}, true, err
 			}
-			dbDataMap := dbData.(map[string]interface{})
-			if tagData, ok := dbDataMap["tag"]; ok {
-				dbTagMap := tagData.(map[string]interface{})
-				if dbTag, ok := dbTagMap[e.DB]; ok {
-					tableTagMap := dbTag.(map[string]interface{})
-					newTable := table
-					if e.DB == chCommon.DB_NAME_PROMETHEUS {
-						newTable = "samples"
-					} else if e.DB == chCommon.DB_NAME_EXT_METRICS {
-						newTable = "ext_common"
-					} else if e.DB == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
-						newTable = "deepflow_system_common"
-					}
-					if tableTag, ok := tableTagMap[newTable]; ok {
-						tabletagSlice := tableTag.([][]interface{})
-						for i, tagSlice := range tabletagSlice {
-							tagType := tagSlice[3].(string)
-							if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
-								continue
-							}
-							if e.DB == chCommon.DB_NAME_FLOW_TAG {
-								continue
-							}
-							name := tagSlice[0].(string)
-							if name == "lb_listener" || name == "pod_ingress" {
-								continue
-							}
-							notSupportedOperators := []string{}
-							if len(tagSlice) >= 9 {
-								notSupportedOperators = chCommon.ParseNotSupportedOperator(tagSlice[8])
-								// not support select
-								if slices.Contains(notSupportedOperators, "select") {
-									continue
-								}
-							}
-							clientName := tagSlice[1].(string)
-							serverName := tagSlice[2].(string)
-							tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
-							displayName := tagLanguage[1].(string)
-							permissions, err := chCommon.ParsePermission("111")
-							if err != nil {
-								return nil, []string{}, true, err
-							}
-							if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
-								if serverName == clientName {
-									clientNameMetric := []interface{}{
-										clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-										"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-									}
-									result.Values = append(result.Values, clientNameMetric)
-								} else {
-									var (
-										serverDisplayName = displayName
-										clientDisplayName = displayName
-									)
-									if config.Cfg.Language == "en" {
-										serverDisplayName = chCommon.TagServerEnPrefix + " " + displayName
-										clientDisplayName = chCommon.TagClientEnPrefix + " " + displayName
-									} else if config.Cfg.Language == "ch" {
-										if letterRegexp.MatchString(serverName) {
-											serverDisplayName = chCommon.TagServerChPrefix + " " + displayName
-											clientDisplayName = chCommon.TagClientChPrefix + " " + displayName
-										} else {
-											serverDisplayName = chCommon.TagServerChPrefix + displayName
-											clientDisplayName = chCommon.TagClientChPrefix + displayName
-										}
-									}
-									serverNameMetric := []interface{}{
-										serverName, true, serverDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-										"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-									}
-									clientNameMetric := []interface{}{
-										clientName, true, clientDisplayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-										"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-									}
-									result.Values = append(result.Values, serverNameMetric, clientNameMetric)
-								}
-							} else {
-								nameMetric := []interface{}{
-									name, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
-									"Tag", metrics.METRICS_OPERATORS, permissions, table, "",
-								}
-								result.Values = append(result.Values, nameMetric)
-							}
-						}
-					}
-				}
-			}
+			ShowTagTypeMetrics(tagDescriptions, result, e.DB, table)
 			return result, []string{}, true, err
 		}
 	case "tag":
