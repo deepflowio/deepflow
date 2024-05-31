@@ -491,7 +491,29 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		filter := ""
 		switch t.Tag {
 		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id", "team_id":
-			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			if table == "user_map" && t.Tag == "user_id" {
+				tagItem, ok := tag.GetTag("value", db, table, "default")
+				if ok {
+					switch strings.ToLower(op) {
+					case "match":
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+					case "not match":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+					case "not ilike":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+					case "not in":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+					case "!=":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+					default:
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+					}
+					return &view.Expr{Value: filter}, nil
+				}
+			} else {
+				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			}
+
 		case "type":
 			if table == "vtap_map" {
 				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
@@ -955,7 +977,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					whereFilter = equalFilter
 				}
 			case "service", "chost", "chost_hostname", "chost_ip", "router", "dhcpgw", "redis", "rds", "lb_listener",
-				"natgw", "lb", "host", "host_hostname", "host_ip", "pod_node", "pod_node_hostname", "pod_node_ip",
+				"natgw", "lb", "host", "host_hostname", "host_ip", "pod_node", "pod_node_hostname", "pod_node_ip", "user",
 				"pod_group_type", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "pod_service_id":
 				whereFilter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 			case "pod_ingress", "pod_service", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
