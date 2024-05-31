@@ -19,6 +19,7 @@ package db
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type VM struct {
@@ -51,19 +52,19 @@ func (v *VM) DeleteBatch(lcuuids []string) ([]*mysql.VM, bool) {
 		for _, con := range vmPodNodeConns {
 			err = v.metadata.DB.Delete(con).Error
 			if err != nil {
-				log.Error(v.metadata.Logf("delete %s (info: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con, err))
+				log.Error(v.metadata.Logf("%s (info: %+v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con, err))
 				continue
 			}
-			log.Info(v.metadata.Logf("delete %s (info: %+v) success", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, con))
+			log.Info(v.metadata.Logf("%s (info: %+v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con))
 		}
 	}
 
 	var dbItems []*mysql.VM
 	err = v.metadata.DB.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
-		log.Error(v.metadata.Logf("delete %s (lcuuids: %v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err))
+		log.Error(v.metadata.Logf("%s (lcuuids: %v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_EN), lcuuids, err))
 		return nil, false
 	}
-	log.Info(v.metadata.Logf("delete %s (lcuuids: %v) success", ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids))
+	log.Info(v.metadata.Logf("%s (lcuuids: %v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_EN), lcuuids))
 	return dbItems, true
 }
