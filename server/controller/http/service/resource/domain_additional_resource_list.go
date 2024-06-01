@@ -30,8 +30,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func ListDomainAdditionalResource(resourceType, resourceName string) (map[string]interface{}, error) {
-	resource, err := GetDomainAdditionalResource(resourceType, resourceName)
+func ListDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql.DB) (map[string]interface{}, error) {
+	resource, err := GetDomainAdditionalResource(resourceType, resourceName, orgDB)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +41,8 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 	return data, nil
 }
 
-func GetDomainAdditionalResource(resourceType, resourceName string) (*model.AdditionalResource, error) {
-	domainToResource, err := getResourceFromDB()
+func GetDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql.DB) (*model.AdditionalResource, error) {
+	domainToResource, err := getResourceFromDB(orgDB)
 	if err != nil {
 		return nil, err
 	}
@@ -273,11 +273,11 @@ func convertToUpperMap(data map[string]interface{}, v reflect.Value) {
 	}
 }
 
-func getResourceFromDB() (map[string]*cloudmodel.AdditionalResource, error) {
+func getResourceFromDB(orgDB *mysql.DB) (map[string]*cloudmodel.AdditionalResource, error) {
 	var items []mysql.DomainAdditionalResource
-	mysql.Db.Select("domain", "content").Where("content!=''").Find(&items)
+	orgDB.Select("domain", "content").Where("content!=''").Find(&items)
 	if len(items) == 0 {
-		mysql.Db.Select("domain", "compressed_content").Find(&items)
+		orgDB.Select("domain", "compressed_content").Find(&items)
 		if len(items) == 0 {
 			return nil, gorm.ErrRecordNotFound
 		}
