@@ -23,12 +23,14 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 
 	"golang.org/x/net/context"
@@ -50,6 +52,7 @@ const (
 	GROUPID_MAX           = 1 << 16
 
 	MASTER_TABLE_MOUDLE_NANE = "ingester"
+	MAX_ORG_COUNT            = ckdb.MAX_ORG_ID + 1
 )
 
 type BaseInfo struct {
@@ -144,47 +147,47 @@ type PlatformInfoTable struct {
 	receiver         *receiver.Receiver
 	regionID         uint32
 	analyzerID       uint32
-	otherRegionCount int64
-	epcIDIPV4Lru     *lru.U64LRU
-	epcIDIPV6Lru     *lru.U160LRU
+	otherRegionCount [MAX_ORG_COUNT]int64
+	epcIDIPV4Lru     [MAX_ORG_COUNT]*lru.U64LRU
+	epcIDIPV6Lru     [MAX_ORG_COUNT]*lru.U160LRU
 
-	epcIDIPV4Infos     map[uint64]*Info
-	epcIDIPV6Infos     map[[EpcIDIPV6_LEN]byte]*Info
-	epcIDIPV4CidrInfos map[int32][]*CidrInfo
-	epcIDIPV6CidrInfos map[int32][]*CidrInfo
+	epcIDIPV4Infos     [MAX_ORG_COUNT]map[uint64]*Info
+	epcIDIPV6Infos     [MAX_ORG_COUNT]map[[EpcIDIPV6_LEN]byte]*Info
+	epcIDIPV4CidrInfos [MAX_ORG_COUNT]map[int32][]*CidrInfo
+	epcIDIPV6CidrInfos [MAX_ORG_COUNT]map[int32][]*CidrInfo
 
-	macInfos     map[uint64]*Info
-	macMissCount map[uint64]*uint64
+	macInfos     [MAX_ORG_COUNT]map[uint64]*Info
+	macMissCount [MAX_ORG_COUNT]map[uint64]*uint64
 
-	epcIDBaseInfos     map[int32]*BaseInfo
-	epcIDBaseMissCount map[int32]*uint64
+	epcIDBaseInfos     [MAX_ORG_COUNT]map[int32]*BaseInfo
+	epcIDBaseMissCount [MAX_ORG_COUNT]map[int32]*uint64
 
-	gprocessInfos      map[uint32]uint64
-	vtapIDProcessInfos map[uint64]uint32
+	gprocessInfos      [MAX_ORG_COUNT]map[uint32]uint64
+	vtapIDProcessInfos [MAX_ORG_COUNT]map[uint64]uint32
 
-	podIDInfosPlatformData map[uint32]*Info
+	podIDInfosPlatformData [MAX_ORG_COUNT]map[uint32]*Info
 	// podIPInfos is first obtained from podIDInfosPlatformData and needs to be supplemented by podIPs information.
-	podIDInfos map[uint32]*Info
+	podIDInfos [MAX_ORG_COUNT]map[uint32]*Info
 
 	bootTime            uint32
 	moduleName          string
-	versionPlatformData uint64
+	versionPlatformData [MAX_ORG_COUNT]uint64
 	ctlIP               string
 
 	hostname   string
 	runtimeEnv utils.RuntimeEnv
 
-	versionGroups uint64
-	*ServiceTable
+	versionGroups [MAX_ORG_COUNT]uint64
+	ServiceTable  [MAX_ORG_COUNT]*ServiceTable
 
-	podNameInfos       map[string][]*PodInfo
-	vtapIdInfos        map[uint16]*VtapInfo
+	podNameInfos       [MAX_ORG_COUNT]map[string][]*PodInfo
+	vtapIdInfos        [MAX_ORG_COUNT]map[uint16]*VtapInfo
 	orgIds             []uint16
-	containerInfos     map[string][]*PodInfo
-	containerHitCount  map[string]*uint64
-	containerMissCount map[string]*uint64
+	containerInfos     [MAX_ORG_COUNT]map[string][]*PodInfo
+	containerHitCount  [MAX_ORG_COUNT]map[string]*uint64
+	containerMissCount [MAX_ORG_COUNT]map[string]*uint64
 
-	peerConnections map[int32][]int32
+	peerConnections [MAX_ORG_COUNT]map[int32][]int32
 
 	*GrpcSession
 
@@ -193,23 +196,25 @@ type PlatformInfoTable struct {
 }
 
 func QueryAllOrgIDs() []uint16 {
-	var orgIDs []uint16
 	// wait until get orgIDs
-	for len(orgIDs) == 0 {
-		log.Info("waiting for get orgIDs")
-		time.Sleep(time.Second)
+	for true {
 		if platformDataManager != nil {
-			orgIDs = platformDataManager.GetMasterPlatformInfoTable().orgIds
+			orgIDs := platformDataManager.GetMasterPlatformInfoTable().orgIds
+			if len(orgIDs) > 0 {
+				return orgIDs
+			}
 		}
+		log.Infof("waiting for get org ids")
+		time.Sleep(time.Second)
 	}
-	return orgIDs
+	return nil
 }
 
-func QueryVtapOrgAndTeamID(vtapId uint16) (uint16, uint16) {
+func QueryVtapOrgAndTeamID(orgId, vtapId uint16) (uint16, uint16) {
 	if platformDataManager == nil {
 		return ckdb.DEFAULT_ORG_ID, ckdb.INVALID_TEAM_ID
 	}
-	return platformDataManager.GetMasterPlatformInfoTable().QueryVtapOrgAndTeamID(vtapId)
+	return platformDataManager.GetMasterPlatformInfoTable().QueryVtapOrgAndTeamID(orgId, vtapId)
 }
 
 func (t *PlatformInfoTable) GetCounter() interface{} {
@@ -237,36 +242,36 @@ func (t *PlatformInfoTable) QueryAnalyzerID() uint32 {
 }
 
 // 统计收到其他region的数据
-func (t *PlatformInfoTable) AddOtherRegion() {
-	atomic.AddInt64(&t.otherRegionCount, 1)
+func (t *PlatformInfoTable) AddOtherRegion(orgId uint16) {
+	atomic.AddInt64(&t.otherRegionCount[orgId], 1)
 }
 
-func (t *PlatformInfoTable) QueryEpcIDBaseInfo(epcID int32) *BaseInfo {
-	return t.queryEpcIDBaseInfo(epcID)
+func (t *PlatformInfoTable) QueryEpcIDBaseInfo(orgId uint16, epcID int32) *BaseInfo {
+	return t.queryEpcIDBaseInfo(orgId, epcID)
 }
 
-func (t *PlatformInfoTable) QueryEpcIDBaseInfosPair(epcID0, epcID1 int32) (*BaseInfo, *BaseInfo) {
-	return t.queryEpcIDBaseInfosPair(epcID0, epcID1)
+func (t *PlatformInfoTable) QueryEpcIDBaseInfosPair(orgId uint16, epcID0, epcID1 int32) (*BaseInfo, *BaseInfo) {
+	return t.queryEpcIDBaseInfosPair(orgId, epcID0, epcID1)
 }
 
-func (t *PlatformInfoTable) QueryMacInfo(mac uint64) *Info {
-	return t.queryMacInfo(mac)
+func (t *PlatformInfoTable) QueryMacInfo(orgId uint16, mac uint64) *Info {
+	return t.queryMacInfo(orgId, mac)
 }
 
-func (t *PlatformInfoTable) QueryMacInfosPair(mac0, mac1 uint64) (*Info, *Info) {
-	return t.queryMacInfosPair(mac0, mac1)
+func (t *PlatformInfoTable) QueryMacInfosPair(orgId uint16, mac0, mac1 uint64) (*Info, *Info) {
+	return t.queryMacInfosPair(orgId, mac0, mac1)
 }
 
-func (t *PlatformInfoTable) QueryIPV4Infos(epcID int32, ipv4 uint32) *Info {
+func (t *PlatformInfoTable) QueryIPV4Infos(orgId uint16, epcID int32, ipv4 uint32) *Info {
 	if epcID == datatype.EPC_FROM_INTERNET {
 		return nil
 	}
-	info := t.queryIPV4Infos(epcID, ipv4)
+	info := t.queryIPV4Infos(orgId, epcID, ipv4)
 	if info != nil {
 		return info
 	}
 
-	baseInfo := t.queryEpcIDBaseInfo(int32(epcID))
+	baseInfo := t.queryEpcIDBaseInfo(orgId, int32(epcID))
 	if baseInfo == nil {
 		return nil
 	}
@@ -275,16 +280,16 @@ func (t *PlatformInfoTable) QueryIPV4Infos(epcID int32, ipv4 uint32) *Info {
 	}
 }
 
-func (t *PlatformInfoTable) QueryIPV6Infos(epcID int32, ipv6 net.IP) *Info {
+func (t *PlatformInfoTable) QueryIPV6Infos(orgId uint16, epcID int32, ipv6 net.IP) *Info {
 	if epcID == datatype.EPC_FROM_INTERNET {
 		return nil
 	}
-	info := t.queryIPV6Infos(epcID, ipv6)
+	info := t.queryIPV6Infos(orgId, epcID, ipv6)
 	if info != nil {
 		return info
 	}
 
-	baseInfo := t.queryEpcIDBaseInfo(int32(epcID))
+	baseInfo := t.queryEpcIDBaseInfo(orgId, int32(epcID))
 	if baseInfo == nil {
 		return nil
 	}
@@ -293,22 +298,22 @@ func (t *PlatformInfoTable) QueryIPV6Infos(epcID int32, ipv6 net.IP) *Info {
 	}
 }
 
-func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int32, ipv40 uint32, epcID1 int32, ipv41 uint32) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) QueryIPV4InfosPair(orgId uint16, epcID0 int32, ipv40 uint32, epcID1 int32, ipv41 uint32) (info0 *Info, info1 *Info) {
 	if epcID0 == datatype.EPC_FROM_INTERNET {
-		return nil, t.QueryIPV4Infos(epcID1, ipv41)
+		return nil, t.QueryIPV4Infos(orgId, epcID1, ipv41)
 	} else if epcID1 == datatype.EPC_FROM_INTERNET {
-		return t.QueryIPV4Infos(epcID0, ipv40), nil
+		return t.QueryIPV4Infos(orgId, epcID0, ipv40), nil
 	}
-	info0, info1 = t.queryIPV4InfosPair(epcID0, ipv40, epcID1, ipv41)
+	info0, info1 = t.queryIPV4InfosPair(orgId, epcID0, ipv40, epcID1, ipv41)
 	if info0 == nil {
-		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(orgId, int32(epcID0)); baseInfo != nil {
 			info0 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
 		}
 	}
 	if info1 == nil {
-		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(orgId, int32(epcID1)); baseInfo != nil {
 			info1 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
@@ -317,22 +322,22 @@ func (t *PlatformInfoTable) QueryIPV4InfosPair(epcID0 int32, ipv40 uint32, epcID
 	return
 }
 
-func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID1 int32, ipv61 net.IP) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) QueryIPV6InfosPair(orgId uint16, epcID0 int32, ipv60 net.IP, epcID1 int32, ipv61 net.IP) (info0 *Info, info1 *Info) {
 	if epcID0 == datatype.EPC_FROM_INTERNET {
-		return nil, t.QueryIPV6Infos(epcID1, ipv61)
+		return nil, t.QueryIPV6Infos(orgId, epcID1, ipv61)
 	} else if epcID1 == datatype.EPC_FROM_INTERNET {
-		return t.QueryIPV6Infos(epcID0, ipv60), nil
+		return t.QueryIPV6Infos(orgId, epcID0, ipv60), nil
 	}
-	info0, info1 = t.queryIPV6InfosPair(epcID0, ipv60, epcID1, ipv61)
+	info0, info1 = t.queryIPV6InfosPair(orgId, epcID0, ipv60, epcID1, ipv61)
 	if info0 == nil {
-		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID0)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(orgId, int32(epcID0)); baseInfo != nil {
 			info0 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
 		}
 	}
 	if info1 == nil {
-		if baseInfo := t.queryEpcIDBaseInfo(int32(epcID1)); baseInfo != nil {
+		if baseInfo := t.queryEpcIDBaseInfo(orgId, int32(epcID1)); baseInfo != nil {
 			info1 = &Info{
 				RegionID: baseInfo.RegionID,
 			}
@@ -341,12 +346,16 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 	return
 }
 
-func (t *PlatformInfoTable) QueryPodIdInfo(podId uint32) *Info {
-	if info, ok := t.podIDInfos[podId]; ok {
+func (t *PlatformInfoTable) QueryPodIdInfo(orgId uint16, podId uint32) *Info {
+	if info, ok := t.podIDInfos[orgId][podId]; ok {
 		atomic.AddUint64(info.HitCount, 1)
 		return info
 	}
 	return nil
+}
+
+func (t *PlatformInfoTable) QueryService(orgId uint16, podID, podNodeID, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
+	return t.ServiceTable[orgId].QueryService(podID, podNodeID, podClusterID, podGroupID, epcID, isIPv6, ipv4, ipv6, protocol, serverPort)
 }
 
 type PlatformDataManager struct {
@@ -421,45 +430,54 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		isMaster: isMaster,
 		index:    index,
 
-		receiver:           receiver,
-		bootTime:           uint32(time.Now().Unix()),
-		GrpcSession:        &GrpcSession{},
-		epcIDIPV4Lru:       lru.NewU64LRU("epcIDIPV4_"+moduleName, LruSlotSize, LruCap),
-		epcIDIPV6Lru:       lru.NewU160LRU("epcIDIPV6_"+moduleName, LruSlotSize, LruCap),
-		epcIDIPV4Infos:     make(map[uint64]*Info),
-		epcIDIPV6Infos:     make(map[[EpcIDIPV6_LEN]byte]*Info),
-		macInfos:           make(map[uint64]*Info),
-		macMissCount:       make(map[uint64]*uint64),
-		epcIDIPV4CidrInfos: make(map[int32][]*CidrInfo),
-		epcIDIPV6CidrInfos: make(map[int32][]*CidrInfo),
-		epcIDBaseInfos:     make(map[int32]*BaseInfo),
-		epcIDBaseMissCount: make(map[int32]*uint64),
-		gprocessInfos:      make(map[uint32]uint64),
-		vtapIDProcessInfos: make(map[uint64]uint32),
-		podIDInfos:         make(map[uint32]*Info),
-		moduleName:         moduleName,
-		runtimeEnv:         utils.GetRuntimeEnv(),
-		ServiceTable:       NewServiceTable(nil),
+		receiver:    receiver,
+		bootTime:    uint32(time.Now().Unix()),
+		GrpcSession: &GrpcSession{},
+		moduleName:  moduleName,
+		runtimeEnv:  utils.GetRuntimeEnv(),
 
-		podNameInfos:       make(map[string][]*PodInfo),
-		vtapIdInfos:        make(map[uint16]*VtapInfo),
-		orgIds:             make([]uint16, 0),
-		containerInfos:     make(map[string][]*PodInfo),
-		containerMissCount: make(map[string]*uint64),
-		containerHitCount:  make(map[string]*uint64),
-		peerConnections:    make(map[int32][]int32),
-		ctlIP:              nodeIP,
-		counter:            &Counter{},
+		orgIds:  []uint16{},
+		ctlIP:   nodeIP,
+		counter: &Counter{},
 	}
+	for i := 0; i < MAX_ORG_COUNT; i++ {
+		table.epcIDIPV4Infos[i] = make(map[uint64]*Info)
+		table.epcIDIPV6Infos[i] = make(map[[EpcIDIPV6_LEN]byte]*Info)
+		table.macInfos[i] = make(map[uint64]*Info)
+		table.macMissCount[i] = make(map[uint64]*uint64)
+		table.epcIDIPV4CidrInfos[i] = make(map[int32][]*CidrInfo)
+		table.epcIDIPV6CidrInfos[i] = make(map[int32][]*CidrInfo)
+		table.epcIDBaseInfos[i] = make(map[int32]*BaseInfo)
+		table.epcIDBaseMissCount[i] = make(map[int32]*uint64)
+		table.gprocessInfos[i] = make(map[uint32]uint64)
+		table.vtapIDProcessInfos[i] = make(map[uint64]uint32)
+		table.podIDInfos[i] = make(map[uint32]*Info)
+		table.ServiceTable[i] = NewServiceTable(nil)
+		table.podNameInfos[i] = make(map[string][]*PodInfo)
+		table.vtapIdInfos[i] = make(map[uint16]*VtapInfo)
+		table.containerInfos[i] = make(map[string][]*PodInfo)
+		table.containerMissCount[i] = make(map[string]*uint64)
+		table.containerHitCount[i] = make(map[string]*uint64)
+		table.peerConnections[i] = make(map[int32][]int32)
+	}
+
 	runOnce := func() {
 		var err error
+
 		if table.isMaster {
-			err = table.ReloadMaster()
-		} else {
-			err = table.ReloadSlave()
+			table.requestOrgIds()
 		}
-		if err != nil {
-			log.Warning(err)
+		orgIds := table.orgIds
+
+		for _, orgId := range orgIds {
+			if table.isMaster {
+				err = table.ReloadMaster(orgId)
+			} else {
+				err = table.ReloadSlave(orgId)
+			}
+			if err != nil {
+				log.Warningf("org %d reload failed: %s", orgId, err)
+			}
 		}
 	}
 	table.Init(ips, uint16(port), DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, runOnce)
@@ -467,14 +485,14 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 	return table
 }
 
-func (t *PlatformInfoTable) IPV4InfoAddLru(info *Info, key uint64) {
+func (t *PlatformInfoTable) IPV4InfoAddLru(orgId uint16, info *Info, key uint64) {
 	if info != nil {
-		t.epcIDIPV4Lru.Add(key, info)
+		t.epcIDIPV4Lru[orgId].Add(key, info)
 		atomic.AddUint64(info.HitCount, 1)
 		return
 	}
 	var missCount uint64 = 1
-	t.epcIDIPV4Lru.Add(key, &missCount)
+	t.epcIDIPV4Lru[orgId].Add(key, &missCount)
 	log.Debugf("can't find IPV4Info from epcID (%d) ip (%s)", key>>32, utils.IpFromUint32(uint32(key)).String())
 	t.counter.IP4MissCount++
 }
@@ -490,16 +508,19 @@ func (t *PlatformInfoTable) IPV4InfoStat(lruItem interface{}) {
 	}
 }
 
-func (t *PlatformInfoTable) queryIPV4Infos(epcID int32, ipv4 uint32) (info *Info) {
+func (t *PlatformInfoTable) queryIPV4Infos(orgId uint16, epcID int32, ipv4 uint32) (info *Info) {
+	if t.epcIDIPV4Lru[orgId] == nil {
+		t.epcIDIPV4Lru[orgId] = lru.NewU64LRU(ckdb.OrgDatabasePrefix(orgId)+"epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
+	}
 	var ok bool
 	var lruValue interface{}
 	t.counter.IP4TotalCount++
 	key := uint64(epcID)<<32 | uint64(ipv4)
-	if lruValue, ok = t.epcIDIPV4Lru.Get(key, false); !ok {
-		if info, ok = t.epcIDIPV4Infos[key]; !ok {
-			info = t.queryIPV4Cidr(epcID, ipv4)
+	if lruValue, ok = t.epcIDIPV4Lru[orgId].Get(key, false); !ok {
+		if info, ok = t.epcIDIPV4Infos[orgId][key]; !ok {
+			info = t.queryIPV4Cidr(orgId, epcID, ipv4)
 		}
-		t.IPV4InfoAddLru(info, key)
+		t.IPV4InfoAddLru(orgId, info, key)
 	} else {
 		t.counter.IP4HitCount++
 		t.IPV4InfoStat(lruValue)
@@ -508,108 +529,111 @@ func (t *PlatformInfoTable) queryIPV4Infos(epcID int32, ipv4 uint32) (info *Info
 	return
 }
 
-func (t *PlatformInfoTable) InfoMissStat(mac uint64) {
-	if missCountAddr, exist := t.macMissCount[mac]; exist {
+func (t *PlatformInfoTable) InfoMissStat(orgId uint16, mac uint64) {
+	if missCountAddr, exist := t.macMissCount[orgId][mac]; exist {
 		atomic.AddUint64(missCountAddr, 1)
 	} else {
 		var missCount uint64 = 1
-		t.macMissCount[mac] = &missCount
+		t.macMissCount[orgId][mac] = &missCount
 		log.Debugf("can't find info from mac (%x)", mac)
 		t.counter.MacMissCount++
 	}
 }
 
 // 只有当l3_epc_id为正数时，才能查到info
-func (t *PlatformInfoTable) queryMacInfo(mac uint64) *Info {
-	info, ok := t.macInfos[mac]
+func (t *PlatformInfoTable) queryMacInfo(orgId uint16, mac uint64) *Info {
+	info, ok := t.macInfos[orgId][mac]
 	if !ok {
-		t.InfoMissStat(mac)
+		t.InfoMissStat(orgId, mac)
 	} else {
 		atomic.AddUint64(info.HitCount, 1)
 	}
 	return info
 }
 
-func (t *PlatformInfoTable) queryMacInfosPair(mac0, mac1 uint64) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) queryMacInfosPair(orgId uint16, mac0, mac1 uint64) (info0 *Info, info1 *Info) {
 	var ok0, ok1 bool
-	if info0, ok0 = t.macInfos[mac0]; ok0 {
+	if info0, ok0 = t.macInfos[orgId][mac0]; ok0 {
 		atomic.AddUint64(info0.HitCount, 1)
 	}
-	if info1, ok1 = t.macInfos[mac1]; ok1 {
+	if info1, ok1 = t.macInfos[orgId][mac1]; ok1 {
 		atomic.AddUint64(info1.HitCount, 1)
 	}
 
 	if !ok0 {
-		t.InfoMissStat(mac0)
+		t.InfoMissStat(orgId, mac0)
 	}
 
 	if !ok1 {
-		t.InfoMissStat(mac1)
+		t.InfoMissStat(orgId, mac1)
 	}
 
 	return
 }
 
-func (t *PlatformInfoTable) baseInfoMissStat(epcID int32) {
-	if missCountAddr, exist := t.epcIDBaseMissCount[epcID]; exist {
+func (t *PlatformInfoTable) baseInfoMissStat(orgId uint16, epcID int32) {
+	if missCountAddr, exist := t.epcIDBaseMissCount[orgId][epcID]; exist {
 		atomic.AddUint64(missCountAddr, 1)
 	} else {
 		var missCount uint64 = 1
-		t.epcIDBaseMissCount[epcID] = &missCount
+		t.epcIDBaseMissCount[orgId][epcID] = &missCount
 		log.Debug("can't find baseInfo from epcID (%d)", epcID)
 		t.counter.EpcMissCount++
 	}
 }
 
-func (t *PlatformInfoTable) queryEpcIDBaseInfo(epcID int32) *BaseInfo {
-	baseInfo, ok := t.epcIDBaseInfos[epcID]
+func (t *PlatformInfoTable) queryEpcIDBaseInfo(orgId uint16, epcID int32) *BaseInfo {
+	baseInfo, ok := t.epcIDBaseInfos[orgId][epcID]
 	if !ok {
-		t.baseInfoMissStat(epcID)
+		t.baseInfoMissStat(orgId, epcID)
 	} else {
 		atomic.AddUint64(&baseInfo.HitCount, 1)
 	}
 	return baseInfo
 }
 
-func (t *PlatformInfoTable) queryEpcIDBaseInfosPair(epcID0, epcID1 int32) (baseInfo0 *BaseInfo, baseInfo1 *BaseInfo) {
+func (t *PlatformInfoTable) queryEpcIDBaseInfosPair(orgId uint16, epcID0, epcID1 int32) (baseInfo0 *BaseInfo, baseInfo1 *BaseInfo) {
 	var ok0, ok1 bool
-	if baseInfo0, ok0 = t.epcIDBaseInfos[epcID0]; ok0 {
+	if baseInfo0, ok0 = t.epcIDBaseInfos[orgId][epcID0]; ok0 {
 		atomic.AddUint64(&baseInfo0.HitCount, 1)
 	}
-	if baseInfo1, ok1 = t.epcIDBaseInfos[epcID1]; ok1 {
+	if baseInfo1, ok1 = t.epcIDBaseInfos[orgId][epcID1]; ok1 {
 		atomic.AddUint64(&baseInfo1.HitCount, 1)
 	}
 
 	if !ok0 {
-		t.baseInfoMissStat(epcID0)
+		t.baseInfoMissStat(orgId, epcID0)
 	}
 
 	if !ok1 {
-		t.baseInfoMissStat(epcID1)
+		t.baseInfoMissStat(orgId, epcID1)
 	}
 
 	return
 }
 
 // 需要一起查询, 防止查询时，平台信息更新
-func (t *PlatformInfoTable) queryIPV4InfosPair(epcID0 int32, ipv40 uint32, epcID1 int32, ipv41 uint32) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) queryIPV4InfosPair(orgId uint16, epcID0 int32, ipv40 uint32, epcID1 int32, ipv41 uint32) (info0 *Info, info1 *Info) {
+	if t.epcIDIPV4Lru[orgId] == nil {
+		t.epcIDIPV4Lru[orgId] = lru.NewU64LRU(ckdb.OrgDatabasePrefix(orgId)+"epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
+	}
 	var ok0, ok1 bool
 	var lruValue0, lruValue1 interface{}
 	key0 := uint64(epcID0)<<32 | uint64(ipv40)
 	key1 := uint64(epcID1)<<32 | uint64(ipv41)
 	t.counter.IP4TotalCount += 2
-	if lruValue0, ok0 = t.epcIDIPV4Lru.Get(key0, false); !ok0 {
-		if info0, ok0 = t.epcIDIPV4Infos[key0]; !ok0 {
-			info0 = t.queryIPV4Cidr(epcID0, ipv40)
+	if lruValue0, ok0 = t.epcIDIPV4Lru[orgId].Get(key0, false); !ok0 {
+		if info0, ok0 = t.epcIDIPV4Infos[orgId][key0]; !ok0 {
+			info0 = t.queryIPV4Cidr(orgId, epcID0, ipv40)
 		}
 	} else {
 		t.counter.IP4HitCount++
 		t.IPV4InfoStat(lruValue0)
 		info0, _ = lruValue0.(*Info)
 	}
-	if lruValue1, ok1 = t.epcIDIPV4Lru.Get(key1, false); !ok1 {
-		if info1, ok1 = t.epcIDIPV4Infos[key1]; !ok1 {
-			info1 = t.queryIPV4Cidr(epcID1, ipv41)
+	if lruValue1, ok1 = t.epcIDIPV4Lru[orgId].Get(key1, false); !ok1 {
+		if info1, ok1 = t.epcIDIPV4Infos[orgId][key1]; !ok1 {
+			info1 = t.queryIPV4Cidr(orgId, epcID1, ipv41)
 		}
 	} else {
 		t.counter.IP4HitCount++
@@ -618,23 +642,23 @@ func (t *PlatformInfoTable) queryIPV4InfosPair(epcID0 int32, ipv40 uint32, epcID
 	}
 
 	if !ok0 {
-		t.IPV4InfoAddLru(info0, key0)
+		t.IPV4InfoAddLru(orgId, info0, key0)
 	}
 	if !ok1 {
-		t.IPV4InfoAddLru(info1, key1)
+		t.IPV4InfoAddLru(orgId, info1, key1)
 	}
 
 	return
 }
 
-func (t *PlatformInfoTable) IPV6InfoAddLru(info *Info, key []byte) {
+func (t *PlatformInfoTable) IPV6InfoAddLru(orgId uint16, info *Info, key []byte) {
 	if info != nil {
-		t.epcIDIPV6Lru.Add(key, info)
+		t.epcIDIPV6Lru[orgId].Add(key, info)
 		atomic.AddUint64(info.HitCount, 1)
 		return
 	}
 	var missCount uint64 = 1
-	t.epcIDIPV6Lru.Add(key, &missCount)
+	t.epcIDIPV6Lru[orgId].Add(key, &missCount)
 	log.Debugf("can't find IPV6Info from epcID (%d) ip (%s)", int32(binary.LittleEndian.Uint16(key[:4])), net.IP(key[4:]).String())
 	t.counter.IP6MissCount++
 }
@@ -650,19 +674,22 @@ func (t *PlatformInfoTable) IPV6InfoStat(lruItem interface{}) {
 	}
 }
 
-func (t *PlatformInfoTable) queryIPV6Infos(epcID int32, ipv6 net.IP) (info *Info) {
+func (t *PlatformInfoTable) queryIPV6Infos(orgId uint16, epcID int32, ipv6 net.IP) (info *Info) {
 	var ok bool
 	var lruValue interface{}
 	var key [EpcIDIPV6_LEN]byte
 	binary.LittleEndian.PutUint32(key[:], uint32(epcID))
 	copy(key[4:], ipv6)
 
+	if t.epcIDIPV6Lru[orgId] == nil {
+		t.epcIDIPV6Lru[orgId] = lru.NewU160LRU(ckdb.OrgDatabasePrefix(orgId)+"epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
+	}
 	t.counter.IP6TotalCount++
-	if lruValue, ok = t.epcIDIPV6Lru.Get(key[:], false); !ok {
-		if info, ok = t.epcIDIPV6Infos[key]; !ok {
-			info = t.queryIPV6Cidr(epcID, ipv6)
+	if lruValue, ok = t.epcIDIPV6Lru[orgId].Get(key[:], false); !ok {
+		if info, ok = t.epcIDIPV6Infos[orgId][key]; !ok {
+			info = t.queryIPV6Cidr(orgId, epcID, ipv6)
 		}
-		t.IPV6InfoAddLru(info, key[:])
+		t.IPV6InfoAddLru(orgId, info, key[:])
 	} else {
 		t.counter.IP6HitCount++
 		t.IPV6InfoStat(lruValue)
@@ -671,19 +698,22 @@ func (t *PlatformInfoTable) queryIPV6Infos(epcID int32, ipv6 net.IP) (info *Info
 	return
 }
 
-func (t *PlatformInfoTable) queryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID1 int32, ipv61 net.IP) (info0 *Info, info1 *Info) {
+func (t *PlatformInfoTable) queryIPV6InfosPair(orgId uint16, epcID0 int32, ipv60 net.IP, epcID1 int32, ipv61 net.IP) (info0 *Info, info1 *Info) {
 	var key0, key1 [EpcIDIPV6_LEN]byte
 	binary.LittleEndian.PutUint32(key0[:], uint32(epcID0))
 	copy(key0[4:], ipv60)
 	binary.LittleEndian.PutUint32(key1[:], uint32(epcID1))
 	copy(key1[4:], ipv61)
 
+	if t.epcIDIPV6Lru[orgId] == nil {
+		t.epcIDIPV6Lru[orgId] = lru.NewU160LRU(ckdb.OrgDatabasePrefix(orgId)+"epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
+	}
 	t.counter.IP6TotalCount += 2
 	var ok0, ok1 bool
 	var lruValue0, lruValue1 interface{}
-	if lruValue0, ok0 = t.epcIDIPV6Lru.Get(key0[:], false); !ok0 {
-		if info0, ok0 = t.epcIDIPV6Infos[key0]; !ok0 {
-			info0 = t.queryIPV6Cidr(epcID0, ipv60)
+	if lruValue0, ok0 = t.epcIDIPV6Lru[orgId].Get(key0[:], false); !ok0 {
+		if info0, ok0 = t.epcIDIPV6Infos[orgId][key0]; !ok0 {
+			info0 = t.queryIPV6Cidr(orgId, epcID0, ipv60)
 		}
 	} else {
 		t.counter.IP6HitCount++
@@ -691,9 +721,9 @@ func (t *PlatformInfoTable) queryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 		info0, _ = lruValue0.(*Info)
 	}
 
-	if lruValue1, ok1 = t.epcIDIPV6Lru.Get(key1[:], false); !ok1 {
-		if info1, ok1 = t.epcIDIPV6Infos[key1]; !ok1 {
-			info1 = t.queryIPV6Cidr(epcID1, ipv61)
+	if lruValue1, ok1 = t.epcIDIPV6Lru[orgId].Get(key1[:], false); !ok1 {
+		if info1, ok1 = t.epcIDIPV6Infos[orgId][key1]; !ok1 {
+			info1 = t.queryIPV6Cidr(orgId, epcID1, ipv61)
 		}
 	} else {
 		t.counter.IP6HitCount++
@@ -703,18 +733,18 @@ func (t *PlatformInfoTable) queryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 
 	if !ok0 {
 		// 加入到map中，下次查该ip，无需遍历cidr
-		t.IPV6InfoAddLru(info0, key0[:])
+		t.IPV6InfoAddLru(orgId, info0, key0[:])
 	}
 	if !ok1 {
-		t.IPV6InfoAddLru(info1, key1[:])
+		t.IPV6InfoAddLru(orgId, info1, key1[:])
 	}
 	return
 }
 
 // 查询Cidr之前，需要先查询过epcip表, 否则会覆盖epcip表的内容
-func (t *PlatformInfoTable) queryIPV4Cidr(epcID int32, ipv4 uint32) *Info {
+func (t *PlatformInfoTable) queryIPV4Cidr(orgId uint16, epcID int32, ipv4 uint32) *Info {
 	var info *Info
-	if cidrInfos, exist := t.epcIDIPV4CidrInfos[int32(epcID)]; exist {
+	if cidrInfos, exist := t.epcIDIPV4CidrInfos[orgId][int32(epcID)]; exist {
 		ip := utils.IpFromUint32(ipv4)
 		for _, cidrInfo := range cidrInfos {
 			if cidrInfo.Cidr.Contains(ip) {
@@ -732,9 +762,9 @@ func (t *PlatformInfoTable) queryIPV4Cidr(epcID int32, ipv4 uint32) *Info {
 }
 
 // 查询Cidr之前，需要先查询过epcip表, 否则会覆盖epcip表的内容
-func (t *PlatformInfoTable) queryIPV6Cidr(epcID int32, ipv6 net.IP) *Info {
+func (t *PlatformInfoTable) queryIPV6Cidr(orgId uint16, epcID int32, ipv6 net.IP) *Info {
 	var info *Info
-	if cidrInfos, exist := t.epcIDIPV6CidrInfos[epcID]; exist {
+	if cidrInfos, exist := t.epcIDIPV6CidrInfos[orgId][epcID]; exist {
 		for _, cidrInfo := range cidrInfos {
 			if cidrInfo.Cidr.Contains(ipv6) {
 				info = &Info{
@@ -751,25 +781,29 @@ func (t *PlatformInfoTable) queryIPV6Cidr(epcID int32, ipv6 net.IP) *Info {
 }
 
 func (t *PlatformInfoTable) String() string {
+	return t.OrgString(ckdb.DEFAULT_ORG_ID)
+}
+
+func (t *PlatformInfoTable) OrgString(orgId uint16) string {
 	sb := &strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("AnalyzerID %d RegionID:%d   Drop Other RegionID Data Count:%d\n", t.analyzerID, t.regionID, t.otherRegionCount))
+	sb.WriteString(fmt.Sprintf("OrgID %d AnalyzerID %d RegionID:%d   Drop Other RegionID Data Count:%d\n", orgId, t.analyzerID, t.regionID, t.otherRegionCount[orgId]))
 	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d\n",
 		t.moduleName, t.ctlIP, t.hostname, t.regionID))
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
-	if len(t.epcIDIPV4Infos) > 0 {
+	if len(t.epcIDIPV4Infos[orgId]) > 0 {
 		sb.WriteString("\n1 *epcID  *ipv4           mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podGroupType podID podClusterID azID isVip isWan vtapId       hitCount (ipv4平台信息)\n")
 		sb.WriteString("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP4s := make([]uint64, 0)
-	for epcIP := range t.epcIDIPV4Infos {
+	for epcIP := range t.epcIDIPV4Infos[orgId] {
 		epcIP4s = append(epcIP4s, epcIP)
 	}
 	sort.Slice(epcIP4s, func(i, j int) bool {
 		return epcIP4s[i] < epcIP4s[j]
 	})
 	for _, epcIP := range epcIP4s {
-		info := t.epcIDIPV4Infos[epcIP]
+		info := t.epcIDIPV4Infos[orgId][epcIP]
 		if info == nil {
 			continue
 		}
@@ -777,37 +811,37 @@ func (t *PlatformInfoTable) String() string {
 			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodGroupType, info.PodID, info.PodClusterID, info.AZID, info.IsVip, info.IsWan, info.VtapID, *info.HitCount)
 	}
 
-	if len(t.epcIDIPV6Infos) > 0 {
+	if len(t.epcIDIPV6Infos[orgId]) > 0 {
 		sb.WriteString("\n\n")
 		sb.WriteString("2 *epcID  *ipv6                                        mac          host            hostID  regionID deviceType  deviceID subnetID  podNodeID podNSID podGroupID podGroupType podID podClusterID azID isVip isWan vtapId    hitCount (ipv6平台信息)\n")
 		sb.WriteString("---------------------------------------------------------------------------------------------i--------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 	}
 	epcIP6s := make([][EpcIDIPV6_LEN]byte, 0)
-	for epcIP := range t.epcIDIPV6Infos {
+	for epcIP := range t.epcIDIPV6Infos[orgId] {
 		epcIP6s = append(epcIP6s, epcIP)
 	}
 	sort.Slice(epcIP6s, func(i, j int) bool {
 		return bytes.Compare(epcIP6s[i][:4], epcIP6s[j][:4]) < 0
 	})
 	for _, epcIP := range epcIP6s {
-		info := t.epcIDIPV6Infos[epcIP]
+		info := t.epcIDIPV6Infos[orgId][epcIP]
 		if info == nil {
 			continue
 		}
 		fmt.Fprintf(sb, "  %-6d  %-44s %-12x %-15s %-6d  %-7d  %-10d  %-7d  %-8d  %-9d %-7d %-10d %-12d %-5d %-12d %-4d %-5t %-5t %-6d %d\n", int32(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(),
 			info.Mac, info.HostStr, info.HostID, info.RegionID, info.DeviceType, info.DeviceID, info.SubnetID, info.PodNodeID, info.PodNSID, info.PodGroupID, info.PodGroupType, info.PodID, info.PodClusterID, info.AZID, info.IsVip, info.IsWan, info.VtapID, *info.HitCount)
 	}
-	if len(t.epcIDIPV4CidrInfos) > 0 || len(t.epcIDIPV6CidrInfos) > 0 {
+	if len(t.epcIDIPV4CidrInfos[orgId]) > 0 || len(t.epcIDIPV6CidrInfos[orgId]) > 0 {
 		sb.WriteString("\n3 *epcID  *cidr                                          regionID  subnetID   azID   isWan hitCount (cidr平台信息) \n")
 		sb.WriteString("---------------------------------------------------------------------------------------------------------------------\n")
 	}
 
 	CidrInfos := make([]*CidrInfo, 0)
 
-	for _, cidrInfo := range t.epcIDIPV4CidrInfos {
+	for _, cidrInfo := range t.epcIDIPV4CidrInfos[orgId] {
 		CidrInfos = append(CidrInfos, cidrInfo...)
 	}
-	for _, cidrInfo := range t.epcIDIPV6CidrInfos {
+	for _, cidrInfo := range t.epcIDIPV6CidrInfos[orgId] {
 		CidrInfos = append(CidrInfos, cidrInfo...)
 	}
 
@@ -822,92 +856,96 @@ func (t *PlatformInfoTable) String() string {
 	sb.WriteString("\n4 *epcID  *ip                                          miss  (epcID和IP无法匹配到1,2,3表的统计)\n")
 	sb.WriteString("---------------------------------------------------------------\n")
 	epcIP4s = epcIP4s[:0]
-	t.epcIDIPV4Lru.Walk(func(key uint64, value interface{}) {
-		if _, ok := value.(*uint64); ok {
-			epcIP4s = append(epcIP4s, key)
+	if t.epcIDIPV4Lru[orgId] != nil {
+		t.epcIDIPV4Lru[orgId].Walk(func(key uint64, value interface{}) {
+			if _, ok := value.(*uint64); ok {
+				epcIP4s = append(epcIP4s, key)
+			}
+		})
+		sort.Slice(epcIP4s, func(i, j int) bool {
+			return epcIP4s[i] < epcIP4s[j]
+		})
+		for _, epcIP := range epcIP4s {
+			info, _ := t.epcIDIPV4Lru[orgId].Get(epcIP, true)
+			missCount, _ := info.(*uint64)
+			fmt.Fprintf(sb, "  %-6d  %-44s %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(), *missCount)
 		}
-	})
-	sort.Slice(epcIP4s, func(i, j int) bool {
-		return epcIP4s[i] < epcIP4s[j]
-	})
-	for _, epcIP := range epcIP4s {
-		info, _ := t.epcIDIPV4Lru.Get(epcIP, true)
-		missCount, _ := info.(*uint64)
-		fmt.Fprintf(sb, "  %-6d  %-44s %d\n", epcIP>>32, utils.IpFromUint32(uint32(epcIP)).String(), *missCount)
 	}
 
-	epcIP6s = make([][EpcIDIPV6_LEN]byte, 0)
-	t.epcIDIPV6Lru.Walk(func(key [EpcIDIPV6_LEN]byte, value interface{}) bool {
-		if _, ok := value.(*uint64); ok {
-			epcIP6s = append(epcIP6s, key)
-		}
-		return false
-	})
+	if t.epcIDIPV6Lru[orgId] != nil {
+		epcIP6s = make([][EpcIDIPV6_LEN]byte, 0)
+		t.epcIDIPV6Lru[orgId].Walk(func(key [EpcIDIPV6_LEN]byte, value interface{}) bool {
+			if _, ok := value.(*uint64); ok {
+				epcIP6s = append(epcIP6s, key)
+			}
+			return false
+		})
 
-	sort.Slice(epcIP6s, func(i, j int) bool {
-		return bytes.Compare(epcIP6s[i][:4], epcIP6s[j][:4]) < 0
-	})
-	for _, epcIP := range epcIP6s {
-		info, _ := t.epcIDIPV6Lru.Get(epcIP[:], true)
-		fmt.Fprintf(sb, "  %-6d  %-44s %d\n", int(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(), *(info.(*uint64)))
+		sort.Slice(epcIP6s, func(i, j int) bool {
+			return bytes.Compare(epcIP6s[i][:4], epcIP6s[j][:4]) < 0
+		})
+		for _, epcIP := range epcIP6s {
+			info, _ := t.epcIDIPV6Lru[orgId].Get(epcIP[:], true)
+			fmt.Fprintf(sb, "  %-6d  %-44s %d\n", int(binary.LittleEndian.Uint32(epcIP[:4])), net.IP(epcIP[4:]).String(), *(info.(*uint64)))
+		}
 	}
 
-	if len(t.macInfos) > 0 {
+	if len(t.macInfos[orgId]) > 0 {
 		sb.WriteString("\n5 *epcID *Mac        hit  (epcID和MAC匹配到平台信息的统计, 优先级最高)\n")
 		sb.WriteString("-----------------------------\n")
 	}
-	for mac, hitCount := range t.macInfos {
+	for mac, hitCount := range t.macInfos[orgId] {
 		if *hitCount.HitCount > 0 {
 			fmt.Fprintf(sb, "  %-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *hitCount.HitCount)
 		}
 	}
 
-	if len(t.macMissCount) > 0 {
+	if len(t.macMissCount[orgId]) > 0 {
 		sb.WriteString("\n6 *epcID *Mac       miss  (epcID和MAC匹配不到平台信息的统计)\n")
 		sb.WriteString("------------------------------\n")
 	}
-	for mac, missCount := range t.macMissCount {
+	for mac, missCount := range t.macMissCount[orgId] {
 		fmt.Fprintf(sb, "  %-5d  %-12x  %d\n", mac>>48, mac&0xffffffffffff, *missCount)
 	}
 
-	if len(t.epcIDBaseInfos) > 0 {
+	if len(t.epcIDBaseInfos[orgId]) > 0 {
 		sb.WriteString("\n7 *epcID           regionID  hitcount (若1,2,3都无法匹配到平台信息，则只使用epcID匹配到Region信息的统计)\n")
 		sb.WriteString("---------------------------------------\n")
-		epcIDs := make([]int32, 0, len(t.epcIDBaseInfos))
-		for epcID := range t.epcIDBaseInfos {
+		epcIDs := make([]int32, 0, len(t.epcIDBaseInfos[orgId]))
+		for epcID := range t.epcIDBaseInfos[orgId] {
 			epcIDs = append(epcIDs, epcID)
 		}
 		sort.Slice(epcIDs, func(i, j int) bool {
 			return epcIDs[i] < epcIDs[j]
 		})
 		for _, epcID := range epcIDs {
-			fmt.Fprintf(sb, "  %-15d  %-8d  %-8d\n", epcID, t.epcIDBaseInfos[epcID].RegionID, t.epcIDBaseInfos[epcID].HitCount)
+			fmt.Fprintf(sb, "  %-15d  %-8d  %-8d\n", epcID, t.epcIDBaseInfos[orgId][epcID].RegionID, t.epcIDBaseInfos[orgId][epcID].HitCount)
 		}
 	}
 
-	if len(t.epcIDBaseMissCount) > 0 {
+	if len(t.epcIDBaseMissCount[orgId]) > 0 {
 		sb.WriteString("\n8 *epcID         miss  (只使用epcID也无法匹配到region信息的统计)\n")
 		sb.WriteString("--------------------------\n")
 	}
-	for epcID, missCount := range t.epcIDBaseMissCount {
+	for epcID, missCount := range t.epcIDBaseMissCount[orgId] {
 		fmt.Fprintf(sb, "  %-15d  %d\n", epcID, *missCount)
 	}
 
-	if len(t.containerHitCount) > 0 {
+	if len(t.containerHitCount[orgId]) > 0 {
 		sb.WriteString("\n9 *containerID         hitcount  (使用containerID匹配pod信息成功的统计)\n")
 		sb.WriteString("--------------------------------\n")
 	}
 
-	for containerID, hitCount := range t.containerHitCount {
+	for containerID, hitCount := range t.containerHitCount[orgId] {
 		fmt.Fprintf(sb, "  %-20s  %d\n", containerID, *hitCount)
 	}
 
-	if len(t.containerMissCount) > 0 {
+	if len(t.containerMissCount[orgId]) > 0 {
 		sb.WriteString("\n10 *containerID         miss  (使用containerID无法匹配到pod信息的统计)\n")
 		sb.WriteString("--------------------------------\n")
 	}
 
-	for containerID, missCount := range t.containerMissCount {
+	for containerID, missCount := range t.containerMissCount[orgId] {
 		fmt.Fprintf(sb, "  %-20s  %d\n", containerID, *missCount)
 	}
 
@@ -915,28 +953,40 @@ func (t *PlatformInfoTable) String() string {
 }
 
 func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
-	if arg == "vtap-" {
-		return t.vtapsString()
-	} else if arg == "pod-" {
-		return t.podsString()
-	} else if arg == "peer_conn-" {
-		return t.peerConnectionsString()
-	} else if arg == "comm_vtaps-" {
-		return t.communicationVtapsString()
-	} else if arg == "service-" {
-		return t.ServiceTable.String()
-	} else if arg == "gprocess-" {
-		return t.gprocessInfosString()
-	} else if arg == "container-" {
-		return t.containersString()
+	var orgId uint16
+	splits := strings.Split(arg, "-")
+	if len(splits) == 2 {
+		id, _ := strconv.Atoi(splits[1])
+		orgId = uint16(id)
+	}
+	if orgId == ckdb.INVALID_ORG_ID {
+		orgId = ckdb.DEFAULT_ORG_ID
 	}
 
-	all := t.String()
+	switch splits[0] {
+	case "vtap":
+		return t.vtapsString(orgId)
+	case "pod":
+		return t.podsString(orgId)
+	case "peer_conn":
+		return t.peerConnectionsString(orgId)
+	case "comm_vtaps":
+		return t.communicationVtapsString(orgId)
+	case "service":
+		return t.ServiceTable[orgId].String()
+	case "gprocess":
+		return t.gprocessInfosString(orgId)
+	case "container":
+		return t.containersString(orgId)
+	}
+
+	filter := splits[0]
+	all := t.OrgString(orgId)
 	lines := strings.Split(all, "\n")
-	if arg != "" { // 按arg过滤返回
+	if filter != "" { // 按arg过滤返回
 		filterLines := make([]string, 0, 10)
 		for _, line := range lines {
-			if strings.Contains(line, arg) ||
+			if strings.Contains(line, filter) ||
 				strings.Contains(line, "epcID") ||
 				strings.Contains(line, "mac") ||
 				strings.Contains(line, "Region") ||
@@ -963,12 +1013,12 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 	return strings.Join(newLines, "\n")
 }
 
-func (t *PlatformInfoTable) updateServices(groupsData *trident.Groups) {
-	t.ServiceTable = NewServiceTable(groupsData.GetSvcs())
+func (t *PlatformInfoTable) updateServices(orgId uint16, groupsData *trident.Groups) {
+	t.ServiceTable[orgId] = NewServiceTable(groupsData.GetSvcs())
 	t.counter.UpdateServicesCount += int64(len(groupsData.GetSvcs()))
 }
 
-func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformData) {
+func (t *PlatformInfoTable) updatePlatformData(orgId uint16, platformData *trident.PlatformData) {
 	newEpcIDIPV4Infos := make(map[uint64]*Info)
 	newEpcIDIPV6Infos := make(map[[EpcIDIPV6_LEN]byte]*Info)
 	newMacInfos := make(map[uint64]*Info)
@@ -983,36 +1033,40 @@ func (t *PlatformInfoTable) updatePlatformData(platformData *trident.PlatformDat
 	for _, cidr := range platformData.GetCidrs() {
 		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, newEpcIDBaseInfos, cidr)
 	}
-	t.updatePeerConnections(platformData.GetPeerConnections())
-	t.updateGprocessInfos(platformData.GetGprocessInfos())
+	t.updatePeerConnections(orgId, platformData.GetPeerConnections())
+	t.updateGprocessInfos(orgId, platformData.GetGprocessInfos())
 
-	t.epcIDIPV4Infos = newEpcIDIPV4Infos
-	t.epcIDIPV4CidrInfos = newEpcIDIPV4CidrInfos
-	t.epcIDIPV4Lru.NoStats()
-	t.epcIDIPV4Lru = lru.NewU64LRU("epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
+	t.epcIDIPV4Infos[orgId] = newEpcIDIPV4Infos
+	t.epcIDIPV4CidrInfos[orgId] = newEpcIDIPV4CidrInfos
+	if t.epcIDIPV4Lru[orgId] != nil {
+		t.epcIDIPV4Lru[orgId].NoStats()
+	}
+	t.epcIDIPV4Lru[orgId] = nil
 
-	t.epcIDIPV6Infos = newEpcIDIPV6Infos
-	t.epcIDIPV6CidrInfos = newEpcIDIPV6CidrInfos
-	t.epcIDIPV6Lru.NoStats()
-	t.epcIDIPV6Lru = lru.NewU160LRU("epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
+	t.epcIDIPV6Infos[orgId] = newEpcIDIPV6Infos
+	t.epcIDIPV6CidrInfos[orgId] = newEpcIDIPV6CidrInfos
+	if t.epcIDIPV6Lru[orgId] != nil {
+		t.epcIDIPV6Lru[orgId].NoStats()
+	}
+	t.epcIDIPV6Lru[orgId] = nil
 
-	t.macInfos = newMacInfos
-	t.macMissCount = make(map[uint64]*uint64)
+	t.macInfos[orgId] = newMacInfos
+	t.macMissCount[orgId] = make(map[uint64]*uint64)
 
-	t.epcIDBaseInfos = newEpcIDBaseInfos
-	t.epcIDBaseMissCount = make(map[int32]*uint64)
-	t.containerHitCount = make(map[string]*uint64)
-	t.containerMissCount = make(map[string]*uint64)
+	t.epcIDBaseInfos[orgId] = newEpcIDBaseInfos
+	t.epcIDBaseMissCount[orgId] = make(map[int32]*uint64)
+	t.containerHitCount[orgId] = make(map[string]*uint64)
+	t.containerMissCount[orgId] = make(map[string]*uint64)
 
-	t.podIDInfosPlatformData = newEpcIDPodInfos
+	t.podIDInfosPlatformData[orgId] = newEpcIDPodInfos
 }
 
-func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
+func (t *PlatformInfoTable) updateOthers(orgId uint16, response *trident.SyncResponse) {
 	vtapIps := response.GetVtapIps()
-	t.updateVtapIps(vtapIps)
+	t.updateVtapIps(orgId, vtapIps)
 	podIps := response.GetPodIps()
 	if podIps != nil {
-		t.updatePodIps(podIps)
+		t.updatePodIps(orgId, podIps)
 	}
 
 	if analyzerConfig := response.GetAnalyzerConfig(); analyzerConfig != nil {
@@ -1026,60 +1080,64 @@ func (t *PlatformInfoTable) updateOthers(response *trident.SyncResponse) {
 	}
 }
 
-func (t *PlatformInfoTable) ReloadSlave() error {
+func (t *PlatformInfoTable) ReloadSlave(orgId uint16) error {
 	if t.manager == nil || t.manager.masterTable == nil {
 		return nil
 	}
 
 	masterTable := t.manager.masterTable
 
-	newGroupsVersion := masterTable.versionGroups
-	if newGroupsVersion != t.versionGroups {
-		t.versionGroups, t.ServiceTable = newGroupsVersion, masterTable.ServiceTable
-		log.Infof("Update slave (%s) rpc groups version %d -> %d ", t.moduleName, t.versionGroups, newGroupsVersion)
+	newGroupsVersion := masterTable.versionGroups[orgId]
+	if newGroupsVersion != t.versionGroups[orgId] {
+		t.versionGroups[orgId], t.ServiceTable[orgId] = newGroupsVersion, masterTable.ServiceTable[orgId]
+		log.Infof("org %d update slave (%s) rpc groups version %d -> %d ", orgId, t.moduleName, t.versionGroups[orgId], newGroupsVersion)
 	}
 
-	newVersion := masterTable.versionPlatformData
-	if newVersion != t.versionPlatformData {
-		log.Infof("Update slave (%s) rpc platformdata version %d -> %d  regionID=%d", t.moduleName, t.versionPlatformData, newVersion, t.regionID)
-		t.peerConnections = masterTable.peerConnections
-		t.gprocessInfos = masterTable.gprocessInfos
-		t.vtapIDProcessInfos = masterTable.vtapIDProcessInfos
-		t.podIDInfos = masterTable.podIDInfos
+	newVersion := masterTable.versionPlatformData[orgId]
+	if newVersion != t.versionPlatformData[orgId] {
+		log.Infof("org %d update slave (%s) rpc platformdata version %d -> %d  regionID=%d", orgId, t.moduleName, t.versionPlatformData[orgId], newVersion, t.regionID)
+		t.peerConnections[orgId] = masterTable.peerConnections[orgId]
+		t.gprocessInfos[orgId] = masterTable.gprocessInfos[orgId]
+		t.vtapIDProcessInfos[orgId] = masterTable.vtapIDProcessInfos[orgId]
+		t.podIDInfos[orgId] = masterTable.podIDInfos[orgId]
 
-		t.epcIDIPV4Infos = masterTable.epcIDIPV4Infos
-		t.epcIDIPV4CidrInfos = masterTable.epcIDIPV4CidrInfos
-		t.epcIDIPV4Lru.NoStats()
-		t.epcIDIPV4Lru = lru.NewU64LRU("epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
+		t.epcIDIPV4Infos[orgId] = masterTable.epcIDIPV4Infos[orgId]
+		t.epcIDIPV4CidrInfos[orgId] = masterTable.epcIDIPV4CidrInfos[orgId]
+		if t.epcIDIPV4Lru[orgId] != nil {
+			t.epcIDIPV4Lru[orgId].NoStats()
+		}
+		t.epcIDIPV4Lru[orgId] = nil
 
-		t.epcIDIPV6Infos = masterTable.epcIDIPV6Infos
-		t.epcIDIPV6CidrInfos = masterTable.epcIDIPV6CidrInfos
-		t.epcIDIPV6Lru.NoStats()
-		t.epcIDIPV6Lru = lru.NewU160LRU("epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
+		t.epcIDIPV6Infos[orgId] = masterTable.epcIDIPV6Infos[orgId]
+		t.epcIDIPV6CidrInfos[orgId] = masterTable.epcIDIPV6CidrInfos[orgId]
+		if t.epcIDIPV6Lru[orgId] != nil {
+			t.epcIDIPV6Lru[orgId].NoStats()
+		}
+		t.epcIDIPV6Lru[orgId] = nil
 
-		t.macInfos = masterTable.macInfos
-		t.macMissCount = make(map[uint64]*uint64)
+		t.macInfos[orgId] = masterTable.macInfos[orgId]
+		t.macMissCount[orgId] = make(map[uint64]*uint64)
 
-		t.epcIDBaseInfos = masterTable.epcIDBaseInfos
-		t.epcIDBaseMissCount = make(map[int32]*uint64)
+		t.epcIDBaseInfos[orgId] = masterTable.epcIDBaseInfos[orgId]
+		t.epcIDBaseMissCount[orgId] = make(map[int32]*uint64)
 
-		t.containerHitCount = make(map[string]*uint64)
-		t.containerMissCount = make(map[string]*uint64)
+		t.containerHitCount[orgId] = make(map[string]*uint64)
+		t.containerMissCount[orgId] = make(map[string]*uint64)
 
-		t.versionPlatformData = newVersion
-		t.otherRegionCount = 0
+		t.versionPlatformData[orgId] = newVersion
+		t.otherRegionCount[orgId] = 0
 	}
-	t.vtapIdInfos = masterTable.vtapIdInfos
+	t.vtapIdInfos[orgId] = masterTable.vtapIdInfos[orgId]
 	t.orgIds = masterTable.orgIds
-	t.podNameInfos = masterTable.podNameInfos
+	t.podNameInfos[orgId] = masterTable.podNameInfos[orgId]
 	t.regionID = masterTable.regionID
 	t.analyzerID = masterTable.analyzerID
-	t.containerInfos = masterTable.containerInfos
+	t.containerInfos[orgId] = masterTable.containerInfos[orgId]
 
 	return nil
 }
 
-func (t *PlatformInfoTable) ReloadMaster() error {
+func (t *PlatformInfoTable) ReloadMaster(orgId uint16) error {
 	t.counter.UpdateCount++
 	var response *trident.SyncResponse
 	start := time.Now()
@@ -1102,17 +1160,18 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(t.bootTime),
-			VersionPlatformData: proto.Uint64(t.versionPlatformData),
-			VersionGroups:       proto.Uint64(t.versionGroups),
+			VersionPlatformData: proto.Uint64(t.versionPlatformData[orgId]),
+			VersionGroups:       proto.Uint64(t.versionGroups[orgId]),
 			CtrlIp:              proto.String(t.ctlIP),
 			ProcessName:         proto.String(t.moduleName),
 			Host:                proto.String(hostname),
-			CommunicationVtaps:  t.getCommunicationVtaps(),
+			CommunicationVtaps:  t.getCommunicationVtaps(orgId),
 			CpuNum:              proto.Uint32(t.runtimeEnv.CpuNum),
 			MemorySize:          proto.Uint64(t.runtimeEnv.MemorySize),
 			Arch:                proto.String(t.runtimeEnv.Arch),
 			Os:                  proto.String(t.runtimeEnv.OS),
 			KernelVersion:       proto.String(t.runtimeEnv.KernelVersion),
+			OrgId:               proto.Uint32(uint32(orgId)),
 		}
 		client := trident.NewSynchronizerClient(t.GetClient())
 		// 分析器请求消息接口，用于ingester
@@ -1126,22 +1185,22 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 	t.counter.GrpcRequestTime += grpcRequestTime
 
 	if status := response.GetStatus(); status != trident.Status_SUCCESS {
-		return fmt.Errorf("grpc response failed. responseStatus is %v", status)
+		return fmt.Errorf("org %d grpc response failed. responseStatus is %v", orgId, status)
 	}
 
 	newGroupsVersion := response.GetVersionGroups()
-	if newGroupsVersion != t.versionGroups {
-		log.Infof("Update rpc groups version %d -> %d ", t.versionGroups, newGroupsVersion)
+	if newGroupsVersion != t.versionGroups[orgId] {
+		log.Infof("org %d update rpc groups version %d -> %d ", orgId, t.versionGroups[orgId], newGroupsVersion)
 		groupsData := trident.Groups{}
 		if compressed := response.GetGroups(); compressed != nil {
 			if err := groupsData.Unmarshal(compressed); err != nil {
-				log.Warningf("unmarshal grpc compressed groups failed as %v", err)
+				log.Warningf("org %d unmarshal grpc compressed groups failed as %v", orgId, err)
 			}
 		}
 
 		if len(groupsData.GetSvcs()) > 0 {
-			t.updateServices(&groupsData)
-			t.versionGroups = newGroupsVersion
+			t.updateServices(orgId, &groupsData)
+			t.versionGroups[orgId] = newGroupsVersion
 		}
 	}
 	serviceTime := int64(time.Since(start)) - grpcRequestTime
@@ -1149,44 +1208,86 @@ func (t *PlatformInfoTable) ReloadMaster() error {
 
 	newVersion := response.GetVersionPlatformData()
 	isUnmarshalSuccess := false
-	if newVersion != t.versionPlatformData {
+	if newVersion != t.versionPlatformData[orgId] {
 		platformData := trident.PlatformData{}
 		if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
 			if err := platformData.Unmarshal(plarformCompressed); err != nil {
-				log.Warningf("unmarshal grpc compressed platformData failed as %v", err)
+				log.Warningf("org %d unmarshal grpc compressed platformData failed as %v", orgId, err)
 			} else {
 				isUnmarshalSuccess = true
 			}
 		}
 
 		if isUnmarshalSuccess {
-			log.Infof("Update rpc platformdata version %d -> %d  regionID=%d", t.versionPlatformData, newVersion, t.regionID)
-			t.updatePlatformData(&platformData)
-			t.otherRegionCount = 0
+			log.Infof("org %d update rpc platformdata version %d -> %d  regionID=%d", orgId, t.versionPlatformData[orgId], newVersion, t.regionID)
+			t.updatePlatformData(orgId, &platformData)
+			t.otherRegionCount[orgId] = 0
 		}
 	}
 	platformTime := int64(time.Since(start)) - grpcRequestTime - serviceTime
 	t.counter.UpdatePlatformTime += platformTime
 
-	t.updateOthers(response)
+	t.updateOthers(orgId, response)
 
 	// the versionPlatformData needs to be updated at the end, otherwise the Slave may have updated the Master's map.
 	//  at this time, updateOthers()->updatePodIps() of Master and QueryPodInfo() of Slave will cause concurrent map write and read panic.
 	if isUnmarshalSuccess {
-		t.versionPlatformData = newVersion
+		t.versionPlatformData[orgId] = newVersion
 	}
 
 	return nil
 }
 
-func (t *PlatformInfoTable) Version() uint64 {
-	return t.versionPlatformData
+func (t *PlatformInfoTable) requestOrgIds() {
+	var response *trident.OrgIDsResponse
+	err := t.Request(func(ctx context.Context, remote net.IP) error {
+		client := trident.NewSynchronizerClient(t.GetClient())
+		var err error
+		response, err = client.GetOrgIDs(ctx, &trident.OrgIDsRequest{})
+		return err
+	})
+	if err != nil {
+		log.Errorf("request org ids failed: %s", err)
+	}
+	orgIdU32s := response.GetOrgIds()
+	orgIdU16s := make([]uint16, 0, len(orgIdU32s))
+	for _, orgId := range orgIdU32s {
+		if ckdb.IsValidOrgID(uint16(orgId)) {
+			orgIdU16s = append(orgIdU16s, uint16(orgId))
+		}
+	}
+	if len(orgIdU16s) == 0 {
+		log.Errorf("request org ids is invalid: %+v", orgIdU32s)
+		return
+	}
+
+	sort.Slice(orgIdU16s, func(i, j int) bool {
+		return orgIdU16s[i] < orgIdU16s[j]
+	})
+
+	isChanged := len(t.orgIds) != len(orgIdU16s)
+	if !isChanged {
+		for i := range orgIdU16s {
+			if t.orgIds[i] != orgIdU16s[i] {
+				isChanged = true
+				break
+			}
+		}
+	}
+	if isChanged {
+		log.Infof("org ids changed from %+v to %+v", t.orgIds, orgIdU16s)
+		t.orgIds = orgIdU16s
+	}
 }
 
-func (t *PlatformInfoTable) getCommunicationVtaps() []*trident.CommunicationVtap {
+func (t *PlatformInfoTable) Version(orgId uint16) uint64 {
+	return t.versionPlatformData[orgId]
+}
+
+func (t *PlatformInfoTable) getCommunicationVtaps(orgId uint16) []*trident.CommunicationVtap {
 	var communicationVtaps []*trident.CommunicationVtap
 	if t.receiver != nil {
-		status := t.receiver.GetTridentStatus()
+		status := t.receiver.GetTridentStatus(orgId)
 		for _, s := range status {
 			communicationVtaps = append(communicationVtaps, &trident.CommunicationVtap{
 				VtapId:         proto.Uint32(uint32(s.VTAPID)),
@@ -1197,9 +1298,9 @@ func (t *PlatformInfoTable) getCommunicationVtaps() []*trident.CommunicationVtap
 	return communicationVtaps
 }
 
-func (t *PlatformInfoTable) communicationVtapsString() string {
+func (t *PlatformInfoTable) communicationVtapsString(orgId uint16) string {
 	sb := &strings.Builder{}
-	for _, comm := range t.getCommunicationVtaps() {
+	for _, comm := range t.getCommunicationVtaps(orgId) {
 		sb.WriteString(fmt.Sprintf("Vtapid: %d  LastActiveTime: %d %s\n", *comm.VtapId, *comm.LastActiveTime, time.Unix(int64(*comm.LastActiveTime), 0)))
 	}
 	return sb.String()
@@ -1436,34 +1537,34 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 	}
 }
 
-func (t *PlatformInfoTable) QueryVtapEpc0(vtapId uint16) int32 {
-	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
+func (t *PlatformInfoTable) QueryVtapEpc0(orgId, vtapId uint16) int32 {
+	if vtapInfo, ok := t.vtapIdInfos[orgId][vtapId]; ok {
 		return int32(vtapInfo.EpcId)
 	}
 	return datatype.EPC_FROM_INTERNET
 }
 
-func (t *PlatformInfoTable) QueryVtapInfo(vtapId uint16) *VtapInfo {
-	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
+func (t *PlatformInfoTable) QueryVtapInfo(orgId, vtapId uint16) *VtapInfo {
+	if vtapInfo, ok := t.vtapIdInfos[orgId][vtapId]; ok {
 		return vtapInfo
 	}
 	return nil
 }
 
-func (t *PlatformInfoTable) QueryVtapOrgAndTeamID(vtapId uint16) (uint16, uint16) {
-	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
+func (t *PlatformInfoTable) QueryVtapOrgAndTeamID(orgId, vtapId uint16) (uint16, uint16) {
+	if vtapInfo, ok := t.vtapIdInfos[orgId][vtapId]; ok {
 		return vtapInfo.OrgId, vtapInfo.TeamId
 	}
 	return ckdb.DEFAULT_ORG_ID, ckdb.INVALID_TEAM_ID
 }
 
-func (t *PlatformInfoTable) inPlatformData(epcID int32, isIPv4 bool, ip4 uint32, ip6 net.IP) bool {
+func (t *PlatformInfoTable) inPlatformData(orgId uint16, epcID int32, isIPv4 bool, ip4 uint32, ip6 net.IP) bool {
 	if isIPv4 {
-		if t.queryIPV4Infos(epcID, ip4) != nil {
+		if t.queryIPV4Infos(orgId, epcID, ip4) != nil {
 			return true
 		}
 	} else {
-		if t.queryIPV6Infos(epcID, ip6) != nil {
+		if t.queryIPV6Infos(orgId, epcID, ip6) != nil {
 			return true
 		}
 	}
@@ -1471,15 +1572,15 @@ func (t *PlatformInfoTable) inPlatformData(epcID int32, isIPv4 bool, ip4 uint32,
 	return false
 }
 
-func (t *PlatformInfoTable) findEpcInWan(isIPv4 bool, ip4 uint32, ip6 net.IP) int32 {
+func (t *PlatformInfoTable) findEpcInWan(orgId uint16, isIPv4 bool, ip4 uint32, ip6 net.IP) int32 {
 	if isIPv4 {
 		// wan数据使用ecpip为0查找
-		if info := t.queryIPV4Infos(0, ip4); info != nil {
+		if info := t.queryIPV4Infos(orgId, 0, ip4); info != nil {
 			return info.EpcID
 		}
 	} else {
 		// wan数据使用ecpip为0查找
-		if info := t.queryIPV6Infos(0, ip6); info != nil {
+		if info := t.queryIPV6Infos(orgId, 0, ip6); info != nil {
 			return info.EpcID
 		}
 	}
@@ -1495,25 +1596,23 @@ func (t *PlatformInfoTable) findEpcInWan(isIPv4 bool, ip4 uint32, ip6 net.IP) in
 // 2.3 假设等于epc_0_1: 验证epc0_0+ip1是否在cidr list中
 // 2.4 ...
 // 3. 如果还找不到, 直接使用ip1去查wan ip
-func (t *PlatformInfoTable) QueryVtapEpc1(vtapId uint16, isIPv4 bool, ip41 uint32, ip61 net.IP) int32 {
-	epc0 := t.QueryVtapEpc0(vtapId)
-	if t.inPlatformData(epc0, isIPv4, ip41, ip61) {
+func (t *PlatformInfoTable) QueryVtapEpc1(orgId, vtapId uint16, isIPv4 bool, ip41 uint32, ip61 net.IP) int32 {
+	epc0 := t.QueryVtapEpc0(orgId, vtapId)
+	if t.inPlatformData(orgId, epc0, isIPv4, ip41, ip61) {
 		return epc0
 	}
 
-	for _, epc1 := range t.queryPeerConnections(epc0) {
-		if t.inPlatformData(epc1, isIPv4, ip41, ip61) {
+	for _, epc1 := range t.queryPeerConnections(orgId, epc0) {
+		if t.inPlatformData(orgId, epc1, isIPv4, ip41, ip61) {
 			return epc1
 		}
 	}
 
-	return t.findEpcInWan(isIPv4, ip41, ip61)
+	return t.findEpcInWan(orgId, isIPv4, ip41, ip61)
 }
 
-func (t *PlatformInfoTable) updateVtapIps(vtapIps []*trident.VtapIp) {
+func (t *PlatformInfoTable) updateVtapIps(orgId uint16, vtapIps []*trident.VtapIp) {
 	vtapIdInfos := make(map[uint16]*VtapInfo)
-	orgIdMap := make(map[uint16]struct{})
-	orgIds := make([]uint16, 0)
 	for _, vtapIp := range vtapIps {
 		// vtapIp.GetEpcId() in range (0,64000], when convert to int32, 0 convert to datatype.EPC_FROM_INTERNET
 		epcId := int32(vtapIp.GetEpcId())
@@ -1528,35 +1627,22 @@ func (t *PlatformInfoTable) updateVtapIps(vtapIps []*trident.VtapIp) {
 			OrgId:        uint16(vtapIp.GetOrgId()),
 			TeamId:       uint16(vtapIp.GetTeamId()),
 		}
-		orgId := vtapIp.GetOrgId()
-		if orgId != ckdb.INVALID_ORG_ID {
-			orgIdMap[uint16(orgId)] = struct{}{}
-		}
 	}
-	// add default org
-	orgIdMap[ckdb.DEFAULT_ORG_ID] = struct{}{}
-	for orgId := range orgIdMap {
-		orgIds = append(orgIds, orgId)
-	}
-	sort.Slice(orgIds, func(i, j int) bool {
-		return orgIds[i] < orgIds[j]
-	})
-	t.vtapIdInfos = vtapIdInfos
-	t.orgIds = orgIds
+	t.vtapIdInfos[orgId] = vtapIdInfos
 }
 
-func (t *PlatformInfoTable) vtapsString() string {
+func (t *PlatformInfoTable) vtapsString(orgId uint16) string {
 	sb := &strings.Builder{}
-	for k, v := range t.vtapIdInfos {
+	for k, v := range t.vtapIdInfos[orgId] {
 		sb.WriteString(fmt.Sprintf("vtapid: %d  %+v\n", k, *v))
 	}
 	return sb.String()
 }
 
-func (t *PlatformInfoTable) QueryPodInfo(vtapId uint16, podName string) *PodInfo {
-	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
+func (t *PlatformInfoTable) QueryPodInfo(orgId, vtapId uint16, podName string) *PodInfo {
+	if vtapInfo, ok := t.vtapIdInfos[orgId][vtapId]; ok {
 		podClusterId := vtapInfo.PodClusterId
-		for _, podInfo := range t.podNameInfos[podName] {
+		for _, podInfo := range t.podNameInfos[orgId][podName] {
 			if podInfo.PodClusterId == podClusterId {
 				return podInfo
 			}
@@ -1565,18 +1651,18 @@ func (t *PlatformInfoTable) QueryPodInfo(vtapId uint16, podName string) *PodInfo
 	return nil
 }
 
-func (t *PlatformInfoTable) QueryPodContainerInfo(vtapID uint16, containerID string) *PodInfo {
-	if vtapInfo, ok := t.vtapIdInfos[vtapID]; ok {
+func (t *PlatformInfoTable) QueryPodContainerInfo(orgId, vtapID uint16, containerID string) *PodInfo {
+	if vtapInfo, ok := t.vtapIdInfos[orgId][vtapID]; ok {
 		podClusterId := vtapInfo.PodClusterId
 		atomic.AddInt64(&t.counter.ContainerTotalCount, 1)
 		// assume containerid will not repeat in one cluster
-		if containerInfos, ok := t.containerInfos[containerID]; ok {
+		if containerInfos, ok := t.containerInfos[orgId][containerID]; ok {
 			for _, podInfo := range containerInfos {
 				if podInfo.PodClusterId == podClusterId {
-					hitCount, ok := t.containerHitCount[containerID]
+					hitCount, ok := t.containerHitCount[orgId][containerID]
 					if !ok {
 						hitCount = new(uint64)
-						t.containerHitCount[containerID] = hitCount
+						t.containerHitCount[orgId][containerID] = hitCount
 					}
 					atomic.AddUint64(hitCount, 1)
 					atomic.AddInt64(&t.counter.ContainerHitCount, 1)
@@ -1586,10 +1672,10 @@ func (t *PlatformInfoTable) QueryPodContainerInfo(vtapID uint16, containerID str
 			}
 		} else {
 			log.Debugf("can't find PodInfo from containerID(%s) and vtapID(%d)", containerID, vtapID)
-			missCount, ok := t.containerMissCount[containerID]
+			missCount, ok := t.containerMissCount[orgId][containerID]
 			if !ok {
 				missCount = new(uint64)
-				t.containerMissCount[containerID] = missCount
+				t.containerMissCount[orgId][containerID] = missCount
 			}
 			atomic.AddUint64(missCount, 1)
 			atomic.AddInt64(&t.counter.ContainerMissCount, 1)
@@ -1612,13 +1698,13 @@ func parseIP(ipStr string) (isIPv4 bool, ip4U32 uint32, ip6 net.IP) {
 	return
 }
 
-func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
+func (t *PlatformInfoTable) updatePodIps(orgId uint16, podIps []*trident.PodIp) {
 	podNameInfos := make(map[string][]*PodInfo)
 	containerInfos := make(map[string][]*PodInfo)
 
 	podIDInfos := make(map[uint32]*Info)
 	// deep copy podIDInfos from t.podIDInfosPlatformData, prevent map read/write panic
-	for k, v := range t.podIDInfosPlatformData {
+	for k, v := range t.podIDInfosPlatformData[orgId] {
 		podIDInfos[k] = v
 	}
 
@@ -1671,9 +1757,9 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 				isIPv4, ip4, ip6 := parseIP(ip)
 				var infoPtr *Info
 				if isIPv4 {
-					infoPtr = t.QueryIPV4Infos(epcId, ip4)
+					infoPtr = t.QueryIPV4Infos(orgId, epcId, ip4)
 				} else {
-					infoPtr = t.QueryIPV6Infos(epcId, ip6)
+					infoPtr = t.QueryIPV6Infos(orgId, epcId, ip6)
 				}
 				if infoPtr != nil {
 					info = *infoPtr
@@ -1690,14 +1776,14 @@ func (t *PlatformInfoTable) updatePodIps(podIps []*trident.PodIp) {
 			podIDInfos[podId] = &info
 		}
 	}
-	t.podNameInfos = podNameInfos
-	t.containerInfos = containerInfos
-	t.podIDInfos = podIDInfos
+	t.podNameInfos[orgId] = podNameInfos
+	t.containerInfos[orgId] = containerInfos
+	t.podIDInfos[orgId] = podIDInfos
 }
 
-func (t *PlatformInfoTable) podsString() string {
+func (t *PlatformInfoTable) podsString(orgId uint16) string {
 	sb := &strings.Builder{}
-	for podName, podInfos := range t.podNameInfos {
+	for podName, podInfos := range t.podNameInfos[orgId] {
 		for _, podInfo := range podInfos {
 			sb.WriteString(fmt.Sprintf("%s %+v\n", podName, *podInfo))
 		}
@@ -1705,9 +1791,9 @@ func (t *PlatformInfoTable) podsString() string {
 	return sb.String()
 }
 
-func (t *PlatformInfoTable) containersString() string {
+func (t *PlatformInfoTable) containersString(orgId uint16) string {
 	sb := &strings.Builder{}
-	for containerId, podInfos := range t.containerInfos {
+	for containerId, podInfos := range t.containerInfos[orgId] {
 		for _, podInfo := range podInfos {
 			sb.WriteString(fmt.Sprintf("%s %+v\n", containerId, *podInfo))
 		}
@@ -1724,7 +1810,7 @@ func inSlice(s []int32, item int32) bool {
 	return false
 }
 
-func (t *PlatformInfoTable) updatePeerConnections(connections []*trident.PeerConnection) {
+func (t *PlatformInfoTable) updatePeerConnections(orgId uint16, connections []*trident.PeerConnection) {
 	peerConnections := make(map[int32][]int32, 1024)
 
 	for _, connection := range connections {
@@ -1746,18 +1832,18 @@ func (t *PlatformInfoTable) updatePeerConnections(connections []*trident.PeerCon
 		}
 	}
 
-	t.peerConnections = peerConnections
+	t.peerConnections[orgId] = peerConnections
 }
 
-func (t *PlatformInfoTable) peerConnectionsString() string {
-	return fmt.Sprintf("%+v", t.peerConnections)
+func (t *PlatformInfoTable) peerConnectionsString(orgId uint16) string {
+	return fmt.Sprintf("org %d: %+v", orgId, t.peerConnections[orgId])
 }
 
-func (t *PlatformInfoTable) queryPeerConnections(epcId int32) []int32 {
-	return t.peerConnections[epcId]
+func (t *PlatformInfoTable) queryPeerConnections(orgId uint16, epcId int32) []int32 {
+	return t.peerConnections[orgId][epcId]
 }
 
-func (t *PlatformInfoTable) updateGprocessInfos(infos []*trident.GProcessInfo) {
+func (t *PlatformInfoTable) updateGprocessInfos(orgId uint16, infos []*trident.GProcessInfo) {
 	gProcessInfos := make(map[uint32]uint64, 1024)
 	vtapIDProcessInfos := make(map[uint64]uint32, 1024)
 
@@ -1775,36 +1861,36 @@ func (t *PlatformInfoTable) updateGprocessInfos(infos []*trident.GProcessInfo) {
 		gProcessInfos[gProcessId] = uint64(vtapId)<<32 | uint64(podId)
 	}
 
-	t.gprocessInfos = gProcessInfos
-	t.vtapIDProcessInfos = vtapIDProcessInfos
+	t.gprocessInfos[orgId] = gProcessInfos
+	t.vtapIDProcessInfos[orgId] = vtapIDProcessInfos
 }
 
-func (t *PlatformInfoTable) gprocessInfosString() string {
+func (t *PlatformInfoTable) gprocessInfosString(orgId uint16) string {
 	sb := &strings.Builder{}
 	sb.WriteString("gprocessId         vtapId        podId\n")
 	sb.WriteString("--------------------------------------\n")
-	for gpid, vtapPodId := range t.gprocessInfos {
+	for gpid, vtapPodId := range t.gprocessInfos[orgId] {
 		sb.WriteString(fmt.Sprintf("%-10d         %-6d       %d\n", gpid, vtapPodId>>32, vtapPodId<<32>>32))
 	}
 	sb.WriteString("\nvtapId         processId        gprocessId\n")
 	sb.WriteString("----------------------------------------\n")
-	for vtapIdPid, gprocessId := range t.vtapIDProcessInfos {
+	for vtapIdPid, gprocessId := range t.vtapIDProcessInfos[orgId] {
 		sb.WriteString(fmt.Sprintf("%-6d         %-9d       %d\n", vtapIdPid>>32, vtapIdPid<<32>>32, gprocessId))
 	}
 	return sb.String()
 }
 
 // return vtapID, podID
-func (t *PlatformInfoTable) QueryGprocessInfo(gprocessId uint32) (uint16, uint32) {
-	if vtapPod, ok := t.gprocessInfos[gprocessId]; ok {
+func (t *PlatformInfoTable) QueryGprocessInfo(orgId uint16, gprocessId uint32) (uint16, uint32) {
+	if vtapPod, ok := t.gprocessInfos[orgId][gprocessId]; ok {
 		return uint16(vtapPod >> 32), uint32(vtapPod << 32 >> 32)
 	}
 	return 0, 0
 }
 
 // return gProcessID
-func (t *PlatformInfoTable) QueryProcessInfo(vtapId uint16, processId uint32) uint32 {
-	return t.vtapIDProcessInfos[uint64(vtapId)<<32|uint64(processId)]
+func (t *PlatformInfoTable) QueryProcessInfo(orgId, vtapId uint16, processId uint32) uint32 {
+	return t.vtapIDProcessInfos[orgId][uint64(vtapId)<<32|uint64(processId)]
 }
 
 func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
@@ -1817,7 +1903,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
 			table := NewPlatformInfoTable(ips, port, 0, 41943040, "test", "", nil, true, nil)
-			table.ReloadMaster()
+			table.ReloadMaster(ckdb.DEFAULT_ORG_ID)
 			fmt.Println(table)
 		},
 	})

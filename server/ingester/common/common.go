@@ -129,11 +129,11 @@ func RegisterCountableForIngester(name string, countable stats.Countable, opts .
 }
 
 // 如果通过MAC匹配平台信息失败，则需要通过IP再获取, 解决工单122/126问题
-func RegetInfoFromIP(isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int32, platformData *grpc.PlatformInfoTable) *grpc.Info {
+func RegetInfoFromIP(orgId uint16, isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int32, platformData *grpc.PlatformInfoTable) *grpc.Info {
 	if isIPv6 {
-		return platformData.QueryIPV6Infos(epcID, ip6)
+		return platformData.QueryIPV6Infos(orgId, epcID, ip6)
 	} else {
-		return platformData.QueryIPV4Infos(epcID, ip4)
+		return platformData.QueryIPV4Infos(orgId, epcID, ip4)
 	}
 }
 
