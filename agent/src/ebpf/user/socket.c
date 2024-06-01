@@ -24,6 +24,7 @@
 #include <linux/version.h>
 #include "clib.h"
 #include "symbol.h"
+#include "proc.h"
 #include "tracer.h"
 #include "probe.h"
 #include "table.h"
@@ -174,19 +175,16 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// process execute
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
-
-	// 周期性触发用于缓存的数据的超时检查
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
+	// process exit
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
 	// clear trace connection
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
 	// fetch close info
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_close");
-
-	// Used for process offsets management
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
 	tps->tps_nr = index;
 
@@ -420,6 +418,10 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	params->datadump_enable = datadump_enable;
 	params->datadump_pid = datadump_pid;
 	params->datadump_proto = datadump_proto;
+
+	params->proc_exec_event_count = get_proc_exec_event_count();
+	params->proc_exit_event_count = get_proc_exit_event_count();
+
 	safe_buf_copy(params->datadump_file_path,
 		      sizeof(params->datadump_file_path),
 		      (void *)datadump_file_path, sizeof(datadump_file_path));
@@ -1095,6 +1097,7 @@ static int check_kern_adapt_and_state_update(void)
 		CLIB_MEMORY_BARRIER();
 		add_probes_act(ACT_DETACH);
 		set_period_event_invalid("check-kern-adapt");
+		set_period_event_invalid("trigger_kern_adapt");
 		t->adapt_success = true;
 	}
 
@@ -1447,9 +1450,9 @@ static void update_allow_reasm_protos_array(struct bpf_tracer *tracer)
 				     get_proto_name(idx), idx);
 			}
 		} else {
-			ebpf_warning("Set proto %s(%d) to map '%s' failed\n",
+			ebpf_warning("Set proto %s(%d) to map '%s' failed, %s\n",
 				     get_proto_name(idx), idx,
-				     MAP_ALLOW_REASM_PROTOS_NAME);
+				     MAP_ALLOW_REASM_PROTOS_NAME, strerror(errno));
 		}
 	}
 }
@@ -2015,7 +2018,8 @@ int running_socket_tracer(tracer_callback_t handle,
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, tps,
-			     thread_nr, NULL, NULL, (void *)handle, 0);
+			     thread_nr, NULL, NULL, (void *)handle,
+			     MS_IN_SEC / KICK_KERN_PERIOD);
 	if (tracer == NULL)
 		return -EINVAL;
 
@@ -2117,6 +2121,12 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	// Configure l7 protocol ports
 	config_proto_ports_bitmap(tracer);
+
+	/*
+	 * Enable periodic perf events and periodically poll to push
+	 * socket data residing in the kernel to a user-space program.
+	 */
+	tracer->enable_sample = true;
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;
@@ -2701,7 +2711,7 @@ static void print_socket_data(struct socket_bpf_data *sd)
 	if (!allow_datadump(sd))
 		return;
 
-	char *timestamp = gen_timestamp_str(0);
+	char *timestamp = get_timestamp_from_us(sd->timestamp);
 	if (timestamp == NULL)
 		return;
 

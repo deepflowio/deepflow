@@ -109,7 +109,8 @@ struct socket_info_s {
 	 * determined by the configuration of protocol reassembly.
 	 */
 	__u16 allow_reassembly: 1;
-	__u16 unused_bits: 15; 
+	__u16 finish_reasm: 1; // Has the reassembly been completed?
+	__u16 unused_bits: 14; 
  	__u32 reasm_bytes; // The amount of data bytes that have been reassembled.
 
 	/*

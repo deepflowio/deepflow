@@ -59,6 +59,7 @@
 #include "java/gen_syms_file.h"
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
+#include "../proc.h"
 
 static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
