@@ -179,6 +179,8 @@ struct bpf_socktrace_params {
 	uint32_t kern_socket_map_used;
 	uint32_t kern_trace_map_max;
 	uint32_t kern_trace_map_used;
+	uint64_t proc_exec_event_count;
+	uint64_t proc_exit_event_count;
 	bool datadump_enable;
 	int datadump_pid;
 	uint8_t datadump_proto;

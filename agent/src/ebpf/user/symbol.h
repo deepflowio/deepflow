@@ -14,106 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef _BPF_SYMBOL_H_
-#define _BPF_SYMBOL_H_
+#ifndef _USER_SYMBOL_H_
+#define _USER_SYMBOL_H_
 #include <stdint.h>
 #include "types.h"
 #include "clib.h"
 #include "mem.h"
 #include "vec.h"
-#include "bihash_8_8.h"
 #include "list.h"
 
-/*
- * symbol_caches_hash_t maps from pid to BCC symbol cache.
- */
-
-#define symbol_caches_hash_t        clib_bihash_8_8_t
-#define symbol_caches_hash_init     clib_bihash_init_8_8
-#define symbol_caches_hash_kv       clib_bihash_kv_8_8_t
-#define print_hash_symbol_caches    print_bihash_8_8
-#define symbol_caches_hash_search   clib_bihash_search_8_8
-#define symbol_caches_hash_add_del  clib_bihash_add_del_8_8
-#define symbol_caches_hash_free     clib_bihash_free_8_8
-#define symbol_caches_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
-#define symbol_caches_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
-
 #define FUNC_RET_MAX 32
-
-#ifndef TASK_COMM_LEN
-#define TASK_COMM_LEN 16
-#endif
-
-struct symbol_cache_pids {
-	struct symbolizer_cache_kvp *exec_pids_cache;
-	struct symbolizer_cache_kvp *exit_pids_cache;
-	volatile u32 *lock;
-};
-
-struct symbolizer_proc_info {
-	int pid;
-	/* The process creation time since
-	 * system boot, (in milliseconds) */
-	u64 stime;
-	u64 netns_id;
-	/*
-	 * Sometimes the process name set by some processes will be delayed.
-	 * When the process is just started, the name may change later. This
-	 * is used to delay confirmation.
-	 */
-	bool verified;
-	/* To mark whether it is a Java process? */
-	bool is_java;
-	/* Determine if the Java symbol file generation has been added to tasks list. */
-	bool add_task_list;
-	/* Have a new perf map file ? */
-	bool new_java_syms_file;
-	/* Java symbol cache needs updating? */
-	bool cache_need_update;
-	/* Did the generation of the Java symbol file encounter any exceptions? */
-	bool gen_java_syms_file_err;
-	/* Unknown symbols was found, and it is currently mainly used to
-	 * obtain the match of the Java process.*/
-	bool unknown_syms_found;
-	/* Expiration time (in seconds) for updating the Java symbol table */
-	u64 update_syms_table_time;
-	/* process name */
-	char comm[TASK_COMM_LEN];
-	/* container id */
-	char container_id[CONTAINER_ID_SIZE];
-	/* reference counting */
-	u64 use;
-	/* Has the process exited? */
-	u64 is_exit;
-	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
-	u32 lock;
-	/* Multithreaded symbol resolution protection. */
-	pthread_mutex_t mutex;
-	/* Recording symbol resolution cache. */
-	volatile uword syms_cache;
-};
-
-static inline void symbolizer_proc_lock(struct symbolizer_proc_info *p)
-{
-	while (__atomic_test_and_set(&p->lock, __ATOMIC_ACQUIRE))
-		CLIB_PAUSE();
-}
-
-static inline void symbolizer_proc_unlock(struct symbolizer_proc_info *p)
-{
-	__atomic_clear(&p->lock, __ATOMIC_RELEASE);
-}
-
-struct symbolizer_cache_kvp {
-	struct {
-		u64 pid;
-	} k;
-
-	struct {
-		/* struct symbolizer_proc_info address */
-		uword proc_info_p;
-	} v;
-};
 
 struct tracer_probes_conf;
 
@@ -173,40 +83,6 @@ struct symbol_tracepoint {
 	char *name;
 };
 
-static_always_inline u64 cache_process_stime(struct symbolizer_cache_kvp *kv)
-{
-	struct symbolizer_proc_info *p =
-	    (struct symbolizer_proc_info *)kv->v.proc_info_p;
-	u64 stime;
-	AO_INC(&p->use);
-	stime = p->stime;
-	AO_DEC(&p->use);
-	return stime;
-}
-
-static_always_inline u64 cache_process_netns_id(struct symbolizer_cache_kvp *
-						kv)
-{
-	struct symbolizer_proc_info *p =
-	    (struct symbolizer_proc_info *)kv->v.proc_info_p;
-	u64 netns_id;
-	AO_INC(&p->use);
-	netns_id = p->netns_id;
-	AO_DEC(&p->use);
-	return netns_id;
-}
-
-static_always_inline void
-copy_process_name(struct symbolizer_cache_kvp *kv, char *dst)
-{
-	struct symbolizer_proc_info *p =
-	    (struct symbolizer_proc_info *)kv->v.proc_info_p;
-	AO_INC(&p->use);
-	static const int len = sizeof(p->comm);
-	strcpy_s_inline(dst, len, p->comm, len);
-	AO_DEC(&p->use);
-}
-
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
 			struct tracer_probes_conf *conf);
 void add_uprobe_symbol(int pid, struct symbol_uprobe *u_sym,
@@ -218,21 +94,4 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    const uint64_t addr,
 						    int pid);
 uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname);
-void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
-			     void **ptr);
-#ifndef AARCH64_MUSL
-int creat_ksyms_cache(void);
-void *get_symbol_cache(pid_t pid, bool new_cache);
-void release_symbol_caches(void);
-u64 get_pid_stime(pid_t pid);
-void set_java_syms_fetch_delay(int delay_secs);
-u64 get_java_syms_fetch_delay(void);
-void free_proc_cache(struct symbolizer_proc_info *p);
-void symbolizer_kernel_lock(void);
-void symbolizer_kernel_unlock(void);
-#endif
-void exec_proc_info_cache_update(void);
-int create_and_init_proc_info_caches(void);
-void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size);
-void update_proc_info_cache(pid_t pid, enum proc_act_type type);
-#endif /* _BPF_SYMBOL_H_ */
+#endif /* _USER_SYMBOL_H_ */
