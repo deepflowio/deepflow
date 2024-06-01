@@ -28,6 +28,8 @@ type ProfileTracing struct {
 	TimeEnd             int    `json:"time_end" binding:"required"`
 	Debug               bool   `json:"debug"`
 	Context             context.Context
+	OrgID               string
+	MaxKernelStackDepth *int `json:"max_kernel_stack_depth"` // default: -1
 }
 
 type ProfileTreeNode struct {

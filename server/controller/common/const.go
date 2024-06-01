@@ -686,13 +686,18 @@ const (
 	HEADER_KEY_X_USER_TYPE = "X-User-Type"
 	HEADER_KEY_X_USER_ID   = "X-User-Id"
 	HEADER_X_APP_KEY       = "X-App-Key"
+
+	USER_TYPE_SUPER_ADMIN = 1
+	USER_ID_SUPER_ADMIN   = 1
 )
 
 const (
 	SET_RESOURCE_TYPE_DOMAIN     = "domain"
 	SET_RESOURCE_TYPE_SUB_DOMAIN = "sub_domain"
 
-	SET_RESOURCE_TYPE_AGENT = "agent"
+	SET_RESOURCE_TYPE_AGENT              = "agent"
+	SET_RESOURCE_TYPE_AGENT_GROUP        = "agent_group"
+	SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG = "agent_group_config"
 )
 
 const TRISOLARIS_NODE_TYPE_MASTER = "master"

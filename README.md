@@ -80,4 +80,5 @@ Here is our [future feature plan](https://deepflow.io/docs/about/milestone/?from
 
 - The paper [Network-Centric Distributed Tracing with DeepFlow: Troubleshooting Your Microservices in Zero Code](https://dl.acm.org/doi/10.1145/3603269.3604823) has been accepted by ACM SIGCOMM 2023.
 - DeepFlow enriches the <a href="https://landscape.cncf.io/?selected=deep-flow">CNCF CLOUD NATIVE Landscape</a>.
+- DeepFlow enriches the <a href="https://landscape.cncf.io/?selected=deep-flow&group=cnai&item=cnai--model-llm-observability--deepflow">CNCF CNAI (Cloud-Native AI) Landscape</a>.
 - DeepFlow enriches the <a href="https://ebpf.io/applications#deepflow">eBPF Project Landscape</a>.

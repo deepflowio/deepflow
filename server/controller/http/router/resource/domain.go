@@ -32,7 +32,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/router/common"
-	svc "github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
@@ -96,7 +95,7 @@ func getDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		excludeTeamIDs := []int{}
-		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
 			return
@@ -137,7 +136,7 @@ func getDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		excludeTeamIDs := []int{}
-		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
 			return
@@ -169,7 +168,7 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 
 		//create with the user id in the header
-		data, err := resource.CreateDomain(domainCreate, svc.GetUserInfo(c), db, cfg)
+		data, err := resource.CreateDomain(domainCreate, httpcommon.GetUserInfo(c), db, cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -198,7 +197,7 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		data, err := resource.UpdateDomain(lcuuid, patchMap, svc.GetUserInfo(c), cfg, db)
+		data, err := resource.UpdateDomain(lcuuid, patchMap, httpcommon.GetUserInfo(c), cfg, db)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -212,7 +211,7 @@ func deleteDomainByNameOrUUID(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 
 		nameOrUUID := c.Param("name-or-uuid")
-		data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db, svc.GetUserInfo(c), cfg)
+		data, err := resource.DeleteDomainByNameOrUUID(nameOrUUID, db, httpcommon.GetUserInfo(c), cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -236,7 +235,7 @@ func deleteDomainByName(cfg *config.ControllerConfig) gin.HandlerFunc {
 			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 			return
 		}
-		data, err := resource.DeleteDomainByNameOrUUID(name, db, svc.GetUserInfo(c), cfg)
+		data, err := resource.DeleteDomainByNameOrUUID(name, db, httpcommon.GetUserInfo(c), cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -251,7 +250,7 @@ func getSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		excludeTeamIDs := []int{}
-		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
 			return
@@ -279,7 +278,7 @@ func getSubDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 		excludeTeamIDs := []int{}
-		teamIDs, err := svc.GetUnauthorizedTeamIDs(svc.GetUserInfo(c), &cfg.FPermit)
+		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.CHECK_SCOPE_TEAMS_FAIL, err.Error())
 			return
@@ -310,7 +309,7 @@ func createSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		data, err := resource.CreateSubDomain(subDomainCreate, db, svc.GetUserInfo(c), cfg)
+		data, err := resource.CreateSubDomain(subDomainCreate, db, httpcommon.GetUserInfo(c), cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -326,7 +325,7 @@ func deleteSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 
 		lcuuid := c.Param("lcuuid")
-		data, err := resource.DeleteSubDomain(lcuuid, db, svc.GetUserInfo(c), cfg)
+		data, err := resource.DeleteSubDomain(lcuuid, db, httpcommon.GetUserInfo(c), cfg)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -356,7 +355,7 @@ func updateSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		data, err := resource.UpdateSubDomain(lcuuid, db, svc.GetUserInfo(c), cfg, patchMap)
+		data, err := resource.UpdateSubDomain(lcuuid, db, httpcommon.GetUserInfo(c), cfg, patchMap)
 		common.JsonResponse(c, data, err)
 	})
 }
@@ -381,7 +380,13 @@ func applyDomainAddtionalResource(c *gin.Context) {
 		return
 	}
 
-	err = resource.ApplyDomainAddtionalResource(data)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
+	err = resource.ApplyDomainAddtionalResource(data, db)
 	common.JsonResponse(c, map[string]interface{}{}, err)
 }
 
@@ -400,7 +405,13 @@ func listDomainAddtionalResource(c *gin.Context) {
 		return
 	}
 
-	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName)
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
+	data, err := resource.ListDomainAdditionalResource(resourceType, resourceName, db)
 	common.JsonResponse(c, data, err)
 }
 
@@ -410,14 +421,20 @@ func GetDomainAdditionalResourceExample(c *gin.Context) {
 }
 
 func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
 	data := &model.AdditionalResource{}
-	err := c.ShouldBindBodyWith(&data, binding.YAML)
+	err = c.ShouldBindBodyWith(&data, binding.YAML)
 	if err == nil || err == io.EOF {
-		if err = resource.ApplyDomainAddtionalResource(*data); err != nil {
+		if err = resource.ApplyDomainAddtionalResource(*data, db); err != nil {
 			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
 			return
 		}
-		d, err := resource.GetDomainAdditionalResource("", "")
+		d, err := resource.GetDomainAdditionalResource("", "", db)
 		if err != nil {
 			common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
 			return
@@ -435,7 +452,13 @@ func updateDomainAddtionalResourceAdvanced(c *gin.Context) {
 }
 
 func getDomainAddtionalResourceAdvanced(c *gin.Context) {
-	d, err := resource.GetDomainAdditionalResource("", "")
+	db, err := common.GetContextOrgDB(c)
+	if err != nil {
+		common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+		return
+	}
+
+	d, err := resource.GetDomainAdditionalResource("", "", db)
 	if err != nil {
 		common.JsonResponse(c, httpcommon.SERVER_ERROR, err)
 		return

@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
@@ -39,7 +40,7 @@ type AgentGroupConfig struct {
 	resourceAccess *ResourceAccess
 }
 
-func NewAgentGroupConfig(userInfo *UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
+func NewAgentGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
 	return &AgentGroupConfig{
 		cfg:            cfg,
 		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
@@ -535,14 +536,14 @@ func (a *AgentGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_co
 		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
 	}
 
-	if err := a.resourceAccess.CanAddResource(dbGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
+	lcuuid := uuid.New().String()
+	if err := a.resourceAccess.CanAddResource(dbGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG, lcuuid); err != nil {
 		return nil, err
 	}
 
 	dbData := &agent_config.AgentGroupConfigModel{}
 	convertJsonToDb(createData, dbData)
 	dbData.VTapGroupLcuuid = createData.VTapGroupLcuuid
-	lcuuid := uuid.New().String()
 	dbData.Lcuuid = &lcuuid
 	db.Create(dbData)
 	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
@@ -568,7 +569,7 @@ func (a *AgentGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*age
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
-	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
+	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG, lcuuid); err != nil {
 		return nil, err
 	}
 
@@ -596,7 +597,8 @@ func (a *AgentGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updat
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
-	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT, "", nil); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID,
+		common.SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG, lcuuid, nil); err != nil {
 		return nil, err
 	}
 
@@ -659,7 +661,7 @@ func getRealVTapGroupConfig(config *agent_config.AgentGroupConfigModel) *agent_c
 	return realConfiguration
 }
 
-func GetVTapGroupConfigs(userInfo *UserInfo, fpermitCfg *common.FPermit, filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
+func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, filter map[string]interface{}) ([]*agent_config.AgentGroupConfigResponse, error) {
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err

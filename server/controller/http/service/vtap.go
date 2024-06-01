@@ -45,7 +45,7 @@ type Agent struct {
 	resourceAccess *ResourceAccess
 }
 
-func NewAgent(userInfo *UserInfo, cfg *config.ControllerConfig) *Agent {
+func NewAgent(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *Agent {
 	return &Agent{
 		cfg:            cfg,
 		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},

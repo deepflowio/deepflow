@@ -329,7 +329,7 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 			log.Error(err.Error())
 			continue
 		}
-		mask := net.IPMask(net.ParseIP("s.Netmask").To4())
+		mask := net.IPMask(net.ParseIP(s.Netmask).To4())
 		maskSize, _ := mask.Size()
 		if maskSize == 0 {
 			log.Errorf("parse netmask (%s) failed", s.Netmask)

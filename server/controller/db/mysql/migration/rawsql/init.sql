@@ -1013,7 +1013,8 @@ CREATE TABLE IF NOT EXISTS `report` (
   `lcuuid`                 varchar(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',
   `created_at`             datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  INDEX lcuuid(`lcuuid`)
+  INDEX lcuuid(`lcuuid`),
+  INDEX policy_id(`policy_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 COMMENT='report records';
 
 CREATE TABLE IF NOT EXISTS vtap (
@@ -1536,7 +1537,8 @@ TRUNCATE TABLE policy_acl_group;
 
 CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     id                                      INTEGER        NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id                                 INTEGER,
+    user_id                                 INTEGER        DEFAULT 1,
+    team_id                                 INTEGER        DEFAULT 1,
     max_collect_pps                         INTEGER        DEFAULT NULL,
     max_npb_bps                             BIGINT         DEFAULT NULL     COMMENT 'unit: bps',
     max_cpus                                INTEGER        DEFAULT NULL,

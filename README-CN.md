@@ -80,4 +80,5 @@ DeepFlow Community 版本主要由 Agent 和 Server 两个进程组成。每个 
 
 - DeepFlow 的论文 [Network-Centric Distributed Tracing with DeepFlow: Troubleshooting Your Microservices in Zero Code](https://dl.acm.org/doi/10.1145/3603269.3604823) 已被国际顶会 ACM SIGCOMM 2023 录用
 - DeepFlow 已加入 <a href="https://landscape.cncf.io/?selected=deep-flow">CNCF CLOUD NATIVE Landscape</a>
+- DeepFlow 已加入 <a href="https://landscape.cncf.io/?selected=deep-flow&group=cnai&item=cnai--model-llm-observability--deepflow">CNCF CNAI (Cloud-Native AI) Landscape</a>
 - DeepFlow 已加入 <a href="https://ebpf.io/applications#deepflow">eBPF Project Landscape</a>
