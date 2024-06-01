@@ -181,9 +181,6 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	// process exit
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
-	// 周期性触发用于缓存的数据的超时检查
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
-
 	// clear trace connection
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
 	// fetch close info
@@ -1100,6 +1097,7 @@ static int check_kern_adapt_and_state_update(void)
 		CLIB_MEMORY_BARRIER();
 		add_probes_act(ACT_DETACH);
 		set_period_event_invalid("check-kern-adapt");
+		set_period_event_invalid("trigger_kern_adapt");
 		t->adapt_success = true;
 	}
 
@@ -2020,7 +2018,8 @@ int running_socket_tracer(tracer_callback_t handle,
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, tps,
-			     thread_nr, NULL, NULL, (void *)handle, 0);
+			     thread_nr, NULL, NULL, (void *)handle,
+			     MS_IN_SEC / KICK_KERN_PERIOD);
 	if (tracer == NULL)
 		return -EINVAL;
 
@@ -2122,6 +2121,12 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	// Configure l7 protocol ports
 	config_proto_ports_bitmap(tracer);
+
+	/*
+	 * Enable periodic perf events and periodically poll to push
+	 * socket data residing in the kernel to a user-space program.
+	 */
+	tracer->enable_sample = true;
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;
@@ -2706,7 +2711,7 @@ static void print_socket_data(struct socket_bpf_data *sd)
 	if (!allow_datadump(sd))
 		return;
 
-	char *timestamp = gen_timestamp_str(0);
+	char *timestamp = get_timestamp_from_us(sd->timestamp);
 	if (timestamp == NULL)
 		return;
 

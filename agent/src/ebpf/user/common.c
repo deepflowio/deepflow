@@ -743,6 +743,34 @@ bool is_process(int pid)
 	return __is_process(pid, false);
 }
 
+char *get_timestamp_from_us(u64 microseconds)
+{
+#define TIME_STR_SIZE 32
+
+	time_t seconds = microseconds / US_IN_SEC;
+	long remainder_microseconds = microseconds % US_IN_SEC;
+
+	struct tm *local_time = localtime(&seconds);
+
+	int year = local_time->tm_year + 1900;
+	int month = local_time->tm_mon + 1;
+	int day = local_time->tm_mday;
+	int hour = local_time->tm_hour;
+	int minute = local_time->tm_min;
+	int second = local_time->tm_sec;
+
+	char *str;
+	str = malloc(TIME_STR_SIZE);
+	if (str == NULL) {
+		ebpf_warning("malloc() failed.\n");
+		return NULL;
+	}
+
+	snprintf(str, TIME_STR_SIZE, "%d-%02d-%02d %02d:%02d:%02d.%ld", year,
+		 month, day, hour, minute, second, remainder_microseconds);
+	return str;
+}
+
 static char *__gen_datetime_str(const char *fmt, u64 ns)
 {
 	const int strlen = DATADUMP_FILE_PATH_SIZE;

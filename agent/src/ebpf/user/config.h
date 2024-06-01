@@ -180,6 +180,14 @@ enum {
 #define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */
 
 /*
+ * The kernel uses bundled burst to send data to the user.
+ * The implementation method is that all CPUs trigger timeout checks and send
+ * the data resident in the eBPF buffer. This value is the periodic time, unit
+ * is milliseconds.
+ */
+#define KICK_KERN_PERIOD 10
+
+/*
  * timer config
  */
 
@@ -191,12 +199,9 @@ enum {
 #define EVENT_TIMER_TICK_US    10000
 
 /*
- * The kernel uses bundled burst to send data to the user.
- * The implementation method is that all CPUs trigger timeout checks and send
- * the data resident in the eBPF buffer. This value is the periodic time, unit
- * is milliseconds.
+ * Trigger kernel adaptation.
  */
-#define KICK_KERN_PERIOD 10	// 10 ticks(100 milliseconds)
+#define TRIG_KERN_ADAPT_PERIOD 10 // 10 ticks(100 millisecond)
 
 /*
  * System boot time update cycle time, unit is milliseconds.
