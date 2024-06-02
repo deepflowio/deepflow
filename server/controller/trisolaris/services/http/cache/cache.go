@@ -46,11 +46,16 @@ func PutCache(c *gin.Context) {
 	log.Debug(c.GetQueryArray("type"))
 	var err error
 	orgID := 0
-	if orgIDStr, ok := c.GetQuery("org_id"); ok {
+	orgIDStr, ok := c.GetQuery("org_id")
+	if ok {
 		orgID, err = strconv.Atoi(orgIDStr)
 		if err != nil {
 			common.Response(c, nil, common.NewReponse("FAILED", "", nil, err.Error()))
 			return
+		}
+	} else {
+		if headerOrgID, ok := c.Get(HEADER_KEY_X_ORG_ID); ok {
+			orgID = headerOrgID.(int)
 		}
 	}
 	if utils.CheckOrgID(orgID) == false {
