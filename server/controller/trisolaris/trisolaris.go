@@ -18,11 +18,8 @@ package trisolaris
 
 import (
 	"context"
-	"strings"
-	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
@@ -30,16 +27,13 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/election"
-	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/kubernetes"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/node"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
-	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
 
@@ -65,19 +59,7 @@ type TrisolarisManager struct {
 	config          *config.Config
 	defaultDB       *gorm.DB
 	startTime       int64
-
-	// tsdb data
-	platformData          *atomic.Value // *metadata.PlatformData
-	groupData             *metadata.GroupProto
-	policyData            *atomic.Value // *metadata.Policy
-	vTapIPs               *atomic.Value // []*trident.VtapIp
-	podIPs                *atomic.Value // []*trident.PodIp
-	universalTagNames     *trident.UniversalTagNameMapsResponse
-	chPlatformDataChanged chan struct{}
-	chGroupDataChanged    chan struct{}
-	chPolicyDataChanged   chan struct{}
-
-	isReady atomicbool.Bool // 缓存是否初始化完成
+	orgIDData       *trident.OrgIDsResponse
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -85,15 +67,8 @@ type TrisolarisManager struct {
 
 var trisolarisManager *TrisolarisManager
 
-func IsTheDataReady() bool {
-	if trisolarisManager == nil {
-		return false
-	}
-	return trisolarisManager.isReady.IsSet()
-}
-
-func GetMetaData() *metadata.MetaData {
-	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+func GetMetaData(orgID int) *metadata.MetaData {
+	trisolaris := GetTrisolaris(orgID)
 	if trisolaris == nil {
 		return nil
 	}
@@ -115,19 +90,27 @@ func GetOrgIDByTeamID(teamID string) int {
 	return trisolarisManager.GetOrgIDByTeamID(teamID)
 }
 
-func GetGVTapInfo(orgID int) *vtap.VTapInfo {
-	if trisolarisManager == nil {
+func GetORGVTapInfo(orgID int) *vtap.VTapInfo {
+	if utils.CheckOrgID(orgID) == false || trisolarisManager == nil {
 		return nil
 	}
 	return trisolarisManager.GetVTapInfo(orgID)
 }
 
-func GetGNodeInfo() *node.NodeInfo {
-	trisolaris := GetTrisolaris(DEFAULT_ORG_ID)
+func GetORGNodeInfo(orgID int) *node.NodeInfo {
+	trisolaris := GetTrisolaris(orgID)
 	if trisolaris == nil {
 		return nil
 	}
 	return trisolaris.nodeInfo
+}
+
+func GetOrgIDsData() *trident.OrgIDsResponse {
+	if trisolarisManager == nil {
+		return &trident.OrgIDsResponse{}
+	}
+
+	return trisolarisManager.orgIDData
 }
 
 func TeamIDToTrisolaris(teamID string) *Trisolaris {
@@ -151,7 +134,7 @@ func GetConfig() *config.Config {
 	return trisolarisManager.config
 }
 
-func GetDB() *gorm.DB {
+func GetDefaultDB() *gorm.DB {
 	return trisolarisManager.defaultDB
 }
 
@@ -172,7 +155,7 @@ func GetIsRefused() bool {
 }
 
 func GetTrisolaris(orgID int) *Trisolaris {
-	if trisolarisManager == nil {
+	if utils.CheckOrgID(orgID) == false || trisolarisManager == nil {
 		return nil
 	}
 
@@ -306,6 +289,8 @@ func getStartTime() int64 {
 
 func (t *Trisolaris) Start() {
 	log.Infof("start ORG(id=%d database=%s) data generate", t.mDB.ORGID, t.mDB.Name)
+	t.metaData.GetPlatformDataOP().RegisteNotifyIngesterDatachanged(
+		t.nodeInfo.NotifyBasePlatformDataChanged)
 	t.metaData.InitData(t.startTime) // 需要先初始化
 	go func() {
 		go t.metaData.TimedRefreshMetaData()
@@ -318,6 +303,14 @@ func (t *Trisolaris) Start() {
 func (t *Trisolaris) Stop() {
 	log.Infof("exit ORG(id=%d database=%s) data generate", t.mDB.ORGID, t.mDB.Name)
 	t.cancel()
+}
+
+func (t *Trisolaris) GetVTapInfo() *vtap.VTapInfo {
+	return t.vTapInfo
+}
+
+func (t *Trisolaris) GetNodeInfo() *node.NodeInfo {
+	return t.nodeInfo
 }
 
 func NewTrisolaris(cfg *config.Config, mDB *mysql.DB, pctx context.Context, startTime int64) *Trisolaris {
@@ -342,27 +335,14 @@ func NewTrisolarisManager(cfg *config.Config, db *gorm.DB) *TrisolarisManager {
 	if trisolarisManager == nil {
 		cfg.Convert()
 		ctx, cancel := context.WithCancel(context.Background())
-		platformData := &atomic.Value{}
-		platformData.Store(metadata.NewPlatformData("", "", 0, 0))
-		policyData := &atomic.Value{}
-		policyData.Store(metadata.NewPolicy(-2, "", 0))
 		trisolarisManager = &TrisolarisManager{
-			orgToTrisolaris:       [utils.ORG_ID_INDEX_MAX]*Trisolaris{},
-			refreshOP:             refresh.NewRefreshOP(db, cfg.NodeIP),
-			teamIDToOrgID:         make(map[string]int),
-			teamIDStrToInt:        make(map[string]int),
-			config:                cfg,
-			defaultDB:             db,
-			platformData:          platformData,
-			groupData:             metadata.NewGroupProto(0, 0),
-			policyData:            policyData,
-			vTapIPs:               &atomic.Value{},
-			podIPs:                &atomic.Value{},
-			universalTagNames:     &trident.UniversalTagNameMapsResponse{},
-			isReady:               atomicbool.NewBool(false),
-			chPlatformDataChanged: make(chan struct{}, 1),
-			chGroupDataChanged:    make(chan struct{}, 1),
-			chPolicyDataChanged:   make(chan struct{}, 1),
+			orgToTrisolaris: [utils.ORG_ID_INDEX_MAX]*Trisolaris{},
+			refreshOP:       refresh.NewRefreshOP(db, cfg.NodeIP),
+			teamIDToOrgID:   make(map[string]int),
+			teamIDStrToInt:  make(map[string]int),
+			config:          cfg,
+			defaultDB:       db,
+			orgIDData:       &trident.OrgIDsResponse{},
 
 			ctx:    ctx,
 			cancel: cancel,
@@ -376,7 +356,6 @@ func (m *TrisolarisManager) Start() error {
 	go m.TimedCheckORG()
 	go m.refreshOP.TimedRefreshIPs()
 	m.startTime = getStartTime()
-	m.groupData.SetStartTime(m.startTime)
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
 		log.Error(err)
@@ -384,7 +363,6 @@ func (m *TrisolarisManager) Start() error {
 	}
 	log.Infof("get orgIDs : %v", orgIDs)
 	trisolaris := NewTrisolaris(m.config, mysql.DefaultDB, m.ctx, m.startTime)
-	m.RegisterIngesterDataChangedNotify(trisolaris)
 	trisolaris.Start()
 	m.orgToTrisolaris[DEFAULT_ORG_ID] = trisolaris
 	for _, orgID := range orgIDs {
@@ -397,53 +375,13 @@ func (m *TrisolarisManager) Start() error {
 			continue
 		}
 		trisolaris := NewTrisolaris(m.config, orgDB, m.ctx, m.startTime)
-		m.RegisterIngesterDataChangedNotify(trisolaris)
 		trisolaris.Start()
 		m.orgToTrisolaris[orgID] = trisolaris
 	}
 
 	m.getTeamData(orgIDs)
-	go m.TimedGenerateTSDBData()
 	log.Infof("finish orgdata init %v", orgIDs)
-	m.isReady.Set()
 	return nil
-}
-
-func (m *TrisolarisManager) NotifyPlatformDataChanged() {
-	if m == nil {
-		return
-	}
-	select {
-	case m.chPlatformDataChanged <- struct{}{}:
-	default:
-	}
-}
-
-func (m *TrisolarisManager) NotifyGroupDataChanged() {
-	if m == nil {
-		return
-	}
-	select {
-	case m.chGroupDataChanged <- struct{}{}:
-	default:
-	}
-}
-
-func (m *TrisolarisManager) NotifyPolicyDataChanged() {
-	if m == nil {
-		return
-	}
-	select {
-	case m.chPolicyDataChanged <- struct{}{}:
-	default:
-	}
-}
-
-func (m *TrisolarisManager) RegisterIngesterDataChangedNotify(trisolaris *Trisolaris) {
-	trisolaris.metaData.GetPlatformDataOP().RegisteNotifyIngesterDatachanged(trisolaris.nodeInfo.NotifyBasePlatformDataChanged)
-	trisolaris.nodeInfo.RegisteNotifyPlatformDataChanged(m.NotifyPlatformDataChanged)
-	trisolaris.metaData.GetPolicyDataOP().RegisteNotifyIngesterDatachanged(m.NotifyPolicyDataChanged)
-	trisolaris.metaData.GetGroupDataOP().RegisteNotifyIngesterDatachanged(m.NotifyGroupDataChanged)
 }
 
 func (m *TrisolarisManager) getTeamData(orgIDs []int) {
@@ -528,6 +466,15 @@ func (m *TrisolarisManager) checkORG() {
 		log.Error(err)
 		return
 	}
+
+	orgIDsUint32 := make([]uint32, len(orgIDs), len(orgIDs))
+	for index, orgID := range orgIDs {
+		orgIDsUint32[index] = uint32(orgID)
+	}
+	m.orgIDData = &trident.OrgIDsResponse{
+		OrgIds: orgIDsUint32,
+	}
+
 	for orgID, trisolaris := range m.orgToTrisolaris {
 		if orgID == DEFAULT_ORG_ID {
 			continue
@@ -545,7 +492,6 @@ func (m *TrisolarisManager) checkORG() {
 					continue
 				}
 				trisolaris := NewTrisolaris(m.config, orgDB, m.ctx, m.startTime)
-				m.RegisterIngesterDataChangedNotify(trisolaris)
 				trisolaris.Start()
 				m.orgToTrisolaris[orgID] = trisolaris
 			}
@@ -555,6 +501,7 @@ func (m *TrisolarisManager) checkORG() {
 }
 
 func (m *TrisolarisManager) TimedCheckORG() {
+	m.checkORG()
 	interval := time.Duration(60)
 	ticker := time.NewTicker(interval * time.Second).C
 	for {
@@ -563,407 +510,6 @@ func (m *TrisolarisManager) TimedCheckORG() {
 			log.Info("start check org data from timed")
 			m.checkORG()
 			log.Info("end check org data from timed")
-		}
-	}
-}
-
-func GetIngesterPlatformDataVersion() uint64 {
-	return trisolarisManager.getIngesterPlatformDataVersion()
-}
-
-func GetIngesterPlatformDataStr() []byte {
-	return trisolarisManager.getIngesterPlatformDataStr()
-}
-
-func GetIngesterGroupProtoVersion() uint64 {
-	return trisolarisManager.getIngesterGroupProtoVersion()
-}
-
-func GetIngesterGroupProtoStr() []byte {
-	return trisolarisManager.getIngesterGroupProtoStr()
-}
-
-func GetIngesterPolicyVersion() uint64 {
-	return trisolarisManager.getIngesterPolicyDataVersion()
-}
-
-func GetIngesterPolicyStr() []byte {
-	return trisolarisManager.getIngesterPolicyDataStr()
-}
-
-func GetIngesterVTapIPs() []*trident.VtapIp {
-	return trisolarisManager.getIngesterVTtridentPs()
-}
-
-func GetIngesterPodIPs() []*trident.PodIp {
-	return trisolarisManager.getIngesterPodIPs()
-}
-
-func GetIngesterUniversalTagNames() *trident.UniversalTagNameMapsResponse {
-	return trisolarisManager.getIngesterUniversalTagNames()
-}
-
-func (m *TrisolarisManager) getIngesterPlatformData() *metadata.PlatformData {
-	return m.platformData.Load().(*metadata.PlatformData)
-}
-
-func (m *TrisolarisManager) updateIngesterPlatformData(data *metadata.PlatformData) {
-	m.platformData.Store(data)
-}
-
-func (m *TrisolarisManager) getIngesterPolicyata() *metadata.Policy {
-	return m.policyData.Load().(*metadata.Policy)
-}
-
-func (m *TrisolarisManager) updateIngesterPolicyData(data *metadata.Policy) {
-	m.policyData.Store(data)
-}
-
-func (m *TrisolarisManager) getIngesterPlatformDataVersion() uint64 {
-	return m.getIngesterPlatformData().GetPlatformDataVersion()
-}
-
-func (m *TrisolarisManager) getIngesterPlatformDataStr() []byte {
-	return m.getIngesterPlatformData().GetPlatformDataStr()
-}
-
-func (m *TrisolarisManager) getIngesterGroupProtoVersion() uint64 {
-	return m.groupData.GetVersion()
-}
-
-func (m *TrisolarisManager) getIngesterGroupProtoStr() []byte {
-	return m.groupData.GetGroups()
-}
-
-func (m *TrisolarisManager) getIngesterPolicyDataVersion() uint64 {
-	return m.getIngesterPolicyata().GetAllVersion()
-}
-
-func (m *TrisolarisManager) getIngesterPolicyDataStr() []byte {
-	return m.getIngesterPolicyata().GetAllSerializeString()
-}
-
-func (m *TrisolarisManager) getIngesterVTtridentPs() []*trident.VtapIp {
-	if m == nil {
-		return nil
-	}
-	result, ok := m.vTapIPs.Load().([]*trident.VtapIp)
-	if ok {
-		return result
-	}
-	return nil
-}
-
-func (m *TrisolarisManager) updateIngesterVTtridentPs(data []*trident.VtapIp) {
-	m.vTapIPs.Store(data)
-}
-
-func (m *TrisolarisManager) getIngesterPodIPs() []*trident.PodIp {
-	if m == nil {
-		return nil
-	}
-	result, ok := m.podIPs.Load().([]*trident.PodIp)
-	if ok {
-		return result
-	}
-	return nil
-}
-
-func (m *TrisolarisManager) getIngesterUniversalTagNames() *trident.UniversalTagNameMapsResponse {
-	if m == nil {
-		return nil
-	}
-	return m.universalTagNames
-}
-
-func (m *TrisolarisManager) updateIngesterPodIPs(data []*trident.PodIp) {
-	m.podIPs.Store(data)
-}
-
-func (m *TrisolarisManager) updateUniversalTagNames(data *trident.UniversalTagNameMapsResponse) {
-	m.universalTagNames = data
-}
-
-func (m *TrisolarisManager) generateUniversalTagNameMaps(dbCache *metadata.DBDataCache) *trident.UniversalTagNameMapsResponse {
-	devices := dbCache.GetChDevicesIDTypeAndName()
-	pods := dbCache.GetPods()
-	regions := dbCache.GetRegions()
-	azs := dbCache.GetAZs()
-	podNodes := dbCache.GetPodNodes()
-	podNSes := dbCache.GetPodNSsIDAndName()
-	podGroups := dbCache.GetPodGroups()
-	podClusters := dbCache.GetPodClusters()
-	vpcs := dbCache.GetVPCs()
-	subnets := dbCache.GetSubnets()
-	processes := dbCache.GetProcesses()
-	vtaps := dbCache.GetVTapsIDAndName()
-	resp := &trident.UniversalTagNameMapsResponse{
-		DeviceMap:      make([]*trident.DeviceMap, len(devices)),
-		PodK8SLabelMap: make([]*trident.PodK8SLabelMap, len(pods)),
-		PodMap:         make([]*trident.IdNameMap, len(pods)),
-		RegionMap:      make([]*trident.IdNameMap, len(regions)),
-		AzMap:          make([]*trident.IdNameMap, len(azs)),
-		PodNodeMap:     make([]*trident.IdNameMap, len(podNodes)),
-		PodNsMap:       make([]*trident.IdNameMap, len(podNSes)),
-		PodGroupMap:    make([]*trident.IdNameMap, len(podGroups)),
-		PodClusterMap:  make([]*trident.IdNameMap, len(podClusters)),
-		L3EpcMap:       make([]*trident.IdNameMap, len(vpcs)),
-		SubnetMap:      make([]*trident.IdNameMap, len(subnets)),
-		GprocessMap:    make([]*trident.IdNameMap, len(processes)),
-		VtapMap:        make([]*trident.IdNameMap, len(vtaps)),
-	}
-	for i, pod := range pods {
-		var labelName, labelValue []string
-		for _, label := range strings.Split(pod.Label, ", ") {
-			if value := strings.Split(label, ":"); len(value) > 1 {
-				labelName = append(labelName, value[0])
-				labelValue = append(labelValue, value[1])
-			}
-		}
-		resp.PodK8SLabelMap[i] = &trident.PodK8SLabelMap{
-			PodId:      proto.Uint32(uint32(pod.ID)),
-			LabelName:  labelName,
-			LabelValue: labelValue,
-		}
-		resp.PodMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(pod.ID)),
-			Name: proto.String(pod.Name),
-		}
-	}
-	for i, region := range regions {
-		resp.RegionMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(region.ID)),
-			Name: proto.String(region.Name),
-		}
-	}
-	for i, az := range azs {
-		resp.AzMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(az.ID)),
-			Name: proto.String(az.Name),
-		}
-	}
-	for i, podNode := range podNodes {
-		resp.PodNodeMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(podNode.ID)),
-			Name: proto.String(podNode.Name),
-		}
-	}
-	for i, podNS := range podNSes {
-		resp.PodNsMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(podNS.ID)),
-			Name: proto.String(podNS.Name),
-		}
-	}
-	for i, podGroup := range podGroups {
-		resp.PodGroupMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(podGroup.ID)),
-			Name: proto.String(podGroup.Name),
-		}
-	}
-	for i, podCluster := range podClusters {
-		resp.PodClusterMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(podCluster.ID)),
-			Name: proto.String(podCluster.Name),
-		}
-	}
-	for i, vpc := range vpcs {
-		resp.L3EpcMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(vpc.ID)),
-			Name: proto.String(vpc.Name),
-		}
-	}
-	for i, subnet := range subnets {
-		resp.SubnetMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(subnet.ID)),
-			Name: proto.String(subnet.Name),
-		}
-	}
-	for i, process := range processes {
-		resp.GprocessMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(process.ID)),
-			Name: proto.String(process.Name),
-		}
-	}
-	for i, vtap := range vtaps {
-		resp.VtapMap[i] = &trident.IdNameMap{
-			Id:   proto.Uint32(uint32(vtap.ID)),
-			Name: proto.String(vtap.Name),
-		}
-	}
-	for i, chDevice := range devices {
-		resp.DeviceMap[i] = &trident.DeviceMap{
-			Id:   proto.Uint32(uint32(chDevice.DeviceID)),
-			Type: proto.Uint32(uint32(chDevice.DeviceType)),
-			Name: proto.String(chDevice.Name),
-		}
-	}
-
-	return resp
-}
-
-func MerageData(first *trident.UniversalTagNameMapsResponse, other *trident.UniversalTagNameMapsResponse) {
-	first.DeviceMap = utils.Concat(first.DeviceMap, other.DeviceMap)
-	first.PodK8SLabelMap = utils.Concat(first.PodK8SLabelMap, other.PodK8SLabelMap)
-	first.PodMap = utils.Concat(first.PodMap, other.PodMap)
-	first.RegionMap = utils.Concat(first.RegionMap, other.RegionMap)
-	first.AzMap = utils.Concat(first.AzMap, other.AzMap)
-	first.PodNodeMap = utils.Concat(first.PodNodeMap, other.PodNodeMap)
-	first.PodNsMap = utils.Concat(first.PodNsMap, other.PodNsMap)
-	first.PodGroupMap = utils.Concat(first.PodGroupMap, other.PodGroupMap)
-	first.PodClusterMap = utils.Concat(first.PodClusterMap, other.PodClusterMap)
-	first.L3EpcMap = utils.Concat(first.L3EpcMap, other.L3EpcMap)
-	first.SubnetMap = utils.Concat(first.SubnetMap, other.SubnetMap)
-	first.GprocessMap = utils.Concat(first.GprocessMap, other.GprocessMap)
-	first.VtapMap = utils.Concat(first.VtapMap, other.VtapMap)
-}
-
-func (m *TrisolarisManager) generateTSDBData() {
-	orgIDs, err := mysql.GetORGIDs()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	platformData := metadata.NewPlatformData("platformData", "", 0, PLATFORM_DATA_FOR_INGESTER_MERGE)
-	groupData := metadata.NewGroupData(nil, nil)
-	policyData := metadata.NewPolicy(-2, "", 0)
-	vTapIPs := []*trident.VtapIp{}
-	podIPs := []*trident.PodIp{}
-	universalTagNames := &trident.UniversalTagNameMapsResponse{}
-	for _, orgID := range orgIDs {
-		if utils.CheckOrgID(orgID) == false {
-			continue
-		}
-		trisolaris := m.orgToTrisolaris[orgID]
-		if trisolaris == nil {
-			log.Warningf("orgID(%d) not trisolaris data", orgID)
-			continue
-		}
-		orgPlatformData := trisolaris.nodeInfo.GetPlatformData()
-		if orgPlatformData != nil {
-			platformData.Merge(orgPlatformData)
-		}
-		orgGroupData := trisolaris.metaData.GetGroupDataOP().GetDropletGroupsData()
-		if orgGroupData != nil {
-			groupData.Merge(orgGroupData)
-		}
-		orgPolicyData := trisolaris.metaData.GetPolicyDataOP().GetDropletPolicy()
-		policyData.MergeIngesterPolicy(orgPolicyData)
-		vTapIPs = append(vTapIPs, trisolaris.vTapInfo.GetVTapIPs()...)
-		podIPs = append(podIPs, trisolaris.metaData.GetPlatformDataOP().GetPodIPs()...)
-
-		orgUniversalTagNameDatga := m.generateUniversalTagNameMaps(trisolaris.metaData.GetDBDataCache())
-		MerageData(universalTagNames, orgUniversalTagNameDatga)
-
-	}
-	platformData.GeneratePlatformDataResult()
-	m.updateIngesterPlatformData(platformData)
-	m.groupData.GenerateIngesterGroup(groupData)
-	policyData.GenerateIngesterData()
-	m.updateIngesterPolicyData(policyData)
-	m.updateIngesterVTtridentPs(vTapIPs)
-	m.updateIngesterPodIPs(podIPs)
-	m.updateUniversalTagNames(universalTagNames)
-}
-
-func (m *TrisolarisManager) generateIngesterPlatformData() {
-	orgIDs, err := mysql.GetORGIDs()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	platformData := metadata.NewPlatformData("platformData", "", 0, PLATFORM_DATA_FOR_INGESTER_MERGE)
-	for _, orgID := range orgIDs {
-		if utils.CheckOrgID(orgID) == false {
-			continue
-		}
-		trisolaris := m.orgToTrisolaris[orgID]
-		if trisolaris == nil {
-			log.Warningf("orgID(%d) not trisolaris data", orgID)
-			continue
-		}
-		orgPlatformData := trisolaris.nodeInfo.GetPlatformData()
-		if orgPlatformData != nil {
-			platformData.Merge(orgPlatformData)
-		}
-	}
-	platformData.GeneratePlatformDataResult()
-	m.updateIngesterPlatformData(platformData)
-}
-
-func (m *TrisolarisManager) generateIngesterGroupData() {
-	orgIDs, err := mysql.GetORGIDs()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	groupData := metadata.NewGroupData(nil, nil)
-	for _, orgID := range orgIDs {
-		if utils.CheckOrgID(orgID) == false {
-			continue
-		}
-		trisolaris := m.orgToTrisolaris[orgID]
-		if trisolaris == nil {
-			log.Warningf("orgID(%d) not trisolaris data", orgID)
-			continue
-		}
-		orgGroupData := trisolaris.metaData.GetGroupDataOP().GetDropletGroupsData()
-		if orgGroupData != nil {
-			groupData.Merge(orgGroupData)
-		}
-
-	}
-	m.groupData.GenerateIngesterGroup(groupData)
-}
-
-func (m *TrisolarisManager) generateIngesterPolicyData() {
-	orgIDs, err := mysql.GetORGIDs()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	policyData := metadata.NewPolicy(-2, "", 0)
-	for _, orgID := range orgIDs {
-		if utils.CheckOrgID(orgID) == false {
-			continue
-		}
-		trisolaris := m.orgToTrisolaris[orgID]
-		if trisolaris == nil {
-			log.Warningf("orgID(%d) not trisolaris data", orgID)
-			continue
-		}
-		orgPolicyData := trisolaris.metaData.GetPolicyDataOP().GetDropletPolicy()
-		policyData.MergeIngesterPolicy(orgPolicyData)
-	}
-	policyData.GenerateIngesterData()
-	m.updateIngesterPolicyData(policyData)
-}
-
-func (m *TrisolarisManager) TimedGenerateTSDBData() {
-	m.generateTSDBData()
-	interval := time.Duration(60)
-	ticker := time.NewTicker(interval * time.Second).C
-	for {
-		select {
-		case <-ticker:
-			log.Info("start generate ingester data from timed")
-			m.generateTSDBData()
-			log.Info("end generate ingester data from timed")
-		case <-m.chPlatformDataChanged:
-			log.Info("pltformdata changed start generate ingester pltformdata")
-			m.generateIngesterPlatformData()
-			pushmanager.IngesterBroadcast()
-		case <-m.chGroupDataChanged:
-			log.Info("groupdata changed start generate ingester groupdata")
-			m.generateIngesterGroupData()
-			pushmanager.IngesterBroadcast()
-		case <-m.chPolicyDataChanged:
-			log.Info("policydata changed start generate ingester policydata")
-			m.generateIngesterPolicyData()
-			pushmanager.IngesterBroadcast()
 		}
 	}
 }
