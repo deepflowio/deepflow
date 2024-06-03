@@ -69,6 +69,9 @@ func (v *VtapGroup) getVtapGroups() gin.HandlerFunc {
 		if value, ok := c.GetQuery("user_id"); ok {
 			args["user_id"] = value
 		}
+		if value, ok := c.GetQuery("can_deleted"); ok {
+			args["can_deleted"] = value
+		}
 		agentGroupService := service.NewAgentGroup(httpcommon.GetUserInfo(c), v.cfg)
 		data, err := agentGroupService.Get(args)
 		JsonResponse(c, data, err)
