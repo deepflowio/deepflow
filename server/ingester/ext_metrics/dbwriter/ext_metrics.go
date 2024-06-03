@@ -51,19 +51,31 @@ type ExtMetrics struct {
 }
 
 func (m *ExtMetrics) DatabaseName() string {
-	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS || m.MsgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
-		return DEEPFLOW_SYSTEM_DB
-	} else {
+	switch m.MsgType {
+	case datatype.MESSAGE_TYPE_DFSTATS:
+		return DEEPFLOW_TENANT_DB
+	case datatype.MESSAGE_TYPE_SERVER_DFSTATS:
+		if ckdb.IsValidOrgID(m.OrgId) {
+			return DEEPFLOW_TENANT_DB
+		} else {
+			return DEEPFLOW_ADMIN_DB
+		}
+	default:
 		return EXT_METRICS_DB
 	}
 }
 
 func (m *ExtMetrics) TableName() string {
-	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
-		return DEEPFLOW_SYSTEM_AGENT_TABLE
-	} else if m.MsgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
-		return DEEPFLOW_SYSTEM_SERVER_TABLE
-	} else {
+	switch m.MsgType {
+	case datatype.MESSAGE_TYPE_DFSTATS:
+		return DEEPFLOW_TENANT_COLLECTOR_TABLE
+	case datatype.MESSAGE_TYPE_SERVER_DFSTATS:
+		if ckdb.IsValidOrgID(m.OrgId) {
+			return DEEPFLOW_TENANT_COLLECTOR_TABLE
+		} else {
+			return DEEPFLOW_ADMIN_SERVER_TABLE
+		}
+	default:
 		return EXT_METRICS_TABLE
 	}
 }

@@ -56,13 +56,13 @@ type Counter struct {
 }
 
 type Decoder struct {
-	index            int
-	msgType          datatype.MessageType
-	platformData     *grpc.PlatformInfoTable
-	inQueue          queue.QueueReader
-	extMetricsWriter *dbwriter.ExtMetricsWriter
-	debugEnabled     bool
-	config           *config.Config
+	index             int
+	msgType           datatype.MessageType
+	platformData      *grpc.PlatformInfoTable
+	inQueue           queue.QueueReader
+	extMetricsWriters [dbwriter.MAX_DB_ID]*dbwriter.ExtMetricsWriter
+	debugEnabled      bool
+	config            *config.Config
 
 	// universal tag cache
 	podNameToUniversalTag    [grpc.MAX_ORG_COUNT]map[string]*flow_metrics.UniversalTag
@@ -80,18 +80,18 @@ func NewDecoder(
 	index int, msgType datatype.MessageType,
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
-	extMetricsWriter *dbwriter.ExtMetricsWriter,
+	extMetricsWriters [dbwriter.MAX_DB_ID]*dbwriter.ExtMetricsWriter,
 	config *config.Config,
 ) *Decoder {
 	d := &Decoder{
-		index:            index,
-		msgType:          msgType,
-		platformData:     platformData,
-		inQueue:          inQueue,
-		debugEnabled:     log.IsEnabledFor(logging.DEBUG),
-		extMetricsWriter: extMetricsWriter,
-		config:           config,
-		counter:          &Counter{},
+		index:             index,
+		msgType:           msgType,
+		platformData:      platformData,
+		inQueue:           inQueue,
+		debugEnabled:      log.IsEnabledFor(logging.DEBUG),
+		extMetricsWriters: extMetricsWriters,
+		config:            config,
+		counter:           &Counter{},
 	}
 	for i := 0; i < grpc.MAX_ORG_COUNT; i++ {
 		d.podNameToUniversalTag[i] = make(map[string]*flow_metrics.UniversalTag)
@@ -175,7 +175,7 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 		d.counter.ErrMetrics++
 		return
 	}
-	d.extMetricsWriter.Write(extMetrics)
+	d.extMetricsWriters[int(dbwriter.EXT_METRICS_DB_ID)].Write(extMetrics)
 	d.counter.OutCount++
 }
 
@@ -201,12 +201,13 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 		if d.debugEnabled {
 			log.Debugf("decoder %d vtap %d recv deepflow stats: %v", d.index, vtapID, pbStats)
 		}
-		d.extMetricsWriter.Write(d.StatsToExtMetrics(vtapID, pbStats))
+		metrics, dbId := d.StatsToExtMetrics(vtapID, pbStats)
+		d.extMetricsWriters[dbId].Write(metrics)
 		d.counter.OutCount++
 	}
 }
 
-func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
+func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) (*dbwriter.ExtMetrics, dbwriter.WriterDBID) {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(s.Timestamp)
 	m.UniversalTag.VTAPID = vtapID
@@ -216,18 +217,22 @@ func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMet
 	m.TagValues = s.TagValues
 	m.MetricsFloatNames = s.MetricsFloatNames
 	m.MetricsFloatValues = s.MetricsFloatValues
+	var writerDBID dbwriter.WriterDBID
 	// if OrgId is set, the set OrgId will be used first.
 	if s.OrgId != 0 {
 		m.OrgId, m.TeamID = uint16(s.OrgId), uint16(s.TeamId)
+		writerDBID = dbwriter.DEEPFLOW_TENANT_DB_ID
 	} else { // OrgId not set
 		// from deepflow_server, OrgId set default
 		if vtapID == 0 {
 			m.OrgId, m.TeamID = ckdb.DEFAULT_ORG_ID, ckdb.DEFAULT_TEAM_ID
+			writerDBID = dbwriter.DEEPFLOW_ADMIN_DB_ID
 		} else { // from deepflow_agent, OrgId Get from header first, then from vtapID
 			m.OrgId, m.TeamID = d.orgId, d.teamId
+			writerDBID = dbwriter.DEEPFLOW_TENANT_DB_ID
 		}
 	}
-	return m
+	return m, writerDBID
 }
 
 func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName string, fillWithVtapId bool) {
