@@ -2554,6 +2554,7 @@ static __inline void trace_io_event_common(void *ctx,
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
+	context->push_reassembly_bytes = 0;
 	context->vecs = false;
 	context->is_close = false;
 	context->dir = direction;

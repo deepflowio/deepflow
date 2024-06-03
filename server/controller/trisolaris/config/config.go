@@ -62,6 +62,7 @@ type Config struct {
 	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
 	NoTeamIDRefused                bool
 	FPermit                        common.FPermit
+	IngesterAPIPort                int // data source
 }
 
 func (c *Config) Convert() {
@@ -98,6 +99,14 @@ func (c *Config) GetGrpcPort() int {
 
 func (c *Config) GetIngesterPort() int {
 	return c.IngesterPort
+}
+
+func (c *Config) SetIngesterAPIPort(port int) {
+	c.IngesterAPIPort = port
+}
+
+func (c *Config) GetIngesterAPIPort() int {
+	return c.IngesterAPIPort
 }
 
 func (c *Config) SetLogLevel(logLevel string) {
