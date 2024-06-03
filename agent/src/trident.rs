@@ -40,7 +40,6 @@ use tokio::sync::broadcast;
 #[cfg(target_os = "linux")]
 use crate::platform::{
     kubernetes::{GenericPoller, Poller, SidecarPoller},
-    prometheus::targets::TargetsWatcher,
     ApiWatcher, LibvirtXmlExtractor,
 };
 use crate::{
@@ -1411,8 +1410,6 @@ pub struct AgentComponents {
     pub kubernetes_poller: Arc<GenericPoller>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub socket_synchronizer: SocketSynchronizer,
-    #[cfg(target_os = "linux")]
-    pub prometheus_targets_watcher: Arc<TargetsWatcher>,
     pub debugger: Debugger,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub ebpf_dispatcher_component: Option<EbpfDispatcherComponent>,
@@ -1860,16 +1857,6 @@ impl AgentComponents {
             platform_synchronizer.set_kubernetes_poller(poller.clone());
             poller
         });
-
-        #[cfg(target_os = "linux")]
-        let prometheus_targets_watcher = Arc::new(TargetsWatcher::new(
-            runtime.clone(),
-            config_handler.platform(),
-            synchronizer.agent_id.clone(),
-            session.clone(),
-            exception_handler.clone(),
-            stats_collector.clone(),
-        ));
 
         let context = ConstructDebugCtx {
             runtime: runtime.clone(),
@@ -2509,8 +2496,6 @@ impl AgentComponents {
             kubernetes_poller,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             socket_synchronizer,
-            #[cfg(target_os = "linux")]
-            prometheus_targets_watcher,
             debugger,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf_dispatcher_component,
@@ -2569,13 +2554,8 @@ impl AgentComponents {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         self.socket_synchronizer.start();
         #[cfg(target_os = "linux")]
-        {
-            if crate::utils::environment::is_tt_pod(self.config.trident_type) {
-                self.kubernetes_poller.start();
-            }
-            if matches!(self.agent_mode, RunningMode::Managed) && running_in_container() {
-                self.prometheus_targets_watcher.start();
-            }
+        if crate::utils::environment::is_tt_pod(self.config.trident_type) {
+            self.kubernetes_poller.start();
         }
         self.debugger.start();
         self.metrics_uniform_sender.start();
@@ -2645,10 +2625,7 @@ impl AgentComponents {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         self.socket_synchronizer.stop();
         #[cfg(target_os = "linux")]
-        {
-            self.kubernetes_poller.stop();
-            self.prometheus_targets_watcher.stop();
-        }
+        self.kubernetes_poller.stop();
 
         if let Some(h) = self.l4_flow_uniform_sender.notify_stop() {
             join_handles.push(h);

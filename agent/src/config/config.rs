@@ -1318,7 +1318,6 @@ pub struct RuntimeConfig {
     pub external_agent_http_proxy_port: u16,
     #[serde(deserialize_with = "to_tap_mode")]
     pub tap_mode: TapMode,
-    pub prometheus_http_api_addresses: Vec<String>,
     #[serde(skip)]
     pub plugins: Option<trident::PluginConfig>,
     // TODO: expand and remove
@@ -1428,7 +1427,6 @@ impl RuntimeConfig {
             external_agent_http_proxy_port: 38086,
             tap_mode: TapMode::Local,
             yaml_config: YamlConfig::load("", TapMode::Local).unwrap(), // Default configuration that needs to be corrected to be available
-            prometheus_http_api_addresses: vec![],
             plugins: Default::default(),
         }
     }
@@ -1676,7 +1674,6 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             external_agent_http_proxy_enabled: conf.external_agent_http_proxy_enabled(),
             external_agent_http_proxy_port: conf.external_agent_http_proxy_port() as u16,
             tap_mode: conf.tap_mode(),
-            prometheus_http_api_addresses: conf.prometheus_http_api_addresses.to_owned(),
             yaml_config: YamlConfig::load(conf.local_config(), conf.tap_mode())?,
             plugins: conf.plugins,
         };

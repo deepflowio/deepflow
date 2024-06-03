@@ -18,7 +18,6 @@ cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
         mod libvirt_xml_extractor;
         pub mod kubernetes;
-        pub mod prometheus;
 
         pub use libvirt_xml_extractor::LibvirtXmlExtractor;
         pub use kubernetes::{ApiWatcher, GenericPoller, Poller};
