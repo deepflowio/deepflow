@@ -98,11 +98,6 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 	if err := ExecSQL(conn, t.MakeOrgGlobalTableCreateSQL(orgID)); err != nil {
 		return err
 	}
-	for _, view := range t.MakeViewsCreateSQLForDeepflowSystem(orgID) {
-		if err := ExecSQL(conn, view); err != nil {
-			return err
-		}
-	}
 
 	for _, c := range t.Columns {
 		for _, table := range []string{t.GlobalName, t.LocalName} {
