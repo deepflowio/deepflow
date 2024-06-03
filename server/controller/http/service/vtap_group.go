@@ -18,6 +18,7 @@ package service
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 
 	mapset "github.com/deckarep/golang-set"
@@ -264,6 +265,9 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 			"team_id":       vtapGroupUpdate["TEAM_ID"],
 			"owner_user_id": vtapGroupUpdate["USER_ID"],
 		}
+		if _, ok := vtapGroupUpdate["USER_ID"]; !ok {
+			resourceUpdate = nil
+		}
 		if err := a.resourceAccess.CanUpdateResource(vtapGroup.TeamID,
 			common.SET_RESOURCE_TYPE_AGENT_GROUP, vtapGroup.Lcuuid, resourceUpdate); err != nil {
 			return err
@@ -302,10 +306,11 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 
 		if _, ok := vtapGroupUpdate["TEAM_ID"]; ok {
 			dbUpdateMap["team_id"] = vtapGroupUpdate["TEAM_ID"]
-			vtapGroupTeamID, ok = vtapGroupUpdate["TEAM_ID"].(int)
+			vtapGroupTeamIDFloat, ok := vtapGroupUpdate["TEAM_ID"].(float64)
 			if !ok {
-				return fmt.Errorf("team id must be int")
+				return fmt.Errorf("get team id(type=%s) error", reflect.TypeOf(vtapGroupUpdate["TEAM_ID"]).String())
 			}
+			vtapGroupTeamID = int(vtapGroupTeamIDFloat)
 		}
 		if _, ok := vtapGroupUpdate["USER_ID"]; ok {
 			dbUpdateMap["user_id"] = vtapGroupUpdate["USER_ID"]

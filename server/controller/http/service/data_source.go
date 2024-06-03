@@ -34,6 +34,30 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
+type DataSource struct {
+	cfg *config.ControllerConfig
+
+	resourceAccess *ResourceAccess
+}
+
+func NewDataSource(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *DataSource {
+	return &DataSource{
+		cfg:            cfg,
+		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+	}
+}
+
+func NewDataSourceWithoutUserInfo(port int) *DataSource {
+	return &DataSource{
+		cfg: &config.ControllerConfig{
+			IngesterApi: config.IngesterApi{
+				Port: port,
+			},
+		},
+		resourceAccess: &ResourceAccess{},
+	}
+}
+
 var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"网络-指标（秒级）", "网络-指标（分钟级）", // flow_metrics.network*
 	"网络-流日志",                  // flow_log.l4_flow_log
@@ -52,7 +76,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"日志数据",          // application_log.log
 }
 
-func GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
+func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -152,7 +176,12 @@ func GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Sp
 	return response, nil
 }
 
-func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
+func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate) (model.DataSource, error) {
+	lcuuid := uuid.New().String()
+	if err := d.resourceAccess.CanAddResource(common.DEFAULT_TEAM_ID, common.SET_RESOURCE_TYPE_DATA_SOURCE, lcuuid); err != nil {
+		return model.DataSource{}, err
+	}
+
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return model.DataSource{}, err
@@ -175,20 +204,20 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 		)
 	}
 
-	if dataSourceCreate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
+	if dataSourceCreate.RetentionTime > d.cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
 			httpcommon.PARAMETER_ILLEGAL,
-			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
+			fmt.Sprintf("data_source retention_time should le %d", d.cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
 
 	if err := db.Model(&model.DataSource{}).Count(&dataSourceCount).Error; err != nil {
 		return model.DataSource{}, err
 	}
-	if int(dataSourceCount) >= cfg.Spec.DataSourceMax {
+	if int(dataSourceCount) >= d.cfg.Spec.DataSourceMax {
 		return model.DataSource{}, NewError(
 			httpcommon.RESOURCE_NUM_EXCEEDED,
-			fmt.Sprintf("data_source count exceeds (limit %d)", cfg.Spec.DataSourceMax),
+			fmt.Sprintf("data_source count exceeds (limit %d)", d.cfg.Spec.DataSourceMax),
 		)
 	}
 
@@ -228,7 +257,7 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 	}
 
 	dataSource = mysql.DataSource{}
-	lcuuid := uuid.New().String()
+
 	dataSource.Lcuuid = lcuuid
 	dataSource.DisplayName = dataSourceCreate.DisplayName
 	dataSource.DataTableCollection = dataSourceCreate.DataTableCollection
@@ -249,7 +278,7 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 
 	var errStrs []string
 	for _, analyzer := range analyzers {
-		if ingesterErr := CallIngesterAPIAddRP(orgID, analyzer.IP, dataSource, baseDataSource, cfg.IngesterApi.Port); ingesterErr != nil {
+		if ingesterErr := d.CallIngesterAPIAddRP(orgID, analyzer.IP, dataSource, baseDataSource); ingesterErr != nil {
 			errStr := fmt.Sprintf(
 				"failed to config analyzer (name:%s, ip:%s) add data_source(%s), error: %s",
 				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
@@ -276,11 +305,11 @@ func CreateDataSource(orgID int, dataSourceCreate *model.DataSourceCreate, cfg *
 		}
 	}
 
-	response, _ := GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
+	response, _ := d.GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 	return response[0], err
 }
 
-func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.ControllerConfig) (model.DataSource, error) {
+func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourceUpdate) (model.DataSource, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return model.DataSource{}, err
@@ -293,10 +322,15 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 		)
 	}
 
-	if dataSourceUpdate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
+	if err := d.resourceAccess.CanUpdateResource(common.DEFAULT_TEAM_ID,
+		common.SET_RESOURCE_TYPE_DATA_SOURCE, dataSource.Lcuuid, nil); err != nil {
+		return model.DataSource{}, err
+	}
+
+	if dataSourceUpdate.RetentionTime > d.cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
 			httpcommon.INVALID_POST_DATA,
-			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
+			fmt.Sprintf("data_source retention_time should le %d", d.cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
 	oldRetentionTime := dataSource.RetentionTime
@@ -312,7 +346,7 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 		if err != nil {
 			return model.DataSource{}, err
 		}
-		response, _ := GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
+		response, _ := d.GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 		return response[0], nil
 	}
 	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
@@ -325,7 +359,7 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 
 	var errs []error
 	for _, analyzer := range analyzers {
-		err = CallIngesterAPIModRP(orgID, analyzer.IP, dataSource, cfg.IngesterApi.Port)
+		err = d.CallIngesterAPIModRP(orgID, analyzer.IP, dataSource)
 		if err != nil {
 			errs = append(errs, fmt.Errorf(
 				"failed to config analyzer (name: %s, ip:%s) update data_source (%s) error: %w",
@@ -372,11 +406,11 @@ func UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate model.DataSourc
 		}
 	}
 
-	response, _ := GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
+	response, _ := d.GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 	return response[0], err
 }
 
-func DeleteDataSource(orgID int, lcuuid string, cfg *config.ControllerConfig) (map[string]string, error) {
+func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]string, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -389,6 +423,11 @@ func DeleteDataSource(orgID int, lcuuid string, cfg *config.ControllerConfig) (m
 		return map[string]string{}, NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("data_source (%s) not found", lcuuid),
 		)
+	}
+
+	if err := d.resourceAccess.CanDeleteResource(common.DEFAULT_TEAM_ID,
+		common.SET_RESOURCE_TYPE_DATA_SOURCE, dataSource.Lcuuid); err != nil {
+		return nil, err
 	}
 
 	// 默认数据源禁止删除
@@ -418,7 +457,7 @@ func DeleteDataSource(orgID int, lcuuid string, cfg *config.ControllerConfig) (m
 
 	var errStrs []string
 	for _, analyzer := range analyzers {
-		if ingesterErr := CallIngesterAPIDelRP(orgID, analyzer.IP, dataSource, cfg.IngesterApi.Port); ingesterErr != nil {
+		if ingesterErr := d.CallIngesterAPIDelRP(orgID, analyzer.IP, dataSource); ingesterErr != nil {
 			errStr := fmt.Sprintf(
 				"failed to config analyzer (name: %s, ip:%s) delete data_source (%s) error(%s)",
 				analyzer.Name, analyzer.IP, dataSource.DisplayName, ingesterErr.Error(),
@@ -451,7 +490,7 @@ func DeleteDataSource(orgID int, lcuuid string, cfg *config.ControllerConfig) (m
 	return map[string]string{"LCUUID": lcuuid}, err
 }
 
-func CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql.DataSource, ingesterApiPort int) error {
+func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql.DataSource) error {
 	var name, baseName string
 	var err error
 	if name, err = getName(dataSource.Interval, dataSource.DataTableCollection); err != nil {
@@ -470,7 +509,7 @@ func CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql
 		"interval":                  dataSource.Interval / common.INTERVAL_1MINUTE,
 		"retention-time":            dataSource.RetentionTime,
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), ingesterApiPort)
+	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), d.cfg.IngesterApi.Port)
 	log.Infof("call add data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("POST", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
@@ -479,7 +518,7 @@ func CallIngesterAPIAddRP(orgID int, ip string, dataSource, baseDataSource mysql
 	return err
 }
 
-func CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
+func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource) error {
 	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 	if err != nil {
 		return err
@@ -490,7 +529,7 @@ func CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource, ing
 		"db":                        getTableName(dataSource.DataTableCollection),
 		"retention-time":            dataSource.RetentionTime,
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), ingesterApiPort)
+	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), d.cfg.IngesterApi.Port)
 	log.Infof("call mod data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("PATCH", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
@@ -499,7 +538,7 @@ func CallIngesterAPIModRP(orgID int, ip string, dataSource mysql.DataSource, ing
 	return err
 }
 
-func CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql.DataSource, ingesterApiPort int) error {
+func (d *DataSource) CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql.DataSource) error {
 	name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 	if err != nil {
 		return err
@@ -509,7 +548,7 @@ func CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql.DataSource, ing
 		"name":                      name,
 		"db":                        getTableName(dataSource.DataTableCollection),
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), ingesterApiPort)
+	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), d.cfg.IngesterApi.Port)
 	log.Infof("call del data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("DELETE", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
@@ -564,7 +603,7 @@ func getTableName(collection string) string {
 	return strings.TrimSuffix(name, ".*")
 }
 
-func ConfigAnalyzerDataSource(ip string) error {
+func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 	var dataSources []mysql.DataSource
 	var err error
 
@@ -583,7 +622,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 		sort.Strings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES)
 		index := sort.SearchStrings(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName)
 		if index < len(DEFAULT_DATA_SOURCE_DISPLAY_NAMES) && DEFAULT_DATA_SOURCE_DISPLAY_NAMES[index] == dataSource.DisplayName {
-			if CallIngesterAPIModRP(common.DEFAULT_ORG_ID, ip, dataSource, common.INGESTER_API_PORT) != nil {
+			if d.CallIngesterAPIModRP(orgID, ip, dataSource) != nil {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) mod data_source (%s) failed", ip, dataSource.DisplayName,
 				)
@@ -599,7 +638,7 @@ func ConfigAnalyzerDataSource(ip string) error {
 				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
-			if CallIngesterAPIAddRP(common.DEFAULT_ORG_ID, ip, dataSource, baseDataSource, common.INGESTER_API_PORT) != nil {
+			if d.CallIngesterAPIAddRP(orgID, ip, dataSource, baseDataSource) != nil {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) add data_source (%s) failed", ip, dataSource.DisplayName,
 				)
