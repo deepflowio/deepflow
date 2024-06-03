@@ -133,6 +133,7 @@ func (c *Config) Load(path string) {
 	c.ControllerConfig.TrisolarisCfg.SetGrpcMaxMessageLength(c.ControllerConfig.GrpcMaxMessageLength)
 	c.ControllerConfig.TrisolarisCfg.SetNoTeamIDRefused(c.ControllerConfig.NoTeamIDRefused)
 	c.ControllerConfig.TrisolarisCfg.SetFPermitConfig(c.ControllerConfig.FPermit)
+	c.ControllerConfig.TrisolarisCfg.SetIngesterAPIPort(c.ControllerConfig.IngesterApi.Port)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)
