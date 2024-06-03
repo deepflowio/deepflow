@@ -2704,22 +2704,29 @@ static bool allow_datadump(struct socket_bpf_data *sd)
 	" CONTAINER_ID %s SOURCE %d COMM %s "			\
 	"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64	\
 	" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64		\
-	" DATA_SEQ %" PRIu64 " TLS %s TimeStamp %" PRIu64 "\n"
+	" DATA_SEQ %" PRIu64 " TLS %s KernCapTime %s\n"
 
 static void print_socket_data(struct socket_bpf_data *sd)
 {
 	if (!allow_datadump(sd))
 		return;
 
-	char *timestamp = get_timestamp_from_us(sd->timestamp);
+	char *timestamp = gen_timestamp_str(0);
 	if (timestamp == NULL)
 		return;
+
+	char *kern_cap_time = get_timestamp_from_us(sd->timestamp);
+	if (kern_cap_time == NULL) {
+		free(timestamp);
+		return;
+	}
 
 	char *proto_tag = get_proto_name(sd->l7_protocal_hint);
 	char *type, *role_str;
 	char *flow_str = flow_info(sd);
 	if (flow_str == NULL) {
 		free(timestamp);
+		free(kern_cap_time);
 		return;
 	}
 
@@ -2750,7 +2757,7 @@ static void print_socket_data(struct socket_bpf_data *sd)
 		     sd->process_kname, flow_str, sd->cap_len,
 		     sd->syscall_len, sd->socket_id,
 		     sd->syscall_trace_id_call, sd->tcp_seq,
-		     sd->cap_seq, sd->is_tls ? "true" : "false", sd->timestamp);
+		     sd->cap_seq, sd->is_tls ? "true" : "false", kern_cap_time);
 
 	if (sd->source == DATA_SOURCE_GO_HTTP2_UPROBE) {
 		len +=
@@ -2800,6 +2807,7 @@ static void print_socket_data(struct socket_bpf_data *sd)
 	}
 
 	free(timestamp);
+	free(kern_cap_time);
 	free(flow_str);
 
 	if (datadump_use_remote) {
