@@ -102,6 +102,11 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 	}
 
 	for _, vtapGroup := range vtapGroups {
+		// Default agent group does not return.
+		if _, ok := filter["can_deleted"]; ok && vtapGroup.ID == 1 {
+			continue
+		}
+
 		vtapGroupResp := model.VtapGroup{
 			ID:                 vtapGroup.ID,
 			Name:               vtapGroup.Name,

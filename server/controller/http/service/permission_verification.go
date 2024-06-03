@@ -55,7 +55,7 @@ func (ra *ResourceAccess) CanAddResource(teamID int, resourceType, resourceUUID 
 	}
 	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessAdd)
 	url += fmt.Sprintf("&team_id=%d", teamID)
-	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
+	if err := PermitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
 	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
@@ -85,7 +85,7 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
 	}
 
-	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
+	if err := PermitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
 	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
@@ -116,7 +116,7 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
 	}
 
-	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
+	if err := PermitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
 	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
@@ -132,7 +132,7 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 	return resourceVerify(url, http.MethodDelete, ra.userInfo, teamID, body)
 }
 
-func permitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
+func PermitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
 	response, err := common.CURLPerform(
 		http.MethodGet,
 		url,
