@@ -205,6 +205,14 @@ func (VTap) TableName() string {
 	return "vtap"
 }
 
+func (v VTap) GetID() int {
+	return v.ID
+}
+
+func (v VTap) GetLcuuid() string {
+	return v.Lcuuid
+}
+
 type VTapGroup struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string    `gorm:"column:name;type:varchar(64);not null" json:"NAME"`
