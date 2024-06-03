@@ -786,12 +786,12 @@ static char *__gen_datetime_str(const char *fmt, u64 ns)
 	long msec = 0;
 	if (ns > 0) {
 		timep = ns / NS_IN_SEC;
-		msec = (ns % NS_IN_SEC) / NS_IN_MSEC;
+		msec = (ns % NS_IN_SEC) / NS_IN_USEC;
 	} else {
 		time(&timep);
 		struct timeval msectime;
 		gettimeofday(&msectime, NULL);
-		msec = msectime.tv_usec / 1000;
+		msec = msectime.tv_usec;
 	}
 
 	p = localtime(&timep);
