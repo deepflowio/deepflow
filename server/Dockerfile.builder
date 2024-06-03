@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine
+FROM golang:1.21-alpine
 
 RUN apk update && \
     apk add protoc python3 py3-ujson make git
