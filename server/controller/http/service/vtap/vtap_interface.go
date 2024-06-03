@@ -243,6 +243,8 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 					vtapVIF.DeviceName = toolDS.podServiceIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_POD:
 					vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
+					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]]]
+					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
 				}
 			}
 		} else if vtapID != 0 {
@@ -271,6 +273,7 @@ type vpToolDataSet struct {
 	redisInstanceIDToName map[int]string
 	podServiceIDToName    map[int]string
 	podIDToName           map[int]string
+	podIDToPodNodeID      map[int]int
 }
 
 func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
@@ -292,6 +295,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		redisInstanceIDToName: make(map[int]string),
 		podServiceIDToName:    make(map[int]string),
 		podIDToName:           make(map[int]string),
+		podIDToPodNodeID:      make(map[int]int),
 	}
 	var vtaps []*mysql.VTap
 	if err = db.Unscoped().Find(&vtaps).Error; err != nil {
@@ -413,12 +417,13 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 	}
 
 	var pods []*mysql.Pod
-	if err = db.Select("id", "name").Unscoped().Find(&pods).Error; err != nil {
+	if err = db.Select("id", "name", "pod_node_id").Unscoped().Find(&pods).Error; err != nil {
 		log.Error(db.Log(dbQueryResourceFailed("pod", err)))
 		return
 	}
 	for _, p := range pods {
 		toolDS.podIDToName[p.ID] = p.Name
+		toolDS.podIDToPodNodeID[p.ID] = p.PodNodeID
 	}
 	return
 }
