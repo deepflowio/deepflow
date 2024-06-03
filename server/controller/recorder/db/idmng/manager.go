@@ -79,6 +79,7 @@ func (m *IDManager) Init(cfg *RecorderConfig) *IDManager {
 		ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN:       &IDPool[mysql.PodGroup]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, max: cfg.ResourceMaxID1},
 		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: &IDPool[mysql.PodReplicaSet]{resourceType: ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
 		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         &IDPool[mysql.Process]{resourceType: ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, max: cfg.ResourceMaxID1},
+		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            &IDPool[mysql.VTap]{resourceType: ctrlrcommon.RESOURCE_TYPE_VTAP_EN, max: cfg.ResourceMaxID0},
 
 		// both recorder and prometheus need to insert data into prometheus_target, they equally share the id pool of prometheus_target.
 		// recorder uses ids [1, max/2+max%2], prometheus uses ids [max/2+max%2+1, max].
