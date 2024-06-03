@@ -582,11 +582,12 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 			}
 		}
 
+		dataSourceService := service.NewDataSourceWithoutUserInfo(n.config.GetIngesterAPIPort())
 		if IsStandaloneRunningMode() {
 			// in standalone mode, since all in one deployment and analyzer communication use 127.0.0.1
-			err = service.ConfigAnalyzerDataSource("127.0.0.1")
+			err = dataSourceService.ConfigAnalyzerDataSource(n.GetORGID(), "127.0.0.1")
 		} else {
-			err = service.ConfigAnalyzerDataSource(tsdb.IP)
+			err = dataSourceService.ConfigAnalyzerDataSource(n.GetORGID(), tsdb.IP)
 		}
 
 		if err != nil {

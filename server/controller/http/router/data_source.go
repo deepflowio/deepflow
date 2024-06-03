@@ -36,23 +36,26 @@ func NewDataSource(cfg *config.ControllerConfig) *DataSource {
 	return &DataSource{cfg: cfg}
 }
 
-func (ds *DataSource) RegisterTo(e *gin.Engine) {
-	e.GET("/v1/data-sources/:lcuuid/", getDataSource)
-	e.GET("/v1/data-sources/", getDataSources(ds.cfg))
-	e.POST("/v1/data-sources/", createDataSource(ds.cfg))
-	e.PATCH("/v1/data-sources/:lcuuid/", updateDataSource(ds.cfg))
-	e.DELETE("/v1/data-sources/:lcuuid/", deleteDataSource(ds.cfg))
+func (d *DataSource) RegisterTo(e *gin.Engine) {
+	e.GET("/v1/data-sources/:lcuuid/", d.getDataSource())
+	e.GET("/v1/data-sources/", d.getDataSources())
+	e.POST("/v1/data-sources/", d.createDataSource())
+	e.PATCH("/v1/data-sources/:lcuuid/", d.updateDataSource())
+	e.DELETE("/v1/data-sources/:lcuuid/", d.deleteDataSource())
 }
 
-func getDataSource(c *gin.Context) {
-	args := make(map[string]interface{})
-	args["lcuuid"] = c.Param("lcuuid")
-	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-	data, err := service.GetDataSources(orgID.(int), args, nil)
-	JsonResponse(c, data, err)
+func (d *DataSource) getDataSource() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		args := make(map[string]interface{})
+		args["lcuuid"] = c.Param("lcuuid")
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		dataSourceService := service.NewDataSource(httpcommon.GetUserInfo(c), d.cfg)
+		data, err := dataSourceService.GetDataSources(orgID.(int), args, nil)
+		JsonResponse(c, data, err)
+	}
 }
 
-func getDataSources(cfg *config.ControllerConfig) gin.HandlerFunc {
+func (d *DataSource) getDataSources() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		args := make(map[string]interface{})
 		if value, ok := c.GetQuery("type"); ok {
@@ -62,12 +65,13 @@ func getDataSources(cfg *config.ControllerConfig) gin.HandlerFunc {
 			args["name"] = value
 		}
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		data, err := service.GetDataSources(orgID.(int), args, &cfg.Spec)
+		dataSourceService := service.NewDataSource(httpcommon.GetUserInfo(c), d.cfg)
+		data, err := dataSourceService.GetDataSources(orgID.(int), args, &d.cfg.Spec)
 		JsonResponse(c, data, err)
 	})
 }
 
-func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
+func (d *DataSource) createDataSource() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var dataSourceCreate *model.DataSourceCreate
@@ -85,12 +89,13 @@ func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		data, err := service.CreateDataSource(orgID.(int), dataSourceCreate, cfg)
+		dataSourceService := service.NewDataSource(httpcommon.GetUserInfo(c), d.cfg)
+		data, err := dataSourceService.CreateDataSource(orgID.(int), dataSourceCreate)
 		JsonResponse(c, data, err)
 	})
 }
 
-func updateDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
+func (d *DataSource) updateDataSource() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var dataSourceUpdate model.DataSourceUpdate
@@ -104,18 +109,20 @@ func updateDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 		lcuuid := c.Param("lcuuid")
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		data, err := service.UpdateDataSource(orgID.(int), lcuuid, dataSourceUpdate, cfg)
+		dataSourceService := service.NewDataSource(httpcommon.GetUserInfo(c), d.cfg)
+		data, err := dataSourceService.UpdateDataSource(orgID.(int), lcuuid, dataSourceUpdate)
 		JsonResponse(c, data, err)
 	})
 }
 
-func deleteDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
+func (d *DataSource) deleteDataSource() gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 
 		lcuuid := c.Param("lcuuid")
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		data, err := service.DeleteDataSource(orgID.(int), lcuuid, cfg)
+		dataSourceService := service.NewDataSource(httpcommon.GetUserInfo(c), d.cfg)
+		data, err := dataSourceService.DeleteDataSource(orgID.(int), lcuuid)
 		JsonResponse(c, data, err)
 	})
 }
