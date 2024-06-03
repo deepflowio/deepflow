@@ -284,7 +284,6 @@ pub struct OsProcScanConfig;
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
-    pub prometheus_http_api_addresses: Vec<String>,
     pub libvirt_xml_path: PathBuf,
     pub kubernetes_poller_type: KubernetesPollerType,
     pub vtap_id: u16,
@@ -1604,7 +1603,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
-                prometheus_http_api_addresses: conf.prometheus_http_api_addresses.clone(),
                 agent_enabled: conf.enabled,
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.extra_netns_regex.to_string(),
@@ -2702,35 +2700,6 @@ impl ConfigHandler {
                     "Kubernetes API enabled set to {}",
                     new_cfg.kubernetes_api_enabled
                 );
-                #[cfg(target_os = "linux")]
-                if new_cfg.kubernetes_api_enabled {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.start();
-                    });
-                } else {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.stop();
-                    });
-                }
-            }
-            #[cfg(target_os = "linux")]
-            if old_cfg.prometheus_http_api_addresses != new_cfg.prometheus_http_api_addresses {
-                info!(
-                    "prometheus_http_api_addresses set to {:?}",
-                    new_cfg.prometheus_http_api_addresses
-                );
-                if new_cfg.prometheus_http_api_addresses.is_empty() {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.stop();
-                    });
-                } else {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.stop();
-                    });
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.start();
-                    });
-                }
             }
 
             // restart api watcher if it keeps running and config changes
