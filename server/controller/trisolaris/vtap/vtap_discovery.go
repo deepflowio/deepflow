@@ -26,6 +26,7 @@ import (
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -166,9 +167,23 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	if r.vTapAutoRegister {
 		dbVTap.State = VTAP_STATE_NORMAL
 	}
+	ids, err := idmng.GetIDs(RESOURCE_TYPE_VTAP_EN, 1)
+	if err != nil {
+		log.Errorf("%s request ids failed", RESOURCE_TYPE_VTAP_EN)
+		return false
+	}
+	if len(ids) != 1 {
+		log.Errorf("request ids=%s err", ids)
+		return false
+	}
+	dbVTap.ID = ids[0]
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(dbVTap).Error; err != nil {
 			log.Errorf("insert agent(%s) to DB faild, err: %s", r, err)
+			errID := idmng.ReleaseIDs(RESOURCE_TYPE_VTAP_EN, ids)
+			if errID != nil {
+				log.Errorf("Release ids=%s err: %s", ids, errID)
+			}
 			return err
 		}
 		finishLog(dbVTap)
