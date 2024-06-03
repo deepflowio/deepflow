@@ -58,7 +58,8 @@ func (ra *ResourceAccess) CanAddResource(teamID int, resourceType, resourceUUID 
 	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
 	}
-	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
+		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
 		return nil
 	}
 
@@ -77,7 +78,8 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 		return nil
 	}
 	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessUpdate)
-	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
+		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
 		url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
 	} else {
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
@@ -87,6 +89,7 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 		return err
 	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
+		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE ||
 		resourceUp == nil || len(resourceUp) == 0 {
 		return nil
 	}
@@ -116,7 +119,8 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 	if err := permitVerify(url, ra.userInfo, teamID); err != nil {
 		return err
 	}
-	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
+		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
 		return nil
 	}
 
