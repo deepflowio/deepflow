@@ -82,12 +82,21 @@ func (t *PrometheusLabelTable) QueryLabelValueID(orgId uint16, labelValue string
 }
 
 func (t *PrometheusLabelTable) QueryLabelNameValue(orgId uint16, nameId, valueId uint32) bool {
-	_, exists := t.labelNameValues[orgId].Get(nameValueKey(nameId, valueId))
-	return exists
+	if timestamp, exists := t.labelNameValues[orgId].Get(nameValueKey(nameId, valueId)); exists {
+		if t.now-int64(timestamp) > int64(t.cacheExpiration) {
+			t.counter.CacheExpiration++
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func (t *PrometheusLabelTable) QueryColumnIndex(orgId uint16, metricID, labelNameID uint32) (uint32, bool) {
-	return t.labelColumnIndexs[orgId].Get(columnIndexKey(metricID, labelNameID))
+	if value, exist := t.labelColumnIndexs[orgId].Get(columnIndexKey(metricID, labelNameID)); exist {
+		return t.getId(value)
+	}
+	return 0, false
 }
 
 type RequestCounter struct {
@@ -115,8 +124,8 @@ type PrometheusLabelTable struct {
 	metricNameIDs     [MAX_ORG_COUNT]*hashmap.Map[string, uint64]
 	labelNameIDs      [MAX_ORG_COUNT]*hashmap.Map[string, uint64]
 	labelValueIDs     [MAX_ORG_COUNT]*hashmap.Map[string, uint64]
-	labelNameValues   [MAX_ORG_COUNT]*hashmap.Map[uint64, struct{}]
-	labelColumnIndexs [MAX_ORG_COUNT]*hashmap.Map[uint64, uint32]
+	labelNameValues   [MAX_ORG_COUNT]*hashmap.Map[uint64, uint32]
+	labelColumnIndexs [MAX_ORG_COUNT]*hashmap.Map[uint64, uint64]
 	cacheExpiration   int
 	now               int64 // precision: 10s
 
@@ -142,8 +151,8 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize, cacheE
 		t.metricNameIDs[i] = hashmap.New[string, uint64]()     // metricName => metricID
 		t.labelNameIDs[i] = hashmap.New[string, uint64]()      // labelName  => labelNameID
 		t.labelValueIDs[i] = hashmap.New[string, uint64]()     // labelValue => labelValueID
-		t.labelNameValues[i] = hashmap.New[uint64, struct{}]() // labelNameValue => exists
-		t.labelColumnIndexs[i] = hashmap.New[uint64, uint32]() // metricID + LabelNameID => columnIndex
+		t.labelNameValues[i] = hashmap.New[uint64, uint32]()   // labelNameValue => timestamp
+		t.labelColumnIndexs[i] = hashmap.New[uint64, uint64]() // metricID + LabelNameID => columnIndex
 	}
 
 	t.GrpcSession.Init(ips, uint16(port), grpc.DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, nil)
@@ -157,8 +166,8 @@ func (t *PrometheusLabelTable) DropOrg(orgId uint16) {
 	t.metricNameIDs[orgId] = hashmap.New[string, uint64]()
 	t.labelNameIDs[orgId] = hashmap.New[string, uint64]()
 	t.labelValueIDs[orgId] = hashmap.New[string, uint64]()
-	t.labelNameValues[orgId] = hashmap.New[uint64, struct{}]()
-	t.labelColumnIndexs[orgId] = hashmap.New[uint64, uint32]()
+	t.labelNameValues[orgId] = hashmap.New[uint64, uint32]()
+	t.labelColumnIndexs[orgId] = hashmap.New[uint64, uint64]()
 }
 
 func (t *PrometheusLabelTable) RequestLabelIDs(request *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
@@ -268,7 +277,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 				} else {
 					t.counter.LabelValueUnknown++
 				}
-				t.labelNameValues[orgId].Set(nameValueKey(nameId, valueId), struct{}{})
+				t.labelNameValues[orgId].Set(nameValueKey(nameId, valueId), uint32(t.now))
 			}
 		}
 	}
@@ -299,11 +308,11 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 				} else {
 					t.counter.LabelValueUnknown++
 				}
-				t.labelNameValues[orgId].Set(nameValueKey(nameId, valueId), struct{}{})
+				t.labelNameValues[orgId].Set(nameValueKey(nameId, valueId), uint32(t.now))
 			}
 
 			cIndex := labelInfo.GetAppLabelColumnIndex()
-			t.labelColumnIndexs[orgId].Set(columnIndexKey(metricId, nameId), cIndex)
+			t.labelColumnIndexs[orgId].Set(columnIndexKey(metricId, nameId), t.genId(isAll, cIndex))
 		}
 	}
 }
@@ -311,7 +320,7 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 func (t *PrometheusLabelTable) GetMaxAppLabelColumnIndex() int {
 	ret := 0
 	for _, labelColumnIndex := range t.labelColumnIndexs {
-		maxIndex := int(getUInt64MapMaxValue(labelColumnIndex))
+		maxIndex := int(getUInt64MapMaxValue(labelColumnIndex) >> 32)
 		if maxIndex > ret {
 			ret = maxIndex
 		}
@@ -369,7 +378,7 @@ func (t *PrometheusLabelTable) columnIndexString(orgId uint16, filter string) st
 	sb.WriteString(fmt.Sprintf("\norg-id %d\n", orgId))
 	sb.WriteString("\ncolumnIndex  metricName                                                                                            metricId   name                                                              nameId\n")
 	sb.WriteString("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
-	t.labelColumnIndexs[orgId].Range(func(k uint64, v uint32) bool {
+	t.labelColumnIndexs[orgId].Range(func(k uint64, v uint64) bool {
 		metricId := k >> METRICID_OFFSET
 		nameId := k << (64 - METRICID_OFFSET) >> (64 - METRICID_OFFSET)
 		metricName, name := "", ""
@@ -387,7 +396,9 @@ func (t *PrometheusLabelTable) columnIndexString(orgId uint16, filter string) st
 			}
 			return true
 		})
-		row := fmt.Sprintf("%-11d  %-100s  %-9d  %-64s  %-6d\n", v, metricName, metricId, name, nameId)
+		secondsTimestamp := v << 32 >> 32
+		timestampTime := time.Unix(int64(secondsTimestamp), 0)
+		row := fmt.Sprintf("%-11d  %-100s  %-9d  %-64s  %-6d %-10d %s\n", v>>32, metricName, metricId, name, nameId, secondsTimestamp, timestampTime.Format(time.RFC3339))
 		if strings.Contains(row, filter) {
 			sb.WriteString(row)
 		}
@@ -407,9 +418,9 @@ func getStringMapMaxValue(m *hashmap.Map[string, uint64]) uint32 {
 	return maxId
 }
 
-func getUInt64MapMaxValue(m *hashmap.Map[uint64, uint32]) uint32 {
-	maxId := uint32(0)
-	m.Range(func(n uint64, i uint32) bool {
+func getUInt64MapMaxValue(m *hashmap.Map[uint64, uint64]) uint64 {
+	maxId := uint64(0)
+	m.Range(func(n uint64, i uint64) bool {
 		if i > maxId {
 			maxId = i
 		}
@@ -437,17 +448,21 @@ func (t *PrometheusLabelTable) statsString(orgId uint16) string {
 	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "metric", t.metricNameIDs[orgId].Len(), getStringMapMaxValue(t.metricNameIDs[orgId])))
 	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "name", t.labelNameIDs[orgId].Len(), getStringMapMaxValue(t.labelNameIDs[orgId])))
 	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "value", t.labelValueIDs[orgId].Len(), getStringMapMaxValue(t.labelValueIDs[orgId])))
-	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "column", t.labelColumnIndexs[orgId].Len(), getUInt64MapMaxValue(t.labelColumnIndexs[orgId])))
+	sb.WriteString(fmt.Sprintf("%-9s  %-11d  %-6d\n", "column", t.labelColumnIndexs[orgId].Len(), getUInt64MapMaxValue(t.labelColumnIndexs[orgId])>>32))
 	return sb.String()
 }
 
 func (t *PrometheusLabelTable) HandleSimpleCommand(op uint16, args string) string {
-	parts := strings.Split(args, "|")
-	id, _ := strconv.Atoi(parts[0])
-	orgId := uint16(id)
-	filter := ""
-	if len(parts) > 1 {
-		filter = parts[1]
+	var orgId uint16
+	var filter string
+	parts := strings.Split(args, "-")
+	if len(parts) != 2 {
+		orgId = ckdb.DEFAULT_ORG_ID
+		filter = args
+	} else {
+		id, _ := strconv.Atoi(parts[1])
+		orgId = uint16(id)
+		filter = parts[0]
 	}
 	cmd := labelCmds[op]
 	switch cmd {
@@ -550,12 +565,13 @@ func (t *PrometheusLabelTable) explainString(str string) string {
 	names, values := make([]string, len(intValues)-1), make([]string, len(intValues)-1)
 
 	for i, valueId := range intValues[2:] {
-		t.labelColumnIndexs[orgId].Range(func(k uint64, v uint32) bool {
+		t.labelColumnIndexs[orgId].Range(func(k uint64, v uint64) bool {
+			columnIdx := uint32(v >> 32)
 			mid := k >> METRICID_OFFSET
 			if uint64(metricId) != mid {
 				return true
 			}
-			if v == uint32(i+1) {
+			if columnIdx == uint32(i+1) {
 				nameId := k << (64 - METRICID_OFFSET) >> (64 - METRICID_OFFSET)
 				name, value := "", ""
 				t.labelNameIDs[orgId].Range(func(n string, i uint64) bool {
@@ -572,8 +588,8 @@ func (t *PrometheusLabelTable) explainString(str string) string {
 					}
 					return true
 				})
-				names[v] = name
-				values[v] = value
+				names[columnIdx] = name
+				values[columnIdx] = value
 				return false
 			}
 			return true
