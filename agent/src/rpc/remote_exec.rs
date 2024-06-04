@@ -17,13 +17,16 @@
 use std::{
     borrow::Cow,
     cell::OnceCell,
-    collections::VecDeque,
-    fmt::{self, Write},
+    collections::{hash_map::Entry, HashMap, VecDeque},
+    fmt::{self, Write as _},
     fs::File,
+    io::Write,
     ops::Deref,
-    path::PathBuf,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
     pin::Pin,
     process::{self, Output},
+    ptr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -174,7 +177,7 @@ fn max_param_nums() -> usize {
 }
 
 #[derive(Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("command `{0}` execution failed")]
     CmdExecFailed(#[from] std::io::Error),
     #[error("command `{0}` failed with code {1:?}")]
@@ -185,28 +188,11 @@ enum Error {
     KubeError(#[from] kube::Error),
     #[error("serialize failed with {0}")]
     SerializeError(#[from] serde_json::Error),
+    #[error("transparent")]
+    SyscallFailed(String),
 }
 
 type Result<T> = std::result::Result<T, Error>;
-
-struct NetNsInfo {
-    id: u64,
-    user: String,
-    pid: u32,
-    cmd: String,
-}
-
-impl From<NetNsInfo> for pb::LinuxNamespace {
-    fn from(c: NetNsInfo) -> Self {
-        Self {
-            id: Some(c.id),
-            ns_type: Some("net".to_owned()),
-            user: Some(c.user),
-            pid: Some(c.pid),
-            cmd: Some(c.cmd),
-        }
-    }
-}
 
 struct Interior {
     agent_id: Arc<RwLock<AgentId>>,
@@ -600,7 +586,7 @@ impl Stream for Responser {
                         }
                         pb::ExecutionType::ListNamespace => {
                             trace!("pending list namespace");
-                            self.pending_lsns = Some((msg.request_id, Box::pin(lsns())));
+                            self.pending_lsns = Some((msg.request_id, Box::pin(ls_netns())));
                             continue;
                         }
                         pb::ExecutionType::RunCommand => {
@@ -663,6 +649,15 @@ impl Stream for Responser {
                                 msg.linux_ns_pid,
                                 params
                             );
+
+                            if *cmdline == "lsns" {
+                                self.pending_command = Some((
+                                    msg.request_id,
+                                    cmd_id as usize,
+                                    Box::pin(lsns_command()),
+                                ));
+                                continue;
+                            }
 
                             match cmd.command_type {
                                 CommandType::Kubernetes(kcmd) => {
@@ -747,46 +742,302 @@ impl Stream for Responser {
     }
 }
 
-async fn lsns() -> Result<Vec<pb::LinuxNamespace>> {
-    let output = TokioCommand::new("lsns")
-        .args([
-            "--list",
-            "--type",
-            "net",
-            "--noheadings",
-            "--output",
-            "NS,PID,USER,COMMAND",
-        ])
-        .output()
-        .await?;
-    if !output.status.success() {
-        return Err(Error::CmdFailed("lsns".to_owned(), output.status.code()));
+const MIN_BUF_SIZE: usize = 1024;
+
+fn username_by_uid(uid: u32) -> Result<String> {
+    // SAFTY: sysconf() is unlikely to go wrong
+    let conf = unsafe { libc::sysconf(libc::_SC_GETPW_R_SIZE_MAX) };
+    let buf_size = if conf < 0 {
+        MIN_BUF_SIZE
+    } else {
+        conf as usize
+    };
+    #[cfg(target_arch = "x86_64")]
+    let mut buffer: Vec<i8> = Vec::with_capacity(buf_size);
+    #[cfg(target_arch = "aarch64")]
+    let mut buffer: Vec<u8> = Vec::with_capacity(buf_size);
+    let mut passwd = libc::passwd {
+        pw_name: ptr::null_mut(),
+        pw_passwd: ptr::null_mut(),
+        pw_uid: 0,
+        pw_gid: 0,
+        pw_gecos: ptr::null_mut(),
+        pw_dir: ptr::null_mut(),
+        pw_shell: ptr::null_mut(),
+    };
+    let mut p_passwd: *mut libc::passwd = ptr::null_mut();
+    unsafe {
+        // SAFTY: `buffer` is pre-allocated with buf_size for syscall
+        //        and will not `Drop` before the end of this function.
+        //        The contents in the buffer is `Copy`.
+        let r = libc::getpwuid_r(
+            uid,
+            &mut passwd as *mut libc::passwd,
+            buffer.as_mut_ptr(),
+            buf_size,
+            &mut p_passwd as *mut *mut libc::passwd,
+        );
+        if r != 0 {
+            return Err(Error::SyscallFailed(format!("getpwuid_r failed with {r}")));
+        } else if p_passwd.is_null() {
+            return Err(Error::SyscallFailed(format!(
+                "username with uid {uid} not found"
+            )));
+        }
+        // SAFTY:
+        // - p_passwd.pw_name points to nul terminated string in a single allocated `Vec<i8>` object.
+        // - The memory referenced will not be mutated.
+        Ok(std::ffi::CStr::from_ptr(p_passwd.read().pw_name)
+            .to_string_lossy()
+            .to_string())
     }
-    let mut namespaces = vec![];
-    for line in output.stdout.split(|c| *c == b'\n') {
-        let Ok(line) = std::str::from_utf8(line) else {
+}
+
+async fn get_proc_cmdline<P: AsRef<Path>>(pid_path: P) -> std::io::Result<String> {
+    let mut pid_path = pid_path.as_ref().to_path_buf();
+    pid_path.push("cmdline");
+    let mut cmdline = match tokio::fs::read(&pid_path).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            pid_path.pop();
+            pid_path.push("comm");
+            match tokio::fs::read(&pid_path).await {
+                Ok(bytes) => bytes,
+                Err(_) => {
+                    pid_path.pop();
+                    return Err(e);
+                }
+            }
+        }
+    };
+
+    // remove trailling \0
+    while let Some(c) = cmdline.pop() {
+        if c != b'\0' {
+            cmdline.push(c);
+            break;
+        }
+    }
+    // replace all \0 with space
+    for c in cmdline.iter_mut() {
+        if *c == b'\0' {
+            *c = b' ';
+        }
+    }
+    Ok(String::from_utf8(cmdline).unwrap_or_default())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NsType {
+    Unknown,
+    Mnt,
+    Net,
+    Pid,
+    Uts,
+    Ipc,
+    User,
+    Cgroup,
+    Time,
+}
+
+impl NsType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Mnt => "mnt",
+            Self::Net => "net",
+            Self::Pid => "pid",
+            Self::Uts => "uts",
+            Self::Ipc => "ipc",
+            Self::User => "user",
+            Self::Cgroup => "cgroup",
+            Self::Time => "time",
+        }
+    }
+}
+
+impl fmt::Display for NsType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<&str> for NsType {
+    fn from(s: &str) -> Self {
+        match s {
+            "mnt" => Self::Mnt,
+            "net" => Self::Net,
+            "pid" => Self::Pid,
+            "uts" => Self::Uts,
+            "ipc" => Self::Ipc,
+            "user" => Self::User,
+            "cgroup" => Self::Cgroup,
+            "time" => Self::Time,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Namespace {
+    pub id: u64,
+    pub ty: NsType,
+    pub nprocs: usize,
+    pub pid: u32,
+    pub user: String,
+    pub command: String,
+}
+
+impl Namespace {
+    pub fn merge(&mut self, mut rhs: Namespace) {
+        if self.pid < rhs.pid {
+            self.nprocs += 1;
+            return;
+        }
+        rhs.nprocs += 1;
+        *self = rhs;
+    }
+}
+
+impl From<Namespace> for pb::LinuxNamespace {
+    fn from(ns: Namespace) -> Self {
+        Self {
+            id: Some(ns.id),
+            pid: Some(ns.pid),
+            user: Some(ns.user),
+            cmd: Some(ns.command),
+            ns_type: Some(ns.ty.to_string()),
+        }
+    }
+}
+
+pub async fn lsns() -> Result<Vec<Namespace>> {
+    let mut ns_by_id: HashMap<u64, Namespace> = HashMap::new();
+    let mut iter = tokio::fs::read_dir(public::netns::PROC_PATH).await?;
+    while let Some(proc) = iter.next_entry().await? {
+        match proc.file_type().await {
+            Ok(t) if t.is_dir() => (),
+            _ => {
+                debug!("skipped {}", proc.path().display());
+                continue;
+            }
+        }
+        let Some(pid) = proc
+            .file_name()
+            .to_str()
+            .and_then(|s| s.parse::<u32>().ok())
+        else {
             continue;
         };
-        trace!("lsns parse line {}", line);
-        let mut segs = line.trim().split_whitespace();
+        let mut path = proc.path();
 
-        let id = segs.next().and_then(|s| s.trim().parse::<u64>().ok());
-        let pid = segs.next().and_then(|s| s.trim().parse::<u32>().ok());
-        let user = segs.next().map(|s| s.trim().to_owned());
-        let cmd = segs.next().map(|s| s.trim().to_owned());
+        let user = match tokio::fs::metadata(&path).await {
+            Ok(fp) => match username_by_uid(fp.uid()) {
+                Ok(name) => name,
+                Err(e) => {
+                    debug!("get username for uid {} failed: {}", fp.uid(), e);
+                    fp.uid().to_string()
+                }
+            },
+            Err(e) => {
+                debug!("get uid for process {} failed: {}", pid, e);
+                continue;
+            }
+        };
 
-        if id.is_none() || pid.is_none() || user.is_none() || cmd.is_none() {
-            continue;
+        let cmdline = match get_proc_cmdline(&path).await {
+            Ok(cmdline) => cmdline,
+            Err(e) => {
+                debug!("get_proc_cmdline for process {} failed: {}", pid, e);
+                continue;
+            }
+        };
+
+        path.push("ns");
+        let mut ns_iter = tokio::fs::read_dir(&path).await?;
+        while let Some(ns_file) = ns_iter.next_entry().await? {
+            let Some(ns_type) = ns_file.file_name().as_os_str().to_str().map(NsType::from) else {
+                continue;
+            };
+            let ns_path = ns_file.path();
+            if ns_type == NsType::Unknown {
+                debug!("ignored path {} with unknown ns type", ns_path.display());
+                continue;
+            }
+
+            let Ok(fp) = tokio::fs::metadata(&ns_path).await else {
+                continue;
+            };
+
+            let nsid = fp.ino();
+            let ns = Namespace {
+                id: nsid,
+                ty: ns_type,
+                nprocs: 1,
+                pid,
+                user: user.clone(),
+                command: cmdline.clone(),
+            };
+            match ns_by_id.entry(nsid) {
+                Entry::Occupied(mut o) => o.get_mut().merge(ns),
+                Entry::Vacant(v) => {
+                    v.insert(ns);
+                }
+            }
         }
-        namespaces.push(pb::LinuxNamespace {
-            id,
-            pid,
-            user,
-            cmd,
-            ns_type: Some("net".to_owned()),
-        });
     }
-    Ok(namespaces)
+    Ok(ns_by_id.into_values().collect())
+}
+
+pub fn write_namespace_table<W: Write>(mut w: W, table: &[Namespace]) -> Result<()> {
+    let name_width = table
+        .iter()
+        .map(|n| n.user.len())
+        .max()
+        .unwrap_or_default()
+        .max("USER".len());
+    write!(
+        w,
+        "        NS TYPE   NPROCS   PID {:<name_width$} COMMAND\n",
+        "USER"
+    )?;
+    for ns in table.iter() {
+        write!(
+            w,
+            "{:>10} {:<6} {:>6} {:>5} {:<name_width$} {}\n",
+            ns.id,
+            ns.ty.as_str(),
+            ns.nprocs,
+            ns.pid,
+            ns.user,
+            ns.command,
+        )?;
+    }
+    Ok(())
+}
+
+async fn ls_netns() -> Result<Vec<pb::LinuxNamespace>> {
+    Ok(lsns()
+        .await?
+        .into_iter()
+        .filter_map(|ns| {
+            if ns.ty == NsType::Net {
+                Some(pb::LinuxNamespace::from(ns))
+            } else {
+                None
+            }
+        })
+        .collect())
+}
+
+async fn lsns_command() -> Result<Output> {
+    let mut output = vec![];
+    write_namespace_table(&mut output, &lsns().await?)?;
+    Ok(Output {
+        status: Default::default(),
+        stdout: output,
+        stderr: vec![],
+    })
 }
 
 struct Params<'a>(&'a [pb::Parameter]);
