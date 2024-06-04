@@ -65,13 +65,6 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		))
 		return nil, false
 	}
-	var subnetID int
-	if cloudItem.SubnetLcuuid != "" {
-		subnetID, exists = i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		if !exists && i.domainToolDataSet != nil {
-			subnetID, _ = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		}
-	}
 	ip := rcommon.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
@@ -84,7 +77,6 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		Domain:       i.cache.DomainLcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		VInterfaceID: vinterfaceID,
-		SubnetID:     subnetID,
 		Region:       cloudItem.RegionLcuuid,
 		ISP:          rcommon.WAN_IP_ISP,
 	}
@@ -104,26 +96,5 @@ func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmod
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
-	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		if cloudItem.SubnetLcuuid == "" {
-			updateInfo["vl2_net_id"] = 0
-		} else {
-			subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-			if !exists {
-				if i.domainToolDataSet != nil {
-					subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-				}
-				if !exists {
-					log.Error(resourceAForResourceBNotFound(
-						ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-						ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
-					))
-					return nil, false
-				}
-			}
-			updateInfo["vl2_net_id"] = subnetID
-		}
-	}
-
 	return updateInfo, len(updateInfo) > 0
 }
