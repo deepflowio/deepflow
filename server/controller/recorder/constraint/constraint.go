@@ -34,7 +34,7 @@ type MySQLModel interface {
 		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
 		mysql.PodIngressRule | mysql.PodIngressRuleBackend | mysql.PodService |
 		mysql.PodServicePort | mysql.PodGroup | mysql.PodGroupPort | mysql.PodReplicaSet |
-		mysql.Pod | mysql.Process | mysql.PrometheusTarget | mysql.VIP
+		mysql.Pod | mysql.Process | mysql.PrometheusTarget | mysql.VIP | mysql.VTap
 
 	GetLcuuid() string
 	GetID() int
