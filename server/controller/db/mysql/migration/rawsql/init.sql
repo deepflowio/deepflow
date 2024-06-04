@@ -1062,7 +1062,8 @@ TRUNCATE TABLE vtap;
 
 CREATE TABLE IF NOT EXISTS vtap_group (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id                 INTEGER,
+    team_id                 INTEGER DEFAULT 1,
+    user_id                 INTEGER DEFAULT 1,
     name                    VARCHAR(64) NOT NULL,
     created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

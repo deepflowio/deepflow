@@ -76,3 +76,15 @@ func (l *Logger) Copy() *Logger {
 		MsgPre:        l.MsgPre,
 	}
 }
+
+func LogAdd(resourceType string) string {
+	return fmt.Sprintf("add %s", resourceType)
+}
+
+func LogUpdate(resourceType string) string {
+	return fmt.Sprintf("update %s", resourceType)
+}
+
+func LogDelete(resourceType string) string {
+	return fmt.Sprintf("delete %s", resourceType)
+}

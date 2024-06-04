@@ -32,6 +32,7 @@
 #define PORT_NUM_MAX	65536
 #define NS_IN_SEC       1000000000ULL
 #define NS_IN_MSEC      1000000ULL
+#define NS_IN_USEC      1000ULL
 #define US_IN_SEC	1000000ULL
 #define MS_IN_SEC       1000ULL
 #define TIME_TYPE_NAN   1
