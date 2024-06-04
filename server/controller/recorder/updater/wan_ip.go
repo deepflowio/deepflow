@@ -90,12 +90,16 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		return nil, false
 	}
 	var subnetID int
-	if cloudItem.SubnetLcuuid != "" {
-		subnetID, exists = i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		if !exists && i.domainToolDataSet != nil {
-			subnetID, _ = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		}
-	}
+
+	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
+	// which may cause recorder performance issues.
+
+	// if cloudItem.SubnetLcuuid != "" {
+	// 	subnetID, exists = i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 	if !exists && i.domainToolDataSet != nil {
+	// 		subnetID, _ = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 	}
+	// }
 	ip := rcommon.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
@@ -130,28 +134,32 @@ func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmod
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		if cloudItem.SubnetLcuuid == "" {
-			mapInfo["vl2_net_id"] = 0
-		} else {
-			subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-			if !exists {
-				if i.domainToolDataSet != nil {
-					subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-				}
-				if !exists {
-					log.Error(resourceAForResourceBNotFound(
-						ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-						ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
-					))
-					return nil, nil, false
-				}
-			}
-			mapInfo["vl2_net_id"] = subnetID
-		}
-		structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
-		structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
-	}
+
+	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
+	// which may cause recorder performance issues.
+
+	// if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
+	// 	if cloudItem.SubnetLcuuid == "" {
+	// 		mapInfo["vl2_net_id"] = 0
+	// 	} else {
+	// 		subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 		if !exists {
+	// 			if i.domainToolDataSet != nil {
+	// 				subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 			}
+	// 			if !exists {
+	// 				log.Error(resourceAForResourceBNotFound(
+	// 					ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+	// 					ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
+	// 				))
+	// 				return nil, nil, false
+	// 			}
+	// 		}
+	// 		mapInfo["vl2_net_id"] = subnetID
+	// 	}
+	// 	structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
+	// 	structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
+	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
