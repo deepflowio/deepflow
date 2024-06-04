@@ -530,6 +530,11 @@ var (
 		db:     "flow_metrics",
 		input:  "SHOW tag chost_ip values from vtap_flow_port where chost_ip_id != 1",
 		output: "SELECT id AS `value`, ip AS `display_name` FROM flow_tag.`chost_map` WHERE (not(value = 1)) AND not(display_name = '') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_application_log_body",
+		db:     "application_log",
+		input:  "SELECT user, user_id FROM log WHERE body!='log' LIMIT 1",
+		output: "SELECT dictGet(flow_tag.user_map, 'name', (toUInt64(user_id))) AS `user`, user_id FROM application_log.`log` PREWHERE NOT (hasToken(body,'log')) LIMIT 1",
 	}}
 )
 
