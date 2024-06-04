@@ -76,19 +76,6 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 			return nil, false
 		}
 	}
-	subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	if !exists {
-		if i.domainToolDataSet != nil {
-			subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		}
-		if !exists {
-			log.Error(resourceAForResourceBNotFound(
-				ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-				ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
-		}
-	}
 	ip := rcommon.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
@@ -102,30 +89,11 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		NetworkID:    networkID,
 		VInterfaceID: vinterfaceID,
-		SubnetID:     subnetID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
 }
 
 func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
-	updateInfo := make(map[string]interface{})
-	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		if !exists {
-			if i.domainToolDataSet != nil {
-				subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-			}
-			if !exists {
-				log.Error(resourceAForResourceBNotFound(
-					ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-					ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-				))
-				return nil, false
-			}
-		}
-		updateInfo["vl2_net_id"] = subnetID
-	}
-
-	return updateInfo, len(updateInfo) > 0
+	return nil, false
 }
