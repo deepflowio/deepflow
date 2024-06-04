@@ -23,7 +23,7 @@ pub(crate) use synchronizer::{StaticConfig, Status, Synchronizer};
 
 cfg_if::cfg_if! {
     if #[cfg(any(target_os = "linux", target_os = "android"))] {
-        mod remote_exec;
+        pub mod remote_exec;
         pub use remote_exec::Executor;
     }
 }
