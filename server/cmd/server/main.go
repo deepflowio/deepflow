@@ -93,7 +93,7 @@ func main() {
 		runtime.GOMAXPROCS(cfg.MaxCPUs)
 	}
 
-	startContinuousProfile(&cfg.ContinuousProfile)
+	NewContinuousProfiler(&cfg.ContinuousProfile).Start(false)
 
 	ctx, cancel := utils.NewWaitGroupCtx()
 	defer func() {
