@@ -35,6 +35,7 @@ chost_ip                   , chost_ip                  , chost_ip               
 chost_hostname             , chost_hostname            , chost_hostname            , resource       ,                       , Universal Tag   , 111          , 0
 pod_node_ip                , pod_node_ip               , pod_node_ip               , resource       ,                       , Universal Tag   , 111          , 0
 pod_node_hostname          , pod_node_hostname         , pod_node_hostname         , resource       ,                       , Universal Tag   , 111          , 0
+user                       , user                      , user                      , resource       ,                       , Universal Tag   , 111          , 0
 agent                      , agent                     , agent                     , resource       ,                       , Capture Info    , 111          , 0
 
 attribute                  , attribute                 , attribute                 , map            ,                       , Native Tag      , 111          , 0
@@ -52,4 +53,4 @@ app_service                , app_service               , app_service            
 trace_id                  , trace_id                  , trace_id                   , string         ,                       , Tracing Info     , 111         , 0
 span_id                   , span_id                   , span_id                    , string         ,                       , Tracing Info     , 111         , 0
 severity_number           , severity_number           , severity_number            , int_enum       , severity_number       , Tracing Info     , 111         , 0
-body                      , body                      , body                       , string         ,                       , Tracing Info     , 111         , 0
+body                      , body                      , body                       , tokenize_string,                        , Tracing Info     , 111         , 0
