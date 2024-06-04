@@ -32,6 +32,7 @@ pub const HTTP_METHOD_AND_SPACE_MAX_OFFSET: usize = 9; // Method：OPTIONS
 pub const HTTP_V1_0_VERSION: &str = "HTTP/1.0";
 pub const HTTP_V1_1_VERSION: &str = "HTTP/1.1";
 pub const HTTP_V1_VERSION_LEN: usize = 8;
+pub const HTTP_STATUS_OK: u16 = 200;
 pub const HTTP_STATUS_CODE_MIN: u16 = 100;
 pub const HTTP_STATUS_CODE_MAX: u16 = 600;
 pub const HTTP_STATUS_CLIENT_ERROR_MIN: u16 = 400;
@@ -55,6 +56,19 @@ pub const HTTPV2_FRAME_HEADERS_TYPE: u8 = 0x01;
 
 pub const HTTPV2_FRAME_TYPE_MIN: u8 = 0x00;
 pub const HTTPV2_FRAME_TYPE_MAX: u8 = 0x09;
+
+// GRPC
+pub const GRPC_HEADER_SIZE: u32 = 5;
+pub const GRPC_MESSAGE_LENGTH_OFFSET: usize = 1;
+pub const GRPC_STATUS_OK: u16 = 0;
+pub const GRPC_STATUS_CANCELLED: u16 = 1;
+pub const GRPC_STATUS_INVALID_ARGUMENT: u16 = 3;
+pub const GRPC_STATUS_NOT_FOUND: u16 = 5;
+pub const GRPC_STATUS_ALREADY_EXISTS: u16 = 6;
+pub const GRPC_STATUS_PERMISSION_DENIED: u16 = 7;
+pub const GRPC_STATUS_FAILED_PRECONDITION: u16 = 9;
+pub const GRPC_STATUS_OUT_OF_RANGE: u16 = 11;
+pub const GRPC_STATUS_UNAUTHENTICATED: u16 = 16;
 
 pub const TRACE_ID_TYPE: usize = 0;
 pub const SPAN_ID_TYPE: usize = 1;
