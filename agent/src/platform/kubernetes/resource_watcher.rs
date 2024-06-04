@@ -391,7 +391,6 @@ pub struct WatcherCounter {
     list_error: AtomicU32,
     watch_applied: AtomicU32,
     watch_deleted: AtomicU32,
-    watch_restarted: AtomicU32,
 }
 
 impl RefCountable for WatcherCounter {
@@ -432,11 +431,6 @@ impl RefCountable for WatcherCounter {
                 "watch_deleted",
                 CounterType::Gauged,
                 CounterValue::Unsigned(self.watch_deleted.swap(0, Ordering::Relaxed) as u64),
-            ),
-            (
-                "watch_restarted",
-                CounterType::Gauged,
-                CounterValue::Unsigned(self.watch_restarted.swap(0, Ordering::Relaxed) as u64),
             ),
         ]
     }
