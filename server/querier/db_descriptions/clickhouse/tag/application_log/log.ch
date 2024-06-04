@@ -35,6 +35,7 @@ chost_ip                   , 云服务器                   , 云服务器的主
 chost_hostname             , 云服务器                   , 云服务器的 Hostname。
 pod_node_ip                , K8s 容器节点               , 容器节点的主 IP。
 pod_node_hostname          , K8s 容器节点               , 容器节点的 Hostname。
+user                       , 用户                       , 
 agent                      , 采集器                     ,
 
 attribute                  , Attribute                  , 事件特有属性
