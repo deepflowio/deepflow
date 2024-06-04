@@ -73,6 +73,17 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
 	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
 	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
+	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
+		ingesterctl.CMD_CONTINUOUS_PROFILER,
+		debug.CmdHelper{Cmd: "continuous-profiler", Helper: "continuous profiler commands"},
+		[]debug.CmdHelper{
+			{Cmd: "on", Helper: "start continuous profiler"},
+			{Cmd: "off", Helper: "stop continuous profiler"},
+			{Cmd: "status", Helper: "get continuous profiler status"},
+			{Cmd: "set-server-address [url]", Helper: "set continuous profiler server address, default: http://deepflow-agent/api/v1/profile. need to restart continuous profiler to take effect"},
+			{Cmd: "set-profile-types [cpu][,inuse_objects][,alloc_objects][,inuse_space][,alloc_space][,goroutines][,mutex_count][,mutex_duration][,block_count][,block_duration]", Helper: "default continuous profiler profile types: cpu,inuse_objects,alloc_objects,inuse_space,alloc_space. need to restart continuous profiler to take effect"},
+		},
+	))
 
 	dropletCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_QUEUE, []string{
 		"1-receiver-to-statsd",
