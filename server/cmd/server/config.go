@@ -21,9 +21,13 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
+	"strings"
 
 	pyroscope "github.com/grafana/pyroscope-go"
 	yaml "gopkg.in/yaml.v2"
+
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/debug"
 )
 
 type Config struct {
@@ -72,13 +76,97 @@ func loadConfig(path string) *Config {
 	return config
 }
 
-func startContinuousProfile(config *ContinuousProfile) {
-	if !config.Enabled {
-		return
+type ContinuousProfiler struct {
+	cfg      *ContinuousProfile
+	profiler *pyroscope.Profiler
+	running  bool
+
+	profileTypes  []string
+	serverAddress string
+}
+
+func NewContinuousProfiler(config *ContinuousProfile) *ContinuousProfiler {
+	p := &ContinuousProfiler{
+		cfg:           config,
+		profileTypes:  config.ProfileTypes,
+		serverAddress: config.ServerAddress,
 	}
+	debug.ServerRegisterSimple(ingesterctl.CMD_CONTINUOUS_PROFILER, p)
+	return p
+}
+
+func logInfo(str string) string {
+	log.Info(str)
+	return str
+}
+
+const (
+	CMD_OPERRATE_ON uint16 = iota
+	CMD_OPERRATE_OFF
+	CMD_OPERATE_STATUS
+	CMD_OPERATE_SET_SERVER_ADDR
+	CMD_OPERATE_SET_PROFILE_TYPES
+)
+
+func (p *ContinuousProfiler) HandleSimpleCommand(op uint16, arg string) string {
+	switch op {
+	case CMD_OPERRATE_ON:
+		if p.running {
+			return logInfo("continuous profile already running")
+		}
+		err := p.Start(true)
+		if err != nil {
+			return logInfo(fmt.Sprintf("continuous profile staring failed: %s ", err))
+		}
+		p.running = true
+		return logInfo("continuous profile starting success")
+	case CMD_OPERRATE_OFF:
+		if p.running && p.profiler != nil {
+			p.profiler.Stop()
+		} else {
+			return logInfo("continuous profile already stopped")
+		}
+		p.profiler = nil
+		p.running = false
+		return logInfo("continuous profile stop success")
+	case CMD_OPERATE_STATUS:
+		if p.running {
+			return logInfo(fmt.Sprintf("continuous profile is running\nserver-addr: %s\nprofile-types: %s", p.serverAddress, strings.Join(p.profileTypes, ",")))
+		} else {
+			return logInfo(fmt.Sprintf("continuous profile is stopped\nserver-addr: %s\nprofile-types: %s", p.serverAddress, strings.Join(p.profileTypes, ",")))
+		}
+	case CMD_OPERATE_SET_SERVER_ADDR:
+		if len(arg) > 0 {
+			oldServerAddress := p.serverAddress
+			p.serverAddress = arg
+			return logInfo(fmt.Sprintf("set continuous profile server addr from %s to %s. need to restart continuous profiler to take effect", oldServerAddress, arg))
+		}
+		return logInfo("continuous profile should not set server addr empty")
+	case CMD_OPERATE_SET_PROFILE_TYPES:
+		if len(arg) > 0 {
+			oldProfileTypes := p.profileTypes
+			p.profileTypes = strings.Split(arg, ",")
+			return logInfo(fmt.Sprintf("set continuous profile types from %s to %s. need to restart continuous profiler to take effect", strings.Join(oldProfileTypes, ","), strings.Join(p.profileTypes, ",")))
+		} else {
+			return logInfo("continuous profile should not set profile types empty")
+		}
+	}
+	return logInfo("invalid arg, should be 'on', 'off', 'status', 'set-server-type', 'set-profile-types'")
+}
+
+func (p *ContinuousProfiler) Start(forced bool) error {
+	config := p.cfg
+	if !config.Enabled && !forced {
+		return nil
+	}
+	if p.running {
+		return fmt.Errorf("already runing")
+	}
+
 	profileTypes := []pyroscope.ProfileType{}
 	hasMutexProfile, hasBlockProfile := false, false
-	for _, t := range config.ProfileTypes {
+
+	for _, t := range p.profileTypes {
 		switch pyroscope.ProfileType(t) {
 		case pyroscope.ProfileCPU,
 			pyroscope.ProfileInuseObjects,
@@ -93,8 +181,11 @@ func startContinuousProfile(config *ContinuousProfile) {
 		case pyroscope.ProfileBlockCount, pyroscope.ProfileBlockDuration:
 			hasBlockProfile = true
 			profileTypes = append(profileTypes, pyroscope.ProfileType(t))
+		default:
+			log.Warningf("invalid profile type: %s", t)
 		}
 	}
+	log.Info("continuous profile profile types: %v", profileTypes)
 
 	if hasMutexProfile {
 		runtime.SetMutexProfileFraction(config.MutexRate)
@@ -106,15 +197,22 @@ func startContinuousProfile(config *ContinuousProfile) {
 	if !config.LogEnabled {
 		logger = nil
 	}
-
-	pyroscope.Start(pyroscope.Config{
+	var err error
+	p.profiler, err = pyroscope.Start(pyroscope.Config{
 		ApplicationName: "deepflow-server",
 		// replace this with the address of pyroscope server
-		ServerAddress: config.ServerAddress,
+		ServerAddress: p.serverAddress,
 		// you can disable logging by setting this to nil
 		Logger: logger,
 		// you can provide static tags via a map:
 		Tags:         map[string]string{"hostname": os.Getenv("K8S_NODE_NAME_FOR_DEEPFLOW")},
 		ProfileTypes: profileTypes,
 	})
+	if err != nil {
+		log.Warningf("start continuous profiler failed: %s", err)
+	} else {
+		p.running = true
+		log.Info("start continuous profiler")
+	}
+	return err
 }
