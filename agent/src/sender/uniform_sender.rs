@@ -159,11 +159,23 @@ impl<T: Sendable> Encoder<T> {
         self.buffer[0..4].copy_from_slice(frame_size.to_be_bytes().as_slice());
     }
 
-    pub fn update_header(&mut self, config: &SenderAccess) {
+    pub fn update_header(&mut self, name: &str, id: usize, config: &SenderAccess) {
         let config = config.load();
-        self.header.vtap_id = config.vtap_id;
-        self.header.team_id = config.team_id;
-        self.header.organize_id = config.organize_id;
+        if self.header.vtap_id != config.vtap_id
+            || self.header.team_id != config.team_id
+            || self.header.organize_id != config.organize_id
+        {
+            info!(
+                "{} id {} update vtap id from {:?} to {:?}, team id from {:?} to {:?}, organize id from {:?} to {:?}.",
+                name, id,
+                self.header.vtap_id, config.vtap_id,
+                self.header.team_id, config.team_id,
+                self.header.organize_id, config.organize_id,
+            );
+            self.header.vtap_id = config.vtap_id;
+            self.header.team_id = config.team_id;
+            self.header.organize_id = config.organize_id;
+        }
     }
 
     pub fn buffer_len(&self) -> usize {
@@ -531,6 +543,7 @@ impl<T: Sendable> UniformSender<T> {
                     SocketType::File => self.flush_writer(),
                     _ => {
                         self.update_dst_ip_and_port();
+                        self.encoder.update_header(self.name, self.id, &self.config);
                         self.flush_encoder();
                     }
                 },
@@ -602,7 +615,7 @@ impl<T: Sendable> UniformSender<T> {
         if !self.cached || self.encoder.buffer_len() > Encoder::<T>::BUFFER_LEN {
             self.check_or_register_counterable(self.encoder.header.msg_type);
             self.update_dst_ip_and_port();
-            self.encoder.update_header(&self.config);
+            self.encoder.update_header(self.name, self.id, &self.config);
             self.flush_encoder();
         }
         Ok(())
