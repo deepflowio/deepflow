@@ -896,6 +896,10 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 	}
 	if db == "ext_metrics" {
 		table = "ext_common"
+	} else if db == ckcommon.DB_NAME_DEEPFLOW_ADMIN {
+		table = "deepflow_server"
+	} else if db == ckcommon.DB_NAME_DEEPFLOW_TENANT {
+		table = "deepflow_collector"
 	} else if db == ckcommon.DB_NAME_PROMETHEUS {
 		table = "samples"
 	}
