@@ -54,10 +54,10 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 	nonLabelValues := mapset.NewSet[string]()
 	nonLabelIDs := mapset.NewSet[int]()
 	mLabels := make([]*trident.MetricLabelResponse, 0)
-	s.cache.MetricName.Get().Range(func(k, v interface{}) bool {
+	for iter := range s.cache.MetricName.GetNameToID().Iter() {
 		var labels []*trident.LabelResponse
-		metricName := k.(string)
-		metricID := v.(int)
+		metricName := iter.Key
+		metricID := iter.Val
 		labelIDs := s.cache.MetricLabel.GetLabelsByMetricName(metricName)
 		for i := range labelIDs {
 			li := labelIDs[i]
@@ -96,8 +96,7 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 			LabelIds:   labels,
 		})
 		s.counter.SendMetricCount++
-		return true
-	})
+	}
 	if nonLabelNames.Cardinality() > 0 {
 		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice())
 	}

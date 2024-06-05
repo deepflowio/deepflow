@@ -64,7 +64,7 @@ func (ml *metricLabel) store(item *mysql.PrometheusMetricLabel) {
 	}
 }
 
-func (ml *metricLabel) refresh(args ...interface{}) error {
+func (ml *metricLabel) refresh() error {
 	var items []*mysql.PrometheusMetricLabel
 	err := mysql.Db.Select("metric_name", "label_id").Find(&items).Error
 	if err != nil {

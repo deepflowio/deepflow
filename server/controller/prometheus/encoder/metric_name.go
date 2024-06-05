@@ -49,7 +49,7 @@ func (mn *metricName) getID(str string) (int, bool) {
 	return mn.strToID.Get(str)
 }
 
-func (mn *metricName) refresh(args ...interface{}) error {
+func (mn *metricName) refresh() error {
 	mn.lock.Lock()
 	defer mn.lock.Unlock()
 

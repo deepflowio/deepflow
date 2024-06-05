@@ -101,6 +101,7 @@ require (
 	github.com/grafana/pyroscope-go v1.0.4
 	github.com/klauspost/compress v1.15.9
 	github.com/mitchellh/mapstructure v1.4.3
+	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pyroscope-io/pyroscope v0.37.1
 	go.opentelemetry.io/collector/pdata v1.0.0
 	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b

@@ -145,7 +145,7 @@ func newLabelLayout(cfg *prometheuscfg.Config) *labelLayout {
 	}
 }
 
-func (ll *labelLayout) refresh(args ...interface{}) error {
+func (ll *labelLayout) refresh() error {
 	var items []*mysql.PrometheusMetricAPPLabelLayout
 	err := mysql.Db.Find(&items).Error
 	if err != nil {
