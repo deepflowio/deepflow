@@ -244,13 +244,21 @@ static inline uint32_t align32pow2(uint32_t x)
 	return x + 1;
 }
 
+uint64_t gettime(clockid_t clk_id, int flag);
+static inline int64_t get_sysboot_time_ns(void)
+{
+	int64_t real_time, monotonic_time;
+	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
+	monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+	return (real_time - monotonic_time);
+}
+
 bool is_core_kernel(void);
 int get_cpus_count(bool **mask);
 void clear_residual_probes();
 int max_locked_memory_set_unlimited(void);
 int sysfs_write(const char *file_name, char *v);
 int sysfs_read_num(const char *file_name);
-uint64_t gettime(clockid_t clk_id, int flag);
 uint32_t get_sys_uptime(void);
 u64 get_sys_btime_msecs(void);
 u64 get_process_starttime(pid_t pid);
