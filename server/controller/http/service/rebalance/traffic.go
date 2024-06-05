@@ -493,7 +493,7 @@ func (q *Query) GetAgentDispatcher(orgDB *mysql.DB, domainPrefix string, dataDur
 	}
 	queryURL := fmt.Sprintf("http://%sdeepflow-server:%d/v1/query", domainPrefix, config.Cfg.ListenPort)
 	values := url.Values{}
-	db := "deepflow_system"
+	db := "deepflow_tenant"
 	now := time.Now()
 	before := now.UTC().Add(time.Second * -1 * time.Duration(dataDuration))
 	sql := fmt.Sprintf("SELECT `tag.host`, Sum(`metrics.tx-bytes`) AS `tx-bps` FROM deepflow_agent_collect_sender"+
