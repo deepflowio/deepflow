@@ -19,6 +19,7 @@ package metrics
 import (
 	"encoding/json"
 
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -48,10 +49,11 @@ var METRICS_TYPE_NAME_MAP = map[string]int{
 }
 
 var METRICS_ARRAY_NAME_MAP = map[string][]string{
-	"flow_log":        []string{"metrics_names", "metrics_values"},
-	"application_log": []string{"metrics_names", "metrics_values"},
-	"ext_metrics":     []string{"metrics_float_names", "metrics_float_values"},
-	"deepflow_system": []string{"metrics_float_names", "metrics_float_values"},
+	"flow_log":                     []string{"metrics_names", "metrics_values"},
+	"application_log":              []string{"metrics_names", "metrics_values"},
+	"ext_metrics":                  []string{"metrics_float_names", "metrics_float_values"},
+	common.DB_NAME_DEEPFLOW_ADMIN:  []string{"metrics_float_names", "metrics_float_values"},
+	common.DB_NAME_DEEPFLOW_TENANT: []string{"metrics_float_names", "metrics_float_values"},
 }
 
 const (
