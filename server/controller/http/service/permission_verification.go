@@ -110,7 +110,8 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 		return nil
 	}
 	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessDelete)
-	if resourceType == common.SET_RESOURCE_TYPE_AGENT {
+	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
+		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
 		url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
 	} else {
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
