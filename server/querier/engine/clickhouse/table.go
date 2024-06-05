@@ -19,6 +19,8 @@ package clickhouse
 import (
 	"context"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
@@ -40,7 +42,7 @@ func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.
 	if !ok {
 		return nil
 	}
-	if db == "ext_metrics" || db == "deepflow_system" {
+	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_EXT_METRICS, chCommon.DB_NAME_DEEPFLOW_TENANT}, db) {
 		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx)...)
 	} else if db == chCommon.DB_NAME_PROMETHEUS {
 		values = append(values, chCommon.GetPrometheusTables(db, queryCacheTTL, orgID, useQueryCache, ctx)...)
