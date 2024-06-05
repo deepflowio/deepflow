@@ -459,7 +459,7 @@ func TestParsePromQLTag(t *testing.T) {
 
 	// Test case for default prefixType
 	t.Run("default prefixType", func(t *testing.T) {
-		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixNone, chCommon.DB_NAME_DEEPFLOW_SYSTEM, "example")
+		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixNone, chCommon.DB_NAME_DEEPFLOW_ADMIN, "example")
 		assert.Equal(t, "`tag.example`", tagName)
 		assert.Equal(t, "", tagAlias)
 		assert.True(t, isDeepFlowTag)
