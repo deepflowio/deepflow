@@ -11,6 +11,7 @@ dunce = "0.1.1"
 [dependencies]
 cfg-if = "1.0"
 libc = "0.2"
+cfg-if = "1.0"
 chrono = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 lazy_static = "1.4.0"

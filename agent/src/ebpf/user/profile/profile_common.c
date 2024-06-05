@@ -709,6 +709,7 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 static void aggregate_stack_traces(struct profiler_context *ctx,
 				   struct bpf_tracer *t,
 				   const char *stack_map_name,
+				   const char *intp_stack_map_name,
 				   stack_str_hash_t * stack_str_hash,
 				   stack_trace_msg_hash_t * msg_hash,
 				   u32 * count, bool use_a_map)
@@ -889,7 +890,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		 */
 
 		char *trace_str =
-		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
+		    resolve_and_gen_stack_trace_str(t, v, stack_map_name, intp_stack_map_name,
 						    stack_str_hash, matched,
 						    process_name, info_p);
 		if (trace_str) {
@@ -1044,7 +1045,7 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 		 * After the reader completes data reading, the work of
 		 * data aggregation will be blocked if there is no data.
 		 */
-		aggregate_stack_traces(ctx, t, stack_map_name,
+		aggregate_stack_traces(ctx, t, stack_map_name, "__python_stack",
 				       &ctx->stack_str_hash, &ctx->msg_hash,
 				       &count, using_map_set_a);
 

@@ -981,7 +981,8 @@ perf_event:
 	if (type == HOOK_ATTACH) {
 		struct ebpf_object *obj = tracer->obj;
 		for (i = 0; i < obj->progs_cnt; i++) {
-			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
+			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT &&
+			    !strstr(obj->progs[i].name, "bpf_prog")) {
 				errno = 0;
 				int ret =
 				    program__attach_perf_event(obj->

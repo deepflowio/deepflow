@@ -258,6 +258,7 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 
 #define PROGTP(F) SEC("prog/tp/"__stringify(F)) int bpf_prog_tp__##F
 #define PROGKP(F) SEC("prog/kp/"__stringify(F)) int bpf_prog_kp__##F
+#define PROGPE(F) SEC("prog/pe/"__stringify(F)) int bpf_prog_pe__##F
 #define KRETPROG(F) SEC("kretprobe/"__stringify(F)) int kretprobe__##F
 #define KPROG(F) SEC("kprobe/"__stringify(F)) int kprobe__##F
 #define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F

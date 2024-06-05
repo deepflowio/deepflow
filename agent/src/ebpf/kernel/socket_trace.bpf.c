@@ -2646,3 +2646,4 @@ int bpf_push_socket_data(struct bpf_perf_event_data *ctx)
 #include "go_tls.bpf.c"
 #include "go_http2.bpf.c"
 #include "openssl.bpf.c"
+#include "python_uprobe.bpf.c"

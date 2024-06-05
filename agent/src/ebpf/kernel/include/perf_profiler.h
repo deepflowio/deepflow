@@ -44,12 +44,39 @@ typedef enum {
 struct stack_trace_key_t {
 	__u32 pid;		// processID or threadID
 	__u32 tgid;		// processID
+	__u64 itid;     // interpreter thread id
 	__u32 cpu;
 	char comm[TASK_COMM_LEN];
 	int kernstack;
 	int userstack;
+	__u64 intpstack;
 	__u64 timestamp;
 	__u64 duration_ns;
 };
+
+typedef struct {
+	char class_name[32];
+	char method_name[64];
+	char path[128];
+} symbol_t;
+
+#define PYTHON_STACK_FRAMES_PER_RUN 16
+#define PYTHON_STACK_PROG_MAX_RUN 5
+#define MAX_STACK_DEPTH (PYTHON_STACK_PROG_MAX_RUN * PYTHON_STACK_FRAMES_PER_RUN)
+
+typedef struct {
+	__u64 len;
+	__u64 addresses[MAX_STACK_DEPTH];
+} stack_trace_t;
+
+typedef struct {
+	struct stack_trace_key_t key;
+	stack_trace_t stack;
+
+	void *thread_state;
+	void *frame_ptr;
+
+	__u32 runs;
+} unwind_state_t;
 
 #endif /* DF_BPF_PERF_PROFILER_H */

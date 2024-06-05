@@ -33,6 +33,7 @@
 #include "log.h"
 #include "go_tracer.h"
 #include "ssl_tracer.h"
+#include "python_probe.h"
 #include "load.h"
 #include "btf_vmlinux.h"
 #include "config.h"
@@ -192,6 +193,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	collect_go_uprobe_syms_from_procfs(tps);
 
 	collect_ssl_uprobe_syms_from_procfs(tps);
+
+	collect_python_uprobe_syms_from_procfs(tps);
 }
 
 /* ==========================================================
@@ -604,12 +607,14 @@ static void process_event(struct process_event_t *e)
 		update_proc_info_cache(e->pid, PROC_EXEC);
 		go_process_exec(e->pid);
 		ssl_process_exec(e->pid);
+		python_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		/* Cache for updating process information used in
 		 * symbol resolution. */
 		update_proc_info_cache(e->pid, PROC_EXIT);
 		go_process_exit(e->pid);
 		ssl_process_exit(e->pid);
+		python_process_exec(e->pid);
 	}
 }
 
@@ -1205,6 +1210,7 @@ static void process_events_handle_main(__unused void *arg)
 
 		go_process_events_handle();
 		ssl_events_handle();
+		python_events_handle();
 		check_datadump_timeout();
 		/* check and clean symbol cache */
 		exec_proc_info_cache_update();
