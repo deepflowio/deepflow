@@ -65,7 +65,8 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"应用-调用日志",       // flow_log.l7_flow_log
 	"网络-TCP 时序数据",   // flow_log.l4_packet
 	"网络-PCAP 数据",    // flow_log.l7_packet
-	"系统监控数据",        // deepflow_system.*
+	"租户侧监控数据",       //  deepflow_tenant.*
+	"系统监控数据",        // deepflow_admin.*
 	"外部指标数据",        // ext_metrics.*
 	"Prometheus 数据", // prometheus.*
 	"事件-资源变更事件",     // event.event
@@ -73,7 +74,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-告警事件",       // event.alarm_event
 	"应用-性能剖析",       // profile.in_process
 	"网络-网络策略",       // flow_metrics.traffic_policy
-	"日志数据",          // application_log.log
+	"日志-日志数据",          // application_log.log
 }
 
 func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
@@ -106,8 +107,10 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 				collection = "flow_metrics.application*"
 			case "network":
 				collection = "flow_metrics.network*"
-			case "deepflow_system":
-				collection = "deepflow_system.*"
+			case "deepflow_tenant":
+				collection = "deepflow_tenant.*"
+			case "deepflow_admin.*":
+				collection = "deepflow_admin.*"
 			case "ext_metrics":
 				collection = "ext_metrics.*"
 			case "prometheus":
@@ -159,7 +162,8 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 			dataSourceResp.IsDefault = false
 		}
 		if specCfg != nil {
-			if dataSource.DataTableCollection == "deepflow_system.*" {
+			if dataSource.DataTableCollection == "deepflow_tenant.*" ||
+				dataSource.DataTableCollection == "deepflow_admin.*" {
 				dataSourceResp.Interval = common.DATA_SOURCE_DEEPFLOW_SYSTEM_INTERVAL
 			}
 			if dataSource.DataTableCollection == "ext_metrics.*" {
@@ -561,7 +565,7 @@ func getName(interval int, collection string) (string, error) {
 	case 0:
 		// return value: flow_log.l4_flow_log, flow_log.l7_flow_log,
 		// flow_log.l4_packet, flow_log.l7_packet,
-		// deepflow_system, ext_metrics, prometheus,
+		// deepflow_tenant, deepflow_admin, ext_metrics, prometheus,
 		// event.event, event.perf_event, event.alarm_event
 		return strings.TrimSuffix(collection, ".*"), nil
 	case 1: // one second
