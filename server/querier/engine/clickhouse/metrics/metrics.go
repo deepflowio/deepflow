@@ -119,7 +119,7 @@ func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
-	if db == "ext_metrics" || db == "deepflow_system" || db == ckcommon.DB_NAME_APPLICATION_LOG || table == "l7_flow_log" {
+	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG}, db) || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
@@ -399,7 +399,7 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQuery
 			)
 			return metrics, err
 		}
-	case "ext_metrics", "deepflow_system":
+	case ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT:
 		return GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	case ckcommon.DB_NAME_PROMETHEUS:
 		return GetPrometheusMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
@@ -419,7 +419,8 @@ func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID stri
 	} */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
-		if db == "ext_metrics" || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
+
+		if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
 			field = metrics.DisplayName
 		} else if db == ckcommon.DB_NAME_PROMETHEUS {
 			index := strings.LastIndex(field, "-")
@@ -442,7 +443,7 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 		var tables []interface{}
 		if db == "ext_metrics" {
 			tables = append(tables, table)
-		} else if db == "deepflow_system" {
+		} else if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) {
 			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
@@ -746,7 +747,7 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		metrics = PROMETHEUS_METRICS
 		replaceMetrics = PROMETHEUS_METRICS_REPLACE
 
-	case "ext_metrics", "deepflow_system":
+	case ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT:
 		metrics = EXT_METRICS
 	}
 	if metrics == nil {
