@@ -2297,7 +2297,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (11, '网络-PCAP 数据', 'flow_log.l7_packet', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (12, '系统监控数据', 'deepflow_system.*', 0, 7*24, @lcuuid);
+                 VALUES (12, '租户侧监控数据', 'deepflow_tenant.*', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (13, '外部指标数据', 'ext_metrics.*', 0, 7*24, @lcuuid);
@@ -2321,7 +2321,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (19, '网络-网络策略', 'flow_metrics.traffic_policy', 60, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (20, '日志数据', 'application_log.log', 1, 7*24, @lcuuid);
+                 VALUES (20, '日志-日志数据', 'application_log.log', 1, 30*24, @lcuuid);
 
 
 CREATE TABLE IF NOT EXISTS license (
