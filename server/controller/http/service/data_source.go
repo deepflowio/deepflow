@@ -82,45 +82,8 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 		return nil, err
 	}
 	db := dbInfo.DB
-	var response []model.DataSource
-	var dataSources []mysql.DataSource
 	var baseDataSources []mysql.DataSource
-
-	if _, ok := filter["lcuuid"]; ok {
-		db = db.Where("lcuuid = ?", filter["lcuuid"])
-	}
-	if t, ok := filter["type"]; ok {
-		var collection string
-		switch t {
-		case "application":
-			collection = "flow_metrics.application*"
-		case "network":
-			collection = "flow_metrics.network*"
-		case "deepflow_system":
-			collection = "deepflow_system.*"
-		case "ext_metrics":
-			collection = "ext_metrics.*"
-		case "prometheus":
-			collection = "prometheus.*"
-		case "traffic_policy":
-			collection = "flow_metrics.traffic_policy"
-		default:
-			return nil, fmt.Errorf("not support type(%s)", t)
-		}
-
-		db = db.Where("data_table_collection = ?", collection)
-	}
-	if name, ok := filter["name"]; ok {
-		interval := convertNameToInterval(name.(string))
-		if interval != 0 {
-			db = db.Where("`interval` = ?", interval)
-		}
-	}
-	if err := db.Find(&dataSources).Error; err != nil {
-		return nil, err
-	}
-
-	if err := dbInfo.Find(&baseDataSources).Error; err != nil {
+	if err := db.Find(&baseDataSources).Error; err != nil {
 		return nil, err
 	}
 	idToDisplayName := make(map[int]string)
@@ -128,7 +91,43 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 		idToDisplayName[baseDataSource.ID] = baseDataSource.DisplayName
 	}
 
-	for _, dataSource := range dataSources {
+	var response []model.DataSource
+	for _, dataSource := range baseDataSources {
+		// filter
+		if _, ok := filter["lcuuid"]; ok {
+			if dataSource.Lcuuid != filter["lcuuid"] {
+				continue
+			}
+		}
+		if t, ok := filter["type"]; ok {
+			var collection string
+			switch t {
+			case "application":
+				collection = "flow_metrics.application*"
+			case "network":
+				collection = "flow_metrics.network*"
+			case "deepflow_system":
+				collection = "deepflow_system.*"
+			case "ext_metrics":
+				collection = "ext_metrics.*"
+			case "prometheus":
+				collection = "prometheus.*"
+			case "traffic_policy":
+				collection = "flow_metrics.traffic_policy"
+			default:
+				return nil, fmt.Errorf("not support type(%s)", t)
+			}
+			if dataSource.DataTableCollection != collection {
+				continue
+			}
+		}
+		if name, ok := filter["name"]; ok {
+			interval := convertNameToInterval(name.(string))
+			if interval != 0 && interval != dataSource.Interval {
+				continue
+			}
+		}
+
 		name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 		if err != nil {
 			log.Error(err)

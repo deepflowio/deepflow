@@ -86,16 +86,27 @@ func SyncDefaultOrgData[T any](data []T) error {
 		}
 	}
 
-	for orgID, db := range dbs.orgIDToDB {
+	orgIDs, err := GetORGIDs()
+	if err != nil {
+		return err
+	}
+
+	for _, orgID := range orgIDs {
 		if orgID == DefaultDB.ORGID {
 			continue
 		}
+		dbInfo, err := GetDB(orgID)
+		if err != nil {
+			log.Errorf("get org id (%d) mysql session failed", orgID)
+			continue
+		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		db := dbInfo.DB
+		err = db.Transaction(func(tx *gorm.DB) error {
 			// delete
 			var existingIDs []int
 			var t T
-			if err := db.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
+			if err := tx.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
 				return err
 			}
 			existingIDMap := make(map[int]bool)
@@ -108,14 +119,14 @@ func SyncDefaultOrgData[T any](data []T) error {
 			}
 			for id, exists := range existingIDMap {
 				if exists {
-					if err := db.Where("id = ?", id).Delete(&t).Error; err != nil {
+					if err := tx.Where("id = ?", id).Delete(&t).Error; err != nil {
 						return err
 					}
 				}
 			}
 
 			// add or update
-			if err := db.Clauses(clause.OnConflict{
+			if err := tx.Clauses(clause.OnConflict{
 				DoUpdates: clause.AssignmentColumns(fields), // `UpdateAll: true,` can not update time
 			}).Save(&data).Error; err != nil {
 				return fmt.Errorf("failed to sync data: %v", err)
@@ -123,7 +134,7 @@ func SyncDefaultOrgData[T any](data []T) error {
 			return nil
 		})
 		if err != nil {
-			log.Errorf("org(id:%d, name:%s) error: %s", db.ORGID, db.Name, err.Error())
+			log.Errorf("org(id:%d, name:%s) error: %s", dbInfo.ORGID, dbInfo.Name, err.Error())
 		}
 	}
 	return nil
