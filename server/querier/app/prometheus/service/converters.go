@@ -161,7 +161,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		metricsArray = append(metricsArray, tagsArray...)
 		expectedDeepFlowNativeTags = make(map[string]string, len(q.Matchers)-1)
 	} else {
-		if db != DB_NAME_EXT_METRICS && db != DB_NAME_DEEPFLOW_SYSTEM && db != chCommon.DB_NAME_PROMETHEUS && db != "" {
+		if db != chCommon.DB_NAME_EXT_METRICS && (db != chCommon.DB_NAME_DEEPFLOW_ADMIN && db != chCommon.DB_NAME_DEEPFLOW_TENANT) && db != chCommon.DB_NAME_PROMETHEUS && db != "" {
 			// DeepFlow native metrics needs aggregation for query
 			if len(q.Hints.Grouping) == 0 {
 				// not specific cardinality
@@ -261,7 +261,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 	if db == "" || db == chCommon.DB_NAME_PROMETHEUS {
 		// append metricName `value`
 		metricsArray = append(metricsArray, metricAlias)
-		// append `tag` only for prometheus & ext_metrics & deepflow_system
+		// append `tag` only for prometheus & ext_metrics & deepflow_admin / deepflow_tenant
 		if !common.IsValueInSliceString(q.Hints.Func, model.RelabelFunctions) {
 			// `tag` should be append into `Select` with:
 			// 1. not any aggregations, try get all `tag`
@@ -280,11 +280,11 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 				}
 			}
 		}
-	} else if db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
+	} else if db == chCommon.DB_NAME_EXT_METRICS || db == chCommon.DB_NAME_DEEPFLOW_ADMIN || db == chCommon.DB_NAME_DEEPFLOW_TENANT {
 		metricsArray = append(metricsArray, fmt.Sprintf(metricAlias, metricName))
 		metricsArray = append(metricsArray, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 	} else {
-		// for flow_metrics/flow_log/deepflow_system/ext_metrics
+		// for flow_metrics/flow_log/deepflow_admin/deepflow_tenant/ext_metrics
 		// append metricName as "%s as value"
 		if metricWithAggFunc != "" {
 			// only when query metric samples
@@ -389,12 +389,12 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 			metricsSplit := strings.Split(metricName, "__")
 			if _, ok := chCommon.DB_TABLE_MAP[metricsSplit[0]]; ok {
 				db = metricsSplit[0]
-				table = metricsSplit[1] // FIXME: should fix deepflow_system table name like 'deepflow_server.xxx'
+				table = metricsSplit[1] // FIXME: should fix deepflow_admin/deepflow_tenant table name like 'deepflow_server.xxx'
 				metricName = metricsSplit[2]
 
-				if db == DB_NAME_DEEPFLOW_SYSTEM {
+				if db == chCommon.DB_NAME_DEEPFLOW_ADMIN || db == chCommon.DB_NAME_DEEPFLOW_TENANT {
 					metricAlias = "`metrics.%s` as value"
-				} else if db == DB_NAME_EXT_METRICS {
+				} else if db == chCommon.DB_NAME_EXT_METRICS {
 					// identify tag prefix as "tag_"
 					prefixType = prefixTag
 					// convert prometheus_xx/influxdb_xx to prometheus.xxx/influxdb.xx (split to 2 parts)
@@ -419,7 +419,7 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 				}
 
 				// data precision only available for 'flow_metrics'
-				if len(metricsSplit) > 3 && db == DB_NAME_FLOW_METRICS {
+				if len(metricsSplit) > 3 && db == chCommon.DB_NAME_FLOW_METRICS {
 					dataPrecision = metricsSplit[3]
 				}
 			} else {
@@ -544,12 +544,12 @@ func (p *prometheusReader) parsePromQLTag(prefixType prefix, db, tag string) (ta
 		}
 	} else {
 		// query ext_metrics/prometheus
-		// query deepflow native metrics (deepflow_system/flow_metrics/flow_log)
+		// query deepflow native metrics (deepflow_admin/deepflow_tenant/flow_metrics/flow_log)
 		tagName = parsePrometheusTag(removeTagPrefix(tag))
 	}
 
-	// deepflow_system don't have any DeepFlow universal tag, overwrite the tagName
-	if db == chCommon.DB_NAME_DEEPFLOW_SYSTEM {
+	// deepflow_admin/deepflow_tanant don't have any DeepFlow universal tag, overwrite the tagName
+	if db == chCommon.DB_NAME_DEEPFLOW_ADMIN || db == chCommon.DB_NAME_DEEPFLOW_TENANT {
 		tagName = parsePrometheusTag(tag)
 		tagAlias = ""
 	}
