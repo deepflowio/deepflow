@@ -365,7 +365,7 @@ struct bpf_tracer {
 	int dispatch_workers_nr;                // Number of dispatch threads
 	struct queue queues[MAX_CPU_NR];        // Dispatch queues, each dispatch thread has its corresponding queue.
 	void *process_fn;                       // Callback interface passed from the application for data processing
-	void (*datadump) (void *data);          // eBPF data dump handle
+	void (*datadump) (void *data, int64_t boot_time); // eBPF data dump handle
 
 	/*
 	 * perf ring-buffer from kernel to user.

@@ -75,6 +75,11 @@ static debug_callback_t datadump_cb;
 static bool datadump_enable;
 static int datadump_pid;	// If the value is 0, process-ID/thread-ID filtering is not performed.
 static uint32_t datadump_start_time;
+/*
+ * The sequence number of the socket data is used to label the
+ * dumped data for ordering purposes.
+ */
+static uint64_t datadump_seq;
 static uint32_t datadump_timeout;
 static char datadump_comm[16];	// If null, process or thread name filtering is not performed.
 static uint8_t datadump_proto;
@@ -121,7 +126,7 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 static bool is_adapt_success(struct bpf_tracer *t);
 static int update_offsets_table(struct bpf_tracer *t,
 				struct bpf_offset_param *offset);
-static void datadump_process(void *data);
+static void datadump_process(void *data, int64_t boot_time);
 static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 				 int socket_num, int trace_num);
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
@@ -490,11 +495,13 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 		}
 
 		if (msg->enable) {
+			datadump_seq = 0;
 			datadump_start_time = get_sys_uptime();
 			datadump_timeout = msg->timeout;
 		}
 
 		if (datadump_enable && !msg->enable) {
+			datadump_seq = 0;
 			datadump_timeout = 0;
 			datadump_pid = 0;
 			datadump_comm[0] = '\0';
@@ -563,6 +570,7 @@ int datadump_set_config(int pid, const char *comm, int proto, int timeout,
 
 	datadump_enable = true;
 	datadump_use_remote = true;
+	datadump_seq = 0;
 	datadump_pid = pid;
 	datadump_proto = (uint8_t) proto;
 	datadump_cb = cb;
@@ -852,11 +860,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		submit_data = data_buf_ptr;
 
 		submit_data->socket_id = sd->socket_id;
-
-		// 数据捕获时间戳，精度为微秒(us)
-		submit_data->timestamp =
-		    (sd->timestamp + sys_boot_time_ns) / 1000ULL;
-
+		submit_data->timestamp =  sd->timestamp;
 		submit_data->tuple = sd->tuple;
 		submit_data->direction = sd->direction;
 		submit_data->l7_protocal_hint = sd->data_type;
@@ -1160,6 +1164,7 @@ static void check_datadump_timeout(void)
 	if (datadump_enable) {
 		passed_sec = get_sys_uptime() - datadump_start_time;
 		if (passed_sec > datadump_timeout) {
+			datadump_seq = 0;
 			datadump_start_time = 0;
 			datadump_enable = false;
 			datadump_use_remote = false;
@@ -2698,15 +2703,16 @@ static bool allow_datadump(struct socket_bpf_data *sd)
 	return output;
 }
 
-#define DATADUMP_FORMAT						\
-	"%s [datadump] <%s> DIR %s TYPE %s(%d) PID %u "		\
-	"THREAD_ID %u COROUTINE_ID %" PRIu64 " ROLE %s"		\
-	" CONTAINER_ID %s SOURCE %d COMM %s "			\
-	"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64	\
-	" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64		\
-	" DATA_SEQ %" PRIu64 " TLS %s KernCapTime %s\n"
+#define DATADUMP_FORMAT							\
+	"%s [datadump] SEQ %" PRIu64 " <%s> DIR %s TYPE %s(%d) PID %u "	\
+	"THREAD_ID %u COROUTINE_ID %" PRIu64 " ROLE %s"			\
+	" CONTAINER_ID %s SOURCE %d COMM %s "				\
+	"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64		\
+	" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64			\
+	" DATA_SEQ %" PRIu64 " TLS %s KernCapTime %s "			\
+	"KernMonoTime %llu us\n"
 
-static void print_socket_data(struct socket_bpf_data *sd)
+static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 {
 	if (!allow_datadump(sd))
 		return;
@@ -2715,7 +2721,11 @@ static void print_socket_data(struct socket_bpf_data *sd)
 	if (timestamp == NULL)
 		return;
 
-	char *kern_cap_time = get_timestamp_from_us(sd->timestamp);
+	int64_t k_fetch_time_us;
+	k_fetch_time_us = 
+		(sd->timestamp + boot_time) / NS_IN_USEC;
+
+	char *kern_cap_time = get_timestamp_from_us(k_fetch_time_us);
 	if (kern_cap_time == NULL) {
 		free(timestamp);
 		return;
@@ -2748,7 +2758,7 @@ static void print_socket_data(struct socket_bpf_data *sd)
 	int len = 0;
 	len +=
 	    snprintf(buff, sizeof(buff), DATADUMP_FORMAT, timestamp,
-		     proto_tag,
+		     datadump_seq++, proto_tag,
 		     sd->direction == T_EGRESS ? "out" : "in", type,
 		     sd->msg_type, sd->process_id, sd->thread_id,
 		     sd->coroutine_id, role_str,
@@ -2757,7 +2767,8 @@ static void print_socket_data(struct socket_bpf_data *sd)
 		     sd->process_kname, flow_str, sd->cap_len,
 		     sd->syscall_len, sd->socket_id,
 		     sd->syscall_trace_id_call, sd->tcp_seq,
-		     sd->cap_seq, sd->is_tls ? "true" : "false", kern_cap_time);
+		     sd->cap_seq, sd->is_tls ? "true" : "false",
+		     kern_cap_time, sd->timestamp / NS_IN_USEC);
 
 	if (sd->source == DATA_SOURCE_GO_HTTP2_UPROBE) {
 		len +=
@@ -2819,12 +2830,12 @@ static void print_socket_data(struct socket_bpf_data *sd)
 	}
 }
 
-static void datadump_process(void *data)
+static void datadump_process(void *data, int64_t boot_time)
 {
 	struct socket_bpf_data *sd = data;
 	pthread_mutex_lock(&datadump_mutex);
 	if (unlikely(datadump_enable))
-		print_socket_data(sd);
+		print_socket_data(sd, boot_time);
 	pthread_mutex_unlock(&datadump_mutex);
 }
 
