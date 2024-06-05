@@ -1101,6 +1101,10 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {
 				table = "metrics"
+			} else if e.DB == chCommon.DB_NAME_DEEPFLOW_ADMIN {
+				table = "deepflow_server"
+			} else if e.DB == chCommon.DB_NAME_DEEPFLOW_TENANT {
+				table = "deepflow_collector"
 			} else if e.DB == chCommon.DB_NAME_PROMETHEUS {
 				whereStmt := Where{}
 				metricIDFilter, err := GetMetricIDFilter(e)
