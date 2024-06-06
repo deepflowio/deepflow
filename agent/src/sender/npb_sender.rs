@@ -481,13 +481,7 @@ impl NpbSender {
 pub struct NpbSenderCounter {
     pub tx: AtomicUsize,
     pub tx_bytes: AtomicUsize,
-}
-
-impl NpbSenderCounter {
-    fn reset(&self) {
-        self.tx.store(0, Ordering::Relaxed);
-        self.tx_bytes.store(0, Ordering::Relaxed);
-    }
+    pub tx_dropped: AtomicUsize,
 }
 
 pub struct StatsNpbSenderCounter(Weak<NpbSenderCounter>);
@@ -500,18 +494,21 @@ impl OwnedCountable for StatsNpbSenderCounter {
     fn get_counters(&self) -> Vec<public::counter::Counter> {
         match self.0.upgrade() {
             Some(x) => {
-                let (tx, tx_bytes) = (
-                    x.tx.load(Ordering::Relaxed) as u64,
-                    x.tx_bytes.load(Ordering::Relaxed) as u64,
-                );
-                x.reset();
-
                 vec![
-                    ("tx", CounterType::Counted, CounterValue::Unsigned(tx)),
+                    (
+                        "tx",
+                        CounterType::Counted,
+                        CounterValue::Unsigned(x.tx.swap(0, Ordering::Relaxed) as u64),
+                    ),
                     (
                         "tx_bytes",
                         CounterType::Counted,
-                        CounterValue::Unsigned(tx_bytes),
+                        CounterValue::Unsigned(x.tx_bytes.swap(0, Ordering::Relaxed) as u64),
+                    ),
+                    (
+                        "tx_dropped",
+                        CounterType::Counted,
+                        CounterValue::Unsigned(x.tx_dropped.swap(0, Ordering::Relaxed) as u64),
                     ),
                 ]
             }
@@ -907,6 +904,7 @@ impl NpbConnectionPool {
         let bytes = packet.len();
         let ret = self.send_to(timestamp, underlay_l2_opt_size, packet);
         if ret.is_err() {
+            self.counter.tx_dropped.fetch_add(1, Ordering::Relaxed);
             return ret;
         }
         self.counter.tx.fetch_add(1, Ordering::Relaxed);

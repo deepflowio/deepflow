@@ -38,7 +38,7 @@ use crate::common::{
 };
 use crate::config::NpbConfig;
 use crate::sender::npb_sender::{NpbArpTable, NpbPacketSender};
-use crate::utils::stats::{self, StatsOption};
+use crate::utils::stats::{self, QueueStats, StatsOption};
 use npb_handler::{NpbHandler, NpbHandlerCounter, NpbHeader, StatsNpbHandlerCounter, NOT_SUPPORT};
 use public::{
     counter::Countable,
@@ -208,8 +208,17 @@ impl NpbBuilder {
         self.stop();
         self.npb_packet_sender = None;
 
-        let (sender, receiver, _) =
-            bounded_with_debug(4096, "1-packet-to-npb-sender", queue_debugger);
+        let queue_name = "1-packet-to-npb-sender";
+        let (sender, receiver, counter) =
+            bounded_with_debug(config.queue_size, queue_name, queue_debugger);
+        self.stats_collector.register_countable(
+            &QueueStats {
+                id: self.id,
+                module: queue_name,
+            },
+            Countable::Owned(Box::new(counter)),
+        );
+
         let npb_packet_sender = Arc::new(NpbPacketSender::new(
             self.id,
             receiver,
@@ -245,8 +254,16 @@ impl NpbBuilder {
         arp: Arc<NpbArpTable>,
         stats_collector: Arc<stats::Collector>,
     ) -> Box<Self> {
-        let (sender, receiver, _) =
-            bounded_with_debug(4096, "1-packet-to-npb-sender", queue_debugger);
+        let queue_name = "1-packet-to-npb-sender";
+        let (sender, receiver, counter) =
+            bounded_with_debug(config.queue_size, queue_name, queue_debugger);
+        stats_collector.register_countable(
+            &QueueStats {
+                id,
+                module: queue_name,
+            },
+            Countable::Owned(Box::new(counter)),
+        );
 
         let builder = Box::new(Self {
             id,
