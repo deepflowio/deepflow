@@ -269,14 +269,28 @@ func (c *Cleaner) cleanDirtyData() {
 	}
 
 	log.Info(c.org.Logf("clean dirty data started"))
+	c.cleanVMDirty()
 	c.cleanNetworkDirty()
 	c.cleanVRouterDirty()
 	c.cleanPodIngressDirty()
 	c.cleanPodServiceDirty()
 	c.cleanPodNodeDirty()
+	c.cleanPodGroupDirty()
 	c.cleanPodDirty()
 	c.cleanVInterfaceDirty()
 	log.Info(c.org.Logf("clean dirty data completed"))
+}
+
+func (c *Cleaner) cleanVMDirty() {
+	vmIDs := getIDs[mysql.VM](c.org.DB)
+	if len(vmIDs) != 0 {
+		var vifs []*mysql.VInterface
+		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_VM, vmIDs).Find(&vifs)
+		if len(vifs) != 0 {
+			c.org.DB.Delete(&vifs)
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, vifs)))
+		}
+	}
 }
 
 func (c *Cleaner) cleanNetworkDirty() {
@@ -344,6 +358,26 @@ func (c *Cleaner) cleanPodServiceDirty() {
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
 			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, vifs)))
+		}
+	}
+}
+
+func (c *Cleaner) cleanPodGroupDirty() {
+	podGroupIDs := getIDs[mysql.PodGroup](c.org.DB)
+	if len(podGroupIDs) != 0 {
+		var podGroupPorts []*mysql.PodGroupPort
+		c.org.DB.Where("pod_group_id NOT IN ?", podGroupIDs).Find(&podGroupPorts)
+		if len(podGroupPorts) != 0 {
+			c.org.DB.Delete(&podGroupPorts)
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, podGroupPorts)))
+		}
+
+		var pods []*mysql.Pod
+		c.org.DB.Where("pod_group_id NOT IN ?", podGroupIDs).Find(&pods)
+		if len(pods) != 0 {
+			c.org.DB.Delete(&pods)
+			publishTagrecorder(c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
+			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, pods)))
 		}
 	}
 }
