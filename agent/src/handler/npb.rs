@@ -187,8 +187,18 @@ impl NpbBuilder {
         self.stop();
         self.npb_packet_sender = None;
 
-        let (sender, receiver, _) =
-            bounded_with_debug(4096, "1-packet-to-npb-sender", queue_debugger);
+        let queue_name = "1-packet-to-npb-sender";
+        let (sender, receiver, counter) =
+            bounded_with_debug(config.queue_size, queue_name, queue_debugger);
+        self.stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", queue_name.to_string()),
+                StatsOption::Tag("index", self.id.to_string()),
+            ],
+        );
+
         let npb_packet_sender = Arc::new(NpbPacketSender::new(
             self.id,
             receiver,
@@ -224,8 +234,17 @@ impl NpbBuilder {
         arp: Arc<NpbArpTable>,
         stats_collector: Arc<stats::Collector>,
     ) -> Box<Self> {
-        let (sender, receiver, _) =
-            bounded_with_debug(4096, "1-packet-to-npb-sender", queue_debugger);
+        let queue_name = "1-packet-to-npb-sender";
+        let (sender, receiver, counter) =
+            bounded_with_debug(config.queue_size, queue_name, queue_debugger);
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", queue_name.to_string()),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
 
         let builder = Box::new(Self {
             id,
