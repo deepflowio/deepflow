@@ -23,7 +23,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
@@ -119,12 +118,12 @@ func (au *APPLabelLayoutUpdater) refresh() error {
 				indexesToRecycle = append(indexesToRecycle, int(idx))
 			}
 		}
-		if len(indexesToRecycle) > 0 {
-			err = au.encoder.LabelLayout.SingleRelease(mn, indexesToRecycle)
-			if err != nil {
-				log.Debugf("recycle metric: %s label indexes: %v failed: %s", mn, indexesToRecycle, err.Error())
-			}
-		}
+		// if len(indexesToRecycle) > 0 {
+		// 	err = au.encoder.LabelLayout.SingleRelease(mn, indexesToRecycle)
+		// 	if err != nil {
+		// 		log.Debugf("recycle metric: %s label indexes: %v failed: %s", mn, indexesToRecycle, err.Error())
+		// 	}
+		// }
 	}
 	log.Info("prometheus app label layout refresh completed")
 	return err
@@ -151,46 +150,46 @@ func newToolDataSet(c *cache.Cache) *toolData {
 }
 
 func (td *toolData) load() error {
-	metricNameToTargetIDs := td.cache.MetricTarget.GetMetricNameToTargetIDs()
-	targetIDToLabelNames := td.cache.Target.GetTargetIDToLabelNames()
-	for mn, tids := range metricNameToTargetIDs {
-		for _, tid := range tids.ToSlice() {
-			lns, ok := targetIDToLabelNames[tid]
-			if !ok {
-				continue
-			}
-			if _, ok := td.metricNameToTargetLabelNames[mn]; !ok {
-				td.metricNameToTargetLabelNames[mn] = mapset.NewSet[string]()
-			}
-			td.metricNameToTargetLabelNames[mn] = td.metricNameToTargetLabelNames[mn].Union(lns)
-		}
-	}
+	// metricNameToTargetIDs := td.cache.MetricTarget.GetMetricNameToTargetIDs()
+	// targetIDToLabelNames := td.cache.Target.GetTargetIDToLabelNames()
+	// for mn, tids := range metricNameToTargetIDs {
+	// 	for _, tid := range tids.ToSlice() {
+	// 		lns, ok := targetIDToLabelNames[tid]
+	// 		if !ok {
+	// 			continue
+	// 		}
+	// 		if _, ok := td.metricNameToTargetLabelNames[mn]; !ok {
+	// 			td.metricNameToTargetLabelNames[mn] = mapset.NewSet[string]()
+	// 		}
+	// 		td.metricNameToTargetLabelNames[mn] = td.metricNameToTargetLabelNames[mn].Union(lns)
+	// 	}
+	// }
 
-	var layouts []*mysql.PrometheusMetricAPPLabelLayout
-	err := mysql.DefaultDB.Find(&layouts).Error
-	if err != nil {
-		return err
-	}
-	for _, item := range layouts {
-		if _, ok := td.metricNameToAPPLabelNames[item.MetricName]; !ok {
-			td.metricNameToAPPLabelNames[item.MetricName] = mapset.NewSet[string]()
-		}
-		td.metricNameToAPPLabelNames[item.MetricName].Add(item.APPLabelName)
-		td.layoutKeyToIndex[cache.NewLayoutKey(item.MetricName, item.APPLabelName)] = item.APPLabelColumnIndex
-	}
+	// var layouts []*mysql.PrometheusMetricAPPLabelLayout
+	// err := mysql.DefaultDB.Find(&layouts).Error
+	// if err != nil {
+	// 	return err
+	// }
+	// for _, item := range layouts {
+	// 	if _, ok := td.metricNameToAPPLabelNames[item.MetricName]; !ok {
+	// 		td.metricNameToAPPLabelNames[item.MetricName] = mapset.NewSet[string]()
+	// 	}
+	// 	td.metricNameToAPPLabelNames[item.MetricName].Add(item.APPLabelName)
+	// 	td.layoutKeyToIndex[cache.NewLayoutKey(item.MetricName, item.APPLabelName)] = item.APPLabelColumnIndex
+	// }
 
-	td.cache.MetricLabelName.GetMetricNameIDToLabelNameIDs().Range(func(mni int, lis mapset.Set[int]) bool {
-		if mn, ok := td.cache.MetricName.GetNameByID(mni); ok {
-			for _, li := range lis.ToSlice() {
-				if ln, ok := td.cache.LabelName.GetNameByID(li); ok {
-					if _, ok := td.metricNameToLabelNames[mn]; !ok {
-						td.metricNameToLabelNames[mn] = mapset.NewSet[string]()
-					}
-					td.metricNameToLabelNames[mn].Add(ln)
-				}
-			}
-		}
-		return true
-	})
+	// td.cache.MetricLabelName.GetMetricNameIDToLabelNameIDs().Range(func(mni int, lis mapset.Set[int]) bool {
+	// 	if mn, ok := td.cache.MetricName.GetNameByID(mni); ok {
+	// 		for _, li := range lis.ToSlice() {
+	// 			if ln, ok := td.cache.LabelName.GetNameByID(li); ok {
+	// 				if _, ok := td.metricNameToLabelNames[mn]; !ok {
+	// 					td.metricNameToLabelNames[mn] = mapset.NewSet[string]()
+	// 				}
+	// 				td.metricNameToLabelNames[mn].Add(ln)
+	// 			}
+	// 		}
+	// 	}
+	// 	return true
+	// })
 	return nil
 }

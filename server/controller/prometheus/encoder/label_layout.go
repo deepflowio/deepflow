@@ -119,17 +119,17 @@ func (ia *indexAllocator) check(ids []int) (inUseIDs []int, err error) {
 	return
 }
 
-func (ia *indexAllocator) release(ids []int) error {
-	ia.lock.Lock()
-	defer ia.lock.Unlock()
+// func (ia *indexAllocator) release(ids []int) error {
+// 	ia.lock.Lock()
+// 	defer ia.lock.Unlock()
 
-	err := ia.org.DB.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Delete(&mysql.PrometheusMetricAPPLabelLayout{}).Error
-	if err != nil {
-		return err
-	}
-	ia.recycle(ids)
-	return nil
-}
+// 	err := ia.org.DB.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Delete(&mysql.PrometheusMetricAPPLabelLayout{}).Error
+// 	if err != nil {
+// 		return err
+// 	}
+// 	ia.recycle(ids)
+// 	return nil
+// }
 
 type labelLayout struct {
 	org                      *common.ORG
@@ -221,10 +221,10 @@ func (ll *labelLayout) SingleEncode(metricName string, labelNames []string) ([]*
 	return ia.encode(labelNames)
 }
 
-func (ll *labelLayout) SingleRelease(metricName string, indexes []int) error {
-	log.Info(ll.org.Logf("recycle metric: %s indexes: %v", metricName, indexes))
-	if allocator, ok := ll.getIndexAllocator(metricName); ok {
-		return allocator.release(indexes)
-	}
-	return nil
-}
+// func (ll *labelLayout) SingleRelease(metricName string, indexes []int) error {
+// 	log.Info(ll.org.Logf("recycle metric: %s indexes: %v", metricName, indexes))
+// 	if allocator, ok := ll.getIndexAllocator(metricName); ok {
+// 		return allocator.release(indexes)
+// 	}
+// 	return nil
+// }

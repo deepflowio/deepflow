@@ -19,11 +19,9 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/op/go-logging"
 	"golang.org/x/sync/errgroup"
 
@@ -49,10 +47,10 @@ type Cache struct {
 	LabelName               *labelName
 	LabelValue              *labelValue
 	MetricAndAPPLabelLayout *metricAndAPPLabelLayout
-	Target                  *target
-	Label                   *label
-	MetricLabelName         *metricLabelName
-	MetricTarget            *metricTarget
+	// Target                  *target
+	Label *label
+	// MetricLabelName         *metricLabelName
+	// MetricTarget            *metricTarget
 }
 
 func newCache(orgID int) (*Cache, error) {
@@ -63,7 +61,7 @@ func newCache(orgID int) (*Cache, error) {
 		return nil, err
 	}
 	mn := newMetricName(org)
-	t := newTarget(org)
+	// t := newTarget(org)
 	c := &Cache{
 		org:                     org,
 		canRefresh:              make(chan bool, 1),
@@ -71,10 +69,10 @@ func newCache(orgID int) (*Cache, error) {
 		LabelName:               newLabelName(org),
 		LabelValue:              newLabelValue(org),
 		MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(org),
-		Target:                  t,
-		Label:                   newLabel(org),
-		MetricLabelName:         newMetricLabelName(org, mn),
-		MetricTarget:            newMetricTarget(org, mn, t),
+		// Target:                  t,
+		Label: newLabel(org),
+		// MetricLabelName:         newMetricLabelName(org, mn),
+		// MetricTarget:            newMetricTarget(org, mn, t),
 	}
 	c.canRefresh <- true
 	return c, nil
@@ -105,13 +103,13 @@ func (c *Cache) refresh() error {
 	egRunAhead := &errgroup.Group{}
 	common.AppendErrGroup(egRunAhead, c.MetricName.refresh)
 	common.AppendErrGroup(egRunAhead, c.Label.refresh)
-	// common.AppendErrGroup(egRunAhead, c.Target.refresh) // TODO
+	// common.AppendErrGroup(egRunAhead, c.Target.refresh)
 	egRunAhead.Wait()
 	eg := &errgroup.Group{}
 	common.AppendErrGroup(eg, c.LabelName.refresh)
 	common.AppendErrGroup(eg, c.LabelValue.refresh)
 	common.AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
-	common.AppendErrGroup(eg, c.MetricLabelName.refresh)
+	// common.AppendErrGroup(eg, c.MetricLabelName.refresh)
 	// common.AppendErrGroup(eg, c.MetricTarget.refresh)
 	err := eg.Wait()
 	log.Info(c.org.Log("refresh cache completed"))
@@ -170,41 +168,36 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 	getMetricAndAppLabelLayout := func() {
 		temp := map[string]interface{}{
 			"layout_key_to_index": make(map[string]interface{}),
-			"layout_key_to_id":    make(map[string]int),
 		}
 		tempCache.MetricAndAPPLabelLayout.layoutKeyToIndex.Range(func(key, value any) bool {
 			temp["layout_key_to_index"].(map[string]interface{})[marshal(key)] = value
 			return true
 		})
-		for iter := range tempCache.MetricAndAPPLabelLayout.layoutKeyToID.IterBuffered() {
-			temp["layout_key_to_id"].(map[string]int)[iter.Key.String()] = iter.Val
-		}
-		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 ||
-			len(temp["layout_key_to_id"].(map[string]int)) > 0 {
+		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 {
 			content["metric_and_app_label_layout"] = temp
 		}
 	}
-	getTarget := func() {
-		temp := map[string]interface{}{
-			"key_to_target_id":         make(map[string]interface{}),
-			"target_id_to_label_names": make(map[string]interface{}),
-		}
-		for key, value := range tempCache.Target.keyToTargetID.Get() {
-			k, _ := json.Marshal(key)
-			temp["key_to_target_id"].(map[string]interface{})[string(k)] = value
-		}
-		for key, value := range tempCache.Target.targetIDToLabelNames.Get() {
-			keys := make(map[string]interface{})
-			for item := range value.Iterator().C {
-				keys[marshal(item)] = struct{}{}
-			}
-			temp["target_id_to_label_names"].(map[string]interface{})[fmt.Sprintf("%d", key)] = keys
-		}
-		if len(temp["key_to_target_id"].(map[string]interface{})) > 0 ||
-			len(temp["target_id_to_label_names"].(map[string]interface{})) > 0 {
-			content["target"] = temp
-		}
-	}
+	// getTarget := func() {
+	// 	temp := map[string]interface{}{
+	// 		"key_to_target_id":         make(map[string]interface{}),
+	// 		"target_id_to_label_names": make(map[string]interface{}),
+	// 	}
+	// 	for key, value := range tempCache.Target.keyToTargetID.Get() {
+	// 		k, _ := json.Marshal(key)
+	// 		temp["key_to_target_id"].(map[string]interface{})[string(k)] = value
+	// 	}
+	// 	for key, value := range tempCache.Target.targetIDToLabelNames.Get() {
+	// 		keys := make(map[string]interface{})
+	// 		for item := range value.Iterator().C {
+	// 			keys[marshal(item)] = struct{}{}
+	// 		}
+	// 		temp["target_id_to_label_names"].(map[string]interface{})[fmt.Sprintf("%d", key)] = keys
+	// 	}
+	// 	if len(temp["key_to_target_id"].(map[string]interface{})) > 0 ||
+	// 		len(temp["target_id_to_label_names"].(map[string]interface{})) > 0 {
+	// 		content["target"] = temp
+	// 	}
+	// }
 	getLabel := func() {
 		temp := map[string]interface{}{
 			"key_to_id": make(map[string]interface{}),
@@ -217,50 +210,50 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 			content["label"] = temp
 		}
 	}
-	getMetricLabel := func() {
-		temp := map[string]interface{}{
-			"metric_name_id_to_label_ids": make(map[int][]int),
-			"metric_label_key_to_id":      make(map[string]int),
-		}
+	// getMetricLabel := func() {
+	// 	temp := map[string]interface{}{
+	// 		"metric_name_id_to_label_ids": make(map[int][]int),
+	// 		"metric_label_key_to_id":      make(map[string]int),
+	// 	}
 
-		tempCache.MetricLabelName.metricNameIDToLabelNameIDs.Range(func(i int, s mapset.Set[int]) bool {
-			temp["metric_name_id_to_label_ids"].(map[int][]int)[i] = s.ToSlice()
-			return true
-		})
-		for iter := range tempCache.MetricLabelName.keyToID.Iter() {
-			temp["metric_label_key_to_id"].(map[string]int)[iter.Key.String()] = iter.Val
-		}
+	// 	tempCache.MetricLabelName.metricNameIDToLabelNameIDs.Range(func(i int, s mapset.Set[int]) bool {
+	// 		temp["metric_name_id_to_label_ids"].(map[int][]int)[i] = s.ToSlice()
+	// 		return true
+	// 	})
+	// 	for iter := range tempCache.MetricLabelName.keyToID.Iter() {
+	// 		temp["metric_label_key_to_id"].(map[string]int)[iter.Key.String()] = iter.Val
+	// 	}
 
-		if len(temp["metric_name_id_to_label_ids"].(map[int][]int)) > 0 ||
-			len(temp["metric_label_key_to_id"].(map[string]int)) > 0 {
-			content["metric_label"] = temp
-		}
-	}
-	getMetricTarget := func() {
-		temp := map[string]interface{}{
-			"metric_target_keys":        make(map[string]interface{}),
-			"metric_name_to_target_ids": make(map[string]interface{}),
-			"target_id_to_metric_ids":   make(map[int][]uint32),
-		}
-		for elem := range tempCache.MetricTarget.metricTargetKeys.Iterator().C {
-			temp["metric_target_keys"].(map[string]interface{})[marshal(elem)] = struct{}{}
-		}
-		for k, v := range tempCache.MetricTarget.targetIDToMetricIDs {
-			temp["target_id_to_metric_ids"].(map[int][]uint32)[k] = v
-		}
-		for key, value := range tempCache.MetricTarget.metricNameToTargetIDs.Get() {
-			keys := make(map[string]interface{})
-			for item := range value.Iterator().C {
-				keys[marshal(item)] = struct{}{}
-			}
-			temp["metric_name_to_target_ids"].(map[string]interface{})[key] = keys
-		}
-		if len(temp["metric_target_keys"].(map[string]interface{})) > 0 ||
-			len(temp["metric_name_to_target_ids"].(map[string]interface{})) > 0 ||
-			len(temp["target_id_to_metric_ids"].(map[int][]uint32)) > 0 {
-			content["metric_target"] = temp
-		}
-	}
+	// 	if len(temp["metric_name_id_to_label_ids"].(map[int][]int)) > 0 ||
+	// 		len(temp["metric_label_key_to_id"].(map[string]int)) > 0 {
+	// 		content["metric_label"] = temp
+	// 	}
+	// }
+	// getMetricTarget := func() {
+	// 	temp := map[string]interface{}{
+	// 		"metric_target_keys":        make(map[string]interface{}),
+	// 		"metric_name_to_target_ids": make(map[string]interface{}),
+	// 		"target_id_to_metric_ids":   make(map[int][]uint32),
+	// 	}
+	// 	for elem := range tempCache.MetricTarget.metricTargetKeys.Iterator().C {
+	// 		temp["metric_target_keys"].(map[string]interface{})[marshal(elem)] = struct{}{}
+	// 	}
+	// 	for k, v := range tempCache.MetricTarget.targetIDToMetricIDs {
+	// 		temp["target_id_to_metric_ids"].(map[int][]uint32)[k] = v
+	// 	}
+	// 	for key, value := range tempCache.MetricTarget.metricNameToTargetIDs.Get() {
+	// 		keys := make(map[string]interface{})
+	// 		for item := range value.Iterator().C {
+	// 			keys[marshal(item)] = struct{}{}
+	// 		}
+	// 		temp["metric_name_to_target_ids"].(map[string]interface{})[key] = keys
+	// 	}
+	// 	if len(temp["metric_target_keys"].(map[string]interface{})) > 0 ||
+	// 		len(temp["metric_name_to_target_ids"].(map[string]interface{})) > 0 ||
+	// 		len(temp["target_id_to_metric_ids"].(map[int][]uint32)) > 0 {
+	// 		content["metric_target"] = temp
+	// 	}
+	// }
 
 	switch t {
 	case controller.PrometheusCacheType_ALL:
@@ -268,10 +261,10 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		getLabelName()
 		getLabelValue()
 		getMetricAndAppLabelLayout()
-		getTarget()
+		// getTarget()
 		getLabel()
-		getMetricLabel()
-		getMetricTarget()
+		// getMetricLabel()
+		// getMetricTarget()
 	case controller.PrometheusCacheType_METRIC_NAME:
 		getMetricName()
 	case controller.PrometheusCacheType_LABEL_NAME:
@@ -280,14 +273,14 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		getLabelValue()
 	case controller.PrometheusCacheType_METRIC_AND_APP_LABEL_LAYOUT:
 		getMetricAndAppLabelLayout()
-	case controller.PrometheusCacheType_TARGET:
-		getTarget()
+	// case controller.PrometheusCacheType_TARGET:
+	// 	getTarget()
 	case controller.PrometheusCacheType_LABEL:
 		getLabel()
-	case controller.PrometheusCacheType_METRIC_LABEL:
-		getMetricLabel()
-	case controller.PrometheusCacheType_METRIC_TARGET:
-		getMetricTarget()
+	// case controller.PrometheusCacheType_METRIC_LABEL:
+	// 	getMetricLabel()
+	// case controller.PrometheusCacheType_METRIC_TARGET:
+	// 	getMetricTarget()
 	default:
 		log.Errorf("%s is not supported", t)
 		return nil

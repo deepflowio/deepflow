@@ -72,9 +72,9 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[mysql.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[mysql.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
 
-		// both recorder and prometheus need to insert data into prometheus_target, they equally share the id pool of prometheus_target.
-		// recorder uses ids [1, max/2+max%2], prometheus uses ids [max/2+max%2+1, max].
-		ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN: newIDPool[mysql.PrometheusTarget](mng.org, ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cfg.ResourceMaxID1/2+cfg.ResourceMaxID1%2),
+		// // both recorder and prometheus need to insert data into prometheus_target, they equally share the id pool of prometheus_target.
+		// // recorder uses ids [1, max/2+max%2], prometheus uses ids [max/2+max%2+1, max].
+		// ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN: newIDPool[mysql.PrometheusTarget](mng.org, ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cfg.ResourceMaxID1/2+cfg.ResourceMaxID1%2),
 	}
 	return mng, nil
 }
@@ -192,6 +192,25 @@ func (p *IDPool[MT]) refresh() error {
 		sort.IntSlice(usableIDs).Sort()
 	}
 	p.usableIDs = usableIDs
+
+	// TODO refactor like this
+	// // usable ids = all ids [min, max] - ids in use in db
+	// // 可用 id = 所有 id [min, max] - db 中正在使用的 id
+	// usableIDSet := allIDSet.Difference(inUseIDSet)
+	// usableIDs = ia.sorter.sortSet(usableIDSet)
+
+	// // usable ids that have been used and returned
+	// // 可用 id 中被使用过后已归还的 id
+	// usedIDSet := ia.sorter.getUsedIDSet(usableIDs, inUseIDSet)
+	// usedIDs := ia.sorter.sortSet(usedIDSet)
+
+	// // usable ids that have not been used
+	// // 可用 id 中未被使用过的 id
+	// unusedIDs := ia.sorter.sortSet(usableIDSet.Difference(usedIDSet))
+
+	// // id pool allocation order: ids that have not been used first, ids that have been returned after use
+	// // id 池分配顺序：未被使用过的 id 优先，被使用过后已归还的 id 在后
+	// usableIDs = append(unusedIDs, usedIDs...)
 
 	log.Info(p.org.Logf("refresh %s id pools (usable ids count: %d) completed", p.resourceType, len(p.usableIDs)))
 	return nil
