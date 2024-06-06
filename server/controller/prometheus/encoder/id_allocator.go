@@ -80,11 +80,11 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	return
 }
 
-func (ia *idAllocator) recycle(ids []int) {
-	ia.sorter.sort(ids)
-	ia.usableIDs = append(ia.usableIDs, ids...)
-	log.Info(ia.org.Logf("recycle %s ids: %v", ia.resourceType, ids))
-}
+// func (ia *idAllocator) recycle(ids []int) {
+// 	ia.sorter.sort(ids)
+// 	ia.usableIDs = append(ia.usableIDs, ids...)
+// 	log.Info(ia.org.Logf("recycle %s ids: %v", ia.resourceType, ids))
+// }
 
 func (ia *idAllocator) refresh() error {
 	log.Debug(ia.org.Logf("refresh %s id pools started", ia.resourceType))
@@ -115,18 +115,21 @@ func (ia *idAllocator) getSortedUsableIDs(allIDSet, inUseIDSet mapset.Set[int]) 
 		usableIDSet := allIDSet.Difference(inUseIDSet)
 		usableIDs = ia.sorter.sortSet(usableIDSet)
 
-		// usable ids that have been used and returned
-		// 可用 id 中被使用过后已归还的 id
-		usedIDSet := ia.sorter.getUsedIDSet(usableIDs, inUseIDSet)
-		usedIDs := ia.sorter.sortSet(usedIDSet)
+		// 通过直接查询 clickhouse 检查数据活跃度后再删除 MySQL 无效数据，不需要考虑立刻使用已归还的 id 会产生 MySQL 与 clickhouse 数据 id 不一致的问题，
+		// 注释掉以下代码，后续根据实际情况决定是否删除。
 
-		// usable ids that have not been used
-		// 可用 id 中未被使用过的 id
-		unusedIDs := ia.sorter.sortSet(usableIDSet.Difference(usedIDSet))
+		// // usable ids that have been used and returned
+		// // 可用 id 中被使用过后已归还的 id
+		// usedIDSet := ia.sorter.getUsedIDSet(usableIDs, inUseIDSet)
+		// usedIDs := ia.sorter.sortSet(usedIDSet)
 
-		// id pool allocation order: ids that have not been used first, ids that have been returned after use
-		// id 池分配顺序：未被使用过的 id 优先，被使用过后已归还的 id 在后
-		usableIDs = append(unusedIDs, usedIDs...)
+		// // usable ids that have not been used
+		// // 可用 id 中未被使用过的 id
+		// unusedIDs := ia.sorter.sortSet(usableIDSet.Difference(usedIDSet))
+
+		// // id pool allocation order: ids that have not been used first, ids that have been returned after use
+		// // id 池分配顺序：未被使用过的 id 优先，被使用过后已归还的 id 在后
+		// usableIDs = append(unusedIDs, usedIDs...)
 	}
 	return usableIDs
 }

@@ -314,6 +314,8 @@ controller:
     # time interval for regularly clearing prometheus expired data, unit: minute, default: 60 * 24
     # time interval should be greater than or equal to ingester: prometheus-label-cache-expiration configuration
     data_clean_interval: 1440
+    # limit the total number of querier queried at a time
+    querier_query_limit: 1000000
 
 querier:
   # querier http listenport

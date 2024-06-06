@@ -1,0 +1,89 @@
+/**
+ * Copyright (c) 2024 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package prometheus
+
+import (
+	"hash/fnv"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+)
+
+var (
+	versionOnce sync.Once
+	version     *Version
+
+	versionName = "prometheus"
+)
+
+type Version struct {
+	version uint32
+	hash    uint64
+}
+
+func GetVersion() *Version {
+	versionOnce.Do(func() {
+		version = &Version{
+			version: uint32(time.Now().Unix()),
+		}
+	})
+	return version
+}
+
+func (v *Version) Refresh() error {
+	var versions string
+	if orgIDs, err := mysql.GetORGIDs(); err != nil {
+		log.Errorf("failed to get org ids: %v", err)
+		return err
+	} else {
+		for _, orgID := range orgIDs {
+			db, err := mysql.GetDB(orgID)
+			if err != nil {
+				log.Errorf("failed to get db: %v for org: %d", err, orgID)
+				return err
+			}
+			var resourceVersion mysql.ResourceVersion
+			err = db.Where("name = ?", versionName).First(&resourceVersion).Error
+			if err != nil {
+				log.Error(db.Logf("failed to get version: %v", err))
+				return err
+			}
+			versions += strconv.Itoa(int(resourceVersion.Version))
+		}
+	}
+	orgVersionsHash := fnv1HashStr(versions)
+	if orgVersionsHash == atomic.LoadUint64(&v.hash) {
+		return nil
+	}
+	atomic.StoreUint64(&orgVersionsHash, v.hash)
+	atomic.StoreUint32(&v.version, uint32(time.Now().Unix()))
+	return nil
+}
+
+func (v *Version) Get() uint32 {
+	v.Refresh()
+	return atomic.LoadUint32(&v.version)
+}
+
+func fnv1HashStr(s string) uint64 {
+	h := fnv.New64()
+	h.Write([]byte(s))
+	return h.Sum64()
+}
