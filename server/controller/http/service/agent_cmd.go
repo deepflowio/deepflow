@@ -29,14 +29,37 @@ import (
 )
 
 var (
-	AgentRemoteExecMap  = make(map[string]*CMDManager)
 	agentCommandTimeout = time.Minute
+
+	agentCMDMutex   sync.RWMutex
+	agentCMDManager = make(AgentCMDManager)
 )
 
-func AddSteamToManager(key string, requestID uint64) *CMDManager {
+type AgentCMDManager map[string]*CMDManager
+
+func GetAgentCMDManager(key string) *CMDManager {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager
+	}
+	return nil
+}
+
+func AddToCMDManager(key string, requestID uint64) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
 	m := initCMDManager(requestID)
-	AgentRemoteExecMap[key] = m
-	return m
+	agentCMDManager[key] = m
+}
+
+func RemoveFromCMDManager(key string) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if _, ok := agentCMDManager[key]; ok {
+		delete(agentCMDManager, key)
+		log.Infof("delete agent(key:%s) in manager", key)
+	}
 }
 
 func initCMDManager(requestID uint64) *CMDManager {
@@ -53,8 +76,6 @@ func initCMDManager(requestID uint64) *CMDManager {
 }
 
 type CMDManager struct {
-	mu sync.RWMutex
-
 	ExecCH               chan *trident.RemoteExecRequest
 	ExecDoneCH           chan struct{}
 	RemoteCMDDoneCH      chan struct{}
@@ -62,77 +83,106 @@ type CMDManager struct {
 
 	requestID uint64
 	resp      *model.RemoteExecResp
-
-	stream trident.Synchronizer_RemoteExecuteServer
 }
 
-func (m *CMDManager) ResetResp() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.resp = &model.RemoteExecResp{}
-
+func resetResp(key string) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.resp = &model.RemoteExecResp{}
+	}
 }
 
-func (m *CMDManager) GetRequestID() uint64 {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.requestID
+func GetRequestID(key string) uint64 {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager.requestID
+	}
+	return 0
 }
 
-func (m *CMDManager) SetRequestID(requestID uint64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.requestID = requestID
+func SetRequestID(key string, requestID uint64) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.requestID = requestID
+	}
 }
 
-func (m *CMDManager) AppendCommands(data []*trident.RemoteCommand) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.resp.RemoteCommand = append(m.resp.RemoteCommand, data...)
+func AppendCommands(key string, data []*trident.RemoteCommand) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.resp.RemoteCommand = append(manager.resp.RemoteCommand, data...)
+	}
 }
 
-func (m *CMDManager) InitCommands(data []*trident.RemoteCommand) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.resp.RemoteCommand = data
+func InitCommands(key string, data []*trident.RemoteCommand) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.resp.RemoteCommand = data
+	}
 }
 
-func (m *CMDManager) AppendNamespaces(data []*trident.LinuxNamespace) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.resp.LinuxNamespace = append(m.resp.LinuxNamespace, data...)
+func AppendNamespaces(key string, data []*trident.LinuxNamespace) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.resp.LinuxNamespace = append(manager.resp.LinuxNamespace, data...)
+	}
 }
 
-func (m *CMDManager) InitNamespaces(data []*trident.LinuxNamespace) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.resp.LinuxNamespace = data
+func InitNamespaces(key string, data []*trident.LinuxNamespace) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.resp.LinuxNamespace = data
+	}
 }
 
-func (m *CMDManager) AppendContent(data []byte) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.resp.Content += string(data)
+func AppendContent(key string, data []byte) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.resp.Content += string(data)
+	}
 }
 
-func (m *CMDManager) AppendErr(data *string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.resp.Content += *data
+func AppendErr(key string, data *string) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		manager.resp.Content += *data
+	}
 }
 
-func (m *CMDManager) GetCommands() []*trident.RemoteCommand {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	result := m.resp.RemoteCommand
-	return result
+func GetContent(key string) string {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager.resp.Content
+	}
+	return ""
 }
 
-func (m *CMDManager) GetNamespaces() []*trident.LinuxNamespace {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	result := m.resp.LinuxNamespace
-	return result
+func GetCommands(key string) []*trident.RemoteCommand {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager.resp.RemoteCommand
+	}
+	return nil
+}
+
+func GetNamespaces(key string) []*trident.LinuxNamespace {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager.resp.LinuxNamespace
+	}
+	return nil
 }
 
 func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
@@ -148,11 +198,11 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name)
 
 	key := agent.CtrlIP + "-" + agent.CtrlMac
-	manager, ok := AgentRemoteExecMap[key]
-	if !ok {
+	manager := GetAgentCMDManager(key)
+	if manager == nil {
 		return nil, fmt.Errorf("agent(name: %s, key: %s) remote exec map not found", agent.Name, key)
 	}
-	manager.ResetResp()
+	resetResp(key)
 	cmdReq := &trident.RemoteExecRequest{ExecType: trident.ExecutionType_LIST_COMMAND.Enum()}
 	manager.ExecCH <- cmdReq
 
@@ -163,17 +213,20 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 		case <-timeout:
 			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", agentCommandTimeout.Seconds())
 		case <-manager.RemoteCMDDoneCH:
-			resp.RemoteCommand = manager.GetCommands()
+			resp.RemoteCommand = GetCommands(key)
 			namespaceReq := &trident.RemoteExecRequest{ExecType: trident.ExecutionType_LIST_NAMESPACE.Enum()}
 			manager.ExecCH <- namespaceReq
 		case <-manager.LinuxNamespaceDoneCH:
-			resp.LinuxNamespace = manager.GetNamespaces()
+			resp.LinuxNamespace = GetNamespaces(key)
+		case <-manager.ExecDoneCH: // error occurred
+			log.Errorf("get agent(key: %s) remote commands and linux namespace, error: %s", key, GetContent(key))
+			return &model.RemoteExecResp{Content: GetContent(key)}, nil
 		default:
-			if len(manager.GetCommands()) != 0 && len(manager.GetNamespaces()) != 0 {
-				log.Infof("len(commands)=%d, len(namespaces)=%d", len(manager.GetCommands()), len(manager.GetNamespaces()))
+			if len(GetCommands(key)) != 0 && len(GetNamespaces(key)) != 0 {
+				log.Infof("len(commands)=%d, len(namespaces)=%d", len(GetCommands(key)), len(GetNamespaces(key)))
 				return &model.RemoteExecResp{
-					RemoteCommand:  manager.GetCommands(),
-					LinuxNamespace: manager.GetNamespaces(),
+					RemoteCommand:  GetCommands(key),
+					LinuxNamespace: GetNamespaces(key),
 				}, nil
 			}
 		}
@@ -193,11 +246,11 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest) (string, er
 	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) run remote command, request: %s",
 		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b))
 	key := agent.CtrlIP + "-" + agent.CtrlMac
-	manager, ok := AgentRemoteExecMap[key]
-	if !ok {
+	manager := GetAgentCMDManager(key)
+	if manager == nil {
 		return "", fmt.Errorf("agent(name: %s, key: %s) remote exec map not found", agent.Name, key)
 	}
-	manager.ResetResp()
+	resetResp(key)
 	manager.ExecCH <- req
 
 	content := ""
