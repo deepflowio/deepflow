@@ -33,7 +33,7 @@ use thiserror::Error;
 use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::L7ProtocolParser;
-use crate::flow_generator::{DnsLog, TlsLog};
+use crate::flow_generator::{DnsLog, OracleLog, TlsLog};
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -598,6 +598,7 @@ pub struct YamlConfig {
 impl YamlConfig {
     const DEFAULT_DNS_PORTS: &'static str = "53,5353";
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
+    const DEFAULT_ORACLE_PORTS: &'static str = "1521";
 
     pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
@@ -848,6 +849,14 @@ impl YamlConfig {
         // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
         if !self.l7_protocol_ports.contains_key(tls_str) {
             new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
+        }
+        let oracle_str = L7ProtocolParser::Oracle(OracleLog::default()).as_str();
+        // oracle default only parse 1521 port. when l7_protocol_ports config without ORACLE, need to reserve the oracle default config.
+        if !self.l7_protocol_ports.contains_key(oracle_str) {
+            new.insert(
+                oracle_str.to_string(),
+                Self::DEFAULT_ORACLE_PORTS.to_string(),
+            );
         }
 
         new
