@@ -45,7 +45,8 @@
 #include "symbol.h"
 #include <regex.h>
 
-// TODO: 对内存拷贝进行硬件优化。
+#define STRINGIFY(x) #x
+#define UPROBE_FUNC_NAME(N) STRINGIFY(df_U_##N)
 
 #define LOOP_DELAY_US  100000
 

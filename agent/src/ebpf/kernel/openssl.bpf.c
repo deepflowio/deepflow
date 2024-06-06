@@ -62,8 +62,7 @@ static int get_fd_from_openssl_ssl(void *ssl)
 }
 
 // int SSL_write(SSL *ssl, const void *buf, int num);
-SEC("uprobe/openssl_write_enter")
-int uprobe_openssl_write_enter(struct pt_regs *ctx)
+UPROG(openssl_write_enter) (struct pt_regs *ctx)
 {
 	void *ssl = (void *)PT_REGS_PARM1(ctx);
 	int fd = get_fd_from_openssl_ssl(ssl);
@@ -79,8 +78,7 @@ int uprobe_openssl_write_enter(struct pt_regs *ctx)
 }
 
 // int SSL_write(SSL *ssl, const void *buf, int num);
-SEC("uretprobe/openssl_write_exit")
-int uprobe_openssl_write_exit(struct pt_regs *ctx)
+UPROG(openssl_write_exit) (struct pt_regs *ctx)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	struct ssl_ctx_struct *ssl_ctx = ssl_ctx_map__lookup(&id);
@@ -118,8 +116,7 @@ int uprobe_openssl_write_exit(struct pt_regs *ctx)
 }
 
 // int SSL_read(SSL *ssl, void *buf, int num);
-SEC("uprobe/openssl_read_enter")
-int uprobe_openssl_read_enter(struct pt_regs *ctx)
+UPROG(openssl_read_enter) (struct pt_regs *ctx)
 {
 	void *ssl = (void *)PT_REGS_PARM1(ctx);
 	int fd = get_fd_from_openssl_ssl(ssl);
@@ -135,8 +132,7 @@ int uprobe_openssl_read_enter(struct pt_regs *ctx)
 }
 
 // int SSL_read(SSL *ssl, void *buf, int num);
-SEC("uretprobe/openssl_read_exit")
-int uprobe_openssl_read_exit(struct pt_regs *ctx)
+UPROG(openssl_read_exit) (struct pt_regs *ctx)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	struct ssl_ctx_struct *ssl_ctx = ssl_ctx_map__lookup(&id);

@@ -29,11 +29,11 @@ struct http2_tcp_seq_key {
 
 /* *INDENT-OFF* */
 /*
- * In uprobe_go_tls_read_exit()
+ * In uprobe go_tls_read_exit()
  * Save the TCP sequence number before the syscall(read())
  * 
  * In uprobe http2 read() (after syscall read()), lookup TCP sequence number recorded previously on the map.
- * e.g.: In uprobe_go_http2serverConn_processHeaders(), get TCP sequence before syscall read(). 
+ * e.g.: In go_http2serverConn_processHeaders(), get TCP sequence before syscall read(). 
  * 
  * Note:  Use for after uprobe read() only.
  */
@@ -447,8 +447,7 @@ static __inline bool is_register_based_call(struct ebpf_proc_info *info)
 #endif
 }
 
-SEC("uprobe/runtime.execute")
-int runtime_execute(struct pt_regs *ctx)
+UPROG(runtime_execute) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -484,13 +483,12 @@ int runtime_execute(struct pt_regs *ctx)
 }
 
 // This function creates a new go coroutine, and the parent and child 
-// coroutine numbers are in the parameters and return values ​​respectively.
+// coroutine numbers are in the parameters and return values respectively.
 // Pass the function parameters through pid_tgid_callerid_map
 //
 // go 1.15 ~ 1.17: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr) *g
 // go1.18+ :func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
-SEC("uprobe/enter_runtime.newproc1")
-int enter_runtime_newproc1(struct pt_regs *ctx)
+UPROG(enter_runtime_newproc1) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -552,8 +550,7 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 //
 // go 1.15 ~ 1.17: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr) *g
 // go1.18+ :func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
-SEC("uprobe/exit_runtime.newproc1")
-int exit_runtime_newproc1(struct pt_regs *ctx)
+UPROG(exit_runtime_newproc1) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -612,8 +609,7 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 }
 
 // /sys/kernel/debug/tracing/events/sched/sched_process_exit/format
-SEC("tracepoint/sched/sched_process_exit")
-int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
+TP_SCHED_PROG(process_exit) (struct sched_comm_exit_ctx *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -671,18 +667,17 @@ static inline int kernel_clone_exit(struct syscall_comm_exit_ctx *ctx)
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_fork/format
-TPPROG(sys_exit_fork) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_fork) (struct syscall_comm_exit_ctx * ctx) {
 	return kernel_clone_exit(ctx);
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_clone/format
-TPPROG(sys_exit_clone) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_clone) (struct syscall_comm_exit_ctx * ctx) {
 	return kernel_clone_exit(ctx);
 }
 
 // /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
-SEC("tracepoint/sched/sched_process_exec")
-int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
+TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
