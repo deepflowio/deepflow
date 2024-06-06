@@ -325,6 +325,28 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 			}
 			filter = fmt.Sprintf("%s %s %s", postAsTag, op, macsStr)
 		}
+	case "body":
+		if strings.Contains(op, "match") {
+			filter = fmt.Sprintf("%s(%s,%s)", op, postAsTag, value)
+		} else {
+			filter = fmt.Sprintf("%s %s %s", postAsTag, op, value)
+		}
+		switch strings.ToLower(op) {
+		case "=", "!=":
+			if strings.Contains(value, " ") {
+				valueSlice := strings.Split(strings.Trim(value, "'"), " ")
+				var filterSlice []string
+				for _, token := range valueSlice {
+					filterSlice = append(filterSlice, fmt.Sprintf("%s(%s,'%s')", "hasToken", postAsTag, token))
+				}
+				filter = strings.Join(filterSlice, " AND ")
+			} else {
+				filter = fmt.Sprintf("%s(%s,%s)", "hasToken", postAsTag, value)
+			}
+			if op == "!=" {
+				filter = fmt.Sprintf("NOT (%s)", filter)
+			}
+		}
 	default:
 		tagName := strings.Trim(whereTag, "`")
 		if strings.HasPrefix(tagName, "k8s.label.") {

@@ -56,16 +56,17 @@ var AUTO_CUSTOM_TAG_MAP = map[string][]string{}
 var AUTO_CUSTOM_TAG_CHECK_MAP = map[string][]string{}
 
 var tagTypeToOperators = map[string][]string{
-	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"int":         []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
-	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
-	"string":      []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"string_enum": []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
-	"time":        []string{"=", "!=", ">=", "<="},
-	"mac":         []string{"=", "!=", "IN", "NOT IN"},
-	"id":          []string{"=", "!=", "IN", "NOT IN"},
-	"default":     []string{"=", "!=", "IN", "NOT IN"},
+	"resource":        []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
+	"int":             []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
+	"int_enum":        []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
+	"string":          []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
+	"tokenize_string": []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
+	"string_enum":     []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
+	"ip":              []string{"=", "!=", "IN", "NOT IN", ">=", "<=", ">", "<"},
+	"time":            []string{"=", "!=", ">=", "<="},
+	"mac":             []string{"=", "!=", "IN", "NOT IN"},
+	"id":              []string{"=", "!=", "IN", "NOT IN"},
+	"default":         []string{"=", "!=", "IN", "NOT IN"},
 }
 var TAG_RESOURCE_TYPE_DEVICE_MAP = map[string]int{
 	"chost":       VIF_DEVICE_TYPE_VM,
@@ -619,7 +620,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
-		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system" && db != ckcommon.DB_NAME_PROMETHEUS) {
+		if key.DB != db || (key.Table != table && !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROMETHEUS}, db)) {
 			continue
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
@@ -658,7 +659,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 				labelKey, labelKey, labelKey, labelKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
 			})
-		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
+		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
@@ -684,7 +685,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
 			})
-		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
+		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
@@ -706,7 +707,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 				envKey, envKey, envKey, envKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
 			})
-		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
+		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				envKey, envKey + "_0", envKey + "_1", envKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
@@ -728,7 +729,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
 			})
-		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
+		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
@@ -750,7 +751,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
 			})
-		} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
+		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
@@ -772,7 +773,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
 					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{},
 				})
-			} else if db != "deepflow_system" && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
+			} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
 					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{},
@@ -782,7 +783,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 
 	// 查询外部字段
-	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system" && db != "event" && db != ckcommon.DB_NAME_PROMETHEUS && db != ckcommon.DB_NAME_APPLICATION_LOG) || (db == "flow_log" && table != "l7_flow_log") {
+	if !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_FLOW_LOG, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_EVENT, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_APPLICATION_LOG}, db) || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -809,7 +810,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
-		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS {
+		if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
@@ -823,7 +824,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 			})
 		}
 	}
-	if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS {
+	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
 		response.Values = append(response.Values, []interface{}{
 			"tag", "tag", "tag", "tag", "map",
 			"Native Tag", []string{}, []bool{true, true, true}, "tag", "", false, []string{},
@@ -895,8 +896,10 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 	}
 	if db == "ext_metrics" {
 		table = "ext_common"
-	} else if db == "deepflow_system" {
-		table = "deepflow_system_common"
+	} else if db == ckcommon.DB_NAME_DEEPFLOW_ADMIN {
+		table = "deepflow_server"
+	} else if db == ckcommon.DB_NAME_DEEPFLOW_TENANT {
+		table = "deepflow_collector"
 	} else if db == ckcommon.DB_NAME_PROMETHEUS {
 		table = "samples"
 	}

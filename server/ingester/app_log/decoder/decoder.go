@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "github.com/bytedance/sonic"
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/ingester/app_log/config"

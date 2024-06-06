@@ -183,8 +183,8 @@ var (
 		db:     "ext_metrics",
 	}, {
 		input:  "select Sum(`metrics.pending`) from `deepflow_server.queue`",
-		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) AS `Sum(metrics.pending)` FROM deepflow_system.`deepflow_system` WHERE (virtual_table_name='deepflow_server.queue') LIMIT 10000",
-		db:     "deepflow_system",
+		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) AS `Sum(metrics.pending)` FROM deepflow_tenant.`deepflow_collector` PREWHERE (virtual_table_name='deepflow_server.queue') LIMIT 10000",
+		db:     "deepflow_tenant",
 	}, {
 		input:  "select `k8s.label_0` from l7_flow_log",
 		output: "SELECT if(dictGetOrDefault(flow_tag.pod_service_k8s_labels_map, 'labels', toUInt64(service_id_0),'{}')!='{}', dictGetOrDefault(flow_tag.pod_service_k8s_labels_map, 'labels', toUInt64(service_id_0),'{}'), dictGetOrDefault(flow_tag.pod_k8s_labels_map, 'labels', toUInt64(pod_id_0),'{}'))  AS `k8s.label_0` FROM flow_log.`l7_flow_log` LIMIT 10000",
@@ -255,24 +255,24 @@ var (
 		db:     "flow_metrics",
 	}, {
 		input:  "SELECT time(time,5,1,0) as toi, AAvg(`metrics.dropped`) AS `AAvg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(_time, toIntervalSecond(5)) + toIntervalSecond(arrayJoin([0]) * 5) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])`) AS `AAvg(metrics.dropped)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])` FROM deepflow_system.`deepflow_system` WHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `_time`) GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
-		db:     "deepflow_system",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(5)) + toIntervalSecond(arrayJoin([0]) * 5) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])`) AS `AAvg(metrics.dropped)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])` FROM deepflow_tenant.`deepflow_collector` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `_time`) GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_tenant",
 	}, {
 		input:  "SELECT time(time,5,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(5)) + toIntervalSecond(arrayJoin([0]) * 5) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(5/1) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_system` WHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
-		db:     "deepflow_system",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(5)) + toIntervalSecond(arrayJoin([0]) * 5) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(5/1) AS `Avg(metrics.dropped)` FROM deepflow_tenant.`deepflow_collector` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_tenant",
 	}, {
 		input:  "SELECT time(time,120,1,0) as toi, AAvg(`metrics.dropped`) AS `AAvg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])`) AS `AAvg(metrics.dropped)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])` FROM deepflow_system.`deepflow_system` WHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `_time`) GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
-		db:     "deepflow_system",
+		output: "WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, AVG(`_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])`) AS `AAvg(metrics.dropped)` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')])) AS `_sum_if(indexOf(metrics_float_names, dropped)=0,null,metrics_float_values[indexOf(metrics_float_names, dropped)])` FROM deepflow_tenant.`deepflow_collector` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `_time`) GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_tenant",
 	}, {
 		input:  "SELECT time(time,120,1,0) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(120/1) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_system` WHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
-		db:     "deepflow_system",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(120/1) AS `Avg(metrics.dropped)` FROM deepflow_tenant.`deepflow_collector` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_tenant",
 	}, {
 		input:  "SELECT time(time,120,1,0,30) as toi, Avg(`metrics.dropped`) AS `Avg(metrics.dropped)` FROM `deepflow_agent_collect_sender` GROUP BY  toi ORDER BY toi desc",
-		output: "WITH toStartOfInterval(time-30, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) + 30 AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(120/1) AS `Avg(metrics.dropped)` FROM deepflow_system.`deepflow_system` WHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
-		db:     "deepflow_system",
+		output: "WITH toStartOfInterval(time-30, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) + 30 AS `_toi` SELECT toUnixTimestamp(`_toi`) AS `toi`, sum(if(indexOf(metrics_float_names, 'dropped')=0,null,metrics_float_values[indexOf(metrics_float_names, 'dropped')]))/(120/1) AS `Avg(metrics.dropped)` FROM deepflow_tenant.`deepflow_collector` PREWHERE (virtual_table_name='deepflow_agent_collect_sender') GROUP BY `toi` ORDER BY `toi` desc LIMIT 10000",
+		db:     "deepflow_tenant",
 	}, {
 		input:  "SELECT chost_id_0 from l4_flow_log WHERE NOT exist(chost_0) LIMIT 1",
 		output: "SELECT if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_id_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (l3_device_type_0=1) LIMIT 1",
@@ -530,6 +530,11 @@ var (
 		db:     "flow_metrics",
 		input:  "SHOW tag chost_ip values from vtap_flow_port where chost_ip_id != 1",
 		output: "SELECT id AS `value`, ip AS `display_name` FROM flow_tag.`chost_map` WHERE (not(value = 1)) AND not(display_name = '') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_application_log_body",
+		db:     "application_log",
+		input:  "SELECT user, user_id FROM log WHERE body!='log' LIMIT 1",
+		output: "SELECT dictGet(flow_tag.user_map, 'name', (toUInt64(user_id))) AS `user`, user_id FROM application_log.`log` PREWHERE NOT (hasToken(body,'log')) LIMIT 1",
 	}}
 )
 

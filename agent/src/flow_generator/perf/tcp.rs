@@ -693,29 +693,33 @@ impl TcpPerf {
         }
     }
 
-    fn is_interested_tcp_flags(flags: TcpFlags) -> bool {
+    fn is_abnormal_tcp_flags(flags: TcpFlags) -> bool {
         if flags.contains(TcpFlags::SYN) {
             if flags.intersects(TcpFlags::FIN | TcpFlags::RST) {
-                return false;
+                return true;
             }
         } else {
             if !flags.intersects(TcpFlags::ACK | TcpFlags::RST) {
-                return false;
+                return true;
             }
         }
 
         if !flags.contains(TcpFlags::ACK) {
             if flags.intersects(TcpFlags::PSH | TcpFlags::FIN | TcpFlags::URG) {
-                return false;
+                return true;
             }
         }
 
+        false
+    }
+
+    fn is_unconcerned_tcp_flags(flags: TcpFlags) -> bool {
         // flow perf do not take care
         if flags.intersects(TcpFlags::FIN | TcpFlags::RST) {
-            return false;
+            return true;
         }
 
-        true
+        false
     }
 
     fn is_handshake_ack_packet(
@@ -967,10 +971,14 @@ impl TcpPerf {
             return false;
         }
 
-        if !Self::is_interested_tcp_flags(tcp_data.flags) {
+        if Self::is_abnormal_tcp_flags(tcp_data.flags) {
             self.counter
                 .ignored_packet_count
                 .fetch_add(1, Ordering::Relaxed);
+            return false;
+        }
+
+        if Self::is_unconcerned_tcp_flags(tcp_data.flags) {
             return false;
         }
 

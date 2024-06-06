@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/deepflowio/deepflow/message v0.0.0-20240527060827-9ad113dbccad
-	github.com/deepflowio/deepflow/server v0.0.0-20240521151831-c9de50d1a803
+	github.com/deepflowio/deepflow/server v0.0.0-20240606051354-5865bbd08049
 	github.com/golang/protobuf v1.5.4
 	github.com/mattn/go-runewidth v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
@@ -19,12 +19,14 @@ require (
 replace cloud.google.com/go => cloud.google.com/go v0.103.0
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.1.0 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/bytedance/sonic v1.11.2 // indirect
-	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
-	github.com/chenzhuoyu/iasm v0.9.1 // indirect
+	github.com/bytedance/sonic v1.11.8 // indirect
+	github.com/bytedance/sonic/loader v0.1.1 // indirect
+	github.com/cloudwego/base64x v0.1.4 // indirect
+	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cornelk/hashmap v1.0.8 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
@@ -40,7 +42,7 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.19.0 // indirect
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect

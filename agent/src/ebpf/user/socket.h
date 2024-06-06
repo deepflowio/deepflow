@@ -320,9 +320,14 @@ prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 		if (block_head->fn != NULL) {
 			block_head->fn(sd);
 		} else {
+			int64_t boot_time = get_sysboot_time_ns();
 			if (t->datadump)
-				t->datadump((void *)sd);
-
+				t->datadump((void *)sd, boot_time);
+			/*
+			 * Modify socket data time to real time, 
+			 * time precision is in microseconds.
+			 */
+			sd->timestamp = (sd->timestamp + boot_time) / NS_IN_USEC;
 			callback(sd);
 		}
 
