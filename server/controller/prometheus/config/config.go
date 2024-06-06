@@ -23,4 +23,5 @@ type Config struct {
 	ResourceMaxID1                   int `default:"499999" yaml:"resource_max_id_1"`
 	APPLabelIndexMax                 int `default:"255" yaml:"app_label_index"`
 	DataCleanInterval                int `default:"1440" yaml:"data_clean_interval"`
+	QuerierQueryLimit                int `default:"1000000" yaml:"querier_query_limit"`
 }

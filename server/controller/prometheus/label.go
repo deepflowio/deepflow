@@ -18,18 +18,15 @@ package prometheus
 
 import (
 	"sync/atomic"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
-	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
@@ -50,14 +47,22 @@ func NewORGLabelSynchronizer() (*ORGLabelSynchronizers, error) {
 }
 
 func (s *ORGLabelSynchronizers) Sync(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
-	// if req == nil || (len(req.GetRequestLabels()) == 0 && len(req.GetRequestTargets()) == 0) {
-	if req == nil || len(req.GetRequestLabels()) == 0 {
-		return s.assembleFully()
+	if req == nil {
+		log.Warning("empty request")
+		return &trident.PrometheusLabelResponse{}, nil
+	}
+	if len(req.GetRequestLabels()) == 0 {
+		curVersion := GetVersion().Get()
+		if req.GetVersion() == curVersion {
+			return &trident.PrometheusLabelResponse{}, nil
+		}
+		log.Infof("label version update from %d to %d", req.GetVersion(), curVersion)
+		return s.assembleFully(curVersion)
 	}
 	return s.assemble(req)
 }
 
-func (s *ORGLabelSynchronizers) assembleFully() (*trident.PrometheusLabelResponse, error) {
+func (s *ORGLabelSynchronizers) assembleFully(version uint32) (*trident.PrometheusLabelResponse, error) {
 	orgIDToResp := cmap.NewWithCustomShardingFunction[int, *trident.PrometheusLabelResponse](common.ShardingInt)
 	eg := &errgroup.Group{}
 	for iter := range cache.GetORGCaches().GetORGIDToCache().IterBuffered() {
@@ -67,7 +72,7 @@ func (s *ORGLabelSynchronizers) assembleFully() (*trident.PrometheusLabelRespons
 		return nil, errors.Wrap(err, "assembleFully")
 	}
 	// merge all orgs' response
-	resp := &trident.PrometheusLabelResponse{}
+	resp := &trident.PrometheusLabelResponse{Version: &version}
 	for iter := range orgIDToResp.IterBuffered() {
 		resp.ResponseLabelIds = append(resp.ResponseLabelIds, iter.Val.ResponseLabelIds...)
 		resp.OrgResponseLabels = append(resp.OrgResponseLabels, iter.Val.OrgResponseLabels...)
@@ -169,19 +174,12 @@ func (s *LabelSynchronizer) assembleFully() (*trident.PrometheusLabelResponse, e
 			OrgId:          proto.Uint32(uint32(s.org.GetID())),
 			ResponseLabels: ls,
 		}}
-
-	// ts, err := s.assembleTargetFully()
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "assembleTargetFully")
-	// }
-	// resp.ResponseTargetIds = ts
 	s.setStatsdCounter()
 	return resp, err
 }
 
 func (s *LabelSynchronizer) assemble(req *trident.PrometheusLabelRequest) (*trident.PrometheusLabelResponse, error) {
-	toEncode, toUpdate := s.splitData(req)
-	go toUpdate.update()
+	toEncode := s.splitData(req)
 
 	err := s.prepare(toEncode)
 	if err != nil {
@@ -195,18 +193,12 @@ func (s *LabelSynchronizer) assemble(req *trident.PrometheusLabelRequest) (*trid
 		return nil, errors.Wrap(err, "assembleMetricLabel")
 	}
 	resp.ResponseLabelIds = mls
-	// ts, err := s.assembleTarget(req.GetRequestTargets())
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "assembleTarget")
-	// }
-	// resp.ResponseTargetIds = ts
 	return resp, nil
 }
 
 func (s *LabelSynchronizer) setStatsdCounter() {
 	s.statsdCounter.SendMetricCount = s.counter.SendMetricCount
 	s.statsdCounter.SendLabelCount = s.counter.SendLabelCount
-	// s.statsdCounter.SendTargetCount = s.counter.SendTargetCount
 }
 
 func (s *LabelSynchronizer) prepare(toEncode *dataToEncode) error {
@@ -224,54 +216,25 @@ func (s *LabelSynchronizer) prepare(toEncode *dataToEncode) error {
 	common.AppendErrGroup(eg, s.addLabelValueCache, syncResp.GetLabelValues())
 	common.AppendErrGroup(eg, s.addMetricAPPLabelLayoutCache, syncResp.GetMetricAppLabelLayouts())
 	common.AppendErrGroup(eg, s.addLabelCache, syncResp.GetLabels())
-	common.AppendErrGroup(eg, s.addMetricLabelNameCache, syncResp.GetMetricLabelNames())
-	// common.AppendErrGroup(eg, s.addMetricTargetCache, syncResp.GetMetricTargets())
-	// common.AppendErrGroup(eg, s.addTargetCache, syncResp.GetTargets())
 	return eg.Wait()
 }
 
-func (s *LabelSynchronizer) splitData(req *trident.PrometheusLabelRequest) (*dataToEncode, *dataToUpdate) {
+func (s *LabelSynchronizer) splitData(req *trident.PrometheusLabelRequest) *dataToEncode {
 	toEncode := newDataToEncode(s.cache)
-	toUpdate := newDataToUpdate(s.cache)
 	for _, m := range req.GetRequestLabels() {
 		mn := m.GetMetricName()
-		toUpdate.appendMetricName(mn)
 		toEncode.tryAppendMetricName(mn)
-		// targetKey, targetID, targetExists := s.getTargetInfoFromLabels(m)
-		// if targetExists {
-		// 	toEncode.tryAppendMetricTarget(mn, targetID)
-		// } else {
-		// 	toEncode.appendMetricTarget(mn, targetKey)
-		// }
-
 		for _, l := range m.GetLabels() {
 			ln := l.GetName()
 			lv := l.GetValue()
-			toUpdate.appendLabelName(ln)
-			toUpdate.appendLabelValue(lv)
-			toUpdate.tryAppendLabelID(ln, lv)
-			toUpdate.tryAppendMetricLabelNameID(mn, ln)
-			toUpdate.tryAppendMetricAppLabelLayoutID(mn, ln)
-
 			toEncode.tryAppendLabelName(ln)
 			toEncode.tryAppendLabelValue(lv)
 			toEncode.tryAppendLabel(ln, lv)
-			toEncode.tryAppendMetricLabelName(mn, ln)
-			// if ln == common.TargetLabelInstance || ln == common.TargetLabelJob {
-			// 	continue
-			// }
-			// if targetExists {
 			toEncode.tryAppendMetricAPPLabelLayout(mn, ln)
-			// } else {
-			// 	toEncode.appendMetricAPPLabelLayout(mn, ln)
-			// }
 		}
 	}
 
-	// for _, t := range req.GetRequestTargets() {
-	// 	toEncode.tryAppendTarget(t.GetInstance(), t.GetJob(), int(t.GetEpcId()), int(t.GetPodClusterId()))
-	// }
-	return toEncode, toUpdate
+	return toEncode
 }
 
 func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *controller.SyncPrometheusRequest {
@@ -302,80 +265,8 @@ func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *control
 			}
 			return res
 		}(toEncode.labels.ToSlice()),
-
-		MetricLabelNames: func(m map[string]mapset.Set[string]) []*controller.PrometheusMetricLabelNameRequest {
-			res := make([]*controller.PrometheusMetricLabelNameRequest, 0, len(m))
-			for mn, lns := range m {
-				rmn := mn
-				res = append(res, &controller.PrometheusMetricLabelNameRequest{
-					MetricName: &rmn,
-					LabelNames: lns.ToSlice(),
-				})
-			}
-			return res
-		}(toEncode.metricNameToLabelNames),
-
-		// MetricTargets: func(ks []cache.MetricTargetKey, iks map[string]mapset.Set[cache.TargetKey]) []*controller.PrometheusMetricTargetRequest {
-		// 	res := make([]*controller.PrometheusMetricTargetRequest, 0, len(ks))
-		// 	for i := range ks {
-		// 		res = append(res, &controller.PrometheusMetricTargetRequest{
-		// 			MetricName: &ks[i].MetricName,
-		// 			TargetId:   proto.Uint32(uint32(ks[i].TargetID)),
-		// 		})
-		// 	}
-		// 	for k, v := range iks {
-		// 		mn := k
-		// 		ts := v.ToSlice()
-		// 		for i := range ts {
-		// 			res = append(res, &controller.PrometheusMetricTargetRequest{
-		// 				MetricName:   &mn,
-		// 				Instance:     &ts[i].Instance,
-		// 				Job:          &ts[i].Job,
-		// 				PodClusterId: proto.Uint32(uint32(ts[i].PodClusterID)),
-		// 				EpcId:        proto.Uint32(uint32(ts[i].VPCID)),
-		// 			})
-		// 		}
-		// 	}
-		// 	return res
-		// }(toEncode.metricTargets.ToSlice(), toEncode.metricToTargets),
-
-		// Targets: func(ts []cache.TargetKey) []*controller.PrometheusTargetRequest {
-		// 	res := make([]*controller.PrometheusTargetRequest, 0, len(ts))
-		// 	for i := range ts {
-		// 		res = append(res, &controller.PrometheusTargetRequest{
-		// 			Instance:     &ts[i].Instance,
-		// 			Job:          &ts[i].Job,
-		// 			PodClusterId: proto.Uint32(uint32(ts[i].PodClusterID)),
-		// 			EpcId:        proto.Uint32(uint32(ts[i].VPCID)),
-		// 		})
-		// 	}
-		// 	return res
-		// }(toEncode.targets.ToSlice()),
 	}
 }
-
-// func (s *LabelSynchronizer) getTargetInfoFromLabels(m *trident.MetricLabelRequest) (cache.TargetKey, int, bool) {
-// 	var instanceValue string
-// 	var insGot bool
-// 	var jobValue string
-// 	var jobGot bool
-// 	for _, l := range m.GetLabels() {
-// 		ln := l.GetName()
-// 		if ln == TargetLabelInstance {
-// 			instanceValue = l.GetValue()
-// 			insGot = true
-// 		} else if ln == TargetLabelJob {
-// 			jobValue = l.GetValue()
-// 			jobGot = true
-// 		}
-// 		if insGot && jobGot {
-// 			break
-// 		}
-// 	}
-// 	targetKey := cache.NewTargetKey(instanceValue, jobValue, int(m.GetEpcId()), int(m.GetPodClusterId()))
-// 	targetID, ok := s.cache.Target.GetIDByKey(targetKey)
-// 	return targetKey, targetID, ok
-// }
 
 func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelRequest) ([]*trident.MetricLabelResponse, error) {
 	respMLs := make([]*trident.MetricLabelResponse, 0)
@@ -388,9 +279,6 @@ func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelReques
 		s.statsdCounter.ReceiveLabelCount += uint64(len(ml.GetLabels()))
 
 		var rls []*trident.LabelResponse
-		// _, _, ok := s.getTargetInfoFromLabels(ml)
-		// responses column index only if instance and job matches one target
-		// if ok {
 		mn := ml.GetMetricName()
 		mni, ok := s.cache.MetricName.GetIDByName(mn)
 		if !ok {
@@ -444,56 +332,6 @@ func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelReques
 	return respMLs, nil
 }
 
-// func (s *LabelSynchronizer) assembleTarget(ts []*trident.TargetRequest) ([]*trident.TargetResponse, error) {
-// 	respTs := make([]*trident.TargetResponse, 0)
-// 	nonTargetKeys := mapset.NewSet[cache.TargetKey]()
-// 	nonInstances := mapset.NewSet[string]()
-// 	nonJobs := mapset.NewSet[string]()
-// 	for _, t := range ts {
-// 		s.statsdCounter.ReceiveTargetCount++
-// 		instance := t.GetInstance()
-// 		job := t.GetJob()
-// 		vpcID := int(t.GetEpcId())
-// 		podClusterID := int(t.GetPodClusterId())
-// 		tID, ok := s.cache.Target.GetIDByKey(cache.NewTargetKey(instance, job, vpcID, podClusterID))
-// 		if !ok {
-// 			nonTargetKeys.Add(cache.NewTargetKey(instance, job, vpcID, podClusterID))
-// 			continue
-// 		}
-// 		insID, ok := s.cache.LabelValue.GetIDByValue(instance)
-// 		if !ok {
-// 			nonInstances.Add(instance)
-// 			continue
-// 		}
-// 		jobID, ok := s.cache.LabelValue.GetIDByValue(job)
-// 		if !ok {
-// 			nonJobs.Add(job)
-// 			continue
-// 		}
-// 		respTs = append(respTs, &trident.TargetResponse{
-// 			OrgId:        proto.Uint32(uint32(s.org.GetID())),
-// 			Instance:     &instance,
-// 			InstanceId:   proto.Uint32(uint32(insID)),
-// 			Job:          &job,
-// 			JobId:        proto.Uint32(uint32(jobID)),
-// 			TargetId:     proto.Uint32(uint32(tID)),
-// 			PodClusterId: proto.Uint32(uint32(podClusterID)),
-// 			EpcId:        proto.Uint32(uint32(vpcID)),
-// 		})
-// 		s.statsdCounter.SendTargetCount++
-// 	}
-// 	if nonTargetKeys.Cardinality() > 0 {
-// 		log.Debug(s.org.Logf("target id not found, target keys: %+v ", nonTargetKeys.ToSlice()))
-// 	}
-// 	if nonInstances.Cardinality() > 0 {
-// 		log.Error(s.org.Logf("target instance id not found, instances: %v", nonInstances.ToSlice()))
-// 	}
-// 	if nonJobs.Cardinality() > 0 {
-// 		log.Error(s.org.Logf("target job id not found, jobs: %v", nonJobs.ToSlice()))
-// 	}
-// 	return respTs, nil
-// }
-
 func (s *LabelSynchronizer) addMetricNameCache(arg ...interface{}) error {
 	mns := arg[0].([]*controller.PrometheusMetricName)
 	s.cache.MetricName.Add(mns)
@@ -524,24 +362,6 @@ func (s *LabelSynchronizer) addLabelCache(arg ...interface{}) error {
 	return nil
 }
 
-func (s *LabelSynchronizer) addMetricLabelNameCache(arg ...interface{}) error {
-	mls := arg[0].([]*controller.PrometheusMetricLabelName)
-	s.cache.MetricLabelName.Add(mls)
-	return nil
-}
-
-// func (s *LabelSynchronizer) addMetricTargetCache(arg ...interface{}) error {
-// 	mts := arg[0].([]*controller.PrometheusMetricTarget)
-// 	s.cache.MetricTarget.Add(mts)
-// 	return nil
-// }
-
-// func (s *LabelSynchronizer) addTargetCache(arg ...interface{}) error {
-// 	ts := arg[0].([]*controller.PrometheusTarget)
-// 	s.cache.Target.Add(ts)
-// 	return nil
-// }
-
 type dataToEncode struct {
 	cache *cache.Cache
 
@@ -551,9 +371,6 @@ type dataToEncode struct {
 	metricAPPLabelLayouts  mapset.Set[cache.LayoutKey]
 	labels                 mapset.Set[cache.LabelKey]
 	metricNameToLabelNames map[string]mapset.Set[string]
-	// metricTargets          mapset.Set[cache.MetricTargetKey]
-	// metricToTargets        map[string]mapset.Set[cache.TargetKey]
-	// targets                mapset.Set[cache.TargetKey]
 }
 
 func newDataToEncode(c *cache.Cache) *dataToEncode {
@@ -566,16 +383,12 @@ func newDataToEncode(c *cache.Cache) *dataToEncode {
 		metricAPPLabelLayouts:  mapset.NewSet[cache.LayoutKey](),
 		labels:                 mapset.NewSet[cache.LabelKey](),
 		metricNameToLabelNames: make(map[string]mapset.Set[string], 0),
-		// metricTargets:          mapset.NewSet[cache.MetricTargetKey](),
-		// metricToTargets:        make(map[string]mapset.Set[cache.TargetKey], 0),
-		// targets:                mapset.NewSet[cache.TargetKey](),
 	}
 }
 
 func (d *dataToEncode) cardinality() int {
 	return d.metricNames.Cardinality() + d.labelNames.Cardinality() + d.labelValues.Cardinality() +
 		d.metricAPPLabelLayouts.Cardinality() + d.labels.Cardinality() + len(d.metricNameToLabelNames)
-	// d.metricTargets.Cardinality() + len(d.metricToTargets) + d.targets.Cardinality()
 }
 
 func (d *dataToEncode) tryAppendMetricName(name string) {
@@ -597,9 +410,6 @@ func (d *dataToEncode) tryAppendLabelValue(value string) {
 }
 
 func (d *dataToEncode) tryAppendMetricAPPLabelLayout(metricName, labelName string) {
-	// if ok := d.cache.MetricTarget.IfLabelIsTargetType(metricName, labelName); ok {
-	// 	return
-	// }
 	k := cache.NewLayoutKey(metricName, labelName)
 	if _, ok := d.cache.MetricAndAPPLabelLayout.GetIndexByKey(k); !ok {
 		d.metricAPPLabelLayouts.Add(k)
@@ -613,134 +423,5 @@ func (d *dataToEncode) appendMetricAPPLabelLayout(metricName, labelName string) 
 func (d *dataToEncode) tryAppendLabel(name, value string) {
 	if _, ok := d.cache.Label.GetIDByKey(cache.NewLabelKey(name, value)); !ok {
 		d.labels.Add(cache.NewLabelKey(name, value))
-	}
-}
-
-func (d *dataToEncode) tryAppendMetricLabelName(metricName, labelName string) {
-	if mi, ok := d.cache.MetricName.GetIDByName(metricName); ok {
-		if li, ok := d.cache.LabelName.GetIDByName(labelName); ok {
-			if ok := d.cache.MetricLabelName.IfLinked(mi, li); ok {
-				return
-			}
-		}
-	}
-	if _, ok := d.metricNameToLabelNames[metricName]; !ok {
-		d.metricNameToLabelNames[metricName] = mapset.NewSet[string]()
-	}
-	d.metricNameToLabelNames[metricName].Add(labelName)
-}
-
-// func (d *dataToEncode) tryAppendMetricTarget(metricName string, targetID int) {
-// 	mtk := cache.NewMetricTargetKey(metricName, targetID)
-// 	if ok := d.cache.MetricTarget.IfKeyExists(mtk); !ok {
-// 		d.metricTargets.Add(mtk)
-// 	}
-// }
-
-// func (d *dataToEncode) appendMetricTarget(metricName string, tk cache.TargetKey) {
-// 	if _, ok := d.metricToTargets[metricName]; !ok {
-// 		d.metricToTargets[metricName] = mapset.NewSet[cache.TargetKey]()
-// 	}
-// 	d.metricToTargets[metricName].Add(tk)
-// }
-
-// func (d *dataToEncode) tryAppendTarget(ins, job string, vpcID, podClusterID int) {
-// 	tk := cache.NewTargetKey(ins, job, vpcID, podClusterID)
-// 	if _, ok := d.cache.Target.GetIDByKey(tk); !ok {
-// 		d.targets.Add(tk)
-// 	}
-// }
-
-type dataToUpdate struct {
-	cache *cache.Cache
-
-	metricNames             mapset.Set[string] // for prometheus_metric_name
-	labelNames              mapset.Set[string] // for prometheus_label_name
-	labelValues             mapset.Set[string] // for prometheus_label_value
-	labelIDs                mapset.Set[int]    // for prometheus_label
-	metricLabelNameIDs      mapset.Set[int]    // for prometheus_metric_label_name
-	metricAppLabelLayoutIDs mapset.Set[int]    // for prometheus_metric_app_label_layout
-	// metricTargetIDs         mapset.Set[int]    // for prometheus_metric_target
-}
-
-func newDataToUpdate(c *cache.Cache) *dataToUpdate {
-	return &dataToUpdate{
-		cache: c,
-
-		metricNames:             mapset.NewSet[string](),
-		labelNames:              mapset.NewSet[string](),
-		labelValues:             mapset.NewSet[string](),
-		labelIDs:                mapset.NewSet[int](),
-		metricLabelNameIDs:      mapset.NewSet[int](),
-		metricAppLabelLayoutIDs: mapset.NewSet[int](),
-		// metricTargetIDs:         mapset.NewSet[int](),
-	}
-}
-
-func (d *dataToUpdate) update() {
-	err := d.cache.GetORG().GetDB().Transaction(func(tx *gorm.DB) error {
-		now := time.Now()
-		if err := tx.Model(&mysql.PrometheusMetricName{}).Where("name IN (?)", d.metricNames.ToSlice()).Update("synced_at", now).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&mysql.PrometheusLabelName{}).Where("name IN (?)", d.labelNames.ToSlice()).Update("synced_at", now).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&mysql.PrometheusLabelValue{}).Where("value IN (?)", d.labelValues.ToSlice()).Update("synced_at", now).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&mysql.PrometheusLabel{}).Where("id IN (?)", d.labelIDs.ToSlice()).Update("synced_at", now).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&mysql.PrometheusMetricLabelName{}).Where("id IN (?)", d.metricLabelNameIDs.ToSlice()).Update("synced_at", now).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&mysql.PrometheusMetricAPPLabelLayout{}).Where("id IN (?)", d.metricAppLabelLayoutIDs.ToSlice()).Update("synced_at", now).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		log.Error(d.cache.GetORG().Logf("update error: %+v", err))
-	}
-}
-
-func (d *dataToUpdate) appendMetricName(name string) {
-	if _, ok := d.cache.MetricName.GetIDByName(name); ok {
-		d.metricNames.Add(name)
-	}
-}
-
-func (d *dataToUpdate) appendLabelName(name string) {
-	if _, ok := d.cache.LabelName.GetIDByName(name); ok {
-		d.labelNames.Add(name)
-	}
-}
-
-func (d *dataToUpdate) appendLabelValue(value string) {
-	if _, ok := d.cache.LabelValue.GetIDByValue(value); ok {
-		d.labelValues.Add(value)
-	}
-}
-
-func (d *dataToUpdate) tryAppendLabelID(name, value string) {
-	if id, ok := d.cache.Label.GetIDByKey(cache.NewLabelKey(name, value)); ok {
-		d.labelIDs.Add(id)
-	}
-}
-
-func (d *dataToUpdate) tryAppendMetricLabelNameID(metricName, labelName string) {
-	if mi, ok := d.cache.MetricName.GetIDByName(metricName); ok {
-		if li, ok := d.cache.LabelName.GetIDByName(labelName); ok {
-			if id, ok := d.cache.MetricLabelName.GetIDByKey(cache.NewMetricLabelNameKey(mi, li)); ok {
-				d.metricLabelNameIDs.Add(id)
-			}
-		}
-	}
-}
-
-func (d *dataToUpdate) tryAppendMetricAppLabelLayoutID(metricName, labelName string) {
-	if id, ok := d.cache.MetricAndAPPLabelLayout.GetIDByKey(cache.NewLayoutKey(metricName, labelName)); ok {
-		d.metricAppLabelLayoutIDs.Add(id)
 	}
 }

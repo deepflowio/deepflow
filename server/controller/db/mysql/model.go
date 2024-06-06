@@ -519,3 +519,11 @@ type User struct {
 	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	UserName string `gorm:"column:username;type:char(128)" json:"USERNAME"`
 }
+
+type ResourceVersion struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name      string    `gorm:"column:name;type:varchar(255)" json:"RESOURCE"`
+	Version   uint32    `gorm:"column:version;type:int unsigned" json:"VERSION"`
+	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
+}
