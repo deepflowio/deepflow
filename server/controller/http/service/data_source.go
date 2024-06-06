@@ -66,7 +66,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"网络-TCP 时序数据",   // flow_log.l4_packet
 	"网络-PCAP 数据",    // flow_log.l7_packet
 	"租户侧监控数据",       //  deepflow_tenant.*
-	"系统监控数据",        // deepflow_admin.*
+	"管理侧监控数据",       // deepflow_admin.*
 	"外部指标数据",        // ext_metrics.*
 	"Prometheus 数据", // prometheus.*
 	"事件-资源变更事件",     // event.event
@@ -74,7 +74,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-告警事件",       // event.alarm_event
 	"应用-性能剖析",       // profile.in_process
 	"网络-网络策略",       // flow_metrics.traffic_policy
-	"日志-日志数据",          // application_log.log
+	"日志-日志数据",       // application_log.log
 }
 
 func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
