@@ -256,12 +256,38 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 
 #define NAME(N)  __##N
 
-#define PROGTP(F) SEC("prog/tp/"__stringify(F)) int bpf_prog_tp__##F
-#define PROGKP(F) SEC("prog/kp/"__stringify(F)) int bpf_prog_kp__##F
-#define KRETPROG(F) SEC("kretprobe/"__stringify(F)) int kretprobe__##F
-#define KPROG(F) SEC("kprobe/"__stringify(F)) int kprobe__##F
-#define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F
-#define TP_SCHED_PROG(F) SEC("tracepoint/sched/"__stringify(F)) int bpf_func_##F
+/*
+ * DeepFlow eBPF program naming convention:
+ *
+ *   'df_<type_identifier>_<probe_name>'
+ *
+ * type_identifier:
+ *   "T"   - tracepoint/syscalls/sys_* / tracepoint/sched/sched_*
+ *   "K"   - kprobe
+ *   "KR"  - kretprobe
+ *   "U"   - uprobe
+ *   "UR"  - uretprobe
+ *   "TP"  - Tailcall eBPF prog of tracepoint type
+ *   "KP"  - Tailcall eBPF prog of kprobe type
+ *
+ * probe_name:
+ *   The name of the tracepoint or the kernel interface.
+ * 
+ * For example:
+ * tracepoint: prog->name:df_T_enter_recvfrom
+ * kprobe: prog->name:df_K_sys_sendmsg
+ * kretprobe: prog->name:df_KR_sys_sendmsg
+ */
+
+#define TP_SYSCALL_PROG(F) SEC("tracepoint/syscalls/sys_"__stringify(F)) int df_T_##F
+#define TP_SCHED_PROG(F) SEC("tracepoint/sched/sched_"__stringify(F)) int df_T_##F
+#define PROGTP(F) SEC("prog/tp/"__stringify(F)) int df_TP_##F
+#define PROGKP(F) SEC("prog/kp/"__stringify(F)) int df_KP_##F
+#define KPROG(F) SEC("kprobe/"__stringify(F)) int df_K_##F
+#define KRETPROG(F) SEC("kretprobe/"__stringify(F)) int df_KR_##F
+#define UPROG(F) SEC("uprobe/"__stringify(F)) int df_U_##F
+#define URETPROG(F) SEC("uretprobe/"__stringify(F)) int df_UR_##F
+#define PERF_EVENT_PROG(F) SEC("perf_event") int df_##F
 
 #ifndef CUR_CPU_IDENTIFIER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)

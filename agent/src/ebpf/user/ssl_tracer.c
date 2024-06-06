@@ -46,25 +46,25 @@ static struct symbol openssl_syms[] = {
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_write",
-		.probe_func = "uprobe_openssl_write_enter",
+		.probe_func = UPROBE_FUNC_NAME(openssl_write_enter),
 		.is_probe_ret = false,
 	},
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_write",
-		.probe_func = "uprobe_openssl_write_exit",
+		.probe_func = UPROBE_FUNC_NAME(openssl_write_exit),
 		.is_probe_ret = true,
 	},
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_read",
-		.probe_func = "uprobe_openssl_read_enter",
+		.probe_func = UPROBE_FUNC_NAME(openssl_read_enter),
 		.is_probe_ret = false,
 	},
 	{
 		.type = OPENSSL_UPROBE,
 		.symbol = "SSL_read",
-		.probe_func = "uprobe_openssl_read_exit",
+		.probe_func = UPROBE_FUNC_NAME(openssl_read_exit),
 		.is_probe_ret = true,
 	},
 };

@@ -542,8 +542,7 @@ static __inline bool skip_http2_uprobe(struct ebpf_proc_info *info)
 }
 
 // func (cc *http2ClientConn) writeHeader(name, value string)
-SEC("uprobe/go_http2ClientConn_writeHeader")
-int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
+UPROG(go_http2ClientConn_writeHeader) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -602,8 +601,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 }
 
 // func (cc *http2ClientConn) writeHeaders(streamID uint32, endStream bool, maxFrameSize int, hdrs []byte) error
-SEC("uprobe/go_http2ClientConn_writeHeaders")
-int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
+UPROG(go_http2ClientConn_writeHeaders) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -648,8 +646,7 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 }
 
 // func (sc *http2serverConn) processHeaders(f *http2MetaHeadersFrame) error
-SEC("uprobe/go_http2serverConn_processHeaders")
-int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
+UPROG(go_http2serverConn_processHeaders) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -688,8 +685,7 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 }
 
 // func (sc *http2serverConn) writeHeaders(st *http2stream, headerData *http2writeResHeaders) error
-SEC("uprobe/go_http2serverConn_writeHeaders")
-int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
+UPROG(go_http2serverConn_writeHeaders) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -778,8 +774,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 }
 
 // func (rl *http2clientConnReadLoop) handleResponse(cs *http2clientStream, f *http2MetaHeadersFrame) (*Response, error)
-SEC("uprobe/go_http2clientConnReadLoop_handleResponse")
-int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
+UPROG(go_http2clientConnReadLoop_handleResponse) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -818,8 +813,7 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 }
 
 // func (l *loopyWriter) writeHeader(streamID uint32, endStream bool, hf []hpack.HeaderField, onWrite func()) error
-SEC("uprobe/go_loopyWriter_writeHeader")
-int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
+UPROG(go_loopyWriter_writeHeader) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -863,8 +857,7 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 }
 
 // func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool)
-SEC("uprobe/go_http2Server_operateHeaders")
-int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
+UPROG(go_http2Server_operateHeaders) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -904,8 +897,7 @@ int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 }
 
 // func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame)
-SEC("uprobe/go_http2Client_operateHeaders")
-int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
+UPROG(go_http2Client_operateHeaders) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -1099,9 +1091,7 @@ static __inline int fill_http2_dataframe_data(struct __http2_stack *stack,
 
 // grpc dataframe
 // func (fr *Framer) checkFrameOrder(f Frame) error
-SEC("uprobe/golang_org_x_net_http2_Framer_checkFrameOrder")
-static int
-uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
+UPROG(golang_org_x_net_http2_Framer_checkFrameOrder) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -1159,9 +1149,7 @@ uprobe_golang_org_x_net_http2_Framer_checkFrameOrder(struct pt_regs *ctx)
 }
 
 // func (f *Framer) WriteDataPadded(streamID uint32, endStream bool, data, pad []byte) error
-SEC("uprobe/golang_org_x_net_http2_Framer_WriteDataPadded")
-static int
-uprobe_golang_org_x_net_http2_Framer_WriteDataPadded(struct pt_regs *ctx)
+UPROG(golang_org_x_net_http2_Framer_WriteDataPadded) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
