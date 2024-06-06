@@ -1560,7 +1560,7 @@ static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
 /***********************************************************
  * BPF syscall probe/tracepoint function entry-points
  ***********************************************************/
-TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_write) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1577,7 +1577,7 @@ TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_write/format
-TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_write) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1594,7 +1594,7 @@ TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx * ctx) {
 }
 
 // ssize_t read(int fd, void *buf, size_t count);
-TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_read) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1611,7 +1611,7 @@ TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_read/format
-TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_read) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1629,7 +1629,7 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx * ctx) {
 
 // ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
 //              const struct sockaddr *dest_addr, socklen_t addrlen);
-TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)ctx->fd;
 
@@ -1649,7 +1649,7 @@ TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendto/format
-TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
@@ -1672,7 +1672,7 @@ TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
 
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                struct sockaddr *src_addr, socklen_t *addrlen);
-TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
 	// If flags contains MSG_PEEK, it is returned directly.
 	// ref : https://linux.die.net/man/2/recvfrom
 	if (ctx->flags & MSG_PEEK)
@@ -1693,7 +1693,7 @@ TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvfrom/format
-TPPROG(sys_exit_recvfrom) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvfrom) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
@@ -1736,7 +1736,7 @@ KPROG(__sys_sendmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmsg/format
-TPPROG(sys_exit_sendmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1779,7 +1779,7 @@ KPROG(__sys_sendmmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmmsg/format
-TPPROG(sys_exit_sendmmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendmmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 
 	int num_msgs = ctx->ret;
@@ -1830,7 +1830,7 @@ KPROG(__sys_recvmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmsg/format
-TPPROG(sys_exit_recvmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1887,7 +1887,7 @@ KPROG(__sys_recvmmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmmsg/format
-TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int num_msgs = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1930,7 +1930,7 @@ KPROG(do_writev) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_writev/format
-TPPROG(sys_exit_writev) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_writev) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
@@ -1971,7 +1971,7 @@ KPROG(do_readv) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_readv/format
-TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_readv) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
@@ -1986,7 +1986,7 @@ TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
-TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	int fd = ctx->fd;
 	//Ignore stdin, stdout and stderr
 	if (fd <= 2)
@@ -2023,7 +2023,7 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_close/format
-TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_close) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	struct data_args_t *read_args = active_read_args_map__lookup(&pid_tgid);
 	if (read_args == NULL)
@@ -2072,7 +2072,7 @@ exit:
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_socket/format
-TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u64 fd = (__u64) ctx->ret;
 	char comm[TASK_COMM_LEN];
@@ -2104,7 +2104,7 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-TPPROG(sys_exit_accept) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_accept) (struct syscall_comm_exit_ctx * ctx) {
 	int sockfd = ctx->ret;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
@@ -2114,7 +2114,7 @@ TPPROG(sys_exit_accept) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-TPPROG(sys_exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
 	int sockfd = ctx->ret;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
@@ -2124,7 +2124,7 @@ TPPROG(sys_exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-TPPROG(sys_enter_connect) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_connect) (struct syscall_comm_enter_ctx * ctx) {
 	int sockfd = ctx->fd;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);

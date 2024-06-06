@@ -107,7 +107,7 @@ __protocol_port_check(enum traffic_protocol proto,
 		 * If the "is_set_ports_bitmap()" function is used in both stages,
 		 * there may be the following error when loading an eBPF program in
 		 * the 4.14 kernel:
-		 * `failed. name: bpf_func_sys_exit_sendmmsg, Argument list too long errno: 7`
+		 * `failed. name: df_T_exit_sendmmsg, Argument list too long errno: 7`
 		 * To avoid this situation, it is necessary to differentiate the calls.
 		 */
 		if (prog_num == L7_PROTO_INFER_PROG_1) {
