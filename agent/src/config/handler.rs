@@ -247,6 +247,7 @@ pub struct NpbConfig {
     pub vlan_mode: trident::VlanMode,
     pub socket_type: trident::SocketType,
     pub ignore_overlay_vlan: bool,
+    pub queue_size: usize,
 }
 
 impl Default for NpbConfig {
@@ -1314,6 +1315,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 vlan_mode: conf.npb_vlan_mode,
                 dedup_enabled: conf.npb_dedup_enabled,
                 socket_type: conf.npb_socket_type,
+                queue_size: conf.yaml_config.collector_sender_queue_size,
             },
             collector: CollectorConfig {
                 enabled: conf.collector_enabled,
