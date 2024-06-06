@@ -677,8 +677,13 @@ const (
 )
 
 const (
+	HEADER_KEY_CONTENT_TYPE = "Content-Type"
+	HEADER_KEY_ACCEPT       = "Accept"
+	CONTENT_TYPE_JSON       = "application/json"
+	CONTEXT_TYPE_FORM       = "application/x-www-form-urlencoded"
+	ACCEPT_JSON             = "application/json, text/plain"
+
 	HEADER_KEY_X_ORG_ID    = "X-Org-Id"
-	INGESTER_BODY_ORG_ID   = "org-id"
 	HEADER_KEY_X_USER_TYPE = "X-User-Type"
 	HEADER_KEY_X_USER_ID   = "X-User-Id"
 	HEADER_X_APP_KEY       = "X-App-Key"
@@ -686,6 +691,8 @@ const (
 	USER_TYPE_SUPER_ADMIN = 1
 	USER_TYPE_ADMIN       = 2
 	USER_ID_SUPER_ADMIN   = 1
+
+	INGESTER_BODY_ORG_ID = "org-id"
 )
 
 const (
