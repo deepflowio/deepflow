@@ -71,10 +71,6 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN: newIDPool[mysql.PodReplicaSet](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[mysql.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[mysql.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
-
-		// both recorder and prometheus need to insert data into prometheus_target, they equally share the id pool of prometheus_target.
-		// recorder uses ids [1, max/2+max%2], prometheus uses ids [max/2+max%2+1, max].
-		ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN: newIDPool[mysql.PrometheusTarget](mng.org, ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, cfg.ResourceMaxID1/2+cfg.ResourceMaxID1%2),
 	}
 	return mng, nil
 }

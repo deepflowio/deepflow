@@ -2651,6 +2651,17 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_target (
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_target;
 
+CREATE TABLE IF NOT EXISTS `resource_version` (
+    `id`            INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `name`          VARCHAR(255) NOT NULL UNIQUE,
+    `version`       INTEGER NOT NULL DEFAULT 0,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE resource_refresh_log;
+SET @prometheus_version = UNIX_TIMESTAMP(NOW());
+INSERT INTO resource_version (name, version) VALUES ('prometheus', @prometheus_version);
+
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
     `id`               INTEGER NOT NULL,
     `key`              VARCHAR(256) NOT NULL,
