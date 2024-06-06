@@ -1155,8 +1155,9 @@ int generate_random_integer(int max_value)
 
 u64 kallsyms_lookup_name(const char *name)
 {
+	static const int len = 256;
 	FILE *f = fopen("/proc/kallsyms", "r");
-	char func[256], buf[256];
+	char func[len], buf[len];
 	char symbol;
 	void *addr;
 
@@ -1166,8 +1167,14 @@ u64 kallsyms_lookup_name(const char *name)
 	while (!feof(f)) {
 		if (!fgets(buf, sizeof(buf), f))
 			break;
-		if (sscanf(buf, "%p %c %s", &addr, &symbol, func) != 3)
-			break;
+		if (strstr(buf, "(null)")) {
+			if (sscanf(buf, "%*s %c %s", &symbol, func) != 2)
+				break;
+			addr = NULL;
+		} else {
+			if (sscanf(buf, "%p %c %s", &addr, &symbol, func) != 3)
+				break;
+		}
 		if (!addr)
 			continue;
 		if (strcmp(func, name) == 0) {
