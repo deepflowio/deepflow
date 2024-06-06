@@ -52,42 +52,42 @@ func newSynchronizer(c *cache.Cache) Synchronizer {
 
 func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelResponse, error) {
 	var err error
-	nonLabelNameIDs := mapset.NewSet[int]()
+	nonLabelNames := mapset.NewSet[string]()
+	metricNameToAPPLabelNames := make(map[string][]*trident.LabelResponse, 0)
+	s.cache.MetricAndAPPLabelLayout.Get().Range(func(k, v interface{}) bool {
+		key := k.(cache.LayoutKey)
+		labelNameID, ok := s.cache.LabelName.GetIDByName(key.LabelName)
+		if !ok {
+			nonLabelNames.Add(key.LabelName)
+			return true
+		}
+		metricNameToAPPLabelNames[key.MetricName] = append(
+			metricNameToAPPLabelNames[key.MetricName],
+			&trident.LabelResponse{
+				Name:                &key.LabelName,
+				NameId:              proto.Uint32(uint32(labelNameID)),
+				AppLabelColumnIndex: proto.Uint32(uint32(v.(uint8))),
+			})
+		return true
+	})
+
 	mLabels := make([]*trident.MetricLabelResponse, 0)
 	s.cache.MetricName.Get().Range(func(k, v interface{}) bool {
-		var labels []*trident.LabelResponse
 		metricName := k.(string)
 		metricID := v.(int)
-		labelNameIDs := s.cache.MetricLabelName.GetLabelNameIDsByMetricName(metricName)
-		for i := range labelNameIDs {
-			li := labelNameIDs[i]
-			ln, ok := s.cache.LabelName.GetNameByID(li)
-			if !ok {
-				nonLabelNameIDs.Add(li)
-				continue
-			}
-			// if slices.Contains([]string{common.TargetLabelInstance, common.TargetLabelJob}, ln) {
-			// 	continue
-			// }
-			idx, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(metricName, ln))
-			label := &trident.LabelResponse{
-				Name:                &ln,
-				NameId:              proto.Uint32(uint32(li)),
-				AppLabelColumnIndex: proto.Uint32(uint32(idx)),
-			}
-			labels = append(labels, label)
-		}
-		mLabels = append(mLabels, &trident.MetricLabelResponse{
-			OrgId:      proto.Uint32(uint32(s.org.GetID())),
-			MetricName: &metricName,
-			MetricId:   proto.Uint32(uint32((metricID))),
-			LabelIds:   labels,
-		})
+		mLabels = append(
+			mLabels,
+			&trident.MetricLabelResponse{
+				OrgId:      proto.Uint32(uint32(s.org.GetID())),
+				MetricName: &metricName,
+				MetricId:   proto.Uint32(uint32((metricID))),
+				LabelIds:   metricNameToAPPLabelNames[metricName],
+			})
 		s.counter.SendMetricCount++
 		return true
 	})
-	if nonLabelNameIDs.Cardinality() > 0 {
-		log.Warning(s.org.Logf("label name not found, ids: %v", nonLabelNameIDs.ToSlice()))
+	if nonLabelNames.Cardinality() > 0 {
+		log.Warning(s.org.Logf("label name id not found, names: %v", nonLabelNames.ToSlice()))
 	}
 	return mLabels, err
 }
@@ -109,7 +109,6 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 			continue
 		}
 		ls = append(ls, &trident.LabelResponse{
-			// OrgId:   proto.Uint32(uint32(s.org.GetID())),
 			Name:    &k.Name,
 			Value:   &k.Value,
 			NameId:  proto.Uint32(uint32(ni)),

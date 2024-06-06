@@ -121,7 +121,6 @@ func (c *ORGCaches) NewCacheAndInitIfNotExist(orgID int) (*Cache, error) {
 }
 
 func (c *ORGCaches) refreshRegularly() error {
-	c.refresh()
 	go func() {
 		ticker := time.NewTicker(c.refreshInterval)
 		defer ticker.Stop()
