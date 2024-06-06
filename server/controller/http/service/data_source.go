@@ -109,7 +109,7 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 				collection = "flow_metrics.network*"
 			case "deepflow_tenant":
 				collection = "deepflow_tenant.*"
-			case "deepflow_admin.*":
+			case "deepflow_admin":
 				collection = "deepflow_admin.*"
 			case "ext_metrics":
 				collection = "ext_metrics.*"
