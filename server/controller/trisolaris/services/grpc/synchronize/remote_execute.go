@@ -32,13 +32,10 @@ import (
 func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) error {
 	key := ""
 	defer func() {
-		if _, ok := service.AgentRemoteExecMap[key]; ok {
-			delete(service.AgentRemoteExecMap, key)
-			log.Infof("delete agent(key:%s) in manager", key)
-		}
+		service.RemoveFromCMDManager(key)
 	}()
 
-	manager := &service.CMDManager{}
+	var manager *service.CMDManager
 	initDone := make(chan struct{})
 
 	ctx, cancel := context.WithCancel(stream.Context())
@@ -68,14 +65,19 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					continue
 				}
 				key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
-				if _, ok := service.AgentRemoteExecMap[key]; !ok {
+				if manager = service.GetAgentCMDManager(key); manager == nil {
 					requestID := uint64(0)
 					if resp.RequestId != nil {
 						requestID = *resp.RequestId
 					}
-					manager = service.AddSteamToManager(key, requestID)
+					service.AddToCMDManager(key, requestID)
 					log.Infof("add agent(key:%s) to cmd manager", key)
 					initDone <- struct{}{}
+				}
+				manager = service.GetAgentCMDManager(key)
+				if manager == nil {
+					log.Errorf("agent(key: %s) remote exec map not found", key)
+					continue
 				}
 				// heartbeat
 				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
@@ -101,6 +103,11 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	}()
 
 	<-initDone
+	if manager == nil {
+		err := fmt.Errorf("get agent(key: %s) remote exec manager nil", key)
+		log.Error(err)
+		return err
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -108,7 +115,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 			return nil
 		case req := <-manager.ExecCH:
 			if req.ExecType != nil {
-				req.RequestId = proto.Uint64(manager.GetRequestID() + 1)
+				req.RequestId = proto.Uint64(service.GetRequestID(key) + 1)
 			}
 			b, _ := json.Marshal(req)
 			log.Infof("agent(key: %s) request: %s", key, string(b))
@@ -122,31 +129,42 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 
 func handleResponse(resp *trident.RemoteExecResponse) {
 	key := resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
-	manager, ok := service.AgentRemoteExecMap[key]
-	if !ok {
+	manager := service.GetAgentCMDManager(key)
+	if manager == nil {
 		log.Errorf("agent(key: %s) remote exec map not found", key)
 		return
 	}
+
 	b, _ := json.Marshal(resp)
 	log.Infof("agent(key: %s) resp: %s", key, string(b))
 
 	if resp.RequestId != nil {
-		manager.SetRequestID(*resp.RequestId)
+		service.SetRequestID(key, *resp.RequestId)
 	}
 
 	switch {
 	case len(resp.LinuxNamespaces) > 0:
-		if len(manager.GetNamespaces()) > 0 {
-			manager.InitNamespaces(resp.LinuxNamespaces)
+		if resp.Errmsg != nil {
+			service.AppendErr(key, resp.Errmsg)
+			manager.RemoteCMDDoneCH <- struct{}{}
+			return
+		}
+		if len(service.GetNamespaces(key)) > 0 {
+			service.InitNamespaces(key, resp.LinuxNamespaces)
 		} else {
-			manager.AppendNamespaces(resp.LinuxNamespaces)
+			service.AppendNamespaces(key, resp.LinuxNamespaces)
 		}
 		manager.LinuxNamespaceDoneCH <- struct{}{}
 	case len(resp.Commands) > 0:
-		if len(manager.GetCommands()) > 0 {
-			manager.InitCommands(resp.Commands)
+		if resp.Errmsg != nil {
+			service.AppendErr(key, resp.Errmsg)
+			manager.RemoteCMDDoneCH <- struct{}{}
+			return
+		}
+		if len(service.GetCommands(key)) > 0 {
+			service.InitCommands(key, resp.Commands)
 		} else {
-			manager.AppendCommands(resp.Commands)
+			service.AppendCommands(key, resp.Commands)
 		}
 		manager.RemoteCMDDoneCH <- struct{}{}
 	default:
@@ -158,12 +176,12 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 		if resp.Errmsg != nil {
 			log.Errorf("agent(key: %s) run command error: %s",
 				key, *resp.Errmsg)
-			manager.AppendErr(resp.Errmsg)
+			service.AppendErr(key, resp.Errmsg)
 			manager.ExecDoneCH <- struct{}{}
 			return
 		}
 		if result.Content != nil {
-			manager.AppendContent(result.Content)
+			service.AppendContent(key, result.Content)
 		}
 		if result.Md5 != nil {
 			manager.ExecDoneCH <- struct{}{}
