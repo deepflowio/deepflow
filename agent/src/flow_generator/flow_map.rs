@@ -1633,11 +1633,6 @@ impl FlowMap {
                         _ => {}
                     }
                 }
-                Err(Error::L7ReqNotFound(c)) => {
-                    self.flow_perf_counter
-                        .mismatched_response
-                        .fetch_add(c, Ordering::Relaxed);
-                }
                 Err(Error::L7ProtocolUnknown) => {
                     self.flow_perf_counter
                         .unknown_l7_protocol
