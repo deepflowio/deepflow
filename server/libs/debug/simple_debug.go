@@ -68,7 +68,7 @@ func ClientRegisterSimple(moduleId ModuleId, module CmdHelper, operates []CmdHel
 			}
 			fmt.Printf("please run with arguments: ")
 			for _, operate := range operates {
-				fmt.Printf("'%s' ", operate.Cmd)
+				fmt.Printf("\n    %-32s : %s", operate.Cmd, operate.Helper)
 			}
 			fmt.Println()
 		},
