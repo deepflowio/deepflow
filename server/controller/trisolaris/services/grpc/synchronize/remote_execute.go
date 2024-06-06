@@ -143,6 +143,12 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 	}
 
 	switch {
+	case resp.Errmsg != nil:
+		log.Errorf("agent(key: %s) run command error: %s",
+			key, *resp.Errmsg)
+		service.AppendErr(key, resp.Errmsg)
+		manager.ExecDoneCH <- struct{}{}
+		return
 	case len(resp.LinuxNamespaces) > 0:
 		if resp.Errmsg != nil {
 			service.AppendErr(key, resp.Errmsg)
@@ -173,13 +179,6 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 			return
 		}
 
-		if resp.Errmsg != nil {
-			log.Errorf("agent(key: %s) run command error: %s",
-				key, *resp.Errmsg)
-			service.AppendErr(key, resp.Errmsg)
-			manager.ExecDoneCH <- struct{}{}
-			return
-		}
 		if result.Content != nil {
 			service.AppendContent(key, result.Content)
 		}
