@@ -2007,6 +2007,8 @@ CREATE TABLE IF NOT EXISTS ch_device (
     PRIMARY KEY (devicetype, deviceid)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_device;
+INSERT INTO ch_device (devicetype, deviceid, name, icon_id, team_id, domain_id, sub_domain_id) values(63999, 63999, "Internet", -1, 0, 0, 0);
+INSERT INTO ch_device (devicetype, deviceid, icon_id, team_id, domain_id, sub_domain_id) values(64000, 64000, -10, 0, 0, 0);
 
 CREATE TABLE IF NOT EXISTS ch_vtap_port (
     vtap_id                 INTEGER NOT NULL,
