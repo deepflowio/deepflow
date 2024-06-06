@@ -28,9 +28,6 @@ pub enum Error {
     InvalidPacketTimestamp,
     #[error("tcp retransmission packet")]
     RetransPacket,
-    // call LayerFlowPerf::parse return Error(Layer7 mismatch_response_count)
-    #[error("layer7 request not found")]
-    L7ReqNotFound(u64),
     #[error("zero payload len")]
     ZeroPayloadLen,
     #[error("invalid ip protocol")]
