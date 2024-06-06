@@ -105,7 +105,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		// get reverse proxy host
 		newHost := common.NodeIP
 		if common.NodeIP == agent.CurControllerIP {
-			if _, ok := service.AgentRemoteExecMap[key]; ok {
+			if manager := service.GetAgentCMDManager(key); manager != nil {
 				c.Next()
 				return
 			} else {
@@ -113,7 +113,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 				c.Request.Header.Set(ForwardControllerTimes, fmt.Sprintf("%d", forwardTimes+1))
 			}
 		} else if common.NodeIP == agent.ControllerIP {
-			if _, ok := service.AgentRemoteExecMap[key]; ok {
+			if manager := service.GetAgentCMDManager(key); manager != nil {
 				c.Next()
 				return
 			} else {
