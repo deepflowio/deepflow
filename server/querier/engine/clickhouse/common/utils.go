@@ -212,9 +212,8 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 		Context:  ctx,
 	}
 	sql := ""
-	slices.Contains([]string{DB_NAME_EXT_METRICS, DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT}, db)
 	if slices.Contains([]string{DB_NAME_EXT_METRICS, DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT}, db) {
-		sql = "SELECT table FROM flow_tag.ext_metrics_custom_field GROUP BY table"
+		sql = fmt.Sprintf("SELECT table FROM flow_tag.%s_custom_field GROUP BY table", db)
 		chClient.DB = "flow_tag"
 	} else {
 		sql = "SHOW TABLES FROM " + db
