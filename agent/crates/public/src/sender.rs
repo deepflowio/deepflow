@@ -29,10 +29,6 @@ pub trait Sendable: Debug + Send + 'static {
     fn file_name(&self) -> &str {
         ""
     }
-    // Send data's version
-    fn version(&self) -> u32 {
-        0
-    }
     // Serialize data to key-value and append to a string
     fn to_kv_string(&self, _: &mut String) {}
 }
