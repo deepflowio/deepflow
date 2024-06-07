@@ -73,7 +73,6 @@ use public::sender::{SendMessageType, Sendable};
 use public::utils::net::MacAddr;
 
 const NANOS_PER_MICRO: u64 = 1000;
-const FLOW_LOG_VERSION: u32 = 20220128;
 
 #[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
 #[repr(u8)]
@@ -416,10 +415,6 @@ impl Sendable for BoxAppProtoLogsData {
         let json = serde_json::to_string(&(*self.0)).unwrap();
         kv_string.push_str(&json);
         kv_string.push('\n');
-    }
-
-    fn version(&self) -> u32 {
-        FLOW_LOG_VERSION
     }
 }
 
