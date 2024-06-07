@@ -653,6 +653,7 @@ impl SessionQueue {
                 _ => {
                     if v.base_info.start_time > item.base_info.start_time {
                         self.send(item);
+                        slot.put(key, v);
                     } else {
                         // swap out old item and send
                         self.counter.cached_request_resource.fetch_sub(
