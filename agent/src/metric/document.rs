@@ -34,7 +34,6 @@ use public::{
     utils::net::MacAddr,
 };
 
-const METRICS_VERSION: u32 = 20220117;
 #[derive(Debug)]
 pub struct Document {
     pub timestamp: u32,
@@ -89,10 +88,6 @@ impl Sendable for BoxedDocument {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::Metrics
-    }
-
-    fn version(&self) -> u32 {
-        METRICS_VERSION
     }
 }
 

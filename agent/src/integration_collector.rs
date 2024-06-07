@@ -82,10 +82,6 @@ type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
 const NOT_FOUND: &[u8] = b"Not Found";
 const GZIP: &str = "gzip";
-const OPEN_TELEMETRY: u32 = 20220607;
-const OPEN_TELEMETRY_COMPRESSED: u32 = 20221024;
-const PROMETHEUS: u32 = 20220613;
-const TELEGRAF: u32 = 20220613;
 
 // Otel的protobuf数据
 // ingester使用该proto https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto进行解析
@@ -102,10 +98,6 @@ impl Sendable for OpenTelemetry {
     fn message_type(&self) -> SendMessageType {
         SendMessageType::OpenTelemetry
     }
-
-    fn version(&self) -> u32 {
-        OPEN_TELEMETRY
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -120,10 +112,6 @@ impl Sendable for OpenTelemetryCompressed {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::OpenTelemetryCompressed
-    }
-
-    fn version(&self) -> u32 {
-        OPEN_TELEMETRY_COMPRESSED
     }
 }
 
@@ -161,10 +149,6 @@ impl Sendable for BoxedPrometheusExtra {
     fn message_type(&self) -> SendMessageType {
         SendMessageType::Prometheus
     }
-
-    fn version(&self) -> u32 {
-        PROMETHEUS
-    }
 }
 
 /// Telegraf metric， 是influxDB标准行协议的UTF8编码的文本数据
@@ -180,10 +164,6 @@ impl Sendable for TelegrafMetric {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::Telegraf
-    }
-
-    fn version(&self) -> u32 {
-        TELEGRAF
     }
 }
 

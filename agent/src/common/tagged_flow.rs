@@ -27,7 +27,6 @@ use super::TapPort;
 
 use public::proto::flow_log;
 
-const FLOW_LOG_VERSION: u32 = 20220128;
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct TaggedFlow {
     #[serde(flatten)]
@@ -104,10 +103,6 @@ impl Sendable for BoxedTaggedFlow {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::TaggedFlow
-    }
-
-    fn version(&self) -> u32 {
-        FLOW_LOG_VERSION
     }
 }
 
