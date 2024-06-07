@@ -57,6 +57,8 @@ controller:
   billing-method: license
   ## If no-teamid-refused is set to true, agent must report team_id to server
   #no-teamid-refused: false
+  ## If all-agent-connect-to-nat-ip is set to true, All agents connect to the server via nat-ip 
+  #all-agent-connect-to-nat-ip: false
 
   # ingester plaform data, default: 0
   # 0 (All K8s Cluster)

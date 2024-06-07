@@ -63,6 +63,7 @@ type Config struct {
 	NoTeamIDRefused                bool
 	FPermit                        common.FPermit
 	IngesterAPIPort                int // data source
+	AllAgentConnectToNatIP         bool
 }
 
 func (c *Config) Convert() {
@@ -83,6 +84,14 @@ func (c *Config) Convert() {
 	} else {
 		c.NodeIP = nodeIP
 	}
+}
+
+func (c *Config) SetAllAgentConnectToNatIP(data bool) {
+	c.AllAgentConnectToNatIP = data
+}
+
+func (c *Config) GetAllAgentConnectToNatIP() bool {
+	return c.AllAgentConnectToNatIP
 }
 
 func (c *Config) SetGrpcPort(port int) {
