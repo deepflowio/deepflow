@@ -50,7 +50,7 @@ func (e *prometheusExecutor) promQLAnalysis(ctx context.Context, metric string, 
 	filters := []string{
 		fmt.Sprintf("time >= %d and time <= %d", startMs, endMs),
 		"endpoint like 'Prometheus*Query'",
-		"tap_port_type = 8",
+		"signal_source = 4",
 	}
 	if metric != "" {
 		filters = append(filters, fmt.Sprintf("`metric_name` = '%s'", metric))
