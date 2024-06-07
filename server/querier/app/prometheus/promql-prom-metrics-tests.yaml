@@ -39,7 +39,6 @@ test_cases:
   - query: '{__name__=~".*"}'
     should_fail: true
   - query: "nonexistent_metric_name"
-    should_fail: true
   - query: 'node_cpu_seconds_total offset {{.offset}}'
     variant_args: ['offset']
   - query: 'node_cpu_seconds_total offset -{{.offset}}'
@@ -50,7 +49,6 @@ test_cases:
     variant_args: ['simpleAggrOp']
   - query: '{{.simpleAggrOp}}(nonexistent_metric_name)'
     variant_args: ['simpleAggrOp']
-    should_fail: true
   - query: '{{.simpleAggrOp}} by() (node_cpu_seconds_total)'
     variant_args: ['simpleAggrOp']
   - query: '{{.simpleAggrOp}} by(instance) (node_cpu_seconds_total)'
@@ -59,6 +57,7 @@ test_cases:
     variant_args: ['simpleAggrOp']
   - query: '{{.simpleAggrOp}} by(nonexistent) (node_cpu_seconds_total)'
     variant_args: ['simpleAggrOp']
+    should_fail: true
   - query: '{{.simpleAggrOp}} without() (node_cpu_seconds_total)'
     variant_args: ['simpleAggrOp']
   - query: '{{.simpleAggrOp}} without(instance) (node_cpu_seconds_total)'
@@ -67,6 +66,7 @@ test_cases:
     variant_args: ['simpleAggrOp']
   - query: '{{.simpleAggrOp}} without(nonexistent) (node_cpu_seconds_total)'
     variant_args: ['simpleAggrOp']
+    should_fail: true
   - query: '{{.topBottomOp}} (3, node_cpu_seconds_total)'
     variant_args: ['topBottomOp']
   - query: '{{.topBottomOp}} by(instance) (2, node_cpu_seconds_total)'
@@ -155,7 +155,6 @@ test_cases:
     variant_args: ['simpleMathFunc']
   - query: '{{.extrapolatedRateFunc}}(nonexistent_metric[5m])'
     variant_args: ['extrapolatedRateFunc']
-    should_fail: true
   - query: '{{.extrapolatedRateFunc}}(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
     variant_args: ['extrapolatedRateFunc', 'range']
   - query: 'deriv(node_cpu_seconds_total{mode="system", cpu="0"}[{{.range}}])'
@@ -211,7 +210,6 @@ test_cases:
   - query: 'histogram_quantile({{.quantile}}, rate(apiserver_request_duration_seconds_bucket[1m]))'
     variant_args: ['quantile']
   - query: 'histogram_quantile(0.9, nonexistent_metric)'
-    should_fail: true
   - # Missing "le" label.
     query: 'histogram_quantile(0.9, node_cpu_seconds_total{mode="system", cpu="0"})'
   # - # Missing "le" label only in some series of the same grouping.
@@ -221,9 +219,7 @@ test_cases:
   - query: 'count_values("value", apiserver_request_duration_seconds_bucket)'
   - query: 'absent(node_cpu_seconds_total{mode="system", cpu="0"})'
   - query: 'absent(nonexistent_metric_name)'
-    should_fail: true
 
   # Subqueries.
   - query: 'max_over_time((time() - max(node_cpu_seconds_total{mode="system", cpu="0"}) < 1000)[5m:10s] offset 5m)'
   - query: 'avg_over_time(rate(node_cpu_seconds_total{mode="system", cpu="0"}[1m])[2m:10s])'
-  
