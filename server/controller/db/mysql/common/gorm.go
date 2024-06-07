@@ -53,20 +53,20 @@ func GetConnector(cfg config.MySqlConfig, useDatabase bool, timeout uint32, mult
 		return nil, err
 	}
 
-	config := mysql_driver.Config{
-		User:                 cfg.UserName,
-		Passwd:               cfg.UserPassword,
-		Net:                  "tcp",
-		Addr:                 fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		DBName:               database,
-		AllowNativePasswords: true,
-		Loc:                  location,
-		Timeout:              time.Duration(timeout) * time.Second,
-		ParseTime:            true,
-		MultiStatements:      multiStatements,
-		Params:               map[string]string{"charset": "utf8mb4"},
-	}
-	connector, err := mysql_driver.NewConnector(&config)
+	config := mysql_driver.NewConfig()
+	config.User = cfg.UserName
+	config.Passwd = cfg.UserPassword
+	config.Net = "tcp"
+	config.Addr = fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	config.DBName = database
+	config.AllowNativePasswords = true
+	config.Loc = location
+	config.Timeout = time.Duration(timeout) * time.Second
+	config.ParseTime = true
+	config.MultiStatements = multiStatements
+	config.Params = map[string]string{"charset": "utf8mb4"}
+
+	connector, err := mysql_driver.NewConnector(config)
 	if err != nil {
 		log.Error("Get database(%s) connector failed with error: %v", database, err.Error())
 		return nil, err
