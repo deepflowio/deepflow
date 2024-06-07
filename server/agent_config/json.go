@@ -91,4 +91,5 @@ type AgentGroupConfigResponse struct {
 	WasmPlugins                       []string       `json:"WASM_PLUGINS"`
 	SoPlugins                         []string       `json:"SO_PLUGINS"`
 	TeamID                            int            `json:"TEAM_ID"`
+	UserID                            int            `json:"USER_ID"`
 }

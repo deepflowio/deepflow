@@ -713,6 +713,7 @@ func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPerm
 		mData.VTapGroupName = &vtapGroup.Name
 		convertDBToJson(realConfig, mData, idToTapTypeName, lcuuidToDomain)
 		mData.TeamID = vtapGroup.TeamID
+		mData.UserID = vtapGroup.UserID
 		result = append(result, mData)
 	}
 
