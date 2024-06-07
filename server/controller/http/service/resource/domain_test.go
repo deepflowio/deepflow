@@ -33,7 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/http/service"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 )
 
 const (
@@ -195,7 +195,7 @@ func (t *SuiteTest) TestDeleteDomain() {
 	r = t.db.Create(&mysql.Pod{Base: mysql.Base{Lcuuid: uuid.NewString()}, Domain: domain.Lcuuid})
 	assert.Equal(t.T(), r.RowsAffected, int64(1))
 
-	DeleteDomainByNameOrUUID(domain.Lcuuid, &mysql.DB{DB: t.db, ORGID: common.DEFAULT_ORG_ID}, &service.UserInfo{}, &config.ControllerConfig{})
+	DeleteDomainByNameOrUUID(domain.Lcuuid, &mysql.DB{DB: t.db, ORGID: common.DEFAULT_ORG_ID}, &httpcommon.UserInfo{}, &config.ControllerConfig{})
 
 	var azs []mysql.AZ
 	t.db.Unscoped().Where("domain = ?", domain.Lcuuid).Find(&azs)
@@ -359,7 +359,7 @@ func (t *SuiteTest) TestDeleteSubDomain() {
 	r = t.db.Create(&mysql.Pod{Base: mysql.Base{Lcuuid: uuid.NewString()}, SubDomain: lcuuid})
 	assert.Equal(t.T(), r.RowsAffected, int64(1))
 
-	DeleteSubDomain(lcuuid, &mysql.DB{DB: t.db, ORGID: common.DEFAULT_ORG_ID}, &service.UserInfo{}, &config.ControllerConfig{})
+	DeleteSubDomain(lcuuid, &mysql.DB{DB: t.db, ORGID: common.DEFAULT_ORG_ID}, &httpcommon.UserInfo{}, &config.ControllerConfig{})
 
 	var networks []mysql.Network
 	t.db.Unscoped().Where("sub_domain = ?", lcuuid).Find(&networks)
