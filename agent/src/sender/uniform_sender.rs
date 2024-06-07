@@ -78,15 +78,29 @@ impl RefCountable for SenderCounter {
     }
 }
 
+//
+// 0          8          16         24         32         40         48         56         64
+// +----------+--------------------------------+----------+----------+----------+----------+
+// | frame_size                                | msg_type | version             | encoder  |
+// +----------+--------------------------------+----------+----------+----------+----------+
+// | team_id                                   | orgnization_id      | rsvd_1              |
+// +---------------------+----------+----------+---------------------+---------------------+
+// | agent_id            | rsvd_2   |
+// +--------------------------------+
+//
+const HEADER_VESION: u16 = 0x8000;
+
 #[derive(Debug)]
 struct Header {
-    frame_size: u32, // tcp发送时，需要按此长度收齐数据后，再decode (FrameSize总长度，包含了 BaseHeader的长度)
+    frame_size: u32,
     msg_type: SendMessageType,
-
-    version: u32, // 用来校验encode和decode是否配套
+    version: u16, // 从 0x8000 开始
+    encoder: u8,
     team_id: u32,
-    organize_id: u32,
-    vtap_id: u16, // roze用来上报server活跃的VTAP信息
+    organization_id: u16,
+    reserved_1: u16,
+    agent_id: u16,
+    reserved_2: u8,
 }
 
 impl Header {
@@ -94,9 +108,12 @@ impl Header {
         buffer.extend_from_slice(self.frame_size.to_be_bytes().as_slice());
         buffer.push(self.msg_type.into());
         buffer.extend_from_slice(self.version.to_le_bytes().as_slice());
+        buffer.push(self.encoder.into());
         buffer.extend_from_slice(self.team_id.to_le_bytes().as_slice());
-        buffer.extend_from_slice(self.organize_id.to_le_bytes().as_slice());
-        buffer.extend_from_slice(self.vtap_id.to_le_bytes().as_slice());
+        buffer.extend_from_slice(self.organization_id.to_le_bytes().as_slice());
+        buffer.extend_from_slice(self.reserved_1.to_le_bytes().as_slice());
+        buffer.extend_from_slice(self.agent_id.to_le_bytes().as_slice());
+        buffer.push(self.reserved_2.into());
     }
 }
 
@@ -110,33 +127,27 @@ struct Encoder<T> {
 
 impl<T: Sendable> Encoder<T> {
     const BUFFER_LEN: usize = 8192;
-    pub fn new(id: usize, msg_type: SendMessageType, vtap_id: u16) -> Self {
+    pub fn new(id: usize, msg_type: SendMessageType, agent_id: u16) -> Self {
         Self {
             id,
             buffer: Vec::with_capacity(Self::BUFFER_LEN),
             header: Header {
                 msg_type,
                 frame_size: 0,
-                version: 0,
+                version: HEADER_VESION,
                 team_id: 0,
-                organize_id: 0,
-                vtap_id,
+                organization_id: 0,
+                agent_id: agent_id,
+                reserved_1: 0,
+                reserved_2: 0,
+                encoder: 0,
             },
             _marker: PhantomData,
         }
     }
 
-    fn set_msg_type_and_version(&mut self, s: &T) {
-        if self.header.version != 0 {
-            return;
-        }
-        self.header.msg_type = s.message_type();
-        self.header.version = s.version();
-    }
-
     pub fn cache_to_sender(&mut self, s: T) {
         if self.buffer.is_empty() {
-            self.set_msg_type_and_version(&s);
             self.add_header();
         }
 
@@ -161,20 +172,20 @@ impl<T: Sendable> Encoder<T> {
 
     pub fn update_header(&mut self, name: &str, id: usize, config: &SenderAccess) {
         let config = config.load();
-        if self.header.vtap_id != config.vtap_id
+        if self.header.agent_id != config.vtap_id
             || self.header.team_id != config.team_id
-            || self.header.organize_id != config.organize_id
+            || self.header.organization_id != config.organize_id as u16
         {
             info!(
-                "{} id {} update vtap id from {:?} to {:?}, team id from {:?} to {:?}, organize id from {:?} to {:?}.",
+                "{} id {} update agent id from {:?} to {:?}, team id from {:?} to {:?}, organization id from {:?} to {:?}.",
                 name, id,
-                self.header.vtap_id, config.vtap_id,
+                self.header.agent_id, config.vtap_id,
                 self.header.team_id, config.team_id,
-                self.header.organize_id, config.organize_id,
+                self.header.organization_id, config.organize_id,
             );
-            self.header.vtap_id = config.vtap_id;
+            self.header.agent_id = config.vtap_id;
             self.header.team_id = config.team_id;
-            self.header.organize_id = config.organize_id;
+            self.header.organization_id = config.organize_id as u16;
         }
     }
 
