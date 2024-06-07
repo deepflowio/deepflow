@@ -133,6 +133,20 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 	return resourceVerify(url, http.MethodDelete, ra.userInfo, teamID, body)
 }
 
+func (ra *ResourceAccess) CanOperateDomainResource(teamID int, domainUUID string) error {
+	if !ra.fpermit.Enabled {
+		return nil
+	}
+	if (domainUUID == "" || domainUUID == common.DEFAULT_DOMAIN) &&
+		ra.userInfo.Type != common.USER_TYPE_SUPER_ADMIN {
+		return fmt.Errorf("non-super administrators do not have permission to operate")
+	}
+
+	url := fmt.Sprintf("http://%s:%d/v1/org/%d/permit_verify?method=update&resource_type=domain&resource_id=%s",
+		ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, domainUUID)
+	return PermitVerify(url, ra.userInfo, teamID)
+}
+
 func PermitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
 	response, err := common.CURLPerform(
 		http.MethodGet,

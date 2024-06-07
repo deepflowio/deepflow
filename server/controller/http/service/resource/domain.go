@@ -834,7 +834,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 
 	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
-	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanAddResource(domain.TeamID, common.SET_RESOURCE_TYPE_SUB_DOMAIN, lcuuid)
+	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanOperateDomainResource(domain.TeamID, subDomainCreate.Domain)
 	if err != nil {
 		return nil, err
 	}
@@ -876,7 +876,7 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 		)
 	}
 
-	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanUpdateResource(subDomain.TeamID, common.SET_RESOURCE_TYPE_SUB_DOMAIN, subDomain.Lcuuid, nil)
+	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanOperateDomainResource(subDomain.TeamID, subDomain.Domain)
 	if err != nil {
 		return nil, err
 	}
@@ -919,7 +919,7 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 		)
 	}
 
-	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanDeleteResource(subDomain.TeamID, common.SET_RESOURCE_TYPE_SUB_DOMAIN, subDomain.Lcuuid)
+	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanOperateDomainResource(subDomain.TeamID, subDomain.Domain)
 	if err != nil {
 		return nil, err
 	}
