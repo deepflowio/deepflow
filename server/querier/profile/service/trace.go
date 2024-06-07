@@ -29,6 +29,7 @@ import (
 
 	controller_common "github.com/deepflowio/deepflow/server/controller/common"
 	ingester_common "github.com/deepflowio/deepflow/server/ingester/profile/common"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	querier_common "github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
@@ -118,14 +119,8 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 		log.Errorf("ExecuteQuery failed: %v", querierDebug, err)
 		return
 	}
-	// XXX: move following line to a function
-	profileDebug := model.Debug{}
-	profileDebug.Sql = sql
-	profileDebug.IP = querierDebug["ip"].(string)
-	profileDebug.QueryUUID = querierDebug["query_uuid"].(string)
-	profileDebug.SqlCH = querierDebug["sql"].(string)
-	profileDebug.Error = querierDebug["error"].(string)
-	profileDebug.QueryTime = querierDebug["query_time"].(string)
+
+	profileDebug := NewProfileDebug(sql, querierDebug)
 	debugs.QuerierDebug = append(debugs.QuerierDebug, profileDebug)
 
 	formatStartTime := time.Now()
@@ -154,31 +149,26 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 
 	// step 1: merge to uniq function stacks
 	stackMap := make(map[string]int)
+	profileLocationStrByte := []byte{}
 	for _, value := range values {
 		switch valueSlice := value.(type) {
 		case []interface{}:
-			profileLocationStr := ""
 			if profileLocation, ok := valueSlice[profileLocationStrIndex].(string); ok {
-				profileLocationStr = profileLocation
-				// XXX: reuse dst for every profileLocationStr
-				dst := make([]byte, 0, len(profileLocationStr))
-				profileLocationStrByte, _ := ingester_common.ZstdDecompress(dst, []byte(profileLocationStr))
-				// XXX: reuse the memory of profileLocationStrByte
-				profileLocationStr = string(profileLocationStrByte)
+				profileLocationStrByte, _ = ingester_common.ZstdDecompress(profileLocationStrByte, utils.Slice(profileLocation))
 				// clip kernel function
 				if *args.MaxKernelStackDepth != common.MAX_KERNEL_STACK_DEPTH_DEFAULT && args.ProfileLanguageType == common.LANGUAGE_TYPE_EBPF {
-					profileLocationStrSlice := strings.Split(profileLocationStr, ";")
-					profileLocationStr = ClipKernelFunction(profileLocationStrSlice, *args.MaxKernelStackDepth)
+					profileLocationStrByte = ClipKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth)
 				}
-			}
-			profileValue := 0
-			if profileValueInt, ok := valueSlice[profileValueIndex].(int); ok {
-				profileValue = profileValueInt
-			}
-			if _, ok := stackMap[profileLocationStr]; ok {
-				stackMap[profileLocationStr] += profileValue
-			} else {
-				stackMap[profileLocationStr] = profileValue
+				profileLocationStr := string(profileLocationStrByte)
+				profileValue := 0
+				if profileValueInt, ok := valueSlice[profileValueIndex].(int); ok {
+					profileValue = profileValueInt
+				}
+				if _, ok := stackMap[profileLocationStr]; ok {
+					stackMap[profileLocationStr] += profileValue
+				} else {
+					stackMap[profileLocationStr] = profileValue
+				}
 			}
 		}
 	}
@@ -186,31 +176,44 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	// step 2: merge function stacks to profile tree
 	rootTotalValue := 0
 	for profileLocationStr, profileValue := range stackMap {
-		profileLocationStrSlice := strings.Split(profileLocationStr, ";")
-		for profileLocationIndex := range profileLocationStrSlice {
-			nodeProfileValue := 0
-			if profileLocationIndex == len(profileLocationStrSlice)-1 {
+		preSemicolonIndex := -1
+		curSemicolonIndex := -1
+		preUUID := controller_common.GenerateUUID("")
+		// Non-leaf nodes profile_value value is 0
+		nodeProfileValue := 0
+		for runeIndex, r := range profileLocationStr {
+			// Only leaf nodes profile_value have a value
+			if runeIndex == len(profileLocationStr)-1 {
+				curSemicolonIndex = len(profileLocationStr)
 				nodeProfileValue = profileValue
 				rootTotalValue += profileValue
+			} else if r == rune(';') {
+				// Non-leaf nodes
+				curSemicolonIndex = runeIndex
+				nodeProfileValue = 0
 			}
-			// XXX: reuse the memory of profileLocationStrByte
-			profileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex+1], ";")
+			if curSemicolonIndex < 0 {
+				continue
+			}
+
+			profileLocationStrs := profileLocationStr[:curSemicolonIndex]
+			// Achieve the hash effect with uuid
 			nodeID := controller_common.GenerateUUID(profileLocationStrs)
 			existNode, ok := NodeIDToProfileTree[nodeID]
 			if ok {
 				existNode.SelfValue += nodeProfileValue
 				existNode.TotalValue = existNode.SelfValue
 			} else {
-				// XXX: After the aforementioned memory reuse optimization is completed, memory allocation is required here.
-				nodeProfileLocationStr := profileLocationStrSlice[profileLocationIndex]
+				nodeProfileLocationStr := profileLocationStr[preSemicolonIndex+1 : curSemicolonIndex]
 				node := NewProfileTreeNode(nodeProfileLocationStr, nodeID, nodeProfileValue)
-				if profileLocationIndex != 0 {
-					// XXX: reuse the memory of profileLocationStrByte
-					parentProfileLocationStrs := strings.Join(profileLocationStrSlice[:profileLocationIndex], ";")
-					node.ParentNodeID = controller_common.GenerateUUID(parentProfileLocationStrs)
+				if preSemicolonIndex > 0 {
+					node.ParentNodeID = preUUID
 				}
 				NodeIDToProfileTree[nodeID] = node
 			}
+			preSemicolonIndex = curSemicolonIndex
+			preUUID = nodeID
+			curSemicolonIndex = -1
 		}
 	}
 
@@ -269,21 +272,31 @@ func UpdateNodeTotalValue(node *model.ProfileTreeNode, parentNode *model.Profile
 	}
 }
 
-func ClipKernelFunction(profileLocationStrSlice []string, maxKernelStackDepth int) string {
-	kernelFuncs := []string{}
-	newProfileLocationStrSlice := []string{}
-	for _, FuncStr := range profileLocationStrSlice {
-		if strings.HasPrefix(FuncStr, "[k]") {
-			kernelFuncs = append(kernelFuncs, FuncStr)
-		} else {
-			newProfileLocationStrSlice = append(newProfileLocationStrSlice, FuncStr)
+func ClipKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int) []byte {
+	startIndex := 0
+	sep := "[k]"
+	clipIndex := len(profileLocationByteSlice)
+	for layer := -1; layer < maxKernelStackDepth; layer++ {
+		kernelFuncIndex := strings.Index(utils.String(profileLocationByteSlice[startIndex:]), sep)
+		if kernelFuncIndex == -1 {
+			break
 		}
+		startIndex += kernelFuncIndex
+		clipIndex = startIndex
+		startIndex += len(sep)
 	}
-	kernelFuncIndex := maxKernelStackDepth
-	if len(kernelFuncs) < maxKernelStackDepth {
-		kernelFuncIndex = len(kernelFuncs)
+	if clipIndex > 0 && clipIndex < len(profileLocationByteSlice) {
+		clipIndex -= 1
 	}
-	newProfileLocationStrSlice = append(newProfileLocationStrSlice, kernelFuncs[:kernelFuncIndex]...)
-	profileLocationStr := strings.Join(newProfileLocationStrSlice, ";")
-	return profileLocationStr
+	return profileLocationByteSlice[:clipIndex]
+}
+
+func NewProfileDebug(sql string, querierDebug map[string]interface{}) (profileDebug model.Debug) {
+	profileDebug.Sql = sql
+	profileDebug.IP = querierDebug["ip"].(string)
+	profileDebug.QueryUUID = querierDebug["query_uuid"].(string)
+	profileDebug.SqlCH = querierDebug["sql"].(string)
+	profileDebug.Error = querierDebug["error"].(string)
+	profileDebug.QueryTime = querierDebug["query_time"].(string)
+	return
 }
