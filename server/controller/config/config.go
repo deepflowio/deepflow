@@ -82,6 +82,7 @@ type ControllerConfig struct {
 	BillingMethod                  string `default:"license" yaml:"billing-method"`
 	PodClusterInternalIPToIngester int    `default:"0" yaml:"pod-cluster-internal-ip-to-ingester"`
 	NoTeamIDRefused                bool   `default:"false" yaml:"no-teamid-refused"`
+	AllAgentConnectToNatIP         bool   `default:"false" yaml:"all-agent-connect-to-nat-ip"`
 
 	DFWebService DFWebService   `yaml:"df-web-service"`
 	FPermit      common.FPermit `yaml:"fpermit"`
@@ -134,6 +135,7 @@ func (c *Config) Load(path string) {
 	c.ControllerConfig.TrisolarisCfg.SetNoTeamIDRefused(c.ControllerConfig.NoTeamIDRefused)
 	c.ControllerConfig.TrisolarisCfg.SetFPermitConfig(c.ControllerConfig.FPermit)
 	c.ControllerConfig.TrisolarisCfg.SetIngesterAPIPort(c.ControllerConfig.IngesterApi.Port)
+	c.ControllerConfig.TrisolarisCfg.SetAllAgentConnectToNatIP(c.ControllerConfig.AllAgentConnectToNatIP)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)
