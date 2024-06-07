@@ -56,14 +56,14 @@ const (
 )
 
 const (
-	EXT_METRICS_TABLE         = "metrics"
-	PROMETHEUS_TABLE          = "samples"
-	L4_FLOW_LOG_TABLE         = "l4_flow_log"
-	L7_FLOW_LOG_TABLE         = "l7_flow_log"
-	VTAP_APP_PORT_TABLE       = "vtap_app_port"
-	VTAP_FLOW_PORT_TABLE      = "vtap_flow_port"
-	VTAP_APP_EDGE_PORT_TABLE  = "vtap_app_edge_port"
-	VTAP_FLOW_EDGE_PORT_TABLE = "vtap_flow_edge_port"
+	EXT_METRICS_TABLE     = "metrics"
+	PROMETHEUS_TABLE      = "samples"
+	L4_FLOW_LOG_TABLE     = "l4_flow_log"
+	L7_FLOW_LOG_TABLE     = "l7_flow_log"
+	NETWORK_TABLE         = "network"
+	APPLICATION_TABLE     = "application"
+	NETWORK_MAP_TABLE     = "network_map"
+	APPLICATION_MAP_TABLE = "application_map"
 )
 
 // indexes to column indexes
@@ -88,8 +88,8 @@ const (
 var ignorableTagNames = []string{"pod_ingress", "lb_listener", "time"}
 
 var edgeTableNames = []string{
-	VTAP_FLOW_EDGE_PORT_TABLE,
-	VTAP_APP_EDGE_PORT_TABLE,
+	NETWORK_MAP_TABLE,
+	APPLICATION_MAP_TABLE,
 	L4_FLOW_LOG_TABLE,
 	L7_FLOW_LOG_TABLE,
 }
@@ -381,7 +381,7 @@ func parseMetric(matchers []*prompb.LabelMatcher) (prefixType prefix, metricName
 			// DeepFlow native metrics: ${db}__${table}__${metricsName}
 			// i.e.: flow_log__l4_flow_log__byte_rx
 			// DeepFlow native metrics(flow_metrics): ${db}__${table}__${metricsName}__${datasource}
-			// i.e.: flow_metrics__vtap_flow_port__byte_rx__1m
+			// i.e.: flow_metrics__network__byte_rx__1m
 			// Telegraf integrated metrics: ext_metrics__metrics__${integratedSource}_${inputTarget}__${metricsName}
 			// i.e.: ext_metrics__metrics__influxdb_cpu__usage_user
 			// Prometheus integrated metrics: prometheus__samples__${metricsName}
@@ -482,7 +482,7 @@ func showTags(ctx context.Context, db string, table string, startTime int64, end
 		}
 
 		// `edgeTable` storage data which contains both client and server-side, so metrics should cover both, else only one of them
-		// e.g.: auto_instance_0/auto_instance_1 in `vtap_app_edge_port`, auto_instance in `vtap_app_port`
+		// e.g.: auto_instance_0/auto_instance_1 in `application_map`, auto_instance in `application`
 		if common.IsValueInSliceString(table, edgeTableNames) && tagName != clientTagName {
 			// tagType=int_enum/string_enum
 			if strings.Contains(tagType, ENUM_TAG_SUFFIX) {
