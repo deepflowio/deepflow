@@ -17,12 +17,12 @@
 
 解析规则：
 
-| db                                         | metrics                                          |
-|--------------------------------------------|--------------------------------------------------|
-| `flow_log`, `event`, `deepflow_system`     | `{db}__{table}__{metricsName}`                   |
-| `flow_metrics`                             | `{db}__{table}__{metricsName}__{datasource}`     |
-| `ext_metrics` (ingested by prometheus)     | `ext_metrics__metrics__prometheus_{metricsName}` |
-| `ext_metrics` (TODO, ingested by influxdb) | `ext_metrics__metrics__influxdb_{metricsName}`   |
+| db                                                        | metrics                                          |
+|-----------------------------------------------------------|--------------------------------------------------|
+| `flow_log`, `event`, `deepflow_admin`, `deepflow_tenant`  | `{db}__{table}__{metricsName}`                   |
+| `flow_metrics`                                            | `{db}__{table}__{metricsName}__{datasource}`     |
+| `prometheus` (ingested by prometheus)                     | `prometheus__samples__{metricsName}`             |
+| `ext_metrics` (TODO, ingested by influxdb)                | `ext_metrics__metrics__influxdb_{metricsName}`   |
 
 其中，prometheus 写入的指标量, 因为需要支持 prometheus 页面的 RemoteRead, 所以直接使用指标量名称裸查, 并且去掉由 ext_common 中 getExtMetrics 所增加的 `metrics.` 前缀。Querier 针对 `ext_metrics` 查询的逻辑与其他 db 不同，查询时需要将 `table` 设置为 `prometheus.{metricsName}`, 查询的 metricsName 需携带 `metrics.` 前缀（如：`select metrics.node_cpu_seconds_total from prometheus.node_cpu_seconds_total`）
 
