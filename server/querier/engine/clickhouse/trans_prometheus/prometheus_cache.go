@@ -56,12 +56,14 @@ func GenerateOrgMap() {
 		log.Errorf("request controller failed: %s, URL: %s", resp, getOrgUrl)
 		return
 	}
+	orgPrometheus := map[string]PrometheusMap{}
 	for i := range resp.Get("DATA").MustArray() {
 		orgIDInt := resp.Get("DATA").GetIndex(i).Get("ORG_ID").MustInt()
 		orgIDStr := fmt.Sprintf("%d", orgIDInt)
 		prometheusMap := GenerateMap(orgIDStr)
-		ORGPrometheus[orgIDStr] = prometheusMap
+		orgPrometheus[orgIDStr] = prometheusMap
 	}
+	ORGPrometheus = orgPrometheus
 }
 
 func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
