@@ -231,7 +231,7 @@ impl L7ProtocolParserInterface for DnsLog {
             info.set_is_on_blacklist(config);
         }
         if !info.is_on_blacklist && !self.last_is_on_blacklist {
-            if info.query_type == DNS_RESPONSE {
+            if info.msg_type == LogMessageType::Response {
                 self.perf_stats.as_mut().map(|p| p.inc_resp());
                 if info.status == L7ResponseStatus::ClientError {
                     self.perf_stats.as_mut().map(|p| p.inc_req_err());
