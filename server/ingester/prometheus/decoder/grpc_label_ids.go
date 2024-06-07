@@ -510,6 +510,7 @@ func (t *PrometheusLabelTable) testString(request string) string {
 	}
 	metricReq.PodClusterId = proto.Uint32(uint32(clusterId))
 	metricReq.EpcId = proto.Uint32(uint32(epcId))
+	metricReq.OrgId = proto.Uint32(uint32(orgId))
 	targetReq.PodClusterId = proto.Uint32(uint32(clusterId))
 	targetReq.EpcId = proto.Uint32(uint32(epcId))
 	targetReq.OrgId = proto.Uint32(uint32(orgId))
