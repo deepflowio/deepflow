@@ -154,6 +154,10 @@ func GetIsRefused() bool {
 	return trisolarisManager.config.GetNoTeamIDRefused()
 }
 
+func GetAllAgentConnectToNatIP() bool {
+	return trisolarisManager.config.GetAllAgentConnectToNatIP()
+}
+
 func GetTrisolaris(orgID int) *Trisolaris {
 	if utils.CheckOrgID(orgID) == false || trisolarisManager == nil {
 		return nil
