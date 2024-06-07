@@ -464,10 +464,13 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 	runOnce := func() {
 		var err error
 
+		var orgIds []uint16
 		if table.isMaster {
 			table.requestOrgIds()
+			orgIds = table.orgIds
+		} else {
+			orgIds = QueryAllOrgIDs()
 		}
-		orgIds := QueryAllOrgIDs()
 
 		for _, orgId := range orgIds {
 			if table.isMaster {
