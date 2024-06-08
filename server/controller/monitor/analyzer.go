@@ -109,7 +109,7 @@ func (c *AnalyzerCheck) Start(sCtx context.Context) {
 			if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
 				c.vtapAnalyzerAlloc(dbAndIP.db, dbAndIP.ip)
 			} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
-				rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(dbAndIP.db, false, cfg.DataDuration)
+				rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTraffic(dbAndIP.db, false, cfg.DataDuration)
 			} else {
 				log.Errorf("algorithm(%s) is not supported, only supports: %s, %s", cfg.Algorithm,
 					common.ANALYZER_ALLOC_BY_INGESTED_DATA, common.ANALYZER_ALLOC_BY_AGENT_COUNT)
