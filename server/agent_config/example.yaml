@@ -951,11 +951,10 @@ vtap_group_id: g-xxxxxx
   ############
   ## Tunnel ##
   ############
-  ## Remove ERSPAN Header
-  ## Note: Whether to remove the ERSPAN header in mirrored traffic. It is applicable to
-  ##   the ERSPAN protocol used by physical switch traffic mirroring and the TEB
-  ##   (Transport Ethernet Bridging) protocol used by VMware remote mirroring.
-  #decap-erspan: false
+  ## Remove Tunnel Header
+  ## Default: [], Range: [ERSPAN, VXLAN, TEB]
+  ## Note: Whether to remove the tunnel header in mirrored traffic.
+  #trim-tunnel-types: []
 
   ##########
   ## gRPC ##

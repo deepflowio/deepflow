@@ -117,6 +117,7 @@ impl LocalPlusModeDispatcher {
         let npb_dedup_enabled = base.npb_dedup_enabled.clone();
         let ctrl_mac = base.ctrl_mac;
         let pool_raw_size = self.pool_raw_size;
+        let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
 
         self.flow_generator_thread_handler.replace(
             thread::Builder::new()
@@ -208,6 +209,7 @@ impl LocalPlusModeDispatcher {
                                 &tap_type_handler,
                                 &mut tunnel_info,
                                 cur_tunnel_type_bitmap,
+                                tunnel_type_trim_bitmap,
                             ) {
                                 Ok((l, _)) => l,
                                 Err(e) => {
