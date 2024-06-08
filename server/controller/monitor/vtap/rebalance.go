@@ -28,6 +28,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 )
 
+var (
+	intervalSendWeight = time.Second * 10
+)
+
 type RebalanceCheck struct {
 	vCtx    context.Context
 	vCancel context.CancelFunc
@@ -186,7 +190,7 @@ func sendWeight(ctx context.Context, dataDuration int) {
 		sCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		ticker := time.NewTicker(time.Second * 10)
+		ticker := time.NewTicker(intervalSendWeight)
 		defer ticker.Stop()
 
 		for {
