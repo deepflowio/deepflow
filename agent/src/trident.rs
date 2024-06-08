@@ -2123,6 +2123,12 @@ impl AgentComponents {
                 .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
                 .pcap_interfaces(pcap_interfaces)
                 .local_dispatcher_count(local_dispatcher_count)
+                .tunnel_type_trim_bitmap(
+                    config_handler
+                        .candidate_config
+                        .dispatcher
+                        .tunnel_type_trim_bitmap,
+                )
                 .analyzer_raw_packet_block_size(
                     yaml_config.analyzer_raw_packet_block_size as usize,
                 );

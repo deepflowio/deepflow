@@ -61,7 +61,7 @@ type StaticConfig struct {
 	PacketDelay                        *string                     `yaml:"packet-delay,omitempty"`
 	Triple                             *TripleMapConfig            `yaml:"triple,omitempty"`
 	KubernetesPollerType               *string                     `yaml:"kubernetes-poller-type,omitempty"`
-	DecapErspan                        *bool                       `yaml:"decap-erspan,omitempty"`
+	TrimTunnelTypes                    []string                    `yaml:"trim-tunnel-types,omitempty"`
 	AnalyzerIp                         *string                     `yaml:"analyzer-ip,omitempty"`
 	AnalyzerPort                       *uint16                     `yaml:"analyzer-port,omitempty"`
 	KubernetesNamespace                *string                     `yaml:"kubernetes-namespace,omitempty"`

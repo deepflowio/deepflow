@@ -311,6 +311,7 @@ pub struct DispatcherConfig {
     pub capture_packet_size: u32,
     pub l7_log_packet_size: u32,
     pub tunnel_type_bitmap: TunnelTypeBitmap,
+    pub tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub trident_type: TridentType,
     pub vtap_id: u16,
     pub capture_socket_type: CaptureSocketType,
@@ -1260,6 +1261,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 dispatcher_queue: conf.yaml_config.dispatcher_queue,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
+                tunnel_type_trim_bitmap: TunnelTypeBitmap::from_strings(
+                    &conf.yaml_config.trim_tunnel_types,
+                ),
                 trident_type: conf.trident_type,
                 vtap_id: conf.vtap_id as u16,
                 capture_socket_type: conf.capture_socket_type,
