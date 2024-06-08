@@ -52,8 +52,8 @@ import (
 //    - demo_cpu_usage_seconds_total
 // - DeepFlow metrics: Return all metrics by ${db_name}__${table_name}__${time_granularity}__${metrics_name}, where you need to replace . in metrics_name with _ to return, for example
 //    - flow_log__l7_flow_log__rrt
-//    - flow_metrics__vtap_flow_port__1m__rtt
-//    - ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total
+//    - flow_metrics__network__rtt__1m
+//    - prometheus__samples__demo_cpu_usage_seconds_total
 //    - ext_metrics__metrics__influxdb_cpu
 
 // Note that as can be seen from the above description, Prometheus native metrics actually return twice.
@@ -858,8 +858,8 @@ func (p *prometheusExecutor) getAllOrganizations() []string {
 
 func (p *prometheusExecutor) loadExtraLabelsCache(orgID string) {
 	// DeepFlow Source have same tag collections, so just try query 1 table to add all external tags
-	showTags := fmt.Sprintf("show tags from %s", VTAP_FLOW_PORT_TABLE)
-	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, VTAP_FLOW_PORT_TABLE, showTags, "", orgID, false, context.Background())
+	showTags := fmt.Sprintf("show tags from %s", NETWORK_TABLE)
+	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, NETWORK_TABLE, showTags, "", orgID, false, context.Background())
 	if err != nil {
 		log.Errorf("load external tag error when start up prometheus executor: %s", err)
 		return
