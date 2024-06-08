@@ -119,6 +119,10 @@ pub const BODY_PARAM_MAX: u8 = 5;
 // Mysql constants
 pub const PROTOCOL_VERSION: u8 = 10;
 
+// Compressed Header
+pub const COMPRESS_HEADER_LEN: usize = 7;
+pub const COMPRESS_HEADER_UNCOMPRESS_OFFSET: usize = 4;
+
 // Header
 pub const HEADER_LEN: usize = 4;
 
@@ -399,6 +403,13 @@ pub const AFFECTED_ROWS_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN
 pub const SQL_STATE_OFFSET: usize = ERROR_CODE_OFFSET + ERROR_CODE_LEN;
 pub const STATEMENT_ID_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN;
 pub const EXECUTE_STATEMENT_PARAMS_OFFSET: usize = STATEMENT_ID_OFFSET + STATEMENT_ID_LEN + 5;
+
+// Login
+pub const CLIENT_PROTOCOL_41: u16 = 512;
+pub const CLIENT_CAPABILITIES_FLAGS_OFFSET: usize = 0;
+pub const FILTER_OFFSET: usize = 9;
+pub const FILTER_SIZE: usize = 23;
+pub const LOGIN_USERNAME_OFFSET: usize = 32;
 
 // int
 pub const INT_FLAGS_2: u8 = 0xfc;
