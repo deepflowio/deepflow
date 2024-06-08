@@ -28,6 +28,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 )
 
+var (
+	intervalSendWeight = time.Second * 10
+)
+
 type RebalanceCheck struct {
 	vCtx    context.Context
 	vCancel context.CancelFunc
@@ -81,6 +85,9 @@ func (r *RebalanceCheck) Start(sCtx context.Context) {
 
 		duration := r.cfg.IngesterLoadBalancingConfig.DataDuration
 		r.analyzerRebalanceByTraffic(duration)
+
+		// report agent weight every 10 secends
+		sendWeight(sCtx, duration)
 
 		ticker := time.NewTicker(time.Duration(r.cfg.IngesterLoadBalancingConfig.RebalanceInterval) * time.Second)
 		defer ticker.Stop()
@@ -162,13 +169,13 @@ func (r *RebalanceCheck) analyzerRebalance(db *mysql.DB) {
 func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
 	for _, db := range mysql.GetDBs().All() {
 		log.Infof("ORG(id=%d database=%s) check analyzer rebalance, traffic duration(%vs)", db.ORGID, db.Name, dataDuration)
-		analyzerInfo := rebalance.NewAnalyzerInfo()
+		analyzerInfo := rebalance.NewAnalyzerInfo(false)
 		result, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
 		if err != nil {
 			log.Errorf("ORG(id=%d database=%s) fail to rebalance analyzer by data(if check: true): %v", db.ORGID, db.Name, err)
 			return
 		}
-		if result.TotalSwitchVTapNum != 0 {
+		if result != nil && result.TotalSwitchVTapNum != 0 {
 			log.Infof("ORG(id=%d database=%s) need rebalance, total switch vtap num(%d)", db.ORGID, db.Name, result.TotalSwitchVTapNum)
 			if _, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, false, dataDuration); err != nil {
 				log.Errorf("ORG(id=%d database=%s) fail to rebalance analyzer by data(if check: false): %v", db.ORGID, db.Name, err)
@@ -176,4 +183,32 @@ func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
 			continue
 		}
 	}
+}
+
+func sendWeight(ctx context.Context, dataDuration int) {
+	go func() {
+		sCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		ticker := time.NewTicker(intervalSendWeight)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-sCtx.Done():
+				log.Infof("agent traffic context done")
+				return
+			case <-ticker.C:
+				for _, db := range mysql.GetDBs().All() {
+					analyzerInfo := rebalance.NewAnalyzerInfo(true)
+					_, err := analyzerInfo.RebalanceAnalyzerByTraffic(db, true, dataDuration)
+					if err != nil {
+						log.Errorf("ORG(id=%d database=%s) fail to rebalance analyzer by data(if check: true): %v", db.ORGID, db.Name, err)
+						return
+					}
+				}
+			default:
+			}
+		}
+	}()
 }

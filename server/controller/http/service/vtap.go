@@ -850,7 +850,7 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 		return vtapControllerRebalance(db, azs, ifCheck)
 	} else {
 		if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
-			return rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(db, ifCheck, cfg.DataDuration)
+			return rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTraffic(db, ifCheck, cfg.DataDuration)
 		} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
 			result, err := vtapAnalyzerRebalance(db, azs, ifCheck)
 			if err != nil {
