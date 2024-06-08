@@ -276,7 +276,7 @@ func (s *LabelSynchronizer) splitData(req *trident.PrometheusLabelRequest) (*dat
 
 func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *controller.SyncPrometheusRequest {
 	return &controller.SyncPrometheusRequest{
-		OrgId:       proto.Uint32(uint32(1)), // TODO
+		OrgId:       proto.Uint32(uint32(s.org.GetID())),
 		MetricNames: toEncode.metricNames.ToSlice(),
 		LabelNames:  toEncode.labelNames.ToSlice(),
 		LabelValues: toEncode.labelValues.ToSlice(),
