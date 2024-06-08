@@ -67,6 +67,9 @@ func (d *DataSource) getDataSources() gin.HandlerFunc {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 		dataSourceService := service.NewDataSource(httpcommon.GetUserInfo(c), d.cfg)
 		data, err := dataSourceService.GetDataSources(orgID.(int), args, &d.cfg.Spec)
+		if err != nil {
+			log.Error("ORGID-%d get data source error: %s", orgID, err)
+		}
 		JsonResponse(c, data, err)
 	})
 }

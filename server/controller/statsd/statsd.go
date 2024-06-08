@@ -50,11 +50,7 @@ func NewStatsdMonitor(cfg config.StatsdConfig) {
 	return
 }
 
-func (s *StatsdMonitor) RegisterStatsdTable(stable Statsdtable) {
-	if !s.enable {
-		return
-	}
-
+func (s *StatsdMonitor) initStatsdClient() error {
 	if dfStatsdClient == nil {
 		var err error
 		dfStatsdClient, err = stats.NewUDPClient(stats.UDPConfig{
@@ -62,9 +58,20 @@ func (s *StatsdMonitor) RegisterStatsdTable(stable Statsdtable) {
 			PayloadSize: 1400,
 		})
 		if err != nil {
-			log.Warningf("connect (%s:%d) stats udp server failed: %s", s.host, s.port, err.Error())
-			return
+			return fmt.Errorf("connect (%s:%d) stats udp server failed: %s", s.host, s.port, err.Error())
 		}
+	}
+	return nil
+}
+
+func (s *StatsdMonitor) RegisterStatsdTable(stable Statsdtable) {
+	if !s.enable {
+		return
+	}
+
+	if err := s.initStatsdClient(); err != nil {
+		log.Warning(err)
+		return
 	}
 
 	encoder := new(codec.SimpleEncoder)
@@ -128,4 +135,22 @@ func (s *StatsdMonitor) RegisterStatsdTable(stable Statsdtable) {
 			encoder.Reset()
 		}
 	}
+}
+
+func (s *StatsdMonitor) Send(data *pb.Stats) error {
+	if !s.enable {
+		return fmt.Errorf("statsd monitor diable")
+	}
+
+	if err := s.initStatsdClient(); err != nil {
+		return err
+	}
+
+	encoder := new(codec.SimpleEncoder)
+	data.Encode(encoder)
+	defer encoder.Reset()
+	if err := dfStatsdClient.Write(encoder.Bytes()); err != nil {
+		return err
+	}
+	return nil
 }
