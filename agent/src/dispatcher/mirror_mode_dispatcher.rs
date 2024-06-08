@@ -465,6 +465,7 @@ impl MirrorModeDispatcher {
                     &self.base.tap_type_handler,
                     &mut self.base.tunnel_info,
                     &self.base.tunnel_type_bitmap,
+                    self.base.tunnel_type_trim_bitmap,
                     &self.base.counter,
                 ) as usize;
                 if len > packet.capture_length as usize {
@@ -638,6 +639,7 @@ impl MirrorModeDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         tunnel_type_bitmap: &Arc<Mutex<TunnelTypeBitmap>>,
+        tunnel_type_trim_bitmap: TunnelTypeBitmap,
         counter: &Arc<PacketCounter>,
     ) -> usize {
         let (decap_length, _) = match BaseDispatcher::decap_tunnel(
@@ -645,6 +647,7 @@ impl MirrorModeDispatcher {
             tap_type_handler,
             tunnel_info,
             tunnel_type_bitmap.lock().unwrap().clone(),
+            tunnel_type_trim_bitmap,
         ) {
             Ok(d) => d,
             Err(e) => {

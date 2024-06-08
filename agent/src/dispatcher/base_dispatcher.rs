@@ -86,6 +86,7 @@ pub(super) struct BaseDispatcher {
     pub(super) collector_config: CollectorAccess,
 
     pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
+    pub(super) tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub(super) tunnel_info: TunnelInfo,
 
     pub(super) tap_type_handler: TapTypeHandler,
@@ -166,6 +167,7 @@ impl BaseDispatcher {
             analyzer_ip: default_address.to_string(),
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
+            tunnel_type_trim_bitmap: self.tunnel_type_trim_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
             #[cfg(target_os = "linux")]
             netns: self.netns.clone(),
@@ -340,6 +342,7 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
+        trim_bitmap: &TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         let mut decap_len = 0;
         let mut tap_type = TapType::Any;
@@ -357,7 +360,7 @@ impl BaseDispatcher {
             if tunnel_info.tunnel_type == TunnelType::None {
                 break;
             }
-            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
+            if trim_bitmap.has(tunnel_info.tunnel_type) {
                 // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
                 // vxlan-erspan：隧道信息为空
                 // erspan-vxlan；隧道信息为vxlan，隧道层数为1
@@ -377,9 +380,10 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
+        trim_bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         *tunnel_info = Default::default();
-        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
+        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
 
     pub(super) fn check_and_update_bpf(&mut self) {
@@ -463,6 +467,7 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
+        trim_bitmap: &TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         let mut decap_len = 0;
         let mut tap_type = TapType::Any;
@@ -480,7 +485,7 @@ impl BaseDispatcher {
             if tunnel_info.tunnel_type == TunnelType::None {
                 break;
             }
-            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
+            if trim_bitmap.has(tunnel_info.tunnel_type) {
                 // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
                 // vxlan-erspan：隧道信息为空
                 // erspan-vxlan；隧道信息为vxlan，隧道层数为1
@@ -497,9 +502,10 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
+        trim_bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         *tunnel_info = Default::default();
-        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
+        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
 
     pub(super) fn check_and_update_bpf(&mut self) {
@@ -632,6 +638,7 @@ pub struct BaseDispatcherListener {
     #[cfg(target_os = "linux")]
     pub platform_poller: Arc<crate::platform::GenericPoller>,
     pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
+    pub tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
     pub pause: Arc<AtomicBool>,
