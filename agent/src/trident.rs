@@ -2992,6 +2992,7 @@ fn build_dispatchers(
         .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
         .pcap_interfaces(pcap_interfaces.clone())
         .local_dispatcher_count(local_dispatcher_count)
+        .tunnel_type_trim_bitmap(dispatcher_config.tunnel_type_trim_bitmap)
         .analyzer_raw_packet_block_size(yaml_config.analyzer_raw_packet_block_size as usize);
     #[cfg(target_os = "linux")]
     let dispatcher_builder = dispatcher_builder

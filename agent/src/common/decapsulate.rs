@@ -17,6 +17,7 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
+use log::warn;
 use num_enum::TryFromPrimitive;
 
 use super::consts::*;
@@ -36,7 +37,8 @@ pub enum TunnelType {
     Ipip = DecapType::Ipip as u8,
     TencentGre = DecapType::Tencent as u8,
     Geneve = DecapType::Geneve as u8,
-    ErspanOrTeb = DecapType::Geneve as u8 + 1,
+    Erspan = DecapType::Geneve as u8 + 1,
+    Teb = DecapType::Geneve as u8 + 2,
 }
 
 impl From<DecapType> for TunnelType {
@@ -59,7 +61,20 @@ impl fmt::Display for TunnelType {
             TunnelType::Ipip => write!(f, "IPIP"),
             TunnelType::TencentGre => write!(f, "GRE"),
             TunnelType::Geneve => write!(f, "Geneve"),
-            TunnelType::ErspanOrTeb => write!(f, "ERSPAN_TEB"),
+            TunnelType::Erspan => write!(f, "ERSPAN"),
+            TunnelType::Teb => write!(f, "TEB"),
+        }
+    }
+}
+
+impl From<&str> for TunnelType {
+    fn from(value: &str) -> Self {
+        let value = value.to_ascii_uppercase();
+        match value.as_str() {
+            "VXLAN" => TunnelType::Vxlan,
+            "ERSPAN" => TunnelType::Erspan,
+            "TEB" => TunnelType::Teb,
+            _ => TunnelType::None,
         }
     }
 }
@@ -79,6 +94,20 @@ impl TunnelTypeBitmap {
         for tunnel_type in tunnel_types.iter() {
             bitmap.0 |= 1 << *tunnel_type as u16;
         }
+        bitmap
+    }
+
+    pub fn from_strings(tunnel_types: &Vec<String>) -> Self {
+        let mut bitmap = TunnelTypeBitmap(0);
+        for s in tunnel_types {
+            let tunnel_type = TunnelType::from(s.as_str());
+            if tunnel_type == TunnelType::None {
+                warn!("Unknown tunnel type {}.", s);
+                continue;
+            }
+            bitmap.add(tunnel_type);
+        }
+
         bitmap
     }
 
@@ -117,8 +146,12 @@ impl fmt::Display for TunnelTypeBitmap {
             write!(f, "{}{}", separation, TunnelType::Geneve)?;
             separation = " ";
         }
-        if self.has(TunnelType::ErspanOrTeb) {
-            write!(f, "{}{}", separation, TunnelType::ErspanOrTeb)?;
+        if self.has(TunnelType::Erspan) {
+            write!(f, "{}{}", separation, TunnelType::Erspan)?;
+            separation = " ";
+        }
+        if self.has(TunnelType::Teb) {
+            write!(f, "{}{}", separation, TunnelType::Teb)?;
         }
         write!(f, "")
     }
@@ -263,7 +296,7 @@ impl TunnelInfo {
                 if self.tier == 0 {
                     self.decapsulate_addr(l3_packet);
                     self.decapsulate_mac(packet);
-                    self.tunnel_type = TunnelType::ErspanOrTeb;
+                    self.tunnel_type = TunnelType::Erspan;
                 }
                 self.tier += 1;
                 ip_header_size + GRE_HEADER_SIZE_DECAP + ERSPAN_I_HEADER_SIZE
@@ -275,7 +308,7 @@ impl TunnelInfo {
                 if self.tier == 0 {
                     self.decapsulate_addr(l3_packet);
                     self.decapsulate_mac(packet);
-                    self.tunnel_type = TunnelType::ErspanOrTeb;
+                    self.tunnel_type = TunnelType::Erspan;
                     self.id = bytes::read_u32_be(
                         &l3_packet[ip_header_size + gre_header_size + ERSPAN_ID_OFFSET..],
                     ) & 0x3ff;
@@ -290,7 +323,7 @@ impl TunnelInfo {
                 if self.tier == 0 {
                     self.decapsulate_addr(l3_packet);
                     self.decapsulate_mac(packet);
-                    self.tunnel_type = TunnelType::ErspanOrTeb;
+                    self.tunnel_type = TunnelType::Erspan;
                     self.id = bytes::read_u32_be(
                         &l3_packet[ip_header_size + gre_header_size + ERSPAN_ID_OFFSET..],
                     ) & 0x3ff;
@@ -390,7 +423,7 @@ impl TunnelInfo {
         if self.tier == 0 {
             self.decapsulate_addr(l3_packet);
             self.decapsulate_mac(packet);
-            self.tunnel_type = TunnelType::ErspanOrTeb;
+            self.tunnel_type = TunnelType::Teb;
             self.id = bytes::read_u32_be(&l3_packet[ip_header_size + gre_key_offset..]);
         }
         self.tier += 1;
@@ -412,7 +445,7 @@ impl TunnelInfo {
         match gre_protocol_type {
             // ERSPAN
             LE_ERSPAN_PROTO_TYPE_II | LE_ERSPAN_PROTO_TYPE_III
-                if tunnel_types.has(TunnelType::ErspanOrTeb) =>
+                if tunnel_types.has(TunnelType::Erspan) =>
             {
                 self.decapsulate_erspan(packet, l2_len, flags, gre_protocol_type, ip_header_size)
             }
@@ -428,7 +461,7 @@ impl TunnelInfo {
                     ip_header_size,
                 )
             }
-            LE_TRANSPARENT_ETHERNET_BRIDGEING if tunnel_types.has(TunnelType::ErspanOrTeb) => {
+            LE_TRANSPARENT_ETHERNET_BRIDGEING if tunnel_types.has(TunnelType::Teb) => {
                 self.decapsulate_teb(packet, l2_len, flags, ip_header_size)
             }
             _ => 0,
@@ -734,14 +767,14 @@ mod tests {
 
     #[test]
     fn test_decapsulate_erspan() {
-        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Erspan]);
         let expected = TunnelInfo {
             src: Ipv4Addr::new(172, 28, 25, 108),
             dst: Ipv4Addr::new(172, 28, 28, 70),
             mac_src: 0xbdf819ff,
             mac_dst: 0x22222222,
             id: 0,
-            tunnel_type: TunnelType::ErspanOrTeb,
+            tunnel_type: TunnelType::Erspan,
             tier: 1,
             is_ipv6: false,
         };
@@ -770,14 +803,14 @@ mod tests {
 
     #[test]
     fn test_decapsulate_erspan_ii() {
-        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Erspan]);
         let expected = TunnelInfo {
             src: Ipv4Addr::new(2, 2, 2, 2),
             dst: Ipv4Addr::new(1, 1, 1, 1),
             mac_src: 0xf1e20101,
             mac_dst: 0xf1e20112,
             id: 100,
-            tunnel_type: TunnelType::ErspanOrTeb,
+            tunnel_type: TunnelType::Erspan,
             tier: 1,
             is_ipv6: false,
         };
@@ -806,14 +839,14 @@ mod tests {
 
     #[test]
     fn test_decapsulate_erspan_iii() {
-        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Erspan]);
         let expected = TunnelInfo {
             src: Ipv4Addr::new(172, 16, 1, 103),
             dst: Ipv4Addr::new(10, 30, 101, 132),
             mac_src: 0x60d19449,
             mac_dst: 0x3ee959f5,
             id: 0,
-            tunnel_type: TunnelType::ErspanOrTeb,
+            tunnel_type: TunnelType::Erspan,
             tier: 1,
             is_ipv6: false,
         };
@@ -901,14 +934,14 @@ mod tests {
 
     #[test]
     fn test_decapsulate_teb() {
-        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::ErspanOrTeb]);
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Teb]);
         let expected = TunnelInfo {
             src: Ipv4Addr::new(10, 25, 6, 6),
             dst: Ipv4Addr::new(10, 25, 59, 67),
             mac_src: 0x3503bca8,
             mac_dst: 0x56aefcc6,
             id: 0x2000000,
-            tunnel_type: TunnelType::ErspanOrTeb,
+            tunnel_type: TunnelType::Teb,
             tier: 1,
             is_ipv6: false,
         };
@@ -982,7 +1015,7 @@ mod tests {
 
     #[test]
     fn test_decapsulate_all() {
-        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan, TunnelType::ErspanOrTeb]);
+        let bitmap = TunnelTypeBitmap::new(&vec![TunnelType::Vxlan, TunnelType::Erspan]);
         let mut actual_bitmap = TunnelTypeBitmap::new(&vec![TunnelType::None]);
 
         let mut packets: Vec<Vec<u8>> = Capture::load_pcap(
@@ -999,7 +1032,7 @@ mod tests {
             actual_bitmap.add(actual.tunnel_type);
         }
         assert!(actual_bitmap.has(TunnelType::Vxlan));
-        assert!(actual_bitmap.has(TunnelType::ErspanOrTeb));
+        assert!(actual_bitmap.has(TunnelType::Erspan));
     }
 
     #[test]

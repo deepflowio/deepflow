@@ -59,6 +59,7 @@ pub use recv_engine::{
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use self::base_dispatcher::TapInterfaceWhitelist;
 
+use crate::common::decapsulate::TunnelTypeBitmap;
 #[cfg(target_os = "linux")]
 use crate::platform::LibvirtXmlExtractor;
 use crate::{
@@ -715,6 +716,7 @@ pub struct DispatcherBuilder {
     queue_debugger: Option<Arc<QueueDebugger>>,
     analyzer_queue_size: Option<usize>,
     analyzer_raw_packet_block_size: Option<usize>,
+    tunnel_type_trim_bitmap: Option<TunnelTypeBitmap>,
 }
 
 impl DispatcherBuilder {
@@ -883,6 +885,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn tunnel_type_trim_bitmap(mut self, v: TunnelTypeBitmap) -> Self {
+        self.tunnel_type_trim_bitmap = Some(v);
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         #[cfg(target_os = "linux")]
         let netns = self.netns.unwrap_or_default();
@@ -1031,6 +1038,10 @@ impl DispatcherBuilder {
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
             pause: Arc::new(AtomicBool::new(self.pause.unwrap())),
             queue_debugger: queue_debugger.clone(),
+            tunnel_type_trim_bitmap: self
+                .tunnel_type_trim_bitmap
+                .take()
+                .ok_or(Error::ConfigIncomplete("no trim tunnel type".into()))?,
         };
         collector.register_countable(
             &stats::SingleTagModule("dispatcher", "id", base.id),
