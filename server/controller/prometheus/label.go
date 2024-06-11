@@ -17,6 +17,7 @@
 package prometheus
 
 import (
+	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -83,6 +84,7 @@ func (s *ORGLabelSynchronizers) goAssembleFully(args ...interface{}) error {
 		return errors.Wrap(err, "goAssembleFully")
 	}
 	orgIDToResp.Set(synchronizer.org.GetID(), resp)
+	s.appendStatsdCounter(synchronizer)
 	return nil
 }
 
@@ -120,7 +122,15 @@ func (s *ORGLabelSynchronizers) goAssemble(args ...interface{}) error {
 		return errors.Wrap(err, "assemble")
 	}
 	orgIDToResp.Set(orgID, resp)
+	s.appendStatsdCounter(synchronizer)
 	return nil
+}
+
+func (s *ORGLabelSynchronizers) appendStatsdCounter(synchronizer *LabelSynchronizer) {
+	atomic.AddUint64(&s.statsdCounter.ReceiveMetricCount, synchronizer.GetStatsdCounter().ReceiveMetricCount)
+	atomic.AddUint64(&s.statsdCounter.ReceiveLabelCount, synchronizer.GetStatsdCounter().ReceiveLabelCount)
+	atomic.AddUint64(&s.statsdCounter.SendMetricCount, synchronizer.GetStatsdCounter().SendMetricCount)
+	atomic.AddUint64(&s.statsdCounter.SendLabelCount, synchronizer.GetStatsdCounter().SendLabelCount)
 }
 
 type LabelSynchronizer struct {
@@ -266,7 +276,7 @@ func (s *LabelSynchronizer) splitData(req *trident.PrometheusLabelRequest) (*dat
 
 func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *controller.SyncPrometheusRequest {
 	return &controller.SyncPrometheusRequest{
-		OrgId:       proto.Uint32(uint32(1)), // TODO
+		OrgId:       proto.Uint32(uint32(s.org.GetID())),
 		MetricNames: toEncode.metricNames.ToSlice(),
 		LabelNames:  toEncode.labelNames.ToSlice(),
 		LabelValues: toEncode.labelValues.ToSlice(),

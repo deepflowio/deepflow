@@ -226,13 +226,7 @@ impl L7ProtocolParserInterface for RedisLog {
         };
         let mut info = RedisInfo::default();
         info.is_tls = param.is_tls();
-        self.parse(
-            payload,
-            param.l4_protocol,
-            param.direction,
-            param.is_from_ebpf(),
-            &mut info,
-        )?;
+        self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
         set_captured_byte!(info, param);
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
@@ -315,7 +309,6 @@ impl RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        is_from_ebpf: bool,
         info: &mut RedisInfo,
     ) -> Result<()> {
         if proto != IpProtocol::TCP {
@@ -330,8 +323,7 @@ impl RedisLog {
             PacketDirection::ClientToServer if payload.get(0) == Some(&b'*') => {
                 self.fill_request(CommandLine::new(payload)?, info)
             }
-            // When packet comes from AfPacket, there must be a request before parsing the response.
-            PacketDirection::ServerToClient if self.has_request || is_from_ebpf => {
+            PacketDirection::ServerToClient if self.has_request => {
                 self.fill_response(stringifier::decode(payload, false)?, info)
             }
             _ => return Err(Error::L7ProtocolUnknown),

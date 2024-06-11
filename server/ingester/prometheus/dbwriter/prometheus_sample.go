@@ -159,6 +159,7 @@ func (m *PrometheusSampleMini) GenerateNewFlowTags(cache *flow_tag.FlowTagCache,
 		PodNsId:   m.PodNsId(),
 		VtapId:    m.VtapId,
 		TeamID:    m.TeamID,
+		OrgId:     m.OrgId,
 	}
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]

@@ -128,9 +128,9 @@ pub(super) fn is_postgresql(sql: &[u8]) -> bool {
 */
 
 // not all of sql start first keyword. only log some necessary sql.
-const MYSQL_START: [&'static str; 14] = [
-    "XA", "FLUSH", "SHOW", "USE", "LOCK", "UNLOCK", "STOP", "START", "LOAD", "ANALYZE", "BEGIN",
-    "COMMIT", "ROLLBACK", "DESC",
+const MYSQL_START: [&'static str; 15] = [
+    "XA", "FLUSH", "SHOW", "USE", "use", "LOCK", "UNLOCK", "STOP", "START", "LOAD", "ANALYZE",
+    "BEGIN", "COMMIT", "ROLLBACK", "DESC",
 ];
 
 pub(super) fn is_mysql(sql: &[u8]) -> bool {
