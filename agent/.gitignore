@@ -27,3 +27,5 @@ src/ebpf/tools/ebpftobuffer
 
 .rpmbuild/
 actual.txt
+
+plugins/**/Cargo.lock
