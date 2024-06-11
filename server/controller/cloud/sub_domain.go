@@ -445,6 +445,7 @@ func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Res
 		retPodNodes = append(retPodNodes, model.PodNode{
 			Lcuuid:           podNode.Lcuuid,
 			Name:             podNode.Name,
+			Hostname:         podNode.Hostname,
 			Type:             podNode.Type,
 			ServerType:       podNode.ServerType,
 			State:            podNode.State,
