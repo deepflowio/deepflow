@@ -169,6 +169,21 @@ func (c *Cloud) suffixResourceOperation(resource model.Resource) model.Resource 
 		retHosts = append(retHosts, host)
 	}
 
+	// get hostname of the vm where node is located
+	for _, sub := range resource.SubDomainResources {
+		nodeLcuuidToHostname := map[string]string{}
+		for _, node := range sub.PodNodes {
+			nodeLcuuidToHostname[node.Lcuuid] = node.Hostname
+		}
+		for _, con := range sub.VMPodNodeConnections {
+			vmHostname, ok := nodeLcuuidToHostname[con.PodNodeLcuuid]
+			if !ok {
+				continue
+			}
+			vmLcuuidToHostName[con.VMLcuuid] = vmHostname
+		}
+	}
+
 	var retVMs []model.VM
 	for _, vm := range resource.VMs {
 		// return a default map, when not found cloud tags
