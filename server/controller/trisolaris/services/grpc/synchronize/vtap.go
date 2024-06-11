@@ -199,7 +199,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	}
 
-	if vtapConfig.NatIPEnabled == 1 {
+	if trisolaris.GetAllAgentConnectToNatIP() || vtapConfig.NatIPEnabled == 1 {
 		configure.ProxyControllerIp = proto.String(trisolaris.GetORGNodeInfo(orgID).GetControllerNatIP(c.GetControllerIP()))
 		configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
 

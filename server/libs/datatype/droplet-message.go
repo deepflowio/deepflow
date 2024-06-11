@@ -182,23 +182,56 @@ func (h *BaseHeader) Decode(buf []byte) error {
 	return nil
 }
 
-// 多个document和taggeflow encode时共用一个header
-type FlowHeader struct {
+type FlowHeaderOld struct {
 	Version uint32 // 用来校验encode和decode是否配套
 	TeamID  uint32
 	OrgID   uint32
 	VTAPID  uint16 // trident的ID
 }
 
-func (h *FlowHeader) Encode(chunk []byte) {
-	binary.LittleEndian.PutUint32(chunk[FLOW_VERSION_OFFSET:], h.Version)
-	binary.LittleEndian.PutUint32(chunk[FLOW_TEAMID_OFFSET:], h.TeamID)
-	binary.LittleEndian.PutUint32(chunk[FLOW_ORGID_OFFSET:], h.OrgID)
-	binary.LittleEndian.PutUint16(chunk[FLOW_VTAPID_OFFSET:], h.VTAPID)
+const (
+	LATEST_VERSION = 0x8000 // v6.5 version
+
+	VERSION_OFFSET   = 0
+	ENCODER_OFFSET   = VERSION_OFFSET + 2
+	TEAMID_OFFSET    = ENCODER_OFFSET + 1
+	ORGID_OFFSET     = TEAMID_OFFSET + 4
+	RESERVED1_OFFSET = ORGID_OFFSET + 2
+	AGENTID_OFFSET   = RESERVED1_OFFSET + 2
+)
+
+type FlowHeader struct {
+	Version   uint16 // start with 0x8000
+	Encoder   uint8  // Flag whether to use compression etc.
+	TeamID    uint32
+	OrgID     uint16
+	Reserved1 uint16
+	AgentID   uint16
+	Reserved2 uint8 //
 }
+
 func (h *FlowHeader) Decode(buf []byte) {
-	h.Version = binary.LittleEndian.Uint32(buf[FLOW_VERSION_OFFSET:])
-	h.TeamID = binary.LittleEndian.Uint32(buf[FLOW_TEAMID_OFFSET:])
-	h.OrgID = binary.LittleEndian.Uint32(buf[FLOW_ORGID_OFFSET:])
-	h.VTAPID = binary.LittleEndian.Uint16(buf[FLOW_VTAPID_OFFSET:])
+	h.Version = binary.LittleEndian.Uint16(buf[VERSION_OFFSET:])
+	if h.Version == LATEST_VERSION {
+		h.Encoder = buf[ENCODER_OFFSET]
+		h.TeamID = binary.LittleEndian.Uint32(buf[TEAMID_OFFSET:])
+		h.OrgID = binary.LittleEndian.Uint16(buf[ORGID_OFFSET:])
+		// reserved1
+		h.AgentID = binary.LittleEndian.Uint16(buf[AGENTID_OFFSET:])
+		// reserved2
+	} else {
+		h.TeamID = binary.LittleEndian.Uint32(buf[FLOW_TEAMID_OFFSET:])
+		h.OrgID = uint16(binary.LittleEndian.Uint32(buf[FLOW_ORGID_OFFSET:]))
+		h.AgentID = binary.LittleEndian.Uint16(buf[FLOW_VTAPID_OFFSET:])
+	}
+}
+
+func (h *FlowHeader) Encode(chunk []byte) {
+	binary.LittleEndian.PutUint16(chunk[VERSION_OFFSET:], h.Version)
+	chunk[ENCODER_OFFSET] = h.Encoder
+	binary.LittleEndian.PutUint32(chunk[TEAMID_OFFSET:], h.TeamID)
+	binary.LittleEndian.PutUint16(chunk[ORGID_OFFSET:], h.OrgID)
+	// reserved1
+	binary.LittleEndian.PutUint16(chunk[AGENTID_OFFSET:], h.AgentID)
+	// reserved2
 }
