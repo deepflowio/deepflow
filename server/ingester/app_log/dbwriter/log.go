@@ -41,10 +41,15 @@ const (
 )
 
 func StringToLogType(str string) string {
+	// lowerStr cannot be returned. This comes from the json field and will be overwritten by the next parsing.
 	lowerStr := strings.ToLower(str)
 	switch lowerStr {
-	case LOG_TYPE_SYSTEM, LOG_TYPE_AUDIT, LOG_TYPE_AGENT:
-		return lowerStr
+	case LOG_TYPE_SYSTEM:
+		return LOG_TYPE_SYSTEM
+	case LOG_TYPE_AUDIT:
+		return LOG_TYPE_AUDIT
+	case LOG_TYPE_AGENT:
+		return LOG_TYPE_AGENT
 	default:
 		return LOG_TYPE_USER
 	}
