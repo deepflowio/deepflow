@@ -68,7 +68,7 @@ type RecvBuffer struct {
 	IP         net.IP // 保存消息的发送方IP
 	VtapID     uint16
 	TeamID     uint32
-	OrgID      uint32
+	OrgID      uint16
 	SocketType ServerType
 }
 
@@ -675,7 +675,7 @@ func (r *Receiver) logTCPReceiveInvalidData(str string) {
 	log.Warningf("%s, already drop log count %d", str, r.dropLogCount)
 }
 
-func (r *Receiver) parseOrgIdTeamId(flowHeader *datatype.FlowHeader) (uint32, uint32) {
+func (r *Receiver) parseOrgIdTeamId(flowHeader *datatype.FlowHeader) (uint16, uint32) {
 	orgID, teamID := flowHeader.OrgID, flowHeader.TeamID
 	if teamID == ckdb.INVALID_TEAM_ID {
 		teamID = ckdb.DEFAULT_TEAM_ID
@@ -731,22 +731,13 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint32(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint16(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
 			headerLen += datatype.FLOW_HEADER_LEN
 
-			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
-				r.logReceiveError(size, remoteAddr, fmt.Errorf("%s msgType: %s ", err, datatype.MessageTypeString[baseHeader.Type]))
-				// 但版本不匹配，且版本小于app.LAST_SIMPLE_CODEC_VERSION时，才会拒绝连接
-				if flowHeader.Version <= app.LAST_SIMPLE_CODEC_VERSION {
-					ReleaseRecvBuffer(recvBuffer)
-					continue
-				}
-			}
-
-			vtapID = flowHeader.VTAPID
-			teamID, orgID = r.parseOrgIdTeamId(flowHeader)
+			vtapID = flowHeader.AgentID
+			orgID, teamID = r.parseOrgIdTeamId(flowHeader)
 
 			if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS {
 				metricsTimestamp = r.getMetricsTimestamp(recvBuffer.Buffer[headerLen:])
@@ -888,7 +879,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint32(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint16(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			if err := ReadN(reader, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
@@ -898,20 +889,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			flowHeader.Decode(flowHeaderBuffer)
 			headerLen += datatype.FLOW_HEADER_LEN
 
-			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
-				atomic.AddUint64(&r.counter.Invalid, 1)
-				// 但版本不匹配，且版本小于app.LAST_SIMPLE_CODEC_VERSION时，才会拒绝连接
-				if flowHeader.Version <= app.LAST_SIMPLE_CODEC_VERSION {
-					log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
-					time.Sleep(10 * time.Second) // 等待10秒，防止日志刷屏
-					return
-				}
-				if r.timeNow-r.lastLogTime > LOG_INTERVAL {
-					log.Infof("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
-					r.lastLogTime = r.timeNow
-				}
-			}
-			vtapID = flowHeader.VTAPID
+			vtapID = flowHeader.AgentID
 			orgID, teamID = r.parseOrgIdTeamId(flowHeader)
 		}
 
