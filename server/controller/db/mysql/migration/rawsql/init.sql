@@ -2352,6 +2352,8 @@ TRUNCATE TABLE voucher;
 
 CREATE TABLE IF NOT EXISTS consumer_bill (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
+    org_id                  INTEGER DEFAULT 1,
     vtap_name               VARCHAR(256) DEFAULT NULL,
     vtap_ctrl_ip            CHAR(64) DEFAULT NULL,
     vtap_ctrl_mac           CHAR(64) DEFAULT NULL,
