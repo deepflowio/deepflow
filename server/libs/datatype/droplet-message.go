@@ -207,7 +207,7 @@ type FlowHeader struct {
 	OrgID     uint16
 	Reserved1 uint16
 	AgentID   uint16
-	Reserved2 uint8 //
+	Reserved2 uint8
 }
 
 func (h *FlowHeader) Decode(buf []byte) {
@@ -220,6 +220,7 @@ func (h *FlowHeader) Decode(buf []byte) {
 		h.AgentID = binary.LittleEndian.Uint16(buf[AGENTID_OFFSET:])
 		// reserved2
 	} else {
+		// decoding the header of the old version (version <= v6.5.8)
 		h.TeamID = binary.LittleEndian.Uint32(buf[FLOW_TEAMID_OFFSET:])
 		h.OrgID = uint16(binary.LittleEndian.Uint32(buf[FLOW_ORGID_OFFSET:]))
 		h.AgentID = binary.LittleEndian.Uint16(buf[FLOW_VTAPID_OFFSET:])
