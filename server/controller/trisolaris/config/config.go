@@ -64,6 +64,7 @@ type Config struct {
 	FPermit                        common.FPermit
 	IngesterAPIPort                int // data source
 	AllAgentConnectToNatIP         bool
+	NoIPOverlapping                bool
 }
 
 func (c *Config) Convert() {
@@ -92,6 +93,14 @@ func (c *Config) SetAllAgentConnectToNatIP(data bool) {
 
 func (c *Config) GetAllAgentConnectToNatIP() bool {
 	return c.AllAgentConnectToNatIP
+}
+
+func (c *Config) SetNoIPOverlapping(data bool) {
+	c.NoIPOverlapping = data
+}
+
+func (c *Config) GetNoIPOverlapping() bool {
+	return c.NoIPOverlapping
 }
 
 func (c *Config) SetGrpcPort(port int) {
