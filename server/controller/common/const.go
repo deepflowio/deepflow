@@ -688,6 +688,7 @@ const (
 	HEADER_X_APP_KEY       = "X-App-Key"
 
 	USER_TYPE_SUPER_ADMIN = 1
+	USER_TYPE_ADMIN       = 2
 	USER_ID_SUPER_ADMIN   = 1
 )
 
