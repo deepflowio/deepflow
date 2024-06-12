@@ -123,16 +123,16 @@ func (c *DBs) Init(cfg config.MySqlConfig) error {
 	if err != nil {
 		return err
 	}
-	orgIDs, err := GetORGIDs()
+	orgIDs, err := CheckORGNumberAndLog()
 	if err != nil {
 		return err
 	}
 	for _, id := range orgIDs {
 		if _, err := c.NewDBIfNotExists(id); err != nil {
-			return err
+			log.Errorf("[OID-%d] failed to create db: %s, please check org status", id, err.Error())
 		}
 	}
-	return err
+	return nil
 }
 
 func (c *DBs) GetConfig() config.MySqlConfig {
@@ -194,7 +194,7 @@ func (c *DBs) check(db *DB) error {
 		return nil
 	}
 	var version string
-	err := db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
+	err := db.Raw("SELECT version FROM db_version").Scan(&version).Error
 	if err != nil {
 		log.Errorf("db: %s, failed to check db version: %s", db.Name, err.Error())
 		return err
