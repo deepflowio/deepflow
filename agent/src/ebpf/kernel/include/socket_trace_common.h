@@ -86,19 +86,34 @@ struct __socket_data_buffer {
 	char data[32760]; // 32760 + len(4bytes) + events_num(4bytes) = 2^15 = 32768
 };
 
-struct trace_conf_t {
-	__u64 socket_id;       // 会话标识
-	__u64 coroutine_trace_id;  // 同一协程的数据转发关联
-	__u64 thread_trace_id; // 同一进程/线程的数据转发关联，用于多事务流转场景
-	__u32 data_limit_max;  // Maximum number of data transfers
-	__u32 go_tracing_timeout;
-	__u32 io_event_collect_mode;
-	__u64 io_event_minimal_duration;
+/**
+ * @brief Used to describe the runtime state of the tracer.
+ */
+struct tracer_ctx_s {
+	__u64 socket_id;          /**< Session identifier */
+	__u64 coroutine_trace_id; /**< Data forwarding association within the same coroutine */
+	__u64 thread_trace_id;    /**< Data forwarding association within the same process/thread, used for multi-transaction scenarios */
+	__u32 data_limit_max;     /**< Maximum number of data transfers */
+	__u32 go_tracing_timeout; /**< Go tracing timeout */
+	__u32 io_event_collect_mode; /**< IO event collection mode */
+	__u64 io_event_minimal_duration; /**< Minimum duration for IO events */
+	int push_buffer_refcnt; /**< Reference count of the data push buffer */
+	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
+	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
 };
 
+/**
+ * @brief Trace statistics.
+ */
 struct trace_stats {
-	__u64 socket_map_count;     // 对socket 链接表进行统计
-	__u64 trace_map_count;     // 对同一进程/线程的多次转发表进行统计
+	__u64 socket_map_count;     /**< Count of socket connection entries */
+	__u64 trace_map_count;      /**< Count of multiple forwarding entries within the same process/thread */
+	__u64 push_conflict_count; /**< When periodic data push is attempted and the push_buffer_refcnt is non-zero,
+					it will result in a data push conflict, and the data push action will not be executed.
+					This counter is used to record the number of conflicts. */
+	__u64 period_event_max_delay; /**< The maximum latency for periodic data push. */
+	__u64 period_event_total_time; /**< The total elapsed time for periodic event. */
+	__u64 period_event_count; /**< The number of occurrences of periodic events. */
 };
 
 struct socket_info_s {

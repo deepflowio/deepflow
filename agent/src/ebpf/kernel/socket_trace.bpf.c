@@ -93,7 +93,7 @@ MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1)
  * 可以存储176年(如果从2022年开始)的数据而UID不会出现重复。
  * ((2^56 - 1) - sys_boot_time)/10/1000/1000/60/60/24/365 = 176 years
  */
-MAP_PERARRAY(trace_conf_map, __u32, struct trace_conf_t, 1)
+MAP_PERARRAY(tracer_ctx_map, __u32, struct tracer_ctx_s, 1)
 
 /*
  * 对各类map进行统计
@@ -987,7 +987,7 @@ static __inline void trace_process(struct socket_info_s *socket_info_ptr,
 				   struct conn_info_s *conn_info,
 				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
-				   struct trace_conf_t *trace_conf,
+				   struct tracer_ctx_s *tracer_ctx,
 				   struct trace_stats *trace_stats,
 				   __u64 * thread_trace_id,
 				   __u64 time_stamp,
@@ -1047,7 +1047,7 @@ static __inline void trace_process(struct socket_info_s *socket_info_ptr,
 		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
 		    (pre_trace_id ==
-		     0 ? ++trace_conf->thread_trace_id : pre_trace_id);
+		     0 ? ++tracer_ctx->thread_trace_id : pre_trace_id);
 		/*
 		 * For NGINX tracing, 'MSG_REQUEST' and 'MSG_RESPONSE' are used
 		 * as judgment conditions. After enabling data segment reassembly,
@@ -1130,22 +1130,22 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	__u64 thread_trace_id = 0;
 	__u32 k0 = 0;
 	struct socket_info_s sk_info = { 0 };
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL)
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
 		return SUBMIT_INVALID;
 
 	/*
 	 * It is possible that these values were modified during ebpf running,
 	 * so they are saved here.
 	 */
-	int data_max_sz = trace_conf->data_limit_max;
+	int data_max_sz = tracer_ctx->data_limit_max;
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
 		return SUBMIT_INVALID;
 
 	struct trace_key_t trace_key =
-	    get_trace_key(trace_conf->go_tracing_timeout,
+	    get_trace_key(tracer_ctx->go_tracing_timeout,
 			  true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
@@ -1153,9 +1153,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	// 'socket_id' used to resolve non-tracing between the same socket
 	__u64 socket_id = 0;
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		// Not use "++trace_conf->socket_id" here,
+		// Not use "++tracer_ctx->socket_id" here,
 		// because it did not pass the verification of linux 4.14.x, 4.15.x
-		socket_id = trace_conf->socket_id + 1;
+		socket_id = tracer_ctx->socket_id + 1;
 	} else {
 		socket_id = socket_info_ptr->uid;
 	}
@@ -1168,13 +1168,13 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	// AAAA record To ensure that the call chain will not be broken.
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
-	    (trace_conf->go_tracing_timeout != 0
+	    (tracer_ctx->go_tracing_timeout != 0
 	     || extra->is_go_process == false)
 	    && !(conn_info->protocol == PROTO_DNS
 		 && conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
 		trace_process(socket_info_ptr, conn_info, socket_id,
 			      bpf_get_current_pid_tgid(), trace_info_ptr,
-			      trace_conf, trace_stats, &thread_trace_id,
+			      tracer_ctx, trace_stats, &thread_trace_id,
 			      time_stamp, &trace_key);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
@@ -1183,8 +1183,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
-		sk_info.uid = trace_conf->socket_id + 1;
-		trace_conf->socket_id++;	// Ensure that socket_id is incremented.
+		sk_info.uid = tracer_ctx->socket_id + 1;
+		tracer_ctx->socket_id++;	// Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
 		//Confirm whether data reassembly is required for this socket.
 		if (is_proto_reasm_enabled(conn_info->protocol)) {
@@ -1230,14 +1230,19 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (!v_buff)
 		return SUBMIT_INVALID;
 
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 		return SUBMIT_INVALID;
+	}
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-	if (get_socket_info(v, conn_info->sk, conn_info) == false)
+	if (get_socket_info(v, conn_info->sk, conn_info) == false) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 		return SUBMIT_INVALID;
+	}
 
 	__u32 send_reasm_bytes = 0;
 	if (is_socket_info_valid(socket_info_ptr)) {
@@ -1252,7 +1257,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		if (socket_info_ptr->l7_proto == PROTO_TLS ||
 		    socket_info_ptr->l7_proto == PROTO_UNKNOWN)
 			socket_info_ptr->l7_proto = conn_info->protocol;
-
 
 		/*
 		 * Ensure that the accumulation operation of capturing the
@@ -2034,18 +2038,21 @@ TP_SYSCALL_PROG(exit_close) (struct syscall_comm_exit_ctx * ctx) {
 	if (!offset)
 		goto exit;
 
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL)
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
 		goto exit;
-	int data_max_sz = trace_conf->data_limit_max;
+	int data_max_sz = tracer_ctx->data_limit_max;
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
 		goto exit;
 
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 		goto exit;
+	}
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
@@ -2152,6 +2159,10 @@ static __inline int output_data_common(void *ctx)
 	__u32 k0 = 0;
 	char *buffer = NULL;
 	__u32 reassembly_bytes = 0;
+
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
+		return 0;
 
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
@@ -2295,6 +2306,7 @@ skip_copy:
 	}
 
 clear_args_map_1:
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 	if (dir == T_INGRESS)
 		active_read_args_map__delete(&id);
 	else
@@ -2303,6 +2315,7 @@ clear_args_map_1:
 	return 0;
 
 clear_args_map_2:
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 	active_read_args_map__delete(&id);
 	active_write_args_map__delete(&id);
 	return 0;
@@ -2483,34 +2496,34 @@ static __inline void trace_io_event_common(void *ctx,
 		return;
 	}
 
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL) {
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL) {
 		return;
 	}
 
-	if (trace_conf->io_event_collect_mode == 0) {
+	if (tracer_ctx->io_event_collect_mode == 0) {
 		return;
 	}
 
-	__u32 timeout = trace_conf->go_tracing_timeout;
+	__u32 timeout = tracer_ctx->go_tracing_timeout;
 	struct trace_key_t trace_key = get_trace_key(timeout, false);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 	if (trace_info_ptr) {
 		trace_id = trace_info_ptr->thread_trace_id;
 	}
 
-	if (trace_id == 0 && trace_conf->io_event_collect_mode == 1) {
+	if (trace_id == 0 && tracer_ctx->io_event_collect_mode == 1) {
 		return;
 	}
 
-	int data_max_sz = trace_conf->data_limit_max;
+	int data_max_sz = tracer_ctx->data_limit_max;
 
 	if (!is_regular_file(data_args->fd)) {
 		return;
 	}
 
 	latency = bpf_ktime_get_ns() - data_args->enter_ts;
-	if (latency < trace_conf->io_event_minimal_duration) {
+	if (latency < tracer_ctx->io_event_minimal_duration) {
 		return;
 	}
 
@@ -2533,10 +2546,13 @@ static __inline void trace_io_event_common(void *ctx,
 	if (!v_buff)
 		return;
 
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 		return;
+	}
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
@@ -2592,52 +2608,85 @@ PROGTP(io_event) (void *ctx) {
  * the cache but not yet transmitted to the user-level receiving program
  * for processing.
  */
-SEC("perf_event")
-int bpf_push_socket_data(struct bpf_perf_event_data *ctx)
-{
-	int k0 = 0;
+PERF_EVENT_PROG(push_socket_data) (struct bpf_perf_event_data * ctx) {
+	__u32 k0 = 0;
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
+		return 0;
+
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_stats == NULL)
+		return 0;
+
+	/*
+	 * For perf event's periodic events, we have set them to push data
+	 * from the kernel buffer every 10 milliseconds. This periodic event
+	 * is implemented based on the kernel's high-resolution timer (hrtimer),
+	 * which triggers a timer interrupt when the time expires. However, in
+	 * reality, the timer does not always trigger the interrupt exactly every
+	 * 10 milliseconds to execute the ebpf program. This is because the timer
+	 * interrupt may be masked off during certain operations, such as when
+	 * interrupts are disabled during locking operations. Consequently, the
+	 * timer may trigger the interrupt after the expected time, resulting in a
+	 * delay in the periodic event. We need to monitor and record the maximum
+	 * delay time, the total runtime, and the number of occurrences of the
+	 * periodic event.
+	 */
+	tracer_ctx->last_period_timestamp = tracer_ctx->period_timestamp;
+	tracer_ctx->period_timestamp = bpf_ktime_get_ns();
+	__u64 diff = tracer_ctx->period_timestamp -
+	    tracer_ctx->last_period_timestamp;
+	if (diff > trace_stats->period_event_max_delay)
+		trace_stats->period_event_max_delay = diff;
+
+	__sync_fetch_and_add(&trace_stats->period_event_total_time, diff);
+	__sync_fetch_and_add(&trace_stats->period_event_count, 1);
+
+	/*
+	 * If a previous system call is in the process of modifying the push buffer to
+	 * push data when it is interrupted by a periodic event interrupt, the interrupt
+	 * handler cannot further manipulate the buffer to avoid conflicts. In such cases,
+	 * we record the number of conflicts.
+	 */
+	if (tracer_ctx->push_buffer_refcnt != 0) {
+		__sync_fetch_and_add(&trace_stats->push_conflict_count, 1);
+		return 0;
+	}
+
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (v_buff) {
 		if (v_buff->events_num > 0) {
-			struct __socket_data *v =
-			    (struct __socket_data *)&v_buff->data[0];
-			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) >
-			    NS_PER_SEC) {
-				__u32 buf_size =
-				    (v_buff->len +
-				     offsetof(typeof
-					      (struct __socket_data_buffer),
-					      data))
-				    & (sizeof(*v_buff) - 1);
+			__u32 buf_size =
+			    (v_buff->len +
+			     offsetof(typeof(struct __socket_data_buffer),
+				      data))
+			    & (sizeof(*v_buff) - 1);
+			/* 
+			 * Note that when 'buf_size == 0', it indicates that the data being
+			 * sent is at its maximum value (sizeof(*v_buff)), and it should
+			 * be sent accordingly.
+			 */
+			if (buf_size < sizeof(*v_buff) && buf_size > 0) {
 				/* 
-				 * Note that when 'buf_size == 0', it indicates that the data being
-				 * sent is at its maximum value (sizeof(*v_buff)), and it should
-				 * be sent accordingly.
+				 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+				 * (Linux 4.14.x) length checks.
 				 */
-				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
-					/* 
-					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
-					 * (Linux 4.14.x) length checks.
-					 */
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      buf_size + 1);
-				} else {
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      sizeof(*v_buff));
-				}
-
-				v_buff->events_num = 0;
-				v_buff->len = 0;
+				bpf_perf_event_output(ctx,
+						      &NAME
+						      (socket_data),
+						      BPF_F_CURRENT_CPU,
+						      v_buff, buf_size + 1);
+			} else {
+				bpf_perf_event_output(ctx,
+						      &NAME
+						      (socket_data),
+						      BPF_F_CURRENT_CPU,
+						      v_buff, sizeof(*v_buff));
 			}
+
+			v_buff->events_num = 0;
+			v_buff->len = 0;
 		}
 	}
 
