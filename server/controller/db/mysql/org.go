@@ -61,6 +61,20 @@ func GetNonDefaultORGIDs() ([]int, error) {
 	return ids, nil
 }
 
+func CheckORGNumberAndLog() ([]int, error) {
+	orgIDs, err := GetORGIDs()
+	if err != nil {
+		return nil, err
+	}
+	msg := fmt.Sprintf("the number of organizations is %d. If you see a `Too many connections` error in the logs, please increase the `max_connections` setting in MySQL.", len(orgIDs))
+	if len(orgIDs) > 10 {
+		log.Info(msg)
+	} else if len(orgIDs) > 20 {
+		log.Warning(msg)
+	}
+	return orgIDs, nil
+}
+
 // SyncDefaultOrgData synchronizes a slice of data items of any type T to all organization databases except the default one.
 // It assumes each data item has an "ID" field (with a json tag "ID") serving as the primary key. During upsertion,
 // fields are updated based on their "gorm" tags, and empty string values are converted to null in the database.
