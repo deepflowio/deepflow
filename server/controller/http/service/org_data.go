@@ -36,6 +36,8 @@ import (
 // Returns the database name and error.
 func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig) (string, error) {
 	log.Infof("create org (id: %d) data", dataCreate.ORGID)
+	mysql.CheckORGNumberAndLog()
+
 	defaultDatabase := mysqlCfg.Database
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, dataCreate.ORGID)
 	existed, err := migrator.CreateDatabase(cfg) // TODO use orgID to create db
