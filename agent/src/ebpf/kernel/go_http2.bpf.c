@@ -323,9 +323,9 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 	__u32 tgid = id >> 32;
 	__u32 k0 = 0;
 
-	// trace_conf, generator for socket_id
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL)
+	// tracer_ctx, generator for socket_id
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
 		return false;
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
@@ -340,8 +340,8 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 	if (is_socket_info_valid(socket_info_ptr)) {
 		send_buffer->socket_id = socket_info_ptr->uid;
 	} else {
-		send_buffer->socket_id = trace_conf->socket_id + 1;
-		trace_conf->socket_id++;
+		send_buffer->socket_id = tracer_ctx->socket_id + 1;
+		tracer_ctx->socket_id++;
 
 		struct socket_info_s sk_info = {
 			.uid = send_buffer->socket_id,
@@ -352,7 +352,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 		}
 	}
 
-	__u32 timeout = trace_conf->go_tracing_timeout;
+	__u32 timeout = tracer_ctx->go_tracing_timeout;
 	struct trace_key_t trace_key = get_trace_key(timeout, true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
@@ -364,7 +364,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 	if (timeout != 0) {
 		trace_process(socket_info_ptr, &conn_info,
 			      send_buffer->socket_id, id, trace_info_ptr,
-			      trace_conf, trace_stats,
+			      tracer_ctx, trace_stats,
 			      &send_buffer->thread_trace_id,
 			      send_buffer->timestamp, &trace_key);
 	}
@@ -1027,9 +1027,9 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 	}
 
 	__u32 k0 = 0;
-	// trace_conf, generator for socket_id
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL)
+	// tracer_ctx, generator for socket_id
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
 		return -1;
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
@@ -1044,8 +1044,8 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 	if (is_socket_info_valid(socket_info_ptr)) {
 		send_buffer->socket_id = socket_info_ptr->uid;
 	} else {
-		send_buffer->socket_id = trace_conf->socket_id + 1;
-		trace_conf->socket_id++;
+		send_buffer->socket_id = tracer_ctx->socket_id + 1;
+		tracer_ctx->socket_id++;
 
 		struct socket_info_s sk_info = {
 			.uid = send_buffer->socket_id,
