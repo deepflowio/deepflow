@@ -135,9 +135,10 @@ pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_CLOSE: u8 = 6;
 
-// 消息类型
-// 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
-// go http2 uprobe 目前 只用了MSG_RESPONSE_END, 用于判断流结束.
+// Message types
+// Currently, except for source=EBPF_TYPE_GO_HTTP2_UPROBE, 
+// the correctness of this direction cannot be guaranteed.
+// The go http2 uprobe currently only uses MSG_RESPONSE_END to determine the end of the stream.
 #[allow(dead_code)]
 pub const MSG_REQUEST: u8 = 1;
 #[allow(dead_code)]
@@ -152,6 +153,11 @@ pub const MSG_REASM_START: u8 = 5;
 // The segment of data reassembly.
 #[allow(dead_code)]
 pub const MSG_REASM_SEG: u8 = 6;
+// When the message type obtained by eBPF cannot accurately
+// indicate a request or response, it should be uniformly
+// set to 'MSG_COMMON'.
+#[allow(dead_code)]
+pub const MSG_COMMON: u8 = 7;
 
 //Register event types
 #[allow(dead_code)]

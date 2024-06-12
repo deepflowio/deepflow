@@ -1322,7 +1322,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	    time_stamp;
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
-	v->msg_type = conn_info->message_type;
+	v->msg_type = MSG_COMMON;
 
 	// Reassembly modification type
 	if (sk_info.allow_reassembly) {
@@ -2056,6 +2056,7 @@ TP_SYSCALL_PROG(exit_close) (struct syscall_comm_exit_ctx * ctx) {
 	v->source = DATA_SOURCE_CLOSE;
 	v->syscall_len = 0;
 	v->data_seq = read_args->data_seq;
+	v->msg_type = MSG_COMMON;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
@@ -2549,6 +2550,7 @@ static __inline void trace_io_event_common(void *ctx,
 	v->source = DATA_SOURCE_IO_EVENT;
 
 	v->thread_trace_id = trace_id;
+	v->msg_type = MSG_COMMON;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
 	struct tail_calls_context *context =

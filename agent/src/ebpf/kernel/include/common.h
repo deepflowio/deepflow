@@ -42,6 +42,8 @@ enum message_type {
 	MSG_REASM_START,
 	// Segment of data reassembled
 	MSG_REASM_SEG,
+	// Common messages
+	MSG_COMMON,
 
 	// 无法推断协议类型，先在map中存储等下一次的数据
 	// 获取后两者合并，再进行判断。主要场景用于MySQL，Kafka
