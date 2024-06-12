@@ -187,15 +187,12 @@ func (r *RebalanceCheck) analyzerRebalanceByTraffic(dataDuration int) {
 
 func sendWeight(ctx context.Context, dataDuration int) {
 	go func() {
-		sCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
 		ticker := time.NewTicker(intervalSendWeight)
 		defer ticker.Stop()
 
 		for {
 			select {
-			case <-sCtx.Done():
+			case <-ctx.Done():
 				log.Infof("agent traffic context done")
 				return
 			case <-ticker.C:
@@ -207,7 +204,6 @@ func sendWeight(ctx context.Context, dataDuration int) {
 						return
 					}
 				}
-			default:
 			}
 		}
 	}()
