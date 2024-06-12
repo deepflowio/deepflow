@@ -466,9 +466,10 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 
 		var orgIds []uint16
 		if table.isMaster {
-			table.requestOrgIds()
-			orgIds = table.orgIds
+			// get orgIds from Controller
+			orgIds = table.requestOrgIds()
 		} else {
+			// get orgIds from master table
 			orgIds = QueryAllOrgIDs()
 		}
 
@@ -1241,7 +1242,7 @@ func (t *PlatformInfoTable) ReloadMaster(orgId uint16) error {
 	return nil
 }
 
-func (t *PlatformInfoTable) requestOrgIds() {
+func (t *PlatformInfoTable) requestOrgIds() []uint16 {
 	var response *trident.OrgIDsResponse
 	err := t.Request(func(ctx context.Context, remote net.IP) error {
 		client := trident.NewSynchronizerClient(t.GetClient())
@@ -1251,6 +1252,7 @@ func (t *PlatformInfoTable) requestOrgIds() {
 	})
 	if err != nil {
 		log.Errorf("request org ids failed: %s", err)
+		return t.orgIds
 	}
 	orgIdU32s := response.GetOrgIds()
 	orgIdU16s := make([]uint16, 0, len(orgIdU32s))
@@ -1261,7 +1263,7 @@ func (t *PlatformInfoTable) requestOrgIds() {
 	}
 	if len(orgIdU16s) == 0 {
 		log.Errorf("request org ids is invalid: %+v", orgIdU32s)
-		return
+		return t.orgIds
 	}
 
 	sort.Slice(orgIdU16s, func(i, j int) bool {
@@ -1281,6 +1283,7 @@ func (t *PlatformInfoTable) requestOrgIds() {
 		log.Infof("org ids changed from %+v to %+v", t.orgIds, orgIdU16s)
 		t.orgIds = orgIdU16s
 	}
+	return t.orgIds
 }
 
 func (t *PlatformInfoTable) Version(orgId uint16) uint64 {
