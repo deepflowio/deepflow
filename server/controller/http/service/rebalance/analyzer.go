@@ -38,6 +38,7 @@ type DBInfo struct {
 }
 
 type AnalyzerInfo struct {
+	onlyWeight                bool
 	dbInfo                    *DBInfo
 	regionToVTapNameToTraffic map[string]map[string]int64
 
@@ -45,10 +46,13 @@ type AnalyzerInfo struct {
 	query Querier
 }
 
-func NewAnalyzerInfo() *AnalyzerInfo {
+func NewAnalyzerInfo(onlyWeight bool) *AnalyzerInfo {
 	return &AnalyzerInfo{
-		dbInfo: &DBInfo{},
-		query:  &Query{},
+		onlyWeight: onlyWeight,
+		dbInfo:     &DBInfo{},
+		query: &Query{
+			onlyWeight: onlyWeight,
+		},
 	}
 }
 

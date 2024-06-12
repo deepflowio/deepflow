@@ -315,7 +315,7 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 		return fmt.Errorf("application log body is empty. agent id: %d, log: %v", agentId, l)
 	}
 
-	s.Body = l.Message
+	s.Body = strings.Clone(l.Message)
 	s.Type = dbwriter.StringToLogType(l.LogType)
 	s.UserID = uint32(l.UserID)
 
@@ -342,11 +342,11 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 			var strValue string
 			for key, value := range v {
 				if s, ok := value.(string); ok {
-					strValue = s
+					strValue = strings.Clone(s)
 				} else {
 					strValue = fmt.Sprintf("%v", value)
 				}
-				s.AttributeNames = append(s.AttributeNames, key)
+				s.AttributeNames = append(s.AttributeNames, strings.Clone(key))
 				s.AttributeValues = append(s.AttributeValues, strValue)
 			}
 		default:
@@ -358,11 +358,11 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	}
 
 	s.SeverityNumber = StringToSeverity(l.Level)
-	s.AppService = l.AppService
+	s.AppService = strings.Clone(l.AppService)
 
 	if l.Kubernetes.PodIp != "" {
 		s.AttributeNames = append(s.AttributeNames, "pod_ip", "pod_name")
-		s.AttributeValues = append(s.AttributeValues, l.Kubernetes.PodIp, l.Kubernetes.PodName)
+		s.AttributeValues = append(s.AttributeValues, strings.Clone(l.Kubernetes.PodIp), strings.Clone(l.Kubernetes.PodName))
 	}
 
 	podName := l.Kubernetes.PodName
@@ -480,7 +480,7 @@ func (d *Decoder) handleAppLog(agentId uint16, decoder *codec.SimpleDecoder) {
 
 		log.Debugf("recv agent Id: %d, applog: %s", agentId, bytes)
 		d.appLogEntrysCache = d.appLogEntrysCache[:0]
-		err := json.Unmarshal(bytes, &d.appLogEntrysCache)
+		err := json.UnmarshalString(utils.String(bytes), &d.appLogEntrysCache)
 		if err != nil {
 			if d.counter.ErrorCount == 0 {
 				log.Errorf("application log json decode failed: %s", err)

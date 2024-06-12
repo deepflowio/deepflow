@@ -739,9 +739,9 @@ func Test_AnalyzerInfo_RebalanceAnalyzerByTraffic(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := NewAnalyzerInfo(nil)
+			r := NewAnalyzerInfo(false)
 			tt.prepareMock(t, r)
-			got, err := r.RebalanceAnalyzerByTraffic(tt.args.ifCheckout, tt.args.dataDuration)
+			got, err := r.RebalanceAnalyzerByTraffic(nil, tt.args.ifCheckout, tt.args.dataDuration)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("analyzerInfo.RebalanceAnalyzerByTraffic() error = %v, wantErr %v", err, tt.wantErr)
 				return

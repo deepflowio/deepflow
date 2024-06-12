@@ -170,6 +170,7 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 		}
 		vtapVIF := model.VTapInterface{
 			ID:       jVIF.Get("ID").MustInt(),
+			TeamID:   jVIF.Get("TEAM_ID").MustInt(),
 			Name:     name,
 			MAC:      jVIF.Get("MAC").MustString(),
 			TapName:  jVIF.Get("TAP_NAME").MustString(),
