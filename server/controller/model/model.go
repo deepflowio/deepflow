@@ -490,6 +490,7 @@ type DetailedConfig struct {
 
 type VTapInterface struct {
 	ID                 int    `json:"ID"`
+	TeamID             int    `json:"TEAM_ID"`
 	Name               string `json:"NAME"`
 	MAC                string `json:"MAC"`
 	TapName            string `json:"TAP_NAME"`
