@@ -359,4 +359,14 @@ var ColumnDatasourceAdd65 = []*ColumnDatasourceAdds{
 		OnlyAppTable:   false,
 		DefaultValue:   "1",
 	},
+	{
+		ColumnNames:      []string{"server_syn_miss", "client_ack_miss"},
+		OldColumnNames:   []string{"", ""},
+		ColumnTypes:      []ckdb.ColumnType{ckdb.UInt64, ckdb.UInt64},
+		OnlyMapTable:     false,
+		OnlyAppTable:     false,
+		OnlyNetworkTable: true,
+		IsMetrics:        true,
+		IsSummable:       true,
+	},
 }
