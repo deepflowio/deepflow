@@ -342,7 +342,6 @@ type DomainUpdate struct {
 	Name         string                 `json:"NAME"`
 	Enabled      int                    `json:"ENABLED"`
 	IconID       int                    `json:"ICON_ID"`
-	TeamID       int                    `json:"TEAM_ID"`
 	UserID       int                    `json:"USER_ID"`
 	ControllerIP string                 `json:"CONTROLLER_IP"`
 	Config       map[string]interface{} `json:"CONFIG"`
