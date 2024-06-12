@@ -33,8 +33,9 @@ const (
 )
 
 var (
-	urlPermitVerify = "http://%s:%d/v1/org/%d/permit_verify?method=%s"
-	urlResource     = "http://%s:%d/v1/org/%d/resource"
+	urlPermitVerify  = "http://%s:%d/v1/org/%d/permit_verify?method=%s"
+	urlResource      = "http://%s:%d/v1/org/%d/resource"
+	urlUGCPermission = "http://%s:%d/v1/org/%d/ugc/permissions/patch"
 )
 
 type ResourceAccess struct {
@@ -92,6 +93,19 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE ||
 		resourceUp == nil || len(resourceUp) == 0 {
 		return nil
+	}
+
+	if newOwnerID, ok := resourceUp["owner_user_id"]; ok {
+		body := map[string]interface{}{
+			"new_team_id":   teamID,
+			"new_owner_id":  newOwnerID,
+			"resource_type": resourceType,
+			"resource_id":   resourceUUID,
+		}
+		url = fmt.Sprintf(urlUGCPermission, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+		if err := ugcPermission(url, ra.userInfo, body); err != nil {
+			return err
+		}
 	}
 
 	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
@@ -156,17 +170,41 @@ func PermitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
 		common.WithHeader(common.HEADER_KEY_X_USER_ID, fmt.Sprintf("%d", userInfo.ID)),
 	)
 	if err != nil {
-		return err
+		log.Errorf("url(%s) user_type(%d) user_id(%d) error: %s", url, userInfo.Type, userInfo.ID, err.Error())
+		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error())
 	}
-	havePermission := response.Get("DATA").MustBool()
 
+	havePermission := response.Get("DATA").MustBool()
 	if !havePermission {
-		if desc := response.Get("DESCRIPTION").MustString(); desc != "" {
-			log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d) error: %s", url, userInfo.Type, userInfo.ID, teamID, desc)
-			return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, desc)
-		}
-		log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d)", url, userInfo.Type, userInfo.ID, teamID)
-		return fmt.Errorf("%w", httpcommon.ERR_NO_PERMISSIONS)
+		desc := response.Get("DESCRIPTION").MustString()
+		log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d) description(%s)",
+			url, userInfo.Type, userInfo.ID, teamID, desc)
+		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, desc)
+	}
+	return nil
+}
+
+func ugcPermission(url string, userInfo *httpcommon.UserInfo, body map[string]interface{}) error {
+	response, err := common.CURLPerform(
+		http.MethodPost,
+		url,
+		body,
+		common.WithHeader(common.HEADER_KEY_X_USER_TYPE, fmt.Sprintf("%d", userInfo.Type)),
+		common.WithHeader(common.HEADER_KEY_X_USER_ID, fmt.Sprintf("%d", userInfo.ID)),
+		common.WithHeader(common.HEADER_X_APP_KEY, common.DEFAULT_APP_KEY),
+	)
+	if err != nil {
+		log.Errorf("url(%s) user_type(%d) user_id(%d) body(%#v) error: %s",
+			url, userInfo.Type, userInfo.ID, body, err.Error())
+		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error())
+	}
+
+	havePermission := response.Get("DATA").MustBool()
+	if !havePermission {
+		desc := response.Get("DESCRIPTION").MustString()
+		log.Errorf("url(%s) user_type(%d) user_id(%d) body(%#v) description(%s)",
+			url, userInfo.Type, userInfo.ID, body, desc)
+		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, desc)
 	}
 	return nil
 }
