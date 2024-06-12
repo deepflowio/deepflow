@@ -53,7 +53,7 @@ func GenerateOrgMap() {
 	getOrgUrl := fmt.Sprintf("http://localhost:%d/v1/orgs/", config.ControllerCfg.ListenPort)
 	resp, err := common.CURLPerform("GET", getOrgUrl, nil)
 	if err != nil {
-		log.Errorf("request controller failed: %s, URL: %s", resp, getOrgUrl)
+		log.Warningf("request controller failed: %s, URL: %s", resp, getOrgUrl)
 		return
 	}
 	orgPrometheus := map[string]PrometheusMap{}
