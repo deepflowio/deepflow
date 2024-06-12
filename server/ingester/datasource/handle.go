@@ -307,6 +307,10 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, db, dstTable, a
 			codec = fmt.Sprintf("codec(%s)", p.Codec.String())
 		}
 
+		if p.Name == t.TimeKey {
+			p.Comment = t.Version
+		}
+
 		if p.GroupBy {
 			if !stringSliceHas(orderKeys, p.Name) {
 				orderKeys = append(orderKeys, p.Name)
