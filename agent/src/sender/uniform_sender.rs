@@ -146,8 +146,13 @@ impl<T: Sendable> Encoder<T> {
         }
     }
 
+    fn set_msg_type(&mut self, s: &T) {
+        self.header.msg_type = s.message_type();
+    }
+
     pub fn cache_to_sender(&mut self, s: T) {
         if self.buffer.is_empty() {
+            self.set_msg_type(&s);
             self.add_header();
         }
 
