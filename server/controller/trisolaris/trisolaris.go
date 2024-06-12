@@ -505,7 +505,6 @@ func (m *TrisolarisManager) checkORG() {
 }
 
 func (m *TrisolarisManager) TimedCheckORG() {
-	m.checkORG()
 	interval := time.Duration(60)
 	ticker := time.NewTicker(interval * time.Second).C
 	for {
