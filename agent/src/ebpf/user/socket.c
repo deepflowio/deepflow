@@ -128,7 +128,10 @@ static int update_offsets_table(struct bpf_tracer *t,
 				struct bpf_offset_param *offset);
 static void datadump_process(void *data, int64_t boot_time);
 static bool bpf_stats_map_update(struct bpf_tracer *tracer,
-				 int socket_num, int trace_num);
+				 int socket_num, int trace_num,
+				 int conflict_count,
+				 int max_delay,
+				 int total_time, int event_count);
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	int index = 0, curr_idx;
@@ -860,7 +863,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		submit_data = data_buf_ptr;
 
 		submit_data->socket_id = sd->socket_id;
-		submit_data->timestamp =  sd->timestamp;
+		submit_data->timestamp = sd->timestamp;
 		submit_data->tuple = sd->tuple;
 		submit_data->direction = sd->direction;
 		submit_data->l7_protocal_hint = sd->data_type;
@@ -994,7 +997,7 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 	reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
 	// The trace statistics map needs to be updated to reflect the count.   
 	curr_trace_count -= reclaim_count;
-	if (!bpf_stats_map_update(tracer, -1, curr_trace_count)) {
+	if (!bpf_stats_map_update(tracer, -1, curr_trace_count, -1, -1, -1, -1)) {
 		ebpf_warning("Update trace statistics failed.\n");
 	}
 
@@ -1040,7 +1043,8 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 
 	sockets_reclaim_count = __reclaim_map(map_fd, &clear_elem_head);
 	curr_socket_count -= sockets_reclaim_count;
-	if (!bpf_stats_map_update(tracer, curr_socket_count, -1)) {
+	if (!bpf_stats_map_update
+	    (tracer, curr_socket_count, -1, -1, -1, -1, -1)) {
 		ebpf_warning("Update trace statistics failed.\n");
 	}
 
@@ -1455,9 +1459,10 @@ static void update_allow_reasm_protos_array(struct bpf_tracer *tracer)
 				     get_proto_name(idx), idx);
 			}
 		} else {
-			ebpf_warning("Set proto %s(%d) to map '%s' failed, %s\n",
-				     get_proto_name(idx), idx,
-				     MAP_ALLOW_REASM_PROTOS_NAME, strerror(errno));
+			ebpf_warning
+			    ("Set proto %s(%d) to map '%s' failed, %s\n",
+			     get_proto_name(idx), idx,
+			     MAP_ALLOW_REASM_PROTOS_NAME, strerror(errno));
 		}
 	}
 }
@@ -1545,11 +1550,11 @@ int set_data_limit_max(int limit_size)
 
 	int cpu;
 	int nr_cpus = get_num_possible_cpus();
-	struct trace_conf_t values[nr_cpus];
+	struct tracer_ctx_s values[nr_cpus];
 	memset(values, 0, sizeof(values));
 
-	if (!bpf_table_get_value(tracer, MAP_TRACE_CONF_NAME, 0, values)) {
-		ebpf_warning("Get map '%s' failed.\n", MAP_TRACE_CONF_NAME);
+	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACER_CTX_NAME);
 		return ETR_NOTEXIST;
 	}
 
@@ -1558,8 +1563,8 @@ int set_data_limit_max(int limit_size)
 	}
 
 	if (!bpf_table_set_value
-	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&values)) {
-		ebpf_warning("Set '%s' failed\n", MAP_TRACE_CONF_NAME);
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACER_CTX_NAME);
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
@@ -1579,11 +1584,11 @@ int set_go_tracing_timeout(int timeout)
 
 	int cpu;
 	int nr_cpus = get_num_possible_cpus();
-	struct trace_conf_t values[nr_cpus];
+	struct tracer_ctx_s values[nr_cpus];
 	memset(values, 0, sizeof(values));
 
-	if (!bpf_table_get_value(tracer, MAP_TRACE_CONF_NAME, 0, values)) {
-		ebpf_warning("Get map '%s' failed.\n", MAP_TRACE_CONF_NAME);
+	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACER_CTX_NAME);
 		return ETR_NOTEXIST;
 	}
 
@@ -1592,8 +1597,8 @@ int set_go_tracing_timeout(int timeout)
 	}
 
 	if (!bpf_table_set_value
-	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&values)) {
-		ebpf_warning("Set '%s' failed\n", MAP_TRACE_CONF_NAME);
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACER_CTX_NAME);
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
@@ -1611,11 +1616,11 @@ int set_io_event_collect_mode(uint32_t mode)
 
 	int cpu;
 	int nr_cpus = get_num_possible_cpus();
-	struct trace_conf_t values[nr_cpus];
+	struct tracer_ctx_s values[nr_cpus];
 	memset(values, 0, sizeof(values));
 
-	if (!bpf_table_get_value(tracer, MAP_TRACE_CONF_NAME, 0, values)) {
-		ebpf_warning("Get map '%s' failed.\n", MAP_TRACE_CONF_NAME);
+	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACER_CTX_NAME);
 		return ETR_NOTEXIST;
 	}
 
@@ -1624,8 +1629,8 @@ int set_io_event_collect_mode(uint32_t mode)
 	}
 
 	if (!bpf_table_set_value
-	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&values)) {
-		ebpf_warning("Set '%s' failed\n", MAP_TRACE_CONF_NAME);
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACER_CTX_NAME);
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
@@ -1643,11 +1648,11 @@ int set_io_event_minimal_duration(uint64_t duration)
 
 	int cpu;
 	int nr_cpus = get_num_possible_cpus();
-	struct trace_conf_t values[nr_cpus];
+	struct tracer_ctx_s values[nr_cpus];
 	memset(values, 0, sizeof(values));
 
-	if (!bpf_table_get_value(tracer, MAP_TRACE_CONF_NAME, 0, values)) {
-		ebpf_warning("Get map '%s' failed.\n", MAP_TRACE_CONF_NAME);
+	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACER_CTX_NAME);
 		return ETR_NOTEXIST;
 	}
 
@@ -1657,8 +1662,8 @@ int set_io_event_minimal_duration(uint64_t duration)
 	}
 
 	if (!bpf_table_set_value
-	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&values)) {
-		ebpf_warning("Set '%s' failed\n", MAP_TRACE_CONF_NAME);
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACER_CTX_NAME);
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
@@ -2089,7 +2094,8 @@ int running_socket_tracer(tracer_callback_t handle,
 		return -EINVAL;
 
 	uint16_t cpu;
-	struct trace_conf_t t_conf[MAX_CPU_NR];
+	struct tracer_ctx_s t_conf[MAX_CPU_NR];
+	memset(&t_conf, 0, sizeof(t_conf));
 	for (cpu = 0; cpu < MAX_CPU_NR; cpu++) {
 		t_conf[cpu].socket_id = (uint64_t) cpu << 56 | uid_base;
 		t_conf[cpu].coroutine_trace_id = t_conf[cpu].socket_id;
@@ -2102,7 +2108,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	}
 
 	if (!bpf_table_set_value
-	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&t_conf))
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&t_conf))
 		return -EINVAL;
 
 	tracer->data_limit_max = socket_data_limit_max;
@@ -2256,26 +2262,41 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 		return false;
 
 	memset(stats_total, 0, sizeof(*stats_total));
-	stats_total->socket_map_count += value.socket_map_count;
-	stats_total->trace_map_count += value.trace_map_count;
-
+	stats_total->socket_map_count = value.socket_map_count;
+	stats_total->trace_map_count = value.trace_map_count;
+	stats_total->push_conflict_count = value.push_conflict_count;
+	stats_total->period_event_max_delay = value.period_event_max_delay;
+	stats_total->period_event_total_time = value.period_event_total_time;
+	stats_total->period_event_count = value.period_event_count;
 	return true;
 }
 
 static bool bpf_stats_map_update(struct bpf_tracer *tracer,
-				 int socket_num, int trace_num)
+				 int socket_num, int trace_num,
+				 int conflict_count,
+				 int max_delay, int total_time, int event_count)
 {
 	struct trace_stats value = { 0 };
 	if (!bpf_table_get_value(tracer, MAP_TRACE_STATS_NAME, 0, &value))
 		return false;
 
-	if (socket_num != -1) {
+	if (socket_num != -1)
 		value.socket_map_count = socket_num;
-	}
 
-	if (trace_num != -1) {
+	if (trace_num != -1)
 		value.trace_map_count = trace_num;
-	}
+
+	if (conflict_count != -1)
+		value.push_conflict_count = conflict_count;
+
+	if (total_time != -1)
+		value.period_event_max_delay = max_delay;
+
+	if (total_time != -1)
+		value.period_event_total_time = total_time;
+
+	if (event_count != -1)
+		value.period_event_count = event_count;
 
 	if (!bpf_table_set_value(tracer,
 				 MAP_TRACE_STATS_NAME, 0, (void *)&value)) {
@@ -2368,10 +2389,23 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.data_limit_max = socket_data_limit_max;
 
 	struct trace_stats stats_total;
-
 	if (bpf_stats_map_collect(t, &stats_total)) {
 		stats.kern_socket_map_used = stats_total.socket_map_count;
 		stats.kern_trace_map_used = stats_total.trace_map_count;
+		stats.period_push_conflict_count =
+		    stats_total.push_conflict_count;
+		if (stats_total.period_event_max_delay > 0)
+			stats.period_push_max_delay =
+			    stats_total.period_event_max_delay / NS_IN_USEC;
+
+		if (stats_total.period_event_total_time > 0
+		    && stats_total.period_event_count > 0)
+			stats.period_push_avg_delay =
+			    (stats_total.period_event_total_time /
+			     stats_total.period_event_count) / NS_IN_USEC;
+		if (!bpf_stats_map_update(t, -1, -1, 0, 0, 0, 0)) {
+			ebpf_warning("Update trace statistics failed.\n");
+		}
 	}
 
 	int i;
@@ -2398,6 +2432,11 @@ struct socket_trace_stats socket_tracer_stats(void)
 
 	// 相邻两次系统启动时间更新后的差值
 	stats.boot_time_update_diff = sys_boot_time_ns - prev_sys_boot_time_ns;
+
+	stats.proc_exec_event_count = get_proc_exec_event_count();
+	stats.proc_exit_event_count = get_proc_exit_event_count();
+	clear_proc_exec_event_count();
+	clear_proc_exit_event_count();
 
 	return stats;
 }
@@ -2722,8 +2761,7 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 		return;
 
 	int64_t k_fetch_time_us;
-	k_fetch_time_us = 
-		(sd->timestamp + boot_time) / NS_IN_USEC;
+	k_fetch_time_us = (sd->timestamp + boot_time) / NS_IN_USEC;
 
 	char *kern_cap_time = get_timestamp_from_us(k_fetch_time_us);
 	if (kern_cap_time == NULL) {
@@ -2742,6 +2780,8 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 
 	if (sd->msg_type == MSG_REQUEST)
 		type = "req";
+	else if (sd->msg_type == MSG_RESPONSE)
+		type = "res";
 	else if (sd->msg_type == MSG_RESPONSE)
 		type = "res";
 	else

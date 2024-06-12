@@ -383,6 +383,17 @@ pub struct SK_TRACE_STATS {
     pub probes_count: u32,
     // Maximum length limit of eBPF data transmission
     pub data_limit_max: u32,
+
+    /*
+     * When the periodic push event detects that the buffer is being modified by
+     * another eBPF program, a conflict will occur. This is used to record the
+     * number of conflicts.
+     */
+    pub period_push_conflict_count: u64,
+    pub period_push_max_delay: u64, // The maximum latency time for periodic push events, in microseconds.
+    pub period_push_avg_delay: u64, // The average latency time for periodic push events, in microseconds.
+    pub proc_exec_event_count: u64, // The number of events for process execute.
+    pub proc_exit_event_count: u64, // The number of events for process exits.
 }
 
 #[repr(C)]

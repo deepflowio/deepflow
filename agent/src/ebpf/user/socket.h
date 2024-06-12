@@ -105,6 +105,14 @@ struct socket_bpf_data {
  * @boot_time_update_diff 这里用于记录相邻两次更新后，系统启动时间之间的差异（单位为纳秒）。
  * @probes_count How many probes now 
  * @data_limit_max Maximum data length limit
+ *
+ * @period_push_conflict_count When the periodic push event detects that the
+ *    buffer is being modified by another eBPF program, a conflict will occur.
+ *    This is used to record the number of conflicts. 
+ * @period_push_max_delay The maximum latency time for periodic push events, in microseconds.
+ * @period_push_avg_delay The average latency time for periodic push events, in microseconds.
+ * @proc_exec_event_count The number of events for process execute.
+ * @proc_exit_event_count The number of events for process exits.
  */
 struct socket_trace_stats {
 
@@ -142,6 +150,19 @@ struct socket_trace_stats {
 	int64_t boot_time_update_diff;
 	uint32_t probes_count;
 	uint32_t data_limit_max;
+
+	/*
+	 * Period push events statistics.
+	 */
+	uint64_t period_push_conflict_count;
+	uint64_t period_push_max_delay;
+	uint64_t period_push_avg_delay;
+
+	/*
+	 * Process start and exit events.
+	 */
+	uint64_t proc_exec_event_count;
+	uint64_t proc_exit_event_count;
 };
 
 struct bpf_offset_param {

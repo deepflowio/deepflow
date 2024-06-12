@@ -104,12 +104,22 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid);
 
 u64 get_proc_exec_event_count(void)
 {
-	return proc_exec_event_count;
+	return AO_GET(&proc_exec_event_count);
 }
 
 u64 get_proc_exit_event_count(void)
 {
-	return proc_exit_event_count;
+	return AO_GET(&proc_exit_event_count);
+}
+
+void clear_proc_exec_event_count(void)
+{
+	AO_SET(&proc_exec_event_count, 0);
+}
+
+void clear_proc_exit_event_count(void)
+{
+	AO_SET(&proc_exit_event_count, 0);
 }
 
 void set_java_syms_fetch_delay(int delay_secs)
