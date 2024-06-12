@@ -60,6 +60,7 @@ type Config struct {
 	GrpcMaxMessageLength           int
 	ExportersEnabled               bool
 	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
+	NoIPOverlapping                bool
 }
 
 func (c *Config) Convert() {
@@ -80,6 +81,14 @@ func (c *Config) Convert() {
 	} else {
 		c.NodeIP = nodeIP
 	}
+}
+
+func (c *Config) SetNoIPOverlapping(data bool) {
+	c.NoIPOverlapping = data
+}
+
+func (c *Config) GetNoIPOverlapping() bool {
+	return c.NoIPOverlapping
 }
 
 func (c *Config) SetGrpcPort(port int) {
