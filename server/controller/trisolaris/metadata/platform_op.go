@@ -162,6 +162,9 @@ func (p *PlatformDataOP) generateVInterfaces() {
 			log.Error(err)
 			continue
 		}
+		if p.metaData.config.GetNoIPOverlapping() {
+			interfaceProto.sInterface.IfType = proto.Uint32(uint32(VIF_TYPE_WAN))
+		}
 		err = rawData.modifyInterfaceProto(vif, interfaceProto, device)
 		if err != nil {
 			log.Error(err)
@@ -295,6 +298,10 @@ func (p *PlatformDataOP) generateCIDRs() {
 			if network.IsVIP != 0 {
 				isVip = true
 			}
+			simplecidrType := trident.CidrType_LAN
+			if p.metaData.config.GetNoIPOverlapping() || network.NetType == NETWORK_TYPE_WAN {
+				simplecidrType = trident.CidrType_WAN
+			}
 			cidrType := trident.CidrType_LAN
 			if network.NetType == NETWORK_TYPE_WAN {
 				cidrType = trident.CidrType_WAN
@@ -311,7 +318,7 @@ func (p *PlatformDataOP) generateCIDRs() {
 			}
 			simplecidr := &trident.Cidr{
 				Prefix:   proto.String(prefix),
-				Type:     &cidrType,
+				Type:     &simplecidrType,
 				EpcId:    proto.Int32(int32(network.VPCID)),
 				RegionId: proto.Uint32(uint32(regionID)),
 				TunnelId: proto.Uint32(uint32(tunnelID)),
@@ -354,6 +361,10 @@ func (p *PlatformDataOP) generateCIDRs() {
 				tunnelID = vpc.TunnelID
 			}
 		}
+		simplecidrType := trident.CidrType_LAN
+		if p.metaData.config.GetNoIPOverlapping() || network.NetType == NETWORK_TYPE_WAN {
+			simplecidrType = trident.CidrType_WAN
+		}
 		cidrType := trident.CidrType_LAN
 		if network.NetType == NETWORK_TYPE_WAN {
 			cidrType = trident.CidrType_WAN
@@ -370,7 +381,7 @@ func (p *PlatformDataOP) generateCIDRs() {
 		}
 		simplecidr := &trident.Cidr{
 			Prefix:   proto.String(prefix),
-			Type:     &cidrType,
+			Type:     &simplecidrType,
 			EpcId:    proto.Int32(int32(network.VPCID)),
 			RegionId: proto.Uint32(uint32(regionID)),
 			TunnelId: proto.Uint32(uint32(tunnelID)),

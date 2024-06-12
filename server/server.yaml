@@ -55,6 +55,8 @@ controller:
   reporting-disabled: false
   # Deepflow billing mode  license/voucher
   billing-method: license
+  ## If no-ip-overlapping is set to true, All IP and cidr issued by the controller to agent are wan
+  #no-ip-overlapping: false
 
   # ingester plaform data, default: 0
   # 0 (All K8s Cluster)
