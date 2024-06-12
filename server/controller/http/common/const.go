@@ -42,5 +42,6 @@ const (
 )
 
 var (
-	ERR_NO_PERMISSIONS = errors.New("NO_PERMISSIONS")
+	ERR_NO_PERMISSIONS    = errors.New("NO_PERMISSIONS")
+	ERR_FPERMIT_EXCEPTION = errors.New("FPERMIT_EXCEPTION")
 )
