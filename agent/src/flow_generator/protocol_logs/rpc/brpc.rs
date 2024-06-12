@@ -40,7 +40,7 @@ pub struct BrpcInfo {
     req_len: Option<u32>,
     req_log_id: Option<i64>,
 
-    resp_status: Option<L7ResponseStatus>,
+    resp_status: L7ResponseStatus,
     resp_code: Option<i32>,
     resp_exception: Option<String>,
     resp_len: Option<u32>,
@@ -92,8 +92,8 @@ impl BrpcInfo {
             info.resp_code = resp.error_code;
             info.resp_exception = resp.error_text;
             info.resp_status = match resp.error_code {
-                Some(x) if x != 0 => Some(L7ResponseStatus::ServerError),
-                _ => Some(L7ResponseStatus::Ok),
+                Some(x) if x != 0 => L7ResponseStatus::ServerError,
+                _ => L7ResponseStatus::Ok,
             };
             info.resp_len = Some(body_size as u32 + 12);
             info.msg_type = LogMessageType::Response;
@@ -182,7 +182,7 @@ impl From<BrpcInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             resp: L7Response {
-                status: info.resp_status.unwrap_or_default(),
+                status: info.resp_status,
                 code: info.resp_code,
                 exception: info.resp_exception.unwrap_or_default(),
                 ..Default::default()
@@ -215,7 +215,9 @@ impl L7ProtocolInfoInterface for BrpcInfo {
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let (req, L7ProtocolInfo::BrpcInfo(rsp)) = (self, other) {
             req.resp_len = req.resp_len.or(rsp.resp_len);
-            req.resp_status = req.resp_status.or(rsp.resp_status);
+            if rsp.resp_status != L7ResponseStatus::Ok {
+                req.resp_status = rsp.resp_status;
+            }
             req.resp_code = req.resp_code.or(rsp.resp_code);
             if req.resp_exception.is_none() {
                 req.resp_exception = rsp.resp_exception.clone();
@@ -293,6 +295,19 @@ impl L7ProtocolParserInterface for BrpcLog {
                         PacketDirection::ServerToClient => {
                             self.perf_stats.as_mut().map(|p| p.inc_resp());
                         }
+                    }
+                    match info.resp_status {
+                        L7ResponseStatus::ClientError => {
+                            self.perf_stats
+                                .as_mut()
+                                .map(|p: &mut L7PerfStats| p.inc_req_err());
+                        }
+                        L7ResponseStatus::ServerError => {
+                            self.perf_stats
+                                .as_mut()
+                                .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                        }
+                        _ => {}
                     }
                     if info.msg_type != LogMessageType::Session {
                         info.cal_rrt(param).map(|rtt| {
