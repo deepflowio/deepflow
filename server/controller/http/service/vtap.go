@@ -17,6 +17,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -318,7 +319,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 		return model.Vtap{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify name or lcuuid")
 	}
 	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.SET_RESOURCE_TYPE_AGENT, "", nil); err != nil {
-		return model.Vtap{}, err
+		return model.Vtap{}, fmt.Errorf("%w agent(name: %s) has no permission to operate.", err, vtap.Name)
 	}
 
 	log.Infof("ORG(id=%d database=%s) update vtap (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
@@ -357,11 +358,15 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (resp map[string
 	var succeedLcuuids []string
 	var failedLcuuids []string
 
+	var isNoPermission bool
 	for _, vtapUpdate := range updateMap {
 		if lcuuid, ok := vtapUpdate["LCUUID"].(string); ok {
 			_, _err := a.Update(lcuuid, "", vtapUpdate)
+			if errors.Is(err, httpcommon.ERR_NO_PERMISSIONS) {
+				isNoPermission = true
+			}
 			if _err != nil {
-				description += _err.Error()
+				description += strings.TrimPrefix(_err.Error(), httpcommon.NO_PERMISSIONS)
 				failedLcuuids = append(failedLcuuids, lcuuid)
 			} else {
 				succeedLcuuids = append(succeedLcuuids, lcuuid)
@@ -374,6 +379,9 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (resp map[string
 		"FAILED_LCUUID":  failedLcuuids,
 	}
 
+	if isNoPermission {
+		return response, NewError(httpcommon.NO_PERMISSIONS, description)
+	}
 	if description != "" {
 		return response, NewError(httpcommon.SERVER_ERROR, description)
 	} else {
