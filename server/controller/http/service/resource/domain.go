@@ -385,13 +385,6 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 	}
 
 	resourceUp := map[string]interface{}{}
-	// team id
-	uTeamID, exist := domainUpdate["TEAM_ID"]
-	if exist {
-		dbUpdateMap["team_id"] = uTeamID
-		resourceUp["team_id"] = uTeamID
-	}
-
 	// user id
 	if uUserID, ok := domainUpdate["USER_ID"]; ok {
 		dbUpdateMap["user_id"] = uUserID
@@ -491,12 +484,6 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 	err = db.Model(&domain).Updates(dbUpdateMap).Error
 	if err != nil {
 		return nil, err
-	}
-	if exist {
-		err = db.Model(&mysql.SubDomain{}).Where("domain = ?", domain.Lcuuid).Update("team_id", uTeamID).Error
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	response, _ := GetDomains(db, []int{}, map[string]interface{}{"lcuuid": domain.Lcuuid})
