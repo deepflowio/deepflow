@@ -76,6 +76,7 @@ impl LocalModeDispatcher {
             base.stats.clone(),
             false, // !from_ebpf
         );
+        let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
 
         while !base.terminated.load(Ordering::Relaxed) {
             let config = Config {
@@ -170,6 +171,7 @@ impl LocalModeDispatcher {
                 &base.tap_type_handler,
                 &mut base.tunnel_info,
                 tunnel_type_bitmap,
+                tunnel_type_trim_bitmap,
             ) {
                 Ok((l, _)) => l,
                 Err(e) => {
@@ -185,6 +187,7 @@ impl LocalModeDispatcher {
                 &base.tap_type_handler,
                 &mut base.tunnel_info,
                 tunnel_type_bitmap,
+                tunnel_type_trim_bitmap,
             ) {
                 Ok((l, _)) => l,
                 Err(e) => {

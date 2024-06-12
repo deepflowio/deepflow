@@ -561,7 +561,7 @@ pub struct YamlConfig {
     pub packet_delay: Duration,
     pub triple: TripleMapConfig,
     pub kubernetes_poller_type: KubernetesPollerType,
-    pub decap_erspan: bool,
+    pub trim_tunnel_types: Vec<String>,
     pub analyzer_ip: String,
     pub grpc_buffer_size: usize,
     #[serde(with = "humantime_serde")]
@@ -966,7 +966,7 @@ impl Default for YamlConfig {
             packet_delay: Duration::from_secs(1),
             triple: Default::default(),
             kubernetes_poller_type: KubernetesPollerType::Adaptive,
-            decap_erspan: false,
+            trim_tunnel_types: vec![],
             analyzer_ip: "".into(),
             grpc_buffer_size: 5,
             l7_log_session_aggr_timeout: Duration::from_secs(120),
@@ -1351,7 +1351,7 @@ impl RuntimeConfig {
         // c.collector_socket_type = trident::SocketType::File;
         c.max_memory <<= 20;
         c.server_tx_bandwidth_threshold <<= 20;
-
+        c.modify_decap_types();
         c.validate()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         Ok(c)
@@ -1437,6 +1437,13 @@ impl RuntimeConfig {
             tap_mode: TapMode::Local,
             yaml_config: YamlConfig::load("", TapMode::Local).unwrap(), // Default configuration that needs to be corrected to be available
             plugins: Default::default(),
+        }
+    }
+
+    fn modify_decap_types(&mut self) {
+        for tunnel_type in &self.yaml_config.trim_tunnel_types {
+            self.decap_types
+                .push(TunnelType::from(tunnel_type.as_str()));
         }
     }
 
@@ -1539,7 +1546,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
     type Error = io::Error;
 
     fn try_from(conf: trident::Config) -> Result<Self, io::Error> {
-        let rc = Self {
+        let mut rc = Self {
             vtap_group_id: Default::default(),
             enabled: conf.enabled(),
             max_millicpus: {
@@ -1686,6 +1693,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             yaml_config: YamlConfig::load(conf.local_config(), conf.tap_mode())?,
             plugins: conf.plugins,
         };
+        rc.modify_decap_types();
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
         Ok(rc)

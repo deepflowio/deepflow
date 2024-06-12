@@ -252,6 +252,7 @@ impl AnalyzerModeDispatcher {
 
         let terminated = base.terminated.clone();
         let tunnel_type_bitmap = base.tunnel_type_bitmap.clone();
+        let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
         let tap_type_handler = base.tap_type_handler.clone();
         let counter = base.counter.clone();
         let analyzer_dedup_disabled = base.analyzer_dedup_disabled;
@@ -324,6 +325,7 @@ impl AnalyzerModeDispatcher {
                                 &tap_type_handler,
                                 &mut tunnel_info,
                                 tunnel_type_bitmap,
+                                tunnel_type_trim_bitmap,
                             ) {
                                 Ok(d) => d,
                                 Err(e) => {
@@ -592,6 +594,7 @@ impl AnalyzerModeDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
+        trim_bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         let packet = packet.as_mut();
         if packet[BILD_FLAGS_OFFSET] == BILD_FLAGS as u8 && packet.len() > ETH_HEADER_SIZE {
@@ -608,7 +611,7 @@ impl AnalyzerModeDispatcher {
             return Ok((overlay_offset, tap_type));
         }
 
-        BaseDispatcher::decap_tunnel(packet, tap_type_handler, tunnel_info, bitmap)
+        BaseDispatcher::decap_tunnel(packet, tap_type_handler, tunnel_info, bitmap, trim_bitmap)
     }
 
     pub(super) fn prepare_flow(
