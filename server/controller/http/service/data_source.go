@@ -338,13 +338,13 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	}
 	oldRetentionTime := dataSource.RetentionTime
 	isUpdateName := false
-	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) {
-		dataSource.DisplayName = dataSourceUpdate.DisplayName
+	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) &&
+		dataSource.DisplayName != dataSourceUpdate.DisplayName {
 		isUpdateName = true
 	}
 
 	// only update display name
-	if dataSource.RetentionTime == dataSourceUpdate.RetentionTime && isUpdateName {
+	if isUpdateName {
 		err := mysql.Db.Save(&dataSource).Error
 		if err != nil {
 			return model.DataSource{}, err
