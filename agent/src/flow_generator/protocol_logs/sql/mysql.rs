@@ -399,6 +399,19 @@ impl L7ProtocolParserInterface for MysqlLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
             }
+            match info.status {
+                L7ResponseStatus::ClientError => {
+                    self.perf_stats
+                        .as_mut()
+                        .map(|p: &mut L7PerfStats| p.inc_req_err());
+                }
+                L7ResponseStatus::ServerError => {
+                    self.perf_stats
+                        .as_mut()
+                        .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                }
+                _ => {}
+            }
             if info.msg_type != LogMessageType::Session {
                 info.cal_rrt(param).map(|rrt| {
                     info.rrt = rrt;
@@ -702,7 +715,6 @@ impl MysqlLog {
                     }
                     info.error_message = String::from_utf8_lossy(context).into_owned();
                 }
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }
             MYSQL_RESPONSE_CODE_OK => {
                 info.status = L7ResponseStatus::Ok;
