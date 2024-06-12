@@ -925,7 +925,9 @@ impl HttpLog {
         } else {
             None
         };
-        info.method = Method::from(param.ebpf_type);
+        if self.proto == L7Protocol::Grpc {
+            info.method = Method::from(param.ebpf_type);
+        }
         return Self::modify_http2_and_grpc(direction, content_length, stream_id, info);
     }
 
@@ -1189,7 +1191,9 @@ impl HttpLog {
 
                 header_frame_parsed = true;
 
-                info.method = Method::from(httpv2_header.frame_type);
+                if self.proto == L7Protocol::Grpc {
+                    info.method = Method::from(httpv2_header.frame_type);
+                }
                 if !param.is_from_ebpf() {
                     info.headers_offset = headers_offset as u32;
                 }
