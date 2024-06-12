@@ -17,6 +17,7 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -81,6 +82,24 @@ func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 
 func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 	errResponse, _ := simplejson.NewJson([]byte("{}"))
+	// no fpermit
+	if !cfg.FPermit.Enabled {
+		datas := []map[string]int{}
+		orgData := map[string]int{"ORG_ID": controllerCommon.DEFAULT_ORG_ID}
+		datas = append(datas, orgData)
+		responseBytes, err := json.Marshal(datas)
+		if err != nil {
+			log.Error(err)
+			return errResponse, err
+		}
+		response, err := simplejson.NewJson(responseBytes)
+		if err != nil {
+			log.Error(err)
+			return errResponse, err
+		}
+		return response, err
+	}
+
 	body := make(map[string]interface{})
 	// master region
 	if cfg.TrisolarisCfg.NodeType != controllerCommon.TRISOLARIS_NODE_TYPE_MASTER {
