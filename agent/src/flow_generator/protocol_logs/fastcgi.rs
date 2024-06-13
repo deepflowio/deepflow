@@ -25,7 +25,6 @@ use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, P
 use crate::config::handler::L7LogDynamicConfig;
 use crate::flow_generator::protocol_logs::value_is_default;
 use crate::flow_generator::{Error, Result};
-use crate::HttpLog;
 
 use super::consts::{
     HTTP_STATUS_CLIENT_ERROR_MAX, HTTP_STATUS_CLIENT_ERROR_MIN, HTTP_STATUS_SERVER_ERROR_MAX,
@@ -206,16 +205,20 @@ impl FastCGIInfo {
 
                 config.map(|c| {
                     if c.is_trace_id(key) {
-                        if let Some(id) = HttpLog::decode_id(val, key, HttpLog::TRACE_ID) {
-                            self.trace_id = id;
+                        if let Some(trace_type) = c.trace_types.iter().find(|t| t.check(key)) {
+                            trace_type
+                                .decode_trace_id(val)
+                                .map(|id| self.trace_id = id.to_string());
                         }
                     }
                 });
 
                 config.map(|c| {
                     if c.is_span_id(key) {
-                        if let Some(id) = HttpLog::decode_id(val, key, HttpLog::SPAN_ID) {
-                            self.span_id = id;
+                        if let Some(trace_type) = c.span_types.iter().find(|t| t.check(key)) {
+                            trace_type
+                                .decode_span_id(val)
+                                .map(|id| self.span_id = id.to_string());
                         }
                     }
                 });

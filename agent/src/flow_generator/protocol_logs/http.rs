@@ -25,9 +25,7 @@ use serde::Serialize;
 use super::pb_adapter::{
     ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
 };
-use super::value_is_default;
-use super::{consts::*, AppProtoHead, L7ResponseStatus};
-use super::{decode_new_rpc_trace_context_with_type, LogMessageType};
+use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
@@ -41,12 +39,11 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
-    config::handler::{L7LogDynamicConfig, TraceType},
+    config::handler::L7LogDynamicConfig,
     flow_generator::error::{Error, Result},
-    flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
+    flow_generator::protocol_logs::L7ProtoRawDataType,
     utils::bytes::{read_u32_be, read_u32_le},
 };
-use cloud_platform::tingyun;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
@@ -591,9 +588,6 @@ impl L7ProtocolParserInterface for HttpLog {
 }
 
 impl HttpLog {
-    pub const TRACE_ID: u8 = 0;
-    pub const SPAN_ID: u8 = 1;
-
     pub fn new_v1() -> Self {
         Self {
             proto: L7Protocol::Http1,
@@ -1074,13 +1068,17 @@ impl HttpLog {
         };
 
         if config.is_trace_id(key) {
-            if let Some(id) = Self::decode_id(val, key, Self::TRACE_ID) {
-                info.trace_id = id;
+            if let Some(trace_type) = config.trace_types.iter().find(|t| t.check(key)) {
+                trace_type
+                    .decode_trace_id(val)
+                    .map(|id| info.trace_id = id.to_string());
             }
         }
         if config.is_span_id(key) {
-            if let Some(id) = Self::decode_id(val, key, Self::SPAN_ID) {
-                info.span_id = id;
+            if let Some(trace_type) = config.span_types.iter().find(|t| t.check(key)) {
+                trace_type
+                    .decode_span_id(val)
+                    .map(|id| info.span_id = id.to_string());
             }
         }
         if config.x_request_id.contains(key) {
@@ -1092,87 +1090,6 @@ impl HttpLog {
         }
         if direction == PacketDirection::ClientToServer && key == &config.proxy_client {
             info.client_ip = val.to_owned();
-        }
-    }
-
-    // uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
-    // 使用':'分隔，第一个字段为TRACEID，第三个字段为SPANID
-    fn decode_uber_id(value: &str, id_type: u8) -> Option<String> {
-        let segs = value.split(":");
-        let mut i = 0;
-        for seg in segs {
-            if id_type == Self::TRACE_ID && i == 0 {
-                return Some(seg.to_string());
-            }
-            if id_type == Self::SPAN_ID && i == 2 {
-                return Some(seg.to_string());
-            }
-
-            i += 1;
-        }
-        None
-    }
-
-    // sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
-    // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
-    // sw6和sw8的value全部使用'-'分隔，TRACEID前为SAMPLE字段取值范围仅有0或1
-    // 提取`TRACEID`展示为HTTP日志中的`TraceID`字段
-    // 提取`SEGMENTID-SPANID`展示为HTTP日志中的`SpanID`字段
-    fn decode_skywalking_id(value: &str, id_type: u8) -> Option<String> {
-        let segs: Vec<&str> = value.split("-").collect();
-
-        if id_type == Self::TRACE_ID && segs.len() > 2 {
-            return Some(decode_base64_to_string(segs[1]));
-        }
-        if id_type == Self::SPAN_ID && segs.len() > 4 {
-            return Some(format!("{}-{}", decode_base64_to_string(segs[2]), segs[3]));
-        }
-
-        None
-    }
-
-    // OTel HTTP Trace format:
-    // traceparent: 00-TRACEID-SPANID-01
-    fn decode_traceparent(value: &str, id_type: u8) -> Option<String> {
-        let segs = value.split("-");
-        let mut i = 0;
-        for seg in segs {
-            if id_type == Self::TRACE_ID && i == 1 {
-                return Some(seg.to_string());
-            }
-            if id_type == Self::SPAN_ID && i == 2 {
-                return Some(seg.to_string());
-            }
-
-            i += 1;
-        }
-        None
-    }
-
-    fn decode_tingyun(value: &str, id_type: u8) -> Option<String> {
-        if id_type != Self::TRACE_ID {
-            return None;
-        }
-        tingyun::decode_trace_id(value).map(|s| s.into())
-    }
-
-    pub fn decode_id(payload: &str, trace_key: &str, id_type: u8) -> Option<String> {
-        let trace_type = TraceType::from(trace_key);
-        match trace_type {
-            TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span | TraceType::Customize(_) => {
-                Some(payload.to_owned())
-            }
-            TraceType::Uber => Self::decode_uber_id(payload, id_type),
-            TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
-            TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
-            TraceType::NewRpcTraceContext => {
-                /*
-                    referer https://github.com/sofastack/sofa-rpc/blob/7931102255d6ea95ee75676d368aad37c56b57ee/tracer/tracer-opentracing-resteasy/src/main/java/com/alipay/sofa/rpc/tracer/sofatracer/RestTracerAdapter.java#L75
-                    in new version of sofarpc, use new_rpc_trace_context header store trace info
-                */
-                decode_new_rpc_trace_context_with_type(payload.as_bytes(), id_type)
-            }
-            TraceType::XTingyun => Self::decode_tingyun(payload, id_type),
         }
     }
 
@@ -1402,7 +1319,7 @@ pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
 mod tests {
     use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
     use crate::common::MetaPacket;
-    use crate::config::handler::LogParserConfig;
+    use crate::config::handler::{LogParserConfig, TraceType};
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
 
