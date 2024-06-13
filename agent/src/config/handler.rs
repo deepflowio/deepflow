@@ -56,6 +56,7 @@ use super::{
     },
     ConfigError, KubernetesPollerType, RuntimeConfig,
 };
+use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType, l7_protocol_log::L7ProtocolBitmap},
@@ -1045,7 +1046,7 @@ pub enum TraceType {
     Sw8,
     TraceParent,
     NewRpcTraceContext,
-    XTingyun,
+    XTingyun(String),
     Customize(String),
 }
 
@@ -1060,16 +1061,20 @@ const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
 const TRACE_TYPE_X_TINGYUN: &str = "x-tingyun";
 
 impl From<&str> for TraceType {
-    // 参数支持如下两种格式：
-    // 示例1：" sw8"
-    // 示例2："sw8"
-    // ==================================================
     // The parameter supports the following two formats:
-    // Example 1: "sw8"
-    // Example 2: " sw8"
+    // Example 1: "xxx"
+    // Example 2: "xxx.x"
     fn from(t: &str) -> TraceType {
         let tag_lowercase = t.trim().to_lowercase();
-        match tag_lowercase.as_str() {
+        let (tag, sub_tag) = if let Some(i) = tag_lowercase.find('.') {
+            (
+                tag_lowercase[..i].to_string(),
+                tag_lowercase[i + 1..].to_string(),
+            )
+        } else {
+            (tag_lowercase, String::new())
+        };
+        match tag.as_str() {
             TRACE_TYPE_XB3 => TraceType::XB3,
             TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
             TRACE_TYPE_UBER => TraceType::Uber,
@@ -1078,8 +1083,8 @@ impl From<&str> for TraceType {
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
             SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
-            TRACE_TYPE_X_TINGYUN => TraceType::XTingyun,
-            _ if tag_lowercase.len() > 0 => TraceType::Customize(tag_lowercase),
+            TRACE_TYPE_X_TINGYUN => TraceType::XTingyun(sub_tag),
+            _ if tag.len() > 0 => TraceType::Customize(tag),
             _ => TraceType::Disabled,
         }
     }
@@ -1098,7 +1103,7 @@ impl TraceType {
             TraceType::NewRpcTraceContext => {
                 context.eq_ignore_ascii_case(SOFA_NEW_RPC_TRACE_CTX_KEY)
             }
-            TraceType::XTingyun => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
+            TraceType::XTingyun(_) => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
             TraceType::Customize(tag) => context.eq_ignore_ascii_case(&tag),
             _ => false,
         }
@@ -1114,14 +1119,14 @@ impl TraceType {
             TraceType::Sw8 => TRACE_TYPE_SW8,
             TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT,
             TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY,
-            TraceType::XTingyun => TRACE_TYPE_X_TINGYUN,
+            TraceType::XTingyun(_) => TRACE_TYPE_X_TINGYUN,
             TraceType::Customize(tag) => &tag,
             _ => "",
         }
     }
 
-    const TRACE_ID: u8 = 0;
-    const SPAN_ID: u8 = 1;
+    pub const TRACE_ID: u8 = 0;
+    pub const SPAN_ID: u8 = 1;
 
     // uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
     // separeted by ':'
@@ -1203,35 +1208,43 @@ impl TraceType {
         }
     }
 
-    fn decode_tingyun(value: &str, id_type: u8) -> Option<Cow<'_, str>> {
+    fn decode_tingyun<'a, 'b>(
+        value: &'a str,
+        sub_tag: &'b str,
+        id_type: u8,
+    ) -> Option<Cow<'a, str>> {
         if id_type == Self::TRACE_ID {
-            cloud_platform::tingyun::decode_trace_id(value)
+            cloud_platform::tingyun::decode_trace_id(value, sub_tag)
         } else {
             None
         }
     }
 
-    fn decode_id<'a>(&self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
+    fn decode_id<'a, 'b>(&'b self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
         let value = value.trim();
         match self {
             TraceType::Disabled => None,
-            TraceType::XB3
-            | TraceType::XB3Span
-            | TraceType::NewRpcTraceContext
-            | TraceType::Customize(_) => Some(value.into()),
+            TraceType::XB3 | TraceType::XB3Span | TraceType::Customize(_) => Some(value.into()),
             TraceType::Uber => Self::decode_uber_id(value, id_type).map(|s| s.into()),
             TraceType::Sw3 => Self::decode_skywalking3_id(value, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(value, id_type),
             TraceType::TraceParent => Self::decode_traceparent(value, id_type).map(|s| s.into()),
-            TraceType::XTingyun => Self::decode_tingyun(value, id_type),
+            /*
+                referer https://github.com/sofastack/sofa-rpc/blob/7931102255d6ea95ee75676d368aad37c56b57ee/tracer/tracer-opentracing-resteasy/src/main/java/com/alipay/sofa/rpc/tracer/sofatracer/RestTracerAdapter.java#L75
+                in new version of sofarpc, use new_rpc_trace_context header store trace info
+            */
+            TraceType::NewRpcTraceContext => {
+                decode_new_rpc_trace_context_with_type(value.as_bytes(), id_type)
+            }
+            TraceType::XTingyun(sub_tag) => Self::decode_tingyun(value, sub_tag, id_type),
         }
     }
 
-    pub fn decode_trace_id<'a>(&self, value: &'a str) -> Option<Cow<'a, str>> {
+    pub fn decode_trace_id<'a, 'b>(&'b self, value: &'a str) -> Option<Cow<'a, str>> {
         self.decode_id(value, Self::TRACE_ID)
     }
 
-    pub fn decode_span_id<'a>(&self, value: &'a str) -> Option<Cow<'a, str>> {
+    pub fn decode_span_id<'a, 'b>(&'b self, value: &'a str) -> Option<Cow<'a, str>> {
         self.decode_id(value, Self::SPAN_ID)
     }
 }
