@@ -100,9 +100,9 @@ func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, clo
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	updateInfo["az"] = cloudItem.AZLcuuid
+	// }
 	if diffBase.Label != cloudItem.Label {
 		updateInfo["label"] = cloudItem.Label
 	}

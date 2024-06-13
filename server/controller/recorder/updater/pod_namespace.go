@@ -82,9 +82,9 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloud
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	updateInfo["az"] = cloudItem.AZLcuuid
+	// }
 	if cloudcommon.DiffMap(diffBase.CloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
 		if cloudItem.CloudTags != nil {
