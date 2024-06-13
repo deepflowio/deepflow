@@ -735,7 +735,7 @@ static struct ebpf_link *exec_attach_kprobe(struct ebpf_prog *prog, char *name,
 	else
 		fn_name = name + strlen("kprobe/");
 
-	snprintf(ev_name, sizeof(ev_name), "%s_%s", isret ? "r" : "p", fn_name);
+	snprintf(ev_name, sizeof(ev_name), "%s_deepflow_%s", isret ? "r" : "p", fn_name);
 	ret =
 	    program__attach_kprobe(prog, isret, pid, fn_name, ev_name,
 				   (void **)&link);
