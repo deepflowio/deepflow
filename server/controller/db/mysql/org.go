@@ -67,10 +67,10 @@ func CheckORGNumberAndLog() ([]int, error) {
 		return nil, err
 	}
 	msg := fmt.Sprintf("the number of organizations is %d. If you see a `Too many connections` error in the logs, please increase the `max_connections` setting in MySQL.", len(orgIDs))
-	if len(orgIDs) > 10 {
-		log.Info(msg)
-	} else if len(orgIDs) > 20 {
+	if len(orgIDs) > 20 {
 		log.Warning(msg)
+	} else if len(orgIDs) > 10 {
+		log.Info(msg)
 	}
 	return orgIDs, nil
 }
