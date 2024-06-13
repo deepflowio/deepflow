@@ -119,8 +119,8 @@ pub struct PulsarInfo {
     req_len: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     resp_len: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    resp_status: Option<L7ResponseStatus>,
+    #[serde(skip)]
+    resp_status: L7ResponseStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     resp_code: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -575,11 +575,11 @@ impl PulsarInfo {
         check!(self.command.tc_client_connect_response, code, msg);
         is_success |= code.is_none();
         if is_success {
-            self.resp_status = Some(L7ResponseStatus::Ok);
+            self.resp_status = L7ResponseStatus::Ok;
             self.resp_code = None;
             self.resp_exception = None;
         } else {
-            self.resp_status = Some(L7ResponseStatus::ServerError);
+            self.resp_status = L7ResponseStatus::ServerError;
             self.resp_code = code;
             self.resp_exception = msg;
         }
@@ -774,7 +774,7 @@ impl From<PulsarInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             resp: L7Response {
-                status: info.resp_status.unwrap_or_default(),
+                status: info.resp_status,
                 code: info.resp_code,
                 exception: info.resp_exception.unwrap_or_default(),
                 ..Default::default()
@@ -807,7 +807,9 @@ impl L7ProtocolInfoInterface for PulsarInfo {
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let (req, L7ProtocolInfo::PulsarInfo(rsp)) = (self, other) {
             req.resp_len = req.resp_len.or(rsp.resp_len);
-            req.resp_status = req.resp_status.or(rsp.resp_status);
+            if rsp.resp_status != L7ResponseStatus::Ok {
+                req.resp_status = rsp.resp_status;
+            }
             req.resp_code = req.resp_code.or(rsp.resp_code);
             if req.resp_exception.is_none() {
                 req.resp_exception = rsp.resp_exception.clone();
@@ -890,6 +892,19 @@ impl L7ProtocolParserInterface for PulsarLog {
                         PacketDirection::ServerToClient => {
                             self.perf_stats.as_mut().map(|p| p.inc_resp());
                         }
+                    }
+                    match info.resp_status {
+                        L7ResponseStatus::ClientError => {
+                            self.perf_stats
+                                .as_mut()
+                                .map(|p: &mut L7PerfStats| p.inc_req_err());
+                        }
+                        L7ResponseStatus::ServerError => {
+                            self.perf_stats
+                                .as_mut()
+                                .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                        }
+                        _ => {}
                     }
                     if info.msg_type != LogMessageType::Session {
                         info.cal_rrt(param).map(|rtt| {

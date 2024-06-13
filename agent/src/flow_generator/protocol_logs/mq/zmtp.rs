@@ -646,6 +646,19 @@ impl L7ProtocolParserInterface for ZmtpLog {
                         self.perf_stats.as_mut().map(|p| p.inc_resp());
                     }
                 }
+                match info.status {
+                    L7ResponseStatus::ClientError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_req_err());
+                    }
+                    L7ResponseStatus::ServerError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                    }
+                    _ => {}
+                }
                 info.cal_rrt(param).map(|rtt| {
                     info.rtt = rtt;
                     self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));

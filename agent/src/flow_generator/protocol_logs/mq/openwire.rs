@@ -1911,6 +1911,19 @@ impl L7ProtocolParserInterface for OpenWireLog {
                         self.perf_stats.as_mut().map(|p| p.inc_resp());
                     }
                 }
+                match info.status {
+                    L7ResponseStatus::ClientError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_req_err());
+                    }
+                    L7ResponseStatus::ServerError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                    }
+                    _ => {}
+                }
                 if info.msg_type != LogMessageType::Session {
                     info.cal_rrt(param).map(|rtt| {
                         info.rtt = rtt;
