@@ -345,7 +345,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	}
 
 	dataSource.DisplayName = dataSourceUpdate.DisplayName
-	if err := mysql.Db.Save(&dataSource).Error; err != nil {
+	if err := db.Save(&dataSource).Error; err != nil {
 		return model.DataSource{}, err
 	}
 	if isOnlyUpdateName {
@@ -610,8 +610,12 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 	var dataSources []mysql.DataSource
 	var err error
 
-	// TODO(weiqiang): add org to register analyzer
-	if err := mysql.Db.Find(&dataSources).Error; err != nil {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return err
+	}
+	db := dbInfo.DB
+	if err := db.Find(&dataSources).Error; err != nil {
 		return err
 	}
 	idToDataSource := make(map[int]mysql.DataSource)
