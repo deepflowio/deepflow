@@ -1172,7 +1172,7 @@ impl CacheItem for MetaPacket<'static> {
     }
 
     fn get_timestmap(&self) -> u64 {
-        self.lookup_key.timestamp.as_secs()
+        self.lookup_key.timestamp.as_millis()
     }
 
     fn get_l7_protocol(&self) -> L7Protocol {

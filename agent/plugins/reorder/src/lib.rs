@@ -33,7 +33,7 @@ pub trait CacheItem: Downcast {
     fn get_id(&self) -> u64;
     // Used for sorting
     fn get_seq(&self) -> u64;
-    // Time in seconds
+    // Time in millis seconds
     fn get_timestmap(&self) -> u64;
     fn get_l7_protocol(&self) -> L7Protocol;
     fn is_segment_start(&self) -> bool;
