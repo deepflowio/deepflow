@@ -30,7 +30,7 @@ func (b *DataSet) AddVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *
 	}
 	var vmLcuuid string
 	if dbItem.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_VM {
-		vmLcuuid, _ = toolDataSet.GetVMLcuuidByID(dbItem.ID)
+		vmLcuuid, _ = toolDataSet.GetVMLcuuidByID(dbItem.DeviceID)
 	}
 	b.VInterfaces[dbItem.Lcuuid] = &VInterface{
 		DiffBase: DiffBase{
