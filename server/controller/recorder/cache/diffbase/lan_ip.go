@@ -24,14 +24,12 @@ import (
 )
 
 func (b *DataSet) AddLANIP(dbItem *mysql.LANIP, seq int, toolDataSet *tool.DataSet) {
-	subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
 	b.LANIPs[dbItem.Lcuuid] = &LANIP{
 		DiffBase: DiffBase{
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
-		SubnetLcuuid:    subnetLcuuid,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
 }
@@ -48,6 +46,4 @@ type LANIP struct {
 }
 
 func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
-	l.SubnetLcuuid = cloudItem.SubnetLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, l))
 }

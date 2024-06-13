@@ -138,9 +138,9 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		updateInfo["az"] = cloudItem.AZLcuuid
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	updateInfo["az"] = cloudItem.AZLcuuid
+	// }
 
 	if len(updateInfo) > 0 {
 		return updateInfo, true
