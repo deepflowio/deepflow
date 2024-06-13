@@ -285,18 +285,18 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		)
 	}
 	oldRetentionTime := dataSource.RetentionTime
-	isUpdateName := false
-	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) {
-		dataSource.DisplayName = dataSourceUpdate.DisplayName
-		isUpdateName = true
+	isOnlyUpdateName := false
+	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) &&
+		dataSource.DisplayName != dataSourceUpdate.DisplayName &&
+		dataSource.RetentionTime == dataSourceUpdate.RetentionTime {
+		isOnlyUpdateName = true
 	}
 
-	// only update display name
-	if dataSource.RetentionTime == dataSourceUpdate.RetentionTime && isUpdateName {
-		err := mysql.Db.Save(&dataSource).Error
-		if err != nil {
-			return model.DataSource{}, err
-		}
+	dataSource.DisplayName = dataSourceUpdate.DisplayName
+	if err := mysql.Db.Save(&dataSource).Error; err != nil {
+		return model.DataSource{}, err
+	}
+	if isOnlyUpdateName {
 		response, _ := GetDataSources(map[string]interface{}{"lcuuid": lcuuid}, nil)
 		return response[0], nil
 	}
