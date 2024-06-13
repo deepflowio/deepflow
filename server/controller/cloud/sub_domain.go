@@ -67,7 +67,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	}
 
 	// 容器节点及与虚拟机关联关系
-	podNodes, vmPodNodeConnections := c.getSubDomainPodNodes(lcuuid, cResource, &kubernetesGatherResource)
+	podNodes, vmPodNodeConnections, nodeLcuuidToAZLcuuid := c.getSubDomainPodNodes(lcuuid, cResource, &kubernetesGatherResource)
 	// 如果当前KubernetesGather数据中没有与主云平台相关的容器节点，则跳过该集群
 	if len(podNodes) == 0 {
 		msg := "gather node is not associated with cloud vm"
@@ -125,7 +125,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	podReplicaSets := c.getSubDomainPodReplicaSets(lcuuid, &kubernetesGatherResource, azLcuuid)
 
 	// pods
-	pods := c.getSubDomainPods(lcuuid, &kubernetesGatherResource, azLcuuid)
+	pods := c.getSubDomainPods(lcuuid, &kubernetesGatherResource, nodeLcuuidToAZLcuuid)
 
 	// IP
 	ips, reservedPodSubnetLcuuidToIPNum, updatedVInterfaceLcuuidToNetworkLcuuid :=
@@ -349,12 +349,13 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 
 // - 根据IP查询对应的虚拟机，生成与虚拟机的关联关系
 // - 根据虚拟机的az属性，确定容器节点的az信息
-func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Resource, kResource *kubernetes_model.KubernetesGatherResource) ([]model.PodNode, []model.VMPodNodeConnection) {
+func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Resource, kResource *kubernetes_model.KubernetesGatherResource) ([]model.PodNode, []model.VMPodNodeConnection, map[string]string) {
 	var retPodNodes []model.PodNode
 	var retVMPodNodeConnections []model.VMPodNodeConnection
+	nodeLcuuidToAZLcuuid := map[string]string{}
 
 	if len(kResource.PodNodes) == 0 {
-		return retPodNodes, retVMPodNodeConnections
+		return retPodNodes, retVMPodNodeConnections, nodeLcuuidToAZLcuuid
 	}
 	vpcLcuuid := kResource.PodNodes[0].VPCLcuuid
 
@@ -458,8 +459,9 @@ func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Res
 			RegionLcuuid:     podNode.RegionLcuuid,
 			SubDomainLcuuid:  subDomainLcuuid,
 		})
+		nodeLcuuidToAZLcuuid[podNode.Lcuuid] = podNodeAZLcuuid
 	}
-	return retPodNodes, retVMPodNodeConnections
+	return retPodNodes, retVMPodNodeConnections, nodeLcuuidToAZLcuuid
 }
 
 func (c *Cloud) getSubDomainPodClusters(
@@ -642,7 +644,7 @@ func (c *Cloud) getSubDomainPodReplicaSets(
 }
 
 func (c *Cloud) getSubDomainPods(
-	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource, azLcuuid string,
+	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource, nodeLcuuidToAZLcuuid map[string]string,
 ) []model.Pod {
 	var retPods []model.Pod
 
@@ -663,7 +665,7 @@ func (c *Cloud) getSubDomainPods(
 			PodNamespaceLcuuid:  pod.PodNamespaceLcuuid,
 			PodClusterLcuuid:    pod.PodClusterLcuuid,
 			VPCLcuuid:           pod.VPCLcuuid,
-			AZLcuuid:            azLcuuid,
+			AZLcuuid:            nodeLcuuidToAZLcuuid[pod.PodNodeLcuuid],
 			RegionLcuuid:        pod.RegionLcuuid,
 			SubDomainLcuuid:     subDomainLcuuid,
 		})
