@@ -584,15 +584,21 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 		}
 	}
 
+	bool has_error = false;
 	uname(&sys_info);
 
 	// e.g.: 3.10.0-940.el7.centos.x86_64, 4.19.17-1.el7.x86_64
-	if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev, num) != 4)
-		return ETR_INVAL;
+	if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev, num) !=
+	    4) {
+		// uname -r (4.19.117.bsk.7-business-amd64)
+		has_error = true;
+	}
 
 	// Get the real version of Debian
-	//#1 SMP Debian 4.19.289-2 (2023-08-08)
-	// # uname -v (4.19.117.bsk.business.1 SMP Debian 4.19.117.business.1 Wed)
+	// #1 SMP Debian 4.19.289-2 (2023-08-08)
+	// e.g.:
+	// uname -v (4.19.117.bsk.business.1 SMP Debian 4.19.117.business.1 Wed)
+	// uname -v (#business SMP Debian 4.19.117.bsk.7-business Fri Sep 10 11:57:17)
 	if (strstr(sys_info.version, "Debian")) {
 		if ((sscanf(sys_info.version, "%*s %*s %*s %u.%u.%u-%u %*s",
 			    major, minor, rev, num) != 4) &&
@@ -601,7 +607,17 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 		    (sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
 			    major, minor, rev, num) != 4)
 		    )
-			return ETR_INVAL;
+			has_error = true;
+		else
+			has_error = false;
+	}
+
+	if (has_error) {
+		ebpf_warning
+		    ("release %s version %s (major %d minor %d rev %d num %d)\n",
+		     sys_info.release, sys_info.version, major, minor, rev,
+		     num);
+		return ETR_INVAL;
 	}
 
 	return ETR_OK;
