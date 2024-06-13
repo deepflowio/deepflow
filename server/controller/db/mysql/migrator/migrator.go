@@ -106,7 +106,7 @@ func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
 }
 
 func DropDatabase(cfg config.MySqlConfig) error {
-	db, err := common.GetSessionWithName(cfg)
+	db, err := common.GetSessionWithoutName(cfg)
 	if err != nil {
 		return err
 	}
