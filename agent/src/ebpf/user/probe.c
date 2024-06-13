@@ -198,9 +198,17 @@ int program__attach_kprobe(void *prog,
 			   char *ev_name, void **ret_link)
 {
 	int maxactive = 0;
-	if (retprobe) {
-		maxactive = KRETPROBE_MAXACTIVE_MAX;
-	}
+
+	/*
+	 * Setting the maxactive value (maxactive > 0) means attaching kretprobe-type
+	 * eBPF programs using the ftrace method. However, this method fails on the
+	 * 3.10.0-957 version of the kernel. Therefore, we use the perf_event_open()
+	 * system call to perform attach/detach operations.
+	 */
+	//if (retprobe) {
+	//	maxactive = KRETPROBE_MAXACTIVE_MAX;
+	//}
+
 	return program__attach_probe((const struct ebpf_prog *)prog,
 				     retprobe, (const char *)ev_name, func_name,
 				     "kprobe", 0, pid, maxactive, ret_link);
