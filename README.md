@@ -13,7 +13,7 @@
 
 -------------
 
-English | [简体中文](./README-CN.md)
+English | [简体中文](./README-CN.md) | [日本語](./README-JP.md)
 
 # What is DeepFlow
 
