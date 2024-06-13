@@ -637,10 +637,9 @@ TP_SCHED_PROG(process_exit) (struct sched_comm_exit_ctx *ctx)
 	return 0;
 }
 
-static inline int kernel_clone_exit(struct syscall_comm_exit_ctx *ctx)
+static inline int kernel_clone_exit(long ret, void *ctx)
 {
 	__u64 id = bpf_get_current_pid_tgid();
-	long ret = ctx->ret;
 
 	// error or parent process
 	if (ret != 0)
@@ -666,14 +665,28 @@ static inline int kernel_clone_exit(struct syscall_comm_exit_ctx *ctx)
 	return 0;
 }
 
+/*
+ * In order to handle older kernels, such as Linux 4.14 and 3.10.0-957.el7,
+ * which lack '/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork' and
+ * '/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone', we use
+ * kretprobe as a substitute for tracepoint type.
+ */
+KRETPROG(sys_fork) (struct pt_regs* ctx) {
+	return kernel_clone_exit((long)PT_REGS_RC(ctx), ctx);
+}
+
+KRETPROG(sys_clone) (struct pt_regs* ctx) {
+	return kernel_clone_exit((long)PT_REGS_RC(ctx), ctx);
+}
+
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_fork/format
 TP_SYSCALL_PROG(exit_fork) (struct syscall_comm_exit_ctx * ctx) {
-	return kernel_clone_exit(ctx);
+	return kernel_clone_exit((long)ctx->ret, ctx);
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_clone/format
 TP_SYSCALL_PROG(exit_clone) (struct syscall_comm_exit_ctx * ctx) {
-	return kernel_clone_exit(ctx);
+	return kernel_clone_exit((long)ctx->ret, ctx);
 }
 
 // /sys/kernel/debug/tracing/events/sched/sched_process_exec/format

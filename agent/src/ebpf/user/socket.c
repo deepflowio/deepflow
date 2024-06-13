@@ -150,6 +150,11 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 		probes_set_enter_symbol(tps, "do_readv");
 	}
 
+	if (access(SYSCALL_FORK_TP_PATH, F_OK))
+		probes_set_exit_symbol(tps, "sys_fork");
+	if (access(SYSCALL_CLONE_TP_PATH, F_OK))
+		probes_set_exit_symbol(tps, "sys_clone");
+
 	tps->kprobes_nr = index;
 
 	/* tracepoints */
@@ -180,8 +185,10 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// process execute
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
+	if (!access(SYSCALL_FORK_TP_PATH, F_OK))
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
+	if (!access(SYSCALL_CLONE_TP_PATH, F_OK))
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
 	// process exit
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
