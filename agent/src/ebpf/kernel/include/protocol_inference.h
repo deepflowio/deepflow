@@ -3247,7 +3247,7 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 		/*
 		 * If data reassembly is enabled, subsequent contiguous data of the
 		 * same direction will be pushed until the data changes direction or
-		 * reaches the maximum data limit ('trace_conf->data_limit_max').
+		 * reaches the maximum data limit ('tracer_ctx->data_limit_max').
 		 *
 		 * In the initial stage of data protocol inference, determine and
 		 * confirm whether data reassembly needs to be continued.
@@ -3256,9 +3256,9 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 			if (conn_info->prev_direction == conn_info->direction) {
 				conn_info->enable_reasm = true;
 				__u32 k0 = 0;
-				struct trace_conf_t *trace_conf =
-				    trace_conf_map__lookup(&k0);
-				if (trace_conf == NULL)
+				struct tracer_ctx_s *tracer_ctx =
+				    tracer_ctx_map__lookup(&k0);
+				if (tracer_ctx == NULL)
 					return;
 				/*
 				 * Here, the length is checked, and if it has already reached
@@ -3275,7 +3275,7 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 				 * for reassembly).
 				 */
 				if (conn_info->socket_info_ptr->reasm_bytes >=
-				    trace_conf->data_limit_max
+				    tracer_ctx->data_limit_max
 				    || conn_info->prev_count > 0)
 					conn_info->enable_reasm = false;
 			} else {

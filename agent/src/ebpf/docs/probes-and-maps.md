@@ -76,7 +76,7 @@
 |__socket_data|BPF_MAP_TYPE_PERF_EVENT_ARRAY|int|__u32|利用perf event output buffer传递数据到用户层|
 |__data_buf|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct __socket_data_buffer|数据是通过burst方式来发送给用户层的，这个map用于积压缓存数据|
 |__members_offset|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct member_fields_offset|eBPF会不断尝试推断几个关键结构体的成员偏移来完成内核适配，如果成功将会把这些偏移值写到此map中。如果BTF内核信息的文件，初始化话阶段会自动从BTF Raw文件或btf vmlinux文件中直接获取偏移填写到此map中|
-|__trace_conf_map|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct trace_conf_t|用于记录tracer的配置信息，例如：记录各种UID（traceID，CapSeq等）初始值。|
+|__tracer_ctx_map|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct tracer_ctx_s|用于记录tracer的配置信息，例如：记录各种UID（traceID，CapSeq等）初始值。|
 |__trace_stats_map|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct trace_stats|用于统计`trace_map` `__socket_info_map` 的当前容量，用于老化处理（资源回收）|
 |__active_write_args_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct data_args_t|write() syscall's input argument.|
 |__active_read_args_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct data_args_t|read() syscall's input argument.|

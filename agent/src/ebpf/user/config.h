@@ -26,7 +26,7 @@
 #define MAP_SOCKET_INFO_NAME            "__socket_info_map"
 #define MAP_TRACE_NAME                  "__trace_map"
 #define MAP_PERF_SOCKET_DATA_NAME       "__socket_data"
-#define MAP_TRACE_CONF_NAME             "__trace_conf_map"
+#define MAP_TRACER_CTX_NAME             "__tracer_ctx_map"
 #define MAP_TRACE_STATS_NAME            "__trace_stats_map"
 #define MAP_PROTO_FILTER_NAME		"__protocol_filter"
 #define MAP_KPROBE_PORT_BITMAP_NAME	"__kprobe_port_bitmap"

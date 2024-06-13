@@ -151,6 +151,8 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 			     void **ptr);
 u64 get_proc_exec_event_count(void);
 u64 get_proc_exit_event_count(void);
+void clear_proc_exec_event_count(void);
+void clear_proc_exit_event_count(void);
 #ifndef AARCH64_MUSL
 int creat_ksyms_cache(void);
 void *get_symbol_cache(pid_t pid, bool new_cache);
