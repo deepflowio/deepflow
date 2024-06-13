@@ -341,10 +341,13 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) &&
 		dataSource.DisplayName != dataSourceUpdate.DisplayName &&
 		dataSource.RetentionTime == dataSourceUpdate.RetentionTime {
-		dataSource.DisplayName = dataSourceUpdate.DisplayName
 		isOnlyUpdateName = true
 	}
 
+	dataSource.DisplayName = dataSourceUpdate.DisplayName
+	if err := mysql.Db.Save(&dataSource).Error; err != nil {
+		return model.DataSource{}, err
+	}
 	// only update display name
 	if isOnlyUpdateName {
 		err := mysql.Db.Save(&dataSource).Error
