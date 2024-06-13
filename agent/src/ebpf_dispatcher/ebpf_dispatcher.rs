@@ -244,15 +244,18 @@ impl EbpfDispatcher {
         config: &Config,
         reorder: &mut Reorder,
     ) {
-        flow_map.inject_flush_ticker(config, Duration::ZERO);
-        let mut packets = reorder.flush(timestamp.as_secs());
+        let mut packets = reorder.flush(timestamp.as_millis() as u64);
         let mut packets = packets
             .drain(..)
             .map(|x| x.into_any().downcast::<MetaPacket>().unwrap())
             .collect::<Vec<Box<MetaPacket>>>();
         let packets = Self::segmentation_reassembly(&mut packets);
+        let need_flush = packets.is_empty();
         for mut packet in packets {
             flow_map.inject_meta_packet(&config, &mut packet);
+        }
+        if need_flush {
+            flow_map.inject_flush_ticker(config, timestamp);
         }
     }
 
@@ -265,7 +268,7 @@ impl EbpfDispatcher {
         let mut packets = match packet.ebpf_type {
             EbpfType::GoHttp2Uprobe | EbpfType::GoHttp2UprobeData => {
                 flow_map.inject_meta_packet(config, &mut packet);
-                reorder.flush(packet.lookup_key.timestamp.as_secs())
+                reorder.flush(packet.lookup_key.timestamp.as_millis() as u64)
             }
             _ => reorder.inject_item(packet),
         };

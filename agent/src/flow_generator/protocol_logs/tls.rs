@@ -503,6 +503,15 @@ impl L7ProtocolParserInterface for TlsLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
             }
+            match info.status {
+                L7ResponseStatus::ClientError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                }
+                L7ResponseStatus::ServerError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                }
+                _ => {}
+            }
             if info.session_id.is_some() {
                 // Triggered by Client Hello and the last Change cipher spec
                 info.cal_rrt(param).map(|rtt| {
@@ -582,9 +591,6 @@ impl TlsLog {
                         info.session_id = Some(0xff);
                     }
                     if h.is_alert() {
-                        self.perf_stats
-                            .as_mut()
-                            .map(|p: &mut L7PerfStats| p.inc_req_err());
                         info.status = L7ResponseStatus::ClientError;
                         info.msg_type = LogMessageType::Session;
                     }
@@ -637,9 +643,6 @@ impl TlsLog {
 
                 tls_headers.iter().for_each(|h| {
                     if h.is_alert() {
-                        self.perf_stats
-                            .as_mut()
-                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
                         info.status = L7ResponseStatus::ServerError;
                         info.msg_type = LogMessageType::Session;
                     }

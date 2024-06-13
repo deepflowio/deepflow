@@ -337,18 +337,18 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 		)
 	}
 	oldRetentionTime := dataSource.RetentionTime
-	isUpdateName := false
+	isOnlyUpdateName := false
 	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) &&
-		dataSource.DisplayName != dataSourceUpdate.DisplayName {
-		isUpdateName = true
+		dataSource.DisplayName != dataSourceUpdate.DisplayName &&
+		dataSource.RetentionTime == dataSourceUpdate.RetentionTime {
+		isOnlyUpdateName = true
 	}
 
-	// only update display name
-	if isUpdateName {
-		err := mysql.Db.Save(&dataSource).Error
-		if err != nil {
-			return model.DataSource{}, err
-		}
+	dataSource.DisplayName = dataSourceUpdate.DisplayName
+	if err := db.Save(&dataSource).Error; err != nil {
+		return model.DataSource{}, err
+	}
+	if isOnlyUpdateName {
 		response, _ := d.GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 		return response[0], nil
 	}
@@ -610,8 +610,12 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 	var dataSources []mysql.DataSource
 	var err error
 
-	// TODO(weiqiang): add org to register analyzer
-	if err := mysql.Db.Find(&dataSources).Error; err != nil {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return err
+	}
+	db := dbInfo.DB
+	if err := db.Find(&dataSources).Error; err != nil {
 		return err
 	}
 	idToDataSource := make(map[int]mysql.DataSource)

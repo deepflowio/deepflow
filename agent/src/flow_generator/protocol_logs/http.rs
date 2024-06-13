@@ -701,7 +701,11 @@ impl L7ProtocolParserInterface for HttpLog {
                             self.perf_stats.as_mut().map(|p| p.inc_req());
                         }
                         PacketDirection::ServerToClient => {
-                            self.set_status(info.status_code, &mut info);
+                            if let Some(code) = info.grpc_status_code {
+                                self.set_grpc_status(code, &mut info);
+                            } else {
+                                self.set_status(info.status_code, &mut info);
+                            }
                             self.perf_stats.as_mut().map(|p| p.inc_resp());
                         }
                     }
@@ -1302,7 +1306,6 @@ impl HttpLog {
                 info.msg_type = LogMessageType::Response;
                 let code = val.parse_to().unwrap_or_default();
                 info.status_code = code;
-                self.set_status(code, info);
             }
             "host" | ":authority" => info.host = String::from_utf8_lossy(val).into_owned(),
             ":path" => info.path = String::from_utf8_lossy(val).into_owned(),
@@ -1310,7 +1313,6 @@ impl HttpLog {
                 info.msg_type = LogMessageType::Response;
                 let code = val.parse_to().unwrap_or_default();
                 info.grpc_status_code = Some(code);
-                self.set_grpc_status(code, info);
             }
             "content-type" => {
                 // change to grpc protocol

@@ -99,6 +99,7 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 		default:
 			if errors.Is(err, httpcommon.ERR_NO_PERMISSIONS) {
 				StatusForbiddenResponse(c, err.Error())
+				return
 			}
 			InternalErrorResponse(c, data, httpcommon.FAIL, err.Error())
 		}
