@@ -24,10 +24,12 @@ import (
 )
 
 func (b *DataSet) AddWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *tool.DataSet) {
-	var subnetLcuuid string
-	if dbItem.SubnetID != 0 {
-		subnetLcuuid, _ = toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
-	}
+	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
+	// which may cause recorder performance issues.
+	// var subnetLcuuid string
+	// if dbItem.SubnetID != 0 {
+	// 	subnetLcuuid, _ = toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
+	// }
 	b.WANIPs[dbItem.Lcuuid] = &WANIP{
 		DiffBase: DiffBase{
 			Sequence: seq,
@@ -35,7 +37,7 @@ func (b *DataSet) AddWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *tool.DataS
 		},
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
-		SubnetLcuuid:    subnetLcuuid,
+		// SubnetLcuuid:    subnetLcuuid,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
 }
@@ -54,6 +56,6 @@ type WANIP struct {
 
 func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
 	w.RegionLcuuid = cloudItem.RegionLcuuid
-	w.SubnetLcuuid = cloudItem.SubnetLcuuid
+	// w.SubnetLcuuid = cloudItem.SubnetLcuuid
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, w))
 }
