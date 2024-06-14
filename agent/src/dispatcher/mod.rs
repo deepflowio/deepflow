@@ -585,6 +585,7 @@ pub struct Options {
 
 pub struct Pipeline {
     vm_mac: MacAddr,
+    bond_mac: MacAddr,
     handlers: Vec<PacketHandler>,
     timestamp: Duration,
 }
@@ -717,6 +718,7 @@ pub struct DispatcherBuilder {
     analyzer_queue_size: Option<usize>,
     analyzer_raw_packet_block_size: Option<usize>,
     tunnel_type_trim_bitmap: Option<TunnelTypeBitmap>,
+    bond_group: Option<Vec<String>>,
 }
 
 impl DispatcherBuilder {
@@ -890,6 +892,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn bond_group(mut self, v: Vec<String>) -> Self {
+        self.bond_group = Some(v);
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         #[cfg(target_os = "linux")]
         let netns = self.netns.unwrap_or_default();
@@ -925,6 +932,28 @@ impl DispatcherBuilder {
         } else {
             self.src_interface.unwrap_or("".to_string())
         };
+
+        #[cfg(target_os = "linux")]
+        let local_tap_interfaces = public::netns::link_list_in_netns(&netns).unwrap_or_default();
+        #[cfg(any(target_os = "windows", target_os = "android"))]
+        let local_tap_interfaces = public::utils::net::link_list().unwrap_or_default();
+        let bond_group = self
+            .bond_group
+            .take()
+            .ok_or(Error::ConfigIncomplete("no bond group".into()))?;
+        let mut bond_group_map = HashMap::new();
+        let mut bond_mac = None;
+        for sub_iface in &bond_group {
+            for iface in &local_tap_interfaces {
+                if sub_iface == &iface.name {
+                    if bond_mac.is_none() {
+                        bond_mac = Some(iface.mac_addr);
+                    }
+                    bond_group_map.insert(iface.if_index, bond_mac.as_ref().unwrap().clone());
+                    break;
+                }
+            }
+        }
 
         #[cfg(target_os = "linux")]
         let platform_poller = self
@@ -1042,6 +1071,7 @@ impl DispatcherBuilder {
                 .tunnel_type_trim_bitmap
                 .take()
                 .ok_or(Error::ConfigIncomplete("no trim tunnel type".into()))?,
+            bond_group_map,
         };
         collector.register_countable(
             &stats::SingleTagModule("dispatcher", "id", base.id),

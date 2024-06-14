@@ -408,6 +408,9 @@ impl HttpInfo {
                 if self.status_code == 0 {
                     self.status_code = other.status_code;
                 }
+                if self.grpc_status_code.is_none() && other.grpc_status_code.is_some() {
+                    self.grpc_status_code = other.grpc_status_code.take();
+                }
 
                 super::swap_if!(self, custom_exception, is_none, other);
                 super::swap_if!(self, custom_result, is_none, other);
