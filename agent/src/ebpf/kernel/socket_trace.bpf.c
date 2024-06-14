@@ -2041,44 +2041,38 @@ TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (v_buff) {
 		if (v_buff->events_num > 0) {
-			struct __socket_data *v =
-			    (struct __socket_data *)&v_buff->data[0];
-			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) >
-			    NS_PER_SEC) {
-				__u32 buf_size =
-				    (v_buff->len +
-				     offsetof(typeof
-					      (struct __socket_data_buffer),
-					      data))
-				    & (sizeof(*v_buff) - 1);
+			__u32 buf_size =
+			    (v_buff->len +
+			     offsetof(typeof
+				      (struct __socket_data_buffer), data))
+			    & (sizeof(*v_buff) - 1);
+			/* 
+			 * Note that when 'buf_size == 0', it indicates that the data being
+			 * sent is at its maximum value (sizeof(*v_buff)), and it should
+			 * be sent accordingly.
+			 */
+			if (buf_size < sizeof(*v_buff) && buf_size > 0) {
 				/* 
-				 * Note that when 'buf_size == 0', it indicates that the data being
-				 * sent is at its maximum value (sizeof(*v_buff)), and it should
-				 * be sent accordingly.
+				 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+				 * (Linux 4.14.x) length checks.
 				 */
-				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
-					/* 
-					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
-					 * (Linux 4.14.x) length checks.
-					 */
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      buf_size + 1);
-				} else {
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      sizeof(*v_buff));
-				}
-
-				v_buff->events_num = 0;
-				v_buff->len = 0;
+				bpf_perf_event_output(ctx,
+						      &NAME
+						      (socket_data),
+						      BPF_F_CURRENT_CPU,
+						      v_buff,
+						      buf_size + 1);
+			} else {
+				bpf_perf_event_output(ctx,
+						      &NAME
+						      (socket_data),
+						      BPF_F_CURRENT_CPU,
+						      v_buff,
+						      sizeof(*v_buff));
 			}
+
+			v_buff->events_num = 0;
+			v_buff->len = 0;
 		}
 	}
 
