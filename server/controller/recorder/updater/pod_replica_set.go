@@ -127,10 +127,10 @@ func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, clo
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	mapInfo["az"] = cloudItem.AZLcuuid
+	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+	// }
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
