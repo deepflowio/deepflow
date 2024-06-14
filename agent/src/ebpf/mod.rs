@@ -136,7 +136,7 @@ pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 pub const DATA_SOURCE_CLOSE: u8 = 6;
 
 // Message types
-// Currently, except for source=EBPF_TYPE_GO_HTTP2_UPROBE, 
+// Currently, except for source=EBPF_TYPE_GO_HTTP2_UPROBE,
 // the correctness of this direction cannot be guaranteed.
 // The go http2 uprobe currently only uses MSG_RESPONSE_END to determine the end of the stream.
 #[allow(dead_code)]
