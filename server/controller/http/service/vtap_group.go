@@ -321,7 +321,23 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 			dbUpdateMap["user_id"] = vtapGroupUpdate["USER_ID"]
 		}
 
-		// 修改组内采集器
+		var allOldVtaps []mysql.VTap
+		tx.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&allOldVtaps)
+		oldVtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allOldVtaps)
+		if err != nil {
+			return err
+		}
+
+		if _, ok := vtapGroupUpdate["ENABLE"]; ok {
+			for _, vtap := range allOldVtaps {
+				if err := a.resourceAccess.CanUpdateResource(vtap.TeamID,
+					common.SET_RESOURCE_TYPE_AGENT, vtap.Lcuuid, nil); err != nil {
+					return fmt.Errorf("%w no permission to update agent(%s)", err, vtap.Name)
+				}
+			}
+		}
+
+		// update agents in agent group
 		if _, ok := vtapGroupUpdate["VTAP_LCUUIDS"]; ok {
 			if len(vtapGroupUpdate["VTAP_LCUUIDS"].([]interface{})) > cfg.Spec.VTapMaxPerGroup {
 				return NewError(
@@ -330,13 +346,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 				)
 			}
 
-			var allOldVtaps []mysql.VTap
 			var allNewVtaps []mysql.VTap
-			tx.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&allOldVtaps)
-			oldVtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allOldVtaps)
-			if err != nil {
-				return err
-			}
 			tx.Where("lcuuid IN (?)", vtapGroupUpdate["VTAP_LCUUIDS"]).Find(&allNewVtaps)
 			newVtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allNewVtaps)
 			if err != nil {
