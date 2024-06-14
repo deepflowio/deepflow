@@ -480,6 +480,12 @@ pub struct OracleParseConfig {
     pub resp_0x04_extra_byte: bool,
 }
 
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct BondGroup {
+    pub tap_interfaces: Vec<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
@@ -499,6 +505,7 @@ pub struct YamlConfig {
     pub first_path_level: u32,
     pub local_dispatcher_count: usize,
     pub src_interfaces: Vec<String>,
+    pub tap_interface_bond_groups: Vec<BondGroup>,
     pub mirror_traffic_pcp: u16,
     pub vtap_group_id_request: String,
     pub pcap: PcapConfig,
@@ -899,6 +906,7 @@ impl Default for YamlConfig {
             fast_path_map_size: 1 << 14,
             first_path_level: 0,
             src_interfaces: vec![],
+            tap_interface_bond_groups: vec![],
             mirror_traffic_pcp: 0,
             vtap_group_id_request: "".into(),
             pcap: Default::default(),
