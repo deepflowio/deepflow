@@ -342,6 +342,7 @@ pub struct DispatcherConfig {
     pub npb_dedup_enabled: bool,
     pub dpdk_enabled: bool,
     pub dispatcher_queue: bool,
+    pub bond_group: Vec<String>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1497,6 +1498,13 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 pod_cluster_id: conf.pod_cluster_id,
                 enabled: conf.enabled,
                 npb_dedup_enabled: conf.npb_dedup_enabled,
+                bond_group: if conf.yaml_config.tap_interface_bond_groups.is_empty() {
+                    vec![]
+                } else {
+                    conf.yaml_config.tap_interface_bond_groups[0]
+                        .tap_interfaces
+                        .clone()
+                },
             },
             sender: SenderConfig {
                 mtu: conf.mtu,

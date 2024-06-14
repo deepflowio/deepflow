@@ -241,7 +241,7 @@ impl LocalModeDispatcher {
             meta_packet.tap_port = TapPort::from_local_mac(
                 meta_packet.lookup_key.get_nat_source(),
                 base.tunnel_info.tunnel_type,
-                u64::from(pipeline.vm_mac) as u32,
+                u64::from(pipeline.bond_mac) as u32,
             );
             BaseDispatcher::prepare_flow(
                 &mut meta_packet,

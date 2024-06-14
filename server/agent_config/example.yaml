@@ -676,6 +676,13 @@ vtap_group_id: g-xxxxxx
   #- dummy0
   #- dummy1
 
+  ## Bond sub interface configuration
+  ## Default: []
+  ## Note: Packets of interfaces in the same group can be aggregated together,
+  ##   Only effective when tap_mode is 0.
+  #tap-interface-bond-groups:
+  #- tap-interfaces: []
+
   ## Local dispatcher count
   ## Default: 1. Range: [1, +oo)
   ## Note: The configuration takes effect when tap_mode is 0 and extra_netns_regex is null
