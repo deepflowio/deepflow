@@ -330,36 +330,52 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 		return model.DataSource{}, err
 	}
 
-	if dataSourceUpdate.RetentionTime > d.cfg.Spec.DataSourceRetentionTimeMax {
+	if dataSourceUpdate.RetentionTime != nil &&
+		*dataSourceUpdate.RetentionTime > d.cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
 			httpcommon.INVALID_POST_DATA,
 			fmt.Sprintf("data_source retention_time should le %d", d.cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
-	oldRetentionTime := dataSource.RetentionTime
-	isOnlyUpdateName := false
-	if !utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) &&
-		dataSource.DisplayName != dataSourceUpdate.DisplayName &&
-		dataSource.RetentionTime == dataSourceUpdate.RetentionTime {
-		isOnlyUpdateName = true
+	// can not update default data source
+	if dataSourceUpdate.DisplayName != nil &&
+		utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, dataSource.DisplayName) {
+		return model.DataSource{}, NewError(
+			httpcommon.INVALID_POST_DATA,
+			fmt.Sprintf("can not update default data source(name: %s)", dataSource.DisplayName),
+		)
+	}
+	// can not update name to default data source name
+	if dataSourceUpdate.DisplayName != nil &&
+		utils.Find(DEFAULT_DATA_SOURCE_DISPLAY_NAMES, *dataSourceUpdate.DisplayName) {
+		return model.DataSource{}, NewError(
+			httpcommon.INVALID_POST_DATA,
+			fmt.Sprintf("can not update name to default data source name(%s)", *dataSourceUpdate.DisplayName),
+		)
 	}
 
-	dataSource.DisplayName = dataSourceUpdate.DisplayName
-	if err := db.Save(&dataSource).Error; err != nil {
-		return model.DataSource{}, err
+	if dataSourceUpdate.DisplayName != nil {
+		if err := db.Model(&dataSource).
+			Updates(map[string]interface{}{"display_name": *dataSourceUpdate.DisplayName}).Error; err != nil {
+			return model.DataSource{}, err
+		}
 	}
-	if isOnlyUpdateName {
+	// only update display nmae
+	if dataSourceUpdate.DisplayName != nil && dataSourceUpdate.RetentionTime == nil {
 		response, _ := d.GetDataSources(orgID, map[string]interface{}{"lcuuid": lcuuid}, nil)
 		return response[0], nil
 	}
-	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
+
+	oldRetentionTime := dataSource.RetentionTime
+	if dataSourceUpdate.RetentionTime != nil {
+		dataSource.RetentionTime = *dataSourceUpdate.RetentionTime
+	}
 
 	// 调用roze API配置clickhouse
 	var analyzers []mysql.Analyzer
 	if err := db.Find(&analyzers).Error; err != nil {
 		return model.DataSource{}, err
 	}
-
 	var errs []error
 	for _, analyzer := range analyzers {
 		err = d.CallIngesterAPIModRP(orgID, analyzer.IP, dataSource)
@@ -375,8 +391,12 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	}
 
 	if len(errs) == 0 {
-		dataSource.State = common.DATA_SOURCE_STATE_NORMAL
-		if err := db.Save(&dataSource).Error; err != nil {
+		if err := db.Model(&dataSource).Updates(
+			map[string]interface{}{
+				"state":          common.DATA_SOURCE_STATE_NORMAL,
+				"retention_time": dataSource.RetentionTime,
+			},
+		).Error; err != nil {
 			return model.DataSource{}, err
 		}
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",

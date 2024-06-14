@@ -15,6 +15,8 @@
  */
 mod hessian;
 
+use std::borrow::Cow;
+
 use nom::InputTakeAtPosition;
 use public::{
     bytes::{read_u16_be, read_u32_be},
@@ -29,13 +31,13 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
-    config::handler::LogParserConfig,
+    config::handler::{LogParserConfig, TraceType},
     flow_generator::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, swap_if, L7ResponseStatus,
         },
-        AppProtoHead, Error, HttpLog, LogMessageType, Result,
+        AppProtoHead, Error, LogMessageType, Result,
     },
 };
 
@@ -616,14 +618,17 @@ pub fn decode_new_rpc_trace_context(mut payload: &[u8]) -> RpcTraceContext {
     ctx
 }
 
-pub fn decode_new_rpc_trace_context_with_type(mut payload: &[u8], id_type: u8) -> Option<String> {
+pub fn decode_new_rpc_trace_context_with_type(
+    mut payload: &[u8],
+    id_type: u8,
+) -> Option<Cow<'_, str>> {
     while let Some((key, val)) = read_url_param_kv(&mut payload) {
         match key {
-            RPC_TRACE_CONTEXT_TCID if id_type == HttpLog::TRACE_ID => {
-                return Some(String::from_utf8_lossy(val).to_string())
+            RPC_TRACE_CONTEXT_TCID if id_type == TraceType::TRACE_ID => {
+                return Some(String::from_utf8_lossy(val))
             }
-            RPC_TRACE_CONTEXT_SPID if id_type == HttpLog::SPAN_ID => {
-                return Some(String::from_utf8_lossy(val).to_string())
+            RPC_TRACE_CONTEXT_SPID if id_type == TraceType::SPAN_ID => {
+                return Some(String::from_utf8_lossy(val))
             }
             _ => {}
         }

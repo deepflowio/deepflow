@@ -144,7 +144,7 @@ func skywalkingGetParentSpanIdFromLinks(links []*v1.Span_Link) string {
 	return ""
 }
 
-func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link) {
+func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link, cfg *flowlogCfg.Config) {
 	h.IsIPv4 = true
 	sw8SegmentId := ""
 	attributeNames, attributeValues := []string{}, []string{}
@@ -191,6 +191,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 				}
 			case "sw8.trace_id":
 				h.TraceId = getValueString(value)
+				h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 			}
 
 		} else {
@@ -334,7 +335,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 		h.Events = string(eventsJSON)
 	}
 
-	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks())
+	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks(), cfg)
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {
 		h.ResponseStatus = uint8(httpCodeToResponseStatus(h.responseCode))
