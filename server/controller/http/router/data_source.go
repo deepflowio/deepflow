@@ -60,6 +60,9 @@ func getDataSources(cfg *config.ControllerConfig) gin.HandlerFunc {
 			args["name"] = value
 		}
 		data, err := service.GetDataSources(args, &cfg.Spec)
+		if err != nil {
+			log.Error(err)
+		}
 		JsonResponse(c, data, err)
 	})
 }
