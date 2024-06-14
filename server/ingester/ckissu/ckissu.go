@@ -1225,9 +1225,14 @@ func (i *Issu) Start() error {
 	}
 
 	errCount := 0
-	for _, connect := range connects {
+	for _, addr := range i.Addrs {
+		connect, err := common.NewCKConnection(addr, i.username, i.password)
+		if err != nil {
+			return fmt.Errorf("conection to %s failed, err: %s", addr, err)
+		}
 		orgIDPrefixs, err := i.getOrgIDPrefixs(connect)
 		if err != nil {
+			connect.Close()
 			return fmt.Errorf("get orgIDs failed, err: %s", err)
 		}
 		for _, orgIDPrefix := range orgIDPrefixs {
@@ -1238,10 +1243,12 @@ func (i *Issu) Start() error {
 				log.Error(err)
 				// if more than 1 Org upgrade fails, or the Default Org upgrade fails, an error will be returned and restarted.
 				if errCount > 1 || orgIDPrefix == "" {
+					connect.Close()
 					return err
 				}
 			}
 		}
+		connect.Close()
 	}
 
 	return nil
