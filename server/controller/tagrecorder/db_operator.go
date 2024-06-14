@@ -66,14 +66,10 @@ func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc
 func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) {
 	err := db.Create(&dbItems).Error
 	if err != nil {
-		for i := range keys {
-			log.Errorf("add %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error()) // TODO is key needed?
-		}
+		log.Errorf("add %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error()) // TODO is key needed?
 		return
 	}
-	for i := range keys {
-		log.Infof("add %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
+	log.Infof("add %s (keys: %+v values: %+v) success", b.resourceTypeName, keys, dbItems)
 }
 
 func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB) {
@@ -88,12 +84,8 @@ func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]i
 func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT, db *mysql.DB) {
 	err := db.Delete(&dbItems).Error
 	if err != nil {
-		for i := range keys {
-			log.Errorf("delete %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
-		}
+		log.Errorf("delete %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error())
 		return
 	}
-	for i := range keys {
-		log.Infof("delete %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
+	log.Infof("delete %s (keys: %+v values: %+v) success", b.resourceTypeName, keys, dbItems)
 }
