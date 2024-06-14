@@ -111,15 +111,15 @@ func NewCKConnections(addrs []string, username, password string) (DBs, error) {
 }
 
 func NewCKConnection(addr, username, password string) (*sql.DB, error) {
-	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s:%s@%s", username, password, addr))
+	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s:%s@%s?dial_timeout=10s&max_execution_time=120", username, password, addr))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new ck connection to %s failed: %s", addr, err)
 	}
 	if err := connect.Ping(); err != nil {
 		if exception, ok := err.(*clickhouse.Exception); ok {
 			log.Warningf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
 		}
-		return nil, err
+		return nil, fmt.Errorf("ck connection ping (%s) failed: %s", addr, err)
 	}
 	return connect, nil
 }
