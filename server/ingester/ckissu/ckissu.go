@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"database/sql"
 
@@ -38,6 +39,7 @@ const (
 	INTERVAL_HOUR = 60
 	INTERVAL_DAY  = 1440
 	DEFAULT_TTL   = 168
+	RETRY_COUNT   = 3
 )
 
 type Issu struct {
@@ -892,16 +894,34 @@ func (i *Issu) setTableVersion(connect *sql.DB, db, table string) error {
 }
 
 func Query(connect *sql.DB, sql string) (*sql.Rows, error) {
-	log.Info("begin query: ", sql)
 	rows, err := connect.Query(sql)
-	log.Infof("end query: %s, err: %s ", sql, err)
+	retryTimes := RETRY_COUNT
+	for err != nil && retryTimes > 0 {
+		log.Warningf("Query SQL (%s) failed: %s, will retry", sql, err)
+		time.Sleep(time.Second)
+		rows, err = connect.Query(sql)
+		if err == nil {
+			log.Infof("Retry query SQL (%s) success", sql)
+			return rows, err
+		}
+		retryTimes--
+	}
 	return rows, err
 }
 
 func Exec(connect *sql.DB, sql string) (sql.Result, error) {
-	log.Info("begin exec: ", sql)
 	result, err := connect.Exec(sql)
-	log.Infof("end exec: %s, err: %s ", sql, err)
+	retryTimes := RETRY_COUNT
+	for err != nil && retryTimes > 0 {
+		log.Warningf("Exec SQL (%s) failed: %s, will retry", sql, err)
+		time.Sleep(time.Second)
+		result, err = connect.Exec(sql)
+		if err == nil {
+			log.Infof("Retry exec SQL (%s) success", sql)
+			return result, err
+		}
+		retryTimes--
+	}
 	return result, err
 }
 
