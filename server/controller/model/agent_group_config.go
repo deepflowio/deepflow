@@ -38,6 +38,7 @@ type StaticConfig struct {
 	FirstPathLevel                     *int                        `yaml:"first-path-level,omitempty"`
 	LocalDispatcherCount               *int                        `yaml:"local-dispatcher-count,omitempty"`
 	SrcInterfaces                      []string                    `yaml:"src-interfaces,omitempty"`
+	TapInterfaceBondGroup              []BondGroup                 `yaml:"tap-interface-bond-groups",omitempty`
 	CloudGatewayTraffic                *bool                       `yaml:"cloud-gateway-traffic,omitempty"`
 	MirrorTrafficPcp                   *uint16                     `yaml:"mirror-traffic-pcp,omitempty"`
 	PCap                               *PCapConfig                 `yaml:"pcap,omitempty"`
@@ -244,4 +245,8 @@ type OracleConfig struct {
 	IsBE              *bool `yaml:"is-be,omitempty"`
 	IntCompress       *bool `yaml:"int-compress,omitempty"`
 	Resp0x04ExtraByte *bool `yaml:"resp-0x04-extra-byte,omitempty"`
+}
+
+type BondGroup struct {
+	TapInterfaces []string `yaml:"tap-interfaces,omitempty"`
 }

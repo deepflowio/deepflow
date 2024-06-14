@@ -2129,6 +2129,13 @@ impl AgentComponents {
                         .dispatcher
                         .tunnel_type_trim_bitmap,
                 )
+                .bond_group(
+                    config_handler
+                        .candidate_config
+                        .dispatcher
+                        .bond_group
+                        .clone(),
+                )
                 .analyzer_raw_packet_block_size(
                     yaml_config.analyzer_raw_packet_block_size as usize,
                 );

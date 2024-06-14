@@ -123,6 +123,8 @@ pub(super) struct BaseDispatcher {
     #[cfg(target_os = "linux")]
     pub(super) netns: public::netns::NsFile,
 
+    pub(super) bond_group_map: HashMap<u32, MacAddr>,
+
     // dispatcher id for easy debugging
     pub log_id: String,
 }
@@ -176,6 +178,7 @@ impl BaseDispatcher {
             reset_whitelist: self.reset_whitelist.clone(),
             pause: self.pause.clone(),
             local_dispatcher_count: self.local_dispatcher_count,
+            bond_group_map: self.bond_group_map.clone(),
         }
     }
 
@@ -642,6 +645,7 @@ pub struct BaseDispatcherListener {
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
     pub pause: Arc<AtomicBool>,
+    pub bond_group_map: HashMap<u32, MacAddr>,
     capture_bpf: String,
     proxy_controller_ip: String,
     analyzer_ip: String,
@@ -782,10 +786,16 @@ impl BaseDispatcherListener {
                 .iter()
                 .map(|b| b.build_with(self.id, *key, vm_mac))
                 .collect();
+            let bond_mac = self
+                .bond_group_map
+                .get(key)
+                .unwrap_or_else(|| &vm_mac)
+                .clone();
             pipelines.insert(
                 *key,
                 Arc::new(Mutex::new(Pipeline {
                     vm_mac,
+                    bond_mac,
                     handlers,
                     timestamp: Duration::ZERO,
                 })),

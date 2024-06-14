@@ -384,6 +384,7 @@ impl Debugger {
                                 match e.kind() {
                                     ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
                                     ErrorKind::WouldBlock => {}
+                                    ErrorKind::TimedOut => {}
                                     _ => {
                                         warn!(
                                             "receive udp packet error: kind=({:?}) detail={}",
@@ -419,6 +420,7 @@ impl Debugger {
                                 match e.kind() {
                                     ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
                                     ErrorKind::WouldBlock => {}
+                                    ErrorKind::TimedOut => {}
                                     _ => {
                                         warn!(
                                             "receive udp packet error: kind=({:?}) detail={}",
