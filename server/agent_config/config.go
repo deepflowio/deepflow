@@ -97,6 +97,10 @@ type AgentGroupConfig struct {
 	YamlConfig                        *StaticConfig `yaml:"static_config,omitempty"`
 }
 
+type BondGroup struct {
+	TapInterfaces []string `yaml:"tap-interfaces,omitempty"`
+}
+
 type StaticConfig struct {
 	ProxyControllerPort                *uint16                      `yaml:"proxy-controller-port,omitempty"`
 	LogLevel                           *string                      `yaml:"log-level,omitempty"`
@@ -114,6 +118,7 @@ type StaticConfig struct {
 	FirstPathLevel                     *int                         `yaml:"first-path-level,omitempty"`
 	LocalDispatcherCount               *int                         `yaml:"local-dispatcher-count,omitempty"`
 	SrcInterfaces                      []string                     `yaml:"src-interfaces,omitempty"`
+	TapInterfaceBondGroup              []BondGroup                  `yaml:"tap-interface-bond-groups",omitempty`
 	CloudGatewayTraffic                *bool                        `yaml:"cloud-gateway-traffic,omitempty"`
 	MirrorTrafficPcp                   *uint16                      `yaml:"mirror-traffic-pcp,omitempty"`
 	PCap                               *PCapConfig                  `yaml:"pcap,omitempty"`
