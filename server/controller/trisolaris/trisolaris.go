@@ -357,7 +357,6 @@ func NewTrisolarisManager(cfg *config.Config, db *gorm.DB) *TrisolarisManager {
 }
 
 func (m *TrisolarisManager) Start() error {
-	go m.TimedCheckORG()
 	go m.refreshOP.TimedRefreshIPs()
 	m.startTime = getStartTime()
 	orgIDs, err := mysql.GetORGIDs()
@@ -367,9 +366,11 @@ func (m *TrisolarisManager) Start() error {
 	}
 	log.Infof("get orgIDs : %v", orgIDs)
 	trisolaris := NewTrisolaris(m.config, mysql.DefaultDB, m.ctx, m.startTime)
-	trisolaris.Start()
 	m.orgToTrisolaris[DEFAULT_ORG_ID] = trisolaris
-	for _, orgID := range orgIDs {
+	go trisolaris.Start()
+	orgIDsUint32 := make([]uint32, len(orgIDs), len(orgIDs))
+	for index, orgID := range orgIDs {
+		orgIDsUint32[index] = uint32(orgID)
 		if utils.CheckOrgID(orgID) == false || orgID == DEFAULT_ORG_ID {
 			continue
 		}
@@ -379,10 +380,13 @@ func (m *TrisolarisManager) Start() error {
 			continue
 		}
 		trisolaris := NewTrisolaris(m.config, orgDB, m.ctx, m.startTime)
-		trisolaris.Start()
 		m.orgToTrisolaris[orgID] = trisolaris
+		go trisolaris.Start()
 	}
-
+	m.orgIDData = &trident.OrgIDsResponse{
+		OrgIds: orgIDsUint32,
+	}
+	go m.TimedCheckORG()
 	m.getTeamData(orgIDs)
 	log.Infof("finish orgdata init %v", orgIDs)
 	return nil
@@ -496,8 +500,8 @@ func (m *TrisolarisManager) checkORG() {
 					continue
 				}
 				trisolaris := NewTrisolaris(m.config, orgDB, m.ctx, m.startTime)
-				trisolaris.Start()
 				m.orgToTrisolaris[orgID] = trisolaris
+				go trisolaris.Start()
 			}
 		}
 	}

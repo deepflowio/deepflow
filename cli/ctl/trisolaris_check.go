@@ -268,6 +268,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		groupID = paramData.GroupID
 		clusterID = paramData.ClusterID
 		teamID = paramData.TeamID
+		orgID = paramData.OrgID
 	case "analyzer":
 		name = paramData.Type
 		orgID = paramData.OrgID
