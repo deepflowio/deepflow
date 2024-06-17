@@ -17,6 +17,7 @@
 package tagrecorder
 
 import (
+	"net"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -233,6 +234,10 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 		// VPCID：网关VPC
 		// IP：SNAT前IP、DNAT后IP
 		for _, natRule := range natGatewayIDToNatRules[natGateway.ID] {
+			parsedIP := net.ParseIP(natRule.FixedIP)
+			if parsedIP == nil {
+				continue
+			}
 			keyToDBItem[IPRelationKey{L3EPCID: natGateway.VPCID, IP: natRule.FixedIP}] = mysql.ChIPRelation{
 				L3EPCID:   natGateway.VPCID,
 				IP:        natRule.FixedIP,
@@ -309,6 +314,10 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 			// VPCID：负载均衡器VPC
 			// IP：负载均衡监听器自身IP
 			for _, ip := range strings.Split(lbListener.IPs, ",") {
+				parsedIP := net.ParseIP(ip)
+				if parsedIP == nil {
+					continue
+				}
 				keyToDBItem[IPRelationKey{L3EPCID: lb.VPCID, IP: ip}] = mysql.ChIPRelation{
 					L3EPCID:        lb.VPCID,
 					IP:             ip,
@@ -321,6 +330,10 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 			// VPCID：负载均衡器VPC、后端主机云服务器VPC
 			// IP：后端主机IP
 			for _, lbTS := range lbListenerIDToLBTargetServers[lbListener.ID] {
+				parsedIP := net.ParseIP(lbTS.IP)
+				if parsedIP == nil {
+					continue
+				}
 				var vpcID int
 				if lbTS.VMID != 0 {
 					vpcID = toolDS.vmIDToVPCID[lbTS.VMID]
