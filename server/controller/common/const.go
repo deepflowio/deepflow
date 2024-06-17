@@ -271,7 +271,6 @@ const (
 	TENCENT           = 4
 	FILEREADER        = 5
 	AWS               = 6
-	PINGAN            = 7
 	ZSTACK            = 8
 	ALIYUN            = 9
 	HUAWEI_PRIVATE    = 10
@@ -299,7 +298,6 @@ const (
 	TENCENT_EN           = "tencent"
 	FILEREADER_EN        = "filereader"
 	AWS_EN               = "aws"
-	PINGAN_EN            = "pingan"
 	ZSTACK_EN            = "zstack"
 	ALIYUN_EN            = "aliyun"
 	HUAWEI_PRIVATE_EN    = "huawei_private"
@@ -323,7 +321,6 @@ const (
 	NFVO_EN              = "nfvo"
 
 	TENCENT_CH          = "腾讯云"
-	PINGAN_CH           = "平安云"
 	ALIYUN_CH           = "阿里云"
 	HUAWEI_CH           = "华为云"
 	QINGCLOUD_CH        = "青云"
@@ -353,7 +350,6 @@ var IconNameToDomainTypes = map[string][]int{
 	NSP_CH:              {NSP},
 	TENCENT_CH:          {TENCENT, TENCENT_TCE},
 	AWS_CH:              {AWS},
-	PINGAN_CH:           {PINGAN},
 	ZSTACK_CH:           {ZSTACK},
 	ALIYUN_CH:           {ALIYUN, APSARA_STACK},
 	KUBERNETES_CH:       {KUBERNETES},
