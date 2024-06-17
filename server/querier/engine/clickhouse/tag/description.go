@@ -797,22 +797,37 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		DB:       "flow_tag",
 		Context:  ctx,
 	}
+	rawSql = strings.ReplaceAll(rawSql, " where ", " WHERE ")
+	rawSql = strings.ReplaceAll(rawSql, " limit ", " LIMIT ")
+	limit := "10000"
 	var whereSql string
 	if strings.Contains(rawSql, "WHERE") {
 		whereSql = strings.Split(rawSql, "WHERE")[1]
 	}
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
+		if strings.Contains(whereSql, " LIMIT ") {
+			limit = strings.Split(whereSql, " LIMIT ")[1]
+			whereSql = strings.Split(whereSql, " LIMIT ")[0]
+
+		}
+	} else {
+		if strings.Contains(rawSql, " LIMIT ") {
+			limit = strings.Split(rawSql, " LIMIT ")[1]
+		}
+	}
 	externalSql := ""
 	if whereSql != "" {
 		if table == "" {
-			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC", db, whereSql)
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, whereSql, limit)
 		} else {
-			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC", db, table, whereSql)
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		}
 	} else {
 		if table == "" {
-			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC", db)
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, limit)
 		} else {
-			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC", db, table)
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		}
 	}
 	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
@@ -848,15 +863,27 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 func GetTagValuesDescriptions(db, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (sqlList []string, err error) {
 	var whereSql string
 	var sql string
+	limit := "10000"
+	rawSql = strings.ReplaceAll(rawSql, " where ", " WHERE ")
+	rawSql = strings.ReplaceAll(rawSql, " limit ", " LIMIT ")
 	if strings.Contains(rawSql, "WHERE") {
 		whereSql = strings.Split(rawSql, "WHERE")[1]
+		if strings.Contains(whereSql, " LIMIT ") {
+			limit = strings.Split(whereSql, " LIMIT ")[1]
+			whereSql = strings.Split(whereSql, " LIMIT ")[0]
+
+		}
+	} else {
+		if strings.Contains(rawSql, " LIMIT ") {
+			limit = strings.Split(rawSql, " LIMIT ")[1]
+		}
 	}
 	switch db {
 	case "prometheus":
 		if whereSql != "" {
-			sql = fmt.Sprintf("SELECT field_name AS label_name, field_value AS label_value FROM prometheus_custom_field_value WHERE %s GROUP BY label_name, label_value ORDER BY label_name", whereSql)
+			sql = fmt.Sprintf("SELECT field_name AS label_name, field_value AS label_value FROM prometheus_custom_field_value WHERE %s GROUP BY label_name, label_value ORDER BY label_name ASC LIMIT %s", whereSql, limit)
 		} else {
-			sql = "SELECT field_name AS label_name, field_value AS label_value FROM prometheus_custom_field_value GROUP BY label_name, label_value ORDER BY label_name"
+			sql = fmt.Sprintf("SELECT field_name AS label_name, field_value AS label_value FROM prometheus_custom_field_value GROUP BY label_name, label_value ORDER BY label_name ASC LIMIT %s", limit)
 		}
 		sqlList = append(sqlList, sql)
 		return sqlList, nil
