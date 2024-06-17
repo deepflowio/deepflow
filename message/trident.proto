@@ -291,7 +291,7 @@ message Config {
     optional bool external_agent_http_proxy_enabled = 406 [default = true];  // 外部Agent数据HTTP代理开关
     optional uint32 external_agent_http_proxy_port = 407 [default = 38086];  // 外部Agent数据HTTP代理端口
     // _ = 408; // deprecated. 408 was once occupied by prometheus_http_api_address.
-    repeated string prometheus_http_api_addresses = 409;
+    // repeated string prometheus_http_api_addresses = 409; // 6.5 delete
 
     optional uint32 packet_sequence_flag = 410 [default = 0];
 
