@@ -62,7 +62,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 			} else {
 				if oldV != v {
 					updateKey = K8sEnvKey{ID: sourceID, Key: k}
-					updateInfo[k] = v
+					updateInfo["value"] = v
 					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, K8sEnvKey{ID: sourceID, Key: k})
