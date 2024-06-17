@@ -900,7 +900,6 @@ var IconNameToDomainType = map[string][]int{
 	"NSP":                      {common.NSP},
 	common.TENCENT_CH:          {common.TENCENT, common.TENCENT_TCE},
 	"AWS":                      {common.AWS},
-	common.PINGAN_CH:           {common.PINGAN},
 	"ZStack":                   {common.ZSTACK},
 	common.ALIYUN_CH:           {common.ALIYUN, common.APSARA_STACK},
 	"Kubernetes":               {common.KUBERNETES},
