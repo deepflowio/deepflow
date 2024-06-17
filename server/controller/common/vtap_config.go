@@ -79,7 +79,6 @@ var DefaultVTapGroupConfig = &agent_config.AgentGroupConfigModel{
 	HTTPLogXRequestID:             &DefaultHTTPLogXRequestID,
 	ExternalAgentHTTPProxyEnabled: &DefaultExternalAgentHTTPProxyEnabled,
 	ExternalAgentHTTPProxyPort:    &DefaultExternalAgentHTTPProxyPort,
-	PrometheusHttpAPIAddresses:    &DefaultPrometheusHttpAPIAddresses,
 	AnalyzerPort:                  &DefaultAnalyzerPort,
 	ProxyControllerPort:           &DefaultProxyControllerPort,
 	ProxyControllerIP:             &DefaultProxyControllerIP,
@@ -152,7 +151,6 @@ var (
 	DefaultHTTPLogXRequestID             = "X-Request-ID"
 	DefaultExternalAgentHTTPProxyEnabled = 1 // 外部Agent数据HTTP代理开关
 	DefaultExternalAgentHTTPProxyPort    = 38086
-	DefaultPrometheusHttpAPIAddresses    = ""
 	DefaultAnalyzerPort                  = 30033
 	DefaultProxyControllerPort           = 30035
 	DefaultProxyControllerIP             = ""
