@@ -88,11 +88,11 @@ func ExecSQL(conn clickhouse.Conn, query string) error {
 	err := conn.Exec(context.Background(), query)
 	retryTimes := RETRY_COUNT
 	for err != nil && retryTimes > 0 {
-		log.Warningf("Exec SQL (%s) failed: %s, will retry", query[:SQL_LOG_LENGTH], err)
+		log.Warningf("Exec SQL (%s) failed: %s, will retry", query, err)
 		time.Sleep(time.Second)
 		err = conn.Exec(context.Background(), query)
 		if err == nil {
-			log.Infof("Retry exec SQL (%s) success", query[:SQL_LOG_LENGTH])
+			log.Infof("Retry exec SQL (%s) success", query)
 			return nil
 		}
 		retryTimes--
