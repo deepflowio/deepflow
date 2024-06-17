@@ -106,7 +106,7 @@ type Domain struct {
 	IconID       int        `gorm:"column:icon_id;type:int" json:"ICON_ID" mapstructure:"ICON_ID"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME" mapstructure:"DISPLAY_NAME"`
 	ClusterID    string     `gorm:"column:cluster_id;type:char(64)" json:"CLUSTER_ID" mapstructure:"CLUSTER_ID"`
-	Type         int        `gorm:"column:type;type:int;default:0" json:"TYPE" mapstructure:"TYPE"` // 1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 7.pingan 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce
+	Type         int        `gorm:"column:type;type:int;default:0" json:"TYPE" mapstructure:"TYPE"` // 1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce
 	Config       string     `gorm:"column:config;type:text" json:"CONFIG" mapstructure:"CONFIG"`
 	ErrorMsg     string     `gorm:"column:error_msg;type:text" json:"ERROR_MSG" mapstructure:"ERROR_MSG"`
 	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED" mapstructure:"ENABLED"` // 0.false 1.true

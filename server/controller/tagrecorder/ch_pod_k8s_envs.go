@@ -41,7 +41,7 @@ func (c *ChPodK8sEnvs) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.ENV.IsDifferent() {
-		envs, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		envs, _ := common.StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
 		updateInfo["envs"] = envs
 	}
 	if len(updateInfo) > 0 {

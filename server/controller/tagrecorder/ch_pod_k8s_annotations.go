@@ -41,7 +41,7 @@ func (c *ChPodK8sAnnotations) onResourceUpdated(sourceID int, fieldsUpdate *mess
 	updateInfo := make(map[string]interface{})
 
 	if fieldsUpdate.Annotation.IsDifferent() {
-		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Label.GetNew())
+		annotations, _ := common.StrToJsonAndMap(fieldsUpdate.Annotation.GetNew())
 		updateInfo["annotations"] = annotations
 	}
 	if len(updateInfo) > 0 {

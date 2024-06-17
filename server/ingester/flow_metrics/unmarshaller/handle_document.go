@@ -121,7 +121,7 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 		return nil
 	}
 
-	myRegionID := uint16(platformData.QueryRegionID())
+	myRegionID := uint16(platformData.QueryRegionID(t.OrgId))
 
 	if t.Code&flow_metrics.ServerPort == flow_metrics.ServerPort {
 		t.Code |= PortAddCode
