@@ -62,7 +62,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 			} else {
 				if oldV != v {
 					updateKey = OSAPPTagKey{PID: sourceID, Key: k}
-					updateInfo[k] = v
+					updateInfo["value"] = v
 					db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
 					if chItem.PID == 0 {
 						keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
