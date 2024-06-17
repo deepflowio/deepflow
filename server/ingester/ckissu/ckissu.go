@@ -321,10 +321,7 @@ func (i *Issu) addColumnDatasource(index int, d *DatasourceInfo, isMapTable, isA
 
 	for _, add := range columnDatasourceAdds {
 		aggTable := d.name + "_agg"
-		version, err := i.getTableRawVersion(index, d.db, aggTable)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableRawVersion(index, d.db, aggTable)
 		if version == common.CK_VERSION {
 			continue
 		}
@@ -353,7 +350,9 @@ func (i *Issu) addColumnDatasource(index int, d *DatasourceInfo, isMapTable, isA
 			sql := fmt.Sprintf("ALTER TABLE %s.`%s` update %s=%s WHERE 1",
 				d.db, aggTable, addColumn.ColumnName, add.OldColumnName)
 			log.Info("datasource copy column: ", sql)
-			_, err = Exec(connect, sql)
+			if _, err := Exec(connect, sql); err != nil {
+				log.Warningf("exec sql %s failed: %s", err)
+			}
 		}
 		dones = append(dones, addColumn)
 	}
@@ -480,10 +479,7 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 	}
 	i.tableRenames = AllTableRenames
 	for idx, connection := range i.Connections {
-		oldVersion, err := i.getTableVersion(idx, "flow_log", "l4_flow_log_local")
-		if err != nil {
-			return err
-		}
+		oldVersion, _ := i.getTableVersion(idx, "flow_log", "l4_flow_log_local")
 		if strings.Compare(oldVersion, "v6.5") >= 0 || oldVersion == "" {
 			continue
 		}
@@ -501,10 +497,7 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 
 func (i *Issu) renameTablesV65(ds *datasource.DatasourceManager) error {
 	for index, connection := range i.Connections {
-		oldVersion, err := i.getTableVersion(index, "flow_log", "l7_flow_log_local")
-		if err != nil {
-			return err
-		}
+		oldVersion, _ := i.getTableVersion(index, "flow_log", "l7_flow_log_local")
 		if strings.Compare(oldVersion, "v6.5.1") >= 0 {
 			continue
 		}
@@ -868,16 +861,17 @@ func (i *Issu) getAllTableVersions(connect *sql.DB) (map[string]string, error) {
 	return versions, nil
 }
 
-func (i *Issu) getTableVersion(idx int, db, table string) (string, error) {
-	version, err := i.getTableRawVersion(idx, db, table)
-	if version == "" {
+func (i *Issu) getTableVersion(idx int, db, table string) (string, bool) {
+	version, exist := i.getTableRawVersion(idx, db, table)
+	if !exist {
 		version = common.CK_VERSION
 	}
-	return version, err
+	return version, exist
 }
 
-func (i *Issu) getTableRawVersion(idx int, db, table string) (string, error) {
-	return i.VersionMaps[idx][genKey(db, table)], nil
+func (i *Issu) getTableRawVersion(idx int, db, table string) (string, bool) {
+	version, exist := i.VersionMaps[idx][genKey(db, table)]
+	return version, exist
 }
 
 func (i *Issu) setTableVersion(connect *sql.DB, db, table string) error {
@@ -950,14 +944,7 @@ func (i *Issu) renameColumns(index int, orgIDPrefix string) ([]*ColumnRename, er
 	dones := []*ColumnRename{}
 	for _, renameColumn := range i.columnRenames {
 		renameColumn.Db = getOrgDatabase(renameColumn.Db, orgIDPrefix)
-		version, err := i.getTableVersion(index, renameColumn.Db, renameColumn.Table)
-		if err != nil {
-			if strings.Contains(err.Error(), "doesn't exist") {
-				log.Infof("db: %s, table: %s info: %s", renameColumn.Db, renameColumn.Table, err)
-				continue
-			}
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, renameColumn.Db, renameColumn.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
@@ -975,10 +962,7 @@ func (i *Issu) modColumns(index int, orgIDPrefix string) ([]*ColumnMod, error) {
 	dones := []*ColumnMod{}
 	for _, modColumn := range i.columnMods {
 		modColumn.Db = getOrgDatabase(modColumn.Db, orgIDPrefix)
-		version, err := i.getTableVersion(index, modColumn.Db, modColumn.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, modColumn.Db, modColumn.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
@@ -995,10 +979,7 @@ func (i *Issu) dropColumns(index int, orgIDPrefix string) ([]*ColumnDrop, error)
 	dones := []*ColumnDrop{}
 	for _, dropColumn := range i.columnDrops {
 		dropColumn.Db = getOrgDatabase(dropColumn.Db, orgIDPrefix)
-		version, err := i.getTableVersion(index, dropColumn.Db, dropColumn.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, dropColumn.Db, dropColumn.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
@@ -1013,11 +994,7 @@ func (i *Issu) dropColumns(index int, orgIDPrefix string) ([]*ColumnDrop, error)
 func (i *Issu) modTableTTLs(index int, orgIDPrefix string) error {
 	for _, modTTL := range i.modTTLs {
 		modTTL.Db = getOrgDatabase(modTTL.Db, orgIDPrefix)
-		version, err := i.getTableVersion(index, modTTL.Db, modTTL.Table)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
+		version, _ := i.getTableVersion(index, modTTL.Db, modTTL.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
@@ -1112,10 +1089,7 @@ func (i *Issu) addColumns(index int, orgIDPrefix string) ([]*ColumnAdd, error) {
 	dones := []*ColumnAdd{}
 	for _, add := range i.columnAdds {
 		add.Db = getOrgDatabase(add.Db, orgIDPrefix)
-		version, err := i.getTableVersion(index, add.Db, add.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, add.Db, add.Table)
 		if version == common.CK_VERSION {
 			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
@@ -1151,10 +1125,7 @@ func (i *Issu) addIndexs(index int, orgIDPrefix string) ([]*IndexAdd, error) {
 	dones := []*IndexAdd{}
 	for _, add := range i.indexAdds {
 		add.Db = getOrgDatabase(add.Db, orgIDPrefix)
-		version, err := i.getTableVersion(index, add.Db, add.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, add.Db, add.Table)
 		if version == common.CK_VERSION {
 			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
