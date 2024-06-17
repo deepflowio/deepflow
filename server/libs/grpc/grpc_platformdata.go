@@ -145,7 +145,7 @@ type PlatformInfoTable struct {
 	index    int
 
 	receiver         *receiver.Receiver
-	regionID         uint32
+	regionID         [MAX_ORG_COUNT]uint32
 	analyzerID       uint32
 	otherRegionCount [MAX_ORG_COUNT]int64
 	epcIDIPV4Lru     [MAX_ORG_COUNT]*lru.U64LRU
@@ -233,8 +233,8 @@ func (t *PlatformInfoTable) ClosePlatformInfoTable() {
 	}
 }
 
-func (t *PlatformInfoTable) QueryRegionID() uint32 {
-	return t.regionID
+func (t *PlatformInfoTable) QueryRegionID(orgId uint16) uint32 {
+	return t.regionID[orgId]
 }
 
 func (t *PlatformInfoTable) QueryAnalyzerID() uint32 {
@@ -790,9 +790,9 @@ func (t *PlatformInfoTable) String() string {
 func (t *PlatformInfoTable) OrgString(orgId uint16) string {
 	sb := &strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("OrgID %d AnalyzerID %d RegionID:%d   Drop Other RegionID Data Count:%d\n", orgId, t.analyzerID, t.regionID, t.otherRegionCount[orgId]))
+	sb.WriteString(fmt.Sprintf("OrgID %d AnalyzerID %d RegionID:%d   Drop Other RegionID Data Count:%d\n", orgId, t.analyzerID, t.regionID[orgId], t.otherRegionCount[orgId]))
 	sb.WriteString(fmt.Sprintf("moduleName:%s ctlIP:%s hostname:%s RegionID:%d\n",
-		t.moduleName, t.ctlIP, t.hostname, t.regionID))
+		t.moduleName, t.ctlIP, t.hostname, t.regionID[orgId]))
 	sb.WriteString(fmt.Sprintf("ARCH:%s OS:%s Kernel:%s CPUNum:%d MemorySize:%d\n", t.runtimeEnv.Arch, t.runtimeEnv.OS, t.runtimeEnv.KernelVersion, t.runtimeEnv.CpuNum, t.runtimeEnv.MemorySize))
 	if len(t.epcIDIPV4Infos[orgId]) > 0 {
 		sb.WriteString("\n1 *epcID  *ipv4           mac          host            hostID  regionID  deviceType  deviceID    subnetID  podNodeID podNSID podGroupID podGroupType podID podClusterID azID isVip isWan vtapId       hitCount (ipv4平台信息)\n")
@@ -1073,7 +1073,7 @@ func (t *PlatformInfoTable) updateOthers(orgId uint16, response *trident.SyncRes
 	}
 
 	if analyzerConfig := response.GetAnalyzerConfig(); analyzerConfig != nil {
-		t.regionID = analyzerConfig.GetRegionId()
+		t.regionID[orgId] = analyzerConfig.GetRegionId()
 		t.analyzerID = analyzerConfig.GetAnalyzerId()
 	} else {
 		log.Warning("get analyzer config failed")
@@ -1222,7 +1222,7 @@ func (t *PlatformInfoTable) ReloadMaster(orgId uint16) error {
 		}
 
 		if isUnmarshalSuccess {
-			log.Infof("org %d update rpc platformdata version %d -> %d  regionID=%d", orgId, t.versionPlatformData[orgId], newVersion, t.regionID)
+			log.Infof("org %d update rpc platformdata version %d -> %d  regionID=%d", orgId, t.versionPlatformData[orgId], newVersion, t.regionID[orgId])
 			t.updatePlatformData(orgId, &platformData)
 			t.otherRegionCount[orgId] = 0
 		}

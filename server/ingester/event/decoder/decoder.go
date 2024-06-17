@@ -472,7 +472,7 @@ func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
 	s.ValueUnit = event.GetValueUnit()
 	s.EventLevel = event.GetEventLevel()
 	s.AlarmTarget = event.GetAlarmTarget()
-	s.RegionId = uint16(d.platformData.QueryRegionID())
+	s.RegionId = uint16(d.platformData.QueryRegionID(uint16(event.GetOrgId())))
 	s.PolicyQueryUrl = event.GetPolicyQueryUrl()
 	s.PolicyQueryConditions = event.GetPolicyQueryConditions()
 	s.PolicyThresholdCritical = event.GetPolicyThresholdCritical()
