@@ -392,7 +392,7 @@ func (v *VTapInfo) loadPlugins() {
 }
 
 func (v *VTapInfo) loadConfigData() {
-	deafaultConfiguration := &agent_config.RAgentGroupConfigModel{}
+	deafaultConfiguration := &agent_config.AgentGroupConfigModel{}
 	b, err := json.Marshal(DefaultVTapGroupConfig)
 	if err == nil {
 		err = json.Unmarshal(b, deafaultConfiguration)
@@ -523,7 +523,7 @@ func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) 
 			}
 		}
 		// 转换结构体类型
-		rtapConfiguration := &agent_config.RAgentGroupConfigModel{}
+		rtapConfiguration := &agent_config.AgentGroupConfigModel{}
 		b, err := json.Marshal(tapConfiguration)
 		if err == nil {
 			err = json.Unmarshal(b, rtapConfiguration)
@@ -536,7 +536,7 @@ func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) 
 
 		vTapConfig := NewVTapConfig(rtapConfiguration)
 		if config.VTapGroupLcuuid != nil {
-			vtapGroupLcuuidToConfiguration[vTapConfig.VTapGroupLcuuid] = vTapConfig
+			vtapGroupLcuuidToConfiguration[*vTapConfig.VTapGroupLcuuid] = vTapConfig
 		}
 	}
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
