@@ -308,7 +308,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
-		"PrometheusHttpAPIAddresses", "WasmPlugins", "SoPlugins",
+		"WasmPlugins", "SoPlugins",
 	}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
@@ -378,9 +378,6 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 			}
 		}
 	}
-	if sData.PrometheusHttpAPIAddresses != nil {
-		tData.PrometheusHttpAPIAddresses = strings.Split(*sData.PrometheusHttpAPIAddresses, ",")
-	}
 	if sData.MaxCollectPps != nil {
 		cMaxCollectPps := *sData.MaxCollectPps / 1000
 		tData.MaxCollectPps = &cMaxCollectPps
@@ -436,7 +433,7 @@ func convertToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.Agent
 	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "VTapGroupID",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
-		"PrometheusHttpAPIAddresses", "WasmPlugins", "SoPlugins",
+		"WasmPlugins", "SoPlugins",
 	}
 	copyStruct(sData, tData, ignoreName)
 	if len(sData.L4LogTapTypes) > 0 {
@@ -474,12 +471,6 @@ func convertToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.Agent
 		tData.Domains = &cDomains
 	} else {
 		tData.Domains = nil
-	}
-	if len(sData.PrometheusHttpAPIAddresses) > 0 {
-		cAddrs := strings.Join(sData.PrometheusHttpAPIAddresses, ",")
-		tData.PrometheusHttpAPIAddresses = &cAddrs
-	} else {
-		tData.PrometheusHttpAPIAddresses = nil
 	}
 	if sData.MaxCollectPps != nil {
 		cMaxCollectPps := *sData.MaxCollectPps * 1000
