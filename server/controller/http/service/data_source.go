@@ -612,7 +612,7 @@ func convertNameToInterval(name string) (interval int) {
 	case "1d":
 		return 86400
 	default:
-		log.Errorf("unsupported name: %s", name)
+		log.Warningf("unsupported name: %s", name)
 		return 0
 	}
 }
