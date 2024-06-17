@@ -117,7 +117,7 @@ type StaticConfig struct {
 	FirstPathLevel                     *int                         `yaml:"first-path-level,omitempty"`
 	LocalDispatcherCount               *int                         `yaml:"local-dispatcher-count,omitempty"`
 	SrcInterfaces                      []string                     `yaml:"src-interfaces,omitempty"`
-	TapInterfaceBondGroup              []BondGroup                  `yaml:"tap-interface-bond-groups",omitempty`
+	TapInterfaceBondGroup              []BondGroup                  `yaml:"tap-interface-bond-groups,omitempty"`
 	CloudGatewayTraffic                *bool                        `yaml:"cloud-gateway-traffic,omitempty"`
 	MirrorTrafficPcp                   *uint16                      `yaml:"mirror-traffic-pcp,omitempty"`
 	PCap                               *PCapConfig                  `yaml:"pcap,omitempty"`
