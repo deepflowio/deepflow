@@ -673,10 +673,18 @@ ingester:
   #  # randomly select an address that can be sent successfully. Kafka address format as: 'broker1.example.com:9092'
   #  endpoints: [broker1.example.com:9092, broker2.example.com:9092]
   #  # the data source that needs to be exported format as $db_name.$table_name, is also the topic name of Kafka
-  #  data-sources:
+  #  data-sources: # currently only supports 'flow_metrics.*', 'flow_log.l4/l7_flow_log', 'event.perf_event'
   #  - flow_log.l7_flow_log
-  #  - flow_log.network.1m
-  #  - flow_log.application_map.1m
+  #  # - flow_log.l4_flow_log
+  #  # - flow_metrics.application_map.1s
+  #  # - flow_metrics.application_map.1m
+  #  # - flow_metrics.application.1s
+  #  # - flow_metrics.application.1m
+  #  # - flow_metrics.network_map.1s
+  #  # - flow_metrics.network_map.1m
+  #  # - flow_metrics.network.1s
+  #  # - flow_metrics.network.1m
+  #  # - event.perf_event
   #  # number of queues exported in parallel
   #  queue-count: 4
   #  # size of exporting queue
@@ -693,9 +701,9 @@ ingester:
   #  # whether the id value of universal-tag is not converted into a resource name for output
   #  universal-tag-translate-to-name-disabled: false
   #  tag-filters:
-  #  - field-name: signal_source # database column name
-  #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
-  #    field-values: [3]         # vlaues
+  #  #- field-name: signal_source # database column name
+  #  #  operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
+  #  #  field-values: [3]         # vlaues
   #  export-fields: # field_name or $category
   #  - $tag
   #  - $metrics
@@ -712,14 +720,18 @@ ingester:
   #  endpoints: [http://127.0.0.1:9091/receive, http://1.1.1.1:9091/receive]
   #  data-sources: # currently only supports 'flow_metrics.*'
   #  - flow_metrics.application_map.1s
+  #  # - flow_metrics.application_map.1m
+  #  # - flow_metrics.application.1s
+  #  # - flow_metrics.application.1m
+  #  # - flow_metrics.network_map.1s
+  #  # - flow_metrics.network_map.1m
+  #  # - flow_metrics.network.1s
+  #  # - flow_metrics.network.1m
   #  queue-count: 4
   #  queue-size: 100000
   #  batch-size: 1024
   #  flush-timeout: 10
   #  tag-filters:
-  #  - field-name: signal_source
-  #    operator: "="
-  #    field-values: [3]
   #  export-fields:
   #  - $tag
   #  - $metrics
@@ -741,9 +753,6 @@ ingester:
   #  batch-size: 32
   #  flush-timeout: 10
   #  tag-filters:
-  #  - field-name: signal_source
-  #    operator: "="
-  #    field-values: [3]
   #  export-fields:
   #  - $tag
   #  - $metrics
