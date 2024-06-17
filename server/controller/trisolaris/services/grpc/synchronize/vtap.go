@@ -158,7 +158,6 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
 		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(c.GetExternalAgentHTTPProxyEnabledConfig())),
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
-		PrometheusHttpApiAddresses:    strings.Split(vtapConfig.PrometheusHttpAPIAddresses, ","),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		// 调整后采集器配置信息
@@ -555,7 +554,6 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
 		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(vtapConfig.ExternalAgentHTTPProxyEnabled)),
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
-		PrometheusHttpApiAddresses:    strings.Split(vtapConfig.PrometheusHttpAPIAddresses, ","),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
 		TapMode:                       &tapMode,
