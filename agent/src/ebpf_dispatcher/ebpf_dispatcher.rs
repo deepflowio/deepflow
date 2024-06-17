@@ -169,6 +169,31 @@ impl OwnedCountable for SyncEbpfCounter {
                 CounterType::Counted,
                 CounterValue::Unsigned(ebpf_counter.probes_count as u64),
             ),
+            (
+                "period_push_conflict_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.period_push_conflict_count as u64),
+            ),
+            (
+                "period_push_max_delay",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.period_push_max_delay as u64),
+            ),
+            (
+                "period_push_avg_delay",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.period_push_avg_delay as u64),
+            ),
+            (
+                "proc_exec_event_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.proc_exec_event_count as u64),
+            ),
+            (
+                "proc_exit_event_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.proc_exit_event_count as u64),
+            ),
         ]
     }
     // EbpfCollector不会重复创建，这里都是false
