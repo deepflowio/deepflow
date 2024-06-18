@@ -79,11 +79,11 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		return &api.Config{}
 	}
 
-	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
+	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[*vtapConfig.CollectorSocketType]
 	if ok == false {
 		collectorSocketType = UDP_SOCKET
 	}
-	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
+	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[*vtapConfig.NpbSocketType]
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
 	}
@@ -91,9 +91,9 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	for _, decap := range vtapConfig.ConvertedDecapType {
 		decapTypes = append(decapTypes, api.DecapType(decap))
 	}
-	npbVlanMode := api.VlanMode(vtapConfig.NpbVlanMode)
-	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
-	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
+	npbVlanMode := api.VlanMode(*vtapConfig.NpbVlanMode)
+	ifMacSource := api.IfMacSource(*vtapConfig.IfMacSource)
+	captureSocketType := api.CaptureSocketType(*vtapConfig.CaptureSocketType)
 	vtapID := uint32(c.GetVTapID())
 
 	tridentType := common.TridentType(0)
@@ -104,62 +104,62 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	}
 	podClusterId := uint32(c.GetPodClusterID())
 	vpcID := uint32(c.GetVPCID())
-	tapMode := api.TapMode(vtapConfig.TapMode)
-	breakerMetricStr := convertBreakerMetric(vtapConfig.SystemLoadCircuitBreakerMetric)
+	tapMode := api.TapMode(*vtapConfig.TapMode)
+	breakerMetricStr := convertBreakerMetric(*vtapConfig.SystemLoadCircuitBreakerMetric)
 	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
 	configure := &api.Config{
-		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
+		CollectorEnabled:              proto.Bool(Int2Bool(*vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
-		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
-		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
-		MaxMillicpus:                  proto.Uint32(uint32(vtapConfig.MaxMilliCPUs)),
-		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
-		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
-		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
-		PlatformSyncInterval:          proto.Uint32(uint32(vtapConfig.PlatformSyncInterval)),
-		NpbBpsThreshold:               proto.Uint64(uint64(vtapConfig.MaxNpbBps)),
-		GlobalPpsThreshold:            proto.Uint64(uint64(vtapConfig.MaxCollectPps)),
-		Mtu:                           proto.Uint32(uint32(vtapConfig.Mtu)),
-		OutputVlan:                    proto.Uint32(uint32(vtapConfig.OutputVlan)),
-		RsyslogEnabled:                proto.Bool(Int2Bool(vtapConfig.RsyslogEnabled)),
-		ServerTxBandwidthThreshold:    proto.Uint64(uint64(vtapConfig.MaxTxBandwidth)),
-		BandwidthProbeInterval:        proto.Uint64(uint64(vtapConfig.BandwidthProbeInterval)),
-		MaxEscapeSeconds:              proto.Uint32(uint32(vtapConfig.MaxEscapeSeconds)),
+		PlatformEnabled:               proto.Bool(Int2Bool(*vtapConfig.PlatformEnabled)),
+		MaxCpus:                       proto.Uint32(uint32(*vtapConfig.MaxCPUs)),
+		MaxMillicpus:                  proto.Uint32(uint32(*vtapConfig.MaxMilliCPUs)),
+		MaxMemory:                     proto.Uint32(uint32(*vtapConfig.MaxMemory)),
+		StatsInterval:                 proto.Uint32(uint32(*vtapConfig.StatsInterval)),
+		SyncInterval:                  proto.Uint32(uint32(*vtapConfig.SyncInterval)),
+		PlatformSyncInterval:          proto.Uint32(uint32(*vtapConfig.PlatformSyncInterval)),
+		NpbBpsThreshold:               proto.Uint64(uint64(*vtapConfig.MaxNpbBps)),
+		GlobalPpsThreshold:            proto.Uint64(uint64(*vtapConfig.MaxCollectPps)),
+		Mtu:                           proto.Uint32(uint32(*vtapConfig.Mtu)),
+		OutputVlan:                    proto.Uint32(uint32(*vtapConfig.OutputVlan)),
+		RsyslogEnabled:                proto.Bool(Int2Bool(*vtapConfig.RsyslogEnabled)),
+		ServerTxBandwidthThreshold:    proto.Uint64(uint64(*vtapConfig.MaxTxBandwidth)),
+		BandwidthProbeInterval:        proto.Uint64(uint64(*vtapConfig.BandwidthProbeInterval)),
+		MaxEscapeSeconds:              proto.Uint32(uint32(*vtapConfig.MaxEscapeSeconds)),
 		NpbVlanMode:                   &npbVlanMode,
-		NpbDedupEnabled:               proto.Bool(Int2Bool(vtapConfig.NpbDedupEnabled)),
+		NpbDedupEnabled:               proto.Bool(Int2Bool(*vtapConfig.NpbDedupEnabled)),
 		IfMacSource:                   &ifMacSource,
 		NpbSocketType:                 &npbSocketType,
-		VtapFlow_1SEnabled:            proto.Bool(Int2Bool(vtapConfig.VTapFlow1sEnabled)),
-		CapturePacketSize:             proto.Uint32(uint32(vtapConfig.CapturePacketSize)),
-		InactiveServerPortEnabled:     proto.Bool(Int2Bool(vtapConfig.InactiveServerPortEnabled)),
-		InactiveIpEnabled:             proto.Bool(Int2Bool(vtapConfig.InactiveIPEnabled)),
-		LibvirtXmlPath:                proto.String(vtapConfig.VMXMLPath),
-		ExtraNetnsRegex:               proto.String(vtapConfig.ExtraNetnsRegex),
-		LogThreshold:                  proto.Uint32(uint32(vtapConfig.LogThreshold)),
-		LogLevel:                      proto.String(vtapConfig.LogLevel),
-		LogRetention:                  proto.Uint32(uint32(vtapConfig.LogRetention)),
-		L4LogCollectNpsThreshold:      proto.Uint64(uint64(vtapConfig.L4LogCollectNpsThreshold)),
-		L7LogCollectNpsThreshold:      proto.Uint64(uint64(vtapConfig.L7LogCollectNpsThreshold)),
-		L7MetricsEnabled:              proto.Bool(Int2Bool(vtapConfig.L7MetricsEnabled)),
-		L7LogPacketSize:               proto.Uint32(uint32(vtapConfig.L7LogPacketSize)),
+		VtapFlow_1SEnabled:            proto.Bool(Int2Bool(*vtapConfig.VTapFlow1sEnabled)),
+		CapturePacketSize:             proto.Uint32(uint32(*vtapConfig.CapturePacketSize)),
+		InactiveServerPortEnabled:     proto.Bool(Int2Bool(*vtapConfig.InactiveServerPortEnabled)),
+		InactiveIpEnabled:             proto.Bool(Int2Bool(*vtapConfig.InactiveIPEnabled)),
+		LibvirtXmlPath:                vtapConfig.VMXMLPath,
+		ExtraNetnsRegex:               vtapConfig.ExtraNetnsRegex,
+		LogThreshold:                  proto.Uint32(uint32(*vtapConfig.LogThreshold)),
+		LogLevel:                      vtapConfig.LogLevel,
+		LogRetention:                  proto.Uint32(uint32(*vtapConfig.LogRetention)),
+		L4LogCollectNpsThreshold:      proto.Uint64(uint64(*vtapConfig.L4LogCollectNpsThreshold)),
+		L7LogCollectNpsThreshold:      proto.Uint64(uint64(*vtapConfig.L7LogCollectNpsThreshold)),
+		L7MetricsEnabled:              proto.Bool(Int2Bool(*vtapConfig.L7MetricsEnabled)),
+		L7LogPacketSize:               proto.Uint32(uint32(*vtapConfig.L7LogPacketSize)),
 		DecapType:                     decapTypes,
 		CaptureSocketType:             &captureSocketType,
-		CaptureBpf:                    proto.String(vtapConfig.CaptureBpf),
-		ThreadThreshold:               proto.Uint32(uint32(vtapConfig.ThreadThreshold)),
-		ProcessThreshold:              proto.Uint32(uint32(vtapConfig.ProcessThreshold)),
-		HttpLogProxyClient:            proto.String(vtapConfig.HTTPLogProxyClient),
-		HttpLogTraceId:                proto.String(vtapConfig.HTTPLogTraceID),
-		HttpLogSpanId:                 proto.String(vtapConfig.HTTPLogSpanID),
-		HttpLogXRequestId:             proto.String(vtapConfig.HTTPLogXRequestID),
-		NtpEnabled:                    proto.Bool(Int2Bool(vtapConfig.NtpEnabled)),
-		L4PerformanceEnabled:          proto.Bool(Int2Bool(vtapConfig.L4PerformanceEnabled)),
+		CaptureBpf:                    vtapConfig.CaptureBpf,
+		ThreadThreshold:               proto.Uint32(uint32(*vtapConfig.ThreadThreshold)),
+		ProcessThreshold:              proto.Uint32(uint32(*vtapConfig.ProcessThreshold)),
+		HttpLogProxyClient:            vtapConfig.HTTPLogProxyClient,
+		HttpLogTraceId:                vtapConfig.HTTPLogTraceID,
+		HttpLogSpanId:                 vtapConfig.HTTPLogSpanID,
+		HttpLogXRequestId:             vtapConfig.HTTPLogXRequestID,
+		NtpEnabled:                    proto.Bool(Int2Bool(*vtapConfig.NtpEnabled)),
+		L4PerformanceEnabled:          proto.Bool(Int2Bool(*vtapConfig.L4PerformanceEnabled)),
 		KubernetesApiEnabled:          proto.Bool(false),
-		SysFreeMemoryLimit:            proto.Uint32(uint32(vtapConfig.SysFreeMemoryLimit)),
-		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
+		SysFreeMemoryLimit:            proto.Uint32(uint32(*vtapConfig.SysFreeMemoryLimit)),
+		LogFileSize:                   proto.Uint32(uint32(*vtapConfig.LogFileSize)),
 		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(c.GetExternalAgentHTTPProxyEnabledConfig())),
-		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
-		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
-		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
+		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(*vtapConfig.ExternalAgentHTTPProxyPort)),
+		AnalyzerPort:                  proto.Uint32(uint32(*vtapConfig.AnalyzerPort)),
+		ProxyControllerPort:           proto.Uint32(uint32(*vtapConfig.ProxyControllerPort)),
 		// 调整后采集器配置信息
 		L7LogStoreTapTypes:  vtapConfig.ConvertedL7LogStoreTapTypes,
 		L4LogTapTypes:       vtapConfig.ConvertedL4LogTapTypes,
@@ -180,8 +180,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 
 		Plugins: e.getPlugins(vtapConfig),
 
-		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
-		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerThreshold: vtapConfig.SystemLoadCircuitBreakerThreshold,
+		SystemLoadCircuitBreakerRecover:   vtapConfig.SystemLoadCircuitBreakerRecover,
 		SystemLoadCircuitBreakerMetric:    &loadMetric,
 
 		TeamId:     proto.Uint32(uint32(c.GetTeamID())),
@@ -198,7 +198,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	}
 
-	if trisolaris.GetAllAgentConnectToNatIP() || vtapConfig.NatIPEnabled == 1 {
+	if trisolaris.GetAllAgentConnectToNatIP() || (vtapConfig.NatIPEnabled != nil && *vtapConfig.NatIPEnabled == 1) {
 		configure.ProxyControllerIp = proto.String(trisolaris.GetORGNodeInfo(orgID).GetControllerNatIP(c.GetControllerIP()))
 		configure.ProxyControllerPort = proto.Uint32(uint32(DefaultProxyControllerPort))
 
@@ -206,17 +206,17 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		configure.AnalyzerPort = proto.Uint32(uint32(DefaultAnalyzerPort))
 	}
 
-	if vtapConfig.ProxyControllerIP != "" {
-		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
+	if vtapConfig.ProxyControllerIP != nil && *vtapConfig.ProxyControllerIP != "" {
+		configure.ProxyControllerIp = vtapConfig.ProxyControllerIP
 	}
-	if vtapConfig.ProxyControllerPort != 0 {
-		configure.ProxyControllerPort = proto.Uint32(uint32(vtapConfig.ProxyControllerPort))
+	if vtapConfig.ProxyControllerPort != nil && *vtapConfig.ProxyControllerPort != 0 {
+		configure.ProxyControllerPort = proto.Uint32(uint32(*vtapConfig.ProxyControllerPort))
 	}
-	if vtapConfig.AnalyzerIP != "" {
-		configure.AnalyzerIp = proto.String(vtapConfig.AnalyzerIP)
+	if vtapConfig.AnalyzerIP != nil && *vtapConfig.AnalyzerIP != "" {
+		configure.AnalyzerIp = vtapConfig.AnalyzerIP
 	}
-	if vtapConfig.AnalyzerPort != 0 {
-		configure.AnalyzerPort = proto.Uint32(uint32(vtapConfig.AnalyzerPort))
+	if vtapConfig.AnalyzerPort != nil && *vtapConfig.AnalyzerPort != 0 {
+		configure.AnalyzerPort = proto.Uint32(uint32(*vtapConfig.AnalyzerPort))
 	}
 
 	if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
@@ -235,8 +235,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 		configure.Enabled = proto.Bool(false)
 		log.Errorf("vtap(%s) has no analyzer_ip", c.GetCtrlIP())
 	}
-	if vtapConfig.TapInterfaceRegex != "" {
-		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
+	if vtapConfig.TapInterfaceRegex != nil && *vtapConfig.TapInterfaceRegex != "" {
+		configure.TapInterfaceRegex = vtapConfig.TapInterfaceRegex
 	}
 	pcapDataRetention := trisolaris.GetORGNodeInfo(orgID).GetPcapDataRetention()
 	if pcapDataRetention != 0 {
@@ -482,11 +482,11 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 	if vtapConfig == nil {
 		return nil
 	}
-	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
+	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[*vtapConfig.CollectorSocketType]
 	if ok == false {
 		collectorSocketType = UDP_SOCKET
 	}
-	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
+	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[*vtapConfig.NpbSocketType]
 	if ok == false {
 		npbSocketType = RAW_UDP_SOCKET
 	}
@@ -494,65 +494,65 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 	for _, decap := range vtapConfig.ConvertedDecapType {
 		decapTypes = append(decapTypes, api.DecapType(decap))
 	}
-	npbVlanMode := api.VlanMode(vtapConfig.NpbVlanMode)
-	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
-	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
-	tapMode := api.TapMode(vtapConfig.TapMode)
-	breakerMetricStr := convertBreakerMetric(vtapConfig.SystemLoadCircuitBreakerMetric)
+	npbVlanMode := api.VlanMode(*vtapConfig.NpbVlanMode)
+	ifMacSource := api.IfMacSource(*vtapConfig.IfMacSource)
+	captureSocketType := api.CaptureSocketType(*vtapConfig.CaptureSocketType)
+	tapMode := api.TapMode(*vtapConfig.TapMode)
+	breakerMetricStr := convertBreakerMetric(*vtapConfig.SystemLoadCircuitBreakerMetric)
 	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
 	configure := &api.Config{
-		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
+		CollectorEnabled:              proto.Bool(Int2Bool(*vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
-		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
-		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
-		MaxMillicpus:                  proto.Uint32(uint32(vtapConfig.MaxMilliCPUs)),
-		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
-		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
-		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
-		PlatformSyncInterval:          proto.Uint32(uint32(vtapConfig.PlatformSyncInterval)),
-		NpbBpsThreshold:               proto.Uint64(uint64(vtapConfig.MaxNpbBps)),
-		GlobalPpsThreshold:            proto.Uint64(uint64(vtapConfig.MaxCollectPps)),
-		Mtu:                           proto.Uint32(uint32(vtapConfig.Mtu)),
-		OutputVlan:                    proto.Uint32(uint32(vtapConfig.OutputVlan)),
-		RsyslogEnabled:                proto.Bool(Int2Bool(vtapConfig.RsyslogEnabled)),
-		ServerTxBandwidthThreshold:    proto.Uint64(uint64(vtapConfig.MaxTxBandwidth)),
-		BandwidthProbeInterval:        proto.Uint64(uint64(vtapConfig.BandwidthProbeInterval)),
-		MaxEscapeSeconds:              proto.Uint32(uint32(vtapConfig.MaxEscapeSeconds)),
+		PlatformEnabled:               proto.Bool(Int2Bool(*vtapConfig.PlatformEnabled)),
+		MaxCpus:                       proto.Uint32(uint32(*vtapConfig.MaxCPUs)),
+		MaxMillicpus:                  proto.Uint32(uint32(*vtapConfig.MaxMilliCPUs)),
+		MaxMemory:                     proto.Uint32(uint32(*vtapConfig.MaxMemory)),
+		StatsInterval:                 proto.Uint32(uint32(*vtapConfig.StatsInterval)),
+		SyncInterval:                  proto.Uint32(uint32(*vtapConfig.SyncInterval)),
+		PlatformSyncInterval:          proto.Uint32(uint32(*vtapConfig.PlatformSyncInterval)),
+		NpbBpsThreshold:               proto.Uint64(uint64(*vtapConfig.MaxNpbBps)),
+		GlobalPpsThreshold:            proto.Uint64(uint64(*vtapConfig.MaxCollectPps)),
+		Mtu:                           proto.Uint32(uint32(*vtapConfig.Mtu)),
+		OutputVlan:                    proto.Uint32(uint32(*vtapConfig.OutputVlan)),
+		RsyslogEnabled:                proto.Bool(Int2Bool(*vtapConfig.RsyslogEnabled)),
+		ServerTxBandwidthThreshold:    proto.Uint64(uint64(*vtapConfig.MaxTxBandwidth)),
+		BandwidthProbeInterval:        proto.Uint64(uint64(*vtapConfig.BandwidthProbeInterval)),
+		MaxEscapeSeconds:              proto.Uint32(uint32(*vtapConfig.MaxEscapeSeconds)),
 		NpbVlanMode:                   &npbVlanMode,
-		NpbDedupEnabled:               proto.Bool(Int2Bool(vtapConfig.NpbDedupEnabled)),
+		NpbDedupEnabled:               proto.Bool(Int2Bool(*vtapConfig.NpbDedupEnabled)),
 		IfMacSource:                   &ifMacSource,
 		NpbSocketType:                 &npbSocketType,
-		VtapFlow_1SEnabled:            proto.Bool(Int2Bool(vtapConfig.VTapFlow1sEnabled)),
-		CapturePacketSize:             proto.Uint32(uint32(vtapConfig.CapturePacketSize)),
-		InactiveServerPortEnabled:     proto.Bool(Int2Bool(vtapConfig.InactiveServerPortEnabled)),
-		InactiveIpEnabled:             proto.Bool(Int2Bool(vtapConfig.InactiveIPEnabled)),
-		LibvirtXmlPath:                proto.String(vtapConfig.VMXMLPath),
-		ExtraNetnsRegex:               proto.String(vtapConfig.ExtraNetnsRegex),
-		LogThreshold:                  proto.Uint32(uint32(vtapConfig.LogThreshold)),
-		LogLevel:                      proto.String(vtapConfig.LogLevel),
-		LogRetention:                  proto.Uint32(uint32(vtapConfig.LogRetention)),
-		L4LogCollectNpsThreshold:      proto.Uint64(uint64(vtapConfig.L4LogCollectNpsThreshold)),
-		L7LogCollectNpsThreshold:      proto.Uint64(uint64(vtapConfig.L7LogCollectNpsThreshold)),
-		L7MetricsEnabled:              proto.Bool(Int2Bool(vtapConfig.L7MetricsEnabled)),
-		L7LogPacketSize:               proto.Uint32(uint32(vtapConfig.L7LogPacketSize)),
+		VtapFlow_1SEnabled:            proto.Bool(Int2Bool(*vtapConfig.VTapFlow1sEnabled)),
+		CapturePacketSize:             proto.Uint32(uint32(*vtapConfig.CapturePacketSize)),
+		InactiveServerPortEnabled:     proto.Bool(Int2Bool(*vtapConfig.InactiveServerPortEnabled)),
+		InactiveIpEnabled:             proto.Bool(Int2Bool(*vtapConfig.InactiveIPEnabled)),
+		LibvirtXmlPath:                vtapConfig.VMXMLPath,
+		ExtraNetnsRegex:               vtapConfig.ExtraNetnsRegex,
+		LogThreshold:                  proto.Uint32(uint32(*vtapConfig.LogThreshold)),
+		LogLevel:                      vtapConfig.LogLevel,
+		LogRetention:                  proto.Uint32(uint32(*vtapConfig.LogRetention)),
+		L4LogCollectNpsThreshold:      proto.Uint64(uint64(*vtapConfig.L4LogCollectNpsThreshold)),
+		L7LogCollectNpsThreshold:      proto.Uint64(uint64(*vtapConfig.L7LogCollectNpsThreshold)),
+		L7MetricsEnabled:              proto.Bool(Int2Bool(*vtapConfig.L7MetricsEnabled)),
+		L7LogPacketSize:               proto.Uint32(uint32(*vtapConfig.L7LogPacketSize)),
 		DecapType:                     decapTypes,
 		CaptureSocketType:             &captureSocketType,
-		CaptureBpf:                    proto.String(vtapConfig.CaptureBpf),
-		ThreadThreshold:               proto.Uint32(uint32(vtapConfig.ThreadThreshold)),
-		ProcessThreshold:              proto.Uint32(uint32(vtapConfig.ProcessThreshold)),
-		HttpLogProxyClient:            proto.String(vtapConfig.HTTPLogProxyClient),
-		HttpLogTraceId:                proto.String(vtapConfig.HTTPLogTraceID),
-		HttpLogSpanId:                 proto.String(vtapConfig.HTTPLogSpanID),
-		HttpLogXRequestId:             proto.String(vtapConfig.HTTPLogXRequestID),
-		NtpEnabled:                    proto.Bool(Int2Bool(vtapConfig.NtpEnabled)),
-		L4PerformanceEnabled:          proto.Bool(Int2Bool(vtapConfig.L4PerformanceEnabled)),
+		CaptureBpf:                    vtapConfig.CaptureBpf,
+		ThreadThreshold:               proto.Uint32(uint32(*vtapConfig.ThreadThreshold)),
+		ProcessThreshold:              proto.Uint32(uint32(*vtapConfig.ProcessThreshold)),
+		HttpLogProxyClient:            vtapConfig.HTTPLogProxyClient,
+		HttpLogTraceId:                vtapConfig.HTTPLogTraceID,
+		HttpLogSpanId:                 vtapConfig.HTTPLogSpanID,
+		HttpLogXRequestId:             vtapConfig.HTTPLogXRequestID,
+		NtpEnabled:                    proto.Bool(Int2Bool(*vtapConfig.NtpEnabled)),
+		L4PerformanceEnabled:          proto.Bool(Int2Bool(*vtapConfig.L4PerformanceEnabled)),
 		KubernetesApiEnabled:          proto.Bool(false),
-		SysFreeMemoryLimit:            proto.Uint32(uint32(vtapConfig.SysFreeMemoryLimit)),
-		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
-		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(vtapConfig.ExternalAgentHTTPProxyEnabled)),
-		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
-		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
-		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
+		SysFreeMemoryLimit:            proto.Uint32(uint32(*vtapConfig.SysFreeMemoryLimit)),
+		LogFileSize:                   proto.Uint32(uint32(*vtapConfig.LogFileSize)),
+		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(*vtapConfig.ExternalAgentHTTPProxyEnabled)),
+		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(*vtapConfig.ExternalAgentHTTPProxyPort)),
+		AnalyzerPort:                  proto.Uint32(uint32(*vtapConfig.AnalyzerPort)),
+		ProxyControllerPort:           proto.Uint32(uint32(*vtapConfig.ProxyControllerPort)),
 		TapMode:                       &tapMode,
 		// 调整后采集器配置信息
 		L7LogStoreTapTypes:  vtapConfig.ConvertedL7LogStoreTapTypes,
@@ -561,21 +561,21 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string, orgID int) *api.Co
 		L7LogIgnoreTapSides: vtapConfig.ConvertedL7LogIgnoreTapSides,
 		Plugins:             e.getPlugins(vtapConfig),
 
-		SystemLoadCircuitBreakerThreshold: proto.Float32((vtapConfig.SystemLoadCircuitBreakerThreshold)),
-		SystemLoadCircuitBreakerRecover:   proto.Float32((vtapConfig.SystemLoadCircuitBreakerRecover)),
+		SystemLoadCircuitBreakerThreshold: vtapConfig.SystemLoadCircuitBreakerThreshold,
+		SystemLoadCircuitBreakerRecover:   vtapConfig.SystemLoadCircuitBreakerRecover,
 		SystemLoadCircuitBreakerMetric:    &loadMetric,
 	}
-	if vtapConfig.TapInterfaceRegex != "" {
-		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
+	if vtapConfig.TapInterfaceRegex != nil && *vtapConfig.TapInterfaceRegex != "" {
+		configure.TapInterfaceRegex = vtapConfig.TapInterfaceRegex
 	}
 	configure.LocalConfig = proto.String(
 		trisolaris.GetORGVTapInfo(orgID).GetVTapLocalConfigByShortID(groupID))
 
-	if vtapConfig.ProxyControllerIP != "" {
-		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
+	if vtapConfig.ProxyControllerIP != nil && *vtapConfig.ProxyControllerIP != "" {
+		configure.ProxyControllerIp = vtapConfig.ProxyControllerIP
 	}
-	if vtapConfig.AnalyzerIP != "" {
-		configure.AnalyzerIp = proto.String(vtapConfig.AnalyzerIP)
+	if vtapConfig.AnalyzerIP != nil && *vtapConfig.AnalyzerIP != "" {
+		configure.AnalyzerIp = vtapConfig.AnalyzerIP
 	}
 
 	return configure

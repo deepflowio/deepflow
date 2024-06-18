@@ -909,7 +909,7 @@ func (r *VTapRegister) registerVTap(done func()) {
 	}
 	vtapConfig := r.vTapInfo.GetVTapConfigFromShortID(r.vTapGroupID)
 	if vtapConfig != nil {
-		r.tapMode = vtapConfig.TapMode
+		r.tapMode = *vtapConfig.TapMode
 	} else {
 		r.tapMode = DefaultTapMode
 	}

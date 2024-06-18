@@ -35,6 +35,8 @@ import (
 type Controller struct {
 	cfg *config.ControllerConfig
 	cc  *monitor.ControllerCheck
+
+	middlewares []gin.HandlerFunc
 }
 
 func NewController(cfg *config.ControllerConfig, cc *monitor.ControllerCheck) *Controller {
@@ -42,10 +44,13 @@ func NewController(cfg *config.ControllerConfig, cc *monitor.ControllerCheck) *C
 }
 
 func (c *Controller) RegisterTo(e *gin.Engine) {
-	e.GET("/v1/controllers/:lcuuid/", getController)
-	e.GET("/v1/controllers/", getControllers)
-	e.PATCH("/v1/controllers/:lcuuid/", updateController(c.cc, c.cfg))
-	e.DELETE("/v1/controllers/:lcuuid/", deleteController(c.cc, c.cfg))
+	adminRoutes := e.Group("/v1/controllers")
+	adminRoutes.Use(AdminPermissionVerificationMiddleware())
+
+	adminRoutes.GET("/:lcuuid/", getController)
+	adminRoutes.GET("/", getControllers)
+	adminRoutes.PATCH("/:lcuuid/", updateController(c.cc, c.cfg))
+	adminRoutes.DELETE("/:lcuuid/", deleteController(c.cc, c.cfg))
 }
 
 func getController(c *gin.Context) {
