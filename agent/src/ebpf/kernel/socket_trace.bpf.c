@@ -2007,8 +2007,10 @@ TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
 	struct socket_info_s *socket_info_ptr =
 		socket_info_map__lookup(&conn_key);
-	if (socket_info_ptr == NULL)
+	if (socket_info_ptr == NULL) {
+		socket_role_map__delete(&conn_key);
 		return 0;
+	}
 
 	__u64 sock_addr = (__u64) get_socket_from_fd(fd, offset);
 	if (sock_addr) {
