@@ -2003,23 +2003,23 @@ TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 
 	INFER_OFFSET_PHASE_2(fd);
 
+	__u64 id = bpf_get_current_pid_tgid();
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+		socket_info_map__lookup(&conn_key);
+	if (socket_info_ptr == NULL)
+		return 0;
+
 	__u64 sock_addr = (__u64) get_socket_from_fd(fd, offset);
 	if (sock_addr) {
-		__u64 id = bpf_get_current_pid_tgid();
-		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
-		struct socket_info_s *socket_info_ptr =
-		    socket_info_map__lookup(&conn_key);
-		if (socket_info_ptr != NULL) {
-			if (socket_info_ptr->uid) {
-				struct data_args_t read_args = {};
-				__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-				read_args.data_seq = socket_info_ptr->seq;
-				read_args.socket_id = socket_info_ptr->uid;
-				active_read_args_map__update(&id, &read_args);
-			}
-			delete_socket_info(conn_key, socket_info_ptr);
+		if (socket_info_ptr->uid) {
+			struct data_args_t read_args = {};
+			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+			read_args.data_seq = socket_info_ptr->seq;
+			read_args.socket_id = socket_info_ptr->uid;
+			active_read_args_map__update(&id, &read_args);
 		}
-
+		delete_socket_info(conn_key, socket_info_ptr);
 		socket_role_map__delete(&conn_key);
 	}
 
