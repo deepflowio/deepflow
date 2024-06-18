@@ -1989,6 +1989,48 @@ TP_SYSCALL_PROG(exit_readv) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
+static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
+					struct member_fields_offset *offset,
+				        struct syscall_comm_enter_ctx *ctx)
+{
+	__u32 k0 = 0;
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
+		return;
+	int data_max_sz = tracer_ctx->data_limit_max;
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		return;
+
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return;
+	}
+
+	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
+	v->socket_id = uid;
+	v->tgid = (__u32) (pid_tgid >> 32);
+	v->pid = (__u32) pid_tgid;
+	v->timestamp = bpf_ktime_get_ns();
+	v->source = DATA_SOURCE_CLOSE;
+	v->syscall_len = 0;
+	v->data_seq = seq;
+	v->msg_type = MSG_COMMON;
+	bpf_get_current_comm(v->comm, sizeof(v->comm));
+	struct tail_calls_context *context =
+	    (struct tail_calls_context *)v->data;
+	context->max_size_limit = data_max_sz;
+	context->vecs = false;
+	context->is_close = true;
+	context->dir = T_INGRESS;
+
+	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
+}
+
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
 TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	int fd = ctx->fd;
@@ -2012,72 +2054,12 @@ TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 		return 0;
 	}
 
-	__u64 sock_addr = (__u64) get_socket_from_fd(fd, offset);
-	if (sock_addr) {
-		if (socket_info_ptr->uid) {
-			struct data_args_t read_args = {};
-			__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-			read_args.data_seq = socket_info_ptr->seq;
-			read_args.socket_id = socket_info_ptr->uid;
-			active_read_args_map__update(&id, &read_args);
-		}
-		delete_socket_info(conn_key, socket_info_ptr);
-		socket_role_map__delete(&conn_key);
-	}
-
-	return 0;
-}
-
-// /sys/kernel/debug/tracing/events/syscalls/sys_exit_close/format
-TP_SYSCALL_PROG(exit_close) (struct syscall_comm_exit_ctx * ctx) {
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	struct data_args_t *read_args = active_read_args_map__lookup(&pid_tgid);
-	if (read_args == NULL)
-		return 0;
-
-	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
-	if (!offset)
-		goto exit;
-
-	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
-	if (tracer_ctx == NULL)
-		goto exit;
-	int data_max_sz = tracer_ctx->data_limit_max;
-	struct __socket_data_buffer *v_buff =
-	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (!v_buff)
-		goto exit;
-
-	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
-	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
-		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
-		goto exit;
-	}
-
-	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
-	v->socket_id = read_args->socket_id;
-	v->tgid = (__u32) (pid_tgid >> 32);
-	v->pid = (__u32) pid_tgid;
-	v->timestamp = bpf_ktime_get_ns();
-	v->source = DATA_SOURCE_CLOSE;
-	v->syscall_len = 0;
-	v->data_seq = read_args->data_seq;
-	v->msg_type = MSG_COMMON;
-	bpf_get_current_comm(v->comm, sizeof(v->comm));
-	struct tail_calls_context *context =
-	    (struct tail_calls_context *)v->data;
-	context->max_size_limit = data_max_sz;
-	context->vecs = false;
-	context->is_close = true;
-	context->dir = T_INGRESS;
-
-	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
-
-exit:
-	active_read_args_map__delete(&pid_tgid);
+	if (socket_info_ptr->uid)
+		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+	delete_socket_info(conn_key, socket_info_ptr);
+	socket_role_map__delete(&conn_key);
+	__push_close_event(id, socket_info_ptr->uid, socket_info_ptr->seq,
+			   offset, ctx);
 	return 0;
 }
 
