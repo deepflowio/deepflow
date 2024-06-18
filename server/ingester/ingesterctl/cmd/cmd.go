@@ -24,12 +24,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowio/deepflow/server/ingester/droplet/adapter"
-	"github.com/deepflowio/deepflow/server/ingester/droplet/labeler"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/profiler"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowio/deepflow/server/ingester/ingesterctl/rpc"
 	"github.com/deepflowio/deepflow/server/ingester/prometheus/decoder"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
@@ -92,9 +89,6 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		"2-meta-packet-block-to-labeler",
 		"3-meta-packet-block-to-pcap-app",
 	}))
-	dropletCmd.AddCommand(adapter.RegisterCommand(ingesterctl.INGESTERCTL_ADAPTER))
-	dropletCmd.AddCommand(labeler.RegisterCommand(ingesterctl.INGESTERCTL_LABELER))
-	dropletCmd.AddCommand(rpc.RegisterRpcCommand())
 
 	flowMetricsCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_FLOW_METRICS_QUEUE, []string{"1-recv-unmarshall"}))
 	flowMetricsCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_METRIC, debug.CmdHelper{"platformData [filter]", "show flow metrics platform data statistics"}, nil))
