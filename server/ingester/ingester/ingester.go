@@ -42,7 +42,6 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/ckissu"
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
-	dropletcfg "github.com/deepflowio/deepflow/server/ingester/droplet/config"
 	eventcfg "github.com/deepflowio/deepflow/server/ingester/event/config"
 	"github.com/deepflowio/deepflow/server/ingester/event/event"
 	exporterscfg "github.com/deepflowio/deepflow/server/ingester/exporters/config"
@@ -93,10 +92,6 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 	stats.SetMinInterval(time.Duration(cfg.StatsInterval) * time.Second)
 	stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD)
 	stats.SetDFRemote(net.JoinHostPort("127.0.0.1", strconv.Itoa(int(cfg.ListenPort))))
-
-	dropletConfig := dropletcfg.Load(cfg, configPath)
-	bytes, _ = yaml.Marshal(dropletConfig)
-	log.Infof("droplet config:\n%s", string(bytes))
 
 	receiver := receiver.NewReceiver(int(cfg.ListenPort), cfg.UDPReadBuffer, cfg.TCPReadBuffer, cfg.TCPReaderBuffer)
 

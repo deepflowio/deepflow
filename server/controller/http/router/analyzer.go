@@ -42,10 +42,13 @@ func NewAnalyzer(cfg *config.ControllerConfig, ac *monitor.AnalyzerCheck) *Analy
 }
 
 func (a *Analyzer) RegisterTo(e *gin.Engine) {
-	e.GET("/v1/analyzers/:lcuuid/", getAnalyzer)
-	e.GET("/v1/analyzers/", getAnalyzers)
-	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(a.ac, a.cfg))
-	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(a.ac, a.cfg))
+	adminRoutes := e.Group("/v1/analyzers")
+	adminRoutes.Use(AdminPermissionVerificationMiddleware())
+
+	adminRoutes.GET("/:lcuuid/", getAnalyzer)
+	adminRoutes.GET("/", getAnalyzers)
+	adminRoutes.PATCH("/:lcuuid/", updateAnalyzer(a.ac, a.cfg))
+	adminRoutes.DELETE("/:lcuuid/", deleteAnalyzer(a.ac, a.cfg))
 }
 
 func getAnalyzer(c *gin.Context) {
