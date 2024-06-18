@@ -68,7 +68,7 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 
 	prometheusLabelTable := decoder.NewPrometheusLabelTable(config.Base.ControllerIPs, int(config.Base.ControllerPort), config.LabelMsgMaxSize, config.LabelCacheExpiration)
 
-	prometheusLabelTable.RequestAllLabelIDs()
+	prometheusLabelTable.RequestAllLabelIDs(0)
 	currentColumnIndexMax := prometheusLabelTable.GetMaxAppLabelColumnIndex()
 	initAppLabelColumnCount := config.AppLabelColumnMinCount
 	if initAppLabelColumnCount < currentColumnIndexMax {
