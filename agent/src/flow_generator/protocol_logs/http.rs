@@ -86,8 +86,10 @@ pub enum Method {
     Options,
     Trace,
     Patch,
-    _Data,
-    _Header,
+    _RequestData,
+    _ResponseData,
+    _RequestHeader,
+    _ResponseHeader,
 }
 
 impl Method {
@@ -107,27 +109,47 @@ impl Method {
             Self::Options => "OPTIONS",
             Self::Trace => "TRACE",
             Self::Patch => "PATCH",
-            Self::_Data => "_DATA",
-            Self::_Header => "_HEADER",
+            Self::_RequestData => "_REQUEST_DATA",
+            Self::_ResponseData => "_RESPONSE_DATA",
+            Self::_RequestHeader => "_REQUEST_HEADER",
+            Self::_ResponseHeader => "_RESPONSE_HEADER",
         }
     }
 }
 
-impl From<u8> for Method {
-    fn from(value: u8) -> Self {
+impl Method {
+    fn from_frame_type(value: u8, direction: PacketDirection) -> Self {
         match value {
-            HTTPV2_FRAME_DATA_TYPE => Method::_Data,
-            HTTPV2_FRAME_HEADERS_TYPE => Method::_Header,
+            HTTPV2_FRAME_DATA_TYPE if direction == PacketDirection::ClientToServer => {
+                Method::_RequestData
+            }
+            HTTPV2_FRAME_DATA_TYPE if direction == PacketDirection::ServerToClient => {
+                Method::_ResponseData
+            }
+            HTTPV2_FRAME_HEADERS_TYPE if direction == PacketDirection::ClientToServer => {
+                Method::_RequestHeader
+            }
+            HTTPV2_FRAME_HEADERS_TYPE if direction == PacketDirection::ServerToClient => {
+                Method::_ResponseHeader
+            }
             _ => Self::None,
         }
     }
-}
 
-impl From<EbpfType> for Method {
-    fn from(value: EbpfType) -> Self {
+    fn from_ebpf_type(value: EbpfType, direction: PacketDirection) -> Self {
         match value {
-            EbpfType::GoHttp2Uprobe => Self::_Header,
-            EbpfType::GoHttp2UprobeData => Self::_Data,
+            EbpfType::GoHttp2UprobeData if direction == PacketDirection::ClientToServer => {
+                Method::_RequestData
+            }
+            EbpfType::GoHttp2UprobeData if direction == PacketDirection::ServerToClient => {
+                Method::_ResponseData
+            }
+            EbpfType::GoHttp2Uprobe if direction == PacketDirection::ClientToServer => {
+                Method::_RequestHeader
+            }
+            EbpfType::GoHttp2Uprobe if direction == PacketDirection::ServerToClient => {
+                Method::_ResponseHeader
+            }
             _ => Self::None,
         }
     }
@@ -171,7 +193,7 @@ pub struct HttpInfo {
     //
     // tcp_seq_offset is 8
     #[serde(skip)]
-    headers_offset: u32,
+    headers_offset: Option<u32>,
     // 流是否结束，用于 http2 ebpf uprobe 处理.
     // 由于ebpf有可能响应会比请求先到，所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
     #[serde(skip)]
@@ -351,7 +373,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
     }
 
     fn tcp_seq_offset(&self) -> u32 {
-        self.headers_offset
+        self.headers_offset.unwrap_or_default()
     }
 
     fn get_request_domain(&self) -> String {
@@ -448,8 +470,10 @@ impl HttpInfo {
         self.proto == L7Protocol::Grpc
     }
     // grpc path: /packageName.Servicename/rcpMethodName
-    // return packetName, ServiceName
-    fn grpc_package_service_name(&self) -> Option<(String, String)> {
+    // return packageName.Servicename
+    // grpc path: /StreamingService/ClientStreamRPC
+    // return StreamingService
+    fn grpc_package_service_name(&self) -> Option<String> {
         if !self.is_grpc() || self.path.len() < 6 {
             return None;
         }
@@ -459,15 +483,10 @@ impl HttpInfo {
             return None;
         }
         let (start, end) = (idx[0].0, idx[1].0);
-        if let Some((p, _)) = self.path.match_indices(".").next() {
-            if p > start && p < end {
-                return Some((
-                    String::from(&self.path[start + 1..p]),
-                    String::from(&self.path[p + 1..end]),
-                ));
-            }
+        if start + 1 == end {
+            return None;
         }
-        None
+        return Some(self.path[start + 1..end].to_string());
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -676,12 +695,7 @@ impl L7ProtocolParserInterface for HttpLog {
         if param.ebpf_type != EbpfType::GoHttp2Uprobe {
             self.wasm_hook(param, payload, &mut info);
         }
-        info.service_name = if let Some((package, service)) = info.grpc_package_service_name() {
-            let svc_name = format!("{}.{}", package, service);
-            Some(svc_name)
-        } else {
-            None
-        };
+        info.service_name = info.grpc_package_service_name();
         if !config.http_endpoint_disabled && info.path.len() > 0 {
             // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
             let path = match info.endpoint.as_ref() {
@@ -731,6 +745,12 @@ impl L7ProtocolParserInterface for HttpLog {
 
                         if info.is_req_end || info.is_resp_end {
                             self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
+                        }
+
+                        if let Some(code) = info.grpc_status_code {
+                            self.set_grpc_status(code, &mut info);
+                        } else {
+                            self.set_status(info.status_code, &mut info);
                         }
                     }
                     _ => {
@@ -925,7 +945,7 @@ impl HttpLog {
             None
         };
         if self.proto == L7Protocol::Grpc {
-            info.method = Method::from(param.ebpf_type);
+            info.method = Method::from_ebpf_type(param.ebpf_type, param.direction);
         }
         return Self::modify_http2_and_grpc(direction, content_length, stream_id, info);
     }
@@ -1048,27 +1068,22 @@ impl HttpLog {
 
         match info.proto {
             L7Protocol::Grpc => match (direction, info.method) {
-                (PacketDirection::ClientToServer, Method::_Data) => {
+                (PacketDirection::ClientToServer, Method::_RequestData) => {
                     info.msg_type = LogMessageType::Session;
                     if content_length.is_some() {
                         info.req_content_length = content_length;
                     }
                 }
-                (PacketDirection::ServerToClient, Method::_Header)
-                    if info.grpc_status_code.is_none() && info.status_code == HTTP_STATUS_OK =>
-                {
+                (PacketDirection::ServerToClient, Method::_ResponseData) => {
                     info.msg_type = LogMessageType::Session;
                     if content_length.is_some() {
                         info.resp_content_length = content_length;
                     }
                 }
-                (PacketDirection::ServerToClient, Method::_Data) => {
-                    info.msg_type = LogMessageType::Session;
-                    if content_length.is_some() {
-                        info.resp_content_length = content_length;
+                (PacketDirection::ServerToClient, Method::_ResponseHeader) => {
+                    if info.grpc_status_code.is_none() && info.status_code != 0 {
+                        info.msg_type = LogMessageType::Session;
                     }
-                }
-                (PacketDirection::ServerToClient, _) => {
                     if content_length.is_some() {
                         info.resp_content_length = content_length;
                     }
@@ -1076,6 +1091,11 @@ impl HttpLog {
                 (PacketDirection::ClientToServer, _) => {
                     if content_length.is_some() {
                         info.req_content_length = content_length;
+                    }
+                }
+                (PacketDirection::ServerToClient, _) => {
+                    if content_length.is_some() {
+                        info.resp_content_length = content_length;
                     }
                 }
             },
@@ -1191,10 +1211,11 @@ impl HttpLog {
                 header_frame_parsed = true;
 
                 if self.proto == L7Protocol::Grpc {
-                    info.method = Method::from(httpv2_header.frame_type);
+                    info.method =
+                        Method::from_frame_type(httpv2_header.frame_type, param.direction);
                 }
-                if !param.is_from_ebpf() {
-                    info.headers_offset = headers_offset as u32;
+                if !param.is_from_ebpf() && info.headers_offset.is_none() {
+                    info.headers_offset = Some(headers_offset as u32);
                 }
                 if content_length.is_some() {
                     is_httpv2 = true;
@@ -1226,7 +1247,8 @@ impl HttpLog {
 
                 is_httpv2 = true;
                 if info.method.is_none() {
-                    info.method = Method::from(httpv2_header.frame_type);
+                    info.method =
+                        Method::from_frame_type(httpv2_header.frame_type, param.direction);
                 }
 
                 if httpv2_header.is_stream_end() {
@@ -1258,6 +1280,9 @@ impl HttpLog {
         }
 
         if is_httpv2 {
+            if info.msg_type == LogMessageType::Other {
+                info.msg_type = LogMessageType::from(direction);
+            }
             return Self::modify_http2_and_grpc(
                 direction,
                 content_length,
@@ -1265,6 +1290,7 @@ impl HttpLog {
                 info,
             );
         }
+
         Err(Error::HttpHeaderParseFailed)
     }
 
@@ -1787,6 +1813,8 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
+            ("grpc-service-name.pcap", "grpc-service-name.result"),
+            ("grpc-unknown.pcap", "grpc-unknown.result"),
             ("grpc-server-stream.pcap", "grpc-server-stream.result"),
             ("httpv1.pcap", "httpv1.result"),
             ("sw8.pcap", "sw8.result"),
