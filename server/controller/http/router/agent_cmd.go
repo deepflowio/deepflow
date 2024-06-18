@@ -49,8 +49,11 @@ func NewAgentCMD() *AgentCMD {
 }
 
 func (c *AgentCMD) RegisterTo(e *gin.Engine) {
-	e.GET("/v1/agent/:id/cmd", forwardToServerConnectedByAgent(), getCMDAndNamespaceHandler)
-	e.POST("/v1/agent/:id/cmd/run", forwardToServerConnectedByAgent(), cmdRunHandler)
+	agentRoutes := e.Group("/v1/agent/:id")
+	agentRoutes.Use(AdminPermissionVerificationMiddleware())
+
+	agentRoutes.GET("/cmd", forwardToServerConnectedByAgent(), getCMDAndNamespaceHandler)
+	agentRoutes.POST("/cmd/run", forwardToServerConnectedByAgent(), cmdRunHandler)
 }
 
 func forwardToServerConnectedByAgent() gin.HandlerFunc {
