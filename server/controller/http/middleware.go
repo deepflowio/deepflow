@@ -27,7 +27,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func HandleOrgIDMiddleware() gin.HandlerFunc {
+func HandleORGIDMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		orgID := mcommon.DEFAULT_ORG_ID
 		orgIDString := ctx.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
