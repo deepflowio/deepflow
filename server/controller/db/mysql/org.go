@@ -81,9 +81,14 @@ func CheckORGNumberAndLog() ([]int, error) {
 //
 // Parameters:
 // - data: A slice of data items of any type T to be synchronized. The type T must have an "ID" field tagged as the primary key.
-func SyncDefaultOrgData[T any](data []T) error {
+func SyncDefaultOrgData[T any](data []T, excludeFields []string) error {
 	if len(data) == 0 {
 		return nil
+	}
+
+	excludeFieldsMap := make(map[string]bool)
+	for _, field := range excludeFields {
+		excludeFieldsMap[field] = true
 	}
 
 	// get fields to update
@@ -94,7 +99,7 @@ func SyncDefaultOrgData[T any](data []T) error {
 		dbTag := field.Tag.Get("gorm")
 		if dbTag != "" {
 			columnName := GetColumnNameFromTag(dbTag)
-			if columnName != "" {
+			if columnName != "" && !excludeFieldsMap[columnName] {
 				fields = append(fields, columnName)
 			}
 		}

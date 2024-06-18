@@ -414,12 +414,14 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 	log.Info("az connection check end")
 }
 
+var SyncAnalyzerExcludeField = []string{"nat_ip", "agg", "state"}
+
 func (c *AnalyzerCheck) SyncDefaultOrgData() {
 	var analyzers []mysql.Analyzer
 	if err := mysql.DefaultDB.Find(&analyzers).Error; err != nil {
 		log.Error(err)
 	}
-	if err := mysql.SyncDefaultOrgData(analyzers); err != nil {
+	if err := mysql.SyncDefaultOrgData(analyzers, SyncAnalyzerExcludeField); err != nil {
 		log.Error(err)
 	}
 }
