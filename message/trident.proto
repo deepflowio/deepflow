@@ -987,16 +987,24 @@ message TargetResponse {
     optional uint32 org_id = 11;
 }
 
-// when the request content is empty, it means requesting all metric label and target information
 message PrometheusLabelRequest {
     repeated MetricLabelRequest request_labels = 1;
     repeated TargetRequest request_targets = 2;
+    // When the request content is empty except version, it means requesting all metric label and target information.
+
+    // the verson is used to identify whether the total data has changed due to expiration.
+    // if the version of the Controller is inconsistent with the requested version by Ingester, the Controller need to send the full amount of data.
+    // if they are consistent, there is no need to send the data.
+    optional uint32 version = 3;
 }
 
 message PrometheusLabelResponse {
     repeated MetricLabelResponse response_label_ids = 1;
     repeated TargetResponse response_target_ids = 2;
-    repeated OrgLabelResponse org_response_labels = 3;  // when requesting all, you need to carry the label value list
+
+    // when requesting all, the Controller need to carry the label value list and the version
+    repeated OrgLabelResponse org_response_labels = 3;
+    optional uint32 version = 4;
 }
 
 message OrgLabelResponse {
