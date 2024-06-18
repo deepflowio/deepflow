@@ -336,6 +336,9 @@ func (p *AZInfo) rebalanceAnalyzer(db *mysql.DB, ifCheckout bool) (map[int]*Chan
 
 		// beforeWeight counts the actual allocated vtap weight before balancing
 		beforeWeight, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(p.vTapIDToTraffic[vtap.ID])/float64(beforeTraffic)), 64)
+		if beforeTraffic == 0 {
+			beforeWeight = 0
+		}
 		for _, detail := range azVTapRebalanceResult.Details {
 			if detail.IP != vtap.AnalyzerIP {
 				continue
