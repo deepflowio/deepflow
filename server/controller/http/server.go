@@ -59,7 +59,7 @@ func NewServer(logFile string, cfg *config.ControllerConfig) *Server {
 	g.Use(gin.Recovery())
 	g.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	// set custom middleware
-	g.Use(HandleOrgIDMiddleware())
+	g.Use(HandleORGIDMiddleware())
 	s.engine = g
 	return s
 }
