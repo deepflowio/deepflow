@@ -180,10 +180,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	// 周期性触发用于缓存的数据的超时检查
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
 
-	// clear trace connection
+	// clear trace connection & fetch close info
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
-	// fetch close info
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_close");
 
 	// Used for process offsets management
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
