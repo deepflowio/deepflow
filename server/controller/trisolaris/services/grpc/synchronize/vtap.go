@@ -316,16 +316,13 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	ctrlMac := in.GetCtrlMac()
 	teamIDStr := in.GetTeamId()
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
+	if rOrgID := int(in.GetOrgId()); rOrgID != 0 && len(teamIDStr) == 0 {
+		orgID = rOrgID
+	}
 	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gVTapInfo == nil {
-		if rOrgID := int(in.GetOrgId()); rOrgID != 0 {
-			orgID = rOrgID
-			gVTapInfo = trisolaris.GetORGVTapInfo(rOrgID)
-		}
-		if gVTapInfo == nil {
-			log.Errorf("ORGID-%d: ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) not found vtapInfo", orgID, ctrlIP, ctrlMac, teamIDStr, teamIDInt)
-			return e.GetFailedResponse(in, gVTapInfo), nil
-		}
+		log.Errorf("ORGID-%d: ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) not found vtapInfo", orgID, ctrlIP, ctrlMac, teamIDStr, teamIDInt)
+		return e.GetFailedResponse(in, gVTapInfo), nil
 	}
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	vtapCache, err := e.getVTapCache(in, orgID)
