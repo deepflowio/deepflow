@@ -419,12 +419,14 @@ func (c *ControllerCheck) cleanExceptionControllerData(orgDB *mysql.DB, controll
 	}
 }
 
+var SyncControllerExcludeField = []string{"nat_ip", "state"}
+
 func (c *ControllerCheck) SyncDefaultOrgData() {
 	var controllers []mysql.Controller
 	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Error(err)
 	}
-	if err := mysql.SyncDefaultOrgData(controllers); err != nil {
+	if err := mysql.SyncDefaultOrgData(controllers, SyncControllerExcludeField); err != nil {
 		log.Error(err)
 	}
 }
