@@ -142,7 +142,7 @@ func listSubDomain(cmd *cobra.Command, args []string, output string) error {
 	if domain != "" {
 		filter["domain"] = domain
 	}
-	response, err := common.GetByFilter(url, nil, filter, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.GetByFilter(url, nil, filter, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func createSubDomain(cmd *cobra.Command, fileName string) error {
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/", server.IP, server.Port)
-	_, err = common.CURLPerform("POST", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	_, err = common.CURLPerform("POST", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return err
 	}
@@ -228,7 +228,7 @@ func updateSubDomain(cmd *cobra.Command, args []string, fileName string) error {
 	}
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/%s/", server.IP, server.Port, lcuuid)
-	_, err = common.CURLPerform("PATCH", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	_, err = common.CURLPerform("PATCH", url, body, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func deleteSubDomain(cmd *cobra.Command, args []string) error {
 	}
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/%s/", server.IP, server.Port, lcuuid)
-	_, err = common.CURLPerform("DELETE", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	_, err = common.CURLPerform("DELETE", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return err
 	}
@@ -284,7 +284,7 @@ func getLcuuidByDomainName(cmd *cobra.Command, domainName string,
 	body map[string]interface{}) (string, error) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/domains", server.IP, server.Port)
-	response, err := common.GetByFilter(url, body, common.Filter{"name": domainName}, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.GetByFilter(url, body, common.Filter{"name": domainName}, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return "", err
 	}
@@ -306,7 +306,7 @@ func getLcuuidByDomainName(cmd *cobra.Command, domainName string,
 func getLcuuidByClusterID(cmd *cobra.Command, clusterID string) (string, error) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains", server.IP, server.Port)
-	response, err := common.GetByFilter(url, nil, common.Filter{"cluster_id": clusterID}, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.GetByFilter(url, nil, common.Filter{"cluster_id": clusterID}, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return "", err
 	}
