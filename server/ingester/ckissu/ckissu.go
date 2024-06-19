@@ -1270,6 +1270,15 @@ func (i *Issu) Start() error {
 		return fmt.Errorf("connections is nil")
 	}
 
+	// update versionMaps
+	for idx, connect := range i.Connections {
+		m, err := i.getAllTableVersions(connect)
+		if err != nil {
+			return err
+		}
+		i.VersionMaps[idx] = m
+	}
+
 	errCount := 0
 	for index, connect := range i.Connections {
 		orgIDPrefixs, err := i.getOrgIDPrefixs(connect)
