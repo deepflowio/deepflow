@@ -61,6 +61,8 @@ const (
 	DOMAIN_TYPE_ESHORE            DomainType = 26 // eshore
 	DOMAIN_TYPE_CLOUD_TOWER       DomainType = 27 // cloudtower
 	DOMAIN_TYPE_NFVO              DomainType = 28 // nfvo
+	DOMAIN_TYPE_SUGON             DomainType = 29 // sugon
+	DOMAIN_TYPE_VOLCENGINE        DomainType = 30 // volcengine
 )
 
 var DomainTypes []DomainType = []DomainType{
@@ -85,6 +87,8 @@ var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_ESHORE,
 	DOMAIN_TYPE_CLOUD_TOWER,
 	DOMAIN_TYPE_NFVO,
+	DOMAIN_TYPE_SUGON,
+	DOMAIN_TYPE_VOLCENGINE,
 }
 
 func GetDomainTypeByName(domainTypeName string) DomainType {
