@@ -196,10 +196,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	// process exit
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
-	// clear trace connection
+	// clear trace connection & fetch close info
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
-	// fetch close info
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_close");
 
 	tps->tps_nr = index;
 
