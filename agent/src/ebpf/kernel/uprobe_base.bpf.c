@@ -637,14 +637,14 @@ TP_SCHED_PROG(process_exit) (struct sched_comm_exit_ctx *ctx)
 	return 0;
 }
 
-static inline int kernel_clone_exit(long ret, void *ctx)
+static inline int kernel_clone_exit(bool is_kprobe, bool maybe_thread,
+				    long ret, void *ctx)
 {
-	__u64 id = bpf_get_current_pid_tgid();
-
-	// error or parent process
-	if (ret != 0)
+	// For tracepoint: error or parent process
+	if (ret != 0 && !is_kprobe)
 		return 0;
 
+	__u64 id = bpf_get_current_pid_tgid();
 	int pid = (int)id;
 	int tgid = (int)(id >> 32);
 	// filter threads
@@ -657,7 +657,17 @@ static inline int kernel_clone_exit(long ret, void *ctx)
 
 	struct process_event_t data;
 	data.meta.event_type = EVENT_TYPE_PROC_EXEC;
-	data.pid = pid;
+	/*
+	 * For kprobe type, it was found that the return value is never 0, which
+	 * indicates that the current process is the parent process rather than
+	 * the child process. In this case, we take the return value (since the
+	 * return value is the child process ID).
+	 */
+	if (ret > 0)
+		data.pid = ret;
+	else
+		data.pid = pid;
+	data.maybe_thread = maybe_thread;
 	bpf_get_current_comm(data.name, sizeof(data.name));
 	bpf_perf_event_output(ctx, &NAME(socket_data),
 			      BPF_F_CURRENT_CPU, &data, sizeof(data));
@@ -672,21 +682,21 @@ static inline int kernel_clone_exit(long ret, void *ctx)
  * kretprobe as a substitute for tracepoint type.
  */
 KRETPROG(sys_fork) (struct pt_regs* ctx) {
-	return kernel_clone_exit((long)PT_REGS_RC(ctx), ctx);
+	return kernel_clone_exit(true, false, (long)PT_REGS_RC(ctx), ctx);
 }
 
 KRETPROG(sys_clone) (struct pt_regs* ctx) {
-	return kernel_clone_exit((long)PT_REGS_RC(ctx), ctx);
+	return kernel_clone_exit(true, true, (long)PT_REGS_RC(ctx), ctx);
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_fork/format
 TP_SYSCALL_PROG(exit_fork) (struct syscall_comm_exit_ctx * ctx) {
-	return kernel_clone_exit((long)ctx->ret, ctx);
+	return kernel_clone_exit(false, false, (long)ctx->ret, ctx);
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_clone/format
 TP_SYSCALL_PROG(exit_clone) (struct syscall_comm_exit_ctx * ctx) {
-	return kernel_clone_exit((long)ctx->ret, ctx);
+	return kernel_clone_exit(false, false, (long)ctx->ret, ctx);
 }
 
 // /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
@@ -704,6 +714,7 @@ TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
 	if (pid == tid) {
 		data.meta.event_type = EVENT_TYPE_PROC_EXEC;
 		data.pid = pid;
+		data.maybe_thread = false;
 		bpf_get_current_comm(data.name, sizeof(data.name));
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, &data, sizeof(data));
