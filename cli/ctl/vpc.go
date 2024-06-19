@@ -79,7 +79,7 @@ func listVPC(cmd *cobra.Command, args []string, output string) error {
 		url += fmt.Sprintf("?name=%s", name)
 	}
 
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		return err
 	}
