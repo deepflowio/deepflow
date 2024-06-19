@@ -33,11 +33,11 @@ type ProfileTracing struct {
 }
 
 type ProfileTreeNode struct {
-	ProfileLocationStr string `json:"profile_location_str"`
-	NodeID             string `json:"node_id"`
-	ParentNodeID       string `json:"parent_node_id"`
-	SelfValue          int    `json:"self_value"`
-	TotalValue         int    `json:"total_value"`
+	LocationID   int `json:"_location_id"`
+	NodeID       int `json:"node_id"`
+	ParentNodeID int `json:"parent_node_id"`
+	SelfValue    int `json:"self_value"`
+	TotalValue   int `json:"total_value"`
 }
 
 type Debug struct {
@@ -52,4 +52,15 @@ type Debug struct {
 type ProfileDebug struct {
 	QuerierDebug []Debug `json:"querier_debug"`
 	FormatTime   string  `json:"format_time"`
+}
+
+type ProfileTree struct {
+	Functions      []string `json:"functions"`
+	FunctionValues Value    `json:"function_values"`
+	NodeValues     Value    `json:"node_values"`
+}
+
+type Value struct {
+	Columns []string `json:"columns"`
+	Values  [][]int  `json:"values"`
 }
