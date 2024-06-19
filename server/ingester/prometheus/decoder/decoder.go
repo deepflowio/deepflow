@@ -467,7 +467,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 	if platformDataVersion != b.platformDataVersion[m.OrgId] {
 		if b.platformDataVersion[m.OrgId] != 0 {
 			log.Infof("platform data version in prometheus-decoder changed from %d to %d",
-				b.platformDataVersion, platformDataVersion)
+				b.platformDataVersion[m.OrgId], platformDataVersion)
 		}
 		b.platformDataVersion[m.OrgId] = platformDataVersion
 		b.podNameIDToUniversalTag[m.OrgId] = make(map[uint32]flow_metrics.UniversalTag)
