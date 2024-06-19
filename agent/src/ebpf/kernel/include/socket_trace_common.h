@@ -262,7 +262,8 @@ struct event_meta {
 // Process execution or exit event data 
 struct process_event_t {
 	struct event_meta meta;
-	__u32 pid; // process ID
+	__u32 pid: 31; // process ID
+	__u32 maybe_thread: 1;
 	__u8 name[TASK_COMM_LEN]; // process name
 };
 
