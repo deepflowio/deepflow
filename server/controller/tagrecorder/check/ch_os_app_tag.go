@@ -49,7 +49,7 @@ func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) 
 	for _, process := range processes {
 		splitTags := strings.Split(process.OSAPPTags, ", ")
 		for _, singleTag := range splitTags {
-			splitSingleTag := strings.Split(singleTag, ":")
+			splitSingleTag := strings.SplitN(singleTag, ":", 2)
 			if len(splitSingleTag) == 2 {
 				key := OSAPPTagKey{
 					PID: process.ID,

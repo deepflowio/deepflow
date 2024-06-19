@@ -50,7 +50,7 @@ func (k *ChPodServiceK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysq
 	for _, podService := range podServices {
 		annotations := strings.Split(podService.Annotation, ", ")
 		for _, singleAnnotation := range annotations {
-			annotationInfo := strings.Split(singleAnnotation, ":")
+			annotationInfo := strings.SplitN(singleAnnotation, ":", 2)
 			if len(annotationInfo) == 2 {
 				key := K8sAnnotationKey{
 					ID:  podService.ID,
