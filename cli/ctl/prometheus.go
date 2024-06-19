@@ -115,7 +115,7 @@ func prometheusCache(cmd *cobra.Command, t string) error {
 func prometheusClear(cmd *cobra.Command, expiredAt string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/prometheus-cleaner-tasks/", server.IP, server.Port)
-	resp, err := common.CURLPerform(http.MethodPost, url, map[string]interface{}{"EXPIRED_AT": expiredAt}, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	resp, err := common.CURLPerform(http.MethodPost, url, map[string]interface{}{"EXPIRED_AT": expiredAt}, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
