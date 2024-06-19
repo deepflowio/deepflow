@@ -89,6 +89,12 @@
 #define DEBUG_BUFF_SIZE 4096
 typedef void (*debug_callback_t)(char *data, int len);
 
+enum perf_event_state {
+	PERF_EV_INIT,
+	PERF_EV_ATTACH,
+	PERF_EV_DETACH
+};
+
 enum tracer_hook_type {
 	HOOK_ATTACH,
 	HOOK_DETACH
@@ -357,6 +363,8 @@ struct bpf_tracer {
 	 * operation will not be executed.
 	 */
 	bool enable_sample;
+	// perf event state
+	enum perf_event_state ev_state;
 
 	/*
 	 * Data distribution processing worker, queues

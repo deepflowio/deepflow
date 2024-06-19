@@ -95,11 +95,12 @@ type TagDescription struct {
 	RelatedTag            string
 	Deprecated            bool
 	NotSupportedOperators []string
+	Table                 string
 }
 
 func NewTagDescription(
 	name, clientName, serverName, displayName, tagType, enumFile, category string,
-	permissions []bool, description, relatedTag string, deprecated bool, notSupportedOperators []string,
+	permissions []bool, description, relatedTag string, deprecated bool, notSupportedOperators []string, table string,
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
@@ -119,6 +120,7 @@ func NewTagDescription(
 		RelatedTag:            relatedTag,
 		Deprecated:            deprecated,
 		NotSupportedOperators: notSupportedOperators,
+		Table:                 table,
 	}
 }
 
@@ -166,6 +168,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 9 - RelatedTag
 				// 10 - Deprecated
 				// 11 - NotSupportedOperators
+				// 12 - Table
 
 				permissions, err := ckcommon.ParsePermission(tag[6])
 				if err != nil {
@@ -203,7 +206,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				des := tagLanguage[2].(string)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
-					tag[3].(string), enumFile, tag[5].(string), permissions, des, "", deprecated, notSupportedOperators,
+					tag[3].(string), enumFile, tag[5].(string), permissions, des, "", deprecated, notSupportedOperators, table,
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)
@@ -614,7 +617,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	response = &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators",
+			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
 		},
 		Values: []interface{}{},
 	}
@@ -628,7 +631,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 			response.Values,
 			[]interface{}{
 				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
-				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag, tag.Deprecated, tag.NotSupportedOperators,
+				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag, tag.Deprecated, tag.NotSupportedOperators, "",
 			},
 		)
 	}
@@ -657,12 +660,12 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		}
 	}
@@ -683,12 +686,12 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				annotationKey, annotationKey, annotationKey, annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				annotationKey, annotationKey + "_0", annotationKey + "_1", annotationKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		}
 	}
@@ -705,12 +708,12 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				envKey, envKey, envKey, envKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				envKey, envKey + "_0", envKey + "_1", envKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		}
 	}
@@ -727,12 +730,12 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, chostCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				chostCloudTagKey, chostCloudTagKey + "_0", chostCloudTagKey + "_1", chostCloudTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		}
 	}
@@ -749,12 +752,12 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		if db == "ext_metrics" || db == "event" || db == ckcommon.DB_NAME_PROMETHEUS || db == ckcommon.DB_NAME_APPLICATION_LOG || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response.Values = append(response.Values, []interface{}{
 				osAPPTagKey, osAPPTagKey, osAPPTagKey, osAPPTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 			response.Values = append(response.Values, []interface{}{
 				osAPPTagKey, osAPPTagKey + "_0", osAPPTagKey + "_1", osAPPTagKey, "map_item",
-				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{},
+				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", false, []string{}, "",
 			})
 		}
 
@@ -771,12 +774,12 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 			if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{},
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
 				})
 			} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{},
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
 				})
 			}
 		}
@@ -794,15 +797,38 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		DB:       "flow_tag",
 		Context:  ctx,
 	}
+	rawSql = strings.ReplaceAll(rawSql, " where ", " WHERE ")
+	rawSql = strings.ReplaceAll(rawSql, " limit ", " LIMIT ")
+	limit := "10000"
 	var whereSql string
 	if strings.Contains(rawSql, "WHERE") {
 		whereSql = strings.Split(rawSql, "WHERE")[1]
 	}
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
+		if strings.Contains(whereSql, " LIMIT ") {
+			limit = strings.Split(whereSql, " LIMIT ")[1]
+			whereSql = strings.Split(whereSql, " LIMIT ")[0]
+
+		}
+	} else {
+		if strings.Contains(rawSql, " LIMIT ") {
+			limit = strings.Split(rawSql, " LIMIT ")[1]
+		}
+	}
 	externalSql := ""
 	if whereSql != "" {
-		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name ORDER BY tag_name ASC", db, table, whereSql)
+		if table == "" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, whereSql, limit)
+		} else {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
+		}
 	} else {
-		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
+		if table == "" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, limit)
+		} else {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
+		}
 	}
 	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
@@ -810,27 +836,59 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
+		tableName := _tagName.([]interface{})[1]
 		if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
-				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, []string{},
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, []string{}, tableName,
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
-				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, []string{},
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, []string{}, tableName,
 			})
 		}
 	}
 	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
 		response.Values = append(response.Values, []interface{}{
 			"tag", "tag", "tag", "tag", "map",
-			"Native Tag", []string{}, []bool{true, true, true}, "tag", "", false, []string{},
+			"Native Tag", []string{}, []bool{true, true, true}, "tag", "", false, []string{}, "",
 		})
 	}
 	return response, nil
+}
+
+func GetTagValuesDescriptions(db, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (sqlList []string, err error) {
+	var whereSql string
+	var sql string
+	limit := "10000"
+	rawSql = strings.ReplaceAll(rawSql, " where ", " WHERE ")
+	rawSql = strings.ReplaceAll(rawSql, " limit ", " LIMIT ")
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
+		if strings.Contains(whereSql, " LIMIT ") {
+			limit = strings.Split(whereSql, " LIMIT ")[1]
+			whereSql = strings.Split(whereSql, " LIMIT ")[0]
+
+		}
+	} else {
+		if strings.Contains(rawSql, " LIMIT ") {
+			limit = strings.Split(rawSql, " LIMIT ")[1]
+		}
+	}
+	switch db {
+	case "prometheus":
+		if whereSql != "" {
+			sql = fmt.Sprintf("SELECT field_name AS label_name, field_value AS label_value FROM prometheus_custom_field_value WHERE %s GROUP BY label_name, label_value ORDER BY label_name ASC LIMIT %s", whereSql, limit)
+		} else {
+			sql = fmt.Sprintf("SELECT field_name AS label_name, field_value AS label_value FROM prometheus_custom_field_value GROUP BY label_name, label_value ORDER BY label_name ASC LIMIT %s", limit)
+		}
+		sqlList = append(sqlList, sql)
+		return sqlList, nil
+	}
+	return sqlList, nil
 }
 
 func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {

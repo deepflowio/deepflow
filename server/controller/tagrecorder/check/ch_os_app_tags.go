@@ -51,7 +51,7 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 		osAppTagsMap := map[string]string{}
 		splitOsAppTags := strings.Split(process.OSAPPTags, ", ")
 		for _, singleOsAppTag := range splitOsAppTags {
-			splitSingleTag := strings.Split(singleOsAppTag, ":")
+			splitSingleTag := strings.SplitN(singleOsAppTag, ":", 2)
 			if len(splitSingleTag) == 2 {
 				osAppTagsMap[strings.Trim(splitSingleTag[0], " ")] = strings.Trim(splitSingleTag[1], " ")
 			}

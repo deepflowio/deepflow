@@ -61,7 +61,7 @@ var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 // show metrics on db
 // show tables
 // show databases
-var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags(?: from ([^\\s]+))?(?: where .+)?|metrics(?: from ([^\\s]+))?(?: where .+)?|metrics functions(?: from ([^\\s]+))?(?: where .+)?|language|metrics on db|tables|databases)$")
+var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags(?: from ([^\\s]+))?(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?|metrics(?: from ([^\\s]+))?(?: where .+)?|metrics functions(?: from ([^\\s]+))?(?: where .+)?|language|tag-values(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?|metrics on db|tables|databases)$")
 
 type TargetLabelFilter struct {
 	OriginFilter string
@@ -379,6 +379,9 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context), []string{}, true, nil
 	case "databases":
 		return GetDatabases(), []string{}, true, nil
+	case "tag-values":
+		sqlList, err := tagdescription.GetTagValuesDescriptions(e.DB, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
+		return nil, sqlList, true, err
 	}
 	return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 }
