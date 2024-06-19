@@ -747,10 +747,12 @@ impl L7ProtocolParserInterface for HttpLog {
                             self.perf_stats.as_mut().map(|p| p.update_rrt(info.rrt));
                         }
 
-                        if let Some(code) = info.grpc_status_code {
-                            self.set_grpc_status(code, &mut info);
-                        } else {
-                            self.set_status(info.status_code, &mut info);
+                        if param.direction == PacketDirection::ServerToClient {
+                            if let Some(code) = info.grpc_status_code {
+                                self.set_grpc_status(code, &mut info);
+                            } else {
+                                self.set_status(info.status_code, &mut info);
+                            }
                         }
                     }
                     _ => {
@@ -760,6 +762,12 @@ impl L7ProtocolParserInterface for HttpLog {
                             }
                             PacketDirection::ServerToClient => {
                                 self.perf_stats.as_mut().map(|p| p.inc_resp());
+
+                                if let Some(code) = info.grpc_status_code {
+                                    self.set_grpc_status(code, &mut info);
+                                } else {
+                                    self.set_status(info.status_code, &mut info);
+                                }
                             }
                         }
                         if info.msg_type != LogMessageType::Session {
