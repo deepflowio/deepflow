@@ -164,6 +164,9 @@ func CURLResponseRawJson(method string, url string, opts ...HTTPOption) (*simple
 	if err != nil {
 		return errResponse, err
 	}
+	if cfg.ORGID != 0 {
+		req.Header.Set(ctrlcommon.HEADER_KEY_X_ORG_ID, strconv.Itoa(cfg.ORGID))
+	}
 	req.Header.Set("Accept", "application/json, text/plain")
 	req.Header.Set("X-User-Id", "1")
 	req.Header.Set("X-User-Type", "1")

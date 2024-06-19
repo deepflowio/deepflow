@@ -153,12 +153,12 @@ func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (genesis.TridentSta
 	return genesis.Synchronizer.GetAgentStats(orgID, vtapID)
 }
 
-func GetGenesisAgentStorage(vtapIDString string) (model.GenesisStorage, error) {
+func GetGenesisAgentStorage(vtapIDString string, orgDB *mysql.DB) (model.GenesisStorage, error) {
 	var gStorage model.GenesisStorage
 	vtapID, err := strconv.Atoi(vtapIDString)
 	if err != nil {
 		return gStorage, errors.New(fmt.Sprintf("invalid vtap id (%s)", vtapIDString))
 	}
-	err = mysql.Db.Where("vtap_id = ?", vtapID).First(&gStorage).Error
+	err = orgDB.Where("vtap_id = ?", vtapID).First(&gStorage).Error
 	return gStorage, err
 }
