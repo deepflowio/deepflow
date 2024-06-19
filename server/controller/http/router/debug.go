@@ -204,7 +204,12 @@ func getAgentStats(g *genesis.Genesis) gin.HandlerFunc {
 
 func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"))
+		db, err := GetContextOrgDB(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			return
+		}
+		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"), db)
 		JsonResponse(c, data, err)
 	})
 }

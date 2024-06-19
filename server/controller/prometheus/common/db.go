@@ -16,16 +16,22 @@
 
 package common
 
-var (
-	ResourcePrometheusMetricName           = "metric_name"
-	ResourcePrometheusLabelName            = "label_name"
-	ResourcePrometheusLabelValue           = "label_value"
-	ResourcePrometheusMetricAPPLabelLayout = "metric_app_label_layout"
-	ResourcePrometheusLabel                = "label"
-	ResourcePrometheusMetricLabelName      = "metric_label_name"
-)
+import "github.com/deepflowio/deepflow/server/controller/db/mysql"
 
-var (
-	TargetLabelInstance = "instance"
-	TargetLabelJob      = "job"
-)
+func FindPtr[T any](db *mysql.DB) ([]*T, error) {
+	var result []*T
+	err := db.Find(&result).Error
+	return result, err
+}
+
+func WhereFind[T any](db *mysql.DB, query interface{}, args ...interface{}) ([]T, error) {
+	var result []T
+	err := db.Where(query, args...).Find(&result).Error
+	return result, err
+}
+
+func WhereFindPtr[T any](db *mysql.DB, query interface{}, args ...interface{}) ([]*T, error) {
+	var result []*T
+	err := db.Where(query, args...).Find(&result).Error
+	return result, err
+}

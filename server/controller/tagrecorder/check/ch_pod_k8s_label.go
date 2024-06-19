@@ -65,7 +65,7 @@ func (k *ChPodK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodK8sLabel, 
 	for _, pod := range pods {
 		splitLabel := strings.Split(pod.Label, ", ")
 		for _, singleLabel := range splitLabel {
-			splitSingleLabel := strings.Split(singleLabel, ":")
+			splitSingleLabel := strings.SplitN(singleLabel, ":", 2)
 			if len(splitSingleLabel) == 2 {
 				key := K8sLabelKey{
 					ID:  pod.ID,

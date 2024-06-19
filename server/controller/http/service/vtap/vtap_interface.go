@@ -43,6 +43,11 @@ func NewVTapInterface(cfg common.FPermit, userInfo *httpcommon.UserInfo) *VTapIn
 }
 
 func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterface, error) {
+	// only super admin and admin can get vtap interfaces
+	if v.userInfo.Type != common.USER_TYPE_SUPER_ADMIN && v.userInfo.Type != common.USER_TYPE_ADMIN {
+		return []model.VTapInterface{}, nil
+	}
+
 	syncAPIQuery, dropAll, err := v.formatSyncAPIQuery(filter)
 	if err != nil {
 		return nil, err

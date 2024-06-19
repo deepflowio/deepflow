@@ -19,6 +19,7 @@ package mysql
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
@@ -58,6 +59,7 @@ func GetNonDefaultORGIDs() ([]int, error) {
 	for _, org := range orgs {
 		ids = append(ids, org.ORGID)
 	}
+	sort.Ints(ids)
 	return ids, nil
 }
 

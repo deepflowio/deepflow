@@ -50,7 +50,7 @@ func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysql.ChPodK8sEnv, bool) 
 	for _, pod := range pods {
 		envs := strings.Split(pod.ENV, ", ")
 		for _, singleEnv := range envs {
-			envInfo := strings.Split(singleEnv, ":")
+			envInfo := strings.SplitN(singleEnv, ":", 2)
 			if len(envInfo) == 2 {
 				key := K8sEnvKey{
 					ID:  pod.ID,
