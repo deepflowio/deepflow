@@ -51,7 +51,7 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 		labelsMap := map[string]string{}
 		splitLabel := strings.Split(podService.Label, ", ")
 		for _, singleLabel := range splitLabel {
-			splitSingleLabel := strings.Split(singleLabel, ":")
+			splitSingleLabel := strings.SplitN(singleLabel, ":", 2)
 			if len(splitSingleLabel) == 2 {
 				labelsMap[splitSingleLabel[0]] = splitSingleLabel[1]
 			}

@@ -51,7 +51,7 @@ func (k *ChPodK8sEnvs) generateNewData() (map[K8sEnvsKey]mysql.ChPodK8sEnvs, boo
 		envsMap := map[string]string{}
 		envs := strings.Split(pod.ENV, ", ")
 		for _, singleEnv := range envs {
-			envInfo := strings.Split(singleEnv, ":")
+			envInfo := strings.SplitN(singleEnv, ":", 2)
 			if len(envInfo) == 2 {
 				envsMap[envInfo[0]] = envInfo[1]
 			}
