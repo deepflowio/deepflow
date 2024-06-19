@@ -1,0 +1,19 @@
+# 名称
+name: volcengine
+# 云平台类型
+type: volcengine
+config:
+  # 所属区域标识 [按需指定]
+  region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
+  # 资源同步控制器 [按需指定,不指定时随机分配]
+  #controller_ip: 127.0.0.1
+  # API 密钥 ID [必需参数], 在火山引擎控制台页面 用户头像-API访问密钥-Access Key ID
+  secret_id: xxxxxxxx
+  # API 密钥 KEY [必需参数], 在火山引擎控制台页面 用户头像-API访问密钥-Secret Access Key
+  secret_key: xxxxxxx
+  # 区域白名单, 多个区域名称之间以英文逗号分隔 [按需指定]
+  include_regions:
+  # 区域黑名单, 多个区域名称之间以英文逗号分隔 [按需指定]
+  exclude_regions:
+  # 同步间隔，单位：秒，输入限制：最小1，最大86400，默认60
+  sync_timer:
