@@ -2658,7 +2658,7 @@ CREATE TABLE IF NOT EXISTS `resource_version` (
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-TRUNCATE TABLE resource_refresh_log;
+TRUNCATE TABLE resource_version;
 SET @prometheus_version = UNIX_TIMESTAMP(NOW());
 INSERT INTO resource_version (name, version) VALUES ('prometheus', @prometheus_version);
 
