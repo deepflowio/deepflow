@@ -51,7 +51,7 @@ func (k *ChPodK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChP
 		annotationsMap := map[string]string{}
 		annotations := strings.Split(pod.Annotation, ", ")
 		for _, singleAnnotation := range annotations {
-			annotationInfo := strings.Split(singleAnnotation, ":")
+			annotationInfo := strings.SplitN(singleAnnotation, ":", 2)
 			if len(annotationInfo) == 2 {
 				annotationsMap[annotationInfo[0]] = annotationInfo[1]
 			}

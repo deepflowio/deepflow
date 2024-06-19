@@ -51,7 +51,7 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 		annotationsMap := map[string]string{}
 		annotations := strings.Split(podService.Annotation, ", ")
 		for _, singleAnnotation := range annotations {
-			annotationInfo := strings.Split(singleAnnotation, ":")
+			annotationInfo := strings.SplitN(singleAnnotation, ":", 2)
 			if len(annotationInfo) == 2 {
 				annotationsMap[annotationInfo[0]] = annotationInfo[1]
 			}
