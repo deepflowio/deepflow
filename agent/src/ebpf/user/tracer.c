@@ -348,6 +348,7 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 	bt->create_cb = create_cb;
 	bt->sample_freq = sample_freq;
 	bt->enable_sample = false;
+	bt->ev_state = PERF_EV_INIT;
 
 	bt->dispatch_workers_nr = workers_nr;
 	bt->process_fn = handle;
@@ -979,6 +980,8 @@ perf_event:
 	 * perf event
 	 */
 	if (type == HOOK_ATTACH) {
+		if (tracer->ev_state == PERF_EV_ATTACH)
+			return ETR_OK;
 		struct ebpf_object *obj = tracer->obj;
 		for (i = 0; i < obj->progs_cnt; i++) {
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
@@ -1007,10 +1010,13 @@ perf_event:
 
 				}
 
+				tracer->ev_state = PERF_EV_ATTACH;
 				return ret;
 			}
 		}
 	} else {
+		if (tracer->ev_state == PERF_EV_DETACH)
+			return ETR_OK;
 		bool has_perf_event = false;
 		for (i = 0; i < ARRAY_SIZE(tracer->per_cpu_fds); i++) {
 			if (tracer->per_cpu_fds[i] > 0) {
@@ -1036,6 +1042,7 @@ perf_event:
 
 			}
 
+			tracer->ev_state = PERF_EV_DETACH;
 			return ret;
 		}
 	}
