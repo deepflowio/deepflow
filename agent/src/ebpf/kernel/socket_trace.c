@@ -1859,16 +1859,15 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 
 	CHECK_OFFSET_READY(fd);
 
-	__u64 sock_addr = (__u64)get_socket_from_fd(fd, offset);
-	if (sock_addr) {
-		__u64 conn_key = gen_conn_key_id(bpf_get_current_pid_tgid() >> 32, (__u64)fd);
-		struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
-		if (socket_info_ptr != NULL)
-			delete_socket_info(conn_key, socket_info_ptr);
-		
+	__u64 conn_key = gen_conn_key_id(bpf_get_current_pid_tgid() >> 32, (__u64)fd);
+	struct socket_info_t *socket_info_ptr = socket_info_map__lookup(&conn_key);
+	if (socket_info_ptr == NULL) {
 		socket_role_map__delete(&conn_key);
+		return 0;
 	}
 
+	delete_socket_info(conn_key, socket_info_ptr);
+	socket_role_map__delete(&conn_key);
 	return 0;
 }
 
