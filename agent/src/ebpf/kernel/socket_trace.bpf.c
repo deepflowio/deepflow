@@ -2175,9 +2175,6 @@ static __inline int output_data_common(void *ctx)
 	else
 		args = active_write_args_map__lookup(&id);
 
-	if (args == NULL)
-		goto clear_args_map_1;
-
 	struct __socket_data *v =
 	    (struct __socket_data *)(v_buff->data + v_buff->len);
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
@@ -2187,6 +2184,9 @@ static __inline int output_data_common(void *ctx)
 		v->data_len = 0;
 		goto skip_copy;
 	}
+
+	if (args == NULL)
+		goto clear_args_map_1;
 
 	if (v->source == DATA_SOURCE_IO_EVENT) {
 		buffer = (char *)io_event_buffer__lookup(&k0);
