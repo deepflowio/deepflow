@@ -1309,6 +1309,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE name %s %s)",
 			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE %s(name,%s))",
 		),
+		"icon_id": NewTag(
+			"0",
+			"",
+			"",
+			"",
+		),
+		"node_type": NewTag(
+			"'user'",
+			"",
+			"",
+			"",
+		),
 	}
 
 	return tagResourceMap
