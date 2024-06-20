@@ -1109,14 +1109,14 @@ func (t *PlatformInfoTable) ReloadSlave(orgId uint16) error {
 		if t.epcIDIPV4Lru[orgId] != nil {
 			t.epcIDIPV4Lru[orgId].NoStats()
 		}
-		t.epcIDIPV4Lru[orgId] = nil
+		t.epcIDIPV4Lru[orgId] = lru.NewU64LRU(ckdb.OrgDatabasePrefix(orgId)+"epcIDIPV4_"+t.moduleName, LruSlotSize, LruCap)
 
 		t.epcIDIPV6Infos[orgId] = masterTable.epcIDIPV6Infos[orgId]
 		t.epcIDIPV6CidrInfos[orgId] = masterTable.epcIDIPV6CidrInfos[orgId]
 		if t.epcIDIPV6Lru[orgId] != nil {
 			t.epcIDIPV6Lru[orgId].NoStats()
 		}
-		t.epcIDIPV6Lru[orgId] = nil
+		t.epcIDIPV6Lru[orgId] = lru.NewU160LRU(ckdb.OrgDatabasePrefix(orgId)+"epcIDIPV6_"+t.moduleName, LruSlotSize, LruCap)
 
 		t.macInfos[orgId] = masterTable.macInfos[orgId]
 		t.macMissCount[orgId] = make(map[uint64]*uint64)
