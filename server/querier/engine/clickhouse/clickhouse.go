@@ -49,6 +49,8 @@ var INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY = "-1"
 var subSqlRegexp = regexp.MustCompile(`\(SELECT\s.+?LIMIT\s.+?\)`)
 var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
+var fromRegexp = regexp.MustCompile(`(?i)from\s+(\S+)`)
+var whereRegexp = regexp.MustCompile(`(?i)where\s+(\S.*)`)
 
 // Perform regular checks on show SQL and support the following formats:
 // show tag {tag_name} values from {table_name} where xxx order by xxx limit xxx :{tag_name} and {table_name} can be any character
@@ -61,7 +63,18 @@ var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 // show metrics on db
 // show tables
 // show databases
-var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags(?: from ([^\\s]+))?(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?|metrics(?: from ([^\\s]+))?(?: where .+)?|metrics functions(?: from ([^\\s]+))?(?: where .+)?|language|tag-values(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?|metrics on db|tables|databases)$")
+var patterns = []string{
+	//if there are new pattern strings to match, add regular expressions directly here
+	`^show\s+language$`,            // 1. show language
+	`^show\s+metrics\s+functions$`, // 2. show metrics functions
+	`^show\s+metrics(?: from ([^\\s]+))?(?: where .+)?$|^show\s+metrics on db$`,     // 3. show metrics or show metrics on db
+	`^show\s+tag\s+\S+\s+values\s+from\s+\S+.*$`,                                    // 4. show tag X values Y, X,Y not nil
+	`^show\s+tags(?: from ([^\\s]+))?(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?`, // 5. show tags ...
+	`^show\s+tables$`,    // 6. show tables
+	`^show\s+databases$`, // 7. show databases
+	`^show\s+tag-values(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?`, // 8. show tag-values
+}
+var res []*regexp.Regexp
 
 type TargetLabelFilter struct {
 	OriginFilter string
@@ -83,6 +96,13 @@ type CHEngine struct {
 	IsDerivative       bool
 	DerivativeGroupBy  []string
 	ORGID              string
+}
+
+func init() {
+	//init show patterns regexp
+	for _, pattern := range patterns {
+		res = append(res, regexp.MustCompile(pattern))
+	}
 }
 
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
@@ -302,33 +322,41 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 	}
 }
 
+// extractFromWhere extracts the first string after 'from' and all strings after 'where'.
+func ExtractFromWhere(s string) (table string, whereClause string) {
+	// Regex to capture the first string after 'from' and all strings after 'where'
+	// Extract from part
+	fromMatch := fromRegexp.FindStringSubmatch(s)
+	if len(fromMatch) > 1 {
+		table = fromMatch[1]
+	}
+	// Extract where part
+	whereMatch := whereRegexp.FindStringSubmatch(s)
+	if len(whereMatch) > 1 {
+		whereClause = whereMatch[1]
+	}
+	return
+}
+
+func MatchPattern(s string) (int, bool) {
+	for i, re := range res {
+		if re.MatchString(s) {
+			return i + 1, true
+		}
+	}
+	return 0, false
+}
+
 func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common.Result, []string, bool, error) {
 	sqlSplit := strings.Fields(sql)
-	if strings.ToLower(sqlSplit[0]) != "show" {
-		return nil, []string{}, false, nil
-	}
 	sql = strings.Join(sqlSplit, " ")
-	if !showSqlRegexp.MatchString(strings.ToLower(sql)) {
+	sql = strings.ToLower(sql)
+	index, flag := MatchPattern(sql)
+	if flag == false {
 		err := fmt.Errorf("not support sql: '%s', please check", sql)
 		return nil, []string{}, true, err
 	}
-	if strings.ToLower(sqlSplit[1]) == "language" {
-		result := &common.Result{}
-		result.Columns = []interface{}{"language"}
-		result.Values = []interface{}{[]string{config.Cfg.Language}}
-		return result, []string{}, true, nil
-	}
-	var table string
-	var where string
-	for i, item := range sqlSplit {
-		if strings.ToLower(item) == "from" {
-			table = sqlSplit[i+1]
-			break
-		}
-		if strings.ToLower(item) == "where" {
-			where = strings.Join(sqlSplit[i+1:], " ")
-		}
-	}
+	table, where := ExtractFromWhere(sql)
 	switch table {
 	case "vtap_app_port":
 		table = "application"
@@ -341,45 +369,41 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 	case "vtap_acl":
 		table = "traffic_policy"
 	}
-	switch strings.ToLower(sqlSplit[1]) {
-	case "metrics":
-		if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
-			funcs, err := metrics.GetFunctionDescriptions()
-			return funcs, []string{}, true, err
-		} else {
-			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
-			if err != nil {
-				return nil, []string{}, true, err
-			}
-
-			// tag metrics
-			tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context)
-			if err != nil {
-				log.Error("Failed to get tag type metrics")
-				return nil, []string{}, true, err
-			}
-			ShowTagTypeMetrics(tagDescriptions, result, e.DB, table)
-			return result, []string{}, true, err
+	//do the corresponding processing according to the matched pattern string
+	switch index {
+	case 1: //show language ...
+		result := &common.Result{}
+		result.Columns = []interface{}{"language"}
+		result.Values = []interface{}{[]string{config.Cfg.Language}}
+		return result, []string{}, true, nil
+	case 2: //show metrics functions ...
+		funcs, err := metrics.GetFunctionDescriptions()
+		return funcs, []string{}, true, err
+	case 3: //show metrics ...
+		result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
+		if err != nil {
+			return nil, []string{}, true, err
 		}
-	case "tag":
-		// show tag {tag} values from table
-		if len(sqlSplit) < 6 {
-			return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
+		// tag metrics
+		tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context)
+		if err != nil {
+			log.Error("Failed to get tag type metrics")
+			return nil, []string{}, true, err
 		}
-		if strings.ToLower(sqlSplit[3]) == "values" {
-			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
-			e.DB = "flow_tag"
-			return result, sqlList, true, err
-		}
-		return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
-	case "tags":
+		ShowTagTypeMetrics(tagDescriptions, result, e.DB, table)
+		return result, []string{}, true, err
+	case 4: //show tag X values from Y  X,Y not nil
+		result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
+		e.DB = "flow_tag"
+		return result, sqlList, true, err
+	case 5: //show tags ...
 		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 		return data, []string{}, true, err
-	case "tables":
+	case 6: //show  tables...
 		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context), []string{}, true, nil
-	case "databases":
+	case 7: //show  databases...
 		return GetDatabases(), []string{}, true, nil
-	case "tag-values":
+	case 8: //show tag-values...
 		sqlList, err := tagdescription.GetTagValuesDescriptions(e.DB, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 		return nil, sqlList, true, err
 	}
@@ -1297,21 +1321,21 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 	// func(field)
 	case *sqlparser.FuncExpr:
 		/* name, args, err := e.parseFunction(expr)
-		if err != nil {
-			return err
-		}
-		err = e.AddFunction(name, args, "", as)
-		return err */
+		 if err != nil {
+			 return err
+		 }
+		 err = e.AddFunction(name, args, "", as)
+		 return err */
 	// field +=*/ field
 	case *sqlparser.BinaryExpr:
 		/* function := expr.Left.(*sqlparser.FuncExpr)
-		name, args, err := e.parseFunction(function)
-		if err != nil {
-			return err
-		}
-		math := expr.Operator
-		math += sqlparser.String(expr.Right)
-		e.AddFunction(name, args, math, as) */
+		 name, args, err := e.parseFunction(function)
+		 if err != nil {
+			 return err
+		 }
+		 math := expr.Operator
+		 math += sqlparser.String(expr.Right)
+		 e.AddFunction(name, args, math, as) */
 	}
 	return nil
 }
