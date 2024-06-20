@@ -2113,10 +2113,8 @@ func (t *DataSet) GetVMIDByPodNodeID(podNodeID int) (int, bool) {
 	if result.RowsAffected == 1 {
 		t.AddVMPodNodeConnection(&conn)
 		return conn.VMID, true
-	} else {
-		log.Error(t.metadata.Logf("db %s (%s id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, podNodeID))
-		return 0, false
 	}
+	return 0, false
 }
 
 func (t *DataSet) GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid string) (int, bool) {

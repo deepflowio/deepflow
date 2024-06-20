@@ -400,7 +400,7 @@ func (c *Cleaner) cleanPodNodeDirty() {
 		}
 
 		var pods []*mysql.Pod
-		c.org.DB.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&pods)
+		c.org.DB.Where("pod_node_id != 0 AND pod_node_id NOT IN ?", podNodeIDs).Find(&pods)
 		if len(pods) != 0 {
 			c.org.DB.Delete(&pods)
 			publishTagrecorder(c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
