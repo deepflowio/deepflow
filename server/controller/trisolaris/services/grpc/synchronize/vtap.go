@@ -229,11 +229,13 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	}
 
 	if configure.GetProxyControllerIp() == "" {
-		log.Errorf("vtap(%s) has no proxy_controller_ip", c.GetCtrlIP())
+		log.Errorf("agent(%s) has no proxy_controller_ip, "+
+			"Please check whether the agent allocs controller IP or If nat-ip is enabled, whether the controller is configured with nat-ip", c.GetCtrlIP())
 	}
 	if configure.GetAnalyzerIp() == "" {
 		configure.Enabled = proto.Bool(false)
-		log.Errorf("vtap(%s) has no analyzer_ip", c.GetCtrlIP())
+		log.Errorf("agent(%s) has no tsdb_ip, "+
+			"Please check whether the agent allocs tsdb IP or If nat-ip is enabled, whether the tsdb is configured with nat-ip", c.GetCtrlIP())
 	}
 	if vtapConfig.TapInterfaceRegex != nil && *vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = vtapConfig.TapInterfaceRegex
