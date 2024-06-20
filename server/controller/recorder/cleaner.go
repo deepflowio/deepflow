@@ -275,7 +275,7 @@ func (c *Cleaner) cleanPodNodeDirty() {
 		}
 
 		var pods []mysql.Pod
-		mysql.Db.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&pods)
+		mysql.Db.Where("pod_node_id != 0 AND pod_node_id NOT IN ?", podNodeIDs).Find(&pods)
 		if len(pods) != 0 {
 			mysql.Db.Delete(&pods)
 			logErrorDeleteResourceTypeABecauseResourceTypeBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods)
