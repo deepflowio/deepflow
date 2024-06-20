@@ -1064,7 +1064,7 @@ func (t *DataSet) GetVMLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
 	var vm mysql.VM
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&vm)
+	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&vm)
 	if result.RowsAffected == 1 {
 		t.AddVM(&vm)
 		return vm.Lcuuid, true
