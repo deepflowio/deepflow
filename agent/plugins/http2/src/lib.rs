@@ -11,5 +11,6 @@ pub fn get_expected_headers() -> HashSet<Vec<u8>> {
     hash_set.insert(b"content-length".to_vec());
     hash_set.insert(b"user-agent".to_vec());
     hash_set.insert(b"referer".to_vec());
+    hash_set.insert(b"grpc-status".to_vec());
     hash_set
 }
