@@ -315,7 +315,7 @@ func (e *VTapEvent) ModifyGroups(data []byte) []byte {
 	err := targetGroups.Unmarshal(data)
 	if err != nil {
 		log.Error(err)
-		return nil
+		return []byte{}
 	}
 	for _, entry := range targetGroups.Groups {
 		if entry.GetEpcId() == uint32(ANY_EPC_ID_UINT32) {
@@ -325,7 +325,7 @@ func (e *VTapEvent) ModifyGroups(data []byte) []byte {
 	groupBytes, err := targetGroups.Marshal()
 	if err != nil {
 		log.Error(err)
-		return nil
+		return []byte{}
 	}
 	return groupBytes
 }
