@@ -65,7 +65,7 @@ func (v *Vtap) RegisterTo(e *gin.Engine) {
 
 	e.POST("/v1/vtaps-csv/", v.getVtapCSV())
 
-	e.GET("/v1/vtap-ports/", getVTapPorts)
+	e.GET("/v1/vtap-ports/", getVTapPorts) // only in default organization
 }
 
 func (v *Vtap) getVtap() gin.HandlerFunc {

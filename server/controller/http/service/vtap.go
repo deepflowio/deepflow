@@ -880,7 +880,7 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 // and virtual network type is VIF_DEVICE_TYPE_VM or VIF_DEVICE_TYPE_POD.
 func GetVTapPortsCount() (int, error) {
 	var vtaps []mysql.VTap
-	if err := mysql.Db.Find(&vtaps).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&vtaps).Error; err != nil {
 		return 0, err
 	}
 	vtapHostIPs, vtapNodeIPs := mapset.NewSet(), mapset.NewSet()
@@ -898,7 +898,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var vms []mysql.VM
-	if err := mysql.Db.Find(&vms).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&vms).Error; err != nil {
 		return 0, err
 	}
 	vtapVMIDs := mapset.NewSet()
@@ -909,7 +909,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var podNodes []mysql.PodNode
-	if err := mysql.Db.Find(&podNodes).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&podNodes).Error; err != nil {
 		return 0, err
 	}
 	podNodeIDs := mapset.NewSet()
@@ -920,7 +920,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var pods []mysql.Pod
-	if err := mysql.Db.Find(&pods).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&pods).Error; err != nil {
 		return 0, err
 	}
 	vtapPodIDs := mapset.NewSet()
@@ -931,7 +931,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var lanIPs []mysql.LANIP
-	if err := mysql.Db.Find(&lanIPs).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&lanIPs).Error; err != nil {
 		return 0, err
 	}
 	pubVTapVIFs := mapset.NewSet()
@@ -943,7 +943,7 @@ func GetVTapPortsCount() (int, error) {
 
 	vtapVifCount := 0
 	var vinterfaces []mysql.VInterface
-	if err := mysql.Db.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
+	if err := mysql.DefaultDB.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
 		Find(&vinterfaces).Error; err != nil {
 		return 0, err
 	}
