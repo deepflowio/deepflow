@@ -398,6 +398,7 @@ static __inline enum message_type parse_http2_headers_frame(const char
 							    const bool is_first)
 {
 #define HTTPV2_FRAME_PROTO_SZ           0x9
+#define HTTPV2_FRAME_TYPE_DATA	        0x0
 #define HTTPV2_FRAME_TYPE_HEADERS       0x1
 #define HTTPV2_STATIC_TABLE_AUTH_IDX    0x1
 #define HTTPV2_STATIC_TABLE_GET_IDX     0x2
@@ -472,6 +473,9 @@ static __inline enum message_type parse_http2_headers_frame(const char
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +
 		    HTTPV2_FRAME_PROTO_SZ;
 		type = buf[3];
+
+		if (type == HTTPV2_FRAME_TYPE_DATA && !is_first)
+			return MSG_REQUEST;
 
 		// 如果不是Header继续寻找下一个Frame
 		if (type != HTTPV2_FRAME_TYPE_HEADERS)
