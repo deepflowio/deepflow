@@ -617,6 +617,8 @@ static inline bool need_proto_reconfirm(uint16_t l7_proto)
 static void process_event(struct process_event_t *e)
 {
 	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC) {
+		if (e->maybe_thread && !is_user_process(e->pid))
+			return;	
 		update_proc_info_cache(e->pid, PROC_EXEC);
 		go_process_exec(e->pid);
 		ssl_process_exec(e->pid);
