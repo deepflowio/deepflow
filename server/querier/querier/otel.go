@@ -30,7 +30,7 @@ import (
 
 func initTraceProvider(endpoint string) *otelTrace.TracerProvider {
 	ctx := context.Background()
-
+    // Todo Delete
 	//应该被携带到span中的环境信息（进程名、主机名、服务名等）
 	res, err := resource.New(ctx,
 		resource.WithFromEnv(),
