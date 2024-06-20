@@ -938,10 +938,7 @@ impl HttpLog {
         info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
 
         // adjuest msg type
-        match direction {
-            PacketDirection::ClientToServer => info.msg_type = LogMessageType::Request,
-            PacketDirection::ServerToClient => info.msg_type = LogMessageType::Response,
-        }
+        info.msg_type = LogMessageType::from(direction);
 
         let val_offset = HTTPV2_CUSTOM_DATA_MIN_LENGTH + key_len;
         let key = &payload[HTTPV2_CUSTOM_DATA_MIN_LENGTH..val_offset];
@@ -966,6 +963,7 @@ impl HttpLog {
         info: &mut HttpInfo,
     ) -> Result<()> {
         self.check_http2_go_uprobe(config, payload, param, info)?;
+        set_captured_byte!(info, param);
         Ok(())
     }
 
@@ -1225,6 +1223,7 @@ impl HttpLog {
                 if !param.is_from_ebpf() && info.headers_offset.is_none() {
                     info.headers_offset = Some(headers_offset as u32);
                 }
+
                 if content_length.is_some() {
                     is_httpv2 = true;
                     break;
@@ -1729,6 +1728,8 @@ mod tests {
         let mut http1 = HttpLog::new_v1();
         let mut http2 = HttpLog::new_v2(false);
         let mut protocol = L7Protocol::Unknown;
+        http1.set_header_decoder(config.expected_headers_set.clone());
+        http2.set_header_decoder(config.expected_headers_set.clone());
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -1744,7 +1745,6 @@ mod tests {
             trace_set.insert(TraceType::Sw8.as_str());
             let mut span_set = HashSet::new();
             span_set.insert(TraceType::Sw8.as_str());
-            http2.set_header_decoder(config.expected_headers_set.clone());
             let param = &mut ParseParam::new(
                 packet as &MetaPacket,
                 log_cache.clone(),
