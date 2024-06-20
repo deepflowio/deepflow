@@ -55,7 +55,7 @@ impl Libpcap {
 pub struct Dpdk;
 
 impl Dpdk {
-    pub fn new(_: Option<String>, _: Option<String>, _: usize) -> Self {
+    pub fn new(_: Option<String>, _: Option<String>, _: usize, _: String) -> Self {
         unimplemented!();
     }
 
