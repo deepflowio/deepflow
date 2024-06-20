@@ -18,7 +18,6 @@ package tagrecorder
 
 import (
 	"sync"
-	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -138,23 +137,9 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 	return subscribers
 }
 
-func (c *SubscriberManager) HealthCheck() {
-	go func() {
-		log.Info("tagrecorder health check data run")
-		t := time.Now()
-		for _, subscriber := range c.subscribers {
-			if err := subscriber.Check(); err != nil {
-				log.Error(err)
-			}
-		}
-		log.Infof("tagrecorder health check data end, time since: %v", time.Since(t))
-	}()
-}
-
 type Subscriber interface {
 	Subscribe()
 	SetConfig(config.ControllerConfig)
-	Check() error
 	GetSubResourceType() string
 	pubsub.ResourceBatchAddedSubscriber
 	pubsub.ResourceUpdatedSubscriber
@@ -221,10 +206,6 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Subscribe() {
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchAddedMySQL, s)
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceUpdatedFields, s)
 	pubsub.Subscribe(s.subResourceTypeName, pubsub.TopicResourceBatchDeletedMySQL, s)
-}
-
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) Check() error {
-	return check(s)
 }
 
 // OnResourceBatchAdded implements interface Subscriber in recorder/pubsub/subscriber.go

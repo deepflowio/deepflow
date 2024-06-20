@@ -18,8 +18,12 @@ package resource
 
 import "github.com/deepflowio/deepflow/server/controller/db/mysql"
 
-func GetVPCs(filter map[string]interface{}) ([]*mysql.VPC, error) {
-	db := mysql.Db
+func GetVPCs(orgID int, filter map[string]interface{}) ([]*mysql.VPC, error) {
+	dbInfo, err := mysql.GetDB(orgID)
+	if err != nil {
+		return nil, err
+	}
+	db := dbInfo.DB
 	if _, ok := filter["name"]; ok {
 		db = db.Where("name = ?", filter["name"])
 	}

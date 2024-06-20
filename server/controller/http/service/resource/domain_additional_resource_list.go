@@ -64,7 +64,7 @@ func GetDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
 		case "cloud-tag":
-			cloudTags, err := getClouTags(resource, domain, resourceName)
+			cloudTags, err := getClouTags(orgDB, resource, domain, resourceName)
 			if err != nil {
 				return nil, err
 			}
@@ -79,7 +79,7 @@ func GetDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql
 			resp.CHosts = append(resp.CHosts, getCHosts(resource.CHosts, resource.VInterfaces, resource.IPs, domain, resourceName)...)
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
-			cloudTags, err := getClouTags(resource, domain, resourceName)
+			cloudTags, err := getClouTags(orgDB, resource, domain, resourceName)
 			if err != nil {
 				return nil, err
 			}
@@ -323,20 +323,20 @@ func getVinterfaces(deviceUUID string, vifs []cloudmodel.VInterface, ips []cloud
 	return resp
 }
 
-func getClouTags(resource *cloudmodel.AdditionalResource, domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
+func getClouTags(orgDB *mysql.DB, resource *cloudmodel.AdditionalResource, domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
 	chostUUIDToName := make(map[string]string)
 	podNSUUIDToName := make(map[string]string)
 	podNSUUIDToSubdomain := make(map[string]string)
 
 	var vms []mysql.VM
-	if err := mysql.Db.Find(&vms).Error; err != nil {
+	if err := orgDB.Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	for _, vm := range vms {
 		chostUUIDToName[vm.Lcuuid] = vm.Name
 	}
 	var podNamespaces []mysql.PodNamespace
-	if err := mysql.Db.Find(&podNamespaces).Error; err != nil {
+	if err := orgDB.Find(&podNamespaces).Error; err != nil {
 		return nil, err
 	}
 	for _, podNS := range podNamespaces {
