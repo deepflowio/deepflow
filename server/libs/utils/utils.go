@@ -479,8 +479,10 @@ func IsNil(i interface{}) bool {
 
 // EscapeJSONString is used to escape special characters in JSON strings
 func EscapeJSONString(value string) string {
-	value = strings.ReplaceAll(value, `\`, `\\"`)
-	value = strings.ReplaceAll(value, `"`, `\"`)
-	value = strings.ReplaceAll(value, "\n", `\n`)
-	return value
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`"`, `\"`,
+		"\n", `\n`,
+	)
+	return replacer.Replace(value)
 }
