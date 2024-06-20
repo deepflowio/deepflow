@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -64,7 +66,9 @@ func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc
 }
 
 func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) {
-	err := db.Create(&dbItems).Error
+	err := db.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&dbItems).Error
 	if err != nil {
 		log.Errorf("add %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error()) // TODO is key needed?
 		return

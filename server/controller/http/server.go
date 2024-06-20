@@ -113,7 +113,6 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewVtapRepo(),
 		router.NewPlugin(),
 		router.NewMail(),
-		router.NewPrometheus(),
 		router.NewDatabase(s.controllerConfig),
 		router.NewAgentCMD(),
 		// icon
