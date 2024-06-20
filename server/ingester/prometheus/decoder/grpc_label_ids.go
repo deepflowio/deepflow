@@ -118,14 +118,15 @@ func (t *PrometheusLabelTable) GetCounter() interface{} {
 }
 
 type PrometheusLabelTable struct {
-	ctlIP       string
-	GrpcSession *grpc.GrpcSession
+	ctlIP        string
+	GrpcSession  *grpc.GrpcSession
+	labelVersion uint32
 
-	metricNameIDs     [MAX_ORG_COUNT]*hashmap.Map[string, uint64]
-	labelNameIDs      [MAX_ORG_COUNT]*hashmap.Map[string, uint64]
-	labelValueIDs     [MAX_ORG_COUNT]*hashmap.Map[string, uint64]
-	labelNameValues   [MAX_ORG_COUNT]*hashmap.Map[uint64, uint32]
-	labelColumnIndexs [MAX_ORG_COUNT]*hashmap.Map[uint64, uint64]
+	metricNameIDs     *[MAX_ORG_COUNT]*hashmap.Map[string, uint64]
+	labelNameIDs      *[MAX_ORG_COUNT]*hashmap.Map[string, uint64]
+	labelValueIDs     *[MAX_ORG_COUNT]*hashmap.Map[string, uint64]
+	labelNameValues   *[MAX_ORG_COUNT]*hashmap.Map[uint64, uint32]
+	labelColumnIndexs *[MAX_ORG_COUNT]*hashmap.Map[uint64, uint64]
 	cacheExpiration   int
 	now               int64 // precision: 10s
 
@@ -142,10 +143,15 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize, cacheE
 		}
 	}
 	t := &PrometheusLabelTable{
-		GrpcSession:     &grpc.GrpcSession{},
-		cacheExpiration: cacheExpiration,
-		now:             time.Now().Unix(),
-		counter:         &RequestCounter{},
+		GrpcSession:       &grpc.GrpcSession{},
+		cacheExpiration:   cacheExpiration,
+		now:               time.Now().Unix(),
+		counter:           &RequestCounter{},
+		metricNameIDs:     &[MAX_ORG_COUNT]*hashmap.Map[string, uint64]{},
+		labelNameIDs:      &[MAX_ORG_COUNT]*hashmap.Map[string, uint64]{},
+		labelValueIDs:     &[MAX_ORG_COUNT]*hashmap.Map[string, uint64]{},
+		labelNameValues:   &[MAX_ORG_COUNT]*hashmap.Map[uint64, uint32]{},
+		labelColumnIndexs: &[MAX_ORG_COUNT]*hashmap.Map[uint64, uint64]{},
 	}
 	for i := 0; i < MAX_ORG_COUNT; i++ {
 		t.metricNameIDs[i] = hashmap.New[string, uint64]()     // metricName => metricID
@@ -157,6 +163,8 @@ func NewPrometheusLabelTable(controllerIPs []string, port, rpcMaxMsgSize, cacheE
 
 	t.GrpcSession.Init(ips, uint16(port), grpc.DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, nil)
 	log.Infof("New PrometheusLabelTable ips:%v port:%d rpcMaxMsgSize:%d", ips, port, rpcMaxMsgSize)
+
+	go t.UpdateAllLabelsRegularIntervals()
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_LABEL, t)
 	common.RegisterCountableForIngester("prometheus-label-request", t)
 	return t
@@ -195,19 +203,37 @@ func (t *PrometheusLabelTable) RequestLabelIDs(request *trident.PrometheusLabelR
 	isAll := false
 	if len(request.RequestLabels) == 0 && len(request.RequestTargets) == 0 {
 		isAll = true
+		t.labelVersion = response.GetVersion()
 	}
 	t.updatePrometheusLabels(response, isAll)
 
 	return response, nil
 }
 
-func (t *PrometheusLabelTable) RequestAllLabelIDs() {
-	log.Info("prometheus request all label IDs start")
-	_, err := t.RequestLabelIDs(&trident.PrometheusLabelRequest{})
+func (t *PrometheusLabelTable) RequestAllLabelIDs(version uint32) {
+	log.Infof("prometheus request all label IDs start, version: %d", version)
+	_, err := t.RequestLabelIDs(&trident.PrometheusLabelRequest{Version: proto.Uint32(version)})
 	if err != nil {
 		log.Warning("request all prometheus label ids failed: %s", err)
 	}
+	if version != t.labelVersion {
+		log.Infof("label version update from %d to %d", version, t.labelVersion)
+	}
 	log.Infof("prometheus request all label IDs end. %s", t.statsString(ckdb.DEFAULT_ORG_ID))
+}
+
+func (t *PrometheusLabelTable) UpdateAllLabelsRegularIntervals() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	var counter int
+	for range ticker.C {
+		counter++
+		if counter%60 == 0 { // for 10 minute
+			t.RequestAllLabelIDs(t.labelVersion)
+		}
+		t.now = time.Now().Unix()
+	}
 }
 
 func u32SliceIsEqual(l, r []uint32) bool {
@@ -250,15 +276,30 @@ func (t *PrometheusLabelTable) genId(isAll bool, id uint32) uint64 {
 }
 
 func (t *PrometheusLabelTable) getId(value uint64) (id uint32, valid bool) {
-	timestamp := uint32(value)
-	if t.now-int64(timestamp) > int64(t.cacheExpiration) {
-		t.counter.CacheExpiration++
-		return uint32(value >> 32), false
-	}
 	return uint32(value >> 32), true
 }
 
 func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLabelResponse, isAll bool) {
+	metricNameIDs := t.metricNameIDs
+	labelNameIDs := t.labelNameIDs
+	labelValueIDs := t.labelValueIDs
+	labelNameValues := t.labelNameValues
+	labelColumnIndexs := t.labelColumnIndexs
+	if isAll {
+		metricNameIDs = &[MAX_ORG_COUNT]*hashmap.Map[string, uint64]{}
+		labelNameIDs = &[MAX_ORG_COUNT]*hashmap.Map[string, uint64]{}
+		labelValueIDs = &[MAX_ORG_COUNT]*hashmap.Map[string, uint64]{}
+		labelNameValues = &[MAX_ORG_COUNT]*hashmap.Map[uint64, uint32]{}
+		labelColumnIndexs = &[MAX_ORG_COUNT]*hashmap.Map[uint64, uint64]{}
+		for i := 0; i < MAX_ORG_COUNT; i++ {
+			metricNameIDs[i] = hashmap.New[string, uint64]()     // metricName => metricID
+			labelNameIDs[i] = hashmap.New[string, uint64]()      // labelName  => labelNameID
+			labelValueIDs[i] = hashmap.New[string, uint64]()     // labelValue => labelValueID
+			labelNameValues[i] = hashmap.New[uint64, uint32]()   // labelNameValue => timestamp
+			labelColumnIndexs[i] = hashmap.New[uint64, uint64]() // metricID + LabelNameID => columnIndex
+		}
+	}
+
 	if isAll {
 		for _, orgLabelInfos := range resp.GetOrgResponseLabels() {
 			orgId := orgLabelInfos.GetOrgId()
@@ -266,18 +307,18 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 				name := labelInfo.GetName()
 				nameId := labelInfo.GetNameId()
 				if name != "" && nameId != 0 {
-					t.labelNameIDs[orgId].Set(strings.Clone(name), t.genId(isAll, nameId))
+					labelNameIDs[orgId].Set(strings.Clone(name), t.genId(isAll, nameId))
 				} else {
 					t.counter.LabelNameUnknown++
 				}
 				value := labelInfo.GetValue()
 				valueId := labelInfo.GetValueId()
 				if valueId != 0 {
-					t.labelValueIDs[orgId].Set(strings.Clone(value), t.genId(isAll, valueId))
+					labelValueIDs[orgId].Set(strings.Clone(value), t.genId(isAll, valueId))
 				} else {
 					t.counter.LabelValueUnknown++
 				}
-				t.labelNameValues[orgId].Set(nameValueKey(nameId, valueId), uint32(t.now))
+				labelNameValues[orgId].Set(nameValueKey(nameId, valueId), uint32(t.now))
 			}
 		}
 	}
@@ -290,12 +331,12 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 		}
 		orgId := metric.GetOrgId()
 		metricId := metric.GetMetricId()
-		t.metricNameIDs[orgId].Set(strings.Clone(metricName), t.genId(isAll, metricId))
+		metricNameIDs[orgId].Set(strings.Clone(metricName), t.genId(isAll, metricId))
 		for _, labelInfo := range metric.GetLabelIds() {
 			name := labelInfo.GetName()
 			nameId := labelInfo.GetNameId()
 			if name != "" && nameId != 0 {
-				t.labelNameIDs[orgId].Set(strings.Clone(name), t.genId(isAll, nameId))
+				labelNameIDs[orgId].Set(strings.Clone(name), t.genId(isAll, nameId))
 			} else {
 				t.counter.LabelNameUnknown++
 			}
@@ -304,16 +345,24 @@ func (t *PrometheusLabelTable) updatePrometheusLabels(resp *trident.PrometheusLa
 				value := labelInfo.GetValue()
 				valueId := labelInfo.GetValueId()
 				if valueId != 0 {
-					t.labelValueIDs[orgId].Set(strings.Clone(value), t.genId(isAll, valueId))
+					labelValueIDs[orgId].Set(strings.Clone(value), t.genId(isAll, valueId))
 				} else {
 					t.counter.LabelValueUnknown++
 				}
-				t.labelNameValues[orgId].Set(nameValueKey(nameId, valueId), uint32(t.now))
+				labelNameValues[orgId].Set(nameValueKey(nameId, valueId), uint32(t.now))
 			}
 
 			cIndex := labelInfo.GetAppLabelColumnIndex()
-			t.labelColumnIndexs[orgId].Set(columnIndexKey(metricId, nameId), t.genId(isAll, cIndex))
+			labelColumnIndexs[orgId].Set(columnIndexKey(metricId, nameId), t.genId(isAll, cIndex))
 		}
+	}
+
+	if isAll {
+		t.metricNameIDs = metricNameIDs
+		t.labelNameIDs = labelNameIDs
+		t.labelValueIDs = labelValueIDs
+		t.labelNameValues = labelNameValues
+		t.labelColumnIndexs = labelColumnIndexs
 	}
 }
 

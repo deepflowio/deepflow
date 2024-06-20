@@ -1099,7 +1099,7 @@ func (t *PlatformInfoTable) ReloadSlave(orgId uint16) error {
 
 	newVersion := masterTable.versionPlatformData[orgId]
 	if newVersion != t.versionPlatformData[orgId] {
-		log.Infof("org %d update slave (%s) rpc platformdata version %d -> %d  regionID=%d", orgId, t.moduleName, t.versionPlatformData[orgId], newVersion, t.regionID)
+		log.Infof("org %d update slave (%s) rpc platformdata version %d -> %d  regionID=%d", orgId, t.moduleName, t.versionPlatformData[orgId], newVersion, t.regionID[orgId])
 		t.peerConnections[orgId] = masterTable.peerConnections[orgId]
 		t.gprocessInfos[orgId] = masterTable.gprocessInfos[orgId]
 		t.vtapIDProcessInfos[orgId] = masterTable.vtapIDProcessInfos[orgId]

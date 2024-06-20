@@ -81,7 +81,7 @@ func getInfo(cmd *cobra.Command, domainLcuuid, domainName, resource string) {
 	lcuuid := domainLcuuid
 	if lcuuid == "" {
 		url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, domainName)
-		resp, err := common.CURLResponseRawJson("GET", url, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+		resp, err := common.CURLResponseRawJson("GET", url, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 		if err != nil {
 			fmt.Println("get domain info by name failed.")
 			fmt.Fprintln(os.Stderr, err)

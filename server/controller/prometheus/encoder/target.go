@@ -89,7 +89,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 			continue
 		}
 		di := podClusterIDToDomainInfo[podClusterID]
-		dbToAdd = append(dbToAdd, &mysql.PrometheusTarget{ // TODO  id 复用
+		dbToAdd = append(dbToAdd, &mysql.PrometheusTarget{
 			Base:         mysql.Base{Lcuuid: common.GenerateUUID(ins + job + fmt.Sprintf("%d-%d", vpcID, podClusterID) + "prometheus")},
 			CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS,
 			Instance:     ins,
