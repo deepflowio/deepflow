@@ -303,6 +303,35 @@ func (e *VTapEvent) GetFailedResponse(in *api.SyncRequest, gVTapInfo *vtap.VTapI
 	}
 }
 
+func (e *VTapEvent) CheckVersion(version string) bool {
+	for _, checkVersion := range []string{"B_LC_RELEASE_v6_4", "B_LC_RELEASE_v6_3", "B_LC_RELEASE_v6_2"} {
+		if strings.Contains(version, checkVersion) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *VTapEvent) ModifyGroups(data []byte) []byte {
+	targetGroups := &api.Groups{}
+	err := targetGroups.Unmarshal(data)
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	for _, entry := range targetGroups.Groups {
+		if entry.GetEpcId() == uint32(ANY_EPC_ID_UINT32) {
+			entry.EpcId = proto.Uint32(0)
+		}
+	}
+	groupBytes, err := targetGroups.Marshal()
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	return groupBytes
+}
+
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	if trisolaris.GetConfig().DomainAutoRegister && in.GetKubernetesClusterId() != "" {
 		gKubernetesInfo := trisolaris.GetGKubernetesInfo(in.GetTeamId())
@@ -431,6 +460,10 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	groups := []byte{}
 	if versionGroups != in.GetVersionGroups() {
 		groups = gVTapInfo.GetGroupData()
+		if e.CheckVersion(in.GetRevision()) {
+			log.Info("agent version(%s) ModifyGroups, Please update agent to 6.5", in.GetRevision())
+			groups = e.ModifyGroups(groups)
+		}
 	}
 	acls := []byte{}
 	if versionPolicy != in.GetVersionAcls() {
