@@ -56,9 +56,13 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 
 	regionToAZLcuuids := make(map[string][]string)
 	azToRegion := make(map[string]string, len(info.AZs))
+	// isAZBalanced checks if AZ is already balanced
+	// (to avoid balancing multiple times when AZ equals 'ALL')
+	isAZBalanced := make(map[string]bool)
 	for _, az := range info.AZs {
 		regionToAZLcuuids[az.Region] = append(regionToAZLcuuids[az.Region], az.Lcuuid)
 		azToRegion[az.Lcuuid] = az.Region
+		isAZBalanced[az.Lcuuid] = false
 	}
 	azToVTaps := make(map[string][]*mysql.VTap)
 	allVTapNameToID := make(map[string]int, len(info.VTaps))
@@ -85,6 +89,13 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 		r.regionToVTapNameToTraffic = regionToVTapNameToTraffic
 	}
 
+	regionToAllAZ := make(map[string]struct{}, len(info.AZAnalyzerConns))
+	for _, item := range info.AZAnalyzerConns {
+		regionToAllAZ[item.Region] = struct{}{}
+	}
+
+	// get all agents in 'ALL' az
+	azToVTaps = GetAZToVtap(info.AZAnalyzerConns, regionToAZLcuuids, azToVTaps)
 	response := &model.VTapRebalanceResult{}
 	for _, az := range info.AZs {
 		azVTaps, ok := azToVTaps[az.Lcuuid]
@@ -114,6 +125,15 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 			log.Warningf("ORGID-%d DATABASE-%s no vtaps to balance, region(%s)", db.ORGID, db.Name, az.Region)
 			continue
 		}
+		if _, ok := regionToAllAZ[az.Region]; ok {
+			if isBalanced, ok := isAZBalanced[az.Lcuuid]; ok && isBalanced {
+				continue
+			}
+			for _, azLcuuid := range regionToAZLcuuids[az.Region] {
+				isAZBalanced[azLcuuid] = true
+			}
+		}
+
 		p := &AZInfo{
 			lcuuid:          az.Lcuuid,
 			vTapIDToTraffic: vTapIDToTraffic,

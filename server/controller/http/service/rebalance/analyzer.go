@@ -102,3 +102,42 @@ func GetAZToAnalyzers(azAnalyzerConns []mysql.AZAnalyzerConnection, regionToAZLc
 	}
 	return azToAnalyzers
 }
+
+func GetAZToVtap(azAnalyzerConns []mysql.AZAnalyzerConnection, regionToAZLcuuids map[string][]string,
+	azToVTaps map[string][]*mysql.VTap) map[string][]*mysql.VTap {
+	azToVTapsMap := make(map[string]map[int]*mysql.VTap)
+
+	addVTapToAZFunc := func(region, azLcuuid string) {
+		if _, ok := azToVTaps[azLcuuid]; !ok {
+			return
+		}
+		if azToVTapsMap[azLcuuid] == nil {
+			azToVTapsMap[azLcuuid] = make(map[int]*mysql.VTap)
+		}
+		for _, vtaps := range azToVTaps {
+			for _, vtap := range vtaps {
+				log.Debugf("region(%s) az(%s) vtap(id: %v, name: %v, analyzer ip: %v)", region, azLcuuid, vtap.ID, vtap.Name, vtap.AnalyzerIP)
+				azToVTapsMap[azLcuuid][vtap.ID] = vtap
+			}
+		}
+	}
+	for _, conn := range azAnalyzerConns {
+		if conn.AZ == "ALL" {
+			if azLcuuids, ok := regionToAZLcuuids[conn.Region]; ok {
+				for _, azLcuuid := range azLcuuids {
+					addVTapToAZFunc(conn.Region, azLcuuid)
+				}
+			}
+		} else {
+			addVTapToAZFunc(conn.Region, conn.AZ)
+		}
+	}
+
+	azToVTapsResp := make(map[string][]*mysql.VTap)
+	for az, vtapMap := range azToVTapsMap {
+		for _, vtap := range vtapMap {
+			azToVTapsResp[az] = append(azToVTapsResp[az], vtap)
+		}
+	}
+	return azToVTapsResp
+}
