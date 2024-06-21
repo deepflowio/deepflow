@@ -205,7 +205,7 @@ func (t *TransportLayer) WriteBlock(block *ckdb.Block) {
 }
 
 type ApplicationLayer struct {
-	L7Protocol uint8 `json:"l7_protocol"` // HTTP, DNS, others
+	L7Protocol uint8 `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"` // HTTP, DNS, others
 }
 
 var ApplicationLayerColumns = []*ckdb.Column{
