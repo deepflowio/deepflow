@@ -125,7 +125,8 @@ controller:
 
   # datasource-api from ingester
   ingester-api:
-    port: 30106
+    port: 20106
+    node-port: 30106
     timeout: 60
 
   # 规格相关定义

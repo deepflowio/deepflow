@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
@@ -582,7 +583,7 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 			}
 		}
 
-		dataSourceService := service.NewDataSourceWithoutUserInfo(n.config.GetIngesterAPIPort())
+		dataSourceService := service.NewDataSourceWithIngesterAPIConfig(&common.UserInfo{ORGID: n.GetORGID()}, n.config.GetIngesterAPI())
 		if IsStandaloneRunningMode() {
 			// in standalone mode, since all in one deployment and analyzer communication use 127.0.0.1
 			err = dataSourceService.ConfigAnalyzerDataSource(n.GetORGID(), "127.0.0.1")
