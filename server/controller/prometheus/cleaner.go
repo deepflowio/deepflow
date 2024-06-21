@@ -306,7 +306,6 @@ func DeleteBatch[MT any](resourceType string, db *mysql.DB, items []MT) error {
 }
 
 var (
-	queryMetric      = "metric"
 	queryLabel       = "label"
 	queryMetricLabel = "metric_label"
 )
@@ -325,16 +324,12 @@ func newQuerier(org *prometheuscommon.ORG, queryLimit int) (*querier, error) {
 		return nil, err
 	}
 	queryBody := map[string]url.Values{
-		queryMetric: url.Values{
-			"db":  {"prometheus"},
-			"sql": {"show tables"},
-		},
 		queryMetricLabel: url.Values{
-			"db":  {"prometheus"},
+			"db":  {"_prometheus"},
 			"sql": {"show tags"},
 		},
 		queryLabel: url.Values{
-			"db":  {"prometheus"},
+			"db":  {"_prometheus"},
 			"sql": {"show tag-values"},
 		},
 	}
@@ -478,24 +473,6 @@ func (q *querier) getRegionToDomainNamePrefix() (map[string]string, error) {
 		}
 	}
 	return regionToDomainNamePrefix, nil
-}
-
-func (q *querier) fillActiveData(resp *simplejson.Json) error {
-	result := resp.Get("result")
-	log.Infof(q.org.Logf("active data count: %d", len(result.Get("values").MustArray())))
-	for i := range result.Get("values").MustArray() {
-		value := result.Get("values").GetIndex(i)
-		metricName := value.GetIndex(0).MustString()
-		labelName := value.GetIndex(1).MustString()
-		labelValue := value.GetIndex(2).MustString()
-
-		q.activeData.appendMetricName(metricName)
-		q.activeData.appendLabelName(labelName)
-		q.activeData.appendLabelValue(labelValue)
-		q.activeData.appendLabel(labelName, labelValue)
-		q.activeData.appendMetricLabelName(metricName, labelName)
-	}
-	return nil
 }
 
 type activeData struct {
