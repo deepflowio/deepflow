@@ -914,16 +914,8 @@ impl TraceType {
         }
     }
 
-    fn decode_tingyun<'a, 'b>(
-        value: &'a str,
-        sub_tag: &'b str,
-        id_type: u8,
-    ) -> Option<Cow<'a, str>> {
-        if id_type == Self::TRACE_ID {
-            cloud_platform::tingyun::decode_trace_id(value, sub_tag)
-        } else {
-            None
-        }
+    fn decode_tingyun<'a, 'b>(value: &'a str, sub_tag: &'b str) -> Option<Cow<'a, str>> {
+        cloud_platform::tingyun::decode_trace_id(value, sub_tag)
     }
 
     fn decode_id<'a, 'b>(&'b self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
@@ -941,7 +933,7 @@ impl TraceType {
             TraceType::NewRpcTraceContext => {
                 decode_new_rpc_trace_context_with_type(value.as_bytes(), id_type)
             }
-            TraceType::XTingyun(sub_tag) => Self::decode_tingyun(value, sub_tag, id_type),
+            TraceType::XTingyun(sub_tag) => Self::decode_tingyun(value, sub_tag),
         }
     }
 
