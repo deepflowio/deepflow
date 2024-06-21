@@ -210,14 +210,14 @@ struct process_data_extra {
 	enum message_type message_type;
 } __attribute__ ((packed));
 
-#define DATA_BUF_MAX  32
+#define INFER_BUF_MAX  32
 
 /*
  * BPF Tail Calls context
  */
 struct infer_data_s {
 	__u32 len;
-	char data[DATA_BUF_MAX * 2];
+	char data[INFER_BUF_MAX * 2];
 };
 
 struct tail_calls_context {

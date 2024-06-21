@@ -264,10 +264,14 @@ static __inline int iovecs_copy(struct __socket_data *v,
 				const struct data_args_t *args,
 				size_t syscall_len, __u32 send_len)
 {
-#define LOOP_LIMIT 12
+/*
+ * The number of loops in eBPF is limited; tests have shown that the
+ * Linux 4.14 kernel supports a maximum of 27 iterations.
+ */
+#define LOOP_LIMIT 27
 
 	struct copy_data_s {
-		char data[CAP_DATA_SIZE];
+		char data[sizeof(v->data)];
 	};
 
 	int bytes_copy = 0;
