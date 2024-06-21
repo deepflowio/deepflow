@@ -22,3 +22,9 @@ type FPermit struct {
 	Port    int    `default:"20823" yaml:"port"`
 	Timeout int    `default:"30" yaml:"timeout"`
 }
+
+type IngesterApi struct {
+	Port     int `default:"20106" yaml:"port"`
+	NodePort int `default:"30106" yaml:"node-port"`
+	Timeout  int `default:"60" yaml:"timeout"`
+}
