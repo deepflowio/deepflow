@@ -535,6 +535,31 @@ var (
 		db:     "application_log",
 		input:  "SELECT user, user_id FROM log WHERE body!='log' LIMIT 1",
 		output: "SELECT dictGet(flow_tag.user_map, 'name', (toUInt64(user_id))) AS `user`, user_id FROM application_log.`log` PREWHERE NOT (hasToken(body,'log')) LIMIT 1",
+	}, {
+		name:   "test_showsql",
+		db:     "flow_log",
+		input:  "SHOW tag  region values from l7_flow_log",
+		output: "SELECT id AS `value`, name AS `display_name` FROM flow_tag.`region_map` GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_showsql",
+		db:     "profile",
+		input:  "SHOW tag host values from in_process",
+		output: "SELECT deviceid AS `value`, name AS `display_name`, uid FROM flow_tag.`device_map` WHERE devicetype = 6 GROUP BY `value`, `display_name`, `uid` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_showsql",
+		db:     "flow_metrics",
+		input:  "SHOW tag chost values from application",
+		output: "SELECT id AS `value`, name AS `display_name` FROM flow_tag.`chost_map` GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
+	}, {
+		name:   "test_showsql",
+		db:     "event",
+		input:  "SHOW tag end_time values from perf_event",
+		output: "SELECT field_value AS `value`, value AS `display_name` FROM flow_tag.`event_custom_field_value` WHERE `table` = 'perf_event' AND field_type = 'tag' AND field_name = 'end_time' GROUP BY `value`, `display_name` ORDER BY sum(count) desc LIMIT 10000",
+	}, {
+		name:   "test_showsql",
+		db:     "prometheus",
+		input:  "SHOW tag region values from node_processes_state where id='1'",
+		output: "SELECT id AS `value`, name AS `display_name` FROM flow_tag.`region_map` WHERE (display_name = '1') GROUP BY `value`, `display_name` ORDER BY `value` asc LIMIT 10000",
 	}}
 )
 
