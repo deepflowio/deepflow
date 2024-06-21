@@ -247,7 +247,7 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 static __inline int iovecs_copy(struct __socket_data *v,
 				struct __socket_data_buffer *v_buff,
 				const struct data_args_t *args,
-				size_t syscall_len, __u32 send_len)
+				size_t real_len, __u32 send_len)
 {
 /*
  * The number of loops in eBPF is limited; tests have shown that the
@@ -262,13 +262,10 @@ static __inline int iovecs_copy(struct __socket_data *v,
 	int bytes_copy = 0;
 	__u32 total_size = 0;
 
-	if (syscall_len >= sizeof(v->data))
+	if (real_len >= sizeof(v->data))
 		total_size = sizeof(v->data);
 	else
 		total_size = send_len;
-
-	if (total_size > syscall_len)
-		total_size = syscall_len;
 
 	char *first_iov = NULL;
 	__u32 first_iov_size = 0;
@@ -2203,7 +2200,7 @@ static __inline int output_data_common(void *ctx)
 	__u32 len = __len & (sizeof(v->data) - 1);
 
 	if (vecs) {
-		len = iovecs_copy(v, v_buff, args, v->syscall_len, len);
+		len = iovecs_copy(v, v_buff, args, __len, len);
 	} else {
 		if (__len >= sizeof(v->data)) {
 			if (v->source != DATA_SOURCE_IO_EVENT) {
