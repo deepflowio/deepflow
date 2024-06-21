@@ -62,7 +62,7 @@ type Config struct {
 	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
 	NoTeamIDRefused                bool
 	FPermit                        common.FPermit
-	IngesterAPIPort                int // data source
+	IngesterAPI                    common.IngesterApi // data source
 	AllAgentConnectToNatIP         bool
 	NoIPOverlapping                bool
 }
@@ -119,12 +119,12 @@ func (c *Config) GetIngesterPort() int {
 	return c.IngesterPort
 }
 
-func (c *Config) SetIngesterAPIPort(port int) {
-	c.IngesterAPIPort = port
+func (c *Config) SetIngesterAPI(ingesterAPI common.IngesterApi) {
+	c.IngesterAPI = ingesterAPI
 }
 
-func (c *Config) GetIngesterAPIPort() int {
-	return c.IngesterAPIPort
+func (c *Config) GetIngesterAPI() common.IngesterApi {
+	return c.IngesterAPI
 }
 
 func (c *Config) SetLogLevel(logLevel string) {

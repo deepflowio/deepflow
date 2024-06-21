@@ -38,24 +38,47 @@ type DataSource struct {
 	cfg *config.ControllerConfig
 
 	resourceAccess *ResourceAccess
+	ipToController map[string]*mysql.Controller
 }
 
 func NewDataSource(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *DataSource {
-	return &DataSource{
+	dataSource := &DataSource{
 		cfg:            cfg,
 		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
 	}
+
+	dataSource.generateIPToController()
+	return dataSource
 }
 
-func NewDataSourceWithoutUserInfo(port int) *DataSource {
-	return &DataSource{
+func NewDataSourceWithIngesterAPIConfig(userInfo *httpcommon.UserInfo, cfg common.IngesterApi) *DataSource {
+	dataSource := &DataSource{
 		cfg: &config.ControllerConfig{
-			IngesterApi: config.IngesterApi{
-				Port: port,
-			},
+			IngesterApi: cfg,
 		},
-		resourceAccess: &ResourceAccess{},
+		resourceAccess: &ResourceAccess{userInfo: userInfo},
 	}
+	if err := dataSource.generateIPToController(); err != nil {
+		log.Warning(err)
+	}
+	return dataSource
+}
+
+func (d *DataSource) generateIPToController() error {
+	db, err := mysql.GetDB(d.resourceAccess.userInfo.ORGID)
+	if err != nil {
+		return err
+	}
+	var controllers []mysql.Controller
+	if err = db.Find(&controllers).Error; err != nil {
+		return err
+	}
+	ipToController := make(map[string]*mysql.Controller)
+	for i, controller := range controllers {
+		ipToController[controller.IP] = &controllers[i]
+	}
+	d.ipToController = ipToController
+	return nil
 }
 
 var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
@@ -532,7 +555,17 @@ func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, base
 		"interval":                  dataSource.Interval / common.INTERVAL_1MINUTE,
 		"retention-time":            dataSource.RetentionTime,
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), d.cfg.IngesterApi.Port)
+	if len(d.ipToController) == 0 {
+		log.Warningf("ORGID-%d get ip to controller nil", orgID)
+	}
+	port := d.cfg.IngesterApi.NodePort
+	if controller, ok := d.ipToController[ip]; ok {
+		if controller.NodeType == common.CONTROLLER_NODE_TYPE_MASTER && len(controller.PodIP) != 0 {
+			ip = controller.PodIP
+			port = d.cfg.IngesterApi.Port
+		}
+	}
+	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), port)
 	log.Infof("call add data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("POST", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
@@ -552,7 +585,17 @@ func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysql
 		"db":                        getTableName(dataSource.DataTableCollection),
 		"retention-time":            dataSource.RetentionTime,
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), d.cfg.IngesterApi.Port)
+	if len(d.ipToController) == 0 {
+		log.Warningf("ORGID-%d get ip to controller nil", orgID)
+	}
+	port := d.cfg.IngesterApi.NodePort
+	if controller, ok := d.ipToController[ip]; ok {
+		if controller.NodeType == common.CONTROLLER_NODE_TYPE_MASTER && len(controller.PodIP) != 0 {
+			ip = controller.PodIP
+			port = d.cfg.IngesterApi.Port
+		}
+	}
+	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), port)
 	log.Infof("call mod data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("PATCH", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
@@ -571,7 +614,17 @@ func (d *DataSource) CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql
 		"name":                      name,
 		"db":                        getTableName(dataSource.DataTableCollection),
 	}
-	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), d.cfg.IngesterApi.Port)
+	if len(d.ipToController) == 0 {
+		log.Warningf("ORGID-%d get ip to controller nil", orgID)
+	}
+	port := d.cfg.IngesterApi.NodePort
+	if controller, ok := d.ipToController[ip]; ok {
+		if controller.NodeType == common.CONTROLLER_NODE_TYPE_MASTER && len(controller.PodIP) != 0 {
+			ip = controller.PodIP
+			port = d.cfg.IngesterApi.Port
+		}
+	}
+	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), port)
 	log.Infof("call del data_source, url: %s, body: %v", url, body)
 	_, err = common.CURLPerform("DELETE", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {

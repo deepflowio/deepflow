@@ -41,11 +41,6 @@ import (
 
 var log = logging.MustGetLogger("config")
 
-type IngesterApi struct {
-	Port    int `default:"30106" yaml:"port"`
-	Timeout int `default:"60" yaml:"timeout"`
-}
-
 type Specification struct {
 	VTapGroupMax                 int `default:"1000" yaml:"vtap_group_max"`
 	VTapMaxPerGroup              int `default:"10000" yaml:"vtap_max_per_group"`
@@ -92,8 +87,8 @@ type ControllerConfig struct {
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
-	IngesterApi IngesterApi   `yaml:"ingester-api"`
-	Spec        Specification `yaml:"spec"`
+	IngesterApi common.IngesterApi `yaml:"ingester-api"`
+	Spec        Specification      `yaml:"spec"`
 
 	MonitorCfg     monitor.MonitorConfig         `yaml:"monitor"`
 	ManagerCfg     manager.ManagerConfig         `yaml:"manager"`
@@ -135,7 +130,7 @@ func (c *Config) Load(path string) {
 	c.ControllerConfig.TrisolarisCfg.SetGrpcMaxMessageLength(c.ControllerConfig.GrpcMaxMessageLength)
 	c.ControllerConfig.TrisolarisCfg.SetNoTeamIDRefused(c.ControllerConfig.NoTeamIDRefused)
 	c.ControllerConfig.TrisolarisCfg.SetFPermitConfig(c.ControllerConfig.FPermit)
-	c.ControllerConfig.TrisolarisCfg.SetIngesterAPIPort(c.ControllerConfig.IngesterApi.Port)
+	c.ControllerConfig.TrisolarisCfg.SetIngesterAPI(c.ControllerConfig.IngesterApi) // for data source
 	c.ControllerConfig.TrisolarisCfg.SetAllAgentConnectToNatIP(c.ControllerConfig.AllAgentConnectToNatIP)
 	c.ControllerConfig.TrisolarisCfg.SetNoIPOverlapping(c.ControllerConfig.NoIPOverlapping)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
