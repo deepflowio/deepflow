@@ -786,7 +786,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 
 	// 查询外部字段
-	if !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_FLOW_LOG, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_EVENT, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_APPLICATION_LOG}, db) || (db == "flow_log" && table != "l7_flow_log") {
+	if !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_FLOW_LOG, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_EVENT, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_APPLICATION_LOG, "_prometheus"}, db) || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -818,13 +818,17 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 	externalSql := ""
 	if whereSql != "" {
-		if table == "" {
+		if db == "_prometheus" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", whereSql, limit)
+		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, whereSql, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		}
 	} else {
-		if table == "" {
+		if db == "_prometheus" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", limit)
+		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
@@ -837,7 +841,13 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
 		tableName := _tagName.([]interface{})[1]
-		if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
+		if db == "_prometheus" {
+			externalTag := tagName.(string)
+			response.Values = append(response.Values, []interface{}{
+				externalTag, externalTag, externalTag, externalTag, "map_item",
+				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, []string{}, tableName,
+			})
+		} else if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "map_item",
@@ -879,7 +889,7 @@ func GetTagValuesDescriptions(db, rawSql, queryCacheTTL, orgID string, useQueryC
 		}
 	}
 	switch db {
-	case "prometheus":
+	case ckcommon.DB_NAME_PROMETHEUS, "_prometheus":
 		if whereSql != "" {
 			sql = fmt.Sprintf("SELECT field_name AS label_name, field_value AS label_value FROM prometheus_custom_field_value WHERE %s GROUP BY label_name, label_value ORDER BY label_name ASC LIMIT %s", whereSql, limit)
 		} else {
