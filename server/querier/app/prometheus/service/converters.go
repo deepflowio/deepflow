@@ -302,12 +302,11 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		if matcher.Name == PROMETHEUS_METRICS_NAME {
 			continue
 		}
-		operation, value := getLabelMatcher(matcher.Type, matcher.Value)
+		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixType, db, matcher.Name)
+		operation, value := getLabelMatcher(matcher.Type, matcher.Value, isDeepFlowTag)
 		if operation == "" {
 			return ctx, "", "", "", "", fmt.Errorf("unknown match type %v", matcher.Type)
 		}
-
-		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixType, db, matcher.Name)
 
 		// for normal query & DeepFlow metrics, query enum tag can only use tag name(Enum(x)) in filter clause
 		tagMatcher := tagName
@@ -324,7 +323,12 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
 		} else {
 			// () with only ONE condition in it will cause error
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0])))
+			if value[0] == "" && isDeepFlowTag {
+				// only for DeepFlow Tag, when value is empty, use [not] exist(`tag`) for query
+				filters = append(filters, fmt.Sprintf("%s(%s)", operation, tagMatcher))
+			} else {
+				filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0])))
+			}
 		}
 
 		if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
@@ -975,12 +979,12 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 		if matcher.Name == labels.MetricName {
 			continue
 		}
-		operation, value := getLabelMatcher(parseMatcherType(matcher.Type), matcher.Value)
+		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixDeepFlow, chCommon.DB_NAME_PROMETHEUS, matcher.Name)
+		operation, value := getLabelMatcher(parseMatcherType(matcher.Type), matcher.Value, isDeepFlowTag)
 		if operation == "" {
 			continue
 		}
 
-		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixDeepFlow, chCommon.DB_NAME_PROMETHEUS, matcher.Name)
 		tagMatcher := tagName
 		if isDeepFlowTag && tagAlias != "" {
 			tagMatcher = tagAlias
@@ -992,7 +996,12 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 			}
 			filters = append(filters, fmt.Sprintf("(%s)", strings.Join(tmpFilters, " OR ")))
 		} else {
-			filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0])))
+			if value[0] == "" && isDeepFlowTag {
+				// only for DeepFlow Tag, when value is empty, use [not] exist(`tag`) for query
+				filters = append(filters, fmt.Sprintf("%s(%s)", operation, tagMatcher))
+			} else {
+				filters = append(filters, fmt.Sprintf("%s %s '%s'", tagMatcher, operation, escapeSingleQuote(value[0])))
+			}
 		}
 
 		if isDeepFlowTag && cap(groupBy) == 0 {
@@ -1104,18 +1113,26 @@ func parseMatcherType(t labels.MatchType) prompb.LabelMatcher_Type {
 }
 
 // match prometheus lable matcher type
-func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, []string) {
+func getLabelMatcher(t prompb.LabelMatcher_Type, v string, isDeepFlowTag bool) (string, []string) {
 	switch t {
 	case prompb.LabelMatcher_EQ:
-		return "=", []string{v}
+		if v == "" && isDeepFlowTag {
+			return "not exist", []string{v}
+		} else {
+			return "=", []string{v}
+		}
 	case prompb.LabelMatcher_NEQ:
-		return "!=", []string{v}
+		if v == "" && isDeepFlowTag {
+			return "exist", []string{v}
+		} else {
+			return "!=", []string{v}
+		}
 	case prompb.LabelMatcher_RE:
 		// for regex like 'a|b', convert to 'tag=a OR tag=b'
 		if _match_fullmatch_reg.MatchString(v) {
 			return "=", strings.Split(v, "|")
-		} else if v == "" {
-			return "=", []string{v}
+		} else if v == "" && isDeepFlowTag {
+			return "not exist", []string{v}
 		} else {
 			return "REGEXP", []string{appendRegexRules(v)}
 		}
@@ -1123,8 +1140,8 @@ func getLabelMatcher(t prompb.LabelMatcher_Type, v string) (string, []string) {
 		// for regex like 'a|b', convert to 'tag!=a OR tag!=b'
 		if _match_fullmatch_reg.MatchString(v) {
 			return "!=", strings.Split(v, "|")
-		} else if v == "" {
-			return "!=", []string{v}
+		} else if v == "" && isDeepFlowTag {
+			return "exist", []string{v}
 		} else {
 			return "NOT REGEXP", []string{appendRegexRules(v)}
 		}
