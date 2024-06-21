@@ -2219,7 +2219,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	__u32 syscall_infer_len = 0;
 	if (extra->vecs) {
 		__infer_buf->len = infer_iovecs_copy(__infer_buf, args,
-						     count, DATA_BUF_MAX,
+						     count, INFER_BUF_MAX,
 						     &syscall_infer_addr,
 						     &syscall_infer_len);
 		/*
