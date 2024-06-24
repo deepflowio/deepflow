@@ -18,6 +18,7 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -219,8 +220,11 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 		case <-manager.LinuxNamespaceDoneCH:
 			resp.LinuxNamespace = GetNamespaces(key)
 		case <-manager.ExecDoneCH: // error occurred
-			log.Errorf("get agent(key: %s) remote commands and linux namespace, error: %s", key, GetContent(key))
-			return &model.RemoteExecResp{Content: GetContent(key)}, nil
+			if len(GetCommands(key)) != 0 {
+				return &model.RemoteExecResp{RemoteCommand: GetCommands(key)}, nil
+			}
+			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key))
+			return nil, errors.New(key)
 		default:
 			if len(GetCommands(key)) != 0 && len(GetNamespaces(key)) != 0 {
 				log.Infof("len(commands)=%d, len(namespaces)=%d", len(GetCommands(key)), len(GetNamespaces(key)))
