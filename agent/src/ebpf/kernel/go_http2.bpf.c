@@ -345,6 +345,7 @@ http2_fill_common_socket_2(struct http2_header_data *data,
 
 		struct socket_info_s sk_info = {
 			.uid = send_buffer->socket_id,
+			.l7_proto = PROTO_HTTP2,
 		};
 
 		if (!socket_info_map__update(&conn_key, &sk_info)) {
@@ -1049,6 +1050,7 @@ static __inline int fill_http2_dataframe_base(struct __http2_stack *stack,
 
 		struct socket_info_s sk_info = {
 			.uid = send_buffer->socket_id,
+			.l7_proto = PROTO_HTTP2,
 		};
 
 		if (!socket_info_map__update(&conn_key, &sk_info)) {
