@@ -101,6 +101,10 @@ controller:
     auto_increment_increment: 1
     # limit the total number of process queried at a time
     result_set_max: 100000
+    max_open_conns: 100
+    max_idle_conns: 50
+    # unit: minute
+    conn_max_life_time: 60
 
   # redis相关配置
   redis:
