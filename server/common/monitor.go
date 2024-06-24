@@ -90,15 +90,15 @@ type Monitor struct {
 }
 
 type Counter struct {
-	CpuPercent float64 `statsd:"cpu-percent"`
-	MemRSS     uint64  `statsd:"mem-rss"`
-	MemInuse   uint64  `statsd:"mem-inuse"`
-	BytesSend  uint64  `statsd:"bytes-send"`
-	BytesRecv  uint64  `statsd:"bytes-recv"`
-	BytesRead  uint64  `statsd:"bytes-read"`
-	BytesWrite uint64  `statsd:"bytes-write"`
-	Load1      float64 `statsd:"load1"`
-	CPUNum     uint64  `statsd:"cpu-num"`
+	CpuPercent    float64 `statsd:"cpu-percent"`
+	MemRSS        uint64  `statsd:"mem-rss"`
+	MemInuse      uint64  `statsd:"mem-inuse"`
+	BytesSend     uint64  `statsd:"bytes-send"`
+	BytesRecv     uint64  `statsd:"bytes-recv"`
+	BytesRead     uint64  `statsd:"bytes-read"`
+	BytesWrite    uint64  `statsd:"bytes-write"`
+	Load1         float64 `statsd:"load1"`
+	Load1ByCpuNum float64 `statsd:"load1-by-cpu-num"`
 }
 
 func NewMonitor(paths []string) (*Monitor, error) {
@@ -132,7 +132,10 @@ func (m *Monitor) GetCounter() interface{} {
 		BytesRead:  bytesRead - m.lastRead,
 		BytesWrite: bytesWrite - m.lastWrite,
 		Load1:      m.GetLoad1(),
-		CPUNum:     m.GetCpuNum(),
+	}
+	CPUNum := m.GetCpuNum()
+	if CPUNum != 0 {
+		c.Load1ByCpuNum = c.Load1 / float64(CPUNum)
 	}
 	m.lastSend, m.lastRecv = bytesSend, bytesRecv
 	m.lastRead, m.lastWrite = bytesRead, bytesWrite
