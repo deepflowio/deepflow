@@ -376,11 +376,6 @@ static __inline enum message_type parse_http2_headers_frame(const char
 {
 #define HTTPV2_FRAME_PROTO_SZ           0x9
 #define HTTPV2_FRAME_TYPE_HEADERS       0x1
-#define HTTPV2_STATIC_TABLE_AUTH_IDX    0x1
-#define HTTPV2_STATIC_TABLE_GET_IDX     0x2
-#define HTTPV2_STATIC_TABLE_POST_IDX    0x3
-#define HTTPV2_STATIC_TABLE_PATH_1_IDX  0x4
-#define HTTPV2_STATIC_TABLE_PATH_2_IDX  0x5
 // In some cases, the compiled binary instructions exceed the limit, the
 // specific reason is unknown, reduce the number of cycles of http2, which
 // may cause http2 packet loss
@@ -489,33 +484,12 @@ static __inline enum message_type parse_http2_headers_frame(const char
 						 HTTPV2_STATIC_TABLE_IDX_MAX);
 
 		// 静态索引表的Index取值范围 [1, 61]
+		// ref : https://datatracker.ietf.org/doc/html/rfc7541#appendix-A 
 		if (static_table_idx > HTTPV2_STATIC_TABLE_IDX_MAX &&
 		    static_table_idx == 0)
 			continue;
 
-		// HTTPV2 REQUEST
-		if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
-		    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
-		    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
-		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
-		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
-			msg_type = MSG_REQUEST;
-
-		} else {
-
-			/*
-			 * If the data type of HTTPV2 is RESPONSE in the initial
-			 * judgment, then the inference will be discarded directly.
-			 * Because the data obtained for the first time is RESPONSE,
-			 * it can be considered as invalid data (the REQUEST cannot
-			 * be found for aggregation, and the judgment of RESPONSE is
-			 * relatively rough and prone to misjudgment).
-			 */
-			if (is_first)
-				return MSG_UNKNOWN;
-
-			msg_type = MSG_RESPONSE;
-		}
+		msg_type = MSG_REQUEST;
 
 		break;
 	}
