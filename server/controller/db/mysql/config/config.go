@@ -26,4 +26,7 @@ type MySqlConfig struct {
 	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
 	AutoIncrementIncrement uint32 `default:"1" yaml:"auto_increment_increment"`
 	ResultSetMax           uint32 `default:"100000" yaml:"result_set_max"`
+	MaxOpenConns           uint16 `default:"100" yaml:"max_open_conns"`
+	MaxIdleConns           uint16 `default:"50" yaml:"max_idle_conns"`
+	ConnMaxLifeTime        uint16 `default:"60" yaml:"conn_max_life_time"`
 }

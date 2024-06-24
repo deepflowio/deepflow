@@ -38,7 +38,7 @@ func GetSession(cfg config.MySqlConfig) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return InitSession(connector)
+	return InitSession(cfg, connector)
 }
 
 func GetConnector(cfg config.MySqlConfig, useDatabase bool, timeout uint32, multiStatements bool) (driver.Connector, error) {
@@ -74,7 +74,7 @@ func GetConnector(cfg config.MySqlConfig, useDatabase bool, timeout uint32, mult
 	return connector, nil
 }
 
-func InitSession(connector driver.Connector) (*gorm.DB, error) {
+func InitSession(cfg config.MySqlConfig, connector driver.Connector) (*gorm.DB, error) {
 	db, err := gorm.Open(mysql.New(mysql.Config{
 		Conn:                      sql.OpenDB(connector),
 		DefaultStringSize:         256,   // string 类型字段的默认长度
@@ -97,12 +97,13 @@ func InitSession(connector driver.Connector) (*gorm.DB, error) {
 		log.Errorf("failed to initialize session: %v", err.Error())
 		return nil, err
 	}
-	log.Infof("initialized mysql session successfully")
+	log.Infof("%s, initialized mysql session successfully", cfg.Database)
 
 	sqlDB, _ := db.DB()
 	// 限制最大空闲连接数、最大连接数和连接的生命周期
-	sqlDB.SetMaxIdleConns(50)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetMaxIdleConns(int(cfg.MaxIdleConns))
+	sqlDB.SetMaxOpenConns(int(cfg.MaxOpenConns))
+	sqlDB.SetConnMaxLifetime(time.Duration(int(cfg.ConnMaxLifeTime) * int(time.Minute)))
+	log.Infof("%s, db stats: %#v", cfg.Database, sqlDB.Stats())
 	return db, nil
 }
