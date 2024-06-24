@@ -220,7 +220,10 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 		case <-manager.LinuxNamespaceDoneCH:
 			resp.LinuxNamespace = GetNamespaces(key)
 		case <-manager.ExecDoneCH: // error occurred
-			log.Errorf("get agent(key: %s) remote commands and linux namespace, error: %s", key, GetContent(key))
+			if len(GetCommands(key)) != 0 {
+				return &model.RemoteExecResp{RemoteCommand: GetCommands(key)}, nil
+			}
+			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key))
 			return nil, errors.New(key)
 		default:
 			if len(GetCommands(key)) != 0 && len(GetNamespaces(key)) != 0 {
