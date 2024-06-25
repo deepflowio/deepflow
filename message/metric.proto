@@ -195,6 +195,8 @@ enum ProfileEventType {
     External = 0;
     EbpfOnCpu = 1;
     EbpfOffCpu = 2;
+    EbpfMemAlloc = 3;
+    EbpfMemInUse = 4;
 }
 
 message Profile {

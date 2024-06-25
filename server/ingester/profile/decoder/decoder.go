@@ -83,9 +83,11 @@ var spyMap = map[string]string{
 }
 
 var eBPFEventType = []string{
-	pb.ProfileEventType_External:   "third-party",
-	pb.ProfileEventType_EbpfOnCpu:  "on-cpu",
-	pb.ProfileEventType_EbpfOffCpu: "off-cpu",
+	pb.ProfileEventType_External:     "third-party",
+	pb.ProfileEventType_EbpfOnCpu:    "on-cpu",
+	pb.ProfileEventType_EbpfOffCpu:   "off-cpu",
+	pb.ProfileEventType_EbpfMemAlloc: "mem-alloc",
+	pb.ProfileEventType_EbpfMemInUse: "mem-inuse",
 }
 
 type Decoder struct {
