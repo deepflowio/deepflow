@@ -49,6 +49,7 @@ const (
 	RESOURCE_NUM_EXCEEDED           = "RESOURCE_NUM_EXCEEDED"
 	SELECTED_RESOURCES_NUM_EXCEEDED = "SELECTED_RESOURCES_NUM_EXCEEDED"
 	SERVICE_UNAVAILABLE             = "SERVICE_UNAVAILABLE"
+	NO_PERMISSIONS                  = "NO_PERMISSIONS"
 )
 
 var (
@@ -615,4 +616,13 @@ var (
 	PluginTypeName = map[int]string{
 		PLUGIN_TYPE_WASM: "wasm",
 	}
+)
+
+const (
+	DEFAULT_USER_TYPE = 1
+
+	USER_TYPE_SUPER_ADMIN = 1
+	USER_TYPE_ADMIN       = 2
+
+	HEADER_KEY_X_USER_TYPE = "X-User-Type"
 )

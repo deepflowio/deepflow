@@ -65,9 +65,13 @@ func getDomains(c *gin.Context) {
 
 func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		var err error
-		var domainCreate model.DomainCreate
+		err := UserTypePermissionVerify(c)
+		if err != nil {
+			BadRequestResponse(c, common.NO_PERMISSIONS, err.Error())
+			return
+		}
 
+		var domainCreate model.DomainCreate
 		// message validation
 		err = c.ShouldBindBodyWith(&domainCreate, binding.JSON)
 		if err != nil {
@@ -82,9 +86,13 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 
 func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		var err error
-		var domainUpdate model.DomainUpdate
+		err := UserTypePermissionVerify(c)
+		if err != nil {
+			BadRequestResponse(c, common.NO_PERMISSIONS, err.Error())
+			return
+		}
 
+		var domainUpdate model.DomainUpdate
 		// message validation
 		err = c.ShouldBindBodyWith(&domainUpdate, binding.JSON)
 		if err != nil {
@@ -103,6 +111,12 @@ func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 }
 
 func deleteDomainByNameOrUUID(c *gin.Context) {
+	err := UserTypePermissionVerify(c)
+	if err != nil {
+		BadRequestResponse(c, common.NO_PERMISSIONS, err.Error())
+		return
+	}
+
 	nameOrUUID := c.Param("name-or-uuid")
 	data, err := DeleteDomainByNameOrUUID(nameOrUUID)
 	JsonResponse(c, data, err)
