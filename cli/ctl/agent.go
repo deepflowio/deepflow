@@ -43,6 +43,8 @@ type RebalanceType string
 
 const RebalanceTypeNull RebalanceType = "null"
 
+var isDebug, isAggIP bool
+
 func RegisterAgentCommand() *cobra.Command {
 	agent := &cobra.Command{
 		Use:   "agent",
@@ -94,6 +96,7 @@ func RegisterAgentCommand() *cobra.Command {
 	}
 
 	var typeStr string
+
 	rebalanceCmd := &cobra.Command{
 		Use:   "rebalance",
 		Short: "rebalance controller or analyzer",
@@ -117,6 +120,8 @@ deepflow-ctl agent rebalance --type=analyzer`,
 		},
 	}
 	rebalanceCmd.Flags().StringVarP(&typeStr, "type", "t", "", "request type controller/analyzer")
+	rebalanceCmd.Flags().BoolVarP(&isDebug, "debug", "d", false, "enable debug output")
+	rebalanceCmd.Flags().BoolVarP(&isAggIP, "agg-ip", "", false, "aggregation based on analyzer ip, type only support analzyer")
 
 	agent.AddCommand(list)
 	agent.AddCommand(delete)
@@ -478,6 +483,9 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 }
 
 func rebalance(cmd *cobra.Command, rebalanceType RebalanceType, typeVal string) error {
+	if isDebug {
+		return rebalanceDebug(cmd, typeVal)
+	}
 	isBalance, err := ifNeedRebalance(cmd, typeVal)
 	if err != nil {
 		return err
@@ -498,6 +506,69 @@ func rebalance(cmd *cobra.Command, rebalanceType RebalanceType, typeVal string) 
 		fmt.Printf("------------------------ %s ------------------------\n", typeVal)
 	}
 	printDetail(resp)
+	return nil
+}
+
+func rebalanceDebug(cmd *cobra.Command, typeVal string) error {
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/rebalance-vtap/debug/?type=%s", server.IP, server.Port, typeVal)
+	resp, err := common.CURLPerform("POST", url, nil, "",
+		[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
+	if err != nil {
+		return err
+	}
+	data := resp.Get("DATA")
+	b, err := data.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(b))
+
+	if data.Get("TRAFFIC_AZ") == nil ||
+		(data.Get("TRAFFIC_AZ") != nil && len(data.Get("TRAFFIC_AZ").MustArray()) == 0) {
+		return nil
+	}
+	fmt.Println()
+
+	t := table.New()
+	t.SetHeader([]string{"REGION", "AZ", "ANALYZER_IP", "ANALYZER_STATE", "AZ_TRAFFIC", "AGENT_COUNT", "ANALYZER_TRAFFIC"})
+	tableItems := [][]string{}
+	for i := range data.Get("TRAFFIC_AZ").MustArray() {
+		d := data.Get("TRAFFIC_AZ").GetIndex(i)
+		tableItems = append(tableItems, []string{
+			d.Get("REGION").MustString(),
+			d.Get("AZ").MustString(),
+			d.Get("ANALYZER_IP").MustString(),
+			strconv.Itoa(int(d.Get("ANALYZER_STATE").MustInt64())),
+			strconv.Itoa(int(d.Get("AZ_TRAFFIC").MustInt64())),
+			strconv.Itoa(int(d.Get("AGENT_COUNT").MustInt())),
+			strconv.Itoa(int(d.Get("ANALYZER_TRAFFIC").MustInt64())),
+		})
+	}
+	t.AppendBulk(tableItems)
+	t.Render()
+
+	if isAggIP {
+		fmt.Println()
+
+		t1 := table.New()
+		t1.SetHeader([]string{"REGION", "AZ", "ANALYZER_IP", "ANALYZER_STATE", "AGENT_COUNT", "ANALYZER_TRAFFIC"})
+		tableItems = [][]string{}
+		for i := range data.Get("TRAFFIC_ANALYZER").MustArray() {
+			d := data.Get("TRAFFIC_ANALYZER").GetIndex(i)
+			tableItems = append(tableItems, []string{
+				d.Get("REGION").MustString(),
+				d.Get("AZ").MustString(),
+				d.Get("ANALYZER_IP").MustString(),
+				strconv.Itoa(int(d.Get("ANALYZER_STATE").MustInt64())),
+				strconv.Itoa(int(d.Get("AGENT_COUNT").MustInt())),
+				strconv.Itoa(int(d.Get("ANALYZER_TRAFFIC").MustInt64())),
+			})
+		}
+		t1.AppendBulk(tableItems)
+		t1.Render()
+	}
+
 	return nil
 }
 
