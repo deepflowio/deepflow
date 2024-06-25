@@ -1067,7 +1067,6 @@ fn component_on_config_change(
                     }
                     Err(e) => {
                         warn!("build dispatcher_component failed: {}", e);
-                        thread::sleep(Duration::from_secs(1));
                         crate::utils::notify_exit(1);
                     }
                 }
@@ -1210,7 +1209,6 @@ impl DomainNameListener {
                                 Err(e) => {
                                     warn!("get ctrl ip and mac failed with error: {}", e);
                                     crate::utils::notify_exit(1);
-                                    thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
                             };
@@ -1227,7 +1225,6 @@ impl DomainNameListener {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                                     warn!("setns error: {}", e);
                                     crate::utils::notify_exit(1);
-                                    thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
                                 let (ip, mac) = match get_ctrl_ip_and_mac(&ips[0].parse().unwrap()) {
@@ -1235,14 +1232,12 @@ impl DomainNameListener {
                                     Err(e) => {
                                         warn!("get ctrl ip and mac failed with error: {}", e);
                                         crate::utils::notify_exit(1);
-                                        thread::sleep(Duration::from_secs(1));
                                         continue;
                                     }
                                 };
                                 if let Err(e) = netns::reset_netns() {
                                     warn!("reset setns error: {}", e);
                                     crate::utils::notify_exit(1);
-                                    thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
                                 AgentId { ip, mac, team_id: team_id.clone() }
