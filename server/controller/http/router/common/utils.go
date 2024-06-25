@@ -21,9 +21,12 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 )
 
 func ForwardMasterController(c *gin.Context, masterControllerName string, port int) {
@@ -133,4 +136,20 @@ func getAllKeys(data interface{}, keys map[string]bool) {
 			getAllKeys(item, keys)
 		}
 	}
+}
+
+func UserTypePermissionVerify(c *gin.Context) error {
+	var err error
+	userType := ccommon.DEFAULT_USER_TYPE
+	userTypeString := c.Request.Header.Get(ccommon.HEADER_KEY_X_USER_TYPE)
+	if len(userTypeString) != 0 {
+		userType, err = strconv.Atoi(userTypeString)
+		if err != nil {
+			return fmt.Errorf("invalid user type (%s)", userTypeString)
+		}
+	}
+	if userType != ccommon.USER_TYPE_SUPER_ADMIN && userType != ccommon.USER_TYPE_ADMIN {
+		return fmt.Errorf("user type (%d) permission denied, can not operate", userType)
+	}
+	return nil
 }
