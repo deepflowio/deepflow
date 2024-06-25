@@ -444,14 +444,19 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 			m.MetricID = metricID
 			m.AppLabelValueIDs = append(m.AppLabelValueIDs, b.appLabelValueIDsBuffer...)
 			m.Value = v
+			m.VtapId = vtapID
 			m.OrgId, m.TeamID = orgId, teamID
 
 			if i == 0 {
 				b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
 				universalTag = &m.UniversalTag
 			} else {
-				// all samples share the same universal tag
-				m.UniversalTag = *universalTag
+				if universalTag != nil {
+					// all samples share the same universal tag
+					m.UniversalTag = *universalTag
+				} else {
+					b.fillUniversalTag(m, vtapID, podName, instance, podNameID, instanceID, false)
+				}
 			}
 			b.samplesBuffer = append(b.samplesBuffer, m)
 		}
@@ -508,7 +513,7 @@ func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample
 func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, fillWithVtapId bool) {
 	t := &m.UniversalTag
 	t.VTAPID = vtapID
-	t.L3EpcID = datatype.EPC_FROM_INTERNET
+	t.L3EpcID = b.platformData.QueryVtapEpc0(m.OrgId, vtapID)
 	var ip net.IP
 	var hasMatched bool
 	if podName != "" {
@@ -528,7 +533,6 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 
 	if !hasMatched {
 		if instanceIP := getIPPartFromPrometheusInstanceString(instance); instanceIP != "" {
-			t.L3EpcID = b.platformData.QueryVtapEpc0(m.OrgId, vtapID)
 			ip = net.ParseIP(instanceIP)
 			if ip != nil {
 				hasMatched = true
@@ -537,7 +541,6 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	}
 
 	if !hasMatched && fillWithVtapId {
-		t.L3EpcID = b.platformData.QueryVtapEpc0(m.OrgId, vtapID)
 		vtapInfo := b.platformData.QueryVtapInfo(m.OrgId, vtapID)
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
