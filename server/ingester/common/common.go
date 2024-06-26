@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
+	"net/url"
 	"sync"
 
 	"github.com/deepflowio/deepflow/message/trident"
@@ -111,7 +112,7 @@ func NewCKConnections(addrs []string, username, password string) (DBs, error) {
 }
 
 func NewCKConnection(addr, username, password string) (*sql.DB, error) {
-	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s:%s@%s?dial_timeout=10s&max_execution_time=120", username, password, addr))
+	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s@%s?dial_timeout=10s&max_execution_time=120", url.UserPassword(username, password), addr))
 	if err != nil {
 		return nil, fmt.Errorf("new ck connection to %s failed: %s", addr, err)
 	}

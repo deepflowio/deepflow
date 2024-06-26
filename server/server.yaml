@@ -418,7 +418,6 @@ ingester:
 
   #ckdb-auth:
   #  username: default
-  #  # '#','@' special characters are not supported in passwords
   #  password:
 
   # local node ip, if not set will get from environment variable 'NODE_IP', dafault: ""
