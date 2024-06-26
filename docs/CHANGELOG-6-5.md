@@ -3,6 +3,7 @@
 ### DeepFlow release v6.5
 
 - feat: Add Changelog [#7095](https://github.com/deepflowio/deepflow/pull/7095)
+- feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
