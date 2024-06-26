@@ -32,6 +32,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
+func newLabelResponse(version uint32) *trident.PrometheusLabelResponse {
+	return &trident.PrometheusLabelResponse{Version: &version}
+}
+
 type ORGLabelSynchronizers struct {
 	statsdCounter *statsd.PrometheusLabelIDsCounter
 }
@@ -54,7 +58,8 @@ func (s *ORGLabelSynchronizers) Sync(req *trident.PrometheusLabelRequest) (*trid
 	if len(req.GetRequestLabels()) == 0 {
 		curVersion := GetVersion().Get()
 		if req.GetVersion() == curVersion {
-			return &trident.PrometheusLabelResponse{}, nil
+			log.Infof("label version is up to date: %d", curVersion)
+			return newLabelResponse(curVersion), nil
 		}
 		log.Infof("label version update from %d to %d", req.GetVersion(), curVersion)
 		return s.assembleFully(curVersion)
@@ -72,7 +77,7 @@ func (s *ORGLabelSynchronizers) assembleFully(version uint32) (*trident.Promethe
 		return nil, errors.Wrap(err, "assembleFully")
 	}
 	// merge all orgs' response
-	resp := &trident.PrometheusLabelResponse{Version: &version}
+	resp := newLabelResponse(version)
 	for iter := range orgIDToResp.IterBuffered() {
 		resp.ResponseLabelIds = append(resp.ResponseLabelIds, iter.Val.ResponseLabelIds...)
 		resp.OrgResponseLabels = append(resp.OrgResponseLabels, iter.Val.OrgResponseLabels...)
