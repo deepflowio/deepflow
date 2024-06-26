@@ -511,12 +511,41 @@ static __inline enum message_type parse_http2_headers_frame(const char
 						 HTTPV2_STATIC_TABLE_IDX_MAX);
 
 		// 静态索引表的Index取值范围 [1, 61]
-		// ref : https://datatracker.ietf.org/doc/html/rfc7541#appendix-A 
 		if (static_table_idx > HTTPV2_STATIC_TABLE_IDX_MAX &&
 		    static_table_idx == 0)
 			continue;
 
-		msg_type = MSG_REQUEST;
+		/*
+		 * ref : https://datatracker.ietf.org/doc/html/rfc7541#appendix-A 
+		 * Static Table Entries:
+		 * +-------+-----------------------------+---------------+
+		 * | Index | Header Name                 | Header Value  |
+		 * +-------+-----------------------------+---------------+
+		 * | 1     | :authority                  |               |
+		 * | 2     | :method                     | GET           |
+		 * | 3     | :method                     | POST          |
+		 * | 4     | :path                       | /             |
+		 * | 5     | :path                       | /index.html   |
+		 * | 6     | :scheme                     | http          |
+		 * | 7     | :scheme                     | https         |
+		 * | 8     | :status                     | 200           |
+		 * | 9     | :status                     | 204           |
+		 * | 10    | :status                     | 206           |
+		 * | 11    | :status                     | 304           |
+		 * | 12    | :status                     | 400           |
+		 * | 13    | :status                     | 404           |
+		 * | 14    | :status                     | 500           |
+		 */
+		if (static_table_idx >= 1 && static_table_idx <= 7) {
+			msg_type = MSG_REQUEST;
+			conn_info->role =
+			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+
+		} else if (static_table_idx >= 8 && static_table_idx <= 14) {
+			conn_info->role =
+			    (conn_info->direction == T_EGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+			msg_type = MSG_RESPONSE;
+		}
 
 		break;
 	}
@@ -715,6 +744,19 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 		return conn_info->direction ==
 		    T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
 	}
+
+	/*
+	 * Strengthen length checking, such as the following MYSQL protocol data:
+	 * MySQL Protocol
+	 *   - Packet Length: 15  --- len
+	 *   - Packet Number: 0
+	 *   - Request Command Query
+	 *       - Command: Query (3)
+	 *       - Statement: show databases
+	 */
+	
+	if (count != (len + 4))
+		return MSG_UNKNOWN;
 
 	if (seq != 0)
 		return MSG_UNKNOWN;
@@ -1012,12 +1054,10 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	static const __u8 bolt_ver_v1 = 0x01;
 	static const __u8 type_req = 0x01;
 	static const __u8 type_resp = 0x0;
+	static const __u16 cmd_code_heartbeat = 0x0;
 	static const __u16 cmd_code_req = 0x01;
 	static const __u16 cmd_code_resp = 0x02;
-	static const __u8 codec_hessian = 0;
 	static const __u8 codec_hessian2 = 1;
-	static const __u8 codec_protobuf = 11;
-	static const __u8 codec_json = 12;
 
 	if (count < bolt_resp_header_len)
 		return MSG_UNKNOWN;
@@ -1026,8 +1066,8 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 		return MSG_UNKNOWN;
 
 	const __u8 *infer_buf = (const __u8 *)buf;
-	__u8 ver = infer_buf[0];	//version for protocol
-	__u8 type = infer_buf[1];	// request/response/request oneway
+	__u8 proto = infer_buf[0]; // Under version V1, proto = 1; under version V2, proto = 2
+	__u8 type = infer_buf[1]; // 0 => RESPONSE，1 => REQUEST，2 => REQUEST_ONEWAY
 
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
@@ -1035,16 +1075,31 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 		goto out;
 	}
 	// code for remoting command (Heartbeat, RpcRequest, RpcResponse)
+	// 1 => rpc request，2 => rpc response
 	__u16 cmdcode = __bpf_ntohs(*(__u16 *) & infer_buf[2]);
+	__u8 ver2 = infer_buf[4];
+	// Command versions, From the source code, it is known that it is currently fixed at 1
+	if (ver2 != 1)
+		return MSG_UNKNOWN;
 
-	// 0 -- "hessian", 1 -- "hessian2", 11 -- "protobuf", 12 -- "json"
+	/*
+	 * Codec, literally understood as an encoder-decoder, is actually
+	 * a marker for serialization and deserialization implementation.
+	 * Both V1 and V2 currently have codec fixed at 1. By tracing the
+	 * source code, it is found that the configuration value of
+	 * SerializerManager is Hessian2 = 1, meaning Hessian2 is used by
+	 * default for serialization and deserialization.
+	 * 
+	 * 0 -- "hessian", 1 -- "hessian2", 11 -- "protobuf", 12 -- "json"
+	 */
 	__u8 codec = infer_buf[9];
+	if (codec != codec_hessian2)
+		return MSG_UNKNOWN;
 
-	if (!((ver == bolt_ver_v1)
+	if (!((proto == bolt_ver_v1)
 	      && (type == type_req || type == type_resp)
-	      && (cmdcode == cmd_code_req || cmdcode == cmd_code_resp)
-	      && (codec == codec_hessian || codec == codec_hessian2
-		  || codec == codec_protobuf || codec == codec_json))) {
+	      && (cmdcode == cmd_code_req || cmdcode == cmd_code_resp
+		  || cmdcode == cmd_code_heartbeat))) {
 		return MSG_UNKNOWN;
 	}
 	// length of request or response class name
@@ -1066,8 +1121,6 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 		    && !sofarpc_check_character(infer_buf[22])) {
 			return MSG_UNKNOWN;;
 		}
-
-		goto out;
 	}
 
 	if (cmdcode == cmd_code_resp) {
@@ -1089,11 +1142,8 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 		    && !sofarpc_check_character(infer_buf[20])) {
 			return MSG_UNKNOWN;;
 		}
-
-		goto out;
 	}
 
-	return MSG_UNKNOWN;
 out:
 	return type == type_req ? MSG_REQUEST : MSG_RESPONSE;
 }
@@ -2887,11 +2937,6 @@ infer_mongo_message(const char *buf, size_t count,
 	if (!protocol_port_check_2(PROTO_MONGO, conn_info))
 		return MSG_UNKNOWN;
 
-	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
-		if (conn_info->socket_info_ptr->l7_proto != PROTO_MONGO)
-			return MSG_UNKNOWN;
-	}
-
 	struct mongo_header *header = NULL;
 	if (conn_info->prev_count == sizeof(*header)) {
 		count += sizeof(*header);
@@ -2919,6 +2964,18 @@ infer_mongo_message(const char *buf, size_t count,
 		save_prev_data_from_kern(buf, conn_info, sizeof(*header));
 		return MSG_PRESTORE;
 	}
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_MONGO)
+			return MSG_UNKNOWN;
+		if (header->op_code == MONGO_OP_REPLY)
+			return MSG_RESPONSE;
+		else
+			return MSG_REQUEST;
+	}
+
+	if (header->message_length != count)
+		return MSG_UNKNOWN;
 
 	if (header->request_id < 0) {
 		return MSG_UNKNOWN;
@@ -3639,18 +3696,9 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		return inferred_message;
 
 #ifdef LINUX_VER_5_2_PLUS
-	if (skip_proto != PROTO_MYSQL && (inferred_message.type =
+	if (skip_proto != PROTO_KAFKA && (inferred_message.type =
 #else
 	if ((inferred_message.type =
-#endif
-	     infer_mysql_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
-		if (inferred_message.type == MSG_PRESTORE)
-			return inferred_message;
-		inferred_message.protocol = PROTO_MYSQL;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_KAFKA && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
 #endif
 		    infer_kafka_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
@@ -3665,6 +3713,15 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		    infer_sofarpc_message(infer_buf, count,
 					  conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_SOFARPC;
+#ifdef LINUX_VER_5_2_PLUS
+	} else if (skip_proto != PROTO_MYSQL && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+	     infer_mysql_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
+		if (inferred_message.type == MSG_PRESTORE)
+			return inferred_message;
+		inferred_message.protocol = PROTO_MYSQL;
 #ifdef LINUX_VER_5_2_PLUS
 	} else if (skip_proto != PROTO_FASTCGI && (inferred_message.type =
 #else
