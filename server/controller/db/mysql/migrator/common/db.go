@@ -24,6 +24,7 @@ import (
 )
 
 func GetSessionWithoutName(cfg config.MySqlConfig) (*gorm.DB, error) {
+	log.Info(LogDBName(cfg.Database, "get session without database name"))
 	connector, err := common.GetConnector(cfg, false, cfg.TimeOut, false)
 	if err != nil {
 		return nil, err
@@ -32,6 +33,7 @@ func GetSessionWithoutName(cfg config.MySqlConfig) (*gorm.DB, error) {
 }
 
 func GetSessionWithName(cfg config.MySqlConfig) (*gorm.DB, error) {
+	log.Info(LogDBName(cfg.Database, "get session with database name"))
 	// set multiStatements=true in dsn only when migrating MySQL
 	connector, err := common.GetConnector(cfg, true, cfg.TimeOut*2, true)
 	if err != nil {

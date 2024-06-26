@@ -53,6 +53,7 @@ func Migrate(cfg config.MySqlConfig) error {
 }
 
 func migrateDefaultDatabase(cfg config.MySqlConfig) error {
+	log.Info(common.LogDBName(cfg.Database, "migrate database"))
 	copiedCfg := cfg
 	databaseExisted, err := CreateDatabase(copiedCfg)
 	if err != nil {

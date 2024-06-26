@@ -41,6 +41,7 @@ func UpgradeDatabase(cfg config.MySqlConfig) error {
 		log.Error(common.LogDBName(dc.Config.Database, "failed to check db_version table: %s", err.Error()))
 		return err
 	}
+	log.Info(common.LogDBName(cfg.Database, "check db_version table: %s", dbVersionTable))
 	if dbVersionTable == "" {
 		return initTablesWithoutRollBack(dc)
 	} else {

@@ -181,7 +181,7 @@ func executeIssue(dc *DBConfig, nextVersion string) error {
 		log.Warning(LogDBName(dc.Config.Database, "issue with no content (version: %s)", nextVersion))
 		return nil
 	}
-
+	log.Info(LogDBName(dc.Config.Database, "executing db issue (version: %s)", nextVersion))
 	strSQL := fmt.Sprintf("SET @defaultDatabaseName='%s';\n", mysql.DefaultDB.Name) + string(byteSQL)
 	err = dc.DB.Exec(strSQL).Error
 	if err != nil {
