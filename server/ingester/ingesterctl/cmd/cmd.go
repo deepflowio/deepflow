@@ -81,13 +81,15 @@ func RegisterIngesterCommand(root *cobra.Command) {
 			{Cmd: "set-profile-types [cpu][,inuse_objects][,alloc_objects][,inuse_space][,alloc_space][,goroutines][,mutex_count][,mutex_duration][,block_count][,block_duration]", Helper: "default continuous profiler profile types: cpu,inuse_objects,alloc_objects,inuse_space,alloc_space. need to restart continuous profiler to take effect"},
 		},
 	))
+	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
+		ingesterctl.CMD_ORG_SWITCH,
+		debug.CmdHelper{Cmd: "switch-to-debug-org [org-id]", Helper: "the debugging command switches to the specified organization"},
+		nil,
+	))
 
 	dropletCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_QUEUE, []string{
 		"1-receiver-to-statsd",
 		"1-receiver-to-syslog",
-		"1-receiver-to-meta-packet",
-		"2-meta-packet-block-to-labeler",
-		"3-meta-packet-block-to-pcap-app",
 	}))
 
 	flowMetricsCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_FLOW_METRICS_QUEUE, []string{"1-recv-unmarshall"}))
