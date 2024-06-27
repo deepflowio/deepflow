@@ -497,7 +497,8 @@ func IPInRanges(ip string, ipRanges ...netaddr.IPPrefix) bool {
 func RequestGet(url string, timeout int, queryStrings map[string]string) error {
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+			DisableKeepAlives: true,
 		},
 		Timeout: time.Duration(timeout) * time.Second,
 	}
@@ -513,13 +514,13 @@ func RequestGet(url string, timeout int, queryStrings map[string]string) error {
 	request.URL.RawQuery = queryData.Encode()
 
 	response, err := client.Do(request)
+	defer response.Body.Close()
 	if err != nil {
 		return err
 	}
 	if response.StatusCode != http.StatusOK {
 		return errors.New(fmt.Sprintf("http status failed: (%d)", response.StatusCode))
 	}
-	defer response.Body.Close()
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
