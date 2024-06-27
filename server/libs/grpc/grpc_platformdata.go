@@ -23,7 +23,6 @@ import (
 	"net"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -38,6 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
+	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/hmap/lru"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
@@ -956,17 +956,8 @@ func (t *PlatformInfoTable) OrgString(orgId uint16) string {
 }
 
 func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
-	var orgId uint16
-	splits := strings.Split(arg, "-")
-	if len(splits) == 2 {
-		id, _ := strconv.Atoi(splits[1])
-		orgId = uint16(id)
-	}
-	if orgId == ckdb.INVALID_ORG_ID {
-		orgId = ckdb.DEFAULT_ORG_ID
-	}
-
-	switch splits[0] {
+	orgId := debug.GetOrgId()
+	switch arg {
 	case "vtap":
 		return t.vtapsString(orgId)
 	case "pod":
@@ -983,7 +974,7 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 		return t.containersString(orgId)
 	}
 
-	filter := splits[0]
+	filter := arg
 	all := t.OrgString(orgId)
 	lines := strings.Split(all, "\n")
 	if filter != "" { // 按arg过滤返回
@@ -1303,6 +1294,7 @@ func (t *PlatformInfoTable) getCommunicationVtaps(orgId uint16) []*trident.Commu
 
 func (t *PlatformInfoTable) communicationVtapsString(orgId uint16) string {
 	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("orgId: %d\n", orgId))
 	for _, comm := range t.getCommunicationVtaps(orgId) {
 		sb.WriteString(fmt.Sprintf("Vtapid: %d  LastActiveTime: %d %s\n", *comm.VtapId, *comm.LastActiveTime, time.Unix(int64(*comm.LastActiveTime), 0)))
 	}
@@ -1636,6 +1628,7 @@ func (t *PlatformInfoTable) updateVtapIps(orgId uint16, vtapIps []*trident.VtapI
 
 func (t *PlatformInfoTable) vtapsString(orgId uint16) string {
 	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("orgId: %d\n", orgId))
 	for k, v := range t.vtapIdInfos[orgId] {
 		sb.WriteString(fmt.Sprintf("vtapid: %d  %+v\n", k, *v))
 	}
@@ -1786,6 +1779,7 @@ func (t *PlatformInfoTable) updatePodIps(orgId uint16, podIps []*trident.PodIp) 
 
 func (t *PlatformInfoTable) podsString(orgId uint16) string {
 	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("orgId: %d\n", orgId))
 	for podName, podInfos := range t.podNameInfos[orgId] {
 		for _, podInfo := range podInfos {
 			sb.WriteString(fmt.Sprintf("%s %+v\n", podName, *podInfo))
@@ -1796,6 +1790,7 @@ func (t *PlatformInfoTable) podsString(orgId uint16) string {
 
 func (t *PlatformInfoTable) containersString(orgId uint16) string {
 	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("orgId: %d\n", orgId))
 	for containerId, podInfos := range t.containerInfos[orgId] {
 		for _, podInfo := range podInfos {
 			sb.WriteString(fmt.Sprintf("%s %+v\n", containerId, *podInfo))
@@ -1870,6 +1865,7 @@ func (t *PlatformInfoTable) updateGprocessInfos(orgId uint16, infos []*trident.G
 
 func (t *PlatformInfoTable) gprocessInfosString(orgId uint16) string {
 	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("orgId: %d\n", orgId))
 	sb.WriteString("gprocessId         vtapId        podId\n")
 	sb.WriteString("--------------------------------------\n")
 	for gpid, vtapPodId := range t.gprocessInfos[orgId] {

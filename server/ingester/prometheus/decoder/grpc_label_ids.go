@@ -506,17 +506,8 @@ func (t *PrometheusLabelTable) statsString(orgId uint16) string {
 }
 
 func (t *PrometheusLabelTable) HandleSimpleCommand(op uint16, args string) string {
-	var orgId uint16
-	var filter string
-	parts := strings.Split(args, "-")
-	if len(parts) != 2 {
-		orgId = ckdb.DEFAULT_ORG_ID
-		filter = args
-	} else {
-		id, _ := strconv.Atoi(parts[1])
-		orgId = uint16(id)
-		filter = parts[0]
-	}
+	orgId := debug.GetOrgId()
+	filter := args
 	cmd := labelCmds[op]
 	switch cmd {
 	case "metric":
@@ -537,7 +528,7 @@ func (t *PrometheusLabelTable) HandleSimpleCommand(op uint16, args string) strin
 	return t.statsString(orgId)
 }
 
-// request string as: metric=xxx,pod_cluster_id=xxx,epc_id=xxx,label1=xxx,label2=xxx
+// request string as: org_id=2,metric=xxx,pod_cluster_id=xxx,epc_id=xxx,label1=xxx,label2=xxx
 func (t *PrometheusLabelTable) testString(request string) string {
 	req := &trident.PrometheusLabelRequest{}
 	metricReq := &trident.MetricLabelRequest{}
