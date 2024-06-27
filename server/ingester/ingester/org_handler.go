@@ -18,11 +18,14 @@ package ingester
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/ingester/prometheus/prometheus"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/debug"
 )
 
 var CleanDatabaseList = []string{
@@ -36,9 +39,21 @@ type OrgHandler struct {
 }
 
 func NewOrgHandler(cfg *config.Config) *OrgHandler {
-	return &OrgHandler{
+	o := &OrgHandler{
 		cfg: cfg,
 	}
+	debug.ServerRegisterSimple(ingesterctl.CMD_ORG_SWITCH, o)
+	return o
+}
+
+func (o *OrgHandler) HandleSimpleCommand(operate uint16, arg string) string {
+	orgId, err := strconv.Atoi(arg)
+	if err != nil || !ckdb.IsValidOrgID(uint16(orgId)) {
+		debug.SetOrgId(ckdb.DEFAULT_ORG_ID)
+		return "set org: default"
+	}
+	debug.SetOrgId(orgId)
+	return "set org: " + arg
 }
 
 func (o *OrgHandler) SetPromHandler(promHandler *prometheus.PrometheusHandler) {
