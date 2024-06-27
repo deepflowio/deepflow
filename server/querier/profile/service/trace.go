@@ -147,28 +147,38 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 	}
 
 	// step 1: merge to uniq function stacks
-	stackMap := make(map[string]int)
-	profileLocationStrByte := []byte{}
+	stackMapCompress := make(map[string]int)
 	for _, value := range values {
 		switch valueSlice := value.(type) {
 		case []interface{}:
-			if profileLocation, ok := valueSlice[profileLocationStrIndex].(string); ok {
-				profileLocationStrByte, _ = ingester_common.ZstdDecompress(profileLocationStrByte, utils.Slice(profileLocation))
-				// clip kernel function
-				if *args.MaxKernelStackDepth != common.MAX_KERNEL_STACK_DEPTH_DEFAULT && args.ProfileLanguageType == common.LANGUAGE_TYPE_EBPF {
-					profileLocationStrByte = ClipKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth)
-				}
-				profileLocationStr := string(profileLocationStrByte)
+			if profileLocationCompress, ok := valueSlice[profileLocationStrIndex].(string); ok {
 				profileValue := 0
 				if profileValueInt, ok := valueSlice[profileValueIndex].(int); ok {
 					profileValue = profileValueInt
 				}
-				if _, ok := stackMap[profileLocationStr]; ok {
-					stackMap[profileLocationStr] += profileValue
+				if _, ok := stackMapCompress[profileLocationCompress]; ok {
+					stackMapCompress[profileLocationCompress] += profileValue
 				} else {
-					stackMap[profileLocationStr] = profileValue
+					stackMapCompress[profileLocationCompress] = profileValue
 				}
 			}
+		}
+	}
+
+	// Decompress and cut kernel function
+	stackMap := make(map[string]int)
+	profileLocationStrByte := []byte{}
+	for profileLocationCompress, profileValue := range stackMapCompress {
+		profileLocationStrByte, _ = ingester_common.ZstdDecompress(profileLocationStrByte, utils.Slice(profileLocationCompress))
+		// cut kernel function
+		if *args.MaxKernelStackDepth != common.MAX_KERNEL_STACK_DEPTH_DEFAULT && args.ProfileLanguageType == common.LANGUAGE_TYPE_EBPF {
+			profileLocationStrByte = CutKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth)
+		}
+		profileLocationStr := string(profileLocationStrByte)
+		if _, ok := stackMap[profileLocationStr]; ok {
+			stackMap[profileLocationStr] += profileValue
+		} else {
+			stackMap[profileLocationStr] = profileValue
 		}
 	}
 
@@ -301,7 +311,7 @@ func UpdateNodeTotalValue(node *model.ProfileTreeNode, parentNode *model.Profile
 	UpdateNodeTotalValue(node, newParentNode, nodes)
 }
 
-func ClipKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int) []byte {
+func CutKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int) []byte {
 	startIndex := 0
 	sep := "[k]"
 	clipIndex := len(profileLocationByteSlice)
