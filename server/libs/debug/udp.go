@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
 )
@@ -50,6 +51,7 @@ var (
 	hostPort int = DEFAULT_LISTEN_PORT
 	running      = false
 	log          = logging.MustGetLogger(os.Args[0])
+	orgId        = 0
 
 	recvHandlers     = [MODULE_MAX]CommandLineProcess{}
 	registerHandlers = [MODULE_MAX]RegisterCommmandLine{}
@@ -64,6 +66,17 @@ type DebugMessage struct {
 func SetIpAndPort(ip string, port int) {
 	hostIp = ip
 	hostPort = port
+}
+
+func SetOrgId(id int) {
+	orgId = id
+}
+
+func GetOrgId() uint16 {
+	if !ckdb.IsValidOrgID(uint16(orgId)) {
+		return ckdb.DEFAULT_ORG_ID
+	}
+	return uint16(orgId)
 }
 
 func RecvFromServer(conn *net.UDPConn) (*bytes.Buffer, error) {
