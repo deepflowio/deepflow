@@ -29,6 +29,7 @@ use kube::{
     Client, Config,
 };
 use log::{error, info, warn};
+use nix::sys::utsname::uname;
 use nom::AsBytes;
 
 use public::utils::net::get_link_enabled_features;
@@ -48,7 +49,6 @@ pub fn free_memory_check(_required: u64, _exception_handler: &ExceptionHandler) 
 }
 
 pub fn kernel_check() {
-    use nix::sys::utsname::uname;
     const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
     // The `kernel_version` is in the format of 5.4.0-13
     let sys_uname = uname();
@@ -397,4 +397,15 @@ pub async fn set_container_resource_limit(
     } else {
         set_docker_resource_limits(milli_cpu_limit, memory_limit).await
     }
+}
+
+pub fn is_kernel_available(kernel_version: &str) -> bool {
+    let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
+    sys_uname
+        .release()
+        .trim()
+        .split_once('-')
+        .unwrap_or_default()
+        .0
+        .ge(kernel_version)
 }
