@@ -203,7 +203,11 @@ func (t *PrometheusLabelTable) RequestLabelIDs(request *trident.PrometheusLabelR
 	isAll := false
 	if len(request.RequestLabels) == 0 && len(request.RequestTargets) == 0 {
 		isAll = true
-		t.labelVersion = response.GetVersion()
+		responseVersion := response.GetVersion()
+		if t.labelVersion == responseVersion {
+			return response, nil
+		}
+		t.labelVersion = responseVersion
 	}
 	t.updatePrometheusLabels(response, isAll)
 
