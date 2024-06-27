@@ -290,6 +290,9 @@ struct data_args_t {
 		ssize_t bytes_count;	// io event
 		ssize_t data_seq;	// Use for socket close
 	};
+	// Scenario for using sendto() with a specified address
+	__u16 port;
+	__u8 addr[16];
 } __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {
@@ -317,6 +320,18 @@ struct sched_comm_exit_ctx {
 	char comm[16];		/*     offset:8;       size:16 */
 	pid_t pid;		/*     offset:24;      size:4  */
 	int prio;		/*     offset:28;      size:4  */
+};
+
+struct syscall_sendto_enter_ctx {
+	__u64 __pad_0;
+	int __syscall_nr;  // offset:8     size:4 
+	__u32 __pad_1;     // offset:12    size:4
+	int fd;   	   //offset:16;      size:8; signed:0;
+	void * buff;       //offset:24;      size:8; signed:0;
+	size_t len;        //offset:32;      size:8; signed:0;
+	unsigned int flags;       //offset:40;      size:8; signed:0;
+	struct sockaddr * addr;   //offset:48;      size:8; signed:0;
+	int addr_len;     //offset:56;      size:8; signed:0;
 };
 
 struct sched_comm_fork_ctx {
