@@ -116,6 +116,7 @@ type StaticConfig struct {
 	FastPathMapSize                    *int                         `yaml:"fast-path-map-size,omitempty"`
 	FirstPathLevel                     *int                         `yaml:"first-path-level,omitempty"`
 	LocalDispatcherCount               *int                         `yaml:"local-dispatcher-count,omitempty"`
+	PacketFanoutType                   *int                         `yaml:"packet-fanout-mode,omitempty"`
 	SrcInterfaces                      []string                     `yaml:"src-interfaces,omitempty"`
 	TapInterfaceBondGroup              []BondGroup                  `yaml:"tap-interface-bond-groups,omitempty"`
 	CloudGatewayTraffic                *bool                        `yaml:"cloud-gateway-traffic,omitempty"`
