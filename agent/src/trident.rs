@@ -2095,6 +2095,7 @@ impl AgentComponents {
                         .capture_packet_size as usize,
                     dpdk_enabled: config_handler.candidate_config.dispatcher.dpdk_enabled,
                     dispatcher_queue: config_handler.candidate_config.dispatcher.dispatcher_queue,
+                    packet_fanout_mode: yaml_config.packet_fanout_mode,
                     ..Default::default()
                 })))
                 .bpf_options(bpf_options.clone())
@@ -2122,7 +2123,6 @@ impl AgentComponents {
                 .queue_debugger(queue_debugger.clone())
                 .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
                 .pcap_interfaces(pcap_interfaces)
-                .local_dispatcher_count(local_dispatcher_count)
                 .tunnel_type_trim_bitmap(
                     config_handler
                         .candidate_config

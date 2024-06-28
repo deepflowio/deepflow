@@ -511,10 +511,6 @@ impl LocalPlusModeDispatcherListener {
         return self.base.id;
     }
 
-    pub fn local_dispatcher_count(&self) -> usize {
-        return self.base.local_dispatcher_count;
-    }
-
     pub fn flow_acl_change(&self) {
         // Start capturing traffic after resource information is distributed
         self.base.pause.store(false, Ordering::Relaxed);

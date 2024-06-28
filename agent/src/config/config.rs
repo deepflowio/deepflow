@@ -504,6 +504,7 @@ pub struct YamlConfig {
     pub fast_path_map_size: usize,
     pub first_path_level: u32,
     pub local_dispatcher_count: usize,
+    pub packet_fanout_mode: u32,
     pub src_interfaces: Vec<String>,
     pub tap_interface_bond_groups: Vec<BondGroup>,
     pub mirror_traffic_pcp: u16,
@@ -606,6 +607,7 @@ impl YamlConfig {
     const DEFAULT_DNS_PORTS: &'static str = "53,5353";
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
     const DEFAULT_ORACLE_PORTS: &'static str = "1521";
+    const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
     pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
@@ -833,8 +835,13 @@ impl YamlConfig {
         if c.process_scheduling_priority < -20 || c.process_scheduling_priority > 19 {
             c.process_scheduling_priority = 0;
         }
+
         if c.local_dispatcher_count == 0 {
             c.local_dispatcher_count = 1;
+        }
+
+        if c.packet_fanout_mode > Self::PACKET_FANOUT_MODE_MAX {
+            c.packet_fanout_mode = 0;
         }
 
         Ok(c)
@@ -1011,6 +1018,7 @@ impl Default for YamlConfig {
             ntp_min_interval: Duration::from_secs(10),
             l7_protocol_advanced_features: L7ProtocolAdvancedFeatures::default(),
             local_dispatcher_count: 1,
+            packet_fanout_mode: 0,
             oracle_parse_config: OracleParseConfig {
                 is_be: true,
                 int_compress: true,

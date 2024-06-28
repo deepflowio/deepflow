@@ -72,7 +72,6 @@ pub(super) struct BaseDispatcher {
     pub(super) src_interface_index: u32,
     pub(super) src_interface: String,
     pub(super) ctrl_mac: MacAddr,
-    pub(super) local_dispatcher_count: usize,
 
     pub(super) options: Arc<Mutex<Options>>,
     pub(super) bpf_options: Arc<Mutex<BpfOptions>>,
@@ -177,7 +176,6 @@ impl BaseDispatcher {
             log_id: self.log_id.clone(),
             reset_whitelist: self.reset_whitelist.clone(),
             pause: self.pause.clone(),
-            local_dispatcher_count: self.local_dispatcher_count,
             bond_group_map: self.bond_group_map.clone(),
         }
     }
@@ -656,7 +654,6 @@ pub struct BaseDispatcherListener {
 
     // dispatcher id for easy debugging
     pub log_id: String,
-    pub local_dispatcher_count: usize,
 }
 
 impl BaseDispatcherListener {
