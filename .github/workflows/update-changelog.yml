@@ -1,0 +1,110 @@
+name: Update Changelog
+
+on:
+  push:
+    branches:
+      - add_changelog_action
+  schedule:
+    - cron: '0 16 * * *' # 每天北京时间0时运行（UTC时间16时）
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
+
+permissions: write-all
+
+jobs:
+  update_changelog:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch:
+          - add_changelog_action
+          # - main
+          # - v6.5
+          - v6.6
+          - v6.7
+          - v6.8
+          - v6.9
+          - v7.1
+          - v7.2
+          - v7.3
+          - v7.4
+          - v7.5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ matrix.branch }}
+          # persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run changelog update script
+        run: |
+          python update_changelog.py -B main CHANGELOG.md
+          # python update_changelog.py -B ${{ matrix.branch }} CHANGELOG.md
+          cat CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REF: ${{ matrix.branch }}
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "jianchang@yunshan.net"
+          git checkout -b update-changelog-${{ matrix.branch }}
+          git add .
+          git commit -m "Update changelog for ${{ matrix.branch }}"
+
+      - name: Delete remote branch
+        run: |
+          git push origin --delete update-changelog-${{ matrix.branch }}
+
+      - name: Push changes
+        run: |
+          git push --set-upstream origin ${{ matrix.branch }}:update-changelog-${{ matrix.branch }}
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update changelog for ${{ matrix.branch }}
+          branch: update-changelog-${{ matrix.branch }}
+          base: ${{ matrix.branch }}
+          title: Update changelog for ${{ matrix.branch }}
+          body: This PR updates the changelog with the latest changes.
+
+      - name: Output PR ID
+        run: |
+          echo "Pull Request ID: ${{ steps.create_pr.outputs.pull-request-number }}"
+
+      - name: Check if on main branch and PR to docs/CHANGELOG-v<分支名>.md if not
+        if: ${{ matrix.branch != 'main' }}
+        run: |
+          git checkout main
+          git pull origin main
+          cp CHANGELOG.md docs/CHANGELOG-${{ matrix.branch }}.md
+          git add docs/CHANGELOG-${{ matrix.branch }}.md
+          git commit -m "Update changelog for ${matrix.branch}"
+          git push origin HEAD
+
+          gh pr create --title "Update changelog for ${matrix.branch}" --body "This PR updates the changelog from branch ${matrix.branch}" --base main
+
+      # - name: Merge Pull Request
+      #   if: success()
+      #   run: |
+      #     gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} --merge --admin
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
