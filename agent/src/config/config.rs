@@ -405,6 +405,7 @@ pub struct YamlConfig {
     pub fast_path_map_size: usize,
     pub first_path_level: u32,
     pub local_dispatcher_count: usize,
+    pub packet_fanout_mode: u32,
     pub src_interfaces: Vec<String>,
     pub mirror_traffic_pcp: u16,
     pub vtap_group_id_request: String,
@@ -502,6 +503,8 @@ pub struct YamlConfig {
 }
 
 impl YamlConfig {
+    const PACKET_FANOUT_MODE_MAX: u32 = 7;
+
     pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
         Self::load(&contents, tap_mode)
@@ -724,8 +727,13 @@ impl YamlConfig {
         if c.process_scheduling_priority < -20 || c.process_scheduling_priority > 19 {
             c.process_scheduling_priority = 0;
         }
+
         if c.local_dispatcher_count == 0 {
             c.local_dispatcher_count = 1;
+        }
+
+        if c.packet_fanout_mode > Self::PACKET_FANOUT_MODE_MAX {
+            c.packet_fanout_mode = 0;
         }
 
         Ok(c)
@@ -880,6 +888,7 @@ impl Default for YamlConfig {
             ntp_max_interval: Duration::from_secs(300),
             ntp_min_interval: Duration::from_secs(10),
             local_dispatcher_count: 1,
+            packet_fanout_mode: 0,
         }
     }
 }

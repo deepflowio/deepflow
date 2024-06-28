@@ -627,8 +627,29 @@ vtap_group_id: g-xxxxxx
 
   ## Local dispatcher count
   ## Default: 1. Range: [1, +oo)
-  ## Note: The configuration takes effect when tap_mode is 0 and extra_netns_regex is null
+  ## Note: The configuration takes effect when tap_mode is 0 and extra_netns_regex is null, 
+  ##   PACKET_FANOUT is to enable load balancing and parallel processing, which can improve  
+  ##   the performance and scalability of network applications. When the `local-dispatcher-count`
+  ##   is greater than 1, multiple dispatcher threads will be launched, consuming more CPU and
+  ##   memory. Increasing the `local-dispatcher-count` helps to reduce the operating system's 
+  ##   software interrupts on multi-core CPU servers.
   #local-dispatcher-count: 1
+
+  ## Packet fanout mode
+  ## Note: The configuration is a parameter used with the PACKET_FANOUT feature in the Linux
+  ##   kernel to specify the desired packet distribution algorithm. Refer to 
+  ##   https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71
+  ##   https://www.stackpath.com/blog/bpf-hook-points-part-1/
+  ## Default: 0. Range: [0, 7]
+  ## PACKET_FANOUT_HASH = 0
+  ## PACKET_FANOUT_LB = 1
+  ## PACKET_FANOUT_CPU = 2
+  ## PACKET_FANOUT_ROLLOVER = 3
+  ## PACKET_FANOUT_RND = 4
+  ## PACKET_FANOUT_QM = 5
+  ## PACKET_FANOUT_CBPF = 6
+  ## PACKET_FANOUT_EBPF = 7
+  #packet-fanout-mode: 0
 
   ## Dispatcher queue
   ## Note: The configuration takes effect when tap_mode is 0 or 2, dispatcher-queue is always true when tap_mode is 2

@@ -34,6 +34,8 @@ use elf::{file::FileHeader, gabi::ET_CORE};
 #[cfg(target_os = "linux")]
 use log::info;
 use log::{error, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::sys::utsname::uname;
 #[cfg(target_os = "linux")]
 use nom::AsBytes;
 use sysinfo::{DiskExt, System, SystemExt};
@@ -101,7 +103,6 @@ pub fn kernel_check() {
 
     #[cfg(target_os = "linux")]
     {
-        use nix::sys::utsname::uname;
         const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
         // kernel_version 形如 5.4.0-13格式
         let sys_uname = uname();
@@ -649,6 +650,23 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> (IpAddr, MacAddr) {
     error!("failed getting control ip and mac, deepflow-agent restart...");
     thread::sleep(Duration::from_secs(1));
     process::exit(-1);
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn is_kernel_available(kernel_version: &str) -> bool {
+    let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
+    sys_uname
+        .release()
+        .trim()
+        .split_once('-')
+        .unwrap_or_default()
+        .0
+        .ge(kernel_version)
+}
+
+#[cfg(target_os = "windows")]
+pub fn is_kernel_available(kernel_version: &str) -> bool {
+    false
 }
 
 //TODO Windows 相关

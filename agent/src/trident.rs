@@ -2006,6 +2006,7 @@ impl AgentComponents {
                     controller_tls_port: static_config.controller_tls_port,
                     libpcap_enabled: yaml_config.libpcap_enabled,
                     dispatcher_queue: config_handler.candidate_config.dispatcher.dispatcher_queue,
+                    packet_fanout_mode: yaml_config.packet_fanout_mode,
                     snap_len: config_handler
                         .candidate_config
                         .dispatcher
@@ -2038,7 +2039,6 @@ impl AgentComponents {
                 .queue_debugger(queue_debugger.clone())
                 .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
                 .pcap_interfaces(pcap_interfaces)
-                .local_dispatcher_count(local_dispatcher_count)
                 .analyzer_raw_packet_block_size(
                     yaml_config.analyzer_raw_packet_block_size as usize,
                 );

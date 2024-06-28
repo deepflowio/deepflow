@@ -264,14 +264,6 @@ impl DispatcherListener {
         }
     }
 
-    fn local_dispatcher_count(&self) -> usize {
-        match self {
-            Self::Local(a) => a.local_dispatcher_count(),
-            Self::LocalPlus(a) => a.local_dispatcher_count(),
-            _ => 1,
-        }
-    }
-
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         match self {
             Self::Local(l) => l.on_config_change(config),
@@ -294,37 +286,6 @@ impl DispatcherListener {
         }
     }
 
-    // When interfaces.len() is greater than local_dispatcher_count, interfaces is evenly distributed among each dispatcher;
-    // otherwise interfaces is evenly distributed among the preceding dispatcher, and the following dispatcher does not work
-    fn get_interfaces<'a>(&self, interfaces: &'a [Link]) -> &'a [Link] {
-        if self.local_dispatcher_count() == 1 {
-            return interfaces;
-        }
-        let id = self.id();
-        if interfaces.len() < self.local_dispatcher_count() {
-            if id < interfaces.len() {
-                return &interfaces[id..id + 1];
-            } else {
-                return &interfaces[0..0];
-            }
-        }
-        let width = interfaces.len() / self.local_dispatcher_count();
-        let remain = interfaces.len() % self.local_dispatcher_count();
-        let (start, width) = if id >= remain {
-            ((id * width) + remain, width)
-        } else {
-            (id * width + id, width + 1)
-        };
-
-        let interfaces = if id == self.local_dispatcher_count() - 1 {
-            &interfaces[start..]
-        } else {
-            &interfaces[start..start + width]
-        };
-
-        interfaces
-    }
-
     pub fn on_tap_interface_change(
         &self,
         interfaces: &[Link],
@@ -333,18 +294,12 @@ impl DispatcherListener {
         blacklist: &Vec<u64>,
     ) {
         match self {
-            Self::LocalPlus(l) => l.on_tap_interface_change(
-                self.get_interfaces(interfaces),
-                if_mac_source,
-                trident_type,
-                blacklist,
-            ),
-            Self::Local(l) => l.on_tap_interface_change(
-                self.get_interfaces(interfaces),
-                if_mac_source,
-                trident_type,
-                blacklist,
-            ),
+            Self::LocalPlus(l) => {
+                l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
+            }
+            Self::Local(l) => {
+                l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
+            }
             // Enterprise Edition Feature: analyzer_mode
             Self::Analyzer(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source);
@@ -587,6 +542,7 @@ pub struct Options {
     pub dpdk_conf: DpdkRingPortConf,
     pub libpcap_enabled: bool,
     pub dispatcher_queue: bool,
+    pub packet_fanout_mode: u32,
     pub tap_mac_script: String,
     pub is_ipv6: bool,
     pub vxlan_flags: u8,
@@ -693,7 +649,6 @@ impl stats::RefCountable for PacketCounter {
 #[derive(Default)]
 pub struct DispatcherBuilder {
     id: Option<usize>,
-    local_dispatcher_count: usize,
     src_interface: Option<String>,
     ctrl_mac: Option<MacAddr>,
     leaky_bucket: Option<Arc<LeakyBucket>>,
@@ -881,11 +836,6 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn local_dispatcher_count(mut self, v: usize) -> Self {
-        self.local_dispatcher_count = v;
-        self
-    }
-
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
         // set ns before creating af packet socket
@@ -940,7 +890,6 @@ impl DispatcherBuilder {
             engine,
 
             id,
-            local_dispatcher_count: self.local_dispatcher_count,
             src_interface: src_interface.clone(),
             src_interface_index: 0,
             ctrl_mac: self
@@ -1218,6 +1167,7 @@ impl DispatcherBuilder {
                     poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
                     version: options.af_packet_version,
                     iface: src_interface.as_ref().unwrap_or(&"".to_string()).clone(),
+                    packet_fanout_mode: options.packet_fanout_mode,
                     ..Default::default()
                 };
                 info!("Afpacket init with {:?}", afp);
