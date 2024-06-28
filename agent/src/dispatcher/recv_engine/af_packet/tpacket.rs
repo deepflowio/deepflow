@@ -19,6 +19,7 @@ use std::io;
 use std::mem;
 use std::net::Shutdown;
 use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::process;
 
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, setsockopt, size_t,
@@ -26,20 +27,23 @@ use libc::{
     MAP_NORESERVE, MAP_SHARED, POLLERR, POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET,
     SO_ATTACH_FILTER,
 };
-use log::warn;
+use log::{info, warn};
 use public::error::*;
 use public::packet::Packet;
 use socket2::Socket;
 
 use super::{bpf, header, options};
 
+use crate::utils::environment::is_kernel_available;
 use crate::utils::stats;
 use public::utils::net::{self, link_by_name};
 
 const PACKET_VERSION: c_int = 10;
 const PACKET_RX_RING: c_int = 5;
+const PACKET_FANOUT: c_int = 18;
 const PACKET_STATISTICS: c_int = 6;
 const MILLI_SECONDS: u32 = 1000000;
+const MIN_KERNEL_VERSION_SUPPORT_PACKET_FANOUT: &'static str = "3.1";
 
 // https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html
 const LINKTYPE_ETHERNET: c_int = 1;
@@ -208,6 +212,18 @@ impl Tpacket {
         } else {
             Err(af_packet::Error::InvalidTpVersion(self.tp_version as isize))
         }
+    }
+
+    fn set_fanout(&self) -> af_packet::Result<()> {
+        // refer to https://man7.org/linux/man-pages/man7/packet.7.html
+        if !is_kernel_available(MIN_KERNEL_VERSION_SUPPORT_PACKET_FANOUT) {
+            info!("kernel version is lower than 3.1, skip the packet fanout setting");
+            return Ok(());
+        }
+        // The first 16 bits encode the fanout group ID, and the second set of 16 bits encode the fanout mode and options.
+        let fanout_group_id = process::id() & 0xffff;
+        let fanout_arg: c_uint = fanout_group_id | (self.opts.packet_fanout_mode << 16);
+        self.setsockopt(SOL_PACKET, PACKET_FANOUT, fanout_arg)
     }
 
     fn mmap_ring(&mut self) -> af_packet::Result<()> {
@@ -390,6 +406,7 @@ impl Tpacket {
         tpacket.set_version()?;
         tpacket.set_ring()?;
         tpacket.mmap_ring()?;
+        tpacket.set_fanout()?;
         tpacket.set_bpf(vec![bpf::BpfSyntax::RetConstant(bpf::RetConstant {
             val: 0,
         })
