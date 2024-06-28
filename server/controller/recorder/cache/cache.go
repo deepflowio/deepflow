@@ -255,7 +255,7 @@ func (c *Cache) Refresh() {
 	c.refreshWANIPs()
 	c.refreshLANIPs()
 	c.refreshProcesses()
-	c.refreshPrometheusTarget()
+	// c.refreshPrometheusTarget()
 }
 
 func (c *Cache) AddRegion(item *mysql.Region) {
