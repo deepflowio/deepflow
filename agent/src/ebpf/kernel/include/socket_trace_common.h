@@ -117,14 +117,21 @@ struct socket_info_t {
 	 * involves reading 4 bytes followed by reading the remaining data.
 	 * Here, the pre-read data is stored for subsequent protocol analysis.
 	 */
-	__u8 prev_data[EBPF_CACHE_SIZE];
+	union {
+		__u8 prev_data[EBPF_CACHE_SIZE];
+		__u8 ipaddr[EBPF_CACHE_SIZE]; // IP address for UDP sendto()
+	};
 	__u8 direction: 1;
 	__u8 pre_direction: 1;
 	__u8 msg_type: 2;	// Store data type, values are MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	__u8 role: 3;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	__u8 role: 2;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	__u8 udp_pre_set_addr: 1; // Is the socket address pre-set during the system call phase in the UDP protocol?
 	__u8 tls_end: 1;	// Use the Identity TLS protocol to infer whether it has been completed
 	bool need_reconfirm;    // L7 protocol inference requiring confirmation.
-	__s32 correlation_id;   // Currently used for Kafka protocol inference.
+	union {
+		__s32 correlation_id;   // Currently used for Kafka protocol inference.
+		__u16 port;		// Port for UDP sendto()
+	};
 
 	__u32 peer_fd;		// Used to record the peer fd for data transfer between sockets.
 
