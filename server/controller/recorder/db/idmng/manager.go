@@ -139,8 +139,8 @@ func (p *IDPool[MT]) refresh() error {
 	// TODO do not handle concrete resource in common, create new type IDPool for process and target
 	if p.resourceType == ctrlrcommon.RESOURCE_TYPE_PROCESS_EN {
 		items, err = query.FindInBatches[MT](p.org.DB.Unscoped().Select("id"))
-	} else if p.resourceType == ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN {
-		err = p.org.DB.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Select("id").Find(&items).Error
+		// } else if p.resourceType == ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN {
+		// 	err = p.org.DB.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Select("id").Find(&items).Error
 	} else {
 		err = p.org.DB.Unscoped().Select("id").Find(&items).Error
 	}
