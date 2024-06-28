@@ -205,6 +205,12 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 							if mv.DeviceType == deviceType {
 								macVIF = mv
 								break
+								// Compatible with pod_node and VM related scenarios
+							} else if mv.DeviceType == common.VIF_DEVICE_TYPE_VM && deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+								if _, ok := toolDS.vmIDToPodNodeID[mv.DeviceID]; ok {
+									macVIF = mv
+									break
+								}
 							}
 						}
 					}
