@@ -1,0 +1,122 @@
+name: Update Changelog
+
+on:
+  push:
+    branches:
+      - add_changelog_action
+  schedule:
+    - cron: '0 16 * * *' # 每天北京时间0时运行（UTC时间16时）
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
+
+permissions: write-all
+
+jobs:
+  update_changelog:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch:
+          - add_changelog_action
+          # - main
+          # - v6.5
+          - v6.6
+          - v6.7
+          - v6.8
+          - v6.9
+          - v7.1
+          - v7.2
+          - v7.3
+          - v7.4
+          - v7.5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ matrix.branch }}
+        continue-on-error: true
+
+      - name: Check if branch exists locally
+        id: check_branch_exists
+        run: |
+          if ! git show-ref --verify --quiet refs/heads/${{ matrix.branch }}; then
+            echo "::set-output name=branch_exists::false"
+          else
+            echo "::set-output name=branch_exists::true"
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run changelog update script
+        run: |
+          python update_changelog.py -B main CHANGELOG.md
+          # python update_changelog.py -B ${{ matrix.branch }} CHANGELOG.md
+          cat CHANGELOG.md
+          git fetch --all
+          if [[ "$GITHUB_REF" == "main" ]]; then
+            # List branches that match the pattern and process each branch
+            for BRANCH in $(git branch -r | grep -E 'origin/v[6-9]+\.[5-9]+|origin/v[7-9]+\.[0-9]+' | sed 's|origin/||'); do
+              echo "Processing branch $BRANCH..."
+              python update_changelog.py -B $BRANCH docs/CHANGELOG-`echo $BRANCH|sed 's|\.|-|' | sed 's|v||'`.md
+            done
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REF: ${{ matrix.branch }}
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "jianchang@yunshan.net"
+          
+          git checkout -b update-changelog-${{ matrix.branch }}
+          git add .
+          git commit -m "Update changelog for ${{ matrix.branch }}"
+
+      - name: Delete remote branch
+        run: |
+          git push origin --delete update-changelog-${{ matrix.branch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push changes
+        run: |
+          git push --set-upstream origin ${{ matrix.branch }}:update-changelog-${{ matrix.branch }} -f
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request
+        id: create_pr
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update changelog for ${{ matrix.branch }}
+          branch: update-changelog-${{ matrix.branch }}
+          base: ${{ matrix.branch }}
+          title: Update changelog for ${{ matrix.branch }}
+          body: This PR updates the changelog with the latest changes.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Output PR ID
+        run: |
+          echo "Pull Request ID: ${{ steps.create_pr.outputs.pull-request-number }}"
+
+      # - name: Merge Pull Request
+      #   if: success()
+      #   run: |
+      #     gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} --merge --admin
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

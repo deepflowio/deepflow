@@ -1,6 +1,10 @@
-# v6.5 Changelog
+### Table of Contents
 
-### DeepFlow release v6.5
+**[DeepFlow release v6.5](#v65)**<br/>
+
+# Changelog
+
+### <a id="v65"></a>DeepFlow release v6.5
 
 #### New Feature
 * feat: Add Changelog [#7095](https://github.com/deepflowio/deepflow/pull/7095)
