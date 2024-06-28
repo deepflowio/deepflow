@@ -37,6 +37,8 @@ use kube::{api::Api, Client, Config};
 use log::info;
 use log::{error, warn};
 #[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::sys::utsname::uname;
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use nom::AsBytes;
 use sysinfo::{DiskExt, System, SystemExt};
 #[cfg(target_os = "windows")]
@@ -106,7 +108,6 @@ pub fn kernel_check() {
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
     {
-        use nix::sys::utsname::uname;
         const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
         // kernel_version 形如 5.4.0-13格式
         let sys_uname = uname();
@@ -729,6 +730,23 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     Err(Error::Environment(
         "failed getting control ip and mac, deepflow-agent restart...".to_owned(),
     ))
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub fn is_kernel_available(kernel_version: &str) -> bool {
+    let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
+    sys_uname
+        .release()
+        .trim()
+        .split_once('-')
+        .unwrap_or_default()
+        .0
+        .ge(kernel_version)
+}
+
+#[cfg(target_os = "windows")]
+pub fn is_kernel_available(kernel_version: &str) -> bool {
+    false
 }
 
 //TODO Windows 相关

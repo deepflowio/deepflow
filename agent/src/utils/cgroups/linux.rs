@@ -21,12 +21,12 @@ use std::{fs, thread};
 
 use super::Error;
 use crate::config::handler::EnvironmentAccess;
+use crate::utils::environment::is_kernel_available;
 
 use arc_swap::access::Access;
 use cgroups_rs::cgroup_builder::*;
 use cgroups_rs::*;
 use log::{info, warn};
-use nix::sys::utsname::uname;
 use public::consts::{DEFAULT_CPU_CFS_PERIOD_US, PROCESS_NAME};
 
 pub struct Cgroups {
@@ -221,25 +221,11 @@ impl Cgroups {
 
 pub fn is_kernel_available_for_cgroups() -> bool {
     const MIN_KERNEL_VERSION_SUPPORT_CGROUP: &str = "2.6.24"; // Support cgroups from Linux 2.6.24
-    let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
-    sys_uname
-        .release()
-        .trim()
-        .split_once('-')
-        .unwrap_or_default()
-        .0
-        .ge(MIN_KERNEL_VERSION_SUPPORT_CGROUP)
+    is_kernel_available(MIN_KERNEL_VERSION_SUPPORT_CGROUP)
 }
 pub fn is_cgroup_procs_writable() -> bool {
     // The cgroup.procs file can only be written after Linux 3.0. Refer to:
     // https://github.com/torvalds/linux/commit/74a1166dfe1135dcc168d35fa5261aa7e087011b
     const MIN_KERNEL_VERSION_CGROUP_PROCS: &str = "3";
-    let sys_uname = uname(); // kernel_version is in the format of 5.4.0-13
-    sys_uname
-        .release()
-        .trim()
-        .split_once('-')
-        .unwrap_or_default()
-        .0
-        .ge(MIN_KERNEL_VERSION_CGROUP_PROCS)
+    is_kernel_available(MIN_KERNEL_VERSION_CGROUP_PROCS)
 }
