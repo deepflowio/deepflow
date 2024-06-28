@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+#include <arpa/inet.h>
 #include <linux/bpf_perf_event.h>
 #include "config.h"
 #include "include/socket_trace.h"
@@ -186,6 +187,8 @@ static __inline void delete_socket_info(__u64 conn_key,
 	if (!socket_info_map__delete(&conn_key)) {
 		__sync_fetch_and_add(&trace_stats->socket_map_count, -1);
 	}
+
+	socket_role_map__delete(&conn_key);
 }
 
 static __u32 __inline get_tcp_write_seq_from_fd(int fd)
@@ -1200,6 +1203,14 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
 		sk_info.correlation_id = conn_info->correlation_id;
+		if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
+		    args->port > 0) {
+			bpf_probe_read_kernel(sk_info.ipaddr,
+					      sizeof(sk_info.ipaddr),
+					      args->addr);
+			sk_info.udp_pre_set_addr = 1;
+			sk_info.port = args->port;
+		}
 
 		/*
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
@@ -1310,6 +1321,18 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->tuple.dport = conn_info->tuple.dport;
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
+	if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
+	    args->port > 0) {
+		if (conn_info->skc_family == PF_INET) {
+			bpf_probe_read_kernel(v->tuple.daddr, 4,
+					      args->addr);
+			v->tuple.addr_len = 4;
+		} else if (conn_info->skc_family == PF_INET6) {
+			bpf_probe_read_kernel(v->tuple.daddr, 16,
+					      args->addr);
+			v->tuple.addr_len = 16;
+		}
+	}
 
 	__u32 *socket_role = socket_role_map__lookup(&conn_key);
 	v->socket_role = socket_role ? *socket_role : 0;
@@ -1415,7 +1438,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 
 static __inline int process_data(struct pt_regs *ctx, __u64 id,
 				 const enum traffic_direction direction,
-				 const struct data_args_t *args,
+				 struct data_args_t *args,
 				 ssize_t bytes_count,
 				 const struct process_data_extra *extra)
 {
@@ -1455,6 +1478,18 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	}
 
 	init_conn_info(id >> 32, args->fd, conn_info, sk, offset);
+	if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
+	    conn_info->tuple.dport == 0) {
+		conn_info->tuple.dport = args->port;
+		if (conn_info->tuple.dport == 0 &&
+		    is_socket_info_valid(conn_info->socket_info_ptr) &&
+		    conn_info->socket_info_ptr->udp_pre_set_addr) {
+			conn_info->tuple.dport = conn_info->socket_info_ptr->port;
+			args->port = conn_info->tuple.dport;
+			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
+					      conn_info->socket_info_ptr->ipaddr);
+		}
+	}
 
 	conn_info->direction = direction;
 
@@ -1523,7 +1558,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 static __inline void process_syscall_data(struct pt_regs *ctx, __u64 id,
 					  const enum traffic_direction
 					  direction,
-					  const struct data_args_t *args,
+					  struct data_args_t *args,
 					  ssize_t bytes_count)
 {
 	struct process_data_extra extra = {
@@ -1544,7 +1579,7 @@ static __inline void process_syscall_data(struct pt_regs *ctx, __u64 id,
 static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
 					       const enum traffic_direction
 					       direction,
-					       const struct data_args_t *args,
+					       struct data_args_t *args,
 					       ssize_t bytes_count)
 {
 	struct process_data_extra extra = {
@@ -1632,8 +1667,28 @@ TP_SYSCALL_PROG(exit_read) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-// ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
-//              const struct sockaddr *dest_addr, socklen_t addrlen);
+/*
+ * The `sendto` functions are generally used in UDP protocols, but can also be used
+ * in TCP after the connect function is called. `sendto()` use the datagram method
+ * to transmit data.
+ * In the connectionless datagram socket mode, since the local socket has not
+ * established a connection with the remote machine, the destination address should
+ * be specified when sending data. The sendto() function prototype is:
+ *
+ * `int sendto(socket s, const void *msg, int len, unsigned int flags, const
+ *             struct sockaddr *to, int tolen);`
+ *
+ * The sendto() function has two more parameters than the send() function. The "to"
+ * parameter specifies the IP address and port number information of the destination
+ * machine.
+ * 
+ * Our current logic is as follows: network tuple information (IP, PORT) is obtained
+ * by reading the corresponding fields of the kernel structure 'struct sock_common'.
+ * Since the IP address and port are specified in the sendto() system calls,
+ * the tuple data will not be populated into the kernel structure 'struct sock_common'.
+ * As a result, we cannot obtain the tuple information. Therefore, when entering these
+ * types of system calls, we need to save this information beforehand.
+ */
 TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)ctx->fd;
@@ -1648,6 +1703,25 @@ TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
 	write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
+	if (write_args.tcp_seq == 0) {
+		struct syscall_sendto_enter_ctx *sendto_ctx =
+			(struct syscall_sendto_enter_ctx *)ctx;
+		struct sockaddr_in addr = { 0 };
+		bpf_probe_read_user(&addr, sizeof(addr), sendto_ctx->addr);
+		write_args.port = __bpf_ntohs(addr.sin_port);
+		if (write_args.port > 0 && addr.sin_family == AF_INET) {
+			*(__u32 *)write_args.addr =
+				__bpf_ntohl(addr.sin_addr.s_addr);
+		} else if (write_args.port > 0 &&
+			   addr.sin_family == AF_INET6) {
+			struct sockaddr_in6 addr = { 0 };
+			bpf_probe_read_user(&addr, sizeof(addr),
+					    sendto_ctx->addr);
+			bpf_probe_read_kernel(&write_args.addr[0], 16,
+					      &addr.sin6_addr.s6_addr[0]);
+                }
+	}
+
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
@@ -1658,11 +1732,6 @@ TP_SYSCALL_PROG(exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
-	// 潜在的问题:如果sentto() addr是由TCP连接提供的，系统调用可能会忽略它，但我们仍然会跟踪它。在实践中，TCP连接不应该使用带addr参数的sendto()。
-	// 在手册页中:
-	//     如果sendto()用于连接模式(SOCK_STREAM, SOCK_SEQPACKET)套接字，参数
-	//     dest_addr和addrlen会被忽略(如果不是，可能会返回EISCONN错误空和0)
-	//
 	// Unstash arguments, and process syscall.
 	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
@@ -2058,7 +2127,6 @@ TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	if (socket_info_ptr->uid)
 		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
 	delete_socket_info(conn_key, socket_info_ptr);
-	socket_role_map__delete(&conn_key);
 	__push_close_event(id, socket_info_ptr->uid, socket_info_ptr->seq,
 			   offset, ctx);
 	return 0;
