@@ -125,7 +125,8 @@ struct socket_info_s {
 	 */
 	__u16 allow_reassembly: 1;
 	__u16 finish_reasm: 1; // Has the reassembly been completed?
-	__u16 unused_bits: 14; 
+	__u16 udp_pre_set_addr: 1; // Is the socket address pre-set during the system call phase in the UDP protocol?
+	__u16 unused_bits: 13; 
  	__u32 reasm_bytes; // The amount of data bytes that have been reassembled.
 
 	/*
@@ -142,7 +143,10 @@ struct socket_info_s {
 	 * involves reading 4 bytes followed by reading the remaining data.
 	 * Here, the pre-read data is stored for subsequent protocol analysis.
 	 */
-	__u8 prev_data[EBPF_CACHE_SIZE];
+	union {
+		__u8 prev_data[EBPF_CACHE_SIZE];
+		__u8 ipaddr[EBPF_CACHE_SIZE]; // IP address for UDP sendto()
+	};
 	__u8 direction: 1;
 	__u8 pre_direction: 1;
 	__u8 unused: 2;
@@ -152,6 +156,7 @@ struct socket_info_s {
 	union {
 		__u8  encoding_type;    // Currently used for OpenWire encoding inference.
 		__s32 correlation_id;   // Currently used for Kafka protocol inference.
+		__u16 port;		// Port for UDP sendto()
 	};
 
 	__u32 peer_fd;		// Used to record the peer fd for data transfer between sockets.
