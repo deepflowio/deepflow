@@ -1227,17 +1227,29 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	 * Here, we assume a maximum length of 128 bytes for the queries name.
 	 * If queries name exceeds 128 bytes, the identification of AAAA or A
 	 * types will be impossible.
+	 *
+	 * For decreasing the stack usage, we use a 32-byte buffer to store the
+	 * queries name, and repeatedly read the queries name from the buffer.
 	 */
 	conn_info->dns_q_type = 0;
-	__u8 tmp_buf[128];
+	__u8 tmp_buf[32];
 	const char *queries_start = ptr + (((char *)(dns + 1)) - buf);
-	// bpf_probe_read_user_str() returns the length including '\0'.
-	const int len =
-	    bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf), queries_start);
-	if (len > 0 && len < sizeof(tmp_buf)) {
-		bpf_probe_read_user(tmp_buf, 2, queries_start + len);
-		conn_info->dns_q_type = __bpf_ntohs(*(__u16 *) tmp_buf);
+	for (int i = 0; i < 4; i++) {
+		short tmp = bpf_probe_read_user_str(tmp_buf, sizeof(tmp_buf),
+						    queries_start);
+		if (tmp < 0) {
+			break;
+		}
+		if (tmp != sizeof(tmp_buf)) {
+			queries_start += tmp;
+			bpf_probe_read_user(tmp_buf, 2, queries_start);
+			conn_info->dns_q_type = __bpf_ntohs(*(__u16 *) tmp_buf);
+			break;
+		} else {
+			queries_start += tmp - 1;
+		}
 	}
+
 	// coreDNS will first send the length in two bytes. If it recognizes
 	// that it is TCP DNS and does not have a length field, it will modify
 	// the offset to correct the TCP sequence number.
