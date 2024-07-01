@@ -45,6 +45,9 @@ var YamlDomainQingCloud []byte
 //go:embed domain_tencent.yaml
 var YamlDomainTencent []byte
 
+//go:embed domain_volcengine.yaml
+var YamlDomainVolcengine []byte
+
 //go:embed sub_domain_create.yaml
 var YamlSubDomain []byte
 

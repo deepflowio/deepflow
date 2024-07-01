@@ -574,7 +574,7 @@ func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *httpcommon.UserI
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATRule{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATGateway{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Process{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
+	// db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VIP{})
 	var sgs []mysql.SecurityGroup
 	db.Unscoped().Where("domain = ?", lcuuid).Find(&sgs)
@@ -937,7 +937,7 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodNode{})
 		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodCluster{})
 		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.Process{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
+		// db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
 	}
 
 	err = db.Delete(&subDomain).Error

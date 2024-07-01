@@ -40,7 +40,7 @@ import (
 var log = logging.MustGetLogger("profile")
 var InstanceProfileEventType = []string{"inuse_objects", "alloc_objects", "inuse_space", "alloc_space", "goroutines"}
 
-func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*model.ProfileTreeNode, debug interface{}, err error) {
+func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model.ProfileTree, debug interface{}, err error) {
 	debugs := model.ProfileDebug{}
 	whereSlice := []string{}
 	whereSlice = append(whereSlice, fmt.Sprintf(" time>=%d", args.TimeStart))
@@ -126,7 +126,6 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	formatStartTime := time.Now()
 	profileLocationStrIndex := -1
 	profileValueIndex := -1
-	NodeIDToProfileTree := map[string]*model.ProfileTreeNode{}
 	columns := querierResult.Columns
 	values := querierResult.Values
 	for columnIndex, col := range columns {
@@ -148,37 +147,58 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	}
 
 	// step 1: merge to uniq function stacks
-	stackMap := make(map[string]int)
-	profileLocationStrByte := []byte{}
+	stackMapCompress := make(map[string]int)
 	for _, value := range values {
 		switch valueSlice := value.(type) {
 		case []interface{}:
-			if profileLocation, ok := valueSlice[profileLocationStrIndex].(string); ok {
-				profileLocationStrByte, _ = ingester_common.ZstdDecompress(profileLocationStrByte, utils.Slice(profileLocation))
-				// clip kernel function
-				if *args.MaxKernelStackDepth != common.MAX_KERNEL_STACK_DEPTH_DEFAULT && args.ProfileLanguageType == common.LANGUAGE_TYPE_EBPF {
-					profileLocationStrByte = ClipKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth)
-				}
-				profileLocationStr := string(profileLocationStrByte)
+			if profileLocationCompress, ok := valueSlice[profileLocationStrIndex].(string); ok {
 				profileValue := 0
 				if profileValueInt, ok := valueSlice[profileValueIndex].(int); ok {
 					profileValue = profileValueInt
 				}
-				if _, ok := stackMap[profileLocationStr]; ok {
-					stackMap[profileLocationStr] += profileValue
+				if _, ok := stackMapCompress[profileLocationCompress]; ok {
+					stackMapCompress[profileLocationCompress] += profileValue
 				} else {
-					stackMap[profileLocationStr] = profileValue
+					stackMapCompress[profileLocationCompress] = profileValue
 				}
 			}
 		}
 	}
 
+	// Decompress and cut kernel function
+	stackMap := make(map[string]int)
+	profileLocationStrByte := []byte{}
+	for profileLocationCompress, profileValue := range stackMapCompress {
+		profileLocationStrByte, _ = ingester_common.ZstdDecompress(profileLocationStrByte, utils.Slice(profileLocationCompress))
+		// cut kernel function
+		if *args.MaxKernelStackDepth != common.MAX_KERNEL_STACK_DEPTH_DEFAULT && args.ProfileLanguageType == common.LANGUAGE_TYPE_EBPF {
+			profileLocationStrByte = CutKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth)
+		}
+		profileLocationStr := string(profileLocationStrByte)
+		if _, ok := stackMap[profileLocationStr]; ok {
+			stackMap[profileLocationStr] += profileValue
+		} else {
+			stackMap[profileLocationStr] = profileValue
+		}
+	}
+
 	// step 2: merge function stacks to profile tree
 	rootTotalValue := 0
+	// root function
+	locations := []string{args.AppService}
+	locationToID := map[string]int{args.AppService: 0}
+	functionValues := [][]int{[]int{0, 0}}
+
+	nodeUUIDToID := map[string]int{}
+	functionColumns := []string{"self_value", "total_value"}
+	nodeColumns := []string{"function_id", "parent_node_id", "self_value", "total_value"}
+
+	rootNode := NewProfileTreeNode(0, 0, 0)
+	nodes := []*model.ProfileTreeNode{rootNode}
 	for profileLocationStr, profileValue := range stackMap {
 		preSemicolonIndex := -1
 		curSemicolonIndex := -1
-		preUUID := controller_common.GenerateUUID("")
+		preID := -1
 		// Non-leaf nodes profile_value value is 0
 		nodeProfileValue := 0
 		for runeIndex, r := range profileLocationStr {
@@ -196,28 +216,44 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 				continue
 			}
 
-			profileLocationStrs := profileLocationStr[:curSemicolonIndex]
 			// Achieve the hash effect with uuid
-			nodeID := controller_common.GenerateUUID(profileLocationStrs)
-			existNode, ok := NodeIDToProfileTree[nodeID]
+			nodeUUID := controller_common.GenerateUUID(utils.String(utils.Slice(profileLocationStr)[:curSemicolonIndex]))
+			// NodeUUID to id
+			nodeID, ok := nodeUUIDToID[nodeUUID]
 			if ok {
+				existNode := nodes[nodeID]
 				existNode.SelfValue += nodeProfileValue
 				existNode.TotalValue = existNode.SelfValue
+				preID = nodeID
 			} else {
-				nodeProfileLocationStr := profileLocationStr[preSemicolonIndex+1 : curSemicolonIndex]
-				node := NewProfileTreeNode(nodeProfileLocationStr, nodeID, nodeProfileValue)
-				if preSemicolonIndex > 0 {
-					node.ParentNodeID = preUUID
+				// Location to id
+				node := &model.ProfileTreeNode{}
+				nodeID = len(nodes)
+				nodeProfileLocationStrRef := utils.String(utils.Slice(profileLocationStr)[preSemicolonIndex+1 : curSemicolonIndex])
+				locationID, ok := locationToID[nodeProfileLocationStrRef]
+				if !ok {
+					locationID = len(locations)
+					locationToID[nodeProfileLocationStrRef] = locationID
+					node = NewProfileTreeNode(locationID, nodeID, nodeProfileValue)
+					locations = append(locations, nodeProfileLocationStrRef)
+					functionValues = append(functionValues, []int{0, 0})
+				} else {
+					node = NewProfileTreeNode(locationID, nodeID, nodeProfileValue)
 				}
-				NodeIDToProfileTree[nodeID] = node
+
+				if preSemicolonIndex > 0 {
+					node.ParentNodeID = preID
+				}
+				nodeUUIDToID[nodeUUID] = nodeID
+				preID = nodeID
+				nodes = append(nodes, node)
 			}
 			preSemicolonIndex = curSemicolonIndex
-			preUUID = nodeID
 			curSemicolonIndex = -1
 		}
 	}
 
-	if len(NodeIDToProfileTree) == 0 {
+	if len(nodes) == 1 {
 		formatEndTime := int64(time.Since(formatStartTime))
 		formatTime := fmt.Sprintf("%.9fs", float64(formatEndTime)/1e9)
 		debugs.FormatTime = formatTime
@@ -226,25 +262,30 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	}
 
 	// update total_value
-	for _, node := range NodeIDToProfileTree {
-		if node.SelfValue == 0 {
+	for _, node := range nodes {
+		if node.SelfValue == 0 || node.ParentNodeID == -1 {
 			continue
 		}
-		parentNode, ok := NodeIDToProfileTree[node.ParentNodeID]
-		if ok {
-			UpdateNodeTotalValue(node, parentNode, NodeIDToProfileTree)
-		}
-
+		parentNode := nodes[node.ParentNodeID]
+		UpdateNodeTotalValue(node, parentNode, nodes)
 	}
+
 	// format root node
-	rootNode := NewProfileTreeNode(args.AppService, "", 0)
-	rootNode.ParentNodeID = "-1"
-	rootNode.TotalValue = rootTotalValue
+	nodes[0].ParentNodeID = -1
+	nodes[0].TotalValue = rootTotalValue
 
-	result = append(result, rootNode)
-	for _, node := range NodeIDToProfileTree {
-		result = append(result, node)
+	// update function value and node value
+	for _, node := range nodes {
+		locationID := node.LocationID
+		functionValues[locationID][0] += node.SelfValue
+		functionValues[locationID][1] += node.TotalValue
+		result.NodeValues.Values = append(result.NodeValues.Values, []int{locationID, node.ParentNodeID, node.SelfValue, node.TotalValue})
 	}
+
+	result.Functions = locations
+	result.FunctionValues.Columns = functionColumns
+	result.FunctionValues.Values = functionValues
+	result.NodeValues.Columns = nodeColumns
 	formatEndTime := int64(time.Since(formatStartTime))
 	formatTime := fmt.Sprintf("%.9fs", float64(formatEndTime)/1e9)
 	debugs.FormatTime = formatTime
@@ -252,27 +293,25 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	return
 }
 
-func NewProfileTreeNode(profileLocationStr string, nodeID string, profileValue int) *model.ProfileTreeNode {
+func NewProfileTreeNode(locationID int, nodeID int, profileValue int) *model.ProfileTreeNode {
 	node := &model.ProfileTreeNode{}
-	node.ProfileLocationStr = profileLocationStr
+	node.LocationID = locationID
 	node.NodeID = nodeID
 	node.SelfValue = profileValue
 	node.TotalValue = profileValue
 	return node
 }
 
-func UpdateNodeTotalValue(node *model.ProfileTreeNode, parentNode *model.ProfileTreeNode, NodeIDToProfileTree map[string]*model.ProfileTreeNode) {
+func UpdateNodeTotalValue(node *model.ProfileTreeNode, parentNode *model.ProfileTreeNode, nodes []*model.ProfileTreeNode) {
 	parentNode.TotalValue += node.SelfValue
-	if parentNode.ParentNodeID == "" {
+	if parentNode.ParentNodeID == -1 || parentNode.ParentNodeID == 0 {
 		return
 	}
-	newParentNode, ok := NodeIDToProfileTree[parentNode.ParentNodeID]
-	if ok {
-		UpdateNodeTotalValue(node, newParentNode, NodeIDToProfileTree)
-	}
+	newParentNode := nodes[parentNode.ParentNodeID]
+	UpdateNodeTotalValue(node, newParentNode, nodes)
 }
 
-func ClipKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int) []byte {
+func CutKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int) []byte {
 	startIndex := 0
 	sep := "[k]"
 	clipIndex := len(profileLocationByteSlice)

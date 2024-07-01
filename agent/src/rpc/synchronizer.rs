@@ -1101,9 +1101,7 @@ impl Synchronizer {
                 resp_packet.ts_orig = NtpTime::from(&send_time).0;
                 let offset = resp_packet.offset(&recv_time) / NANOS_IN_SECOND * NANOS_IN_SECOND;
                 match ntp_diff.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
-                    if (x > offset && x - offset >= min_interval)
-                        || (offset > x && offset - x >= min_interval)
-                    {
+                    if (x - offset).abs() >= min_interval {
                         info!("NTP Set time offset {}s.", offset / NANOS_IN_SECOND);
                         Some(offset)
                     } else {
@@ -1111,7 +1109,7 @@ impl Synchronizer {
                     }
                 }) {
                     Ok(last_offset) => {
-                        if !first && (last_offset > offset && last_offset - offset >= max_interval) {
+                        if !first && (last_offset - offset).abs() >= max_interval {
                             warn!("Openning NTP causes the timestamp to fall back by {}s, and the agent needs to be restarted.", offset/ NANOS_IN_SECOND);
                             crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
                             return;

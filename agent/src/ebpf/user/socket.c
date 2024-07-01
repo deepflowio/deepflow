@@ -153,10 +153,20 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 		probes_set_enter_symbol(tps, "do_readv");
 	}
 
-	if (access(SYSCALL_FORK_TP_PATH, F_OK))
-		probes_set_exit_symbol(tps, "sys_fork");
-	if (access(SYSCALL_CLONE_TP_PATH, F_OK))
-		probes_set_exit_symbol(tps, "sys_clone");
+	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
+		/*
+		 * Different CPU architectures have variations in system calls.
+		 * It is necessary to confirm whether a specific system call exists.
+		 * You can check https://arm64.syscall.sh/ for reference.
+		 */
+		if (kallsyms_lookup_name("sys_fork"))
+			probes_set_exit_symbol(tps, "sys_fork");
+	}
+
+	if (access(SYSCALL_CLONE_TP_PATH, F_OK)) {
+		if (kallsyms_lookup_name("sys_clone"))
+			probes_set_exit_symbol(tps, "sys_clone");
+	}
 
 	tps->kprobes_nr = index;
 

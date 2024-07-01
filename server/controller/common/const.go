@@ -291,6 +291,8 @@ const (
 	ESHORE            = 26
 	CLOUD_TOWER       = 27
 	NFVO              = 28
+	SUGON             = 29
+	VOLCENGINE        = 30
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -319,6 +321,8 @@ const (
 	BAIDU_BCE_EN         = "baidu_bce"
 	CLOUD_TOWER_EN       = "cloudtower"
 	NFVO_EN              = "nfvo"
+	SUGON_EN             = "sugon"
+	VOLCENGINE_EN        = "volcengine"
 
 	TENCENT_CH          = "腾讯云"
 	ALIYUN_CH           = "阿里云"
@@ -329,6 +333,8 @@ const (
 	BAIDU_BCE_CH        = "百度云"
 	ESHORE_CH           = "亿迅云"
 	NFVO_CH             = "华为NFVO+"
+	SUGON_CH            = "曙光云"
+	VOLCENGINE_CH       = "火山云"
 
 	OPENSTACK_CH   = "OpenStack"
 	VSPHERE_CH     = "vSphere"

@@ -178,7 +178,7 @@ fn max_param_nums() -> usize {
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("command `{0}` execution failed")]
+    #[error("command execution failed with {0}")]
     CmdExecFailed(#[from] std::io::Error),
     #[error("command `{0}` failed with code {1:?}")]
     CmdFailed(String, Option<i32>),

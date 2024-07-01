@@ -1043,7 +1043,6 @@ fn component_on_config_change(
                     components.rx_leaky_bucket.clone(),
                     components.policy_getter,
                     components.exception_handler.clone(),
-                    0,
                     components.bpf_options.clone(),
                     components.packet_sequence_uniform_output.clone(),
                     components.proto_log_sender.clone(),
@@ -1067,7 +1066,6 @@ fn component_on_config_change(
                     }
                     Err(e) => {
                         warn!("build dispatcher_component failed: {}", e);
-                        thread::sleep(Duration::from_secs(1));
                         crate::utils::notify_exit(1);
                     }
                 }
@@ -1210,7 +1208,6 @@ impl DomainNameListener {
                                 Err(e) => {
                                     warn!("get ctrl ip and mac failed with error: {}", e);
                                     crate::utils::notify_exit(1);
-                                    thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
                             };
@@ -1227,7 +1224,6 @@ impl DomainNameListener {
                                     warn!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'.");
                                     warn!("setns error: {}", e);
                                     crate::utils::notify_exit(1);
-                                    thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
                                 let (ip, mac) = match get_ctrl_ip_and_mac(&ips[0].parse().unwrap()) {
@@ -1235,14 +1231,12 @@ impl DomainNameListener {
                                     Err(e) => {
                                         warn!("get ctrl ip and mac failed with error: {}", e);
                                         crate::utils::notify_exit(1);
-                                        thread::sleep(Duration::from_secs(1));
                                         continue;
                                     }
                                 };
                                 if let Err(e) = netns::reset_netns() {
                                     warn!("reset setns error: {}", e);
                                     crate::utils::notify_exit(1);
-                                    thread::sleep(Duration::from_secs(1));
                                     continue;
                                 }
                                 AgentId { ip, mac, team_id: team_id.clone() }
@@ -2115,7 +2109,6 @@ impl AgentComponents {
                 rx_leaky_bucket.clone(),
                 policy_getter,
                 exception_handler.clone(),
-                local_dispatcher_count,
                 bpf_options.clone(),
                 packet_sequence_uniform_output.clone(),
                 proto_log_sender.clone(),
@@ -2814,7 +2807,6 @@ fn build_dispatchers(
     rx_leaky_bucket: Arc<LeakyBucket>,
     policy_getter: PolicyGetter,
     exception_handler: ExceptionHandler,
-    local_dispatcher_count: usize,
     bpf_options: Arc<Mutex<BpfOptions>>,
     packet_sequence_uniform_output: DebugSender<BoxedPacketSequenceBlock>,
     proto_log_sender: DebugSender<BoxAppProtoLogsData>,
@@ -2960,6 +2952,7 @@ fn build_dispatchers(
             snap_len: dispatcher_config.capture_packet_size as usize,
             dpdk_enabled: dispatcher_config.dpdk_enabled,
             dispatcher_queue: dispatcher_config.dispatcher_queue,
+            packet_fanout_mode: yaml_config.packet_fanout_mode,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
@@ -2991,7 +2984,6 @@ fn build_dispatchers(
         .queue_debugger(queue_debugger.clone())
         .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
         .pcap_interfaces(pcap_interfaces.clone())
-        .local_dispatcher_count(local_dispatcher_count)
         .tunnel_type_trim_bitmap(dispatcher_config.tunnel_type_trim_bitmap)
         .bond_group(dispatcher_config.bond_group.clone())
         .analyzer_raw_packet_block_size(yaml_config.analyzer_raw_packet_block_size as usize);
