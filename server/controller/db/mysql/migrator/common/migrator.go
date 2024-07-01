@@ -75,7 +75,6 @@ func DropDatabase(dc *DBConfig) error {
 
 func CreateDatabase(dc *DBConfig) error {
 	log.Infof(LogDBName(dc.Config.Database, "create database"))
-	log.Infof("%#v", dc.DB)
 	return dc.DB.Exec(fmt.Sprintf("CREATE DATABASE %s", dc.Config.Database)).Error
 }
 
