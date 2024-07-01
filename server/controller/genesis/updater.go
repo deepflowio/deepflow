@@ -406,7 +406,8 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	ports := []model.GenesisPort{}
 	ipLastSeens := []model.GenesisIP{}
 	for _, iface := range interfaces {
-		if iface.MAC == "" {
+		if iface.MAC == "" || iface.Name == "lo" {
+			log.Debugf("not found mac or netcard is loopback (%#v)", iface)
 			continue
 		}
 		ips := iface.IPs
