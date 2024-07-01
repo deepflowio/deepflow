@@ -126,7 +126,13 @@ struct socket_info_s {
 	__u16 allow_reassembly: 1;
 	__u16 finish_reasm: 1; // Has the reassembly been completed?
 	__u16 udp_pre_set_addr: 1; // Is the socket address pre-set during the system call phase in the UDP protocol?
-	__u16 unused_bits: 13; 
+	/*
+	 * Indicate that the current and next data must be pushed in
+	 * the form of data reorganization.
+	 * Currently only protocol inference is available on sofarpc.
+	 */
+	__u16 force_reasm: 1;
+	__u16 unused_bits: 12; 
  	__u32 reasm_bytes; // The amount of data bytes that have been reassembled.
 
 	/*
