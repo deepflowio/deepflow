@@ -56,7 +56,7 @@ use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
 use super::crd::{
     calico::IpPool,
     kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
-    pingan::ServiceRule,
+    pingan_cloud::ServiceRule,
 };
 use crate::utils::stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable};
 
