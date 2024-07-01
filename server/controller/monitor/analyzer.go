@@ -18,6 +18,7 @@ package monitor
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"time"
 
@@ -362,6 +363,9 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 		azLcuuidToName[az.Lcuuid] = az.Name
 	}
 
+	b, _ := json.Marshal(azs)
+	log.Infof("azs: %s", string(b))
+
 	analyzerIPToConn := make(map[string]mysql.AZAnalyzerConnection)
 	mysql.Db.Find(&azAnalyzerConns)
 	for _, conn := range azAnalyzerConns {
@@ -372,6 +376,8 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
 			mysql.Db.Delete(&conn)
 			log.Infof("delete analyzer (%s) az (%s) connection", conn.AnalyzerIP, name)
+			log.Infof("delete analyzer (ip: %s) az (name: %s, lcuuid: %s, region: %s) connection",
+				conn.AnalyzerIP, name, conn.AZ, conn.Region)
 		}
 	}
 

@@ -18,6 +18,7 @@ package monitor
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"time"
 
@@ -365,6 +366,9 @@ func (c *ControllerCheck) azConnectionCheck() {
 		azLcuuidToName[az.Lcuuid] = az.Name
 	}
 
+	b, _ := json.Marshal(azs)
+	log.Infof("azs: %s", string(b))
+
 	mysql.Db.Find(&azControllerConns)
 	for _, conn := range azControllerConns {
 		if conn.AZ == "ALL" {
@@ -372,7 +376,8 @@ func (c *ControllerCheck) azConnectionCheck() {
 		}
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
 			mysql.Db.Delete(&conn)
-			log.Infof("delete controller (%s) az (%s) connection", conn.ControllerIP, name)
+			log.Infof("delete controller (ip: %s) az (name: %s, lcuuid: %s, region: %s) connection",
+				conn.ControllerIP, name, conn.AZ, conn.Region)
 		}
 	}
 	log.Info("az connection check end")
