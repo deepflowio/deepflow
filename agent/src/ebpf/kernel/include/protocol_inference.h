@@ -1072,6 +1072,23 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOFARPC)
 			return MSG_UNKNOWN;
+		/*
+		 * The system call behavior of sofarpc protocol is to first receive
+		 * 64 bytes when receiving, and then receive the following content.
+		 * We make sure that this type of data is reassembled.
+		 */
+		if (conn_info->socket_info_ptr->allow_reassembly &&
+		    (conn_info->direction == T_INGRESS)) {
+			if (conn_info->prev_direction == conn_info->direction &&
+			    conn_info->socket_info_ptr->force_reasm)
+				return MSG_UNKNOWN;
+
+			if (count == 64)
+				conn_info->socket_info_ptr->force_reasm = true;
+			else
+				conn_info->socket_info_ptr->force_reasm = false;
+		}
+
 		goto out;
 	}
 	// code for remoting command (Heartbeat, RpcRequest, RpcResponse)
