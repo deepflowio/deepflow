@@ -554,6 +554,7 @@ pub struct YamlConfig {
     pub dpdk_enabled: bool,
     pub dispatcher_queue: bool,
     pub libpcap_enabled: bool,
+    pub vhost_socket_path: String,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
     pub ignore_overlay_vlan: bool,
@@ -966,6 +967,7 @@ impl Default for YamlConfig {
             libpcap_enabled: false,
             #[cfg(target_os = "windows")]
             libpcap_enabled: true,
+            vhost_socket_path: "".into(),
             xflow_collector: Default::default(),
             vxlan_flags: 0xff,
             ignore_overlay_vlan: false,

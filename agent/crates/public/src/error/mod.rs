@@ -30,6 +30,8 @@ pub enum Error {
     CreateRawSocketError(#[from] std::io::Error),
     #[error("libpcap error {0}")]
     LibpcapError(String),
+    #[error("vhost user error {0}")]
+    VhostUserError(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
