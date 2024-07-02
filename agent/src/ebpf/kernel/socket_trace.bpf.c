@@ -1275,9 +1275,16 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 					      args->addr);
 			v->tuple.addr_len = 4;
 		} else if (conn_info->skc_family == PF_INET6) {
-			bpf_probe_read_kernel(v->tuple.daddr, 16,
-					      args->addr);
-			v->tuple.addr_len = 16;
+			if (*(__u64 *)&args->addr[0] == 0 &&
+			    *(__u32 *)&args->addr[8] == 0xffff0000) {
+				*(__u32 *)v->tuple.daddr = 
+					*(__u32 *)&args->addr[12];
+				v->tuple.addr_len = 4;
+			} else {
+				bpf_probe_read_kernel(v->tuple.daddr, 16,
+						      args->addr);
+				v->tuple.addr_len = 16;
+			}
 		}
 	}
 
