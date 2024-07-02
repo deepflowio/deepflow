@@ -19,7 +19,6 @@ package log_data
 import (
 	"encoding/hex"
 	"net"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -298,11 +297,11 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 	// If http.target exists, read it for RequestResource. If not exist, read the part after the domain name from http.url.
 	// eg. http.url = http://nacos:8848/nacos/v1/ns/instance/list, mapped to request_resource is /nacos/v1/ns/instance/list
 	if h.RequestResource == "" && httpURL != "" {
-		parsedURL, err := url.Parse(httpURL)
+		parsedURLPath, err := parseUrlPath(httpURL)
 		if err != nil {
-			log.Warningf("http.url (%s) parse failed: %s", httpURL, err)
+			log.Debugf("http.url (%s) parse failed: %s", httpURL, err)
 		} else {
-			h.RequestResource = parsedURL.Path
+			h.RequestResource = parsedURLPath
 		}
 	}
 
