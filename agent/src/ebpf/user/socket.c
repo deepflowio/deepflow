@@ -136,79 +136,44 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	int index = 0, curr_idx;
 
-	probes_set_enter_symbol(tps, "__sys_sendmsg");
-	probes_set_enter_symbol(tps, "__sys_sendmmsg");
-	probes_set_enter_symbol(tps, "__sys_recvmsg");
-	probes_set_enter_symbol(tps, "__sys_recvmmsg");
+	probes_set_symbol(tps, "__sys_sendmsg");
+	probes_set_symbol(tps, "__sys_sendmmsg");
+	probes_set_symbol(tps, "__sys_recvmsg");
+	probes_set_symbol(tps, "__sys_recvmmsg");
+	probes_set_symbol(tps, "ksys_write");
+	probes_set_symbol(tps, "ksys_read");
+	probes_set_symbol(tps, "do_writev");
+	probes_set_symbol(tps, "do_readv");
+	probes_set_symbol(tps, "__sys_sendto");
+	probes_set_symbol(tps, "__sys_recvfrom");
 
-	if (k_version == KERNEL_VERSION(3, 10, 0)) {
-		/*
-		 * The Linux 3.10 kernel interface for Redhat7 and
-		 * Centos7 is sys_writev() and sys_readv()
-		 */
-		probes_set_enter_symbol(tps, "sys_writev");
-		probes_set_enter_symbol(tps, "sys_readv");
-	} else {
-		probes_set_enter_symbol(tps, "do_writev");
-		probes_set_enter_symbol(tps, "do_readv");
-	}
-
+	probes_set_symbol(tps, "__arm64_sys_close");
 	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
 		/*
 		 * Different CPU architectures have variations in system calls.
 		 * It is necessary to confirm whether a specific system call exists.
 		 * You can check https://arm64.syscall.sh/ for reference.
 		 */
-		if (kallsyms_lookup_name("sys_fork"))
-			probes_set_exit_symbol(tps, "sys_fork");
+		if (kallsyms_lookup_name("__arm64_sys_fork"))
+			probes_set_exit_symbol(tps, "__arm64_sys_fork");
 	}
 
 	if (access(SYSCALL_CLONE_TP_PATH, F_OK)) {
-		if (kallsyms_lookup_name("sys_clone"))
-			probes_set_exit_symbol(tps, "sys_clone");
+		if (kallsyms_lookup_name("__arm64_sys_clone"))
+			probes_set_exit_symbol(tps, "__arm64_sys_clone");
 	}
 
+	probes_set_exit_symbol(tps, "__sys_connect");
+	probes_set_exit_symbol(tps, "__sys_socket");
+	probes_set_exit_symbol(tps, "__arm64_sys_accept");
+	probes_set_exit_symbol(tps, "__arm64_sys_accept4");
 	tps->kprobes_nr = index;
 
 	/* tracepoints */
 	index = 0;
-
-	/*
-	 * 由于在Linux 4.17+ sys_write, sys_read, sys_sendto, sys_recvfrom
-	 * 接口会发生变化为了避免对内核的依赖采用tracepoints方式
-	 */
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_write");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_read");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_sendto");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
-
-	// exit tracepoints
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_read");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_write");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendto");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvfrom");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendmmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_writev");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
-	// process execute
-	if (!access(SYSCALL_FORK_TP_PATH, F_OK))
-		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
-	if (!access(SYSCALL_CLONE_TP_PATH, F_OK))
-		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
 	// process exit
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
-
-	// clear trace connection & fetch close info
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
-
 	tps->tps_nr = index;
 
 	// 收集go可执行文件uprobe符号信息
@@ -1255,7 +1220,7 @@ static int update_offset_map_default(struct bpf_tracer *t,
 		break;
 	default:
 		offset.struct_files_struct_fdt_offset = 0x20;
-		offset.struct_files_private_data_offset = 0xc8;
+		offset.struct_files_private_data_offset = 0xd8;
 	};
 
 	/*
@@ -1279,7 +1244,9 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	offset.struct_sock_dport_offset = 0xc;
 	offset.struct_sock_sport_offset = 0xe;
 	offset.struct_sock_skc_state_offset = 0x12;
-	offset.struct_sock_common_ipv6only_offset = 0x13;
+	// aosp_kernel-common-android12-5.10 on target kernel_kprobes_aarch64
+	offset.struct_sock_common_ipv6only_offset = 0x60;
+	//offset.struct_sock_common_ipv6only_offset = 0x13;
 
 	if (update_offsets_table(t, &offset) != ETR_OK) {
 		ebpf_error("update_offset_map_default failed.\n");
@@ -1715,6 +1682,7 @@ static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
  */
 static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 {
+#if 0
 	// jmp for tracepoints
 	__insert_output_prog_to_map(tracer,
 				    MAP_PROGS_JMP_TP_NAME,
@@ -1728,12 +1696,13 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 				    MAP_PROGS_JMP_TP_NAME,
 				    PROG_OUTPUT_DATA_NAME_FOR_TP,
 				    PROG_OUTPUT_DATA_TP_IDX);
-	__insert_output_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_IO_EVENT_NAME_FOR_TP,
-				    PROG_IO_EVENT_TP_IDX);
-
+#endif
 	// jmp for kprobe/uprobe
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_KP_NAME,
+				    PROG_IO_EVENT_NAME_FOR_KP,
+				    PROG_IO_EVENT_KP_IDX);
+
 	__insert_output_prog_to_map(tracer,
 				    MAP_PROGS_JMP_KP_NAME,
 				    PROG_PROTO_INFER_FOR_KP,
