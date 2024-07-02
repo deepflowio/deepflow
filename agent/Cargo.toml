@@ -6,6 +6,8 @@ default-run = "deepflow-agent"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ["crates/*"]
 
 [dependencies]
 ahash = "0.8"
@@ -26,6 +28,7 @@ dashmap = "5.3.3"
 dns-lookup = "1.0.8"
 elf = "0.4.0"
 enum_dispatch = "0.3.7"
+enterprise-utils = { path = "crates/enterprise-utils", optional = true }
 flate2 = "1.0.23"
 # the feature flag fixes the following problem:
 #
@@ -134,11 +137,11 @@ uluru = "3.0.0"
 
 [build-dependencies]
 chrono = "0.4"
-dunce = "0.1.1"
+dunce = "1"
 tonic-build = "0.8.0"
 
 [features]
-enterprise = ["off_cpu"]
+enterprise = ["off_cpu", "enterprise-utils"]
 off_cpu = []
 
 [[bench]]
