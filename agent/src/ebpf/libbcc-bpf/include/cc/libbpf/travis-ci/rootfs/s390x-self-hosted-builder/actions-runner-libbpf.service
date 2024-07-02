@@ -1,0 +1,24 @@
+[Unit]
+Description=Self-Hosted IBM Z Github Actions Runner
+Wants=qemu-user-static
+After=qemu-user-static
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+ExecStart=/usr/bin/docker run \
+              --device=/dev/kvm \
+              --env-file=/etc/actions-runner-libbpf \
+              --init \
+              --interactive \
+              --name=actions-runner-libbpf \
+              --rm \
+              --volume=actions-runner-libbpf:/home/actions-runner \
+              iiilinuxibmcom/actions-runner-libbpf
+ExecStop=/bin/sh -c "docker exec actions-runner-libbpf kill -INT -- -1"
+ExecStop=/bin/sh -c "docker wait actions-runner-libbpf"
+ExecStop=/bin/sh -c "docker rm actions-runner-libbpf"
+
+[Install]
+WantedBy=multi-user.target
