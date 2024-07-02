@@ -147,7 +147,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	probes_set_symbol(tps, "__sys_sendto");
 	probes_set_symbol(tps, "__sys_recvfrom");
 
-	probes_set_symbol(tps, "__arm64_sys_close");
+	probes_set_enter_symbol(tps, "__arm64_sys_close");
 	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
 		/*
 		 * Different CPU architectures have variations in system calls.
@@ -163,7 +163,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 			probes_set_exit_symbol(tps, "__arm64_sys_clone");
 	}
 
-	probes_set_exit_symbol(tps, "__sys_connect");
+	probes_set_enter_symbol(tps, "__sys_connect");
 	probes_set_exit_symbol(tps, "__sys_socket");
 	probes_set_exit_symbol(tps, "__arm64_sys_accept");
 	probes_set_exit_symbol(tps, "__arm64_sys_accept4");
@@ -1244,9 +1244,29 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	offset.struct_sock_dport_offset = 0xc;
 	offset.struct_sock_sport_offset = 0xe;
 	offset.struct_sock_skc_state_offset = 0x12;
-	// aosp_kernel-common-android12-5.10 on target kernel_kprobes_aarch64
-	offset.struct_sock_common_ipv6only_offset = 0x60;
-	//offset.struct_sock_common_ipv6only_offset = 0x13;
+/*
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO Offsets from BTF vmlinux:
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     copied_seq_offs: 0x614
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     write_seq_offs: 0x794
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     files_offs: 0x7d8
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     sk_flags_offs: 0x228
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_files_struct_fdt_offset: 0x20
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_files_private_data_offset: 0xd8
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_file_f_inode_offset: 0x20
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_inode_i_mode_offset: 0x0
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_file_dentry_offset: 0x18
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_dentry_name_offset: 0x28
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_family_offset: 0x10
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_saddr_offset: 0x4
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_daddr_offset: 0x0
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_ip6saddr_offset: 0x48
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_ip6daddr_offset: 0x38
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_dport_offset: 0xc
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_sport_offset: 0xe
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_skc_state_offset: 0x12
+[2024-07-02T12:33:21.130Z INFO  socket_tracer::ebpf] [eBPF] INFO     struct_sock_common_ipv6only_offset: 0x13
+ */
+	offset.struct_sock_common_ipv6only_offset = 0x13;
 
 	if (update_offsets_table(t, &offset) != ETR_OK) {
 		ebpf_error("update_offset_map_default failed.\n");

@@ -158,13 +158,13 @@ fn main() {
       .init();
 
     // cat ./.profiler.folded |./flamegraph.pl --color=io --countname=ms > profiler-test.svg
-    let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
-    let log_file_c = log_file.as_c_str();
+    //let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
+    //let log_file_c = log_file.as_c_str();
     unsafe {
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()
-        if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
-            println!("bpf_tracer_init() file:{:?} error", log_file);
+        if bpf_tracer_init(std::ptr::null(), true) != 0 {
+            println!("bpf_tracer_init() error");
             ::std::process::exit(1);
         }
 

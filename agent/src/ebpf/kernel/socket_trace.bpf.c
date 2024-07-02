@@ -2062,7 +2062,7 @@ KRETPROG(do_readv) (struct pt_regs* ctx) {
 
 static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 					struct member_fields_offset *offset,
-				        struct syscall_comm_enter_ctx *ctx)
+				        struct pt_regs *ctx)
 {
 	__u32 k0 = 0;
 	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
@@ -2102,8 +2102,8 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), PROG_OUTPUT_DATA_KP_IDX);
 }
 
-KPROG(__close_fd) (struct pt_regs* ctx) {
-	int fd = (int)PT_REGS_PARM2(ctx);
+KPROG(__arm64_sys_close) (struct pt_regs* ctx) {
+	int fd = (int)PT_REGS_PARM1(ctx);
 	//Ignore stdin, stdout and stderr
 	if (fd <= 2)
 		return 0;
@@ -2132,7 +2132,7 @@ KPROG(__close_fd) (struct pt_regs* ctx) {
 	return 0;
 }
 
-KRETPROG(__close_fd) (struct pt_regs* ctx) {
+KRETPROG(__sys_socket) (struct pt_regs* ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u64 fd = (__u64) PT_REGS_RC(ctx);
 	char comm[TASK_COMM_LEN];
@@ -2373,10 +2373,6 @@ clear_args_map_2:
 	return 0;
 }
 
-PROGTP(output_data) (void *ctx) {
-	return output_data_common(ctx);
-}
-
 PROGKP(output_data) (void *ctx) {
 	return output_data_common(ctx);
 }
@@ -2470,33 +2466,10 @@ clear_args_map_2:
 	return -1;
 }
 
-PROGTP(proto_infer_2) (void *ctx) {
-	if (__proto_infer_2(ctx) == 0)
-		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
-			      PROG_DATA_SUBMIT_KP_IDX);
-	return 0;
-}
-
 PROGKP(proto_infer_2) (void *ctx) {
 	if (__proto_infer_2(ctx) == 0)
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
-	return 0;
-}
-
-PROGTP(data_submit) (void *ctx) {
-	int ret;
-	ret = data_submit(ctx);
-	if (ret == SUBMIT_OK) {
-		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
-			      PROG_OUTPUT_DATA_KP_IDX);
-	} else if (ret == SUBMIT_ABORT) {
-		return 0;
-	} else {
-		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
-			      PROG_IO_EVENT_KP_IDX);
-	}
-
 	return 0;
 }
 
