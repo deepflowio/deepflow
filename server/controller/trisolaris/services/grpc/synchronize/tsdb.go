@@ -95,7 +95,10 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 		tsdbCache := nodeInfo.GetTSDBCache(tsdbIP)
 		// 数据节点注册
 		if tsdbCache == nil {
-			nodeInfo.RegisterTSDB(in)
+			// Only the default organization registers with tsdb
+			if orgID == DEFAULT_ORG_ID {
+				nodeInfo.RegisterTSDB(in)
+			}
 			return &api.SyncResponse{
 				Status: &STATUS_FAILED,
 			}, nil
