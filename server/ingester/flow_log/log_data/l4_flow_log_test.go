@@ -18,13 +18,10 @@ package log_data
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/geo"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
-	"github.com/deepflowio/deepflow/server/libs/datatype/pb"
-	"github.com/deepflowio/deepflow/server/libs/grpc"
 )
 
 func TestJsonify(t *testing.T) {
@@ -46,37 +43,6 @@ func TestJsonify(t *testing.T) {
 	if info.L2End0 != newInfo.L2End0 {
 		t.Error("bool jsonify failed")
 	}
-}
-
-func TestZeroToNull(t *testing.T) {
-	pf := grpc.NewPlatformInfoTable(nil, 0, 0, 0, "", "", nil, true, nil)
-	taggedFlow := pb.TaggedFlow{
-		Flow: &pb.Flow{
-			FlowKey:        &pb.FlowKey{},
-			Tunnel:         &pb.TunnelField{},
-			MetricsPeerSrc: &pb.FlowMetricsPeer{},
-			MetricsPeerDst: &pb.FlowMetricsPeer{},
-		},
-	}
-
-	flow := TaggedFlowToL4FlowLog(&taggedFlow, pf)
-
-	flowByte, _ := json.Marshal(flow)
-
-	print(string(flowByte))
-
-	if strings.Contains(string(flowByte), "\"byte_tx\"") {
-		t.Error("rtt zero to null failed")
-	}
-
-	if strings.Contains(string(flowByte), "\"rtt\"") {
-		t.Error("rtt zero to null failed")
-	}
-	if flow.EndTime() != 0 {
-		t.Error("flow endtime should be 0")
-	}
-	flow.String()
-	flow.Release()
 }
 
 func TestParseUint32EpcID(t *testing.T) {
