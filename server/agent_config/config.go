@@ -128,6 +128,7 @@ type StaticConfig struct {
 	AnalyzerQueueSize                  *int                         `yaml:"analyzer-queue-size,omitempty"`
 	DpdkEnabled                        *bool                        `yaml:"dpdk-enabled,omitempty"`
 	LibpcapEnabled                     *bool                        `yaml:"libpcap-enabled,omitempty"`
+	VhostSocketPath                    *string                      `yaml:"vhost-socket-path,omitempty"`
 	XflowCollector                     *XflowCollectorConfig        `yaml:"xflow-collector,omitempty"`
 	NpbPort                            *uint16                      `yaml:"npb-port,omitempty"`
 	VxlanFlags                         *uint8                       `yaml:"vxlan-flags,omitempty"`
