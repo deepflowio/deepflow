@@ -42,7 +42,7 @@
 #define PROG_DATA_SUBMIT_NAME_FOR_TP	"df_TP_data_submit"
 #define PROG_OUTPUT_DATA_NAME_FOR_KP	"df_KP_output_data"
 #define PROG_OUTPUT_DATA_NAME_FOR_TP	"df_TP_output_data"
-#define PROG_IO_EVENT_NAME_FOR_TP	"df_TP_io_event"
+#define PROG_IO_EVENT_NAME_FOR_KP	"df_KP_io_event"
 #define PROG_PROTO_INFER_FOR_KP		"df_KP_proto_infer_2"
 #define PROG_PROTO_INFER_FOR_TP		"df_TP_proto_infer_2"
 
@@ -63,6 +63,7 @@ enum {
 	PROG_PROTO_INFER_KP_IDX,
 	PROG_DATA_SUBMIT_KP_IDX,
 	PROG_OUTPUT_DATA_KP_IDX,
+	PROG_IO_EVENT_KP_IDX,
 	PROG_KP_NUM
 };
 
@@ -102,7 +103,7 @@ enum {
 #define SK_TRACER_NAME			"socket-trace"
 
 #define DATADUMP_FILE_PATH_SIZE		1024
-#define DATADUMP_FILE_PATH_PREFIX	"/var/log"
+#define DATADUMP_FILE_PATH_PREFIX	"/data"
 
 // trace map回收的最大比例（指当前数量超过了整个MAP的容量的回收比例才进行回收）
 // Maximum proportion of trace map reclamation (refers to the proportion of

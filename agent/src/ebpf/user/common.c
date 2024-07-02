@@ -617,9 +617,15 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 			has_error = false;
 	}
 
+	// 5.15.119-android13-8-00016-g965abef6ee9f-ab10816505
+	if (sscanf(sys_info.release, "%u.%u.%u", major, minor, rev) != 3)
+		has_error = true;
+	else
+		has_error = false;
+
 	if (has_error) {
 		ebpf_warning
-		    ("release %s version %s (major %d minor %d rev %d num %d)\n",
+		    ("+ release %s version %s (major %d minor %d rev %d num %d)\n",
 		     sys_info.release, sys_info.version, major, minor, rev,
 		     num);
 		return ETR_INVAL;
