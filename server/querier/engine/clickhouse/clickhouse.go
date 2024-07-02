@@ -118,18 +118,20 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		return slimitResult, slimitDebug, err
 	}
 	// Parse showSql
-	result, sqlList, isShow, err := e.ParseShowSql(sql, args)
+	debug := &client.Debug{
+		IP:        config.Cfg.Clickhouse.Host,
+		QueryUUID: query_uuid,
+	}
+	ShowDebug := &client.ShowDebug{}
+	// For testing purposes, ParseShowSql requires the addition of the debug parameter
+	result, sqlList, isShow, err := e.ParseShowSql(sql, args, ShowDebug)
 	if isShow {
 		if err != nil {
 			return nil, nil, err
 		}
 		if len(sqlList) == 0 {
-			return result, nil, nil
+			return result, ShowDebug.Get(), nil
 		}
-	}
-	debug := &client.Debug{
-		IP:        config.Cfg.Clickhouse.Host,
-		QueryUUID: query_uuid,
 	}
 
 	if len(sqlList) > 0 {
@@ -302,7 +304,7 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 	}
 }
 
-func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common.Result, []string, bool, error) {
+func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, ShowDebug *client.ShowDebug) (*common.Result, []string, bool, error) {
 	sqlSplit := strings.Fields(sql)
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
@@ -353,7 +355,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 			}
 
 			// tag metrics
-			tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context)
+			tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context, ShowDebug)
 			if err != nil {
 				log.Error("Failed to get tag type metrics")
 				return nil, []string{}, true, err
@@ -373,10 +375,10 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 		}
 		return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 	case "tags":
-		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, ShowDebug)
 		return data, []string{}, true, err
 	case "tables":
-		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context), []string{}, true, nil
+		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, ShowDebug), []string{}, true, nil
 	case "databases":
 		return GetDatabases(), []string{}, true, nil
 	case "tag-values":
@@ -505,9 +507,10 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 			}
 		}
 	}
+	ShowDebug := &client.ShowDebug{}
 
 	showTagsSql := "show tags from " + table
-	tags, _, _, err := e.ParseShowSql(showTagsSql, args)
+	tags, _, _, err := e.ParseShowSql(showTagsSql, args, ShowDebug)
 	if err != nil {
 		return "", nil, nil, err
 	} else if len(tags.Values) == 0 {
