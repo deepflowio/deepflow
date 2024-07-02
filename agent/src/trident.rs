@@ -2953,6 +2953,7 @@ fn build_dispatchers(
             dpdk_enabled: dispatcher_config.dpdk_enabled,
             dispatcher_queue: dispatcher_config.dispatcher_queue,
             packet_fanout_mode: yaml_config.packet_fanout_mode,
+            vhost_socket_path: yaml_config.vhost_socket_path.clone(),
             ..Default::default()
         })))
         .bpf_options(bpf_options)

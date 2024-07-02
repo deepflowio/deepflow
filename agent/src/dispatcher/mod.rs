@@ -39,9 +39,9 @@ use log::error;
 use log::{debug, info, warn};
 use packet_dedup::*;
 use public::debug::QueueDebugger;
-#[cfg(target_os = "linux")]
-use special_recv_engine::Dpdk;
 use special_recv_engine::Libpcap;
+#[cfg(target_os = "linux")]
+use special_recv_engine::{Dpdk, VhostUser};
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
@@ -537,6 +537,7 @@ pub struct Options {
     pub npb_port: u16,
     pub controller_port: u16,
     pub controller_tls_port: u16,
+    pub vhost_socket_path: String,
 }
 
 pub struct Pipeline {
@@ -1151,6 +1152,9 @@ impl DispatcherBuilder {
     ) -> Result<RecvEngine> {
         let options = options.lock().unwrap();
         match tap_mode {
+            TapMode::Mirror if !options.vhost_socket_path.is_empty() => Ok(RecvEngine::VhostUser(
+                VhostUser::new(options.vhost_socket_path.clone(), 4096),
+            )),
             TapMode::Mirror | TapMode::Local if options.libpcap_enabled => {
                 if pcap_interfaces.is_none() || pcap_interfaces.as_ref().unwrap().is_empty() {
                     return Err(error::Error::Libpcap(
