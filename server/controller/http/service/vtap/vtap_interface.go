@@ -267,6 +267,11 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 	return vtapVIFs
 }
 
+type DeviceKey struct {
+	DeviceID   int
+	DeviceType int
+}
+
 type vpToolDataSet struct {
 	idToVTap              map[int]*mysql.VTap
 	macToVIFs             map[string][]*mysql.VInterface
@@ -286,6 +291,8 @@ type vpToolDataSet struct {
 	podServiceIDToName    map[int]string
 	podIDToName           map[int]string
 	podIDToPodNodeID      map[int]int
+	VTapIDToVPCID         map[int]int
+	DeviceToVPCID         map[DeviceKey]int
 }
 
 func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
@@ -308,6 +315,8 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 		podServiceIDToName:    make(map[int]string),
 		podIDToName:           make(map[int]string),
 		podIDToPodNodeID:      make(map[int]int),
+		VTapIDToVPCID:         make(map[int]int),
+		DeviceToVPCID:         make(map[DeviceKey]int),
 	}
 	var vtaps []*mysql.VTap
 	if err = db.Unscoped().Find(&vtaps).Error; err != nil {
