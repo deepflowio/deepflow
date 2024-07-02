@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use super::resource_watcher::Trimmable;
 
-pub mod pingan {
+pub mod pingan_cloud {
     use super::*;
 
     use k8s_openapi::api::core::v1::ServicePort;
