@@ -221,7 +221,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_VPC_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -232,7 +233,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_TAP_TYPE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `value` UInt64,\n" +
@@ -241,7 +243,8 @@ const (
 		"PRIMARY KEY value\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_VTAP_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -252,7 +255,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_DEVICE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `devicetype` UInt64,\n" +
@@ -264,7 +268,8 @@ const (
 		"PRIMARY KEY devicetype, deviceid\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_VTAP_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `vtap_id` UInt64,\n" +
@@ -280,7 +285,8 @@ const (
 		"PRIMARY KEY vtap_id, tap_port\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -296,7 +302,8 @@ const (
 		"PRIMARY KEY id, protocol, port\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_IP_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `ip` String,\n" +
@@ -313,7 +320,8 @@ const (
 		"PRIMARY KEY ip, subnet_id, protocol, port\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_DEVICE_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `devicetype` UInt64,\n" +
@@ -330,7 +338,8 @@ const (
 		"PRIMARY KEY devicetype, deviceid, protocol, port\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_SERVER_PORT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `server_port` UInt64,\n" +
@@ -339,7 +348,8 @@ const (
 		"PRIMARY KEY server_port\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_IP_RELATION_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `l3_epc_id` UInt64,\n" +
@@ -358,7 +368,8 @@ const (
 		"PRIMARY KEY l3_epc_id, ip\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_ID_NAME_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -367,7 +378,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_K8S_LABEL_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -379,7 +391,8 @@ const (
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_K8S_LABELS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -390,7 +403,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_IP_RESOURCE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `ip` String,\n" +
@@ -439,7 +453,8 @@ const (
 		"PRIMARY KEY ip, subnet_id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_STRING_ENUM_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `tag_name` String,\n" +
@@ -450,7 +465,8 @@ const (
 		"PRIMARY KEY tag_name, value\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_INT_ENUM_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `tag_name` String,\n" +
@@ -461,7 +477,8 @@ const (
 		"PRIMARY KEY tag_name, value\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_NODE_TYPE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `resource_type` UInt64,\n" +
@@ -470,7 +487,8 @@ const (
 		"PRIMARY KEY resource_type\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_CLOUD_TAG_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -480,7 +498,8 @@ const (
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_CLOUD_TAGS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -489,7 +508,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_OS_APP_TAG_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `pid` UInt64,\n" +
@@ -499,7 +519,8 @@ const (
 		"PRIMARY KEY pid, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_OS_APP_TAGS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `pid` UInt64,\n" +
@@ -508,8 +529,8 @@ const (
 		"PRIMARY KEY pid\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
-
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_K8S_ANNOTATION_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -521,7 +542,8 @@ const (
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_K8S_ANNOTATIONS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -532,7 +554,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_K8S_ENV_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -544,7 +567,8 @@ const (
 		"PRIMARY KEY id, key\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_K8S_ENVS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -555,7 +579,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_PROMETHEUS_LABEL_NAME_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -564,7 +589,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_PROMETHEUS_METRIC_APP_LABEL_LAYOUT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -575,7 +601,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_APP_LABEL_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `label_name_id` UInt64,\n" +
@@ -585,7 +612,8 @@ const (
 		"PRIMARY KEY label_name_id, label_value_id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_TARGET_LABEL_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `metric_id` UInt64,\n" +
@@ -596,7 +624,8 @@ const (
 		"PRIMARY KEY metric_id, label_name_id, target_id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_PROMETHEUS_TARGET_LABEL_LAYOUT_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `target_id` UInt64,\n" +
@@ -606,7 +635,8 @@ const (
 		"PRIMARY KEY target_id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_POD_NS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -617,7 +647,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_POD_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -632,7 +663,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_POD_SERVICE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -643,7 +675,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_CHOST_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -654,7 +687,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_CH_POD_GROUP_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -667,7 +701,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_CH_GPROCESS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `id` UInt64,\n" +
@@ -679,7 +714,8 @@ const (
 		"PRIMARY KEY id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(FLAT())"
+		"LAYOUT(FLAT())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 	CREATE_POLICY_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `tunnel_type` UInt64,\n" +
@@ -690,7 +726,8 @@ const (
 		"PRIMARY KEY tunnel_type, acl_gid\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select(select updated_at from %s order by updated_at desc limit 1) as updated_at'))\n" +
 		"LIFETIME(MIN 30 MAX %d)\n" +
-		"LAYOUT(COMPLEX_KEY_HASHED())"
+		"LAYOUT(COMPLEX_KEY_HASHED())\n" +
+		"SETTINGS(connection_auto_close = 0)"
 )
 
 const (
