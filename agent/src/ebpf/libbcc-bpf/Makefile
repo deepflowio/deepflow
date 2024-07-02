@@ -6,6 +6,8 @@ else
 	msg = @printf '  %-8s %s%s\n' "$(1)" "$(notdir $(2))" "$(if $(3), $(3))";
 endif
 
+ARCH := $(shell uname -m)
+
 #CXX := /work/aarch64-linux-musl-native/bin/aarch64-linux-musl-c++
 #CC :=  /work/aarch64-linux-musl-native/bin/aarch64-linux-musl-gcc
 #AR := /work/aarch64-linux-musl-native/bin/ar
@@ -42,7 +44,9 @@ STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 STATIC_OBJS_C := $(addprefix $(STATIC_OBJDIR)/,$(OBJS_C))
 
 build: $(STATIC_OBJS) $(STATIC_OBJS_C)
-	$(AR) qc libbcc_bpf.a $(STATIC_OBJS) $(STATIC_OBJS_C)
+	@if [[ $(ARCH) == *"aarch64"* ]]; then \
+            $(AR) qc ../libbcc_bpf.a $(STATIC_OBJS) $(STATIC_OBJS_C); \
+        fi
 
 $(STATIC_OBJDIR) $(STATIC_OBJDIR_C):
 	$(call msg,MKDIR,$@)
@@ -81,6 +85,6 @@ $(STATIC_OBJDIR)/%.o: % | $(STATIC_OBJDIR)
 	$(CXX) $(CFLAGS_CXX) -c $< -o $@
 
 clean:
-	@rm -rf $(STATIC_OBJS) $(STATIC_OBJS_C) $(STATIC_OBJDIR) ./libbcc_bpf.a
+	@rm -rf $(STATIC_OBJS) $(STATIC_OBJS_C) $(STATIC_OBJDIR) ../libbcc_bpf.a
 
 .PHONY: clean
