@@ -1319,27 +1319,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
 		 */
 		v->tcp_seq = tcp_seq;
-		if (tcp_seq == 0 && conn_info->fd > 0) {
-			if (conn_info->direction == T_INGRESS) {
-				tcp_seq =
-				    get_tcp_read_seq_from_fd(conn_info->fd);
-				/*
-				 * If the current state is TCPF_CLOSE_WAIT, the FIN
-				 * frame already has been received.
-				 * Since tcp_sock->copied_seq has done such an operation +1,
-				 * need to fix the value of tcp_seq.
-				 */
-				if ((1 << conn_info->skc_state) &
-				    TCPF_CLOSE_WAIT) {
-					tcp_seq--;
-				}
-			} else {
-				tcp_seq =
-				    get_tcp_write_seq_from_fd(conn_info->fd);
-			}
-
-			v->tcp_seq = tcp_seq - syscall_len;
-		}
 	}
 
 	v->thread_trace_id = thread_trace_id;
