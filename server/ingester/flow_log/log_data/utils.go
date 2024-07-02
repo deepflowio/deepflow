@@ -16,8 +16,26 @@
 
 package log_data
 
-import "net"
+import (
+	"fmt"
+	"net"
+	"strings"
+)
 
 func IPIntToString(ipInt uint32) string {
 	return net.IPv4(byte(ipInt>>24), byte(ipInt>>16), byte(ipInt>>8), byte(ipInt)).String()
+}
+
+// eg. url=http://nacos:8848/nacos/v1/ns/instance/list, parse return `/nacos/v1/ns/instance/list`
+func parseUrlPath(rawURL string) (string, error) {
+	parts := strings.SplitN(rawURL, "://", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return "", fmt.Errorf("invalid URL format")
+	}
+	pathStart := strings.Index(parts[1], "/")
+	if pathStart == -1 {
+		return "/", nil
+	}
+
+	return parts[1][pathStart:], nil
 }
