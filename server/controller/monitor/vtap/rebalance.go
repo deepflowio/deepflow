@@ -22,7 +22,9 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	ctrlconfig "github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
@@ -119,6 +121,10 @@ func (r *RebalanceCheck) controllerRebalance(db *mysql.DB) {
 		return
 	}
 
+	userInfo := &httpcommon.UserInfo{
+		ORGID: db.ORGID, DatabaseName: db.Name,
+		Type: common.USER_TYPE_SUPER_ADMIN, ID: common.USER_ID_SUPER_ADMIN,
+	}
 	for _, controller := range controllers {
 		// check if need rebalance
 		if controller.VtapCount == 0 && controller.VTapMax > 0 &&
@@ -128,7 +134,7 @@ func (r *RebalanceCheck) controllerRebalance(db *mysql.DB) {
 				"check": false,
 				"type":  "controller",
 			}
-			if result, err := service.VTapRebalance(db, args, r.cfg.IngesterLoadBalancingConfig); err != nil {
+			if result, err := service.NewAgent(userInfo, &ctrlconfig.ControllerConfig{MonitorCfg: r.cfg}).VTapRebalance(db, args); err != nil {
 				log.Errorf("ORG(id=%d database=%s) %s", db.ORGID, db.Name, err.Error())
 			} else {
 				data, _ := json.Marshal(result)
@@ -147,6 +153,10 @@ func (r *RebalanceCheck) analyzerRebalance(db *mysql.DB) {
 		return
 	}
 
+	userInfo := &httpcommon.UserInfo{
+		ORGID: db.ORGID, DatabaseName: db.Name,
+		Type: common.USER_TYPE_SUPER_ADMIN, ID: common.USER_ID_SUPER_ADMIN,
+	}
 	for _, analyzer := range analyzers {
 		if analyzer.VtapCount == 0 && analyzer.VTapMax > 0 &&
 			analyzer.State == common.HOST_STATE_COMPLETE && len(analyzer.Azs) != 0 {
@@ -155,7 +165,7 @@ func (r *RebalanceCheck) analyzerRebalance(db *mysql.DB) {
 				"check": false,
 				"type":  "analyzer",
 			}
-			if result, err := service.VTapRebalance(db, args, r.cfg.IngesterLoadBalancingConfig); err != nil {
+			if result, err := service.NewAgent(userInfo, &ctrlconfig.ControllerConfig{MonitorCfg: r.cfg}).VTapRebalance(db, args); err != nil {
 				log.Errorf("ORG(id=%d database=%s) %s", db.ORGID, db.Name, err.Error())
 			} else {
 				data, _ := json.Marshal(result)

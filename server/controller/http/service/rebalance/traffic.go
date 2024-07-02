@@ -42,56 +42,17 @@ import (
 var log = logging.MustGetLogger("service.rebalance")
 
 func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool, dataDuration int) (*model.VTapRebalanceResult, error) {
-	// In automatic balancing, data is not obtained when ifCheckout = false.
-	if len(r.dbInfo.Analyzers) == 0 {
-		err := r.dbInfo.Get(db)
-		if err != nil {
-			return nil, err
-		}
-	}
-	info := r.dbInfo
-	if len(info.VTaps) == 0 || len(info.Analyzers) == 0 {
-		return nil, nil
-	}
-
-	regionToAZLcuuids := make(map[string][]string)
-	azToRegion := make(map[string]string, len(info.AZs))
-	for _, az := range info.AZs {
-		regionToAZLcuuids[az.Region] = append(regionToAZLcuuids[az.Region], az.Lcuuid)
-		azToRegion[az.Lcuuid] = az.Region
-	}
-	azToVTaps := make(map[string][]*mysql.VTap)
-	allVTapNameToID := make(map[string]int, len(info.VTaps))
-	allVTapIDToVTap := make(map[int]*mysql.VTap, len(info.VTaps))
-	for i, vtap := range info.VTaps {
-		azToVTaps[vtap.AZ] = append(azToVTaps[vtap.AZ], &info.VTaps[i])
-		allVTapNameToID[vtap.Name] = vtap.ID
-		allVTapIDToVTap[vtap.ID] = &vtap
-	}
-	ipToAnalyzer := make(map[string]*mysql.Analyzer)
-	for i, analyzer := range info.Analyzers {
-		ipToAnalyzer[analyzer.IP] = &info.Analyzers[i]
-	}
-	azToAnalyzers := GetAZToAnalyzers(info.AZAnalyzerConns, regionToAZLcuuids, ipToAnalyzer)
-
-	if r.regionToVTapNameToTraffic == nil {
-		regionToVTapNameToTraffic, err := r.getVTapTraffic(db, dataDuration, regionToAZLcuuids)
-		if err != nil {
-			return nil, fmt.Errorf("get traffic data failed: %v", err)
-		}
-		for region, vtapNameToTraffic := range regionToVTapNameToTraffic {
-			log.Infof("ORGID-%d DATABASE-%s region(%s) agent traffic: %#v", db.ORGID, db.Name, region, vtapNameToTraffic)
-		}
-		r.regionToVTapNameToTraffic = regionToVTapNameToTraffic
+	if err := r.generateRebalanceData(db, dataDuration); err != nil {
+		return nil, err
 	}
 
 	response := &model.VTapRebalanceResult{}
-	for _, az := range info.AZs {
-		azVTaps, ok := azToVTaps[az.Lcuuid]
+	for _, az := range r.AZs {
+		azVTaps, ok := r.AZToVTaps[az.Lcuuid]
 		if !ok {
 			continue
 		}
-		azAnalyzers, ok := azToAnalyzers[az.Lcuuid]
+		azAnalyzers, ok := r.AZToAnalyzers[az.Lcuuid]
 		if !ok {
 			continue
 		}
@@ -103,7 +64,7 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 			vTapIDToTraffic[vtap.ID] = 0
 			vTapIDToVTap[vtap.ID] = vtap
 		}
-		for vtapName, traffic := range r.regionToVTapNameToTraffic[az.Region] {
+		for vtapName, traffic := range r.RegionToVTapNameToTraffic[az.Region] {
 			vtapID, ok := vtapNameToID[vtapName]
 			if !ok {
 				continue
@@ -160,6 +121,13 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 
 		r.updateCounter(db, vTapIDToVTap, vtapNameToID, vTapIDToChangeInfo)
 	}
+
+	allVTapNameToID := make(map[string]int, len(r.dbInfo.VTaps))
+	allVTapIDToVTap := make(map[int]*mysql.VTap, len(r.dbInfo.VTaps))
+	for _, vtap := range r.dbInfo.VTaps {
+		allVTapNameToID[vtap.Name] = vtap.ID
+		allVTapIDToVTap[vtap.ID] = &vtap
+	}
 	vtapCounter := statsd.GetVTapCounter()
 	for name, counter := range vtapCounter.GetVtapNameCounter(db.ORGID) {
 		vtapID, ok := allVTapNameToID[name]
@@ -182,6 +150,227 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 	}
 
 	return response, nil
+}
+
+type TrafficDebugResp struct {
+	AZs []struct {
+		Lcuuid string `json:"LCUUID"`
+		Name   string `json:"NAME"`
+		Region string `json:"REGION" `
+	}
+}
+
+func (r *AnalyzerInfo) RebalanceAnalyzerByTrafficDebug(db *mysql.DB, dataDuration int) (map[string]interface{}, error) {
+	data := make(map[string]interface{})
+	if err := r.generateRebalanceData(db, dataDuration); err != nil {
+		return nil, err
+	}
+
+	azData := make([]interface{}, len(r.dbInfo.AZs))
+	for i, az := range r.AZs {
+		azData[i] = map[string]interface{}{
+			"LCUUID": az.Lcuuid,
+			"DOMAIN": az.Domain,
+			"REGION": az.Region,
+		}
+	}
+
+	azToVtaps := map[string][]interface{}{}
+	for az, vtaps := range r.AZToVTaps {
+		for _, vtap := range vtaps {
+			azToVtaps[az] = append(azToVtaps[az], map[string]interface{}{
+				"ID":          vtap.ID,
+				"NAME":        vtap.Name,
+				"ANALYZER_IP": vtap.AnalyzerIP,
+				"AZ":          vtap.AZ,
+			})
+		}
+	}
+
+	azToAnalyzers := map[string][]interface{}{}
+	for az, analyzers := range r.AZToAnalyzers {
+		for _, analyzer := range analyzers {
+			azToAnalyzers[az] = append(azToAnalyzers[az], map[string]interface{}{
+				"IP":    analyzer.IP,
+				"STATE": analyzer.State,
+				"NAME":  analyzer.Name,
+			})
+		}
+	}
+
+	data["TRAFFIC_DATA"] = map[string]interface{}{
+		"AZs":                       azData,
+		"RegionToVTapNameToTraffic": r.RegionToVTapNameToTraffic,
+		"RegionToAZLcuuids":         r.RegionToAZLcuuids,
+		"AZToRegion":                r.AZToRegion,
+		"AZToVTaps":                 azToVtaps,
+		"AZToAnalyzers":             azToAnalyzers,
+	}
+
+	data = r.trafficAZDebug(data)
+	data = r.trafficAnalyzerDebug(db.ORGID, data)
+
+	return data, nil
+}
+
+func (r *AnalyzerInfo) trafficAZDebug(data map[string]interface{}) map[string]interface{} {
+	var trafficResult []map[string]interface{}
+	regionToName := make(map[string]string, len(r.dbInfo.Regions))
+	for _, region := range r.dbInfo.Regions {
+		regionToName[region.Lcuuid] = region.Name
+	}
+	for _, az := range r.AZs {
+		azVTaps, ok := r.AZToVTaps[az.Lcuuid]
+		if !ok {
+			continue
+		}
+		azAnalyzers, ok := r.AZToAnalyzers[az.Lcuuid]
+		if !ok {
+			continue
+		}
+		analyzerIPToVTaps := make(map[string][]mysql.VTap, len(azAnalyzers))
+		for _, vtap := range azVTaps {
+			analyzerIPToVTaps[vtap.AnalyzerIP] = append(analyzerIPToVTaps[vtap.AnalyzerIP], *vtap)
+		}
+		vTapNameToTraffic := make(map[string]int64)
+		for vtapName, traffic := range r.RegionToVTapNameToTraffic[az.Region] {
+			vTapNameToTraffic[vtapName] = traffic
+		}
+
+		results := make([]map[string]interface{}, len(azAnalyzers))
+		azTraffic := int64(0)
+		for i, analyzer := range azAnalyzers {
+			results[i] = map[string]interface{}{
+				"REGION":         fmt.Sprintf("%s(%s)", az.Region, regionToName[az.Region]),
+				"AZ":             fmt.Sprintf("%s(%s)", az.Lcuuid, az.Name),
+				"ANALYZER_IP":    analyzer.IP,
+				"ANALYZER_STATE": analyzer.State,
+				"AGENT_COUNT":    len(analyzerIPToVTaps[analyzer.IP]),
+			}
+			trafficData := int64(0)
+			for _, vtap := range analyzerIPToVTaps[analyzer.IP] {
+				trafficData += vTapNameToTraffic[vtap.Name]
+				azTraffic += vTapNameToTraffic[vtap.Name]
+			}
+			results[i]["ANALYZER_TRAFFIC"] = trafficData
+		}
+		for _, result := range results {
+			result["AZ_TRAFFIC"] = azTraffic
+		}
+		trafficResult = append(trafficResult, results...)
+	}
+	data["TRAFFIC_AZ"] = trafficResult
+
+	return data
+}
+
+func (r *AnalyzerInfo) trafficAnalyzerDebug(orgID int, data map[string]interface{}) map[string]interface{} {
+	regionToName := make(map[string]string, len(r.dbInfo.Regions))
+	for _, region := range r.dbInfo.Regions {
+		regionToName[region.Lcuuid] = region.Name
+	}
+	lcuuidToAz := make(map[string]*mysql.AZ)
+	for i, az := range r.AZs {
+		lcuuidToAz[az.Lcuuid] = &r.AZs[i]
+	}
+	ipToAzAnalyzerCon := make(map[string][]*mysql.AZAnalyzerConnection)
+	for i, conn := range r.dbInfo.AZAnalyzerConns {
+		ipToAzAnalyzerCon[conn.AnalyzerIP] = append(
+			ipToAzAnalyzerCon[conn.AnalyzerIP],
+			&r.dbInfo.AZAnalyzerConns[i],
+		)
+	}
+	analyzerIPToVTaps := make(map[string][]mysql.VTap, len(r.dbInfo.VTaps))
+	for _, vtap := range r.dbInfo.VTaps {
+		analyzerIPToVTaps[vtap.AnalyzerIP] = append(analyzerIPToVTaps[vtap.AnalyzerIP], vtap)
+	}
+	vtapNameToTraffic := make(map[string]int64)
+	for _, item := range r.RegionToVTapNameToTraffic {
+		for vtapName, traffic := range item {
+			vtapNameToTraffic[vtapName] = traffic
+		}
+	}
+
+	results := make([]map[string]interface{}, len(r.dbInfo.Analyzers))
+	for i, analyzer := range r.dbInfo.Analyzers {
+		results[i] = map[string]interface{}{
+			"ANALYZER_IP":    analyzer.IP,
+			"ANALYZER_STATE": analyzer.State,
+			"AGENT_COUNT":    len(analyzerIPToVTaps[analyzer.IP]),
+		}
+
+		trafficData := int64(0)
+		for _, vtap := range analyzerIPToVTaps[analyzer.IP] {
+			trafficData += vtapNameToTraffic[vtap.Name]
+		}
+		results[i]["ANALYZER_TRAFFIC"] = trafficData
+
+		azConns, ok := ipToAzAnalyzerCon[analyzer.IP]
+		if ok && len(azConns) > 0 {
+			if regionName, ok := regionToName[azConns[0].Region]; ok {
+				results[i]["REGION"] = fmt.Sprintf("%s(%s)", azConns[0].Region, regionName)
+			}
+		}
+		var azStr string
+		for _, azConn := range azConns {
+			if azConn.AZ == "ALL" {
+				azStr = "ALL"
+				break
+			} else {
+				if azStr == "" {
+					azStr = fmt.Sprintf("%s(%s)", azConn.AZ, lcuuidToAz[azConn.AZ].Name)
+				} else {
+					azStr += fmt.Sprintf(", %s(%s)", azConn.AZ, lcuuidToAz[azConn.AZ].Name)
+				}
+			}
+		}
+		results[i]["AZ"] = azStr
+	}
+	data["TRAFFIC_ANALYZER"] = results
+	return data
+}
+
+func (r *AnalyzerInfo) generateRebalanceData(db *mysql.DB, dataDuration int) error {
+	// In automatic balancing, data is not obtained when ifCheckout = false.
+	if len(r.dbInfo.Analyzers) == 0 {
+		err := r.dbInfo.Get(db)
+		if err != nil {
+			return err
+		}
+	}
+	info := r.dbInfo
+	if len(info.VTaps) == 0 || len(info.Analyzers) == 0 {
+		return nil
+	}
+
+	r.RegionToAZLcuuids = make(map[string][]string)
+	r.AZToRegion = make(map[string]string, len(info.AZs))
+	for _, az := range info.AZs {
+		r.RegionToAZLcuuids[az.Region] = append(r.RegionToAZLcuuids[az.Region], az.Lcuuid)
+		r.AZToRegion[az.Lcuuid] = az.Region
+	}
+	r.AZToVTaps = make(map[string][]*mysql.VTap)
+	for i, vtap := range info.VTaps {
+		r.AZToVTaps[vtap.AZ] = append(r.AZToVTaps[vtap.AZ], &info.VTaps[i])
+	}
+	ipToAnalyzer := make(map[string]*mysql.Analyzer)
+	for i, analyzer := range info.Analyzers {
+		ipToAnalyzer[analyzer.IP] = &info.Analyzers[i]
+	}
+	r.AZToAnalyzers = GetAZToAnalyzers(info.AZAnalyzerConns, r.RegionToAZLcuuids, ipToAnalyzer)
+
+	if r.RegionToVTapNameToTraffic == nil {
+		regionToVTapNameToTraffic, err := r.getVTapTraffic(db, dataDuration, r.RegionToAZLcuuids)
+		if err != nil {
+			return fmt.Errorf("get traffic data failed: %v", err)
+		}
+		for region, vtapNameToTraffic := range r.RegionToVTapNameToTraffic {
+			log.Infof("ORGID-%d DATABASE-%s region(%s) agent traffic: %#v", db.ORGID, db.Name, region, vtapNameToTraffic)
+		}
+		r.RegionToVTapNameToTraffic = regionToVTapNameToTraffic
+	}
+	r.AZs = r.dbInfo.AZs
+	return nil
 }
 
 type AZInfo struct {

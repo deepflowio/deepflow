@@ -58,7 +58,8 @@ func (v *Vtap) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/vtaps/batch/", v.batchUpdateVtap())
 	e.DELETE("/v1/vtaps/batch/", v.batchDeleteVtap())
 
-	e.POST("/v1/rebalance-vtap/", rebalanceVtap(v.cfg))
+	e.POST("/v1/rebalance-vtap/", v.rebalanceVtap(false))
+	e.POST("/v1/rebalance-vtap/debug/", v.rebalanceVtap(true))
 
 	e.PATCH("/v1/vtaps-license-type/:lcuuid/", v.updateVtapLicenseType())
 	e.PATCH("/v1/vtaps-license-type/", v.batchUpdateVtapLicenseType())
@@ -246,12 +247,12 @@ func (v *Vtap) batchDeleteVtap() gin.HandlerFunc {
 	}
 }
 
-func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
-	return gin.HandlerFunc(func(c *gin.Context) {
-		// 如果不是masterController，将请求转发至是masterController
+func (v *Vtap) rebalanceVtap(isDebug bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// // 如果不是masterController，将请求转发至是masterController
 		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			ForwardMasterController(c, masterControllerIP, cfg.ListenPort)
+			ForwardMasterController(c, masterControllerIP, v.cfg.ListenPort)
 			return
 		}
 
@@ -281,13 +282,18 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 			return
 		}
 
-		data, err := service.VTapRebalance(dbInfo, args, cfg.MonitorCfg.IngesterLoadBalancingConfig)
+		var data interface{}
+		if isDebug {
+			data, err = service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).VTapRebalanceDebug(dbInfo, args)
+		} else {
+			data, err = service.NewAgent(httpcommon.GetUserInfo(c), v.cfg).VTapRebalance(dbInfo, args)
+		}
 		if err != nil {
 			JsonResponse(c, nil, fmt.Errorf("ORG(id=%d database=%s) %s", dbInfo.ORGID, dbInfo.Name, err.Error()))
 			return
 		}
 		JsonResponse(c, data, nil)
-	})
+	}
 }
 
 func (v *Vtap) getVtapCSV() gin.HandlerFunc {

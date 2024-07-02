@@ -17,6 +17,7 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -34,7 +35,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/model"
-	monitorconf "github.com/deepflowio/deepflow/server/controller/monitor/config"
+	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -44,12 +45,42 @@ type Agent struct {
 	cfg *config.ControllerConfig
 
 	resourceAccess *ResourceAccess
+
+	RebalanceController *RebalanceController
+	RebalanceAnalyzer   *RebalanceAnalyzer
+}
+
+type RebalanceController struct {
+	Controllers       []mysql.Controller
+	AZControllerConns []mysql.AZControllerConnection
+	Agents            []mysql.VTap
+	AZs               []mysql.AZ
+	AZToControllers   map[string][]*mysql.Controller
+	AZToAgents        map[string][]*mysql.VTap
+}
+
+type RebalanceAnalyzer struct {
+	Analyzers       []mysql.Analyzer
+	AZAnalyzerConns []mysql.AZAnalyzerConnection
+	Agents          []mysql.VTap
+	AZs             []mysql.AZ
+	AZToAnalyzer    map[string][]*mysql.Analyzer
+	AZToAgents      map[string][]*mysql.VTap
 }
 
 func NewAgent(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *Agent {
 	return &Agent{
-		cfg:            cfg,
-		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+		cfg:                 cfg,
+		resourceAccess:      &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+		RebalanceController: &RebalanceController{},
+		RebalanceAnalyzer:   &RebalanceAnalyzer{},
+	}
+}
+
+func NewAgentWithMonitorConfig(userInfo *httpcommon.UserInfo, cfg *mconfig.MonitorConfig) *Agent {
+	return &Agent{
+		cfg:            &config.ControllerConfig{MonitorCfg: *cfg},
+		resourceAccess: &ResourceAccess{userInfo: userInfo},
 	}
 }
 
@@ -560,7 +591,7 @@ func (a *Agent) BatchDelete(deleteMap []map[string]string) (resp map[string][]st
 	}
 }
 
-func execAZRebalance(
+func (a *Agent) execAZRebalance(
 	db *mysql.DB, azLcuuid string, vtapNum int, hostType string, hostIPToVTaps map[string][]*mysql.VTap,
 	hostIPToAvailableVTapNum map[string]int, hostIPToUsedVTapNum map[string]int,
 	hostIPToState map[string]int, ifCheck bool,
@@ -665,66 +696,89 @@ func execAZRebalance(
 	return response
 }
 
-func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
-	var controllers []mysql.Controller
-	var azControllerConns []mysql.AZControllerConnection
-	var vtaps []mysql.VTap
-	response := &model.VTapRebalanceResult{}
+func (a *Agent) generateControllerRebalanceData(db *mysql.DB) error {
+	data := a.RebalanceController
+	if err := db.Find(&data.AZs).Error; err != nil {
+		return err
+	}
+	if err := db.Find(&data.Controllers).Error; err != nil {
+		return err
+	}
+	if err := db.Find(&data.AZControllerConns).Error; err != nil {
+		return err
+	}
+	if err := db.Where("controller_ip != ''").Find(&data.Agents).Error; err != nil {
+		return err
+	}
 
-	db.Find(&controllers)
-	db.Find(&azControllerConns)
-	db.Where("controller_ip != ''").Find(&vtaps)
-
-	azToVTaps := make(map[string][]*mysql.VTap)
-	for i, vtap := range vtaps {
-		azToVTaps[vtap.AZ] = append(azToVTaps[vtap.AZ], &vtaps[i])
+	data.AZToAgents = make(map[string][]*mysql.VTap)
+	for i, vtap := range data.Agents {
+		data.AZToAgents[vtap.AZ] = append(data.AZToAgents[vtap.AZ], &data.Agents[i])
 	}
 
 	regionToAZLcuuids := make(map[string][]string)
-	for _, az := range azs {
+	for _, az := range data.AZs {
 		regionToAZLcuuids[az.Region] = append(regionToAZLcuuids[az.Region], az.Lcuuid)
 	}
 
 	normalControllerNum := 0
 	ipToController := make(map[string]*mysql.Controller)
-	for i, controller := range controllers {
-		ipToController[controller.IP] = &controllers[i]
+	for i, controller := range data.Controllers {
+		ipToController[controller.IP] = &data.Controllers[i]
 		if controller.State == common.HOST_STATE_COMPLETE && controller.VTapMax > 0 {
 			normalControllerNum += 1
 		}
 	}
 	if normalControllerNum == 0 {
 		errMsg := "No available controllers，Global equalization is not possible"
-		return nil, NewError(httpcommon.SERVER_ERROR, errMsg)
+		return NewError(httpcommon.SERVER_ERROR, errMsg)
 	}
 
 	// 获取各可用区中的控制列表
-	azToControllers := make(map[string][]*mysql.Controller)
-	for _, conn := range azControllerConns {
+	data.AZToControllers = make(map[string][]*mysql.Controller)
+	for _, conn := range data.AZControllerConns {
 		if conn.AZ == "ALL" {
 			if azLcuuids, ok := regionToAZLcuuids[conn.Region]; ok {
 				for _, azLcuuid := range azLcuuids {
 					if controller, ok := ipToController[conn.ControllerIP]; ok {
-						azToControllers[azLcuuid] = append(
-							azToControllers[azLcuuid], controller,
+						data.AZToControllers[azLcuuid] = append(
+							data.AZToControllers[azLcuuid], controller,
 						)
 					}
 				}
 			}
 		} else {
 			if controller, ok := ipToController[conn.ControllerIP]; ok {
-				azToControllers[conn.AZ] = append(azToControllers[conn.AZ], controller)
+				data.AZToControllers[conn.AZ] = append(data.AZToControllers[conn.AZ], controller)
 			}
 		}
 	}
+	return nil
+}
 
+func (a *Agent) vtapControllerRebalance(db *mysql.DB, ifCheck bool) (*model.VTapRebalanceResult, error) {
+	if err := a.generateControllerRebalanceData(db); err != nil {
+		return nil, err
+	}
+	data := a.RebalanceController
+	normalControllerNum := 0
+	for _, controller := range data.Controllers {
+		if controller.State == common.HOST_STATE_COMPLETE && controller.VTapMax > 0 {
+			normalControllerNum += 1
+		}
+	}
+	if normalControllerNum == 0 {
+		return nil, NewError(httpcommon.SERVER_ERROR, "No available controllers，Global equalization is not possible")
+	}
+
+	response := &model.VTapRebalanceResult{}
 	// 遍历可用区，进行控制器均衡
-	for _, az := range azs {
-		azVTaps, ok := azToVTaps[az.Lcuuid]
+	for _, az := range data.AZs {
+		azVTaps, ok := data.AZToAgents[az.Lcuuid]
 		if !ok {
 			continue
 		}
-		azControllers, ok := azToControllers[az.Lcuuid]
+		azControllers, ok := data.AZToControllers[az.Lcuuid]
 		if !ok {
 			continue
 		}
@@ -751,7 +805,7 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model
 		}
 
 		// 执行均衡操作
-		azVTapRebalanceResult := execAZRebalance(
+		azVTapRebalanceResult := a.execAZRebalance(
 			db, az.Lcuuid, len(azVTaps), "controller", controllerIPToVTaps,
 			controllerIPToAvailableVTapNum, controllerIPToUsedVTapNum,
 			controllerIPToState, ifCheck,
@@ -762,30 +816,55 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model
 	return response, nil
 }
 
-func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
-	var analyzers []mysql.Analyzer
-	var azAnalyzerConns []mysql.AZAnalyzerConnection
-	var vtaps []mysql.VTap
-	response := &model.VTapRebalanceResult{}
+func (a *Agent) vtapControllerRebalanceDebug(db *mysql.DB) (map[string]interface{}, error) {
+	if err := a.generateControllerRebalanceData(db); err != nil {
+		return nil, err
+	}
+	b, err := json.Marshal(a.RebalanceController)
+	if err != nil {
+		return nil, err
+	}
+	response := make(map[string]interface{})
+	if err = json.Unmarshal(b, &response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
 
-	db.Find(&analyzers)
-	db.Find(&azAnalyzerConns)
-	db.Where("analyzer_ip != ''").Find(&vtaps)
+func (a *Agent) generateAnalyzerRebalanceData(db *mysql.DB) error {
+	data := a.RebalanceAnalyzer
 
-	azToVTaps := make(map[string][]*mysql.VTap)
-	for i, vtap := range vtaps {
-		azToVTaps[vtap.AZ] = append(azToVTaps[vtap.AZ], &vtaps[i])
+	db.Find(&data.Analyzers)
+	db.Find(&data.AZAnalyzerConns)
+	db.Where("analyzer_ip != ''").Find(&data.Agents)
+
+	data.AZToAgents = make(map[string][]*mysql.VTap)
+	for i, vtap := range data.Agents {
+		data.AZToAgents[vtap.AZ] = append(data.AZToAgents[vtap.AZ], &data.Agents[i])
 	}
 
 	regionToAZLcuuids := make(map[string][]string)
-	for _, az := range azs {
+	for _, az := range data.AZs {
 		regionToAZLcuuids[az.Region] = append(regionToAZLcuuids[az.Region], az.Lcuuid)
 	}
 
-	normalAnalyzerNum := 0
 	ipToAnalyzer := make(map[string]*mysql.Analyzer)
-	for i, analyzer := range analyzers {
-		ipToAnalyzer[analyzer.IP] = &analyzers[i]
+	for i, analyzer := range data.Analyzers {
+		ipToAnalyzer[analyzer.IP] = &data.Analyzers[i]
+	}
+
+	data.AZToAnalyzer = rebalance.GetAZToAnalyzers(data.AZAnalyzerConns, regionToAZLcuuids, ipToAnalyzer)
+	return nil
+}
+
+func (a *Agent) vtapAnalyzerRebalance(db *mysql.DB, ifCheck bool) (*model.VTapRebalanceResult, error) {
+	if err := a.generateAnalyzerRebalanceData(db); err != nil {
+		return nil, err
+	}
+	data := a.RebalanceAnalyzer
+
+	normalAnalyzerNum := 0
+	for _, analyzer := range data.Analyzers {
 		if analyzer.State == common.HOST_STATE_COMPLETE && analyzer.VTapMax > 0 {
 			normalAnalyzerNum += 1
 		}
@@ -795,15 +874,14 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 		return nil, NewError(httpcommon.SERVER_ERROR, errMsg)
 	}
 
-	azToAnalyzers := rebalance.GetAZToAnalyzers(azAnalyzerConns, regionToAZLcuuids, ipToAnalyzer)
-
+	response := &model.VTapRebalanceResult{}
 	// 遍历可用区，进行数据节点均衡
-	for _, az := range azs {
-		azVTaps, ok := azToVTaps[az.Lcuuid]
+	for _, az := range data.AZs {
+		azVTaps, ok := data.AZToAgents[az.Lcuuid]
 		if !ok {
 			continue
 		}
-		azAnalyzers, ok := azToAnalyzers[az.Lcuuid]
+		azAnalyzers, ok := data.AZToAnalyzer[az.Lcuuid]
 		if !ok {
 			continue
 		}
@@ -829,7 +907,7 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 		}
 
 		// 执行均衡操作
-		azVTapRebalanceResult := execAZRebalance(
+		azVTapRebalanceResult := a.execAZRebalance(
 			db, az.Lcuuid, len(azVTaps), "analyzer", analyzerIPToVTaps,
 			analyzerIPToAvailableVTapNum, analyzerIPToUsedVTapNum,
 			analyzerIPToState, ifCheck,
@@ -840,8 +918,23 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 	return response, nil
 }
 
-func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (*model.VTapRebalanceResult, error) {
-	var azs []mysql.AZ
+func (a *Agent) vtapAnalyzerRebalanceDebug(db *mysql.DB) (map[string]interface{}, error) {
+	if err := a.generateAnalyzerRebalanceData(db); err != nil {
+		return nil, err
+	}
+	b, err := json.Marshal(a.RebalanceAnalyzer)
+	if err != nil {
+		return nil, err
+	}
+	response := make(map[string]interface{})
+	if err = json.Unmarshal(b, &response); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (a *Agent) VTapRebalance(db *mysql.DB, args map[string]interface{}) (*model.VTapRebalanceResult, error) {
+	cfg := a.cfg.MonitorCfg.IngesterLoadBalancingConfig
 
 	hostType := "controller"
 	if argsType, ok := args["type"]; ok {
@@ -853,20 +946,45 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 		ifCheck = argsCheck.(bool)
 	}
 
-	db.Find(&azs)
 	if hostType == "controller" {
-		return vtapControllerRebalance(db, azs, ifCheck)
+		return a.vtapControllerRebalance(db, ifCheck)
 	} else {
 		if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
 			return rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTraffic(db, ifCheck, cfg.DataDuration)
 		} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
-			result, err := vtapAnalyzerRebalance(db, azs, ifCheck)
+			result, err := a.vtapAnalyzerRebalance(db, ifCheck)
 			if err != nil {
 				return nil, err
 			}
 			for _, detail := range result.Details {
 				detail.BeforeVTapWeights = 1
 				detail.AfterVTapWeights = 1
+			}
+			return result, nil
+		} else {
+			return nil, fmt.Errorf("algorithm(%s) is not supported, only supports: %s, %s", cfg.Algorithm,
+				common.ANALYZER_ALLOC_BY_INGESTED_DATA, common.ANALYZER_ALLOC_BY_AGENT_COUNT)
+		}
+	}
+}
+
+func (a *Agent) VTapRebalanceDebug(db *mysql.DB, args map[string]interface{}) (map[string]interface{}, error) {
+	cfg := a.cfg.MonitorCfg.IngesterLoadBalancingConfig
+
+	hostType := "controller"
+	if argsType, ok := args["type"]; ok {
+		hostType = argsType.(string)
+	}
+
+	if hostType == "controller" {
+		return a.vtapControllerRebalanceDebug(db)
+	} else {
+		if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
+			return rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTrafficDebug(db, cfg.DataDuration)
+		} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
+			result, err := a.vtapAnalyzerRebalanceDebug(db)
+			if err != nil {
+				return nil, err
 			}
 			return result, nil
 		} else {
