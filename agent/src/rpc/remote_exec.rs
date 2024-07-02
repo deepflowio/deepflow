@@ -62,35 +62,11 @@ use public::{
 
 const MIN_BATCH_LEN: usize = 1024;
 
-#[derive(Clone, Copy)]
-enum OutputFormat {
-    Text,
-    Binary,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum KubeCmd {
-    DescribePod,
-    Log,
-    LogPrevious,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum CommandType {
-    Linux,
-    Kubernetes(KubeCmd),
-}
-
-#[derive(Clone, Copy)]
-struct Command {
-    cmdline: &'static str,
-    output_format: OutputFormat,
-    desc: &'static str,
-    command_type: CommandType,
-}
+pub use public::rpc::remote_exec::*;
 
 fn all_supported_commands() -> Vec<Command> {
-    vec![
+    #[allow(unused_mut)]
+    let mut commands = vec![
         Command {
             cmdline: "lsns",
             output_format: OutputFormat::Text,
@@ -133,7 +109,10 @@ fn all_supported_commands() -> Vec<Command> {
             desc: "",
             command_type: CommandType::Kubernetes(KubeCmd::LogPrevious),
         },
-    ]
+    ];
+    #[cfg(feature = "enterprise")]
+    commands.extend(enterprise_utils::rpc::remote_exec::extra_commands());
+    commands
 }
 
 thread_local! {

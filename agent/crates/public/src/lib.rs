@@ -28,6 +28,7 @@ pub mod packet;
 pub mod proto;
 pub mod pwd;
 pub mod queue;
+pub mod rpc;
 pub mod sender;
 pub mod utils;
 
