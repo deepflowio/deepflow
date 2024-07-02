@@ -929,8 +929,9 @@ dependencies = [
  "criterion",
  "dashmap",
  "dns-lookup",
- "dunce 0.1.1",
+ "dunce",
  "elf",
+ "enterprise-utils",
  "enum_dispatch",
  "envmnt",
  "flate2",
@@ -1085,12 +1086,6 @@ dependencies = [
 
 [[package]]
 name = "dunce"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e86b07356baf1cc7058c95807ffba0bebe0c8cadd0df4c40b292c86194eabb37"
-
-[[package]]
-name = "dunce"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
@@ -1121,6 +1116,10 @@ checksum = "071a31f4ee85403370b58aca746f01041ede6f0da2730960ad001edc2b71b394"
 dependencies = [
  "cfg-if",
 ]
+
+[[package]]
+name = "enterprise-utils"
+version = "0.1.0"
 
 [[package]]
 name = "enum_dispatch"
@@ -1297,7 +1296,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dad0ce30be0cc441b325c5d705c8b613a0ca0d92b6a8953d41bd236dc09a36d0"
 dependencies = [
- "dunce 1.0.4",
+ "dunce",
 ]
 
 [[package]]
