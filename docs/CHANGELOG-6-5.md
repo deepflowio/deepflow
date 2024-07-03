@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent Packet fanout can only be set in TapMode::Local mode [#7229](https://github.com/deepflowio/deepflow/pull/7229) by [TomatoMr](https://github.com/TomatoMr)
+* fix: Attribute supports Chinese [#7228](https://github.com/deepflowio/deepflow/pull/7228) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - incorrect grpc log collected by uprobe [#7201](https://github.com/deepflowio/deepflow/pull/7201) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Modify the value of team's short lcuuid corresponding to org_id [#7176](https://github.com/deepflowio/deepflow/pull/7176) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: Only the default organization registers with tsdb [#7169](https://github.com/deepflowio/deepflow/pull/7169) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
@@ -35,8 +37,8 @@
 
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
-
 #### NEW FEATURE
+* feat: Add volcengine icon const [#7232](https://github.com/deepflowio/deepflow/pull/7232) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: add volcengine icon const [#7180](https://github.com/deepflowio/deepflow/pull/7180) by [askyrie](https://github.com/askyrie)
 * feat: Dictionary adds auto-close connection [#7165](https://github.com/deepflowio/deepflow/pull/7165) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: deepflow-ctl ingester support debugging by org id [#7163](https://github.com/deepflowio/deepflow/pull/7163) by [lzf575](https://github.com/lzf575)
@@ -46,10 +48,10 @@
 * feat: server - add ebpf event type mem alloc/inuse [#7106](https://github.com/deepflowio/deepflow/pull/7106) by [rvql](https://github.com/rvql)
 * feat: add change log [#7095](https://github.com/deepflowio/deepflow/pull/7095) by [Nick-0314](https://github.com/Nick-0314)
 
-
 #### Refactoring
 * refactor: Change crate name [#7158](https://github.com/deepflowio/deepflow/pull/7158) by [rvql](https://github.com/rvql)
 
 
 #### OTHER
+
 * Cp 65 73 [#7202](https://github.com/deepflowio/deepflow/pull/7202) by [lzf575](https://github.com/lzf575)
