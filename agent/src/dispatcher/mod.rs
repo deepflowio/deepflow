@@ -1212,7 +1212,11 @@ impl DispatcherBuilder {
                     poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
                     version: options.af_packet_version,
                     iface: src_interface.as_ref().unwrap_or(&"".to_string()).clone(),
-                    packet_fanout_mode: options.packet_fanout_mode,
+                    packet_fanout_mode: if options.tap_mode == TapMode::Local {
+                        Some(options.packet_fanout_mode)
+                    } else {
+                        None
+                    },
                     ..Default::default()
                 };
                 info!("Afpacket init with {:?}", afp);
