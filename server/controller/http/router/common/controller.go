@@ -19,17 +19,23 @@ package common
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("common/controller")
 
 func ForwardMasterController(c *gin.Context, masterControllerName string, port int) {
 	requestHosts := strings.Split(c.Request.Host, ":")
 	if len(requestHosts) > 1 {
-		c.Request.Host = strings.Replace(
-			c.Request.Host, requestHosts[0], masterControllerName, 1,
-		)
+		if requestHosts[1] != strconv.Itoa(port) {
+			c.Request.Host = fmt.Sprintf("%s:%d", masterControllerName, port)
+		} else {
+			c.Request.Host = strings.Replace(c.Request.Host, requestHosts[0], masterControllerName, 1)
+		}
 	} else {
 		c.Request.Host = fmt.Sprintf("%s:%d", masterControllerName, port)
 	}

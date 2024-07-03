@@ -840,12 +840,19 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 	return response, nil
 }
 
-func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (*model.VTapRebalanceResult, error) {
+func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (interface{}, error) {
 	var azs []mysql.AZ
 
 	hostType := "controller"
 	if argsType, ok := args["type"]; ok {
 		hostType = argsType.(string)
+	}
+
+	if _, ok := args["is_debug"]; ok && hostType == "controller" {
+		return nil, errors.New("rebalance agent debug only support analyzer type")
+	}
+	if _, ok := args["is_debug"]; ok && cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
+		return nil, errors.New("rebalance agent debug algorithm only support by-ingested-data")
 	}
 
 	ifCheck := false
@@ -858,6 +865,9 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 		return vtapControllerRebalance(db, azs, ifCheck)
 	} else {
 		if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
+			if _, ok := args["is_debug"]; ok {
+				return rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTrafficDebug(db, cfg.DataDuration)
+			}
 			return rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTraffic(db, ifCheck, cfg.DataDuration)
 		} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
 			result, err := vtapAnalyzerRebalance(db, azs, ifCheck)
