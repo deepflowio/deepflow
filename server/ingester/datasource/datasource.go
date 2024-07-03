@@ -45,7 +45,7 @@ type DatasourceManager struct {
 	readTimeout      int
 	replicaEnabled   bool
 	ckdbColdStorages map[string]*ckdb.ColdStorage
-	isModifyingFlags []bool
+	isModifyingFlags [ckdb.MAX_ORG_ID + 1][MAX_DATASOURCE_COUNT]bool
 
 	ckdbCluster       string
 	ckdbStoragePolicy string
@@ -62,7 +62,6 @@ func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManage
 		ckdbCluster:       cfg.CKDB.ClusterName,
 		ckdbStoragePolicy: cfg.CKDB.StoragePolicy,
 		ckdbColdStorages:  cfg.GetCKDBColdStorages(),
-		isModifyingFlags:  make([]bool, MAX_DATASOURCE_COUNT),
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),
