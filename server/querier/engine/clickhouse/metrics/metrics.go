@@ -238,7 +238,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	}
 
 	// tag metrics
-	tagDescriptions, err := tag.GetTagDescriptions(db, table, "", "", orgID, true, context.Background())
+	tagDescriptions, err := tag.GetTagDescriptions(db, table, "", "", orgID, true, context.Background(), nil)
 	if err != nil {
 		log.Error("Failed to get tag type metrics")
 		return nil, false
@@ -400,8 +400,8 @@ func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID stri
 		return nil, err
 	}
 	/* columns := []interface{}{
-		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table"
-	} */
+		 "name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table"
+	 } */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
 
@@ -429,7 +429,7 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 		if db == "ext_metrics" {
 			tables = append(tables, table)
 		} else if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) {
-			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx) {
+			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, nil) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
