@@ -80,7 +80,7 @@ pub struct Options {
     pub version: OptTpacketVersion,
     pub socket_type: OptSocketType,
     pub iface: String,
-    pub packet_fanout_mode: u32,
+    pub packet_fanout_mode: Option<u32>,
 }
 
 impl Default for Options {
@@ -95,7 +95,7 @@ impl Default for Options {
             version: OptTpacketVersion::TpacketVersionHighestavailablet,
             socket_type: OptSocketType::SocketTypeRaw,
             iface: "".to_string(),
-            packet_fanout_mode: 0,
+            packet_fanout_mode: None,
         }
     }
 }
