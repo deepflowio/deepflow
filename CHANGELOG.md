@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+
 * fix: agent - eBPF DNS cannot obtain network tuple data (#7131) [#7132](https://github.com/deepflowio/deepflow/pull/7132) by [yinjiping](https://github.com/yinjiping)
 * fix: Ingester always update prometheus labels even if labels version has not changed [#7128](https://github.com/deepflowio/deepflow/pull/7128) by [lzf575](https://github.com/lzf575)
 * fix: k8s refresh close keep alive [#7125](https://github.com/deepflowio/deepflow/pull/7125) by [askyrie](https://github.com/askyrie)
@@ -30,6 +31,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+
 * feat: Profile adjust decompression order [#7122](https://github.com/deepflowio/deepflow/pull/7122) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: CK’s username and password support the use of special characters [#7119](https://github.com/deepflowio/deepflow/pull/7119) by [lzf575](https://github.com/lzf575)
 * feat: add volcengine icon const [#7179](https://github.com/deepflowio/deepflow/pull/7179) by [askyrie](https://github.com/askyrie)
