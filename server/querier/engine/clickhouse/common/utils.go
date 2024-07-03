@@ -202,7 +202,7 @@ func GetDatasourceInterval(db string, table string, name string, orgID string) (
 	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
 }
 
-func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, ShowDebug *client.ShowDebug) (values []interface{}) {
+func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -225,7 +225,9 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 		log.Error(err)
 		return nil
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
+	if DebugInfo != nil {
+		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
+	}
 	for _, _table := range rst.Values {
 		table := _table.([]interface{})[0].(string)
 		if !strings.HasSuffix(table, "_local") {
@@ -236,7 +238,7 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 	return values
 }
 
-func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, ShowDebug *client.ShowDebug) (values []interface{}) {
+func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -258,7 +260,9 @@ func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ct
 		log.Error(err)
 		return nil
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
+	if DebugInfo != nil {
+		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
+	}
 	for _, _table := range rst.Values {
 		table := _table.([]interface{})[0].(string)
 		if !strings.HasSuffix(table, "_local") {

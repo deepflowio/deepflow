@@ -23,7 +23,6 @@ import (
 
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
 )
@@ -72,9 +71,7 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 			}
 		} else if db == chCommon.DB_NAME_PROMETHEUS {
 			// prometheus samples should get all metrcis from `table`
-			//To delete
-			ShowDebug := &client.ShowDebug{}
-			samples := clickhouse.GetTables(db, "", args.OrgID, false, ctx, ShowDebug)
+			samples := clickhouse.GetTables(db, "", args.OrgID, false, ctx, nil)
 			for _, v := range samples.Values {
 				tableName := v.([]interface{})[0].(string)
 				// append ${metrics_name}
