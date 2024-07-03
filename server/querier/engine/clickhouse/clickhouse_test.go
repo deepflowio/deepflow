@@ -577,14 +577,12 @@ var (
 		db:     "deepflow_tenant",
 		input:  "SHOW tables",
 		output: []string{"SELECT table FROM flow_tag.deepflow_tenant_custom_field GROUP BY table"},
+	}, {
+		name:   "test_showsql",
+		db:     "_prometheus",
+		input:  "SHOW tag-values",
+		output: []string{"SELECT field_name AS `label_name`, field_value AS `label_value` FROM flow_tag.`prometheus_custom_field_value` GROUP BY `label_name`, `label_value` ORDER BY `label_name` asc LIMIT 10000"},
 	}}
-	// fix me
-	// {
-	// 	name:   "test_showsql",
-	// 	db:     "flow_tag",
-	// 	input:  "SHOW tag-values",
-	// 	output: []string{"SELECT field_name AS `label_name`, field_value AS `label_value` FROM flow_tag.`prometheus_custom_field_value` GROUP BY `label_name`, `label_value` ORDER BY `label_name` asc LIMIT 10000"},
-	// }
 )
 
 func TestGetSql(t *testing.T) {
@@ -626,24 +624,26 @@ func TestGetSql(t *testing.T) {
 			outSql, _, _, err = e.ParseSlimitSql(pcase.input, args)
 			out = append(out, outSql)
 		} else {
-			input := pcase.input
-			ShowDebug := &client.ShowDebug{}
+			DebugInfo := &client.DebugInfo{}
 			if strings.HasPrefix(pcase.input, "SHOW") {
-				_, sqlList, _, err = e.ParseShowSql(pcase.input, args, ShowDebug)
-				if len(sqlList) > 0 {
-					input = sqlList[0]
-				}
+				_, sqlList, _, err = e.ParseShowSql(pcase.input, args, DebugInfo)
+				e.DB = "flow_tag"
 			}
 			if err == nil {
-				count := len(ShowDebug.Debug)
+				count := len(DebugInfo.Debug)
 				if count > 0 {
-					for _, debug := range ShowDebug.Debug {
+					for _, debug := range DebugInfo.Debug {
 						out = append(out, debug.Sql)
 					}
 				} else {
-					parser := parse.Parser{Engine: &e}
-					err = parser.ParseSQL(input)
-					out = append(out, parser.Engine.ToSQLString())
+					if len(sqlList) == 0 {
+						sqlList = append(sqlList, pcase.input)
+					}
+					for _, input := range sqlList {
+						parser := parse.Parser{Engine: &e}
+						err = parser.ParseSQL(input)
+						out = append(out, parser.Engine.ToSQLString())
+					}
 				}
 			}
 		}
