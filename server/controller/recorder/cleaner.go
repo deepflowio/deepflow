@@ -454,6 +454,9 @@ func deleteExpired[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt t
 		log.Error(db.Logf("mysql delete resource failed: %s", err.Error()))
 		return nil
 	}
+	if len(dbItems) == 0 {
+		return nil
+	}
 	if err := db.Unscoped().Delete(&dbItems).Error; err != nil {
 		log.Error(db.Logf("mysql delete resource failed: %s", err.Error()))
 		return nil
@@ -473,6 +476,7 @@ func getIDs[MT constraint.MySQLModel](db *mysql.DB) (ids []int) {
 func deleteAndPublish[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData) {
 	dbItems := deleteExpired[MT](db, expiredAt)
 	publishTagrecorder(db, dbItems, resourceType, toolData)
+	log.Info(db.Logf("clean %s completed: %d", resourceType, len(dbItems)))
 }
 
 func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItems []*MT, resourceType string, toolData *toolData) {
@@ -489,6 +493,9 @@ func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItem
 			continue
 		}
 		msgMetadataToDBItems[msgMetadata] = append(msgMetadataToDBItems[msgMetadata], item)
+	}
+	if len(msgMetadataToDBItems) == 0 {
+		return
 	}
 	for _, sub := range tagrecorder.GetSubscriberManager().GetSubscribers(resourceType) {
 		for msgMetadata, dbItems := range msgMetadataToDBItems {
