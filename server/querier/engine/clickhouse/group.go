@@ -271,80 +271,80 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 			}
 			return &view.Expr{Value: "(" + filter + ")"}, true
 		} else {
-			name := strings.Trim(name, "`")
-			if strings.HasPrefix(name, "k8s.label.") {
-				if strings.HasSuffix(name, "_0") {
+			noBackQuoteName := strings.Trim(name, "`")
+			if strings.HasPrefix(noBackQuoteName, "k8s.label.") {
+				if strings.HasSuffix(noBackQuoteName, "_0") {
 					tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-				} else if strings.HasSuffix(name, "_1") {
+				} else if strings.HasSuffix(noBackQuoteName, "_1") {
 					tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
 				} else {
 					tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
 				}
-				filterName := strings.TrimPrefix(name, "k8s.label.")
+				filterName := strings.TrimPrefix(noBackQuoteName, "k8s.label.")
 				filterName = strings.TrimSuffix(filterName, "_0")
 				filterName = strings.TrimSuffix(filterName, "_1")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if strings.HasPrefix(name, "k8s.annotation.") {
-				if strings.HasSuffix(name, "_0") {
+			} else if strings.HasPrefix(noBackQuoteName, "k8s.annotation.") {
+				if strings.HasSuffix(noBackQuoteName, "_0") {
 					tagItem, _ = tag.GetTag("k8s_annotation_0", db, table, "default")
-				} else if strings.HasSuffix(name, "_1") {
+				} else if strings.HasSuffix(noBackQuoteName, "_1") {
 					tagItem, _ = tag.GetTag("k8s_annotation_1", db, table, "default")
 				} else {
 					tagItem, _ = tag.GetTag("k8s_annotation", db, table, "default")
 				}
-				filterName := strings.TrimPrefix(name, "k8s.annotation.")
+				filterName := strings.TrimPrefix(noBackQuoteName, "k8s.annotation.")
 				filterName = strings.TrimSuffix(filterName, "_0")
 				filterName = strings.TrimSuffix(filterName, "_1")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if strings.HasPrefix(name, "k8s.env.") {
-				if strings.HasSuffix(name, "_0") {
+			} else if strings.HasPrefix(noBackQuoteName, "k8s.env.") {
+				if strings.HasSuffix(noBackQuoteName, "_0") {
 					tagItem, _ = tag.GetTag("k8s_env_0", db, table, "default")
-				} else if strings.HasSuffix(name, "_1") {
+				} else if strings.HasSuffix(noBackQuoteName, "_1") {
 					tagItem, _ = tag.GetTag("k8s_env_1", db, table, "default")
 				} else {
 					tagItem, _ = tag.GetTag("k8s_env", db, table, "default")
 				}
-				filterName := strings.TrimPrefix(name, "k8s.env.")
+				filterName := strings.TrimPrefix(noBackQuoteName, "k8s.env.")
 				filterName = strings.TrimSuffix(filterName, "_0")
 				filterName = strings.TrimSuffix(filterName, "_1")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if strings.HasPrefix(name, "cloud.tag.") {
-				if strings.HasSuffix(name, "_0") {
+			} else if strings.HasPrefix(noBackQuoteName, "cloud.tag.") {
+				if strings.HasSuffix(noBackQuoteName, "_0") {
 					tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-				} else if strings.HasSuffix(name, "_1") {
+				} else if strings.HasSuffix(noBackQuoteName, "_1") {
 					tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
 				} else {
 					tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
 				}
-				filterName := strings.TrimPrefix(name, "cloud.tag.")
+				filterName := strings.TrimPrefix(noBackQuoteName, "cloud.tag.")
 				filterName = strings.TrimSuffix(filterName, "_0")
 				filterName = strings.TrimSuffix(filterName, "_1")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if strings.HasPrefix(name, "os.app.") {
-				if strings.HasSuffix(name, "_0") {
+			} else if strings.HasPrefix(noBackQuoteName, "os.app.") {
+				if strings.HasSuffix(noBackQuoteName, "_0") {
 					tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-				} else if strings.HasSuffix(name, "_1") {
+				} else if strings.HasSuffix(noBackQuoteName, "_1") {
 					tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
 				} else {
 					tagItem, ok = tag.GetTag("os_app", db, table, "default")
 				}
-				filterName := strings.TrimPrefix(name, "os.app.")
+				filterName := strings.TrimPrefix(noBackQuoteName, "os.app.")
 				filterName = strings.TrimSuffix(filterName, "_0")
 				filterName = strings.TrimSuffix(filterName, "_1")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
+			} else if strings.HasPrefix(noBackQuoteName, "tag.") || strings.HasPrefix(noBackQuoteName, "attribute.") {
 				if db == chCommon.DB_NAME_PROMETHEUS {
 					return &view.Expr{}, false
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if common.IsValueInSliceString(name, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
+			} else if common.IsValueInSliceString(noBackQuoteName, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
 				filter := fmt.Sprintf("%s is not null", name)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			}
