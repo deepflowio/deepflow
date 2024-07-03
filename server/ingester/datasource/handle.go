@@ -525,11 +525,12 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 			log.Error(err)
 			return err
 		}
-		if m.isModifyingFlags[datasourceId] {
+		defer cks.Close()
+		if m.isModifyingFlags[orgID][datasourceId] {
 			return fmt.Errorf(ERR_IS_MODIFYING, dbGroup)
 		}
 		go func(tableNames, flowTagTableNames []string, id int) {
-			m.isModifyingFlags[id] = true
+			m.isModifyingFlags[orgID][id] = true
 			for _, tableName := range tableNames {
 				if err := m.modTableTTL(cks, db, tableName, duration); err != nil {
 					log.Info(err)
@@ -540,8 +541,7 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 					log.Info(err)
 				}
 			}
-			m.isModifyingFlags[id] = false
-			cks.Close()
+			m.isModifyingFlags[orgID][id] = false
 		}(tables, flowTagTables, datasourceId)
 
 		return nil
@@ -600,7 +600,7 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 				return err
 			}
 		case MOD:
-			if m.isModifyingFlags[tableId] {
+			if m.isModifyingFlags[orgID][tableId] {
 				return fmt.Errorf(ERR_IS_MODIFYING, tableId.TableName())
 			}
 			log.Infof("mod rp tableId %d %s, dstTable %s", tableId, tableId.TableName(), dstTable)
@@ -611,11 +611,11 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 					return
 				}
 				defer cks.Close()
-				m.isModifyingFlags[id] = true
+				m.isModifyingFlags[orgID][id] = true
 				if err := m.modTableMV(cks, id, db, dstTable, duration); err != nil {
 					log.Warning(err)
 				}
-				m.isModifyingFlags[id] = false
+				m.isModifyingFlags[orgID][id] = false
 			}(tableId)
 		case DEL:
 			if err := delTableMV(cks, tableId, db, dstTable); err != nil {
