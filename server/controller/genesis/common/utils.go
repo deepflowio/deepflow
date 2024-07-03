@@ -23,7 +23,6 @@ import (
 	. "encoding/binary"
 	"encoding/csv"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -514,12 +513,12 @@ func RequestGet(url string, timeout int, queryStrings map[string]string) error {
 	request.URL.RawQuery = queryData.Encode()
 
 	response, err := client.Do(request)
-	defer response.Body.Close()
 	if err != nil {
 		return err
 	}
+	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return errors.New(fmt.Sprintf("http status failed: (%d)", response.StatusCode))
+		return fmt.Errorf("http status failed: (%d)", response.StatusCode)
 	}
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -527,12 +526,12 @@ func RequestGet(url string, timeout int, queryStrings map[string]string) error {
 	}
 	respJson, err := simplejson.NewJson(body)
 	if err != nil {
-		return errors.New(fmt.Sprintf("response body (%s) serializer to json failed: (%s)", string(body), err.Error()))
+		return fmt.Errorf("response body (%s) serializer to json failed: (%s)", string(body), err.Error())
 	}
 	optStatus := respJson.Get("OPT_STATUS").MustString()
 	if optStatus != "" && optStatus != "SUCCESS" {
 		description := respJson.Get("DESCRIPTION").MustString()
-		return errors.New(fmt.Sprintf("curl (%s) failed, (%v)", request.URL, description))
+		return fmt.Errorf("curl (%s) failed, (%s)", request.URL.String(), description)
 	}
 
 	return nil

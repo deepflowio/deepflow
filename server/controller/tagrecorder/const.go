@@ -893,23 +893,6 @@ var DBNodeTypeToResourceType = map[string]string{
 	"gprocess":    RESOURCE_TYPE_GPROCESS,
 }
 
-// icon名称不会重复
-var IconNameToDomainType = map[string][]int{
-	"OpenStack":                {common.OPENSTACK},
-	"vSphere":                  {common.VSPHERE},
-	"NSP":                      {common.NSP},
-	common.TENCENT_CH:          {common.TENCENT, common.TENCENT_TCE},
-	"AWS":                      {common.AWS},
-	"ZStack":                   {common.ZSTACK},
-	common.ALIYUN_CH:           {common.ALIYUN, common.APSARA_STACK},
-	"Kubernetes":               {common.KUBERNETES},
-	common.HUAWEI_CH:           {common.HUAWEI, common.HUAWEI_PRIVATE},
-	common.QINGCLOUD_CH:        {common.QINGCLOUD, common.QINGCLOUD_PRIVATE},
-	common.MICROSOFT_CH:        {common.AZURE, common.CMB_CMDB, common.MICROSOFT_ACS},
-	common.KINGSOFT_PRIVATE_CH: {common.KINGSOFT_PRIVATE},
-	common.BAIDU_BCE_CH:        {common.BAIDU_BCE},
-}
-
 var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_REGION:                 CREATE_REGION_DICTIONARY_SQL,
 	CH_DICTIONARY_AZ:                     CREATE_AZ_DICTIONARY_SQL,
