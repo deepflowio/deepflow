@@ -19,6 +19,8 @@ package datatype
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 )
 
 // 本消息格式仅用于同droplet通信:
@@ -220,8 +222,9 @@ func (h *FlowHeader) Decode(buf []byte) {
 		h.AgentID = binary.LittleEndian.Uint16(buf[AGENTID_OFFSET:])
 		// reserved2
 	} else {
-		h.TeamID = binary.LittleEndian.Uint32(buf[FLOW_TEAMID_OFFSET:])
-		h.OrgID = uint16(binary.LittleEndian.Uint32(buf[FLOW_ORGID_OFFSET:]))
+		// decoding the header of the old version (version <= v6.5.8)
+		h.TeamID = ckdb.DEFAULT_TEAM_ID
+		h.OrgID = ckdb.DEFAULT_ORG_ID
 		h.AgentID = binary.LittleEndian.Uint16(buf[FLOW_VTAPID_OFFSET:])
 	}
 }
