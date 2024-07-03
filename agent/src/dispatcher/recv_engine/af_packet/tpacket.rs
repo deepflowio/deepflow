@@ -220,9 +220,13 @@ impl Tpacket {
             info!("kernel version is lower than 3.1, skip the packet fanout setting");
             return Ok(());
         }
+        let Some(packet_fanout_mode) = self.opts.packet_fanout_mode else {
+            info!("Packet fanout can only be set in TapMode::Local mode");
+            return Ok(());
+        };
         // The first 16 bits encode the fanout group ID, and the second set of 16 bits encode the fanout mode and options.
         let fanout_group_id = process::id() & 0xffff;
-        let fanout_arg: c_uint = fanout_group_id | (self.opts.packet_fanout_mode << 16);
+        let fanout_arg: c_uint = fanout_group_id | (packet_fanout_mode << 16);
         self.setsockopt(SOL_PACKET, PACKET_FANOUT, fanout_arg)
     }
 
