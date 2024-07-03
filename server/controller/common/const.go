@@ -349,7 +349,6 @@ var DomainTypeToIconID = map[int]int{
 	KUBERNETES: 14,
 }
 
-// TODO delete tagrecorder dup definition
 var IconNameToDomainTypes = map[string][]int{
 	OPENSTACK_CH:        {OPENSTACK},
 	VSPHERE_CH:          {VSPHERE},
@@ -364,6 +363,7 @@ var IconNameToDomainTypes = map[string][]int{
 	MICROSOFT_CH:        {AZURE, CMB_CMDB, MICROSOFT_ACS},
 	KINGSOFT_PRIVATE_CH: {KINGSOFT_PRIVATE},
 	BAIDU_BCE_CH:        {BAIDU_BCE},
+	VOLCENGINE_CH:       {VOLCENGINE},
 }
 
 const (
