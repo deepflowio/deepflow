@@ -45,7 +45,7 @@ func ParseIcon(cfg config.ControllerConfig, response *simplejson.Json) (map[stri
 	Icons := []IconData{}
 	for i, _ := range response.Get("DATA").MustArray() {
 		data := response.Get("DATA").GetIndex(i)
-		for k, _ := range IconNameToDomainType {
+		for k, _ := range common.IconNameToDomainTypes {
 			if data.Get("NAME").MustString() == k {
 				var iconData IconData
 				iconData.Name = data.Get("NAME").MustString()
@@ -69,7 +69,7 @@ func ParseIcon(cfg config.ControllerConfig, response *simplejson.Json) (map[stri
 	}
 	domainTypeToDefaultIconID := make(map[int]int)
 	for _, icon := range Icons {
-		for _, domainType := range IconNameToDomainType[icon.Name] {
+		for _, domainType := range common.IconNameToDomainTypes[icon.Name] {
 			domainTypeToDefaultIconID[domainType] = icon.ID
 		}
 	}
