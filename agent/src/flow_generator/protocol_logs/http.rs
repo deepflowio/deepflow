@@ -1087,7 +1087,10 @@ impl HttpLog {
                     }
                 }
                 (PacketDirection::ServerToClient, Method::_ResponseHeader) => {
-                    if info.grpc_status_code.is_none() && info.status_code != 0 {
+                    if info.grpc_status_code.is_none() {
+                        if info.status_code == 0 {
+                            return Err(Error::HttpHeaderParseFailed);
+                        }
                         info.msg_type = LogMessageType::Session;
                     }
                     if content_length.is_some() {
