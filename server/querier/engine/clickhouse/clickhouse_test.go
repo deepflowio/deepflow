@@ -577,9 +577,7 @@ var (
 		db:     "deepflow_tenant",
 		input:  "SHOW tables",
 		output: []string{"SELECT table FROM flow_tag.deepflow_tenant_custom_field GROUP BY table"},
-	}}
-	// fix me
-	// {
+	}} //{
 	// 	name:   "test_showsql",
 	// 	db:     "flow_tag",
 	// 	input:  "SHOW tag-values",
