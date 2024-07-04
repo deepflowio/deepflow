@@ -750,7 +750,7 @@ ingester:
   #  export-empty-metrics-disabled: false
   #  enum-translate-to-name-disabled: false
   #  universal-tag-translate-to-name-disabled: false
-  #- protocol: opentemetry
+  #- protocol: opentelemetry
   #  enabled: true
   #  # Randomly select an address that can be sent successfully, otlp address format as: 127.0.0.1:4317, only supports grpc protocol
   #  endpoints: [127.0.0.1:4317, 1.1.1.1:4317]
