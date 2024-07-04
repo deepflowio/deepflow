@@ -18,29 +18,40 @@ package client
 
 import (
 	"fmt"
+
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/google/uuid"
 )
 
 type Debug struct {
 	IP        string
 	Sql       string
-	QueryTime int64
+	QueryTime string
 	QueryUUID string
 	Error     string
 }
 
-func (s *Debug) Get() map[string]interface{} {
+type DebugInfo struct {
+	Debug []Debug
+}
+
+func NewDebug(sql string) *Debug {
+
+	return &Debug{
+		IP:        config.Cfg.Clickhouse.Host,
+		Sql:       sql,
+		QueryUUID: uuid.NewString(),
+	}
+}
+func (s *DebugInfo) Get() map[string]interface{} {
 	return map[string]interface{}{
-		"ip":         s.IP,
-		"sql":        s.Sql,
-		"query_time": fmt.Sprintf("%.9fs", float64(s.QueryTime)/1e9),
-		"query_uuid": s.QueryUUID,
-		"error":      s.Error,
+		"query_sqls": s.Debug,
 	}
 }
 
 func (s *Debug) String() string {
 	return fmt.Sprintf(
-		"| ip: %s | sql: %s | query_time: %.9fs | query_uuid: %s | error: %s |",
-		s.IP, s.Sql, float64(s.QueryTime)/1e9, s.QueryUUID, s.Error,
+		"| ip: %s | sql: %s | query_time: %s | query_uuid: %s | error: %s |",
+		s.IP, s.Sql, s.QueryTime, s.QueryUUID, s.Error,
 	)
 }
