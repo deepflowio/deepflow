@@ -1152,6 +1152,7 @@ impl DispatcherBuilder {
     ) -> Result<RecvEngine> {
         let options = options.lock().unwrap();
         match tap_mode {
+            #[cfg(target_os = "linux")]
             TapMode::Mirror if !options.vhost_socket_path.is_empty() => Ok(RecvEngine::VhostUser(
                 VhostUser::new(options.vhost_socket_path.clone(), 4096),
             )),
