@@ -611,7 +611,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, ShowDebug *client.ShowDebug) (response *common.Result, err error) {
+func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (response *common.Result, err error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	response = &common.Result{
@@ -639,6 +639,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if table == "alarm_event" {
 		return response, nil
 	}
+
 	// 查询 k8s_label
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
@@ -649,12 +650,10 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		Context:  ctx,
 	}
 	k8sLabelSql := "SELECT key FROM (SELECT key FROM flow_tag.pod_service_k8s_label_map UNION ALL SELECT key FROM flow_tag.pod_k8s_label_map) GROUP BY key"
-	chClient.Debug = client.NewDebug(k8sLabelSql)
 	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range k8sLabelRst.Values {
 		key := _key.([]interface{})[0]
 		labelKey := "k8s.label." + key.(string)
@@ -672,10 +671,8 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 
 	// 查询 k8s_annotation
-	k8sAnnotationSql := "SELECT key FROM (SELECT key FROM flow_tag.pod_k8s_annotation_map UNION ALL SELECT key FROM flow_tag.pod_service_k8s_annotation_map) GROUP BY key"
-	chClient.Debug = client.NewDebug(k8sAnnotationSql)
 	k8sAnnotationRst, err := chClient.DoQuery(&client.QueryParams{
-		Sql:           k8sAnnotationSql,
+		Sql:           "SELECT key FROM (SELECT key FROM flow_tag.pod_k8s_annotation_map UNION ALL SELECT key FROM flow_tag.pod_service_k8s_annotation_map) GROUP BY key",
 		UseQueryCache: useQueryCache,
 		QueryCacheTTL: queryCacheTTL,
 		ORGID:         orgID,
@@ -683,7 +680,6 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return nil, err
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range k8sAnnotationRst.Values {
 		key := _key.([]interface{})[0]
 		annotationKey := "k8s.annotation." + key.(string)
@@ -701,14 +697,11 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 
 	// 查询 k8s_env
-	podK8senvSql := "SELECT key FROM flow_tag.pod_k8s_env_map GROUP BY key"
-	chClient.Debug = client.NewDebug(podK8senvSql)
 	podK8senvRst, err := chClient.DoQuery(&client.QueryParams{
-		Sql: podK8senvSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
+		Sql: "SELECT key FROM flow_tag.pod_k8s_env_map GROUP BY key", UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range podK8senvRst.Values {
 		key := _key.([]interface{})[0]
 		envKey := "k8s.env." + key.(string)
@@ -727,12 +720,10 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 
 	// 查询cloud.tag
 	cloudTagSql := "SELECT key FROM (SELECT key FROM flow_tag.chost_cloud_tag_map UNION ALL SELECT key FROM flow_tag.pod_ns_cloud_tag_map) GROUP BY key"
-	chClient.Debug = client.NewDebug(cloudTagSql)
 	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range cloudTagRst.Values {
 		key := _key.([]interface{})[0]
 		chostCloudTagKey := "cloud.tag." + key.(string)
@@ -751,12 +742,10 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 
 	// 查询 os.app
 	osAPPTagSql := "SELECT key FROM flow_tag.os_app_tag_map GROUP BY key"
-	chClient.Debug = client.NewDebug(osAPPTagSql)
 	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range osAPPTagRst.Values {
 		key := _key.([]interface{})[0]
 		osAPPTagKey := "os.app." + key.(string)
@@ -845,12 +834,10 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		}
 	}
-	externalChClient.Debug = client.NewDebug(externalSql)
 	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		return nil, err
 	}
-	ShowDebug.Debug = append(ShowDebug.Debug, *externalChClient.Debug)
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
 		tableName := _tagName.([]interface{})[1]
