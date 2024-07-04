@@ -76,8 +76,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/deepflowio/deepflow/message v0.0.0-20240527060827-9ad113dbccad h1:7fDWYpLr7Xd0LXrYDkFqQSv2luydJ+uqrU2c9bVCKgw=
 github.com/deepflowio/deepflow/message v0.0.0-20240527060827-9ad113dbccad/go.mod h1:e+1lUMMlycCvFRKvlwt/y/0vxJnF8wVss3GyR1ARXY0=
-github.com/deepflowio/deepflow/server v0.0.0-20240606051354-5865bbd08049 h1:ixj3k0UgJpBS0mq/xzOImDQuNoRJ8ylx1h6uC48nit8=
-github.com/deepflowio/deepflow/server v0.0.0-20240606051354-5865bbd08049/go.mod h1:25LVtiqKDMy3yfr4NnAhpNy1oLZOXldlux5TJVMrkj8=
+github.com/deepflowio/deepflow/server v0.0.0-20240704023830-13fcbc7f5589 h1:udZZx4Y41Xa0IH3xeQanh+v22nnMgs4/BzWdDA82/fM=
+github.com/deepflowio/deepflow/server v0.0.0-20240704023830-13fcbc7f5589/go.mod h1:HjjZNVaGBEI2cdq3N0wUMxzxG4qdtUlHisTZX7xG7mQ=
 github.com/docker/go-units v0.4.0 h1:3uh0PgVws3nIA0Q+MwDC8yjEPf9zjRfZZWXZYDct3Tw=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
 github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153/go.mod h1:/Zj4wYkgs4iZTTu3o/KG3Itv/qCCa8VVMlb3i9OVuzc=
