@@ -37,16 +37,16 @@ func GetDatabases() *common.Result {
 	}
 }
 
-func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) *common.Result {
+func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, ShowDebug *client.ShowDebug) *common.Result {
 	var values []interface{}
 	tables, ok := chCommon.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
 	}
 	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_EXT_METRICS, chCommon.DB_NAME_DEEPFLOW_TENANT}, db) {
-		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
+		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, ShowDebug)...)
 	} else if db == chCommon.DB_NAME_PROMETHEUS {
-		values = append(values, chCommon.GetPrometheusTables(db, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
+		values = append(values, chCommon.GetPrometheusTables(db, queryCacheTTL, orgID, useQueryCache, ctx, ShowDebug)...)
 	} else {
 		for _, table := range tables {
 			datasource, err := chCommon.GetDatasources(db, table, orgID)

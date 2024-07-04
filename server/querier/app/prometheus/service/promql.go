@@ -43,6 +43,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
@@ -859,7 +860,8 @@ func (p *prometheusExecutor) getAllOrganizations() []string {
 func (p *prometheusExecutor) loadExtraLabelsCache(orgID string) {
 	// DeepFlow Source have same tag collections, so just try query 1 table to add all external tags
 	showTags := fmt.Sprintf("show tags from %s", NETWORK_TABLE)
-	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, NETWORK_TABLE, showTags, "", orgID, false, context.Background(), nil)
+	ShowDebug := &client.ShowDebug{}
+	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, NETWORK_TABLE, showTags, "", orgID, false, context.Background(), ShowDebug)
 	if err != nil {
 		log.Errorf("load external tag error when start up prometheus executor: %s", err)
 		return

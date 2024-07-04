@@ -49,8 +49,6 @@ var INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY = "-1"
 var subSqlRegexp = regexp.MustCompile(`\(SELECT\s.+?LIMIT\s.+?\)`)
 var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
-var fromRegexp = regexp.MustCompile(`(?i)from\s+(\S+)`)
-var whereRegexp = regexp.MustCompile(`(?i)where\s+(\S.*)`)
 
 // Perform regular checks on show SQL and support the following formats:
 // show tag {tag_name} values from {table_name} where xxx order by xxx limit xxx :{tag_name} and {table_name} can be any character
@@ -63,18 +61,7 @@ var whereRegexp = regexp.MustCompile(`(?i)where\s+(\S.*)`)
 // show metrics on db
 // show tables
 // show databases
-var showPatterns = []string{
-	//if there are new pattern strings to match, add regular expressions directly here
-	`^show\s+language$`,            // 1. show language
-	`^show\s+metrics\s+functions$`, // 2. show metrics functions
-	`^show\s+metrics(?: from ([^\\s]+))?(?: where .+)?$|^show\s+metrics on db$`,     // 3. show metrics or show metrics on db
-	`^show\s+tag\s+\S+\s+values\s+from\s+\S+.*$`,                                    // 4. show tag X values Y, X,Y not nil
-	`^show\s+tags(?: from ([^\\s]+))?(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?`, // 5. show tags ...
-	`^show\s+tables$`,    // 6. show tables
-	`^show\s+databases$`, // 7. show databases
-	`^show\s+tag-values(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?`, // 8. show tag-values
-}
-var res []*regexp.Regexp
+var showSqlRegexp = regexp.MustCompile("^show (?:tag ([^\\s]+) values(?: from ([^\\s]+))?(?: where .+)?(?: order by \\w+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?(?: offset \\d+)?|tags(?: from ([^\\s]+))?(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?|metrics(?: from ([^\\s]+))?(?: where .+)?|metrics functions(?: from ([^\\s]+))?(?: where .+)?|language|tag-values(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?|metrics on db|tables|databases)$")
 
 type TargetLabelFilter struct {
 	OriginFilter string
@@ -98,13 +85,6 @@ type CHEngine struct {
 	ORGID              string
 }
 
-func init() {
-	// init show patterns regexp
-	for _, pattern := range showPatterns {
-		res = append(res, regexp.MustCompile(pattern))
-	}
-}
-
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
@@ -119,44 +99,113 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	}
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
-	debug_info := &client.DebugInfo{}
+
 	// Parse withSql
 	withResult, withDebug, err := e.QueryWithSql(sql, args)
 	if err != nil {
 		return nil, nil, err
 	}
 	if withResult != nil {
-		debug_info.Debug = append(debug_info.Debug, *withDebug)
-		return withResult, debug_info.Get(), err
+		return withResult, withDebug, err
 	}
+
 	// Parse slimitSql
 	slimitResult, slimitDebug, err := e.QuerySlimitSql(sql, args)
 	if err != nil {
 		return nil, nil, err
 	}
 	if slimitResult != nil {
-		debug_info.Debug = append(debug_info.Debug, *slimitDebug)
-		return slimitResult, debug_info.Get(), err
+		return slimitResult, slimitDebug, err
 	}
 	// Parse showSql
 	debug := &client.Debug{
 		IP:        config.Cfg.Clickhouse.Host,
 		QueryUUID: query_uuid,
 	}
+	ShowDebug := &client.ShowDebug{}
 	// For testing purposes, ParseShowSql requires the addition of the debug parameter
-	result, sqlList, isShow, err := e.ParseShowSql(sql, args, debug_info)
+	result, sqlList, isShow, err := e.ParseShowSql(sql, args, ShowDebug)
 	if isShow {
 		if err != nil {
 			return nil, nil, err
 		}
 		if len(sqlList) == 0 {
-			return result, debug_info.Get(), nil
+			return result, ShowDebug.Get(), nil
 		}
-		e.DB = "flow_tag"
-	} else { // Normal query, added to sqllist
-		sqlList = append(sqlList, sql)
 	}
-	results := &common.Result{}
+
+	if len(sqlList) > 0 {
+		e.DB = "flow_tag"
+		results := &common.Result{}
+		chClient := client.Client{
+			Host:     config.Cfg.Clickhouse.Host,
+			Port:     config.Cfg.Clickhouse.Port,
+			UserName: config.Cfg.Clickhouse.User,
+			Password: config.Cfg.Clickhouse.Password,
+			DB:       e.DB,
+			Debug:    debug,
+			Context:  e.Context,
+		}
+		ColumnSchemaMap := make(map[string]*common.ColumnSchema)
+		for _, ColumnSchema := range e.ColumnSchemas {
+			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
+		}
+		for _, showSql := range sqlList {
+			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
+			showEngine.Init()
+			showParser := parse.Parser{Engine: showEngine}
+			err = showParser.ParseSQL(showSql)
+			if err != nil {
+				errorMessage := fmt.Sprintf("sql: %s; parse error: %s", showSql, err.Error())
+				log.Error(errorMessage)
+				return nil, nil, err
+			}
+			for _, stmt := range showEngine.Statements {
+				stmt.Format(showEngine.Model)
+			}
+			FormatModel(showEngine.Model)
+			// 使用Model生成View
+			showEngine.View = view.NewView(showEngine.Model)
+			chSql := showEngine.ToSQLString()
+
+			debug.Sql = chSql
+			params := &client.QueryParams{
+				Sql:             chSql,
+				UseQueryCache:   args.UseQueryCache,
+				QueryCacheTTL:   args.QueryCacheTTL,
+				QueryUUID:       query_uuid,
+				ColumnSchemaMap: ColumnSchemaMap,
+				ORGID:           args.ORGID,
+			}
+			result, err := chClient.DoQuery(params)
+			if err != nil {
+				log.Error(err)
+				return nil, nil, err
+			}
+			if result != nil {
+				results.Values = append(results.Values, result.Values...)
+				results.Columns = result.Columns
+			}
+		}
+		return results, debug.Get(), nil
+	}
+	parser := parse.Parser{Engine: e}
+	err = parser.ParseSQL(sql)
+	if err != nil {
+		errorMessage := fmt.Sprintf("sql: %s; parse error: %s", sql, err.Error())
+		log.Error(errorMessage)
+		return nil, nil, err
+	}
+	for _, stmt := range e.Statements {
+		stmt.Format(e.Model)
+	}
+	FormatModel(e.Model)
+	// 使用Model生成View
+	e.View = view.NewView(e.Model)
+	e.View.NoPreWhere = e.NoPreWhere
+	chSql := e.ToSQLString()
+	callbacks := e.View.GetCallbacks()
+	debug.Sql = chSql
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -170,57 +219,20 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	for _, ColumnSchema := range e.ColumnSchemas {
 		ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 	}
-	parser := parse.Parser{}
-	for _, sql1 := range sqlList {
-		if isShow {
-			showEngine := &CHEngine{DB: e.DB, DataSource: e.DataSource, Context: e.Context, ORGID: e.ORGID}
-			showEngine.Init()
-			parser.Engine = showEngine
-		} else {
-			parser.Engine = e
-		}
-		err = parser.ParseSQL(sql1)
-		if err != nil {
-			errorMessage := fmt.Sprintf("sql: %s; parse error: %s", sql1, err.Error())
-			log.Error(errorMessage)
-			return nil, nil, err
-		}
-		for _, stmt := range e.Statements {
-			stmt.Format(e.Model)
-		}
-		FormatModel(e.Model)
-		// 使用Model生成View
-		e.View = view.NewView(e.Model)
-		if !isShow {
-			e.View.NoPreWhere = e.NoPreWhere
-		}
-		chSql := e.ToSQLString()
-		callbacks := e.View.GetCallbacks()
-		debug.Sql = chSql
-		params := &client.QueryParams{
-			Sql:             chSql,
-			UseQueryCache:   args.UseQueryCache,
-			QueryCacheTTL:   args.QueryCacheTTL,
-			QueryUUID:       query_uuid,
-			ColumnSchemaMap: ColumnSchemaMap,
-			ORGID:           args.ORGID,
-		}
-		if !isShow {
-			params.Callbacks = callbacks
-		}
-		result, err := chClient.DoQuery(params)
-		if err != nil {
-			log.Error(err)
-			return nil, nil, err
-		}
-		if result != nil {
-			results.Values = append(results.Values, result.Values...)
-			results.Columns = result.Columns
-			debug_info.Debug = append(debug_info.Debug, *debug)
-		}
+	params := &client.QueryParams{
+		Sql:             chSql,
+		UseQueryCache:   args.UseQueryCache,
+		QueryCacheTTL:   args.QueryCacheTTL,
+		Callbacks:       callbacks,
+		QueryUUID:       query_uuid,
+		ColumnSchemaMap: ColumnSchemaMap,
+		ORGID:           args.ORGID,
 	}
-	return results, debug_info.Get(), nil
-
+	rst, err := chClient.DoQuery(params)
+	if err != nil {
+		return nil, debug.Get(), err
+	}
+	return rst, debug.Get(), err
 }
 
 func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string) {
@@ -292,41 +304,33 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 	}
 }
 
-// extractFromWhere extracts the first string after 'from' and all strings after 'where'.
-func ExtractFromWhere(s string) (table string, whereClause string) {
-	// Regex to capture the first string after 'from' and all strings after 'where'
-	// Extract from part
-	fromMatch := fromRegexp.FindStringSubmatch(s)
-	if len(fromMatch) > 1 {
-		table = fromMatch[1]
-	}
-	// Extract where part
-	whereMatch := whereRegexp.FindStringSubmatch(s)
-	if len(whereMatch) > 1 {
-		whereClause = whereMatch[1]
-	}
-	return
-}
-
-func MatchPattern(s string) (int, bool) {
-	for i, re := range res {
-		if re.MatchString(s) {
-			return i + 1, true
-		}
-	}
-	return 0, false
-}
-
-func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInfo *client.DebugInfo) (*common.Result, []string, bool, error) {
+func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, ShowDebug *client.ShowDebug) (*common.Result, []string, bool, error) {
 	sqlSplit := strings.Fields(sql)
+	if strings.ToLower(sqlSplit[0]) != "show" {
+		return nil, []string{}, false, nil
+	}
 	sql = strings.Join(sqlSplit, " ")
-	sql = strings.ToLower(sql)
-	index, flag := MatchPattern(sql)
-	if flag == false {
+	if !showSqlRegexp.MatchString(strings.ToLower(sql)) {
 		err := fmt.Errorf("not support sql: '%s', please check", sql)
 		return nil, []string{}, true, err
 	}
-	table, where := ExtractFromWhere(sql)
+	if strings.ToLower(sqlSplit[1]) == "language" {
+		result := &common.Result{}
+		result.Columns = []interface{}{"language"}
+		result.Values = []interface{}{[]string{config.Cfg.Language}}
+		return result, []string{}, true, nil
+	}
+	var table string
+	var where string
+	for i, item := range sqlSplit {
+		if strings.ToLower(item) == "from" {
+			table = sqlSplit[i+1]
+			break
+		}
+		if strings.ToLower(item) == "where" {
+			where = strings.Join(sqlSplit[i+1:], " ")
+		}
+	}
 	switch table {
 	case "vtap_app_port":
 		table = "application"
@@ -339,48 +343,52 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 	case "vtap_acl":
 		table = "traffic_policy"
 	}
-	// do the corresponding processing according to the matched pattern string
-	switch index {
-	case 1: // show language ...
-		result := &common.Result{}
-		result.Columns = []interface{}{"language"}
-		result.Values = []interface{}{[]string{config.Cfg.Language}}
-		return result, []string{}, true, nil
-	case 2: // show metrics functions ...
-		funcs, err := metrics.GetFunctionDescriptions()
-		return funcs, []string{}, true, err
-	case 3: // show metrics ...
-		result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
-		if err != nil {
-			return nil, []string{}, true, err
+	switch strings.ToLower(sqlSplit[1]) {
+	case "metrics":
+		if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
+			funcs, err := metrics.GetFunctionDescriptions()
+			return funcs, []string{}, true, err
+		} else {
+			result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
+			if err != nil {
+				return nil, []string{}, true, err
+			}
+
+			// tag metrics
+			tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context, ShowDebug)
+			if err != nil {
+				log.Error("Failed to get tag type metrics")
+				return nil, []string{}, true, err
+			}
+			ShowTagTypeMetrics(tagDescriptions, result, e.DB, table)
+			return result, []string{}, true, err
 		}
-		// tag metrics
-		tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context, DebugInfo)
-		if err != nil {
-			log.Error("Failed to get tag type metrics")
-			return nil, []string{}, true, err
+	case "tag":
+		// show tag {tag} values from table
+		if len(sqlSplit) < 6 {
+			return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 		}
-		ShowTagTypeMetrics(tagDescriptions, result, e.DB, table)
-		return result, []string{}, true, err
-	case 4: // show tag X values from Y  X, Y not nil
-		result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
-		e.DB = "flow_tag"
-		return result, sqlList, true, err
-	case 5: // show tags ...
-		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, DebugInfo)
+		if strings.ToLower(sqlSplit[3]) == "values" {
+			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)
+			e.DB = "flow_tag"
+			return result, sqlList, true, err
+		}
+		return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
+	case "tags":
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, ShowDebug)
 		return data, []string{}, true, err
-	case 6: // show  tables...
-		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, DebugInfo), []string{}, true, nil
-	case 7: // show  databases...
+	case "tables":
+		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, ShowDebug), []string{}, true, nil
+	case "databases":
 		return GetDatabases(), []string{}, true, nil
-	case 8: // show tag-values...
+	case "tag-values":
 		sqlList, err := tagdescription.GetTagValuesDescriptions(e.DB, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 		return nil, sqlList, true, err
 	}
 	return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
 }
 
-func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*common.Result, *client.Debug, error) {
+func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
 	sql, callbacks, columnSchemaMap, err := e.ParseSlimitSql(sql, args)
 	if err != nil {
 		log.Error(err)
@@ -416,9 +424,9 @@ func (e *CHEngine) QuerySlimitSql(sql string, args *common.QuerierParams) (*comm
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
 		log.Error(err)
-		return nil, debug, err
+		return nil, debug.Get(), err
 	}
-	return rst, debug, err
+	return rst, debug.Get(), err
 }
 
 func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (string, map[string]func(*common.Result) error, map[string]*common.ColumnSchema, error) {
@@ -499,8 +507,10 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 			}
 		}
 	}
+	ShowDebug := &client.ShowDebug{}
+
 	showTagsSql := "show tags from " + table
-	tags, _, _, err := e.ParseShowSql(showTagsSql, args, nil)
+	tags, _, _, err := e.ParseShowSql(showTagsSql, args, ShowDebug)
 	if err != nil {
 		return "", nil, nil, err
 	} else if len(tags.Values) == 0 {
@@ -740,7 +750,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 	return outerSql, callbacks, columnSchemaMap, nil
 }
 
-func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common.Result, *client.Debug, error) {
+func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
 	sql, callbacks, columnSchemaMap, err := e.ParseWithSql(sql)
 	if err != nil {
 		log.Error(err)
@@ -777,9 +787,9 @@ func (e *CHEngine) QueryWithSql(sql string, args *common.QuerierParams) (*common
 	rst, err := chClient.DoQuery(params)
 	if err != nil {
 		log.Error(err)
-		return nil, debug, err
+		return nil, debug.Get(), err
 	}
-	return rst, debug, err
+	return rst, debug.Get(), err
 }
 
 func (e *CHEngine) ParseWithSql(sql string) (string, map[string]func(*common.Result) error, map[string]*common.ColumnSchema, error) {
