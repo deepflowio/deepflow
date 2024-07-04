@@ -120,6 +120,7 @@ pub struct Resource {
     pub group_versions: Vec<GroupVersion>,
     // group version to use
     pub selected_gv: Option<GroupVersion>,
+    pub field_selector: String,
 }
 
 impl fmt::Display for Resource {
@@ -141,6 +142,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "nodes",
@@ -150,6 +152,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "pods",
@@ -159,6 +162,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "replicationcontrollers",
@@ -168,6 +172,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "services",
@@ -177,6 +182,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "daemonsets",
@@ -186,6 +192,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "deployments",
@@ -195,6 +202,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "replicasets",
@@ -204,6 +212,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "statefulsets",
@@ -213,6 +222,7 @@ pub fn default_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "ingresses",
@@ -232,6 +242,7 @@ pub fn default_resources() -> Vec<Resource> {
                 },
             ],
             selected_gv: None,
+            field_selector: String::new(),
         },
     ]
 }
@@ -246,6 +257,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "nodes",
@@ -255,6 +267,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "pods",
@@ -264,6 +277,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "replicationcontrollers",
@@ -273,6 +287,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "services",
@@ -282,6 +297,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "daemonsets",
@@ -291,6 +307,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "deployments",
@@ -300,6 +317,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "replicasets",
@@ -309,6 +327,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "statefulsets",
@@ -324,6 +343,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 },
             ],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "ingresses",
@@ -343,6 +363,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 },
             ],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "routes",
@@ -352,6 +373,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "servicerules",
@@ -361,6 +383,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1alpha1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "clonesets",
@@ -370,6 +393,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1alpha1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
         Resource {
             name: "ippools",
@@ -379,6 +403,7 @@ pub fn supported_resources() -> Vec<Resource> {
                 version: "v1",
             }],
             selected_gv: None,
+            field_selector: String::new(),
         },
     ]
 }
@@ -552,7 +577,7 @@ where
             let mut stream = match ctx
                 .api
                 .watch(
-                    &ListParams::default(),
+                    &ListParams::default().fields(&ctx.kind.field_selector),
                     ctx.resource_version
                         .as_ref()
                         .map(|s| s as &str)
@@ -675,7 +700,9 @@ where
         let mut total_count = 0;
         let mut estimated_total = None;
         let mut total_bytes = 0;
-        let mut params = ListParams::default().limit(ctx.config.list_limit);
+        let mut params = ListParams::default()
+            .fields(&ctx.kind.field_selector)
+            .limit(ctx.config.list_limit);
         loop {
             trace!("{} list with {:?}", ctx.kind, params);
             match ctx.api.list(&params).await {
