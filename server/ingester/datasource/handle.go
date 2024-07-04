@@ -508,8 +508,8 @@ func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, du
 }
 
 func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
-	if len(m.ckAddrs) == 0 {
-		return fmt.Errorf("ck addrs is empty")
+	if len(m.cks) == 0 {
+		return fmt.Errorf("ck connections is empty")
 	}
 
 	if IsModifiedOnlyDatasource(dbGroup) && action == MOD {
@@ -520,24 +520,18 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 		flowTagDb := ckdb.OrgDatabasePrefix(uint16(orgID)) + FLOW_TAG_DB
 		flowTagTables := datasoureInfo.FlowTagTables
 
-		cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-		if err != nil {
-			log.Error(err)
-			return err
-		}
-		defer cks.Close()
 		if m.isModifyingFlags[orgID][datasourceId] {
 			return fmt.Errorf(ERR_IS_MODIFYING, dbGroup)
 		}
 		go func(tableNames, flowTagTableNames []string, id int) {
 			m.isModifyingFlags[orgID][id] = true
 			for _, tableName := range tableNames {
-				if err := m.modTableTTL(cks, db, tableName, duration); err != nil {
+				if err := m.modTableTTL(m.cks, db, tableName, duration); err != nil {
 					log.Info(err)
 				}
 			}
 			for _, tableName := range flowTagTableNames {
-				if err := m.modTableTTL(cks, flowTagDb, tableName, duration); err != nil {
+				if err := m.modTableTTL(m.cks, flowTagDb, tableName, duration); err != nil {
 					log.Info(err)
 				}
 			}
@@ -546,13 +540,6 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 
 		return nil
 	}
-
-	cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	defer cks.Close()
 
 	table := baseTable
 	if table == "" {
@@ -596,7 +583,7 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 			if interval == 1440 {
 				aggInterval = IntervalDay
 			}
-			if err := m.createTableMV(cks, db, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
+			if err := m.createTableMV(m.cks, db, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
 				return err
 			}
 		case MOD:
@@ -605,20 +592,14 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 			}
 			log.Infof("mod rp tableId %d %s, dstTable %s", tableId, tableId.TableName(), dstTable)
 			go func(id flow_metrics.MetricsTableID) {
-				cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				defer cks.Close()
 				m.isModifyingFlags[orgID][id] = true
-				if err := m.modTableMV(cks, id, db, dstTable, duration); err != nil {
+				if err := m.modTableMV(m.cks, id, db, dstTable, duration); err != nil {
 					log.Warning(err)
 				}
 				m.isModifyingFlags[orgID][id] = false
 			}(tableId)
 		case DEL:
-			if err := delTableMV(cks, tableId, db, dstTable); err != nil {
+			if err := delTableMV(m.cks, tableId, db, dstTable); err != nil {
 				return err
 			}
 		default:
