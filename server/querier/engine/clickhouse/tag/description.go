@@ -611,7 +611,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
+func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, ShowDebug *client.ShowDebug) (response *common.Result, err error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	response = &common.Result{
@@ -654,9 +654,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return nil, err
 	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
-	}
+	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range k8sLabelRst.Values {
 		key := _key.([]interface{})[0]
 		labelKey := "k8s.label." + key.(string)
@@ -685,9 +683,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return nil, err
 	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
-	}
+	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range k8sAnnotationRst.Values {
 		key := _key.([]interface{})[0]
 		annotationKey := "k8s.annotation." + key.(string)
@@ -712,9 +708,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return nil, err
 	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
-	}
+	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range podK8senvRst.Values {
 		key := _key.([]interface{})[0]
 		envKey := "k8s.env." + key.(string)
@@ -738,9 +732,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return nil, err
 	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
-	}
+	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range cloudTagRst.Values {
 		key := _key.([]interface{})[0]
 		chostCloudTagKey := "cloud.tag." + key.(string)
@@ -764,9 +756,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return nil, err
 	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
-	}
+	ShowDebug.Debug = append(ShowDebug.Debug, *chClient.Debug)
 	for _, _key := range osAPPTagRst.Values {
 		key := _key.([]interface{})[0]
 		osAPPTagKey := "os.app." + key.(string)
@@ -860,9 +850,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return nil, err
 	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *externalChClient.Debug)
-	}
+	ShowDebug.Debug = append(ShowDebug.Debug, *externalChClient.Debug)
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
 		tableName := _tagName.([]interface{})[1]

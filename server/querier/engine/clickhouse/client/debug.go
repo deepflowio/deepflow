@@ -31,7 +31,7 @@ type Debug struct {
 	Error     string
 }
 
-type DebugInfo struct {
+type ShowDebug struct {
 	Debug []Debug
 }
 
@@ -43,10 +43,17 @@ func NewDebug(sql string) *Debug {
 		QueryUUID: uuid.NewString(),
 	}
 }
-func (s *DebugInfo) Get() map[string]interface{} {
+
+func (s *ShowDebug) Get() map[string]interface{} {
 	return map[string]interface{}{
 		"query_sqls": s.Debug,
 	}
+}
+
+func (s *Debug) Get() map[string]interface{} {
+	ShowDebug := &ShowDebug{}
+	ShowDebug.Debug = append(ShowDebug.Debug, *s)
+	return ShowDebug.Get()
 }
 
 func (s *Debug) String() string {

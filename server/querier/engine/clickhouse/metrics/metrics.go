@@ -27,6 +27,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	ckcommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
@@ -238,7 +239,8 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	}
 
 	// tag metrics
-	tagDescriptions, err := tag.GetTagDescriptions(db, table, "", "", orgID, true, context.Background(), nil)
+	ShowDebug := &client.ShowDebug{}
+	tagDescriptions, err := tag.GetTagDescriptions(db, table, "", "", orgID, true, context.Background(), ShowDebug)
 	if err != nil {
 		log.Error("Failed to get tag type metrics")
 		return nil, false
@@ -429,7 +431,9 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 		if db == "ext_metrics" {
 			tables = append(tables, table)
 		} else if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) {
-			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, nil) {
+
+			ShowDebug := &client.ShowDebug{}
+			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, ShowDebug) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
