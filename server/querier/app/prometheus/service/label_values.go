@@ -71,7 +71,7 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 			}
 		} else if db == chCommon.DB_NAME_PROMETHEUS {
 			// prometheus samples should get all metrcis from `table`
-			samples := clickhouse.GetTables(db, "", args.OrgID, false, ctx, nil)
+			samples := clickhouse.GetTables(db, "", args.OrgID, false, ctx)
 			for _, v := range samples.Values {
 				tableName := v.([]interface{})[0].(string)
 				// append ${metrics_name}

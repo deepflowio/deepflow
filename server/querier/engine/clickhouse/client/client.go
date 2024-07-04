@@ -198,7 +198,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 			QueryTime:    uint64(queryTime),
 		},
 	)
-	c.Debug.QueryTime = fmt.Sprintf("%.9fs", float64(queryTime)/1e9)
+	c.Debug.QueryTime = int64(queryTime)
 	result = &common.Result{
 		Columns: columnNames,
 		Values:  values,

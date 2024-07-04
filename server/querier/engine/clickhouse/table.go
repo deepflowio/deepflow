@@ -22,7 +22,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
-	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
@@ -37,16 +36,16 @@ func GetDatabases() *common.Result {
 	}
 }
 
-func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) *common.Result {
+func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) *common.Result {
 	var values []interface{}
 	tables, ok := chCommon.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
 	}
 	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_EXT_METRICS, chCommon.DB_NAME_DEEPFLOW_TENANT}, db) {
-		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
+		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx)...)
 	} else if db == chCommon.DB_NAME_PROMETHEUS {
-		values = append(values, chCommon.GetPrometheusTables(db, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
+		values = append(values, chCommon.GetPrometheusTables(db, queryCacheTTL, orgID, useQueryCache, ctx)...)
 	} else {
 		for _, table := range tables {
 			datasource, err := chCommon.GetDatasources(db, table, orgID)
