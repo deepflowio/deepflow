@@ -33,6 +33,7 @@ jobs:
         uses: actions/setup-go@master
         with:
           go-version: 1.21.x
+          check-latest: true
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
