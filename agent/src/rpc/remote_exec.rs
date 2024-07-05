@@ -17,7 +17,7 @@
 use std::{
     borrow::Cow,
     cell::OnceCell,
-    collections::{hash_map::Entry, HashMap, VecDeque},
+    collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     fmt::{self, Write as _},
     fs::File,
     io::Write,
@@ -68,42 +68,49 @@ fn all_supported_commands() -> Vec<Command> {
     #[allow(unused_mut)]
     let mut commands = vec![
         Command {
+            id: CmdId::Community(0),
             cmdline: "lsns",
             output_format: OutputFormat::Text,
             desc: "",
             command_type: CommandType::Linux,
         },
         Command {
+            id: CmdId::Community(1),
             cmdline: "top -b -n 1 -c -w 512",
             output_format: OutputFormat::Text,
             desc: "top",
             command_type: CommandType::Linux,
         },
         Command {
+            id: CmdId::Community(2),
             cmdline: "ps auxf",
             output_format: OutputFormat::Text,
             desc: "ps",
             command_type: CommandType::Linux,
         },
         Command {
+            id: CmdId::Community(3),
             cmdline: "ip address",
             output_format: OutputFormat::Text,
             desc: "",
             command_type: CommandType::Linux,
         },
         Command {
+            id: CmdId::Community(4),
             cmdline: "kubectl -n $ns describe pod $pod",
             output_format: OutputFormat::Text,
             desc: "",
             command_type: CommandType::Kubernetes(KubeCmd::DescribePod),
         },
         Command {
+            id: CmdId::Community(5),
             cmdline: "kubectl -n $ns logs --tail=10000 $pod",
             output_format: OutputFormat::Text,
             desc: "",
             command_type: CommandType::Kubernetes(KubeCmd::Log),
         },
         Command {
+            id: CmdId::Community(6),
             cmdline: "kubectl -n $ns logs --tail=10000 -p $pod",
             output_format: OutputFormat::Text,
             desc: "",
@@ -112,6 +119,15 @@ fn all_supported_commands() -> Vec<Command> {
     ];
     #[cfg(feature = "enterprise")]
     commands.extend(enterprise_utils::rpc::remote_exec::extra_commands());
+    let mut validator = HashSet::new();
+    for c in commands.iter() {
+        if !validator.insert(c.id) {
+            warn!(
+                "command `{}` ({}) as duplicated id, ignored",
+                c.desc, c.cmdline
+            );
+        }
+    }
     commands
 }
 
@@ -120,17 +136,17 @@ thread_local! {
     static MAX_PARAM_NUMS: OnceCell<usize> = OnceCell::new();
 }
 
-fn get_cmdline(id: usize) -> Option<&'static str> {
+fn get_cmdline(id: CmdId) -> Option<&'static str> {
     SUPPORTED_COMMANDS.with(|cell| {
         let cs = cell.get_or_init(|| all_supported_commands());
-        cs.get(id).map(|c| c.cmdline)
+        cs.iter().find(|c| c.id == id).map(|c| c.cmdline)
     })
 }
 
-fn get_cmd(id: usize) -> Option<Command> {
+fn get_cmd(id: CmdId) -> Option<Command> {
     SUPPORTED_COMMANDS.with(|cell| {
         let cs = cell.get_or_init(|| all_supported_commands());
-        cs.get(id).copied()
+        cs.iter().find(|c| c.id == id).copied()
     })
 }
 
@@ -327,7 +343,7 @@ struct Responser {
     )>,
 
     // request id, command id, future
-    pending_command: Option<(Option<u64>, usize, BoxFuture<'static, Result<Output>>)>,
+    pending_command: Option<(Option<u64>, CmdId, BoxFuture<'static, Result<Output>>)>,
     result: CommandResult,
 }
 
@@ -517,9 +533,9 @@ impl Stream for Responser {
                             let mut commands = vec![];
                             SUPPORTED_COMMANDS.with(|cell| {
                                 let cs = cell.get_or_init(|| all_supported_commands());
-                                for (id, c) in cs.iter().enumerate() {
+                                for c in cs.iter() {
                                     commands.push(pb::RemoteCommand {
-                                        id: Some(id as u32),
+                                        id: Some(c.id.into()),
                                         cmd: if c.desc.is_empty() {
                                             Some(c.cmdline.to_owned())
                                         } else {
@@ -572,18 +588,20 @@ impl Stream for Responser {
                             if let Some(batch_len) = msg.batch_len {
                                 self.batch_len = MIN_BATCH_LEN.max(batch_len as usize);
                             }
-                            let Some(cmd_id) = msg.command_id else {
-                                return self.command_failed_helper(
-                                    msg.request_id,
-                                    None,
-                                    "command_id not specified",
-                                );
-                            };
-                            let Some(cmd) = get_cmd(cmd_id as usize) else {
+                            let Some(cmd_id) =
+                                msg.command_id.and_then(|id| CmdId::try_from(id).ok())
+                            else {
                                 return self.command_failed_helper(
                                     msg.request_id,
                                     None,
                                     "command_id not specified or invalid in run command request",
+                                );
+                            };
+                            let Some(cmd) = get_cmd(cmd_id) else {
+                                return self.command_failed_helper(
+                                    msg.request_id,
+                                    None,
+                                    format!("command not found for id {}", msg.command_id.unwrap()),
                                 );
                             };
                             let cmdline = &cmd.cmdline;
@@ -630,11 +648,8 @@ impl Stream for Responser {
                             );
 
                             if *cmdline == "lsns" {
-                                self.pending_command = Some((
-                                    msg.request_id,
-                                    cmd_id as usize,
-                                    Box::pin(lsns_command()),
-                                ));
+                                self.pending_command =
+                                    Some((msg.request_id, cmd_id, Box::pin(lsns_command())));
                                 continue;
                             }
 
@@ -643,7 +658,7 @@ impl Stream for Responser {
                                     match kubectl_execute(kcmd, &params) {
                                         Ok(future) => {
                                             self.pending_command =
-                                                Some((msg.request_id, cmd_id as usize, future));
+                                                Some((msg.request_id, cmd_id, future));
                                             continue;
                                         }
                                         Err(e) => {
@@ -700,7 +715,7 @@ impl Stream for Responser {
                             }
                             self.pending_command = Some((
                                 msg.request_id,
-                                cmd_id as usize,
+                                cmd_id,
                                 Box::pin(output.map_err(|e| e.into())),
                             ));
                             continue;

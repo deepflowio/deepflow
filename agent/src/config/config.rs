@@ -446,6 +446,7 @@ pub struct KubernetesResourceConfig {
     pub group: String,
     pub version: String,
     pub disabled: bool,
+    pub field_selector: String,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]

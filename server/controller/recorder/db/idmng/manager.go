@@ -17,7 +17,6 @@
 package idmng
 
 import (
-	"sort"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -32,6 +31,8 @@ import (
 )
 
 var log = logging.MustGetLogger("recorder.idmng")
+
+var minID = 1
 
 type IDManager struct {
 	org *common.ORG
@@ -76,7 +77,9 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 }
 
 func (m *IDManager) Refresh() error {
-	log.Info(m.org.Logf("refresh id pools"))
+	log.Info(m.org.Logf("refresh id pools started"))
+	defer log.Info(m.org.Logf("refresh id pools completed"))
+
 	var result error
 	for _, idPool := range m.resourceTypeToIDPool {
 		err := idPool.refresh()
@@ -115,82 +118,53 @@ type IDPoolUpdater interface {
 
 // 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type IDPool[MT MySQLModel] struct {
-	org          *common.ORG
-	resourceType string
-	mutex        sync.RWMutex
-	max          int
-	usableIDs    []int
+	mutex sync.RWMutex
+	AscIDAllocator
 }
 
 func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *IDPool[MT] {
-	return &IDPool[MT]{
-		org: org,
-
-		resourceType: resourceType,
-		max:          max,
+	p := &IDPool[MT]{
+		AscIDAllocator: NewAscIDAllocator(org, resourceType, minID, max),
 	}
+	p.SetInUseIDsProvider(p)
+	return p
 }
 
-func (p *IDPool[MT]) refresh() error {
-	log.Info(p.org.Logf("refresh %s id pools started", p.resourceType))
-
-	var items []*MT
-	var err error
-	// TODO do not handle concrete resource in common, create new type IDPool for process and target
-	if p.resourceType == ctrlrcommon.RESOURCE_TYPE_PROCESS_EN {
-		items, err = query.FindInBatches[MT](p.org.DB.Unscoped().Select("id"))
-		// } else if p.resourceType == ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN {
-		// 	err = p.org.DB.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Select("id").Find(&items).Error
-	} else {
-		err = p.org.DB.Unscoped().Select("id").Find(&items).Error
-	}
+func (p *IDPool[MT]) load() (mapset.Set[int], error) {
+	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select("id"))
 	if err != nil {
-		log.Error(p.org.Logf("db query %s failed: %v", p.resourceType, err))
-		return err
+		log.Error(p.org.Logf("failed to query %s: %v", p.resourceType, err))
+		return nil, err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDsSet.Add((*item).GetID())
 	}
-	allIDsSet := mapset.NewSet[int]()
-	for i := 1; i <= p.max; i++ {
-		allIDsSet.Add(i)
-	}
+	log.Info(p.org.Logf("loaded %s ids successfully", p.resourceType))
+	return inUseIDsSet, nil
+}
 
+func (p *IDPool[MT]) check(ids []int) ([]int, error) {
+	var dbItems []*MT
+	err := p.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	if err != nil {
+		log.Error(p.org.Logf("failed to query %s: %v", p.resourceType, err))
+		return nil, err
+	}
+	inUseIDs := make([]int, 0)
+	if len(dbItems) != 0 {
+		for _, item := range dbItems {
+			inUseIDs = append(inUseIDs, (*item).GetID())
+		}
+		log.Info(p.org.Logf("%s ids: %+v are in use.", p.resourceType, inUseIDs))
+	}
+	return inUseIDs, nil
+}
+
+func (p *IDPool[MT]) refresh() error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	// 可用ID = 所有ID（1~max）- db中正在使用的ID
-	// 排序原则：大于db正在使用的max值的ID（未曾被使用过的ID）优先，小于db正在使用的max值的ID（已被使用过且已回收的ID）在后
-	var usableIDs []int
-	if inUseIDsSet.Cardinality() != 0 {
-		inUseIDs := inUseIDsSet.ToSlice()
-		sort.IntSlice(inUseIDs).Sort()
-		maxInUseID := inUseIDs[len(inUseIDs)-1]
-
-		usableIDsSet := allIDsSet.Difference(inUseIDsSet)
-		usedIDs := []int{}
-		usableIDs = usableIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-		for _, id := range usableIDs {
-			if id < maxInUseID {
-				usedIDs = append(usedIDs, id)
-				usableIDsSet.Remove(id)
-			} else {
-				break
-			}
-		}
-		usableIDs = usableIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-		sort.IntSlice(usedIDs).Sort()
-		usableIDs = append(usableIDs, usedIDs...)
-	} else {
-		usableIDs = allIDsSet.ToSlice()
-		sort.IntSlice(usableIDs).Sort()
-	}
-	p.usableIDs = usableIDs
-
-	log.Info(p.org.Logf("refresh %s id pools (usable ids count: %d) completed", p.resourceType, len(p.usableIDs)))
-	return nil
+	return p.Refresh()
 }
 
 // 批量分配ID，若ID池中数量不足，分配ID池所有ID；反之分配指定个数ID。
@@ -198,43 +172,11 @@ func (p *IDPool[MT]) refresh() error {
 func (p *IDPool[MT]) allocate(count int) (ids []int, err error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-
-	if len(p.usableIDs) == 0 {
-		log.Error(p.org.Logf("%s has no more usable ids", p.resourceType))
-		return
-	}
-
-	trueCount := count
-	if len(p.usableIDs) < count {
-		trueCount = len(p.usableIDs)
-	}
-	ids = make([]int, trueCount)
-	copy(ids, p.usableIDs[:trueCount])
-	p.usableIDs = p.usableIDs[trueCount:]
-
-	var dbItems []*MT
-	err = p.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
-	if err != nil {
-		log.Error(p.org.Logf("db query %s failed: %v", p.resourceType, err))
-		return
-	}
-	if len(dbItems) != 0 {
-		inUseIDs := make([]int, 0, len(dbItems))
-		for _, item := range dbItems {
-			inUseIDs = append(inUseIDs, (*item).GetID())
-		}
-		log.Info(p.org.Logf("%s ids: %+v are in use.", p.resourceType, inUseIDs))
-		ids = mapset.NewSet(ids...).Difference(mapset.NewSet(inUseIDs...)).ToSlice()
-	}
-	log.Info(p.org.Logf("allocate %s ids: %v (expected count: %d, true count: %d)", p.resourceType, ids, count, len(ids)))
-	return
+	return p.Allocate(count)
 }
 
 func (p *IDPool[MT]) recycle(ids []int) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-
-	sort.IntSlice(ids).Sort()
-	p.usableIDs = append(p.usableIDs, ids...)
-	log.Info(p.org.Logf("recycle %s ids: %v", p.resourceType, ids))
+	p.Recycle(ids)
 }

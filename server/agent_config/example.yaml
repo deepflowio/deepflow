@@ -512,6 +512,7 @@ vtap_group_id: g-xxxxxx
   #        group: string
   #        version: string
   #        disabled: bool
+  #        field-selector: string
   #    }
   #
   #    Agent will watch the following resources by default:
