@@ -27,6 +27,7 @@ type DB interface {
 }
 
 type DBInfo struct {
+	Regions         []mysql.Region
 	AZs             []mysql.AZ
 	Analyzers       []mysql.Analyzer
 	AZAnalyzerConns []mysql.AZAnalyzerConnection
@@ -38,12 +39,21 @@ type DBInfo struct {
 }
 
 type AnalyzerInfo struct {
-	onlyWeight                bool
-	dbInfo                    *DBInfo
-	regionToVTapNameToTraffic map[string]map[string]int64
+	onlyWeight bool
 
-	db    DB
-	query Querier
+	dbInfo *DBInfo
+	db     DB
+	query  Querier
+
+	RebalanceData
+}
+
+type RebalanceData struct {
+	RegionToVTapNameToTraffic map[string]map[string]int64  `json:"RegionToVTapNameToTraffic"`
+	RegionToAZLcuuids         map[string][]string          `json:"RegionToAZLcuuids"`
+	AZToRegion                map[string]string            `json:"AZToRegion"`
+	AZToVTaps                 map[string][]*mysql.VTap     `json:"AZToVTaps"`
+	AZToAnalyzers             map[string][]*mysql.Analyzer `json:"AZToAnalyzers"`
 }
 
 func NewAnalyzerInfo(onlyWeight bool) *AnalyzerInfo {
@@ -57,6 +67,9 @@ func NewAnalyzerInfo(onlyWeight bool) *AnalyzerInfo {
 }
 
 func (r *DBInfo) Get(db *mysql.DB) error {
+	if err := db.Find(&r.Regions).Error; err != nil {
+		return err
+	}
 	if err := db.Find(&r.AZs).Error; err != nil {
 		return err
 	}
