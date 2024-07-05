@@ -41,8 +41,8 @@ type ExtMetrics struct {
 
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database '<DatabaseName()>', otherwise stored in '<OrgId>_<DatabaseName()>'.
-	OrgId  uint16
-	TeamID uint16
+	OrgId, RawOrgId uint16 // RawOrgId is read from server-stats message, only used to distinguish which database data is written to
+	TeamID          uint16
 
 	TagNames  []string
 	TagValues []string
@@ -56,7 +56,7 @@ func (m *ExtMetrics) DatabaseName() string {
 	case datatype.MESSAGE_TYPE_DFSTATS:
 		return DEEPFLOW_TENANT_DB
 	case datatype.MESSAGE_TYPE_SERVER_DFSTATS:
-		if ckdb.IsValidOrgID(m.OrgId) {
+		if ckdb.IsValidOrgID(m.RawOrgId) {
 			return DEEPFLOW_TENANT_DB
 		} else {
 			return DEEPFLOW_ADMIN_DB
@@ -71,7 +71,7 @@ func (m *ExtMetrics) TableName() string {
 	case datatype.MESSAGE_TYPE_DFSTATS:
 		return DEEPFLOW_TENANT_COLLECTOR_TABLE
 	case datatype.MESSAGE_TYPE_SERVER_DFSTATS:
-		if ckdb.IsValidOrgID(m.OrgId) {
+		if ckdb.IsValidOrgID(m.RawOrgId) {
 			return DEEPFLOW_TENANT_COLLECTOR_TABLE
 		} else {
 			return DEEPFLOW_ADMIN_SERVER_TABLE
