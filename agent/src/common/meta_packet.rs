@@ -1090,15 +1090,6 @@ impl<'a> MetaPacket<'a> {
         return Ok(packet);
     }
 
-    pub fn set_loopback_mac(&mut self, mac: MacAddr) {
-        if self.lookup_key.src_ip.is_loopback() {
-            self.lookup_key.src_mac = mac;
-        }
-        if self.lookup_key.dst_ip.is_loopback() {
-            self.lookup_key.dst_mac = mac;
-        }
-    }
-
     pub fn npb_mode(&self) -> NpbMode {
         if self.lookup_key.is_l2() {
             NpbMode::L2

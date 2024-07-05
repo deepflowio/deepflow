@@ -112,7 +112,6 @@ impl LocalPlusModeDispatcher {
         let tap_type_handler = base.tap_type_handler.clone();
         let mut tunnel_info = TunnelInfo::default();
         let npb_dedup_enabled = base.npb_dedup_enabled.clone();
-        let ctrl_mac = base.ctrl_mac;
         let pool_raw_size = self.pool_raw_size;
         let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -258,8 +257,6 @@ impl LocalPlusModeDispatcher {
                                 if meta_packet.lookup_key.src_mac == MacAddr::ZERO
                                     && meta_packet.lookup_key.dst_mac == MacAddr::ZERO
                                 {
-                                    meta_packet.lookup_key.src_mac = ctrl_mac;
-                                    meta_packet.lookup_key.dst_mac = ctrl_mac;
                                     meta_packet.lookup_key.l2_end_0 = true;
                                     meta_packet.lookup_key.l2_end_1 = true;
                                 }
