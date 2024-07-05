@@ -215,10 +215,10 @@ impl MetaAppProto {
             }
         }
 
-        if flow.flow.tap_side == TapSide::Local || base_info.is_vip_interface_src {
+        if base_info.is_vip_interface_src {
             base_info.mac_src = flow.flow.flow_key.mac_src;
         }
-        if flow.flow.tap_side == TapSide::Local || base_info.is_vip_interface_dst {
+        if base_info.is_vip_interface_dst {
             base_info.mac_dst = flow.flow.flow_key.mac_dst;
         }
 
