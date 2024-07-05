@@ -267,6 +267,9 @@ func rebalanceVtap(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if value, ok := c.GetQuery("check"); ok {
 			args["check"] = (strings.ToLower(value) == "true")
 		}
+		if isDebug, ok := c.GetQuery("is_debug"); ok {
+			args["is_debug"] = (strings.ToLower(isDebug) == "true")
+		}
 		if value, ok := c.GetQuery("type"); ok {
 			args["type"] = value
 			if args["type"] != "controller" && args["type"] != "analyzer" {
