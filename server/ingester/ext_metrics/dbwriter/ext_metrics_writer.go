@@ -197,7 +197,7 @@ func NewExtMetricsWriter(
 		counter: &Counter{},
 	}
 
-	s := AcquireExtMetrics()
+	s := &ExtMetrics{}
 	s.Timestamp = uint32(time.Now().Unix())
 	s.MsgType = msgType
 	if flowTagTablePrefix == DEEPFLOW_TENANT_DB {
