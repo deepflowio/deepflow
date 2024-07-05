@@ -995,6 +995,18 @@ fn component_on_config_change(
             }
         }
         TapMode::Mirror | TapMode::Analyzer => {
+            #[cfg(target_os = "linux")]
+            if conf.tap_mode == TapMode::Mirror
+                && (!config_handler
+                    .candidate_config
+                    .yaml_config
+                    .vhost_socket_path
+                    .is_empty()
+                    || conf.dpdk_enabled)
+            {
+                return;
+            }
+
             // Obtain the currently configured network interfaces
             let mut current_interfaces = get_listener_links(
                 conf,
@@ -1785,6 +1797,13 @@ impl AgentComponents {
                     interfaces_and_ns.push(links.clone());
                 }
             }
+        }
+        #[cfg(target_os = "linux")]
+        if candidate_config.tap_mode == TapMode::Mirror
+            && (!yaml_config.vhost_socket_path.is_empty()
+                || candidate_config.dispatcher.dpdk_enabled)
+        {
+            interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
         }
 
         match candidate_config.tap_mode {
