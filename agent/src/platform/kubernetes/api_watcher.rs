@@ -287,7 +287,10 @@ impl ApiWatcher {
             };
             let sr = &supported_resources[index];
             if r.group == "" && r.version == "" {
-                resources.push(sr.clone());
+                resources.push(Resource {
+                    field_selector: r.field_selector.clone(),
+                    ..sr.clone()
+                });
                 continue;
             }
             if r.version == "" {
@@ -307,6 +310,7 @@ impl ApiWatcher {
                 } else {
                     resources.push(Resource {
                         group_versions: gv,
+                        field_selector: r.field_selector.clone(),
                         ..sr.clone()
                     });
                 }
@@ -325,6 +329,7 @@ impl ApiWatcher {
             };
             resources.push(Resource {
                 selected_gv: Some(sr.group_versions[index]),
+                field_selector: r.field_selector.clone(),
                 ..sr.clone()
             });
         }
@@ -482,9 +487,10 @@ impl ApiWatcher {
 
         for r in resources.iter() {
             info!(
-                "will query resource {} from {}",
+                "will query resource {} from {} with field_selector `{}`",
                 r.name,
-                r.selected_gv.unwrap()
+                r.selected_gv.unwrap(),
+                r.field_selector,
             );
         }
 

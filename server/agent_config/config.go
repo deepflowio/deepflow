@@ -302,10 +302,11 @@ type PrometheusExtraConfig struct {
 }
 
 type KubernetesResourceConfig struct {
-	Name     *string `yaml:"name,omitempty"`
-	Group    *string `yaml:"group,omitempty"`
-	Version  *string `yaml:"version,omitempty"`
-	Disabled *bool   `yaml:"disabled,omitempty"`
+	Name          *string `yaml:"name,omitempty"`
+	Group         *string `yaml:"group,omitempty"`
+	Version       *string `yaml:"version,omitempty"`
+	Disabled      *bool   `yaml:"disabled,omitempty"`
+	FieldSelector *string `yaml:"field-selector,omitempty"`
 }
 
 type MatchRule struct {

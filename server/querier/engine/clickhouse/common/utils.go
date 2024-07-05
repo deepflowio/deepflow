@@ -202,7 +202,7 @@ func GetDatasourceInterval(db string, table string, name string, orgID string) (
 	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
 }
 
-func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
+func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -218,15 +218,10 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}
-	// for debug
-	chClient.Debug = client.NewDebug(sql)
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		log.Error(err)
 		return nil
-	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
 	}
 	for _, _table := range rst.Values {
 		table := _table.([]interface{})[0].(string)
@@ -238,7 +233,7 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 	return values
 }
 
-func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
+func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -254,14 +249,10 @@ func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ct
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}
-	chClient.Debug = client.NewDebug(sql)
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		log.Error(err)
 		return nil
-	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
 	}
 	for _, _table := range rst.Values {
 		table := _table.([]interface{})[0].(string)

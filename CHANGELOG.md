@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - windows compilation errors [#7243](https://github.com/deepflowio/deepflow/pull/7243) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: uses long connections to connect to CK for datasources manager [#7239](https://github.com/deepflowio/deepflow/pull/7239) by [lzf575](https://github.com/lzf575)
+* fix: server recorder prints unnecessary error logs [#7190](https://github.com/deepflowio/deepflow/pull/7190) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Attribute supports Chinese [#7210](https://github.com/deepflowio/deepflow/pull/7210) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent Packet fanout can only be set in TapMode::Local mode [#7205](https://github.com/deepflowio/deepflow/pull/7205) by [TomatoMr](https://github.com/TomatoMr)
 * fix: agent - eBPF DNS cannot obtain network tuple data (#7131) [#7132](https://github.com/deepflowio/deepflow/pull/7132) by [yinjiping](https://github.com/yinjiping)
@@ -32,6 +35,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Add JAVA symbol file generation log [#7258](https://github.com/deepflowio/deepflow/pull/7258) by [yinjiping](https://github.com/yinjiping)
+* feat: revert - Rewriting ParseShowSql with Regular Expressions [#7252](https://github.com/deepflowio/deepflow/pull/7252) by [duandaa](https://github.com/duandaa)
+* feat: querier - Rewriting ParseShowSql with Regular Expressions [#7181](https://github.com/deepflowio/deepflow/pull/7181) by [duandaa](https://github.com/duandaa)
+* feat: server adds mysql conns configs [#7139](https://github.com/deepflowio/deepflow/pull/7139) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Add command for java stack dump [#7226](https://github.com/deepflowio/deepflow/pull/7226) by [rvql](https://github.com/rvql)
 * feat: Add volcengine icon const [#7204](https://github.com/deepflowio/deepflow/pull/7204) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Added automatic update changlog action [#7135](https://github.com/deepflowio/deepflow/pull/7135) by [Nick-0314](https://github.com/Nick-0314)
@@ -55,3 +62,11 @@
 #### Performance
 
 * perf: improve parsing RequestResource from http.url of OTel data [#7172](https://github.com/deepflowio/deepflow/pull/7172) by [lzf575](https://github.com/lzf575)
+
+
+#### Documentation
+* docs: rename opentemetry to opentelemetry [#7245](https://github.com/deepflowio/deepflow/pull/7245) by [lzf575](https://github.com/lzf575)
+
+
+#### Chore
+* chore: update cli dependencies [#7249](https://github.com/deepflowio/deepflow/pull/7249) by [lzf575](https://github.com/lzf575)

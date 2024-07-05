@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -203,8 +204,16 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 					if ok {
 						for _, mv := range macVIFs {
 							if mv.DeviceType == deviceType {
-								macVIF = mv
-								break
+								// When the mac is the same, select the vinterface of the same vpc
+								if slices.Contains([]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P, common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM}, vtapVIF.VTapType) {
+									if mv.DeviceID == vtapVIF.VTapLaunchServerID {
+										macVIF = mv
+										break
+									}
+								} else {
+									macVIF = mv
+									break
+								}
 								// Compatible with pod_node and VM related scenarios
 							} else if mv.DeviceType == common.VIF_DEVICE_TYPE_VM && deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
 								if _, ok := toolDS.vmIDToPodNodeID[mv.DeviceID]; ok {
