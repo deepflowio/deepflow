@@ -540,6 +540,13 @@ pub struct Options {
     pub vhost_socket_path: String,
 }
 
+impl Options {
+    fn vhost_queue_size(&self) -> usize {
+        // The unit of packet_blocks is M, and the buffer size of the queue is 4096 bytes
+        self.packet_blocks * 1024 * 1024 / 4096
+    }
+}
+
 pub struct Pipeline {
     vm_mac: MacAddr,
     bond_mac: MacAddr,
@@ -1153,9 +1160,12 @@ impl DispatcherBuilder {
         let options = options.lock().unwrap();
         match tap_mode {
             #[cfg(target_os = "linux")]
-            TapMode::Mirror if !options.vhost_socket_path.is_empty() => Ok(RecvEngine::VhostUser(
-                VhostUser::new(options.vhost_socket_path.clone(), 4096),
-            )),
+            TapMode::Mirror if !options.vhost_socket_path.is_empty() => {
+                Ok(RecvEngine::VhostUser(VhostUser::new(
+                    options.vhost_socket_path.clone(),
+                    options.vhost_queue_size(),
+                )))
+            }
             TapMode::Mirror | TapMode::Local if options.libpcap_enabled => {
                 if pcap_interfaces.is_none() || pcap_interfaces.as_ref().unwrap().is_empty() {
                     return Err(error::Error::Libpcap(
