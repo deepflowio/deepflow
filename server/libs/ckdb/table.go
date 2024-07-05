@@ -155,7 +155,7 @@ PRIMARY KEY (%s)
 ORDER BY (%s)
 %s
 %s
-SETTINGS storage_policy = '%s'`,
+SETTINGS storage_policy = '%s', ttl_only_drop_parts = 1`,
 		database, fmt.Sprintf("`%s`", t.LocalName),
 		strings.Join(columns, ",\n"),
 		engine,
