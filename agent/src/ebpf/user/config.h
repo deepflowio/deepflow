@@ -177,7 +177,7 @@ enum {
 #define JAVA_SYMS_UPDATE_DELAY_MAX 3600	// 3600 seconds
 
 /* Profiler - maximum data push interval time (in nanosecond). */
-#define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */
+#define MAX_PUSH_MSG_TIME_INTERVAL_NS 1000000000ULL	/* 1 seconds */
 
 /*
  * The kernel uses bundled burst to send data to the user.
@@ -273,5 +273,11 @@ enum {
  */
 
 #define PROFILER_DEFER_RANDOM_MAX 60	// 60 seconds
+
+/*
+ * Scaling factor is sized to avoid hash table collisions and timing variations.
+ */
+#define STACKMAP_SCALING_FACTOR 3.0
+#define STACKMAP_CAPACITY_THRESHOLD 32768 // The capacity limit of the Stack trace map, power of two. 
 
 #endif /* DF_EBPF_CONFIG_H */

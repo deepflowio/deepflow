@@ -1363,19 +1363,19 @@ vtap_group_id: g-xxxxxx
     #ring-size: 65536
 
     ## eBPF max socket entries
-    ## Default: 524288. Range: [100000, 2000000]
+    ## Default: 131072. Range: [100000, 2000000]
     ## Note: Set the maximum value of hash table entries for socket tracking, depending on the number of concurrent requests in the actual scenario
-    #max-socket-entries: 524288
+    #max-socket-entries: 131072
 
     ## eBPF socket map max reclaim
-    ## Default: 520000. Range: [100000, 2000000]
+    ## Default: 120000. Range: [100000, 2000000]
     ## Note: The maximum threshold for cleaning socket map table entries.
-    #socket-map-max-reclaim: 520000
+    #socket-map-max-reclaim: 120000
 
     ## eBPF max trace entries
-    ## Default: 524288. Range: [100000, 2000000]
+    ## Default: 131072. Range: [100000, 2000000]
     ## Note: Set the maximum value of hash table entries for thread/coroutine tracking sessions.
-    #max-trace-entries: 524288
+    #max-trace-entries: 131072
 
     ## eBPF go trace timeout
     ## Default: 120 second[s]. Range: [0, +]
