@@ -454,11 +454,11 @@ void push_and_release_stack_trace_msg(struct profiler_context *ctx,
 	 * to the upper-level processing:
 	 *
 	 *   If the time interval since the last push exceeds or equals
-	 *   the maximum time interval (MAX_PUSH_MSG_TIME_INTERVAL).
+	 *   the maximum time interval (MAX_PUSH_MSG_TIME_INTERVAL_NS).
 	 *
 	 * Otherwise, it should return directly.
 	 */
-	if (!((elapsed >= MAX_PUSH_MSG_TIME_INTERVAL) || is_force))
+	if (!((elapsed >= MAX_PUSH_MSG_TIME_INTERVAL_NS) || is_force))
 		return;
 
 	/* update last push time. */
