@@ -22,6 +22,7 @@
  */
 #ifndef AARCH64_MUSL
 #include <sys/stat.h>
+#include <math.h>
 #include <bcc/perf_reader.h>
 #include "../config.h"
 #include "../utils.h"
@@ -66,6 +67,7 @@
 #define LOG_CP_TAG	"[CP] "
 #define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
+extern int sys_cpus_count;
 
 /* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
 int g_java_syms_write_bytes_max;
@@ -1104,11 +1106,52 @@ exit:
 	pthread_exit(NULL);
 }
 
+static int stack_trace_map_capacity(struct bpf_tracer *tracer)
+{
+	/*
+	 * Calculation method for stack map capacity:
+	 * 
+	 *  `scaling_factor * (ncpus * expected_stack_count_per_cpu)`
+	 *
+	 * scaling_factor:
+	 *   To ensure the integrity and accuracy of data, especially during stack
+	 *   tracing in performance analysis or debugging tools, it's crucial to
+	 *   include a margin. Stack tracing involves recording the state of program
+	 *   call stacks to analyze program behavior and performance.
+	 * ncpus:
+	 *   This needs to calculate the total expected number of stack traces
+	 *   because sampling is done per CPU.
+	 * expected_stack_count_per_cpu:
+	 *   Represents the expected number of stack traces on each CPU.
+	 *   Here we set it as the number of samples per second.
+	 *
+	 * In kernel, round the given value(capacity) up to nearest power of two.
+	 * ref: https://elixir.bootlin.com/linux/v4.19.313/source/kernel/bpf/stackmap.c#L122
+	 */
+
+	double scaling_factor = STACKMAP_SCALING_FACTOR;
+	int ncpus = sys_cpus_count;
+	int expected_stack_count_per_cpu = tracer->sample_freq;
+	int capacity =
+	    (int)round(scaling_factor * (ncpus * expected_stack_count_per_cpu));
+	capacity = 1 << max_log2(capacity);
+	if (capacity > STACKMAP_CAPACITY_THRESHOLD)
+		capacity = STACKMAP_CAPACITY_THRESHOLD;
+
+	return capacity;
+}
+
 static int create_profiler(struct bpf_tracer *tracer)
 {
 	int ret;
 
 	profiler_tracer = tracer;
+	int cap = stack_trace_map_capacity(tracer);
+	if ((ret = maps_config(tracer, MAP_STACK_A_NAME, cap)))
+		return ret;
+
+	if ((ret = maps_config(tracer, MAP_STACK_B_NAME, cap)))
+		return ret;
 
 	/* load ebpf perf profiler */
 	if (tracer_bpf_load(tracer))
