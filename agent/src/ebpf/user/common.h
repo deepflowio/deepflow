@@ -276,7 +276,7 @@ int copy_file(const char *src_file, const char *dest_file);
 int df_enter_ns(int pid, const char *type, int *self_fd);
 void df_exit_ns(int fd);
 int gen_file_from_mem(const char *mem_ptr, int write_bytes, const char *path);
-int exec_command(const char *cmd, const char *args);
+int exec_command(const char *cmd, const char *args, char *ret_buf, int ret_buf_size);
 u64 current_sys_time_secs(void);
 int fetch_container_id_from_str(char *buff, char *id, int copy_bytes);
 int fetch_container_id(pid_t pid, char *id, int copy_bytes);
