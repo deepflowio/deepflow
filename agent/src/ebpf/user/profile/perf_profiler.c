@@ -1144,8 +1144,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 	}
 
 	/* clear old perf files */
-	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
-	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "", NULL, 0);
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "", NULL, 0);
 
 	/* attach perf event */
 	tracer_hooks_attach(tracer);
