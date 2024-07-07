@@ -333,6 +333,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 	if ((ret = maps_config(tracer, MAP_STACK_B_NAME, cap)))
 		return ret;
 
+	extended_maps_set(tracer);
+
 	/* load ebpf perf profiler */
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
