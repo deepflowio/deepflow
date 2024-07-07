@@ -30,6 +30,7 @@
  * @return 0 on success, non-zero on error
  */
 int extended_reader_create(struct bpf_tracer *tracer);
+int extended_maps_set(struct bpf_tracer *tracer);
 
 /**
  * @brief **extended_proc_event_handler()** extend the handling of process

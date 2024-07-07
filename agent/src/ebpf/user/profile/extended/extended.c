@@ -31,6 +31,11 @@ int __attribute__ ((weak)) extended_reader_create(struct bpf_tracer *tracer)
 	return 0;
 }
 
+int __attribute__ ((weak)) extended_maps_set(struct bpf_tracer *tracer)
+{
+	return 0;
+}
+
 int __attribute__ ((weak)) extended_proc_event_handler(int pid,
 						       const char *name,
 						       enum proc_act_type type)
