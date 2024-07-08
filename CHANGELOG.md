@@ -8,6 +8,11 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - incorrect http2 log [#7296](https://github.com/deepflowio/deepflow/pull/7296) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: the flow_tag of prometheus may be lost under multiple organizations [#7294](https://github.com/deepflowio/deepflow/pull/7294) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Adjust Java syms-cache update logic & error log output [#7291](https://github.com/deepflowio/deepflow/pull/7291) by [yinjiping](https://github.com/yinjiping)
+* fix: deepflow stats may write to wrong database [#7284](https://github.com/deepflowio/deepflow/pull/7284) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Addressing excessive eBPF maps memory usage [#7281](https://github.com/deepflowio/deepflow/pull/7281) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - remove duplicate vhost dispatcher [#7267](https://github.com/deepflowio/deepflow/pull/7267) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Show metrics use query cache can be configured [#7263](https://github.com/deepflowio/deepflow/pull/7263) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: server recorder prints unnecessary error logs [#7262](https://github.com/deepflowio/deepflow/pull/7262) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -40,6 +45,11 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add trace map router [#7299](https://github.com/deepflowio/deepflow/pull/7299) by [taloric](https://github.com/taloric)
+* feat: server uses sub_domain team id first when publishing message to tagrecorder. [#7293](https://github.com/deepflowio/deepflow/pull/7293) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: agent opens the protocol desensitization by default [#7285](https://github.com/deepflowio/deepflow/pull/7285) by [TomatoMr](https://github.com/TomatoMr)
+* feat: agent - flow&app log collected by lo nic do not report ctrl_mac [#7272](https://github.com/deepflowio/deepflow/pull/7272) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: querier - Rewriting ParseShowSql with Regular Expressions [#7268](https://github.com/deepflowio/deepflow/pull/7268) by [duandaa](https://github.com/duandaa)
 * feat: Support kubernetes api field_selector [#7248](https://github.com/deepflowio/deepflow/pull/7248) by [rvql](https://github.com/rvql)
 * feat: add debug ctl to rebalance agent by traffic [#7184](https://github.com/deepflowio/deepflow/pull/7184) by [roryye](https://github.com/roryye)
 * feat: agent - eBPF Add JAVA symbol file generation log [#7258](https://github.com/deepflowio/deepflow/pull/7258) by [yinjiping](https://github.com/yinjiping)
@@ -63,6 +73,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: OTel HTTP l7_protocol_str change from http to HTTP [#7292](https://github.com/deepflowio/deepflow/pull/7292) by [lzf575](https://github.com/lzf575)
 * refactor: server recorder polishes id allocator [#7168](https://github.com/deepflowio/deepflow/pull/7168) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * refactor: Change crate name [#7155](https://github.com/deepflowio/deepflow/pull/7155) by [rvql](https://github.com/rvql)
 
