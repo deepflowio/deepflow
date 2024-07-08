@@ -340,8 +340,8 @@ static int create_profiler(struct bpf_tracer *tracer)
 		return ETR_LOAD;
 
 	/* clear old perf files */
-	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
-	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "", NULL, 0);
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "", NULL, 0);
 
 	ret = create_work_thread("java_update",
 				 &java_syms_update_thread,
