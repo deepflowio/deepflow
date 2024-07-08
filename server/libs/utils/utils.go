@@ -17,6 +17,7 @@
 package utils
 
 import (
+	"bytes"
 	. "encoding/binary"
 	"fmt"
 	"math"
@@ -26,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -479,10 +481,35 @@ func IsNil(i interface{}) bool {
 
 // EscapeJSONString is used to escape special characters in JSON strings
 func EscapeJSONString(value string) string {
-	replacer := strings.NewReplacer(
-		`\`, `\\`,
-		`"`, `\"`,
-		"\n", `\n`,
-	)
-	return replacer.Replace(value)
+	var buf bytes.Buffer
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch r {
+		case utf8.RuneError:
+			buf.WriteString(fmt.Sprintf("\\u%04x", r))
+			i += size
+		case '"':
+			buf.WriteString("\\\"")
+		case '\\':
+			buf.WriteString("\\\\")
+		case '\b':
+			buf.WriteString("\\b")
+		case '\f':
+			buf.WriteString("\\f")
+		case '\r':
+			buf.WriteString("\\r")
+		case '\t':
+			buf.WriteString("\\t")
+		case '\n':
+			buf.WriteString("\\n")
+		default:
+			if r < 32 || r == 127 {
+				buf.WriteString(fmt.Sprintf("\\u%04x", s[i]))
+			} else {
+				buf.WriteRune(r)
+			}
+		}
+		i += size
+	}
+	return buf.String()
 }
