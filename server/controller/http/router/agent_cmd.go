@@ -42,6 +42,16 @@ const (
 	DefaultForwardControllerTimes = 3
 )
 
+var (
+	profileCommandMap = map[string]struct{}{
+		"ps":              struct{}{},
+		"java-dump-stack": struct{}{},
+		"java-dump-gc":    struct{}{},
+		"java-dump-heap":  struct{}{},
+		"ebpf-dump-stack": struct{}{},
+	}
+)
+
 type AgentCMD struct{}
 
 func NewAgentCMD() *AgentCMD {
@@ -164,7 +174,23 @@ func getCMDAndNamespaceHandler(c *gin.Context) {
 	}
 
 	data, err := service.GetCMDAndNamespace(orgID.(int), agentID)
-	JsonResponse(c, data, err)
+	if err != nil {
+		JsonResponse(c, data, err)
+		return
+	}
+	switch c.Query("type") {
+	case "profile":
+		var cmds []*trident.RemoteCommand
+		for _, item := range data.RemoteCommand {
+			if _, ok := profileCommandMap[*item.Cmd]; ok {
+				cmds = append(cmds, item)
+			}
+		}
+		data.RemoteCommand = cmds
+		data.LinuxNamespace = nil
+	default:
+	}
+	JsonResponse(c, data, nil)
 }
 
 func getAgentID(c *gin.Context) (int, error) {
@@ -191,14 +217,15 @@ func cmdRunHandler(c *gin.Context) {
 		return
 	}
 	agentReq := trident.RemoteExecRequest{
-		ExecType:   trident.ExecutionType_RUN_COMMAND.Enum(),
-		CommandId:  req.CommandId,
-		LinuxNsPid: req.LinuxNsPid,
-		Params:     req.Params,
+		ExecType: trident.ExecutionType_RUN_COMMAND.Enum(),
+		// CommandId:    req.CommandId, // deprecated
+		CommandIdent: req.CommandIdent,
+		LinuxNsPid:   req.LinuxNsPid,
+		Params:       req.Params,
 	}
 
 	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-	content, err := service.RunAgentCMD(orgID.(int), agentID, &agentReq)
+	content, err := service.RunAgentCMD(orgID.(int), agentID, &agentReq, req.CMD)
 	if err != nil {
 		BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 		return
