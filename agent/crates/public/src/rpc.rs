@@ -1,42 +1,5 @@
 pub mod remote_exec {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    pub enum CmdId {
-        Community(u32),
-        Enterprise(u32),
-        Temporary(u32),
-    }
-
-    impl CmdId {
-        const ID_BITS: u32 = 24;
-    }
-
-    impl From<CmdId> for u32 {
-        fn from(cmd_id: CmdId) -> u32 {
-            let (type_id, inner_id) = match cmd_id {
-                CmdId::Community(id) => (0, id),
-                CmdId::Enterprise(id) => (1 << CmdId::ID_BITS, id),
-                CmdId::Temporary(id) => (2 << CmdId::ID_BITS, id),
-            };
-            let mask = u32::MAX << CmdId::ID_BITS;
-            assert_eq!(inner_id & mask, 0);
-            type_id | (inner_id & !mask)
-        }
-    }
-
-    impl TryFrom<u32> for CmdId {
-        type Error = &'static str;
-
-        fn try_from(id: u32) -> Result<Self, Self::Error> {
-            let mask = u32::MAX << CmdId::ID_BITS;
-            let inner_id = id & !mask;
-            match id & mask {
-                0 => Ok(Self::Community(inner_id)),
-                1 => Ok(Self::Enterprise(inner_id)),
-                2 => Ok(Self::Temporary(inner_id)),
-                _ => Err("invalid mask for id"),
-            }
-        }
-    }
+    use std::fmt::{self, Write};
 
     #[derive(Clone, Copy)]
     pub enum OutputFormat {
@@ -53,16 +16,105 @@ pub mod remote_exec {
 
     #[derive(Clone, Copy, PartialEq)]
     pub enum CommandType {
-        Linux,
+        System,
         Kubernetes(KubeCmd),
+        Enterprise(&'static str),
+    }
+
+    impl fmt::Display for CommandType {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                Self::System => write!(f, "system"),
+                Self::Kubernetes(_) => write!(f, "kubernetes"),
+                Self::Enterprise(t) => write!(f, "{}", t),
+            }
+        }
     }
 
     #[derive(Clone, Copy)]
+    pub struct Parameter {
+        pub name: &'static str,
+        pub charset: &'static str,
+        pub max_length: usize,
+    }
+
+    #[derive(Clone)]
     pub struct Command {
-        pub id: CmdId,
+        pub id: String,
         pub cmdline: &'static str,
         pub output_format: OutputFormat,
         pub desc: &'static str,
         pub command_type: CommandType,
+        pub params: Vec<Parameter>,
+    }
+
+    impl Default for Command {
+        fn default() -> Self {
+            Self {
+                id: String::new(),
+                cmdline: "",
+                output_format: OutputFormat::Text,
+                desc: "",
+                command_type: CommandType::System,
+                params: Vec::new(),
+            }
+        }
+    }
+
+    impl Command {
+        pub fn gen_id(&self) -> String {
+            let mut id = String::new();
+            let _ = write!(&mut id, "{}", self.command_type);
+            for arg in self.cmdline.split_whitespace() {
+                let (prefix, word) = if arg.starts_with("--") {
+                    (&arg[0..2], &arg[2..])
+                } else if arg.starts_with("-") || arg.starts_with("$") {
+                    (&arg[0..1], &arg[1..])
+                } else {
+                    ("", &arg[..])
+                };
+                let wl = word.len();
+                if wl <= 3 {
+                    let _ = write!(&mut id, "_{}{}", prefix, word);
+                } else {
+                    let _ = write!(
+                        &mut id,
+                        "_{}{}{}{}",
+                        prefix,
+                        &word[0..1],
+                        wl - 2,
+                        &word[wl - 1..wl]
+                    );
+                }
+            }
+            id
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn command_gen_id() {
+            assert_eq!(
+                "kubernetes_k5l_-n_$ns_d6e_pod_$pod",
+                &Command {
+                    cmdline: "kubectl -n $ns describe pod $pod",
+                    command_type: CommandType::Kubernetes(KubeCmd::DescribePod),
+                    ..Default::default()
+                }
+                .gen_id()
+            );
+            assert_eq!(
+                "kubernetes_k5l_-n_$ns_l2s_--t80_-p_$pod",
+                &Command {
+                    cmdline: "kubectl -n $ns logs --tail=10000 -p $pod",
+                    command_type: CommandType::Kubernetes(KubeCmd::LogPrevious),
+                    ..Default::default()
+                }
+                .gen_id(),
+            );
+        }
     }
 }
