@@ -28,9 +28,9 @@ func (b *DataSet) AddVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *
 	if dbItem.NetworkID != 0 {
 		networkLcuuid, _ = toolDataSet.GetNetworkLcuuidByID(dbItem.NetworkID)
 	}
-	var vmLcuuid string
-	if dbItem.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_VM {
-		vmLcuuid, _ = toolDataSet.GetVMLcuuidByID(dbItem.DeviceID)
+	var deviceLcuuid string
+	if dbItem.DeviceID != 0 {
+		deviceLcuuid, _ = toolDataSet.GetDeviceLcuuidByID(dbItem.DeviceType, dbItem.DeviceID)
 	}
 	b.VInterfaces[dbItem.Lcuuid] = &VInterface{
 		DiffBase: DiffBase{
@@ -43,7 +43,7 @@ func (b *DataSet) AddVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *
 		NetnsID:         dbItem.NetnsID,
 		TapMac:          dbItem.TapMac,
 		DeviceType:      dbItem.DeviceType,
-		DeviceLcuuid:    vmLcuuid,
+		DeviceLcuuid:    deviceLcuuid,
 		NetworkLcuuid:   networkLcuuid,
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
