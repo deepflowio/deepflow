@@ -353,7 +353,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams) (*common
 			}
 
 			// tag metrics
-			tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, "", e.ORGID, true, e.Context)
+			tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, e.ORGID, args.UseQueryCache, e.Context)
 			if err != nil {
 				log.Error("Failed to get tag type metrics")
 				return nil, []string{}, true, err
