@@ -883,6 +883,13 @@ impl YamlConfig {
             c.packet_fanout_mode = 0;
         }
 
+        if c.l7_protocol_advanced_features
+            .obfuscate_enabled_protocols
+            .is_empty()
+        {
+            c.l7_protocol_advanced_features.obfuscate_enabled_protocols = vec!["Redis".to_string()];
+        }
+
         Ok(c)
     }
 

@@ -1154,13 +1154,15 @@ vtap_group_id: g-xxxxxx
     ## List of L7 protocols that need to be obfuscated
     ## Note: For the sake of data security, the data of the protocol that needs
     ## to be desensitized is configured here and is not processed by default.
-    ## Default: obfuscate-enabled-protocols: [], by default, neither sql statements nor redis commands are obfuscated
-    ## If you want to obfuscate sql statements and redis commands, you can set it to:
+    ## If you want to desensitize http url, sql statements and redis commands, you can set it to:
     ## obfuscate-enabled-protocols:
     ## - MySQL
     ## - PostgreSQL
+    ## - HTTP
+    ## - HTTP2
     ## - Redis
-    #obfuscate-enabled-protocols: []
+    #obfuscate-enabled-protocols: 
+    #- Redis
 
     ## Configuration to extract the customized header fields of HTTP, HTTP2, GRPC protocol etc
     #extra-log-fields:
