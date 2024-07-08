@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use hpack::Decoder;
 use nom::{AsBytes, ParseTo};
+use public::l7_protocol::L7ProtocolChecker;
 use serde::Serialize;
 
 use super::pb_adapter::{
@@ -694,6 +695,17 @@ impl L7ProtocolParserInterface for HttpLog {
         // in this condition the call to the wasm plugin will be skipped.
         if param.ebpf_type != EbpfType::GoHttp2Uprobe {
             self.wasm_hook(param, payload, &mut info);
+        }
+        if config
+            .obfuscate_enabled_protocols
+            .is_enabled(L7Protocol::Http1)
+            || config
+                .obfuscate_enabled_protocols
+                .is_enabled(L7Protocol::Http2)
+        {
+            if let Some(index) = info.path.find('?') {
+                info.path.truncate(index + 1); // retain `?`
+            }
         }
         info.service_name = info.grpc_package_service_name();
         if !config.http_endpoint_disabled && info.path.len() > 0 {
