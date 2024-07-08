@@ -265,4 +265,10 @@ enum {
 
 #define PROFILER_DEFER_RANDOM_MAX 60 // 60 seconds
 
+/*
+ * Scaling factor is sized to avoid hash table collisions and timing variations.
+ */
+#define STACKMAP_SCALING_FACTOR 3.0
+#define STACKMAP_CAPACITY_THRESHOLD 32768 // The capacity limit of the Stack trace map, power of two. 
+
 #endif /* DF_EBPF_CONFIG_H */
