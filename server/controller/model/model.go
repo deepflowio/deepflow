@@ -750,10 +750,12 @@ type RemoteExecReq struct {
 
 	OutputFormat   *trident.OutputFormat `json:"output_format"` // 0: "TEXT", 1: "BINARY"
 	OutputFilename string                `json:"output_filename"`
+	CMD            string                `json:"cmd"`
 }
 
 type RemoteExecResp struct {
-	Content        string                    `json:"content,omitempty"`          // RUN_COMMAND
+	Content        string                    `json:"content,omitempty"` // RUN_COMMAND
+	ErrorMessage   string                    `json:"-"`
 	RemoteCommand  []*trident.RemoteCommand  `json:"remote_commands,omitempty"`  // LIST_COMMAND
 	LinuxNamespace []*trident.LinuxNamespace `json:"linux_namespaces,omitempty"` // LIST_NAMESPACE
 }

@@ -146,15 +146,10 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 	case resp.Errmsg != nil:
 		log.Errorf("agent(key: %s) run command error: %s",
 			key, *resp.Errmsg)
-		service.AppendErr(key, resp.Errmsg)
+		service.AppendErrorMessage(key, resp.Errmsg)
 		manager.ExecDoneCH <- struct{}{}
 		return
 	case len(resp.LinuxNamespaces) > 0:
-		if resp.Errmsg != nil {
-			service.AppendErr(key, resp.Errmsg)
-			manager.RemoteCMDDoneCH <- struct{}{}
-			return
-		}
 		if len(service.GetNamespaces(key)) > 0 {
 			service.InitNamespaces(key, resp.LinuxNamespaces)
 		} else {
@@ -162,11 +157,6 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 		}
 		manager.LinuxNamespaceDoneCH <- struct{}{}
 	case len(resp.Commands) > 0:
-		if resp.Errmsg != nil {
-			service.AppendErr(key, resp.Errmsg)
-			manager.RemoteCMDDoneCH <- struct{}{}
-			return
-		}
 		if len(service.GetCommands(key)) > 0 {
 			service.InitCommands(key, resp.Commands)
 		} else {
