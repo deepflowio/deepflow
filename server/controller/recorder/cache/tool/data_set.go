@@ -1064,7 +1064,7 @@ func (t *DataSet) GetVMLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
 	var vm mysql.VM
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&vm)
+	result := t.metadata.DB.Where("id = ?", id).Find(&vm)
 	if result.RowsAffected == 1 {
 		t.AddVM(&vm)
 		return vm.Lcuuid, true
@@ -1098,7 +1098,7 @@ func (t *DataSet) GetVPCLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, id)))
 	var vpc mysql.VPC
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&vpc)
+	result := t.metadata.DB.Where("id = ?", id).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
 		return vpc.Lcuuid, true
@@ -1152,7 +1152,7 @@ func (t *DataSet) GetSubnetLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, id)))
 	var subnet mysql.Subnet
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&subnet)
+	result := t.metadata.DB.Where("id = ?", id).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
 		return subnet.Lcuuid, true
@@ -1240,7 +1240,7 @@ func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id)))
 	var network mysql.Network
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&network)
+	result := t.metadata.DB.Where("id = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
 		return network.Lcuuid, true
@@ -1623,7 +1623,7 @@ func (t *DataSet) GetPodServiceLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id)))
 	var podService mysql.PodService
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&podService)
+	result := t.metadata.DB.Where("id = ?", id).Find(&podService)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&podService)
 		return podService.Lcuuid, true
