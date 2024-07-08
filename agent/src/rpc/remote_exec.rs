@@ -60,68 +60,84 @@ use public::{
     proto::trident as pb,
 };
 
-const MIN_BATCH_LEN: usize = 1024;
-
 pub use public::rpc::remote_exec::*;
+
+const MIN_BATCH_LEN: usize = 1024;
+const KUBERNETES_NAMESPACE_PARAM: &'static Parameter = &Parameter {
+    name: "ns",
+    charset: "[\\-0-9a-z]", // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
+    max_length: 64,
+};
+const KUBERNETES_POD_PARAM: &'static Parameter = &Parameter {
+    name: "pod",
+    charset: "[.\\-0-9a-z]", // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    max_length: 256,
+};
 
 fn all_supported_commands() -> Vec<Command> {
     #[allow(unused_mut)]
     let mut commands = vec![
         Command {
-            id: CmdId::Community(0),
             cmdline: "lsns",
             output_format: OutputFormat::Text,
-            desc: "",
-            command_type: CommandType::Linux,
+            command_type: CommandType::System,
+            ..Default::default()
         },
         Command {
-            id: CmdId::Community(1),
             cmdline: "top -b -n 1 -c -w 512",
             output_format: OutputFormat::Text,
             desc: "top",
-            command_type: CommandType::Linux,
+            command_type: CommandType::System,
+            ..Default::default()
         },
         Command {
-            id: CmdId::Community(2),
             cmdline: "ps auxf",
             output_format: OutputFormat::Text,
             desc: "ps",
-            command_type: CommandType::Linux,
+            command_type: CommandType::System,
+            ..Default::default()
         },
         Command {
-            id: CmdId::Community(3),
             cmdline: "ip address",
             output_format: OutputFormat::Text,
-            desc: "",
-            command_type: CommandType::Linux,
+            command_type: CommandType::System,
+            ..Default::default()
         },
         Command {
-            id: CmdId::Community(4),
             cmdline: "kubectl -n $ns describe pod $pod",
             output_format: OutputFormat::Text,
-            desc: "",
             command_type: CommandType::Kubernetes(KubeCmd::DescribePod),
+            params: vec![*KUBERNETES_NAMESPACE_PARAM, *KUBERNETES_POD_PARAM],
+            ..Default::default()
         },
         Command {
-            id: CmdId::Community(5),
             cmdline: "kubectl -n $ns logs --tail=10000 $pod",
             output_format: OutputFormat::Text,
-            desc: "",
             command_type: CommandType::Kubernetes(KubeCmd::Log),
+            params: vec![*KUBERNETES_NAMESPACE_PARAM, *KUBERNETES_POD_PARAM],
+            ..Default::default()
         },
         Command {
-            id: CmdId::Community(6),
             cmdline: "kubectl -n $ns logs --tail=10000 -p $pod",
             output_format: OutputFormat::Text,
-            desc: "",
             command_type: CommandType::Kubernetes(KubeCmd::LogPrevious),
+            params: vec![*KUBERNETES_NAMESPACE_PARAM, *KUBERNETES_POD_PARAM],
+            ..Default::default()
         },
     ];
     #[cfg(feature = "enterprise")]
     commands.extend(enterprise_utils::rpc::remote_exec::extra_commands());
+
+    for c in commands.iter_mut() {
+        if c.id == "" {
+            c.id = c.gen_id();
+        }
+    }
+
     let mut validator = HashSet::new();
     for c in commands.iter() {
-        if !validator.insert(c.id) {
+        assert!(c.id != "");
+        if !validator.insert(&c.id) {
             warn!(
                 "command `{}` ({}) as duplicated id, ignored",
                 c.desc, c.cmdline
@@ -136,17 +152,17 @@ thread_local! {
     static MAX_PARAM_NUMS: OnceCell<usize> = OnceCell::new();
 }
 
-fn get_cmdline(id: CmdId) -> Option<&'static str> {
+fn get_cmdline(id: &str) -> Option<&'static str> {
     SUPPORTED_COMMANDS.with(|cell| {
         let cs = cell.get_or_init(|| all_supported_commands());
         cs.iter().find(|c| c.id == id).map(|c| c.cmdline)
     })
 }
 
-fn get_cmd(id: CmdId) -> Option<Command> {
+fn get_cmd(id: &str) -> Option<Command> {
     SUPPORTED_COMMANDS.with(|cell| {
         let cs = cell.get_or_init(|| all_supported_commands());
-        cs.iter().find(|c| c.id == id).copied()
+        cs.iter().find(|c| c.id == id).cloned()
     })
 }
 
@@ -155,17 +171,7 @@ fn max_param_nums() -> usize {
         *p.get_or_init(|| {
             SUPPORTED_COMMANDS.with(|cell| {
                 let cs = cell.get_or_init(|| all_supported_commands());
-                // count number of dollar args
-                cs.iter()
-                    .map(|c| {
-                        c.cmdline
-                            .split_whitespace()
-                            .into_iter()
-                            .map(|seg| if seg.starts_with('$') { 1 } else { 0 })
-                            .sum::<usize>()
-                    })
-                    .max()
-                    .unwrap_or_default()
+                cs.iter().map(|c| c.params.len()).max().unwrap_or_default()
             })
         })
     })
@@ -343,7 +349,7 @@ struct Responser {
     )>,
 
     // request id, command id, future
-    pending_command: Option<(Option<u64>, CmdId, BoxFuture<'static, Result<Output>>)>,
+    pending_command: Option<(Option<u64>, String, BoxFuture<'static, Result<Output>>)>,
     result: CommandResult,
 }
 
@@ -436,14 +442,14 @@ impl Stream for Responser {
             }
 
             if let Some((_, id, future)) = self.pending_command.as_mut() {
-                trace!("poll pending command '{}'", get_cmdline(*id).unwrap());
+                trace!("poll pending command '{}'", get_cmdline(id).unwrap());
                 let p = future.as_mut().poll(ctx);
 
                 if let Poll::Ready(res) = p {
                     let (request_id, id, _) = self.pending_command.take().unwrap();
                     match res {
                         Ok(output) if output.status.success() => {
-                            debug!("command '{}' succeeded", get_cmdline(id).unwrap());
+                            debug!("command '{}' succeeded", get_cmdline(&id).unwrap());
                             if output.stdout.is_empty() {
                                 return Poll::Ready(Some(pb::RemoteExecResponse {
                                     agent_id: Some(self.agent_id.read().deref().into()),
@@ -467,7 +473,7 @@ impl Stream for Responser {
                                     Some(code),
                                     format!(
                                         "command '{}' failed with {}",
-                                        get_cmdline(id).unwrap(),
+                                        get_cmdline(&id).unwrap(),
                                         code
                                     ),
                                 );
@@ -477,7 +483,7 @@ impl Stream for Responser {
                                     None,
                                     format!(
                                         "command '{}' execute terminated without errno",
-                                        get_cmdline(id).unwrap()
+                                        get_cmdline(&id).unwrap()
                                     ),
                                 );
                             }
@@ -488,7 +494,7 @@ impl Stream for Responser {
                                 None,
                                 format!(
                                     "command '{}' execute failed: {}",
-                                    get_cmdline(id).unwrap(),
+                                    get_cmdline(&id).unwrap(),
                                     e
                                 ),
                             )
@@ -535,23 +541,11 @@ impl Stream for Responser {
                                 let cs = cell.get_or_init(|| all_supported_commands());
                                 for c in cs.iter() {
                                     commands.push(pb::RemoteCommand {
-                                        id: Some(c.id.into()),
                                         cmd: if c.desc.is_empty() {
                                             Some(c.cmdline.to_owned())
                                         } else {
                                             Some(c.desc.to_owned())
                                         },
-                                        param_names: c
-                                            .cmdline
-                                            .split_whitespace()
-                                            .filter_map(|seg| {
-                                                if seg.starts_with("$") {
-                                                    Some(seg.split_at(1).1.to_owned())
-                                                } else {
-                                                    None
-                                                }
-                                            })
-                                            .collect(),
                                         output_format: match c.output_format {
                                             OutputFormat::Text => {
                                                 Some(pb::OutputFormat::Text as i32)
@@ -560,14 +554,18 @@ impl Stream for Responser {
                                                 Some(pb::OutputFormat::Binary as i32)
                                             }
                                         },
-                                        cmd_type: match c.command_type {
-                                            CommandType::Linux => {
-                                                Some(pb::CommandType::Linux as i32)
-                                            }
-                                            CommandType::Kubernetes(_) => {
-                                                Some(pb::CommandType::Kubernetes as i32)
-                                            }
-                                        },
+                                        ident: Some(c.id.clone()),
+                                        params: c
+                                            .params
+                                            .iter()
+                                            .map(|p| pb::CommandParam {
+                                                name: Some(p.name.to_owned()),
+                                                charset: Some(p.charset.to_owned()),
+                                                max_length: Some(p.max_length as u32),
+                                            })
+                                            .collect(),
+                                        type_name: Some(c.command_type.to_string()),
+                                        ..Default::default()
                                     });
                                 }
                             });
@@ -588,20 +586,18 @@ impl Stream for Responser {
                             if let Some(batch_len) = msg.batch_len {
                                 self.batch_len = MIN_BATCH_LEN.max(batch_len as usize);
                             }
-                            let Some(cmd_id) =
-                                msg.command_id.and_then(|id| CmdId::try_from(id).ok())
-                            else {
+                            let Some(cmd_id) = msg.command_ident else {
                                 return self.command_failed_helper(
                                     msg.request_id,
                                     None,
-                                    "command_id not specified or invalid in run command request",
+                                    "command_ident not specified in run command request",
                                 );
                             };
-                            let Some(cmd) = get_cmd(cmd_id) else {
+                            let Some(cmd) = get_cmd(&cmd_id) else {
                                 return self.command_failed_helper(
                                     msg.request_id,
                                     None,
-                                    format!("command not found for id {}", msg.command_id.unwrap()),
+                                    format!("command not found for id {}", cmd_id),
                                 );
                             };
                             let cmdline = &cmd.cmdline;
