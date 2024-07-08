@@ -67,11 +67,10 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 		 DF_AGENT_LOCAL_PATH_FMT ".log", pid,
 		 g_java_syms_write_bytes_max, pid, pid);
 
-	i64 curr_local_sz;
-	curr_local_sz = get_local_symbol_file_sz(pid, target_ns_pid);
-
+	char ret_buf[1024];
+	memset(ret_buf, 0, sizeof(ret_buf));
 	u64 start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-	exec_command(DF_JAVA_ATTACH_CMD, args);
+	exec_command(DF_JAVA_ATTACH_CMD, args, ret_buf, sizeof(ret_buf));
 	u64 end_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 
 	if (target_symbol_file_access(pid, target_ns_pid, true) != 0) {
@@ -87,12 +86,12 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 		  ".map, PID %d, size %ld, cost %lu us",
 		  pid, pid, new_file_sz, (end_time - start_time) / 1000ULL);
 
-	if (new_file_sz > curr_local_sz)
-		*ret_val = JAVA_SYMS_NEED_UPDATE;
+	*ret_val = JAVA_SYMS_NEED_UPDATE;
 	return;
 error:
 	*ret_val = JAVA_SYMS_ERR;
-	ebpf_warning("Generate Java symbol files failed. PID %d\n", pid);
+	ebpf_warning("Generate Java symbol files failed. PID %d\n%s\n", pid,
+		     ret_buf);
 }
 
 void clean_local_java_symbols_files(int pid)
@@ -143,8 +142,7 @@ void java_syms_update_main(void *arg)
 			if (AO_GET(&p->use) > 1) {
 				int ret;
 				gen_java_symbols_file(p->pid, &ret,
-						      p->
-						      gen_java_syms_file_err);
+						      p->gen_java_syms_file_err);
 				if (ret != JAVA_SYMS_ERR) {
 					if (ret == JAVA_SYMS_NEED_UPDATE)
 						p->cache_need_update = true;
