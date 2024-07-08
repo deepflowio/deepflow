@@ -101,6 +101,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
 	github.com/bytedance/sonic v1.11.8
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/tracemap v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service v0.0.0-00010101000000-000000000000
