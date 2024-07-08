@@ -951,8 +951,9 @@ impl HttpLog {
         };
         if self.proto == L7Protocol::Grpc {
             info.method = Method::from_ebpf_type(param.ebpf_type, param.direction);
+            return Self::modify_http2_and_grpc(direction, content_length, stream_id, info);
         }
-        return Self::modify_http2_and_grpc(direction, content_length, stream_id, info);
+        Ok(())
     }
 
     pub fn parse_http2_go_uprobe(
