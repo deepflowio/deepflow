@@ -291,7 +291,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 	}
 
 	if isHttp && len(h.L7ProtocolStr) == 0 {
-		h.L7ProtocolStr = "http"
+		h.L7ProtocolStr = datatype.L7_PROTOCOL_HTTP_1.String(false)
 	}
 
 	// If http.target exists, read it for RequestResource. If not exist, read the part after the domain name from http.url.
