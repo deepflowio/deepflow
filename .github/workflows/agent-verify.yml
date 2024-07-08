@@ -77,9 +77,10 @@ jobs:
         run: |
           docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowio/rust-build:1.30-arm64 "-c" "\
           source /opt/rh/devtoolset-8/enable && \
-          cd  agent/src/ebpf && \
+          cd agent/src/ebpf && \
           make clean && \
-          make rust-sample && \
+          CC=musl-gcc CLANG=musl-clang make -C libbcc-bpf && \
+          CC=musl-gcc CLANG=musl-clang make rust-sample && \
           make test && \
           make tools && \
           cd ../../ && \

@@ -681,11 +681,11 @@ static inline int kernel_clone_exit(bool is_kprobe, bool maybe_thread,
  * '/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone', we use
  * kretprobe as a substitute for tracepoint type.
  */
-KRETPROG(sys_fork) (struct pt_regs* ctx) {
+KRETPROG(__arm64_sys_fork) (struct pt_regs* ctx) {
 	return kernel_clone_exit(true, false, (long)PT_REGS_RC(ctx), ctx);
 }
 
-KRETPROG(sys_clone) (struct pt_regs* ctx) {
+KRETPROG(__arm64_sys_clone) (struct pt_regs* ctx) {
 	return kernel_clone_exit(true, true, (long)PT_REGS_RC(ctx), ctx);
 }
 

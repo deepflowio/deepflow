@@ -1,0 +1,35 @@
+From: Kumar Kartikeya Dwivedi <memxor@gmail.com>
+To: bpf@vger.kernel.org
+Cc: Alexei Starovoitov <ast@kernel.org>,
+	Daniel Borkmann <daniel@iogearbox.net>,
+	Andrii Nakryiko <andrii@kernel.org>
+Subject: [PATCH bpf-next] selftests/bpf: Fix OOB write in test_verifier
+Date: Tue, 14 Dec 2021 07:18:00 +0530	[thread overview]
+Message-ID: <20211214014800.78762-1-memxor@gmail.com> (raw)
+
+The commit referenced below added fixup_map_timer support (to create a
+BPF map containing timers), but failed to increase the size of the
+map_fds array, leading to out of bounds write. Fix this by changing
+MAX_NR_MAPS to 22.
+
+Fixes: e60e6962c503 ("selftests/bpf: Add tests for restricted helpers")
+Signed-off-by: Kumar Kartikeya Dwivedi <memxor@gmail.com>
+---
+ tools/testing/selftests/bpf/test_verifier.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tools/testing/selftests/bpf/test_verifier.c b/tools/testing/selftests/bpf/test_verifier.c
+index ad5d30bafd93..33e2ecb3bef9 100644
+--- a/tools/testing/selftests/bpf/test_verifier.c
++++ b/tools/testing/selftests/bpf/test_verifier.c
+@@ -54,7 +54,7 @@
+ #define MAX_INSNS	BPF_MAXINSNS
+ #define MAX_TEST_INSNS	1000000
+ #define MAX_FIXUPS	8
+-#define MAX_NR_MAPS	21
++#define MAX_NR_MAPS	22
+ #define MAX_TEST_RUNS	8
+ #define POINTER_VALUE	0xcafe4all
+ #define TEST_DATA_LEN	64
+--
+2.34.1

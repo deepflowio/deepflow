@@ -1636,6 +1636,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		    ("\"/proc/sys/net/core/bpf_jit_enable value is invalid\n");
 	}
 
+	exec_command("mount -t debugfs nodev /sys/kernel/debug", "");
+	exec_command("mount -t tracefs nodev /sys/kernel/debug/tracing", "");
+
 	/* Memory management initialization. */
 	clib_mem_init();
 
