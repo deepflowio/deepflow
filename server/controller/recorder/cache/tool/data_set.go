@@ -46,6 +46,7 @@ type DataSet struct {
 	regionIDToLcuuid map[int]string
 
 	hostLcuuidToID map[string]int
+	hostIDToLcuuid map[int]string
 
 	vmLcuuidToID map[string]int
 	vmIDToLcuuid map[int]string
@@ -61,8 +62,10 @@ type DataSet struct {
 	subnetIDToLcuuid map[int]string
 
 	vrouterLcuuidToID map[string]int
+	vrouterIDToLcuuid map[int]string
 
 	dhcpPortLcuuidToID map[string]int
+	dhcpPortIDToLcuuid map[int]string
 
 	vinterfaceLcuuidToID         map[string]int
 	vinterfaceLcuuidToType       map[string]int
@@ -75,13 +78,18 @@ type DataSet struct {
 	securityGroupLcuuidToID map[string]int
 
 	natGatewayLcuuidToID map[string]int
+	natGatewayIDToLcuuid map[int]string
 
-	lbLcuuidToID         map[string]int
+	lbLcuuidToID map[string]int
+	lbIDToLcuuid map[int]string
+
 	lbListenerLcuuidToID map[string]int
 
 	rdsInstanceLcuuidToID map[string]int
+	rdsInstanceIDToLcuuid map[int]string
 
 	redisInstanceLcuuidToID map[string]int
+	redisInstanceIDToLcuuid map[int]string
 
 	podClusterLcuuidToID map[string]int
 
@@ -105,6 +113,7 @@ type DataSet struct {
 	podReplicaSetIDToLcuuid map[int]string
 
 	podLcuuidToID map[string]int
+	podIDToLcuuid map[int]string
 }
 
 func NewDataSet(md *rcommon.Metadata) *DataSet {
@@ -120,6 +129,7 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		regionIDToLcuuid: make(map[int]string),
 
 		hostLcuuidToID: make(map[string]int),
+		hostIDToLcuuid: make(map[int]string),
 
 		vmLcuuidToID: make(map[string]int),
 		vmIDToLcuuid: make(map[int]string),
@@ -134,8 +144,10 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		subnetIDToLcuuid: make(map[int]string),
 
 		vrouterLcuuidToID: make(map[string]int),
+		vrouterIDToLcuuid: make(map[int]string),
 
 		dhcpPortLcuuidToID: make(map[string]int),
+		dhcpPortIDToLcuuid: make(map[int]string),
 
 		vinterfaceLcuuidToID:         make(map[string]int),
 		vinterfaceLcuuidToType:       make(map[string]int),
@@ -148,13 +160,18 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		securityGroupLcuuidToID: make(map[string]int),
 
 		natGatewayLcuuidToID: make(map[string]int),
+		natGatewayIDToLcuuid: make(map[int]string),
 
-		lbLcuuidToID:         make(map[string]int),
+		lbLcuuidToID: make(map[string]int),
+		lbIDToLcuuid: make(map[int]string),
+
 		lbListenerLcuuidToID: make(map[string]int),
 
 		rdsInstanceLcuuidToID: make(map[string]int),
+		rdsInstanceIDToLcuuid: make(map[int]string),
 
 		redisInstanceLcuuidToID: make(map[string]int),
+		redisInstanceIDToLcuuid: make(map[int]string),
 
 		podClusterLcuuidToID: make(map[string]int),
 
@@ -178,6 +195,7 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		podReplicaSetIDToLcuuid: make(map[int]string),
 
 		podLcuuidToID: make(map[string]int),
+		podIDToLcuuid: make(map[int]string),
 	}
 }
 
@@ -227,6 +245,7 @@ func (t *DataSet) DeleteRegion(lcuuid string) {
 
 func (t *DataSet) AddHost(item *mysql.Host) {
 	t.hostLcuuidToID[item.Lcuuid] = item.ID
+	t.hostIDToLcuuid[item.ID] = item.Lcuuid
 	t.hostIPToID[item.IP] = item.ID
 	t.hostIDtoInfo[item.ID] = &hostInfo{Name: item.Name}
 	if regionID, ok := t.GetRegionIDByLcuuid(item.Region); ok {
@@ -242,6 +261,7 @@ func (t *DataSet) DeleteHost(lcuuid string) {
 	id, _ := t.GetHostIDByLcuuid(lcuuid)
 	delete(t.hostIDtoInfo, id)
 	delete(t.hostLcuuidToID, lcuuid)
+	delete(t.hostIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid)))
 }
 
@@ -367,6 +387,7 @@ func (t *DataSet) DeleteSubnet(lcuuid string) {
 
 func (t *DataSet) AddVRouter(item *mysql.VRouter) {
 	t.vrouterLcuuidToID[item.Lcuuid] = item.ID
+	t.vrouterIDToLcuuid[item.ID] = item.Lcuuid
 	t.vrouterIDToInfo[item.ID] = &vrouterInfo{
 		Name:           item.Name,
 		VPCID:          item.VPCID,
@@ -400,11 +421,13 @@ func (t *DataSet) DeleteVRouter(lcuuid string) {
 	id, _ := t.GetVRouterIDByLcuuid(lcuuid)
 	delete(t.vrouterIDToInfo, id)
 	delete(t.vrouterLcuuidToID, lcuuid)
+	delete(t.vrouterIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid)))
 }
 
 func (t *DataSet) AddDHCPPort(item *mysql.DHCPPort) {
 	t.dhcpPortLcuuidToID[item.Lcuuid] = item.ID
+	t.dhcpPortIDToLcuuid[item.ID] = item.Lcuuid
 	t.dhcpPortIDToInfo[item.ID] = &dhcpPortInfo{
 		Name:  item.Name,
 		VPCID: item.VPCID,
@@ -442,6 +465,7 @@ func (t *DataSet) DeleteDHCPPort(lcuuid string) {
 	id, _ := t.GetDHCPPortIDByLcuuid(lcuuid)
 	delete(t.dhcpPortIDToInfo, id)
 	delete(t.dhcpPortLcuuidToID, lcuuid)
+	delete(t.dhcpPortIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid)))
 }
 
@@ -540,6 +564,7 @@ func (t *DataSet) DeleteSecurityGroup(lcuuid string) {
 
 func (t *DataSet) AddNATGateway(item *mysql.NATGateway) {
 	t.natGatewayLcuuidToID[item.Lcuuid] = item.ID
+	t.natGatewayIDToLcuuid[item.ID] = item.Lcuuid
 	t.natGatewayIDToInfo[item.ID] = &natGatewayInfo{
 		Name:  item.Name,
 		VPCID: item.VPCID,
@@ -574,11 +599,13 @@ func (t *DataSet) DeleteNATGateway(lcuuid string) {
 	id, _ := t.GetNATGatewayIDByLcuuid(lcuuid)
 	delete(t.natGatewayIDToInfo, id)
 	delete(t.natGatewayLcuuidToID, lcuuid)
+	delete(t.natGatewayIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid)))
 }
 
 func (t *DataSet) AddLB(item *mysql.LB) {
 	t.lbLcuuidToID[item.Lcuuid] = item.ID
+	t.lbIDToLcuuid[item.ID] = item.Lcuuid
 	t.lbIDToInfo[item.ID] = &lbInfo{
 		Name:  item.Name,
 		VPCID: item.VPCID,
@@ -610,6 +637,7 @@ func (t *DataSet) DeleteLB(lcuuid string) {
 	id, _ := t.GetLBIDByLcuuid(lcuuid)
 	delete(t.lbIDToInfo, id)
 	delete(t.lbLcuuidToID, lcuuid)
+	delete(t.lbIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid)))
 }
 
@@ -625,6 +653,7 @@ func (t *DataSet) DeleteLBListener(lcuuid string) {
 
 func (t *DataSet) AddRDSInstance(item *mysql.RDSInstance) {
 	t.rdsInstanceLcuuidToID[item.Lcuuid] = item.ID
+	t.rdsInstanceIDToLcuuid[item.ID] = item.Lcuuid
 	t.rdsInstanceIDToInfo[item.ID] = &rdsInstanceInfo{
 		Name:  item.Name,
 		VPCID: item.VPCID,
@@ -662,11 +691,13 @@ func (t *DataSet) DeleteRDSInstance(lcuuid string) {
 	id, _ := t.GetRDSInstanceIDByLcuuid(lcuuid)
 	delete(t.rdsInstanceIDToInfo, id)
 	delete(t.rdsInstanceLcuuidToID, lcuuid)
+	delete(t.rdsInstanceIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid)))
 }
 
 func (t *DataSet) AddRedisInstance(item *mysql.RedisInstance) {
 	t.redisInstanceLcuuidToID[item.Lcuuid] = item.ID
+	t.redisInstanceIDToLcuuid[item.ID] = item.Lcuuid
 	t.redisInstanceIDToInfo[item.ID] = &redisInstanceInfo{
 		Name:  item.Name,
 		VPCID: item.VPCID,
@@ -704,6 +735,7 @@ func (t *DataSet) DeleteRedisInstance(lcuuid string) {
 	id, _ := t.GetRedisInstanceIDByLcuuid(lcuuid)
 	delete(t.redisInstanceIDToInfo, id)
 	delete(t.redisInstanceLcuuidToID, lcuuid)
+	delete(t.redisInstanceIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid)))
 }
 
@@ -912,6 +944,7 @@ func (t *DataSet) updateContainerIDToPodID(containerID string, podID int) {
 
 func (t *DataSet) AddPod(item *mysql.Pod) {
 	t.podLcuuidToID[item.Lcuuid] = item.ID
+	t.podIDToLcuuid[item.ID] = item.Lcuuid
 	t.podIDToInfo[item.ID] = &podInfo{
 		DomainLcuuid:   item.Domain,
 		Name:           item.Name,
@@ -969,6 +1002,7 @@ func (t *DataSet) DeletePod(lcuuid string) {
 	delete(t.podIDToInfo, id)
 	delete(t.podIDToIPNetworkIDMap, id)
 	delete(t.podLcuuidToID, lcuuid)
+	delete(t.podIDToLcuuid, id)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid)))
 }
 
@@ -1012,14 +1046,31 @@ func (t *DataSet) GetHostIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid)))
-	var host mysql.Host
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&host)
+	var dbItem mysql.Host
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddHost(&host)
-		return host.ID, true
+		t.AddHost(&dbItem)
+		return dbItem.ID, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid)))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetHostLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.hostIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, id)))
+	var dbItem mysql.Host
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddHost(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, id)))
+		return lcuuid, false
 	}
 }
 
@@ -1046,11 +1097,11 @@ func (t *DataSet) GetVMIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid)))
-	var vm mysql.VM
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&vm)
+	var dbItem mysql.VM
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddVM(&vm)
-		return vm.ID, true
+		t.AddVM(&dbItem)
+		return dbItem.ID, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid)))
 		return id, false
@@ -1063,11 +1114,11 @@ func (t *DataSet) GetVMLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
-	var vm mysql.VM
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&vm)
+	var dbItem mysql.VM
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddVM(&vm)
-		return vm.Lcuuid, true
+		t.AddVM(&dbItem)
+		return dbItem.Lcuuid, true
 	} else {
 		log.Error(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
 		return lcuuid, false
@@ -1098,7 +1149,7 @@ func (t *DataSet) GetVPCLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, id)))
 	var vpc mysql.VPC
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&vpc)
+	result := t.metadata.DB.Where("id = ?", id).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
 		return vpc.Lcuuid, true
@@ -1152,7 +1203,7 @@ func (t *DataSet) GetSubnetLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, id)))
 	var subnet mysql.Subnet
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&subnet)
+	result := t.metadata.DB.Where("id = ?", id).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
 		return subnet.Lcuuid, true
@@ -1240,7 +1291,7 @@ func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id)))
 	var network mysql.Network
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&network)
+	result := t.metadata.DB.Where("id = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
 		return network.Lcuuid, true
@@ -1256,14 +1307,31 @@ func (t *DataSet) GetVRouterIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid)))
-	var vrouter mysql.VRouter
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&vrouter)
+	var dbItem mysql.VRouter
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddVRouter(&vrouter)
-		return vrouter.ID, true
+		t.AddVRouter(&dbItem)
+		return dbItem.ID, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid)))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetVRouterLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.vrouterIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, id)))
+	var dbItem mysql.VRouter
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddVRouter(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, id)))
+		return lcuuid, false
 	}
 }
 
@@ -1273,14 +1341,31 @@ func (t *DataSet) GetDHCPPortIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid)))
-	var dhcpPort mysql.DHCPPort
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dhcpPort)
+	var dbItem mysql.DHCPPort
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddDHCPPort(&dhcpPort)
-		return dhcpPort.ID, true
+		t.AddDHCPPort(&dbItem)
+		return dbItem.ID, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid)))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetDHCPPortLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.dhcpPortIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, id)))
+	var dbItem mysql.DHCPPort
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddDHCPPort(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, id)))
+		return lcuuid, false
 	}
 }
 
@@ -1315,6 +1400,35 @@ func (t *DataSet) GetVInterfaceTypeByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)))
 		return vt, false
+	}
+}
+
+func (t *DataSet) GetDeviceLcuuidByID(deviceType, deviceID int) (string, bool) {
+	if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_HOST {
+		return t.GetHostLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_VM {
+		return t.GetVMLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_VROUTER {
+		return t.GetVRouterLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT {
+		return t.GetDHCPPortLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY {
+		return t.GetNATGatewayLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_LB {
+		return t.GetLBLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE {
+		return t.GetRDSInstanceLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE {
+		return t.GetRedisInstanceLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE {
+		return t.GetPodNodeLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE {
+		return t.GetPodServiceLcuuidByID(deviceID)
+	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
+		return t.GetPodLcuuidByID(deviceID)
+	} else {
+		log.Error(t.metadata.Logf("device type %d not supported", deviceType))
+		return "", false
 	}
 }
 
@@ -1398,14 +1512,31 @@ func (t *DataSet) GetNATGatewayIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid)))
-	var natGateway mysql.NATGateway
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&natGateway)
+	var dbItem mysql.NATGateway
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddNATGateway(&natGateway)
-		return natGateway.ID, true
+		t.AddNATGateway(&dbItem)
+		return dbItem.ID, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid)))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetNATGatewayLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.natGatewayIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, id)))
+	var dbItem mysql.NATGateway
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddNATGateway(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, id)))
+		return lcuuid, false
 	}
 }
 
@@ -1415,14 +1546,31 @@ func (t *DataSet) GetLBIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid)))
-	var lb mysql.LB
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&lb)
+	var dbItem mysql.LB
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddLB(&lb)
-		return lb.ID, true
+		t.AddLB(&dbItem)
+		return dbItem.ID, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid)))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetLBLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.lbIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, id)))
+	var dbItem mysql.LB
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddLB(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, id)))
+		return lcuuid, false
 	}
 }
 
@@ -1460,6 +1608,23 @@ func (t *DataSet) GetRDSInstanceIDByLcuuid(lcuuid string) (int, bool) {
 	}
 }
 
+func (t *DataSet) GetRDSInstanceLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.rdsInstanceIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, id)))
+	var dbItem mysql.RDSInstance
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddRDSInstance(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, id)))
+		return lcuuid, false
+	}
+}
+
 func (t *DataSet) GetRedisInstanceIDByLcuuid(lcuuid string) (int, bool) {
 	id, exists := t.redisInstanceLcuuidToID[lcuuid]
 	if exists {
@@ -1477,17 +1642,34 @@ func (t *DataSet) GetRedisInstanceIDByLcuuid(lcuuid string) (int, bool) {
 	}
 }
 
+func (t *DataSet) GetRedisInstanceLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.redisInstanceIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, id)))
+	var dbItem mysql.RedisInstance
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddRedisInstance(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, id)))
+		return lcuuid, false
+	}
+}
+
 func (t *DataSet) GetPodClusterIDByLcuuid(lcuuid string) (int, bool) {
 	id, exists := t.podClusterLcuuidToID[lcuuid]
 	if exists {
 		return id, true
 	}
 	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid)))
-	var podCluster mysql.PodCluster
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podCluster)
+	var dbItem mysql.PodCluster
+	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddPodCluster(&podCluster)
-		return podCluster.ID, true
+		t.AddPodCluster(&dbItem)
+		return dbItem.ID, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid)))
 		return id, false
@@ -1622,11 +1804,11 @@ func (t *DataSet) GetPodServiceLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id)))
-	var podService mysql.PodService
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&podService)
+	var dbItem mysql.PodService
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
-		t.AddPodService(&podService)
-		return podService.Lcuuid, true
+		t.AddPodService(&dbItem)
+		return dbItem.Lcuuid, true
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id)))
 		return lcuuid, false
@@ -1732,6 +1914,23 @@ func (t *DataSet) GetPodIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid)))
 		return id, false
+	}
+}
+
+func (t *DataSet) GetPodLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.podIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, id)))
+	var dbItem mysql.Pod
+	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.AddPod(&dbItem)
+		return dbItem.Lcuuid, true
+	} else {
+		log.Error(t.metadata.Logf(dbResourceByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, id)))
+		return lcuuid, false
 	}
 }
 
