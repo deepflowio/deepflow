@@ -267,7 +267,7 @@ func (m *PrometheusSample) GenCKTable(cluster, storagePolicy string, ttl int, co
 }
 
 func genLru128Key(f *flow_tag.FlowTagInfo) (uint64, uint64) {
-	return uint64(f.TableId)<<32 | uint64(f.FieldNameId), uint64(f.FieldValueId)<<32 | uint64(int16(f.VpcId))<<16 | uint64(f.PodNsId)
+	return uint64(f.TableId)<<32 | uint64(f.FieldNameId), uint64(f.FieldValueId)<<32 | uint64(f.OrgId)<<16 | uint64(f.TeamID)
 }
 
 func (m *PrometheusSample) VpcId() int32 {
