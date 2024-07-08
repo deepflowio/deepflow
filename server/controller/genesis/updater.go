@@ -397,9 +397,9 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	vpcs := []model.GenesisVpc{vpc}
 
 	vm := model.GenesisVM{
-		Name:         hostName,
-		Label:        hostName,
-		Lcuuid:       common.GetUUIDByOrgID(info.orgID, hostName),
+		Name:         peer + "-" + hostName,
+		Label:        peer + "-" + hostName,
+		Lcuuid:       common.GetUUIDByOrgID(info.orgID, peer + "-" + hostName),
 		VPCLcuuid:    vpc.Lcuuid,
 		LaunchServer: "127.0.0.1",
 		State:        common.VM_STATE_RUNNING,
