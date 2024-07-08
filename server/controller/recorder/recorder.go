@@ -19,17 +19,15 @@ package recorder
 import (
 	"context"
 
-	"github.com/op/go-logging"
-
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-var log = logging.MustGetLogger("recorder")
+var log = logger.MustGetLogger("recorder")
 
 type Recorder struct {
 	cfg config.RecorderConfig
@@ -39,15 +37,15 @@ type Recorder struct {
 }
 
 func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, orgID int, domainLcuuid string) *Recorder {
-	log.Info(ctrlcommon.FmtLog(orgID, "domain lcuuid: %s, new recorder", domainLcuuid))
+	log.Infof("domain lcuuid: %s, new recorder", domainLcuuid, logger.NewORGPrefix(orgID))
 	md, err := common.NewMetadata(orgID)
 	if err != nil {
-		log.Error(ctrlcommon.FmtLog(orgID, "domain lcuuid: %s, failed to create metadata object: %s", domainLcuuid, err.Error()))
+		log.Errorf("domain lcuuid: %s, failed to create metadata object: %s", domainLcuuid, err.Error(), logger.NewORGPrefix(orgID))
 		return nil
 	}
 	var domain mysql.Domain
 	if err := md.DB.Where("lcuuid = ?", domainLcuuid).First(&domain).Error; err != nil {
-		log.Error(md.Logf("domain lcuuid: %s, failed to get domain from db: %s", domainLcuuid, err.Error()))
+		log.Errorf("domain lcuuid: %s, failed to get domain from db: %s", domainLcuuid, err.Error(), md.LogPrefixes)
 		return nil
 	}
 	md.SetDomain(domain)
