@@ -636,7 +636,7 @@ func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *httpcommon.UserI
 	db.Delete(&domain)
 
 	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, domain.TeamID, domain.ID)
+	metadata := message.NewMetadata(db.ORGID, message.MetadataTeamID(domain.TeamID), message.MetadataDomainID(domain.ID))
 	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("domain") {
 		s.OnDomainDeleted(metadata)
 	}
@@ -946,7 +946,7 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	}
 
 	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, 0, 0, message.MetadataSubDomainID(subDomain.ID))
+	metadata := message.NewMetadata(db.ORGID, message.MetadataSubDomainID(subDomain.ID))
 	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
 		s.OnSubDomainDeleted(metadata)
 	}
