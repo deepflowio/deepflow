@@ -1052,7 +1052,7 @@ func (t *DataSet) GetVMLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
 	var vm mysql.VM
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&vm)
+	result := mysql.Db.Where("id = ?", id).Find(&vm)
 	if result.RowsAffected == 1 {
 		t.AddVM(&vm)
 		return vm.Lcuuid, true
@@ -1086,7 +1086,7 @@ func (t *DataSet) GetVPCLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, id))
 	var vpc mysql.VPC
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&vpc)
+	result := mysql.Db.Where("id = ?", id).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
 		return vpc.Lcuuid, true
@@ -1140,7 +1140,7 @@ func (t *DataSet) GetSubnetLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, id))
 	var subnet mysql.Subnet
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&subnet)
+	result := mysql.Db.Where("id = ?", id).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
 		return subnet.Lcuuid, true
@@ -1228,7 +1228,7 @@ func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id))
 	var network mysql.Network
-	result := mysql.Db.Where("lcuuid = ?", id).Find(&network)
+	result := mysql.Db.Where("id = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
 		return network.Lcuuid, true
