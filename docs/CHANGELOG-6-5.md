@@ -11,6 +11,11 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - incorrect http2 log [#7297](https://github.com/deepflowio/deepflow/pull/7297) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: the flow_tag of prometheus may be lost under multiple organizations [#7295](https://github.com/deepflowio/deepflow/pull/7295) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Adjust Java syms-cache update logic & error log output [#7290](https://github.com/deepflowio/deepflow/pull/7290) by [yinjiping](https://github.com/yinjiping)
+* fix: deepflow stats may write to wrong database [#7286](https://github.com/deepflowio/deepflow/pull/7286) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Addressing excessive eBPF maps memory usage [#7276](https://github.com/deepflowio/deepflow/pull/7276) by [yinjiping](https://github.com/yinjiping)
 * fix: Show metrics use query cache can be configured [#7271](https://github.com/deepflowio/deepflow/pull/7271) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: server recorder prints unnecessary error logs [#7264](https://github.com/deepflowio/deepflow/pull/7264) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Network interface card list supports duplicate mac [#7253](https://github.com/deepflowio/deepflow/pull/7253) by [xiaochaoren1](https://github.com/xiaochaoren1)
