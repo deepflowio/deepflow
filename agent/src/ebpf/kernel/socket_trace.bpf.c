@@ -1512,35 +1512,39 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		}
 	}
 
-	bool data_submit_dircet = false;
 	struct kprobe_port_bitmap *allow = kprobe_port_bitmap__lookup(&k0);
 	if (allow) {
 		if (is_set_bitmap(allow->bitmap, conn_info->tuple.dport) ||
 		    is_set_bitmap(allow->bitmap, conn_info->tuple.num)) {
-			data_submit_dircet = true;
+			conn_info->protocol = PROTO_CUSTOM;
 		}
 	}
-	if (data_submit_dircet) {
-		conn_info->protocol = PROTO_ORTHER;
-		conn_info->message_type = MSG_REQUEST;
-	} else {
-		int act;
-		act = infer_l7_class_1(ctx_map, conn_info, direction, args,
-				       bytes_count, sock_state, extra);
 
-		if (act == INFER_CONTINUE) {
-			ctx_map->tail_call.conn_info = __conn_info;
-			ctx_map->tail_call.extra = *extra;
-			ctx_map->tail_call.bytes_count = bytes_count;
-			ctx_map->tail_call.offset = offset;
-			ctx_map->tail_call.dir = direction;
-			/* Enter the protocol inference tail call program. */
-			if (extra->source == DATA_SOURCE_SYSCALL)
-				bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
-					      PROG_PROTO_INFER_TP_IDX);
-			else
-				bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
-					      PROG_PROTO_INFER_KP_IDX);
+	int act;
+	act = infer_l7_class_1(ctx_map, conn_info, direction, args,
+			       bytes_count, sock_state, extra);
+
+	if (act == INFER_CONTINUE) {
+		ctx_map->tail_call.conn_info = __conn_info;
+		ctx_map->tail_call.extra = *extra;
+		ctx_map->tail_call.bytes_count = bytes_count;
+		ctx_map->tail_call.offset = offset;
+		ctx_map->tail_call.dir = direction;
+		/* Enter the protocol inference tail call program. */
+		if (extra->source == DATA_SOURCE_SYSCALL)
+			bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+				      PROG_PROTO_INFER_TP_IDX);
+		else
+			bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+				      PROG_PROTO_INFER_KP_IDX);
+	}
+
+	if (conn_info->protocol == PROTO_CUSTOM) {
+		if (conn_info->enable_reasm) {
+			if (conn_info->socket_info_ptr) {
+				conn_info->socket_info_ptr->finish_reasm = true;
+			}
+			conn_info->is_reasm_seg = true;
 		}
 	}
 
