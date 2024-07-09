@@ -65,7 +65,7 @@ enum traffic_direction {
 // 数据协议
 enum traffic_protocol {
 	PROTO_UNKNOWN = 0,
-	PROTO_ORTHER = 1,
+	PROTO_OTHER = 1,
 	PROTO_HTTP1 = 20,
 	PROTO_HTTP2 = 21,
 	PROTO_DUBBO = 40,
