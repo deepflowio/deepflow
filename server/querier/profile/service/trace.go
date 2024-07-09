@@ -33,6 +33,7 @@ import (
 	querier_common "github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowio/deepflow/server/querier/profile/common"
 	"github.com/deepflowio/deepflow/server/querier/profile/model"
 )
@@ -73,17 +74,18 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 		timeEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
 		timeEngine.Init()
 		timeResult, timeDebug, timeError := timeEngine.ExecuteQuery(&timeArgs)
+		tDebug := timeDebug["query_sqls"].([]client.Debug)[0]
 		if timeError != nil {
 			log.Errorf("ExecuteQuery failed: %v", timeDebug, timeError)
 			return
 		}
 		profileTimeDebug := model.Debug{}
 		profileTimeDebug.Sql = timeSql
-		profileTimeDebug.IP = timeDebug["ip"].(string)
-		profileTimeDebug.QueryUUID = timeDebug["query_uuid"].(string)
-		profileTimeDebug.SqlCH = timeDebug["sql"].(string)
-		profileTimeDebug.Error = timeDebug["error"].(string)
-		profileTimeDebug.QueryTime = timeDebug["query_time"].(string)
+		profileTimeDebug.IP = tDebug.IP
+		profileTimeDebug.QueryUUID = tDebug.QueryUUID
+		profileTimeDebug.SqlCH = tDebug.Sql
+		profileTimeDebug.Error = tDebug.Error
+		profileTimeDebug.QueryTime = tDebug.QueryTime
 		debugs.QuerierDebug = append(debugs.QuerierDebug, profileTimeDebug)
 		var timeValue int64
 		timeValues := timeResult.Values
@@ -332,10 +334,11 @@ func CutKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int)
 
 func NewProfileDebug(sql string, querierDebug map[string]interface{}) (profileDebug model.Debug) {
 	profileDebug.Sql = sql
-	profileDebug.IP = querierDebug["ip"].(string)
-	profileDebug.QueryUUID = querierDebug["query_uuid"].(string)
-	profileDebug.SqlCH = querierDebug["sql"].(string)
-	profileDebug.Error = querierDebug["error"].(string)
-	profileDebug.QueryTime = querierDebug["query_time"].(string)
+	qDebug := querierDebug["query_sqls"].([]client.Debug)[0]
+	profileDebug.IP = qDebug.IP
+	profileDebug.QueryUUID = qDebug.QueryUUID
+	profileDebug.SqlCH = qDebug.Sql
+	profileDebug.Error = qDebug.Error
+	profileDebug.QueryTime = qDebug.QueryTime
 	return
 }
