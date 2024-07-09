@@ -65,13 +65,11 @@ pub use public::rpc::remote_exec::*;
 const MIN_BATCH_LEN: usize = 1024;
 const KUBERNETES_NAMESPACE_PARAM: &'static Parameter = &Parameter {
     name: "ns",
-    charset: "[\\-0-9a-z]", // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
-    max_length: 64,
+    regex: "[-0-9a-z]{1,64}", // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
 };
 const KUBERNETES_POD_PARAM: &'static Parameter = &Parameter {
     name: "pod",
-    charset: "[.\\-0-9a-z]", // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
-    max_length: 256,
+    regex: "[.-0-9a-z]{1,256}", // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
 };
 
 fn all_supported_commands() -> Vec<Command> {
@@ -560,8 +558,7 @@ impl Stream for Responser {
                                             .iter()
                                             .map(|p| pb::CommandParam {
                                                 name: Some(p.name.to_owned()),
-                                                charset: Some(p.charset.to_owned()),
-                                                max_length: Some(p.max_length as u32),
+                                                regex: Some(p.regex.to_owned()),
                                             })
                                             .collect(),
                                         type_name: Some(c.command_type.to_string()),
