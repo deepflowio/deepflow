@@ -254,8 +254,8 @@ func (d *Decoder) WritePerfEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.RegionID = uint16(baseInfo.RegionID)
 	}
 
-	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint8(s.L3DeviceType), s.L3EpcID)
-	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(s.ServiceID, s.PodGroupID, s.GProcessID, uint32(s.PodClusterID), s.L3DeviceID, uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
+	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), s.L3EpcID)
+	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(s.ServiceID, s.PodGroupID, s.GProcessID, uint32(s.PodClusterID), s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
 
 	s.AppInstance = strconv.Itoa(int(e.Pid))
 
@@ -394,6 +394,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			s.GProcessID,
 			s.PodNodeID,
 			s.L3DeviceID,
+			uint32(s.SubnetID),
 			s.L3DeviceType,
 			s.L3EpcID,
 		)
@@ -415,6 +416,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			s.GProcessID,
 			uint32(s.PodClusterID),
 			s.L3DeviceID,
+			uint32(s.SubnetID),
 			s.L3DeviceType,
 			podGroupType,
 			s.L3EpcID,
