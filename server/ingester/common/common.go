@@ -152,7 +152,7 @@ const (
 
 )
 
-func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
+func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID, subnetID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
 	if podID > 0 {
 		return podID, PodType
 	} else if gpID > 0 {
@@ -165,10 +165,10 @@ func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID uint32, l3DeviceType uin
 		return 0, InternetIpType
 	}
 
-	return 0, IpType
+	return subnetID, IpType
 }
 
-func GetAutoService(serviceID, podGroupID, gpID, podClusterID, l3DeviceID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
+func GetAutoService(serviceID, podGroupID, gpID, podClusterID, l3DeviceID, subnetID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
 	if serviceID > 0 {
 		return serviceID, ServiceType
 	} else if podGroupID > 0 {
@@ -182,7 +182,7 @@ func GetAutoService(serviceID, podGroupID, gpID, podClusterID, l3DeviceID uint32
 	} else if l3EpcID == datatype.EPC_FROM_INTERNET {
 		return 0, InternetIpType
 	}
-	return 0, IpType
+	return subnetID, IpType
 }
 
 func IsPodServiceIP(deviceType flow_metrics.DeviceType, podId, podNodeId uint32) bool {
