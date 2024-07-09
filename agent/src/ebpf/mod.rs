@@ -88,6 +88,8 @@ pub const SOCK_DATA_ZMTP: u16 = 106;
 pub const SOCK_DATA_DNS: u16 = 120;
 #[allow(dead_code)]
 pub const SOCK_DATA_TLS: u16 = 121;
+#[allow(dead_code)]
+pub const SOCK_DATA_CUSTOM: u16 = 127;
 
 // Feature
 #[allow(dead_code)]
