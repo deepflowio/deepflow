@@ -179,7 +179,10 @@ func (b *UpdaterBase[MT, KT]) Check() error {
 }
 
 func compareAndCheck[CT MySQLChModel](db *mysql.DB, oldItems, newItems []CT) error {
-	if len(newItems) == 0 && len(oldItems) == 0 {
+	var t CT
+	tableName := reflect.TypeOf(t).String()
+	if len(oldItems) == 0 {
+		log.Infof("ORG(id=%d database=%s) table(%v) old items is null, skip check", db.ORGID, db.Name, tableName)
 		return nil
 	}
 
@@ -187,8 +190,6 @@ func compareAndCheck[CT MySQLChModel](db *mysql.DB, oldItems, newItems []CT) err
 	if err != nil {
 		return err
 	}
-	var t CT
-	tableName := reflect.TypeOf(t).String()
 	log.Infof("ORG(id=%d database=%s) check tagrecorder table(%v), old len(%v) hash(%v), new len(%v) hash(%v)",
 		db.ORGID, db.Name, tableName, len(oldItems), oldHash, len(newItems), newHash)
 	if oldHash == newHash {
