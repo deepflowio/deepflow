@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,39 +14,13 @@
  * limitations under the License.
  */
 
-package message
+package router
 
-type Metadata struct {
-	ORGID       int
-	TeamID      int
-	DomainID    int
-	SubDomainID int
-}
+import (
+	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/tracemap"
+	"github.com/gin-gonic/gin"
+)
 
-func NewMetadata(orgID int, options ...func(*Metadata)) *Metadata {
-	md := &Metadata{
-		ORGID: orgID,
-	}
-	for _, option := range options {
-		option(md)
-	}
-	return md
-}
-
-func MetadataSubDomainID(id int) func(*Metadata) {
-	return func(m *Metadata) {
-		m.SubDomainID = id
-	}
-}
-
-func MetadataTeamID(id int) func(*Metadata) {
-	return func(m *Metadata) {
-		m.TeamID = id
-	}
-}
-
-func MetadataDomainID(id int) func(*Metadata) {
-	return func(m *Metadata) {
-		m.DomainID = id
-	}
+func TraceMapRouter(e *gin.Engine) {
+	e.GET("/trace_map", tracemap.TraceMap)
 }

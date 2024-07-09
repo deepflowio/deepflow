@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,40 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package tracemap
 
-package message
+import "github.com/gin-gonic/gin"
 
-type Metadata struct {
-	ORGID       int
-	TeamID      int
-	DomainID    int
-	SubDomainID int
-}
-
-func NewMetadata(orgID int, options ...func(*Metadata)) *Metadata {
-	md := &Metadata{
-		ORGID: orgID,
-	}
-	for _, option := range options {
-		option(md)
-	}
-	return md
-}
-
-func MetadataSubDomainID(id int) func(*Metadata) {
-	return func(m *Metadata) {
-		m.SubDomainID = id
-	}
-}
-
-func MetadataTeamID(id int) func(*Metadata) {
-	return func(m *Metadata) {
-		m.TeamID = id
-	}
-}
-
-func MetadataDomainID(id int) func(*Metadata) {
-	return func(m *Metadata) {
-		m.DomainID = id
-	}
+func TraceMap(ctx *gin.Context) {
+	// Only the Enterprise Edition supports this feature.
+	return
 }

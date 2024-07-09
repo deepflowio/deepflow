@@ -598,7 +598,6 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 		// uname -r (4.19.117.bsk.7-business-amd64)
 		has_error = true;
 	}
-
 	// Get the real version of Debian
 	// #1 SMP Debian 4.19.289-2 (2023-08-08)
 	// e.g.:
@@ -1057,7 +1056,8 @@ void df_exit_ns(int fd)
 	close(fd);
 }
 
-int exec_command(const char *cmd, const char *args)
+int exec_command(const char *cmd, const char *args,
+		 char *ret_buf, int ret_buf_size)
 {
 	FILE *fp;
 	int rc = 0;
@@ -1069,13 +1069,20 @@ int exec_command(const char *cmd, const char *args)
 			     __func__, cmd_buf, strerror(errno));
 		return -1;
 	}
-#ifdef PROFILE_JAVA_DEBUG
-	/* Read and print the output */
-	char buffer[1024];
-	while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-		ebpf_info("%s", buffer);
+
+	if (ret_buf != NULL && ret_buf_size > 0) {
+		/* Read and print the output */
+		char buffer[1024];
+		int write_bytes =
+		    snprintf(ret_buf, ret_buf_size, "\n%s\n", cmd_buf);
+		while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+			write_bytes +=
+			    snprintf(ret_buf + write_bytes,
+				     ret_buf_size - write_bytes, "%s", buffer);
+			if (write_bytes >= ret_buf_size)
+				break;
+		}
 	}
-#endif
 
 	rc = pclose(fp);
 	if (-1 == rc) {
