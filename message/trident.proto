@@ -1077,8 +1077,7 @@ enum CommandType {
 
 message CommandParam {
     optional string name = 1;
-    optional string charset = 2;
-    optional uint32 max_length = 3;
+    optional string regex = 2;
 }
 
 message RemoteCommand {
