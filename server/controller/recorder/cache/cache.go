@@ -659,7 +659,7 @@ func (c *Cache) refreshWANIPs() {
 	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN))
 	var wanIPs []*mysql.WANIP
 
-	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&wanIPs).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&wanIPs).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, err))
 		return
@@ -686,7 +686,7 @@ func (c *Cache) refreshLANIPs() {
 	log.Infof(refreshResource(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN))
 	var lanIPs []*mysql.LANIP
 
-	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&lanIPs).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&lanIPs).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, err))
 		return
