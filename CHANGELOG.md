@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Fix missing pod interface in macvlan mode [#7315](https://github.com/deepflowio/deepflow/pull/7315) by [rvql](https://github.com/rvql)
 * fix: agent - incorrect http2 log [#7296](https://github.com/deepflowio/deepflow/pull/7296) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: the flow_tag of prometheus may be lost under multiple organizations [#7294](https://github.com/deepflowio/deepflow/pull/7294) by [lzf575](https://github.com/lzf575)
 * fix: agent - eBPF Adjust Java syms-cache update logic & error log output [#7291](https://github.com/deepflowio/deepflow/pull/7291) by [yinjiping](https://github.com/yinjiping)
@@ -45,6 +46,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Whitelist implementation reassembly [#7316](https://github.com/deepflowio/deepflow/pull/7316) by [yinjiping](https://github.com/yinjiping)
+* feat: Change remote exec param to use regex [#7314](https://github.com/deepflowio/deepflow/pull/7314) by [rvql](https://github.com/rvql)
+* feat: mark the resource information of loopback traffic by Agent info [#7305](https://github.com/deepflowio/deepflow/pull/7305) by [lzf575](https://github.com/lzf575)
+* feat: Add RemoteExec param spec and change cmd id type to string [#7287](https://github.com/deepflowio/deepflow/pull/7287) by [rvql](https://github.com/rvql)
 * feat: add trace map router [#7299](https://github.com/deepflowio/deepflow/pull/7299) by [taloric](https://github.com/taloric)
 * feat: server uses sub_domain team id first when publishing message to tagrecorder. [#7293](https://github.com/deepflowio/deepflow/pull/7293) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent opens the protocol desensitization by default [#7285](https://github.com/deepflowio/deepflow/pull/7285) by [TomatoMr](https://github.com/TomatoMr)
