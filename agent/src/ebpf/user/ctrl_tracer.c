@@ -99,7 +99,7 @@ static void datadump_help(void)
 		DF_BPF_NAME);
 	fprintf(stderr, "PROTO_NUM:\n");
 	fprintf(stderr, "    0:   PROTO_ALL\n");
-	fprintf(stderr, "    1:   PROTO_ORTHER\n");
+	fprintf(stderr, "    1:   PROTO_OTHER\n");
 	fprintf(stderr, "    20:  PROTO_HTTP1\n");
 	fprintf(stderr, "    21:  PROTO_HTTP2\n");
 	fprintf(stderr, "    40:  PROTO_DUBBO\n");
