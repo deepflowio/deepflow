@@ -97,7 +97,7 @@ OBJS := user/elf.o \
 	user/profile/java/gen_syms_file.o
 
 JAVA_TOOL := deepflow-jattach
-JAVA_AGENT_VERSION := 1
+JAVA_AGENT_VERSION := 2
 JAVA_AGENT_GNU_SO := df_java_agent_v$(JAVA_AGENT_VERSION).so
 JAVA_AGENT_MUSL_SO := df_java_agent_musl_v$(JAVA_AGENT_VERSION).so
 JAVA_AGENT_SO := $(JAVA_AGENT_GNU_SO) $(JAVA_AGENT_MUSL_SO)
@@ -134,11 +134,11 @@ endif
 
 all: build
 
-SOCKET_TRACE_ELFS := \
-	user/socket_trace_bpf_common.c \
-	user/socket_trace_bpf_3_10_0.c \
-	user/socket_trace_bpf_5_2_plus.c \
-	user/socket_trace_bpf_kylin.c
+SOCKET_TRACE_ELFS := user/socket_trace_bpf_5_2_plus.c
+#	user/socket_trace_bpf_common.c \
+#	user/socket_trace_bpf_3_10_0.c \
+#	user/socket_trace_bpf_5_2_plus.c \
+#	user/socket_trace_bpf_kylin.c
 
 PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c
 

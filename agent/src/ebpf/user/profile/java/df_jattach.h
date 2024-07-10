@@ -38,12 +38,11 @@ typedef struct receiver_args {
 } receiver_args_t;
 
 void clear_target_ns_tmp_file(const char *target_path);
-int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type);
 void clear_target_ns(int pid, int target_ns_pid);
 void clear_target_ns_so(int pid, int target_ns_pid);
 void clear_local_perf_files(int pid);
 bool is_same_mntns(int target_pid);
 i64 get_target_symbol_file_sz(int pid, int ns_pid);
 i64 get_local_symbol_file_sz(int pid, int ns_pid);
-int target_symbol_file_access(int pid, int ns_pid, bool is_same_mnt);
+int target_symbol_file_access(int pid, int ns_pid);
 #endif /* DF_JATTACH_H */

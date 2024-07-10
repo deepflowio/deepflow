@@ -73,7 +73,7 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 	exec_command(DF_JAVA_ATTACH_CMD, args, ret_buf, sizeof(ret_buf));
 	u64 end_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 
-	if (target_symbol_file_access(pid, target_ns_pid, true) != 0) {
+	if (target_symbol_file_access(pid, target_ns_pid) != 0) {
 		goto error;
 	}
 
@@ -82,11 +82,13 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 		goto error;
 	}
 
+	fprintf(stdout, "%s\n", ret_buf);
 	ebpf_info("Refreshing JAVA symbol file: " DF_AGENT_LOCAL_PATH_FMT
 		  ".map, PID %d, size %ld, cost %lu us",
 		  pid, pid, new_file_sz, (end_time - start_time) / 1000ULL);
 
 	*ret_val = JAVA_SYMS_NEED_UPDATE;
+	fflush(stdout);
 	return;
 error:
 	*ret_val = JAVA_SYMS_ERR;

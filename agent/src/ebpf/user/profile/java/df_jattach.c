@@ -63,6 +63,7 @@ static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 					  int target_gid)
 {
+	
 	/*
 	 * Call this function only when the target process is in a subordinate
 	 * namespace. Here, we copy the agent.so to a temporary path within t-
@@ -96,6 +97,7 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
 		 "/%s", AGENT_LIB_NAME);
 
+	printf("src:%s dst:%s\n", AGENT_LIB_SRC_PATH, copy_target_path);
 	if ((ret =
 	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
@@ -357,15 +359,11 @@ static inline void switch_to_root_ns(int root_fd)
 	df_exit_ns(root_fd);
 }
 
-static inline i64 get_symbol_file_size(int pid, int ns_pid, bool is_target)
+static inline i64 get_symbol_file_size(int pid, int ns_pid)
 {
 	char path[PERF_PATH_SZ];
-	if (is_target)
-		snprintf(path, sizeof(path), DF_AGENT_PATH_FMT ".map",
-			 pid, ns_pid);
-	else
-		snprintf(path, sizeof(path),
-			 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
+	snprintf(path, sizeof(path),
+		 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
 
 	if (access(path, F_OK)) {
 		return -1;
@@ -379,54 +377,18 @@ static inline i64 get_symbol_file_size(int pid, int ns_pid, bool is_target)
 	return -1;
 }
 
-int target_symbol_file_access(int pid, int ns_pid, bool is_same_mnt)
+int target_symbol_file_access(int pid, int ns_pid)
 {
 	char path[PERF_PATH_SZ];
-	if (!is_same_mnt)
-		snprintf(path, sizeof(path), DF_AGENT_PATH_FMT ".map",
-			 pid, ns_pid);
-	else
-		snprintf(path, sizeof(path),
-			 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
+	snprintf(path, sizeof(path),
+		 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
 
 	return access(path, F_OK);
 }
 
-i64 get_target_symbol_file_sz(int pid, int ns_pid)
-{
-	return get_symbol_file_size(pid, ns_pid, true);
-}
-
 i64 get_local_symbol_file_sz(int pid, int ns_pid)
 {
-	return get_symbol_file_size(pid, ns_pid, false);
-}
-
-int copy_file_from_target_ns(int pid, int ns_pid, const char *file_type)
-{
-	char target_path[PERF_PATH_SZ];
-	char src_path[PERF_PATH_SZ];
-	snprintf(src_path, sizeof(src_path), DF_AGENT_PATH_FMT ".%s",
-		 pid, ns_pid, file_type);
-	snprintf(target_path, sizeof(target_path),
-		 DF_AGENT_LOCAL_PATH_FMT ".%s", pid, file_type);
-
-	if (access(src_path, F_OK)) {
-		return -1;
-	}
-
-	if (access(target_path, F_OK) == 0) {
-		if (unlink(target_path) != 0) {
-			return -1;
-		}
-	}
-
-	if (copy_file(src_path, target_path)) {
-		jattach_log("Copy '%s' to '%s' failed.\n", src_path,
-			    target_path);
-	}
-
-	return 0;
+	return get_symbol_file_size(pid, ns_pid);
 }
 
 // parse comma separated arguments
@@ -497,6 +459,8 @@ int java_attach_same_namespace(pid_t pid, options_t *opts)
 
 int create_ipc_socket(const char *path)
 {
+
+	printf("==========socket path:%s\n", path);
 	int sock = -1;
 	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
 		jattach_log("Create unix socket failed with %d\n", errno);
@@ -522,6 +486,9 @@ int create_ipc_socket(const char *path)
 static void *ipc_receiver_thread(void *arguments)
 {
 	receiver_args_t *args = (receiver_args_t *)arguments;
+
+	printf("perf_map_path %s\n", args->opts->perf_map_path);
+	printf("perf_log_path %s\n", args->opts->perf_log_path);
 
 	FILE *map_fp = fopen(args->opts->perf_map_path, "w");
 	if (!map_fp) {
@@ -669,13 +636,13 @@ int java_attach_different_namespace(pid_t pid, options_t *opts)
 	 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
 	 * (for visibility to the target process).
 	 */
-	jattach_log("[PID %d] copy agent os library ...\n", pid);
+	jattach_log("[PID %d] copy agent so library ...\n", pid);
 	if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
 		jattach_log("[PID %d] copy agent os library failed.\n",
 			    pid);
 		goto cleanup;
 	}
-	jattach_log("[PID %d] copy agent os library success.\n", pid);
+	jattach_log("[PID %d] copy agent so library success.\n", pid);
 
 	/*
 	 * In containers, different libc implementations may be used to compile agent

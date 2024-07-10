@@ -478,7 +478,6 @@ Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 	_(set_callback_funs(jvmti));
 	_(set_notification_modes(jvmti, JVMTI_ENABLE));
 	_(replay_callbacks(jvmti));
-	_(set_notification_modes(jvmti, JVMTI_DISABLE));
 
 	df_log("- JVMTI symbolization agent startup sequence complete.");
 

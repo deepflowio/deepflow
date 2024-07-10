@@ -32,13 +32,12 @@
 #define JAVA_LOG_TAG "[JAVA]"
 
 #define PERF_PATH_SZ 256
-#define DF_AGENT_MAP_PATH_FMT "/proc/%d/root/deepflow/df-perf-%d.map"
-#define DF_AGENT_LOG_PATH_FMT "/proc/%d/root/deepflow/df-perf-%d.log"
+#define DF_AGENT_MAP_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-symbols-%d.socket"
+#define DF_AGENT_LOG_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-jvmti-logs-%d.socket"
 
-#define DF_AGENT_PATH_FMT "/proc/%d/root/deepflow/df-perf-%d"
 #define DF_AGENT_LOCAL_PATH_FMT "/tmp/perf-%d"
 
-#define PERF_MAP_FILE_FMT "/deepflow/df-perf-%d.map"
-#define PERF_MAP_LOG_FILE_FMT "/deepflow/df-perf-%d.log"
+#define PERF_MAP_FILE_FMT "/tmp/.deepflow-java-symbols-%d.socket"
+#define PERF_MAP_LOG_FILE_FMT "/tmp/.deepflow-java-jvmti-logs-%d.socket"
 
 #endif /* DF_JAVA_CONFIG_H */
