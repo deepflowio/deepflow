@@ -46,6 +46,8 @@ func InitEnvData() {
 		POD_IP_KEY, PodIP,
 		NAME_SPACE_KEY, NameSpace,
 		RUNNING_MODE_KEY, runningMode)
+
+	CAMD5 = getCAMD5()
 }
 
 func GetNodeName() string {
