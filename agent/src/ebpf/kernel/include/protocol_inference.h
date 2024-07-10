@@ -406,7 +406,7 @@ static __inline enum message_type parse_http2_headers_frame(const char
 #ifdef LINUX_VER_5_2_PLUS
 #define HTTPV2_LOOP_MAX 8
 #else
-#define HTTPV2_LOOP_MAX 7
+#define HTTPV2_LOOP_MAX 6
 #endif
 /*
  *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
@@ -3413,6 +3413,13 @@ infer_protocol_1(struct ctx_info_s *ctx,
 
 	// In the initial stage of data protocol inference, reassembly check.
 	check_and_set_data_reassembly(conn_info);
+
+	// To avoid errors when loading eBPF programs on Linux 4.14, this check is implemented here.
+	if (conn_info->protocol == PROTO_CUSTOM) {
+		inferred_message.protocol = PROTO_CUSTOM;
+		inferred_message.type = MSG_REQUEST;
+		return inferred_message;
+	}
 
 	/*
 	 * TLS protocol datas cause other L7 protocols inference misjudgment,

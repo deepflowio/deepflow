@@ -34,8 +34,7 @@ pub mod remote_exec {
     #[derive(Clone, Copy)]
     pub struct Parameter {
         pub name: &'static str,
-        pub charset: &'static str,
-        pub max_length: usize,
+        pub regex: &'static str,
     }
 
     #[derive(Clone)]
