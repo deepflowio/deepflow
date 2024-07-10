@@ -193,7 +193,7 @@ struct conn_info_s {
 	__u32 prev_count;	// Prestored data length
 	__u32 syscall_infer_len;
 	__u64 count:40;
-	__u64 tcpseq_offset:24;
+	__u64 unused_bits:24;
 	char prev_buf[EBPF_CACHE_SIZE];
 	char *syscall_infer_addr;
 	void *sk;
