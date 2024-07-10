@@ -201,7 +201,7 @@ func NewExtMetricsWriter(
 	s.Timestamp = uint32(time.Now().Unix())
 	s.MsgType = msgType
 	if flowTagTablePrefix == DEEPFLOW_TENANT_DB {
-		s.OrgId = ckdb.DEFAULT_ORG_ID
+		s.OrgId, s.RawOrgId = ckdb.DEFAULT_ORG_ID, ckdb.DEFAULT_ORG_ID
 	}
 	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()))
 	ckwriter, err := ckwriter.NewCKWriter(
