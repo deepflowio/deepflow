@@ -1,0 +1,4718 @@
+# type: section
+# name:
+#   en: Global
+#   ch: 全局配置
+# description:
+global:
+  # type: section
+  # name:
+  #   en: Limits
+  #   ch: 资源限制
+  # description:
+  limits:
+    # type: int
+    # name:
+    #   en: CPU Limit
+    #   ch: CPU 限制
+    # unit: Logical Milli Cores
+    # range: [1, 100000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     deepflow-agent uses cgroups to limit CPU usage.
+    #     1 millicpu = 1 millicore = 0.001 core.
+    #   ch: |-
+    #     deepflow-agent 使用 cgroups 来限制 CPU 自身的 CPU 用量，
+    #     1 millicpu = 1 millicore = 0.001 core。
+    # upgrade_from: max_millicpus
+    max_millicpus: 1000
+    # type: int
+    # name:
+    #   en: CPU Limit (Cores)
+    #   ch: CPU 限制 (Cores)
+    # upgrade_from: max_cpus
+    # deprecated: true
+    # TODO: 此配置项与 max_millicpus 合并
+    max_cpus: 1
+    # type: int
+    # name:
+    #   en: Memory Limit
+    #   ch: 内存限制
+    # unit: MiB
+    # range: [128, 100000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     deepflow-agent uses cgroups to limit memory usage.
+    #   ch: |-
+    #     deepflow-agent 使用 cgroups 限制自身的 memory 用量.
+    # upgrade_from: max_memory
+    max_memory: 768
+    # type: int
+    # name:
+    #   en: Maximum Log Backhaul Rate
+    #   ch: 日志回传速率限制
+    # unit: Lines/Hour
+    # range: [0, 10000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     deepflow-agent will send logs to deepflow-server, 0 means no limit.
+    #   ch: |-
+    #     deepflow-agent 会将自身的日志回传给 deepflow-server，设置为 0 表示
+    #     速率不设限制。
+    # upgrade_from: log_threshold
+    max_log_backhaul_rate: 300
+    # type: int
+    # name:
+    #   en: Maximum Local Log File Size
+    #   ch: 本地日志文件大小限制
+    # unit: MiB
+    # range: [10, 10000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The maximum disk space allowed for deepflow-agent log files.
+    #   ch: |-
+    #     The maximum disk space allowed for deepflow-agent log files.
+    # upgrade_from: log_file_size
+    # TODO: 还有用吗？是否还会写本地文件，和 standalone.log_fize 是什么关系？
+    max_local_log_file_size: 1000
+    # type: duration
+    # name:
+    #   en: Local Log Retention
+    #   ch: 本地日志留存时间
+    # unit:
+    # range: [10d, 10000d]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The retention time for deepflow-agent log files.
+    #   zh: |-
+    #     The retention time for deepflow-agent log files.
+    # upgrade_from: log_retention
+    # TODO: 以前的单位是天，改为 duration
+    # TODO: 还有用吗？是否还会写本地文件，和 standalone.log_fize 是什么关系？
+    local_log_retention: 300d
+  # type: section
+  # name:
+  #   en: Alerts
+  #   ch: 告警
+  # description:
+  alerts:
+    # type: int
+    # name:
+    #   en: Thread Limit
+    #   ch: 线程数限制
+    # unit:
+    # range: [1, 1000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Maximum number of threads that deepflow-agent is allowed to launch.
+    #   ch: |-
+    #     Maximum number of threads that deepflow-agent is allowed to launch.
+    # upgrade_from: thread_threshold
+    thread_threshold: 500
+    # type: int
+    # name:
+    #   en: Process Limit
+    #   ch: 进程数限制
+    # unit:
+    # range: [1, 100]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Maximum number of processes that deepflow-agent is allowed to launch.
+    #   ch: |-
+    #     Maximum number of processes that deepflow-agent is allowed to launch.
+    # upgrade_from: process_threshold
+    process_threshold: 10
+    # type: bool
+    # name:
+    #   en: Core File Checker
+    #   ch: Core File 检查
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When the host has an invalid NFS file system or a docker is running,
+    #     sometime program hang when checking the core file, so the core file
+    #     check provides a switch to prevent the process hang. Additional links:
+    #     - https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory
+    #     - https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
+    #   ch: |-
+    #     When the host has an invalid NFS file system or a docker is running,
+    #     sometime program hang when checking the core file, so the core file
+    #     check provides a switch to prevent the process hang. Additional links:
+    #     - https://serverfault.com/questions/367438/ls-hangs-for-a-certain-directory
+    #     - https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
+    # upgrade_from: static_config.check-core-file-disabled
+    # deprecated: true
+    # TODO: 【待确认】可以废弃了？
+    check_core_file_disabled: false
+  # type: section
+  # name:
+  #   en: Circuit Breakers
+  #   ch: 熔断机制
+  # description:
+  circuit_breakers:
+    # type: section
+    # name:
+    #   en: System Free Memory Percentage
+    #   ch: 系统空闲内存百分比
+    # description:
+    #   en: |-
+    #     Calculation Method: `(free_memory / total_memory) * 100%`
+    #   ch: |-
+    #     Calculation Method: `(free_memory / total_memory) * 100%`
+    sys_free_memory_percentage:
+      # type: int
+      # name:
+      #   en: Trigger Threshold
+      #   ch: 触发阈值
+      # unit: '%'
+      # range: [0, 100]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The limit of the percentage of system free memory.
+      #     When the free percentage is lower than 90% of this value,
+      #     the agent will automatically restart.
+      #   ch: |-
+      #     The limit of the percentage of system free memory.
+      #     When the free percentage is lower than 90% of this value,
+      #     the agent will automatically restart.
+      # upgrade_from: sys_free_memory_limit
+      # TODO: 为何不是低于这个比例直接重启，需要 90% 的控制吗？
+      trigger_threshold: 0
+    # type: section
+    # name:
+    #   en: Relative System Load
+    #   ch: 相对系统负载
+    # description:
+    #   en: |-
+    #     Calculation Method: `system_load / total_cpu_cores`
+    #   ch: |-
+    #     Calculation Method: `system_load / total_cpu_cores`
+    relative_sys_load:
+      # type: float
+      # name:
+      #   en: Trigger Threshold
+      #   ch: 触发阈值
+      # unit:
+      # range: [0, 10]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When the load of the Linux system divided by the number of
+      #     CPU cores exceeds this value, the agent automatically enters
+      #     the disabled state. It will automatically recover if it remains
+      #     below 90% of this value for a continuous 5 minutes. Setting it
+      #     to 0 disables this feature.
+      #   ch: |-
+      #     When the load of the Linux system divided by the number of
+      #     CPU cores exceeds this value, the agent automatically enters
+      #     the disabled state. It will automatically recover if it remains
+      #     below 90% of this value for a continuous 5 minutes. Setting it
+      #     to 0 disables this feature.
+      # upgrade_from: system_load_circuit_breaker_threshold
+      trigger_threshold: 1.0
+      # type: float
+      # name:
+      #   en: Recovery Threshold
+      #   ch: 恢复阈值
+      # unit:
+      # range: [0, 10]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When the system load of the Linux system divided by the
+      #     number of CPU cores is continuously below this value for 5
+      #     minutes, the agent can recover from the circuit breaker
+      #     disabled state, and setting it to 0 means turning off the
+      #     circuit breaker feature.
+      # upgrade_from: system_load_circuit_breaker_recover
+      recovery_threshold: 0.9
+      # type: string
+      # name:
+      #   en: Metric
+      #   ch: 观测指标
+      # unit:
+      # range: []
+      # enum_options: [load1, load5, load15]
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The system load circuit breaker mechanism uses this metric,
+      #     and the agent will check this metric every 10 seconds by default.
+      # upgrade_from: system_load_circuit_breaker_metric
+      system_load_circuit_breaker_metric: load15
+    # type: section
+    # name:
+    #   en: Tx Throughput
+    #   ch: 发送吞吐
+    # description:
+    tx_throughput:
+      # type: int
+      # name:
+      #   en: Trigger Threshold
+      #   ch: 触发阈值
+      # unit: Mbps
+      # range: [0, 100000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     When the outbound throughput of the NPB interface reaches or exceeds
+      #     the threshold, the broker will be stopped, after that the broker will
+      #     be resumed if the throughput is lower than
+      #     `(trigger_threshold - outputs.npb.max_npb_throughput)*90%`
+      #     within 5 consecutive monitoring intervals.
+      #
+      #     Attention: When configuring this value, it must be greater than
+      #     `outputs.npb.max_npb_throughput`. Set to 0 will disable this feature.
+      # upgrade_from: max_tx_bandwidth
+      trigger_threshold: 0
+      # type: duration
+      # name:
+      #   en: Throughput Monitoring Interval
+      #   ch: 吞吐监控间隔
+      # unit:
+      # range: [1s, 60s]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Monitoring interval for outbound traffic rate of NPB interface.
+      # upgrade_from: bandwidth_probe_interval
+      # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
+      throughput_monitoring_interval: 10s
+  # type: section
+  # name:
+  #   en: Tunning
+  #   ch: 调优
+  # description:
+  tunning:
+    # type: int
+    # name:
+    #   en: CPU Affinity
+    #   ch: CPU 亲和性
+    # unit:
+    # range: [0, 65536]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     CPU affinity is the tendency of a process to run on a given CPU for as long as possible
+    #     without being migrated to other processors. Example: `cpu-affinity: [1, 3, 5, 7, 9]`.
+    # upgrade_from: static_config.cpu-affinity
+    cpu_affinity: []
+    # type: int
+    # name:
+    #   en: Process Scheduling Priority
+    #   ch: 进程调度优先级
+    # unit:
+    # range: [-20, 19]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The smaller the value of process scheduling priority, the higher the priority of the
+    #     `deepflow-agent` process, and the larger the value, the lower the priority.
+    # upgrade_from: static_config.process-scheduling-priority
+    process_scheduling_priority: 0
+    # type: bool
+    # name:
+    #   en: Idle Memory Trimming
+    #   ch: 闲置内存裁剪
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Proactive memory trimming can effectively reduce memory usage, but there may be
+    #     performance loss.
+    # upgrade_from: static_config.memory-trim-disabled
+    # TODO: 【待确认】可以废弃了？
+    # TODO: 注意换成了正向的开关，字面值变了但默认行为没变
+    idle_memory_trimming: false
+    # type: duration
+    # name:
+    #   en: Resource Monitoring Interval
+    #   ch: 资源监控间隔
+    # unit:
+    # range: [1s, 3600s]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The agent will monitor:
+    #     1. System free memory
+    #     2. Get the number of threads of the agent itself by reading the file information
+    #        under the /proc directory
+    #     3. Size and number of log files generated by the agent.
+    #     4. System load
+    #     5. Agent memory usage (check if memory trimming is needed)
+    # upgrade_from: static_config.guard-interval
+    resource_monitoring_interval: 10s
+  # type: section
+  # name:
+  #   en: NTP Clock Synchronization
+  #   ch: NTP 时钟同步
+  # description:
+  #   en: |-
+  #     This synchronization mechanism does not alter the host's clock; it is only used
+  #     internally by the deepflow-agent process.
+  #   ch: |-
+  #     此同步机制不会改变主机的时钟，仅供 deepflow-agent 进程内部使用。
+  ntp:
+    # type: bool
+    # name: Enabled
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to synchronize the clock to the deepflow-server, this behavior
+    #     will not change the time of the deepflow-agent running environment.
+    # upgrade_from: ntp_enabled
+    # TODO: 原来是 int，需要改为 bool
+    enabled: false
+    # type: duration
+    # name:
+    #   en: Maximum Drift
+    #   ch: 最大时钟偏差
+    # unit:
+    # range: [0, 365d]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When the clock drift exceeds this value, the agent will restart.
+    # upgrade_from: static_config.ntp-max-interval
+    max_drift: 300s
+    # type: duration
+    # name:
+    #   en: Minimal Drift
+    #   ch: 最小时钟偏差
+    # unit:
+    # range: [0, 365d]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When the clock drift exceeds this value, the timestamp will be corrected.
+    # upgrade_from: static_config.ntp-min-interval
+    min_drift: 10s
+  # type: section
+  # name:
+  #   en: Communication
+  #   ch: 通信
+  # description:
+  communication:
+    # type: duration
+    # name:
+    #   en: Proactive Request Interval
+    #   ch: 主动请求间隔
+    # unit:
+    # range: [10s, 3600s]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The interval at which deepflow-agent proactively requests configuration and
+    #     tag information from deepflow-server.
+    # upgrade_from: sync_interval
+    # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
+    proactive_request_interval: 60s
+    # type: duration
+    # name:
+    #   en: Maximum Escape Duration
+    #   ch: 最大逃逸时长
+    # unit:
+    # range: [600s, 30d]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The maximum time that the agent is allowed to work normally when it
+    #     cannot connect to the server. After the timeout, the agent automatically
+    #     enters the disabled state.
+    # upgrade_from: max_escape_seconds
+    # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
+    max_escape_duration: 3600s
+    # type: ip
+    # name:
+    #   en: Controller IP Address
+    #   ch: Controller IP 地址
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When this value is set, deepflow-agent will use this IP to access the
+    #     control plane port of deepflow-server, which is usually used when
+    #     deepflow-server uses an external load balancer.
+    # upgrade_from: proxy_controller_ip
+    controller_ip: ""
+    # type: int
+    # name:
+    #   en: Controller Port
+    #   ch: Controller 端口号
+    # unit:
+    # range: [1, 65535]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The control plane port used by deepflow-agent to access deepflow-server.
+    #     The default port within the same K8s cluster is 20035, and the default port
+    #     of deepflow-agent outside the cluster is 30035.
+    # upgrade_from: proxy_controller_port
+    controller_port: 30035
+    # type: ip
+    # name:
+    #   en: Ingester IP Address
+    #   ch: Ingester IP 地址
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When this value is set, deepflow-agent will use this IP to access the
+    #     data plane port of deepflow-server, which is usually used when
+    #     deepflow-server uses an external load balancer.
+    # upgrade_from: analyzer_ip
+    ingester_ip: ""
+    # type: int
+    # name:
+    #   en: Ingester Port
+    #   ch: Ingester 端口号
+    # unit:
+    # range: [1, 65535]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The data plane port used by deepflow-agent to access deepflow-server.
+    #     The default port within the same K8s cluster is 20033, and the default port
+    #     of deepflow-agent outside the cluster is 30033.
+    # upgrade_from: analyzer_port
+    ingester_port: 30033
+    # type: int
+    # name:
+    #   en: gRPC Socket Buffer Size
+    #   ch: gRPC Socket 缓冲区大小
+    # unit: MiB
+    # range: [5, 1024]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     gRPC socket buffer size.
+    # upgrade_from: static_config.grpc-buffer-size
+    # TODO: 【待确认】拆分为两个 RPC，第一个获取 size
+    grpc_buffer_size: 5
+    # type: bool
+    # name:
+    #   en: Request via NAT IP Address
+    #   ch: 请求 NAT IP 地址
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Used when deepflow-agent uses an external IP address to access
+    #     deepflow-server. For example, when deepflow-server is behind a NAT gateway,
+    #     or the host where deepflow-server is located has multiple node IP addresses
+    #     and different deepflow-agents need to access different node IPs, you can
+    #     set an additional NAT IP for each deepflow-server address, and modify this
+    #     value to true.
+    # upgrade_from: nat_ip_enabled
+    # TODO: 原来是 int，需要改为 bool
+    request_via_nat_ip: false
+  # type: section
+  # name:
+  #   en: Self Monitoring
+  #   ch: 自监控
+  # description:
+  #   en:
+  self_monitoring:
+    # type: section
+    # name:
+    #  en: Log
+    #  ch: 日志
+    # description:
+    #   en:
+    log:
+      # type: string
+      # name:
+      #   en: Log Level
+      #   ch: 日志等级
+      # unit:
+      # range: []
+      # enum_options: [DEBUG, INFO, WARNING, ERROR]
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Log level of deepflow-agent.
+      # upgrade_from: log_level
+      log_level: INFO
+      # type: bool
+      # name:
+      #   en: Log Backhaul Enabled
+      #   ch: 启用日志回传
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When enabled, deepflow-agent will send its own logs to deepflow-server.
+      # upgrade_from: rsyslog_enabled
+      # TODO: 原来是 int，需要改为 bool
+      log_backhaul_enabled: true
+    # type: section
+    # name: Profile
+    # description:
+    profile:
+      # type: bool
+      # name: Enabled
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Only available for Trident (Golang version of Agent).
+      # upgrade_from: static_config.profiler
+      # TODO: 【待确认】only for trident
+      enabled: false
+    # type: section
+    # name: Debug
+    # description:
+    debug:
+      # type: int
+      # name:
+      #   en: Listen UDP Port
+      #   ch: 监听 UDP 端口号
+      # unit:
+      # range: [0, 65535]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Default value `0` means use a random client port number.
+      #     Only available for Trident (Golang version of Agent).
+      # upgrade_from: static_config.debug-listen-port
+      # TODO: 【待确认】only for trident，【待确认】可使用 unix socket，从而避免 listen port
+      listen_udp_port: 0
+      # type: bool
+      # name:
+      #   en: Debug Metrics Enabled
+      #   ch: 启用调试指标
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Only available for Trident (Golang version of Agent).
+      # upgrade_from: static_config.enable-debug-stats
+      # TODO: 【待确认】only for trident
+      debug_metrics_enabled: false
+  # type: section
+  # name:
+  #   en: Standalone Mode
+  #   ch: 独立运行模式
+  # description:
+  standalone_mode:
+    # type: int
+    # name:
+    #   en: Maximum Data File Size
+    #   ch: 最大数据文件大小
+    # unit: MiB
+    # range: [1, 1000000]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When deepflow-agent runs in standalone mode, it will not be controlled by
+    #     deepflow-server, and the collected data will only be written to the local file.
+    #     Currently supported data types for writing are l4_flow_log and l7_flow_log. Each
+    #     type of data is written to a separate file. This configuration can be used to
+    #     specify the maximum size of the data file, and rotate when it exceeds this size.
+    #     A maximum of two files are kept for each type of data.
+    # upgrade_from: static_config.standalone-data-file-size
+    # TODO: 增加了最小、最大值
+    max_data_file_size: 200
+    # type: string
+    # name:
+    #   en: Data File Directory
+    #   ch: 数据文件目录
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Directory where data files are written to.
+    # upgrade_from: static_config.standalone-data-file-dir
+    data_file_dir: /var/log/deepflow_agent/
+    # type: string
+    # name:
+    #   en: Log File
+    #   ch: 日志文件
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Note that this configuration is only used in standalone mode.
+    # upgrade_from: static_config.log-file
+    log_file: /var/log/deepflow_agent/deepflow_agent.log
+
+# type: section
+# name:
+#   en: Inputs
+#   ch: 输入
+# description:
+inputs:
+  # type: section
+  # name:
+  #   en: Proc
+  #   ch: 进程
+  # description:
+  proc:
+    # type: bool
+    # name: Enabled
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Only make sense when agent type is one of CHOST_VM, CHOST_BM, K8S_VM, K8S_BM.
+    # upgrade_from: static_config.os-proc-sync-enabled
+    enabled: false
+    # type: string
+    # name:
+    #   en: Directory of /proc
+    #   ch: /proc 目录
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The /proc fs mount path.
+    # upgrade_from: static_config.os-proc-root
+    proc_dir_path: /proc
+    # type: duration
+    # name:
+    #   en: Synchronization Interval
+    #   ch: 同步间隔
+    # unit:
+    # range: [1s, 1h]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The interval of socket info sync.
+    # upgrade_from: static_config.os-proc-socket-sync-interval
+    # TODO: 从数字改为了 duration，增加了最小、最大值
+    sync_interval: 10s
+    # type: duration
+    # name:
+    #   en: Minimal Lifetime
+    #   ch: 最小活跃时间
+    # unit:
+    # range: [1s, 1h]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Socket and Process uptime threshold
+    # upgrade_from: static_config.os-proc-socket-min-lifetime
+    # TODO: 从数字改为了 duration，增加了最小、最大值
+    min_lifetime: 3s
+    # type: section
+    # name:
+    #   en: Tag Extraction
+    #   ch: Tag 提取
+    # description:
+    tag_extraction:
+      # type: string
+      # name:
+      #   en: Script Command
+      #   ch: 脚本命令
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Execute the command every time when scan the process, expect get the process tag
+      #     from stdout in yaml format, the example yaml format as follow:
+      #     ```
+      #     - pid: 1
+      #       tags:
+      #       - key: xxx
+      #         value: xxx
+      #     - pid: 2
+      #       tags:
+      #       - key: xxx
+      #         value: xxx
+      #     ```
+      #     Example configuration: `os_app_tag_exec: ["cat", "/tmp/tag.yaml"]`
+      # upgrade_from: static_config.os-app-tag-exec
+      script_command: []
+      # type: string
+      # name:
+      #   en: Execution Username
+      #   ch: 执行用户名
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The user who should execute the `os-app-tag-exec` command.
+      # upgrade_from: static_config.os-app-tag-exec-user
+      exec_username: deepflow
+    # type: dict
+    # name:
+    #   en: Process Matcher
+    #   ch: 进程匹配器
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Will traverse over the entire array, so the previous ones will be matched first.
+    #     when match_type is parent_process_name, will recursive to match parent proc name,
+    #     and rewrite_name field will ignore. rewrite_name can replace by regexp capture group
+    #     and windows style environment variable, for example: `$1-py-script-%HOSTNAME%` will
+    #     replace regexp capture group 1 and HOSTNAME env var. If proc not match any regexp
+    #     will be accepted (essentially will auto append `- match_regex: .*` at the end).
+    #
+    #     Configuration Item:
+    #     - match_regex: The regexp use for match the process, default value is `.*`
+    #     - match_type: regexp match field, default value is `process_name`, options are
+    #       [process_name, cmdline, parent_process_name, tag]
+    #     - ignore: Whether to ignore when regex match, default value is `false`
+    #     - rewrite_name: The name will replace the process name or cmd use regexp replace.
+    #       Default value `""` means no replacement.
+    #
+    #     Example:
+    #     ```
+    #     os_proc_regex:
+    #       - match_regex: python3 (.*)\.py
+    #         match_type: cmdline
+    #         match_languages: []
+    #         match_usernames: []
+    #         only_in_container: true
+    #         only_with_tag: false
+    #         ignore: false
+    #         rewrite_name: $1-py-script
+    #         enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
+    #       - match_regex: (?P<PROC_NAME>nginx)
+    #         match_type: process_name
+    #         rewrite_name: ${PROC_NAME}-%HOSTNAME%
+    #       - match_regex: "nginx"
+    #         match_type: parent_process_name
+    #         ignore: true
+    #       - match_regex: .*sleep.*
+    #         match_type: process_name
+    #         ignore: true
+    #       - match_regex: .+ # match after concatenating a tag key and value pair using colon,
+    #                         # i.e., an regex `app:.+` can match all processes has a `app` tag
+    #         match_type: tag
+    #     ```
+    # upgrade_from: static_config.os-proc-regex
+    # TODO: 注意 dict 的升级
+    # ---
+    # type: string
+    # name:
+    #   en: Match Regex
+    #   ch: 匹配正则表达式
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The regex of matcher.
+    # upgrade_from: static_config.os-proc-regex.match-regex
+    # ---
+    # match_regex: ""
+    # ---
+    # type: string
+    # name:
+    #   en: Match Type
+    #   ch: 匹配类型
+    # unit:
+    # range: []
+    # enum_options: [process_name, cmdline, parent_process_name, tag]
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The type of matcher.
+    # upgrade_from: static_config.os-proc-regex.match-regex
+    # ---
+    # match_type: ""
+    # ---
+    # type: string
+    # name:
+    #   en: Match Languages
+    #   ch: 匹配语言
+    # unit:
+    # range: []
+    # enum_options: [java, golang, python, nodejs, dotnet]
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Default value `[]` match all languages.
+    # TODO: 6.6 新增
+    # ---
+    # match_languages: []
+    # ---
+    # type: string
+    # name:
+    #   en: Match Usernames
+    #   ch: 匹配用户名
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Default value `[]` match all usernames.
+    # TODO: 6.6 新增
+    # ---
+    # match_usernames: []
+    # ---
+    # type: bool
+    # name:
+    #   en: Only in Container
+    #   ch: 仅匹配容器内的进程
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Default value true means only match processes in container.
+    # TODO: 6.6 新增
+    # ---
+    # only_in_container: true
+    # ---
+    # type: bool
+    # name:
+    #   en: Only with Tag
+    #   ch: 仅匹配有 Tag 的进程
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Default value false means match processes with or without tags.
+    # upgrade_from: static_config.os-proc-sync-tagged-only
+    # TODO: 放到内层来来了
+    # ---
+    # only_with_tag: false
+    # ---
+    # type: bool
+    # name:
+    #   en: Ignore
+    #   ch: 忽略
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to ingore matched processes..
+    # upgrade_from: static_config.os-proc-regex.action
+    # TODO: 注意类型变成了 bool
+    # ---
+    # ignore: false
+    # ---
+    # type: string
+    # name:
+    #   en: Rewrite Name
+    #   ch: 重命名
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     New name after matched.
+    # upgrade_from: static_config.os-proc-regex.rewrite-name
+    # ---
+    # rewrite_name: ""
+    # ---
+    # type: string
+    # name:
+    #   en: Enabled Features
+    #   ch: 开启功能列表
+    # unit:
+    # range: []
+    # enum_options:
+    #   - proc.socket_list
+    #   - proc.symbol_table
+    #   - proc.proc_event // XXX
+    #   - ebpf.socket.uprobe.golang
+    #   - ebpf.socket.uprobe.tls
+    #   - ebpf.socket.uprobe.rdma // XXX
+    #   - ebpf.file.io_event
+    #   - ebpf.file.management_event // XXX
+    #   - ebpf.profile.on_cpu
+    #   - ebpf.profile.off_cpu
+    #   - ebpf.profile.mem // XXX
+    #   - ebpf.profile.cuda // XXX
+    #   - ebpf.profile.hbm // XXX
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Enabled feature list.
+    # upgrade_from: static_config.ebpf.on-cpu-profile.regex, static_config.ebpf.off-cpu-profile.regex
+    # TODO: 注意功能升级
+    # ---
+    # enabled_features: []
+    process_matcher:
+      - match_regex: deepflow-*
+        only_in_container: false
+        enabled_features: [ebpf.profile.on_cpu, ebpf.profile.off_cpu]
+    # type: section
+    # name:
+    #   en: Symbol Table
+    #   ch: 符号表
+    # description:
+    symbol_table:
+      # type: section
+      # name:
+      #   en: Golang-specific
+      #   ch: Golang 特有
+      # description:
+      golang_specific:
+        # type: string
+        # name:
+        #   en: Enabled
+        #   ch: Enabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Whether to enable Golang-specific symbol table parsing.
+        #
+        #     This feature acts on Golang processes that have trimmed the standard symbol
+        #     table. When this feature is enabled, for processes with Golang
+        #     version >= 1.13 and < 1.18, when the standard symbol table is missing, the
+        #     Golang-specific symbol table will be parsed to complete uprobe data collection.
+        #     Note that enabling this feature may cause the eBPF initialization process to
+        #     take ten minutes. The `golang-symbol` configuration item depends on the `golang`
+        #     configuration item, the `golang-symbol` is a subset of the `golang` configuration item.
+        #
+        #     Example:
+        #     - Ensure that the regular expression matching for the 'golang' configuration
+        #       item is enabled, for example: `golang: .*`
+        #     - You've encountered the following warning log:
+        #       ```
+        #       [eBPF] WARNING: func resolve_bin_file() [user/go_tracer.c:558] Go process pid 1946
+        #       [path: /proc/1946/root/usr/local/bin/kube-controller-manager] (version: go1.16). Not find any symbols!
+        #       ```
+        #       Suppose there is a Golang process with a process ID of '1946.'
+        #     - To initially confirm whether the executable file for this process has a symbol table:
+        #       - Retrieve the executable file's path using the process ID:
+        #         ```
+        #         # ls -al /proc/1946/exe
+        #         /proc/1946/exe -> /usr/local/bin/kube-controller-manager
+        #         ```
+        #       - Check if there is a symbol table:
+        #         ```
+        #         # nm /proc/1946/root/usr/local/bin/kube-controller-manager
+        #         nm: /proc/1946/root/usr/local/bin/kube-controller-manager: no symbols
+        #         ```
+        #     - If "no symbols" is encountered, it indicates the absence of a symbol table. In such a
+        #       scenario, we need to configure the "golang-symbol" setting.
+        #     - During the agent startup process, you will observe the following log information: (The entry
+        #       address for the function `crypto/tls.(*Conn).Write` has already been resolved, i.e., entry:0x25fca0).
+        #       ```
+        #       [eBPF] INFO Uprobe [/proc/1946/root/usr/local/bin/kube-controller-manager] pid:1946 go1.16.0
+        #       entry:0x25fca0 size:1952 symname:crypto/tls.(*Conn).Write probe_func:uprobe_go_tls_write_enter rets_count:0
+        #       ```
+        #       The logs indicate that the Golang program has been successfully hooked.
+        # upgrade_from: static_config.ebpf.uprobe-process-name-regexs.golang-symbol
+        enabled: false
+      # type: section
+      # name: Java
+      java:
+        # type: duration
+        # name:
+        #   en: Refresh Defer Duration
+        #   ch: 刷新延迟时长
+        # unit:
+        # range: [5s, 3600s]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When deepflow-agent finds that an unresolved function name appears in the function call
+        #     stack of a Java process, it will trigger the regeneration of the symbol file of the
+        #     process. Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain
+        #     more symbols for Java processes, the regeneration will be deferred for a period of time.
+        # upgrade_from: static_config.ebpf.java-symbol-file-refresh-defer-interval
+        refresh_defer_duration: 600s
+        # type: int
+        # name:
+        #   en: Maximum Symbol File Size
+        #   ch: 符号表文件最大大小
+        # unit: MiB
+        # range: [2, 100]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     All Java symbol files are stored in the '/tmp' directory mounted by the deepflow-agent.
+        #     To prevent excessive occupation of host node space due to large Java symbol files, a
+        #     maximum size limit is set for each generated Java symbol file.
+        # upgrade_from: static_config.ebpf.java-symbol-file-max-space-limit
+        max_symbol_file_size: 10
+  # type: section
+  # name: cBPF
+  # description:
+  cbpf:
+    # type: section
+    # name:
+    #   en: Common
+    #   ch: 通用配置
+    # description:
+    common:
+      # type: int
+      # name:
+      #   en: Packet Capture Mode
+      #   ch: Packet 采集模式
+      # unit:
+      # range: []
+      # enum_options:
+      #   - 0:
+      #       en: Local
+      #       ch: 本地流量
+      #   - 1:
+      #       en: Virtual Mirror
+      #       ch: 虚拟网络镜像
+      #   - 2:
+      #       en: Physical Mirror
+      #       ch: 物理网络镜像
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Mirror mode is used when deepflow-agent cannot directly capture the traffic from
+      #     the source. For example:
+      #     - in the K8s macvlan environment, capture the Pod traffic through the Node NIC
+      #     - in the Hyper-V environment, capture the VM traffic through the Hypervisor NIC
+      #     - in the ESXi environment, capture traffic through VDS/VSS local SPAN
+      #     - in the DPDK environment, capture traffic through DPDK ring buffer
+      #     Use Physical Mirror mode when deepflow-agent captures traffic through physical
+      #     switch mirroring.
+      #
+      #     <mark>`Physical Mirror` is only supported in the Enterprise Edition.</mark>
+      # upgrade_from: tap_mode
+      capture_mode: 0
+    # type: section
+    # name:
+    #   en: Capture via AF_PACKET
+    #   ch: 使用 AF_PACKET 采集
+    # description:
+    #   en:
+    af_packet:
+      # type: string
+      # name:
+      #   en: Interface Regex
+      #   ch: 网卡名正则表达式
+      # unit:
+      # range: [0, 65535]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Regular expression of NIC name for collecting traffic.
+      #
+      #     Explanation of the default configuration:
+      #     ```
+      #     Localhost:     lo
+      #     Common NIC:    eth.*|en[osipx].*
+      #     QEMU VM NIC:   tap.*
+      #     Flannel:       veth.*
+      #     Calico:        cali.*
+      #     Cilium         lxc.*
+      #     Kube-OVN       [0-9a-f]+_h$
+      #     ```
+      # upgrade_from: tap_interface_regex
+      # TODO: 字符串长度为 0 时的行为确认下
+      interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
+      # type: dict
+      # name:
+      #   en: Bond Interfaces
+      #   ch: Bond 网卡列表
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Packets of interfaces in the same group can be aggregated together,
+      #     Only effective when capture_mode is 0.
+      #
+      #     Example:
+      #     ```yaml
+      #     bond_interfaces:
+      #       - slave_interfaces: [eth0, eth1]
+      #       - slave_interfaces: [eth2, eth3]
+      #     ```
+      # upgrade_from: static_config.tap-interface-bond-groups
+      # TODO: dict 中的配置注意升级问题
+      # ---
+      # type: string
+      # name:
+      #   en: Slave Interfaces
+      #   ch: Slave 网卡列表
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The slave interfaces of one bond interface.
+      # upgrade_from: static_config.tap-interface-bond-groups.tap-interfaces
+      # ---
+      # slave_interfaces: []
+      bond_interfaces: []
+      # type: string
+      # name:
+      #   en: Extra Network Namespace Regex
+      #   ch: 需要采集的额外网络 Namespace
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Packet will be captured in regex matched namespaces besides the default
+      #     namespace. NICs captured in extra namespaces are also filtered with
+      #     `tap_interface_regex`.
+      #
+      #     Default value `""` means no extra network namespace (default namespace only).
+      # upgrade_from: extra_netns_regex
+      extra_netns_regex: ""
+      # type: string
+      # name:
+      #   en: Extra BPF Filter
+      #   ch: 额外的 BPF 过滤器
+      # unit:
+      # range: [0, 512]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     If not configured, all traffic will be collected. Please
+      #     refer to BPF syntax: https://biot.com/capstats/bpf.html
+      # upgrade_from: capture_bpf
+      extra_bpf_filter: ""
+      # type: string
+      # name: TAP Interfaces
+      # upgrade_from: static_config.src-interfaces
+      # deprecated: true
+      # TODO: 【待确定】deprecated
+      src_interfaces: []
+      # type: int
+      # name:
+      #   en: VLAN PCP in Physical Mirror Traffic
+      #   ch: 物理网络镜像流量中的 VLAN PCP
+      # unit:
+      # range: [0, 8]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Calculate `capture_network_type` from vlan tag only if vlan pcp matches this value.
+      # upgrade_from: static_config.mirror-traffic-pcp
+      vlan_pap_in_physical_mirror_traffic: 0
+      # type: bool
+      # name:
+      #   en: BPF Filter Disabled
+      #   ch: 禁用 BPF 过滤
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     It is found that there may be bugs in BPF traffic filtering under some
+      #     versions of Linux Kernel. After this configuration is enabled, deepflow-agent
+      #     will not use the filtering capabilities of BPF, and will filter by itself after
+      #     capturing full traffic. Note that this may significantly increase the resource
+      #     overhead of deepflow-agent.
+      # upgrade_from: static_config.bpf-disabled
+      bpf_filter_disabled: false
+      # type: section
+      # name:
+      #   en: Tunning
+      #   ch: 调优
+      # description:
+      tunning:
+        # type: int
+        # name:
+        #   en: Socket Version
+        #   ch: Socket 版本
+        # unit:
+        # range: []
+        # enum_options:
+        #   - 0:
+        #       en: Adaptive
+        #       ch: 自适应
+        #   - 2: AF_PACKET V2
+        #   - 3: AF_PACKET V3
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     AF_PACKET socket version in Linux environment.
+        # upgrade_from: capture_socket_type
+        socket_version: 0
+        # type: bool
+        # name:
+        #   en: Ring Blocks Config Enabled
+        #   ch: 使能 Ring Blocks 配置
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When capture_mode != 2, you need to explicitly turn on this switch to
+        #     configure 'afpacket-blocks'.
+        # upgrade_from: static_config.afpacket-blocks-enabled
+        ring_blocks_enabled: false
+        # type: int
+        # name: Ring Blocks
+        # unit:
+        # range: [8, 1000000]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     deepflow-agent will automatically calculate the number of blocks
+        #     used by AF_PACKET according to max_memory, which can also be specified
+        #     using this configuration item. The size of each block is fixed at 1MB.
+        # upgrade_from: static_config.afpacket-blocks
+        # TODO: 以前的最大值不限制，现在增加了 1000000 的限制
+        ring_blocks: 128
+        # type: int
+        # name:
+        #   en: Packet Fanout Count
+        #   ch: Packet Fanout 路数
+        # unit:
+        # range: [1, 64]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     The configuration takes effect when capture_mode is 0 and extra_netns_regex is null,
+        #     PACKET_FANOUT is to enable load balancing and parallel processing, which can improve
+        #     the performance and scalability of network applications. When the `local-dispatcher-count`
+        #     is greater than 1, multiple dispatcher threads will be launched, consuming more CPU and
+        #     memory. Increasing the `local-dispatcher-count` helps to reduce the operating system's
+        #     software interrupts on multi-core CPU servers.
+        #
+        #     Attention: only valid for `traffic_capture_mode` = Local
+        # upgrade_from: static_config.local-dispatcher-count
+        # TODO: 【待确定】适用于哪些 recv engine。另外以前没有最大值，现在加上了 64 的限制
+        packet_fanout_count: 1
+        # type: int
+        # name:
+        #   en: Packet Fanout Mode
+        #   ch: Packet Fanout 模式
+        # unit:
+        # range: []
+        # enum_options:
+        #   - 0: PACKET_FANOUT_HASH
+        #   - 1: PACKET_FANOUT_LB
+        #   - 2: PACKET_FANOUT_CPU
+        #   - 3: PACKET_FANOUT_ROLLOVER
+        #   - 4: PACKET_FANOUT_RND
+        #   - 5: PACKET_FANOUT_QM
+        #   - 6: PACKET_FANOUT_CBPF
+        #   - 7: PACKET_FANOUT_EBPF
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     The configuration is a parameter used with the PACKET_FANOUT feature in the Linux
+        #     kernel to specify the desired packet distribution algorithm. Refer to:
+        #     - https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71
+        #     - https://www.stackpath.com/blog/bpf-hook-points-part-1/
+        # upgrade_from: static_config.packet-fanout-mode
+        # TODO: 【待确定】适用于哪些 recv engine
+        packet_fanout_mode: 0
+    # type: section
+    # name:
+    #   en: Special Network
+    #   ch: 特殊网络
+    # description:
+    special_network:
+      # type: section
+      # name: DPDK
+      # description:
+      dpdk:
+        # type: bool
+        # name: Enabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     The DPDK RecvEngine is only started when this configuration item is turned on.
+        #     Note that you also need to set capture_mode to 1. Please refer to
+        #     https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+        # upgrade_from: static_config.dpdk-enabled
+        enabled: false
+        # type: string
+        # name:
+        #   en: CPU Core List
+        #   ch: CPU 核心列表
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Map lcore set to physical cpu set.
+        #     Format: `<lcores[@cpus]>[<,lcores[@cpus]>...]`
+        #
+        #     Examples:
+        #     - 1,2,3,4
+        #     - 1-4
+        #     - (1,2)(3-10)
+        #     - 1@3,2@4
+        #
+        #     lcores and cpus list are grouped by `(` and `)`. Within the group, `-` is used
+        #     for range separator, `,` is used for single number separator. `()` can be
+        #     omitted for single element group, `@` can be omitted if cpus and lcores have
+        #     the same value.
+        # upgrade_from: static_config.dpdk_core_list
+        cpu_core_list: ""
+      # type: section
+      # name: Libpcap
+      # description:
+      libpcap:
+        # type: bool
+        # name: Enabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Supports running on Windows and Linux, Low performance when using multiple interfaces.
+        #     Default to true in Windows, false in Linux.
+        # upgrade_from: static_config.libpcap-enabled
+        enabled: false
+      # type: section
+      # name: vHost User
+      # description:
+      vhost_user:
+        # type: bool
+        # name: vHost Socket Path
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Supports running on Linux with mirror mode.
+        # upgrade_from: static_config.vhost-socket-path
+        vhost_socket_path: ""
+      # type: section
+      # name:
+      #   en: Physical Switch
+      #   ch: 物理交换机
+      # description:
+      physical_switch:
+        # type: int
+        # name:
+        #   en: sFlow Receiving Ports
+        #   ch: sFlow 接收端口号
+        # unit:
+        # range: [1, 65535]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     This feature is only supported by the Enterprise Edition of Trident.
+        #     In general, sFlow uses port 6343. Default value `[]` means that no sFlow
+        #     data will be collected.
+        # upgrade_from: static_config.xflow-collector.sflow-ports
+        sflow_ports: []
+        # type: int
+        # name:
+        #   en: NetFlow Receiving Ports
+        #   ch: NetFlow 接收端口号
+        # unit:
+        # range: [1, 65535]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     This feature is only supported by the Enterprise Edition of Trident.
+        #     Additionally, only NetFlow v5 is currently supported. In general, NetFlow
+        #     uses port 2055. Default value `[]` means that no NetFlow data will be collected.
+        # upgrade_from: static_config.xflow-collector.netflow-ports
+        netflow_ports: []
+    # type: section
+    # name:
+    #   en: Tunning
+    #   ch: 调优
+    # description:
+    tunning:
+      # type: bool
+      # name:
+      #   en: Dispatcher Queue Enabled
+      #   ch: 启用 Dispatcher 队列
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The configuration takes effect when capture_mode is 0 or 2,
+      #     dispatcher-queue is always true when capture_mode is 2
+      # upgrade_from: static_config.dispatcher-queue
+      # TODO: 【待确定】适用于哪些 recv engine
+      # TODO: 是不是 capture_mode 1 也支持了？@苑超
+      dispatcher_queue_enabled: false
+      # type: int
+      # name:
+      #   en: Maximum Capture Packet Size
+      #   ch: 最大采集包长
+      # unit: byte
+      # range: [128, 65535]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     DPDK environment does not support this configuration.
+      # upgrade_from: capture_packet_size
+      # TODO: 待确认适用于哪些 recv engine
+      max_capture_packet_size: 65535
+      # type: int
+      # name:
+      #   en: Raw Packet Buffer Block Size
+      #   ch: 裸包缓冲区 Block 大小
+      # unit:
+      # range: [65536, 16000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Larger value will reduce memory allocation for raw packet, but will also
+      #     delay memory free.
+      # upgrade_from: static_config.analyzer-raw-packet-block-size
+      # TODO: 以前没有限定最大值，此次加了最大值
+      raw_packet_buffer_block_size: 65536
+      # type: int
+      # name:
+      #   en: Raw Packet Queue Size
+      #   ch: 裸包队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     The length of the following queues (only for capture_mode = 2):
+      #     - 0.1-bytes-to-parse
+      #     - 0.2-packet-to-flowgenerator
+      #     - 0.3-packet-to-pipeline
+      # upgrade_from: static_config.analyzer-queue-size
+      # TODO: 确认一下，仅用于 raw packet 吧？
+      raw_packet_queue_size: 131072
+      # type: int
+      # name:
+      #   en: Max Capture PPS
+      #   ch: 最大采集 PPS
+      # unit: Kpps
+      # range: [1, 1000000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Maximum packet rate allowed for collection.
+      # upgrade_from: max_collect_pps
+      # TODO: 确认一下适用于哪些 recv engine。另外默认值偏小了，默认设置为 0 表示不限速？
+      max_capture_pps: 200
+    # type: section
+    # name:
+    #   en: Preprocess
+    #   ch: 预处理
+    # description:
+    preprocess:
+      # type: int
+      # name:
+      #   en: Tunnel Decap Protocols
+      #   ch: 隧道解封装协议
+      # unit:
+      # range: []
+      # enum_options:
+      #   - 1: VXLAN
+      #   - 2: IPIP
+      #   - 3: GRE
+      #   - 4: Geneve
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Decapsulation tunnel protocols.
+      # upgrade_from: decap_type
+      tunnel_decap_protocols: [1, 2]
+      # type: string
+      # name:
+      #   en: Tunnel Trim Protocols
+      #   ch: 隧道头剥离协议
+      # unit:
+      # range: []
+      # enum_options: [ERSPAN, VXLAN, TEB]
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Whether to remove the tunnel header in mirrored traffic.
+      # upgrade_from: static_config.trim-tunnel-types
+      # TODO: 用于哪些 capture_mode?
+      tunnel_trim_protocols: []
+    # type: section
+    # name:
+    #   en: Physical Mirror Traffic
+    #   ch: 物理网络流量镜像
+    # description:
+    physical_mirror:
+      # type: int
+      # name:
+      #   en: Default Capture Network Type
+      #   ch: 默认采集网络类型
+      # unit:
+      # range: []
+      # enum_options:
+      #   - 3:
+      #       en: Cloud Network
+      #       ch: 云网络
+      #   - _DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     deepflow-agent will mark the TAP (Traffic Access Point) location
+      #     according to the outer vlan tag in the mirrored traffic of the physical
+      #     switch. When the vlan tag has no corresponding TAP value, or the vlan
+      #     pcp does not match the 'mirror-traffic-pcp', it will assign the TAP value.
+      #     This configuration item. Default value `3` means Cloud Network.
+      # upgrade_from: static_config.default-tap-type
+      # TODO: 候选项特殊，需要改写
+      default_capture_network_type: 3
+      # type: bool
+      # name:
+      #   en: Packet Dedup Disabled
+      #   ch: 禁用 Packet 去重
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Whether to enable mirror traffic deduplication when capture_mode = 2.
+      # upgrade_from: static_config.analyzer-dedup-disabled
+      packet_dedup_disabled: false
+      # type: bool
+      # name:
+      #   en: Gateway Traffic of Private Cloud
+      #   ch: 专有云网关流量
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Whether it is the mirrored traffic of NFVGW (cloud gateway).
+      # upgrade_from: static_config.cloud-gateway-traffic
+      private_cloud_gateway_traffic: false
+  # type: section
+  # name: eBPF
+  # description:
+  ebpf:
+    # type: bool
+    # name: Disabled
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to enable eBPF features.
+    # upgrade_from: static_config.ebpf.disabled
+    disabled: false
+    # type: section
+    # name:
+    #   en: Socket
+    #   ch: Socket
+    # description:
+    socket:
+      # type: section
+      # name: Uprobe
+      # description:
+      uprobe:
+        # type: section
+        # name: Golang
+        # description:
+        golang:
+          # type: string
+          # name: Enabled
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Whether golang process enables HTTP2/HTTPS protocol data collection
+          #     and auto-tracing. go auto-tracing also dependent go-tracing-timeout.
+          # upgrade_from: static_config.ebpf.uprobe-process-name-regexs.golang
+          enabled: false
+          # type: duration
+          # name:
+          #   en: Tracing Timeout
+          #   ch: 追踪超时时间
+          # unit:
+          # range: [0, 1d]
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     The expected maximum time interval between the server receiving the request and returning
+          #     the response, If the value is 0, this feature is disabled. Tracing only considers the
+          #     thread number.
+          # upgrade_from: static_config.ebpf.go-tracing-timeout
+          # TODO: 类型从数字改为了 duration
+          tracing_timeout: 120s
+        # type: section
+        # name: TLS
+        # description:
+        tls:
+          # type: string
+          # name: Enabled
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Whether the process that uses the openssl library to enable HTTPS protocol data collection.
+          #     One can use the following method to determine whether an application process can use
+          #     `Uprobe hook openssl library` to access encrypted data:
+          #
+          #     Use the command `cat /proc/<PID>/maps | grep "libssl.so"` to check if it contains
+          #     information about openssl. If it does, it indicates that this process is using the
+          #     openssl library. After configuring the openssl options, deepflow-agent will retrieve process
+          #     information that matches the regular expression, hooking the corresponding encryption/decryption
+          #     interfaces of the openssl library.
+          #
+          #     In the logs, you will encounter a message similar to the following:
+          #     ```
+          #     [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
+          #     ```
+          # upgrade_from: static_config.ebpf.uprobe-process-name-regexs.openssl
+          # TODO: 进程匹配要统一修改
+          enabled: false
+      # type: section
+      # name: Kprobe
+      # description:
+      kprobe:
+        # type: section
+        # name:
+        #   en: Blacklist
+        #   ch: 黑名单
+        # description:
+        blacklist:
+          # type: string
+          # name:
+          #   en: Port Numbers
+          #   ch: 端口号
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description: |-
+          #   TCP&UDP Port Blacklist, Priority higher than kprobe-whitelist.
+          #
+          #   Example: 80,1000-2000
+          # upgrade_from: static_config.ebpf.kprobe-blacklist.port-list
+          ports: ""
+        # type: section
+        # name:
+        #   en: Whitelist
+        #   ch: 白名单
+        # description:
+        whitelist:
+          # type: string
+          # name:
+          #   en: Port Numbers
+          #   ch: 比啊名单
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
+          #
+          #     Example: 80,1000-2000
+          # upgrade_from: static_config.ebpf.kprobe-whitelist.port-list
+          port: ""
+    # type: section
+    # name:
+    #   en: File
+    #   ch: File
+    # description:
+    file:
+      # type: section
+      # name:
+      #   en: IO Event
+      #   ch: IO 事件
+      # description:
+      io_event:
+        # type: int
+        # name:
+        #   en: Collect Mode
+        #   ch: 采集模式
+        # unit:
+        # range: []
+        # enum_options:
+        #   - 0:
+        #       en: Disabled
+        #       ch: 禁用
+        #   - 1:
+        #       en: Request Life Cycle
+        #       ch: 调用生命周期
+        #   - 2:
+        #       en: All
+        #       ch: 全部
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Collection modes:
+        #     - 0: Indicates that no IO events are collected.
+        #     - 1: Indicates that only IO events within the request life cycle are collected.
+        #     - 2: Indicates that all IO events are collected.
+        # upgrade_from: static_config.ebpf.io-event-collect-mode
+        collect_mode: 1
+        # type: duration
+        # name:
+        #   en: Minimal Duration
+        #   ch: 最小耗时
+        # unit:
+        # range: [1ns, 1s]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Only collect IO events with delay exceeding this threshold.
+        # upgrade_from: static_config.ebpf.io-event-minimal-duration
+        minimal_duration: 1ms
+    # type: section
+    # name: Profile
+    # description:
+    profile:
+      # type: section
+      # name: On-CPU
+      # description:
+      on_cpu:
+        # type: bool
+        # name: Disabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     eBPF On-CPU profile switch.
+        # upgrade_from: static_config.ebpf.on-cpu-profile.disabled
+        disabled: false
+        # type: int
+        # name:
+        #   en: Sampling Frequency
+        #   ch: 采样频率
+        # unit:
+        # range: [1, 1000]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     eBPF On-CPU profile sampling frequency.
+        # upgrade_from: static_config.ebpf.on-cpu-profile.frequency
+        sampling_frequency: 99
+        # type: bool
+        # name:
+        #   en: Aggregate by CPU
+        #   ch: 按 CPU 聚合
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Whether to obtain the value of CPUID and decide whether to participate in aggregation.
+        #     - Set to 1: Obtain the value of CPUID and will be included in the aggregation of stack
+        #       trace data.
+        #     - Set to 0: It will not be included in the aggregation. Any other value is considered
+        #       invalid, the CPU value for stack trace data reporting is a special value
+        #       `CPU_INVALID: 0xfff` used to indicate that it is an invalid value.
+        # upgrade_from: static_config.ebpf.on-cpu-profile.cpu
+        # TODO: 从数值改为了 bool
+        aggregate_by_cpu: false
+      # type: section
+      # name: Off-CPU
+      # description:
+      off_cpu:
+        # type: bool
+        # name: Disabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     eBPF Off-CPU profile switch.
+        # upgrade_from: static_config.ebpf.off-cpu-profile.disabled
+        # TODO: 默认值应该是 true 吧？
+        disabled: false
+        # type: bool
+        # name:
+        #   en: Aggregate by CPU
+        #   ch: 按 CPU 聚合
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Whether to obtain the value of CPUID and decide whether to participate in aggregation.
+        #     - Set to 1: Obtain the value of CPUID and will be included in the aggregation of stack
+        #       trace data.
+        #     - Set to 0: It will not be included in the aggregation. Any other value is considered
+        #       invalid, the CPU value for stack trace data reporting is a special value
+        #       `CPU_INVALID: 0xfff` used to indicate that it is an invalid value.
+        # upgrade_from: static_config.ebpf.off-cpu-profile.cpu
+        # TODO: 从数值改为了 bool
+        aggregate_by_cpu: false
+        # type: duration
+        # name:
+        #   en: Minimum Blocking Time
+        #   ch: 最小阻塞时间
+        # unit:
+        # range: [0, 1h]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     If set to 0, there will be no minimum value limitation. Scheduler events are still
+        #     high-frequency events, as their rate may exceed 1 million events per second, so
+        #     caution should still be exercised.
+        #
+        #     If overhead remains an issue, you can configure the 'minblock' tunable parameter here.
+        #     If the off-CPU time is less than the value configured in this item, the data will be
+        #     discarded. If your goal is to trace longer blocking events, increasing this parameter
+        #     can filter out shorter blocking events, further reducing overhead. Additionally, we
+        #     will not collect events with a blocking time exceeding 1 hour.
+        # upgrade_from: static_config.ebpf.off-cpu-profile.minblock
+        min_blocking_time: 50us
+    # type: section
+    # name:
+    #   en: Tunning
+    #   ch: 调优
+    # description:
+    tunning:
+      # type: int
+      # name:
+      #   en: Max Capture Rate
+      #   ch: 最大采集速率
+      # unit: Per Second
+      # range: [0, 64000000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Default value `0` means no limitation.
+      # upgrade_from: static_config.ebpf.global-ebpf-pps-threshold
+      max_capture_rate: 0
+      # type: int
+      # name:
+      #   en: Collector Queue Size
+      #   ch: 采集队列大小
+      # unit:
+      # range: [4096, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 0-ebpf-to-ebpf-collector
+      #     - 1-proc-event-to-sender
+      #     - 1-profile-to-sender
+      # upgrade_from: static_config.ebpf-collector-queue-size
+      collector_queue_size: 65535
+      # type: int
+      # name:
+      #   en: Userspace Worker Threads
+      #   ch: 用户态工作线程数
+      # unit:
+      # range: [1, 1024]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The number of worker threads refers to how many threads participate
+      #     in data processing in user-space. The actual maximal value is the number
+      #     of CPU logical cores on the host.
+      # upgrade_from: static_config.ebpf.thread-num
+      userspace_worker_threads: 1
+      # type: int
+      # name:
+      #   en: Perf Pages Count
+      #   ch: Perf Page 数量
+      # unit:
+      # range: [32, 8192]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The number of page occupied by the shared memory of the kernel. The
+      #     value is `2^n (5 <= n <= 13)`. Used for perf data transfer. If the
+      #     value is between `2^n` and `2^(n+1)`, it will be automatically adjusted
+      #     by the ebpf configurator to the minimum value `2^n`.
+      # upgrade_from: static_config.ebpf.perf-pages-count
+      # TODO: 准确含义是什么？名字不太清晰
+      perf_pages_count: 128
+      # type: int
+      # name:
+      #   en: Kernel Ring Size
+      #   ch: 内核环形队列大小
+      # unit:
+      # range: [8192, 131072]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The size of the ring cache queue, The value is `2^n (13 <= n <= 17)`.
+      #     If the value is between `2^n` and `2^(n+1)`, it will be automatically
+      #     adjusted by the ebpf configurator to the minimum value `2^n`.
+      # upgrade_from: static_config.ebpf.ring-size
+      # TODO: 含义确认
+      kernel_ring_size: 65536
+      # type: int
+      # name:
+      #   en: Maximum Socket Entries
+      #   ch: 最大 Socket 条目数
+      # unit:
+      # range: [100000, 2000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Set the maximum value of hash table entries for socket tracking, depending
+      #     on the number of concurrent requests in the actual scenario
+      # upgrade_from: static_config.ebpf.max-socket-entries
+      max_socket_entries: 131072
+      # type: int
+      # name:
+      #   en: Socket Map Reclaim Threshold
+      #   ch: Socket Map 回收阈值
+      # unit:
+      # range: [100000, 2000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The threshold for cleaning socket map table entries.
+      # upgrade_from: static_config.ebpf.socket-map-max-reclaim
+      socket_map_reclaim_threshold: 120000
+      # type: int
+      # name:
+      #   en: Maximum Trace Entries
+      #   ch: 最大 Trace 条目数
+      # unit:
+      # range: [100000, 2000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Set the maximum value of hash table entries for thread/coroutine tracking sessions.
+      # upgrade_from: static_config.ebpf.max-trace-entries
+      max_trace_entries: 131072
+    # type: section
+    # name:
+    #   en: Preprocess
+    #   ch: 预处理
+    # description:
+    preprocess:
+      # type: int
+      # name:
+      #   en: OOOR Cache Size
+      #   ch: 乱序重排（OOOR）缓冲区大小
+      # unit:
+      # range: [8, 1024]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     OOOR: Out Of Order Reassembly
+      #
+      #     When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size`
+      #     eBPF socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached
+      #     in each TCP/UDP flow to prevent out-of-order events from impacting application protocol
+      #     parsing. Since eBPF socket events are sent to user space in batches, out-of-order scenarios
+      #     mainly occur when requests and responses within a single session are processed by different
+      #     CPUs, causing the response to reach user space before the request.
+      # upgrade_from: static_config.ebpf.syscall-out-of-order-cache-size
+      out_of_order_reassembly_cache_size: 16
+      # type: string
+      # name:
+      #   en: OOOR Protocols
+      #   ch: 乱序重排（OOOR）协议列表
+      # unit:
+      # range: []
+      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     OOOR: Out Of Order Reassembly
+      #
+      #     When this capability is enabled for a specific application protocol, the agent will add
+      #     out-of-order-reassembly processing for it. Note that the agent will consume more memory
+      #     in this case, so please adjust the syscall-out-of-order-cache-size accordingly and monitor
+      #     the agent's memory usage.
+      #
+      #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+      #
+      #     Attention: use `HTTP2` for `gRPC` Protocol.
+      # upgrade_from: static_config.ebpf.syscall-out-of-order-reassembly
+      out_of_order_reassembly_protocols: []
+      # type: string
+      # name:
+      #   en: SR Protocols
+      #   ch: 分段重组（SR）协议列表
+      # unit:
+      # range: []
+      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     SR: Segmentation Reassembly
+      #
+      #     When this capability is enabled for a specific application protocol, the agent will add
+      #     segmentation-reassembly processing to merge application protocol content spread across
+      #     multiple syscalls before parsing it. This enhances the success rate of application
+      #     protocol parsing. Note that `syscall-out-of-order-reassembly` must also be enabled for
+      #     this feature to be effective.
+      #
+      #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+      #
+      #     Attention: use `HTTP2` for `gRPC` Protocol.
+      # upgrade_from: static_config.ebpf.syscall-segmentation-reassembly
+      segmentation_reassembly_protocols: []
+  # type: section
+  # name:
+  #   en: Resources
+  #   ch: 资源
+  # description:
+  resources:
+    # type: duration
+    # name:
+    #   en: Push Interval
+    #   ch: 推送间隔
+    # unit:
+    # range: [10s, 3600s]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     The interval at which deepflow-agent actively reports resource information
+    #     to deepflow-server.
+    # upgrade_from: platform_sync_interval
+    # TODO: 原来的单位是 s、类型是 int，新版本要改成 duration
+    push_interval: 10s
+    # type: section
+    # name:
+    #   en: Collect Private Cloud Resource
+    #   ch: 采集专有云资源
+    # description:
+    private_cloud:
+      # type: bool
+      # name:
+      #   en: Hypervisor Resource Enabled
+      #   ch: 启用云宿主机资源
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When enabled, deepflow-agent will automatically synchronize virtual
+      #     machine and network information on the KVM (or Host) to deepflow-server.
+      # upgrade_from: platform_enabled
+      # TODO: 原来是 int，需要改为 bool
+      # TODO: 到底包含采集哪些信息？决定起什么名字
+      hypervisor_resource_enabled: false
+      # type: int
+      # name:
+      #   en: VM MAC Source
+      #   ch: 虚拟机 MAC 源
+      # unit:
+      # range: []
+      # enum_options:
+      #   - 0:
+      #       en: Interface MAC Address
+      #       ch: 网卡 MAC 地址
+      #   - 1:
+      #       en: Interface Name
+      #       ch: 网卡名称
+      #   - 2:
+      #       en: Qemu XML File
+      #       ch: Qemu XML 文件
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     How to extract the real MAC address of the virtual machine when the
+      #     agent runs on the KVM host.
+      #
+      #     Explanation of the options:
+      #     - 0: extracted from tap interface MAC address
+      #     - 1: extracted from tap interface name
+      #     - 2: extracted from the XML file of the virtual machine
+      # upgrade_from: if_mac_source
+      vm_mac_source: 0
+      # type: string
+      # name:
+      #   en: VM XML Directory
+      #   ch: 虚拟机 XML 文件夹
+      # unit:
+      # range: [0, 100]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     VM XML file directory.
+      # upgrade_from: vm_xml_path
+      vm_xml_directory: /etc/libvirt/qemu/
+      # type: string
+      # name:
+      #   en: VM MAC Mapping Script
+      #   ch: 虚拟机 MAC 映射脚本
+      # unit:
+      # range: [0, 100]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The MAC address mapping relationship of TAP NIC in complex environment can be
+      #     constructed by writing a script. The following conditions must be met to use this
+      #     script:
+      #     1. if_mac_source = 2
+      #     2. tap_mode = 0
+      #     3. The name of the TAP NIC is the same as in the virtual machine XML file
+      #     4. The format of the script output is as follows:
+      #        - tap2d283dfe,11:22:33:44:55:66
+      #        - tap2d283223,aa:bb:cc:dd:ee:ff
+      # upgrade_from: static_config.tap-mac-script
+      # TODO: 增加了最小、最大长度
+      vm_mac_mapping_script: ""
+    # type: section
+    # name:
+    #   en: Collect K8s Resource
+    #   ch: 采集 K8s 资源
+    # description:
+    kubernetes:
+      # type: string
+      # name:
+      #   en: K8s Namespace
+      #   ch: K8s 命名空间
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Used when deepflow-agent has only one k8s namespace query permission.
+      # upgrade_from: static_config.kubernetes-namespace
+      kubernetes_namespace:
+      # type: dict
+      # name:
+      #   en: K8s API Resources
+      #   ch: K8s API 资源
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Specify kubernetes resources to watch.
+      #
+      #     The schematics of entries in list is:
+      #     ```
+      #     name: string
+      #     group: string
+      #     version: string
+      #     disabled: bool (default false)
+      #     field-selector: string
+      #     ```
+      #
+      #     To disable a resource, add an entry to the list with `disabled: true`:
+      #     ```
+      #     kubernetes-resources:
+      #     - name: services
+      #       disabled: true
+      #     ```
+      #
+      #     To enable a resource, add an entry of this resource to the list. Be advised that
+      #     this setting overrides the default of the same resource. For example, to enable
+      #     `statefulsets` in both group `apps` (the default) and `apps.kruise.io` will require
+      #     two entries:
+      #     ```
+      #     kubernetes-resources:
+      #     - name: statefulsets
+      #       group: apps
+      #     - name: statefulsets
+      #       group: apps.kruise.io
+      #       version: v1beta1
+      #     ```
+      #
+      #     To watching `routes` in openshift you can use the following settings:
+      #     ```
+      #     kubernetes-resources:
+      #     - name: ingresses
+      #       disabled: true
+      #     - name: routes
+      #     ```
+      # upgrade_from: static_config.kubernetes-resources
+      # TODO: dict 类型的字段升级时要注意
+      # ---
+      # type: string
+      # name:
+      #   en: Name
+      #   ch: 名称
+      # unit:
+      # range: []
+      # enum_options:
+      #   - namespaces
+      #   - nodes
+      #   - pods
+      #   - replicationcontrollers
+      #   - services
+      #   - daemonsets
+      #   - deployments
+      #   - replicasets
+      #   - statefulsets
+      #   - ingresses
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     K8s API resource name.
+      # upgrade_from: static_config.kubernetes-resources.name
+      # ---
+      # name: ""
+      # ---
+      # type: string
+      # name:
+      #   en: Group
+      #   ch: 组
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     K8s API resource group.
+      # upgrade_from: static_config.kubernetes-resources.group
+      # ---
+      # group: ""
+      # ---
+      # type: string
+      # name:
+      #   en: Version
+      #   ch: 版本
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     K8s API version.
+      # upgrade_from: static_config.kubernetes-resources.version
+      # ---
+      # version: ""
+      # ---
+      # type: bool
+      # name: Disabled
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     K8s API resource disabled.
+      # upgrade_from: static_config.kubernetes-resources.disabled
+      # ---
+      # disabled: false
+      # ---
+      # type: string
+      # name: Field Selector
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     K8s API resource field selector.
+      # upgrade_from: static_config.kubernetes-resources.field-selector
+      # ---
+      # field_selector: ""
+      api_resources:
+      - name: namespaces
+      - name: nodes
+      - name: pods
+      - name: replicationcontrollers
+      - name: services
+      - name: daemonsets
+      - name: deployments
+      - name: replicasets
+      - name: statefulsets
+      - name: ingresses
+      # type: int
+      # name:
+      #   en: K8s API List Page Size
+      #   ch: K8s API List 页大小
+      # unit:
+      # range: [10, 4294967295]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Used when limit k8s api list entry size.
+      # upgrade_from: static_config.kubernetes-api-list-limit
+      api_list_page_size: 1000
+      # type: duration
+      # name:
+      #   en: K8s API List Maximum Interval
+      #   ch: K8s API List 最大间隔
+      # unit:
+      # range: [10m, 30d]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Interval of listing resource when watcher idles
+      # upgrade_from: static_config.kubernetes-api-list-interval
+      # TODO: 以前没有最大值限制，我加上了 30d
+      api_list_max_interval: 10m
+      # type: string
+      # name: Ingress Flavour
+      # upgrade_from: static_config.ingress-flavour
+      # deprecated: true
+      # TODO: 这个字段废弃了，应该可以直接删除了？
+      ingress_flavour: kubernetes
+      # type: string
+      # name:
+      #   en: Pod MAC Collection Method
+      #   ch: Pod MAC 地址采集方法
+      # unit:
+      # range: []
+      # enum_options: [adaptive, active, passive]
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     In active mode, deepflow-agent enters the netns of other Pods through
+      #     setns syscall to query the MAC and IP addresses. In this mode, the setns
+      #     operation requires the SYS_ADMIN permission. In passive mode deepflow-agent
+      #     calculates the MAC and IP addresses used by Pods by capturing ARP/ND traffic.
+      #     When set to adaptive, active mode will be used first.
+      # upgrade_from: static_config.kubernetes-poller-type
+      pod_mac_collection_method: adaptive
+    # type: section
+    # name:
+    #   en: Pull Resource From Controller
+    #   ch: 从控制器拉取资源
+    # description:
+    pull_resource_from_controller:
+      # type: int
+      # name:
+      #   en: Domain Filter
+      #   ch: 云平台过滤器
+      # unit:
+      # range: []
+      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Default value `0` means all domains, or can be set to a list of lcuuid of a
+      #     series of domains, you can get lcuuid through 'deepflow-ctl domain list'.
+      #
+      #     Note: The list of MAC and IP addresses is used by deepflow-agent to inject tags
+      #     into data. This configuration can reduce the number and frequency of MAC and
+      #     IP addresses delivered by deepflow-server to deepflow-agent. When there is no
+      #     cross-domain service request, deepflow-server can be configured to only deliver
+      #     the information in the local domain to deepflow-agent.
+      # upgrade_from: domains
+      # TODO: 特殊字段，候选项需要通过自己的 API 获取。这个字段是 int 还是 string？默认值为空数组更合理？
+      domain_filter: [0]
+      # type: int
+      # name:
+      #   en: K8s Internal Pod IP Filter
+      #   ch: K8s 内部 Pod IP 过滤器
+      # unit:
+      # range: []
+      # enum_options:
+      #   - 0:
+      #       en: All K8s Cluster
+      #       ch: 所有 K8s 集群
+      #   - 1:
+      #       en: Local K8s Cluster
+      #       ch: 本地 K8s 集群
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The list of MAC and IP addresses is used by deepflow-agent to inject tags
+      #     into data. This configuration can reduce the number and frequency of MAC and IP
+      #     addresses delivered by deepflow-server to deepflow-agent. When the Pod IP is not
+      #     used for direct communication between the K8s cluster and the outside world,
+      #     deepflow-server can be configured to only deliver the information in the local
+      #     K8s cluster to deepflow-agent.
+      # upgrade_from: pod_cluster_internal_ip
+      kubernetes_internal_pod_ip_filter: 0
+  # type: section
+  # name:
+  #   en: Integration
+  #   ch: 集成
+  # description:
+  integration:
+    # type: bool
+    # name: Enabled
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to enable receiving external data sources such as Prometheus,
+    #     Telegraf, OpenTelemetry, and SkyWalking.
+    # upgrade_from: external_agent_http_proxy_enabled
+    # TODO: 原来是 int，需要改为 bool
+    enabled: true
+    # type: int
+    # name:
+    #   en: Listen Port
+    #   ch: 监听端口
+    # unit:
+    # range: [1, 65535]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Listen port of the data integration socket.
+    # upgrade_from: external_agent_http_proxy_port
+    listen_port: 38086
+    # type: bool
+    # name:
+    #   en: Data Compression
+    #   ch: 数据压缩
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Whether to compress the integrated data received by deepflow-agent. Currently,
+    #     only opentelemetry data is supported, and the compression ratio is about 5:1~10:1.
+    #     Turning on this feature will result in higher CPU consumption of deepflow-agent.
+    # upgrade_from: static_config.external-agent-http-proxy-compressed
+    data_compression: false
+    # type: section
+    # name:
+    #   en: Prometheus Extra Labels
+    #   ch: Prometheus 额外 Label
+    # description:
+    #   en: |-
+    #     Support for getting extra labels from headers in http requests from RemoteWrite.
+    prometheus_extra_labels:
+      # type: bool
+      # name: Enabled
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Prometheus extra labels switch.
+      # upgrade_from: static_config.prometheus-extra-config.enabled
+      enabled: false
+      # type: string
+      # name:
+      #   en: Extra Labels
+      #   ch: 额外 Label
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Labels list. Labels in this list are sent. Label is a string
+      #     matching the regular expression `[a-zA-Z_][a-zA-Z0-9_]*`
+      # upgrade_from: static_config.prometheus-extra-config.labels
+      # TODO: 这里如何配置？原来的例子应该不对，只有 key 没有 value
+      extra_labels: []
+      # type: int
+      # name:
+      #   en: Label Length Limit
+      #   ch: Label 键长度限制
+      # unit: byte
+      # range: [1024, 1048576]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The size limit of the parsed key.
+      # upgrade_from: static_config.prometheus-extra-config.labels-limit
+      # TODO: 是 labels limit 还是 label-length limit?
+      label_length: 1024
+      # type: int
+      # name:
+      #   en: Value Length Limit
+      #   ch: Label 值长度限制
+      # unit: byte
+      # range: [4096, 4194304]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The size limit of the parsed value.
+      # upgrade_from: static_config.prometheus-extra-config.values-limit
+      # TODO: 是 values limit 还是 value-length limit?
+      value_length: 4096
+    # type: section
+    # name:
+    #   en: Feature Control
+    #   ch: 特性开关
+    # description:
+    feature_control:
+      # type: bool
+      # name:
+      #   en: Profile Integration Disabled
+      #   ch: 禁用 Profile 集成
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      # upgrade_from: static_config.external-profile-integration-disabled
+      profile_integration_disabled: false
+      # type: bool
+      # name:
+      #   en: Trace Integration Disabled
+      #   ch: 禁用 Trace 集成
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      # upgrade_from: static_config.external-trace-integration-disabled
+      trace_integration_disabled: false
+      # type: bool
+      # name:
+      #   en: Metric Integration Disabled
+      #   ch: 禁用 Metric 集成
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      # upgrade_from: static_config.external-metric-integration-disabled
+      metric_integration_disabled: false
+      # type: bool
+      # name:
+      #   en: Log Integration Disabled
+      #   ch: 禁用 Log 集成
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      # upgrade_from: static_config.external-log-integration-disabled
+      log_integration_disabled: false
+
+# type: section
+# name:
+#   en: Precessors
+#   ch: 处理器
+# description:
+processors:
+  # type: section
+  # name: Packet
+  # description:
+  packet:
+    # type: section
+    # name: Policy
+    # description:
+    policy:
+      # type: int
+      # name:
+      #   en: Fast-path Map Size
+      #   ch: Fast-path 字典大小
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When set to 0, deepflow-agent will automatically adjust the map size
+      #     according to max_memory.
+      # upgrade_from: static_config.fast-path-map-size
+      # TODO: 需要确认允许的范围
+      fast_path_map_size: 0
+      # type: bool
+      # name:
+      #   en: Fast-path Disabled
+      #   ch: 禁用 Fast-path
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description: |-
+      #   When set to true, deepflow-agent will not use fast path.
+      # upgrade_from: static_config.fast-path-disabled
+      # TODO: 还在用吗：
+      fast_path_disabled: false
+      # type: int
+      # name:
+      #   en: Forward Table Capacity
+      #   ch: Forward 表容量
+      # unit:
+      # range: [16384, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When this value is larger, the more memory usage may be.
+      # upgrade_from: static_config.forward-capacity
+      # TODO: 需要确定最大值能配多少
+      forward_table_capacity: 16384
+      # type: int
+      # name:
+      #   en: Max First-path Level
+      #   ch: 最大 First-path 层级
+      # unit:
+      # range: [1, 16]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description: |-
+      #   When this value is larger, the memory overhead is smaller, but the
+      #   performance of policy matching is worse.
+      # upgrade_from: static_config.first-path-level
+      # TODO: 这个名字不太清晰？
+      max_first_path_level: 8
+    # type: section
+    # name:
+    #   en: TCP Header
+    #   ch: TCP 包头（时序图）
+    # description:
+    tcp_header:
+      # type: int
+      # name:
+      #   en: Block Size
+      #   ch: Block 大小
+      # unit:
+      # range: [16, 8192]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     When generating TCP header data, each flow uses one block to compress and
+      #     store multiple TCP headers, and the block size can be set here.
+      # upgrade_from: static_config.packet-sequence-block-size
+      # TODO: 增加了最小、最大值
+      block_size: 256
+      # type: int
+      # name:
+      #   en: Sender Queue Size
+      #   ch: Sender 队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     The length of the following queues (to UniformCollectSender):
+      #     - 1-packet-sequence-block-to-uniform-collect-sender
+      # upgrade_from: static_config.packet-sequence-queue-size
+      # TODO: 增加了最大值
+      sender_queue_size: 65536
+      # type: int
+      # name:
+      #   en: Sender Queue Count
+      #   ch: Sender 队列数量
+      # unit:
+      # range: [1, 64]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     The number of replicas for each output queue of the PacketSequence.
+      # upgrade_from: static_config.packet-sequence-queue-count
+      # TODO: 增加了最大值
+      sender_queue_count: 1
+      # type: int
+      # name:
+      #   en: Header Fields Flag
+      #   ch: 包头字段 Flag
+      # unit:
+      # range: [0, 255]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     packet-sequence-flag determines which fields need to be reported, the default
+      #     value is 0, which means the feature is disabled, and 255, which means all fields
+      #     need to be reported all fields corresponding to each bit:
+      #     ```
+      #     | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
+      #     8      7     6     5              4             3         2        1          0
+      #     ```
+      # upgrade_from: static_config.packet-sequence-flag
+      header_fields_flag: 0b0000_0000
+    # type: section
+    # name:
+    #   en: PCAP Stream
+    #   ch: PCAP 字节流
+    # description:
+    pcap_stream:
+      # type: int
+      # name:
+      #   en: Receiver Queue Size
+      #   ch: Receiver 队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 1-mini-meta-packet-to-pcap
+      # upgrade_from: static_config.pcap.queue-size
+      # TODO: 增加了最大值
+      receiver_queue_size: 65536
+      # type: int
+      # name:
+      #   en: Buffer Size Per Flow
+      #   ch: 每个 Flow 的缓冲区大小
+      # unit:
+      # range: [64, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Buffer flushes when one of the flows reach this limit.
+      # upgrade_from: static_config.pcap.flow-buffer-size
+      # TODO: 增加了最小、最大值
+      buffer_size_per_flow: 65536
+      # type: int
+      # name:
+      #   en: Total Buffer Size
+      #   ch: 总体缓冲区大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Buffer flushes when total data size reach this limit,
+      #     cannot exceed sender buffer size 128K.
+      # upgrade_from: static_config.pcap.buffer-size
+      # TODO: 增加了最小、最大值。注意这里最大值还要梳理一下，是否只能 128K
+      total_buffer_size: 88304
+      # type: duration
+      # name:
+      #   en: Flush Interval
+      #   ch: Flush 间隔
+      # unit:
+      # range: [1s, 10m]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Flushes a flow if its first packet were older then this interval.
+      # upgrade_from: static_config.pcap.flush-interval
+      # TODO: 增加了最小、最大值。
+      flush_interval: 1m
+    # type: section
+    # name: TOA (TCP Option Address)
+    # description:
+    toa:
+      # type: int
+      # name:
+      #   en: Sender Queue Size
+      #   ch: Sender 队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     FIXME
+      # upgrade_from: static_config.toa-sender-queue-size
+      # TODO: 以前最小值写的 1，是笔误吗？另外加上了最大值限制。以及以前的描述信息不对，需要重写。
+      sender_queue_size: 65536
+      # type: int
+      # name:
+      #   en: Cache Size
+      #   ch: Cache 大小
+      # unit:
+      # range: [1, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Size of tcp option address info cache size.
+      # upgrade_from: static_config.toa-lru-cache-size
+      # TODO: 增加了最大值限制
+      cache_size: 65536
+  # type: section
+  # name:
+  #   en: Request Log
+  #   ch: 调用日志
+  # description:
+  request_log:
+    # type: section
+    # name:
+    #   en: Application Protocol Inference
+    #   ch: 应用协议推断
+    # description:
+    application_protocol_inference:
+      # type: int
+      # name:
+      #   en: Inference Maximum Retries
+      #   ch: 推断重试最大次数
+      # unit:
+      # range: [0, 10000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     deepflow-agent will mark the long live stream and application protocol for each
+      #     <vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails
+      #     to be identified for many times (for multiple packets, Socket Data, Function Data),
+      #     the tuple will be marked as an unknown type to avoid deepflow-agent continuing to
+      #     try (incurring significant computational overhead) until the duration exceeds
+      #     l7-protocol-inference-ttl.
+      # upgrade_from: static_config.l7-protocol-inference-max-fail-count
+      # TODO: 增加了最小、最大值
+      inference_max_retries: 5
+      # type: duration
+      # name:
+      #   en: Inference Result TTL
+      #   ch: 推断结果 TTL
+      # unit:
+      # range: [0, 1d]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     deepflow-agent will mark the application protocol for each
+      #     <vpc, ip, protocol, port> tuple. In order to avoid misidentification caused by IP
+      #     changes, the validity period after successfully identifying the protocol will be
+      #     limited to this value.
+      # upgrade_from: static_config.l7-protocol-inference-ttl
+      # TODO: 增加了最小、最大值
+      inference_result_ttl: 60
+      # type: string
+      # name:
+      #   en: Enabled Protocols
+      #   ch: 启用协议列表
+      # unit:
+      # range: []
+      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Turning off some protocol identification can reduce deepflow-agent resource consumption.
+      #
+      #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+      #
+      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      # upgrade_from: static_config.l7-protocol-enabled
+      # TODO: 确认一下 SofaRPC 的拼写
+      enabled_protocols:
+        - HTTP
+        - HTTP2
+        - Dubbo
+        - SofaRPC
+        - FastCGI
+        - bRPC
+        - MySQL
+        - PostgreSQL
+        - Oracle
+        - Redis
+        - MongoDB
+        - Kafka
+        - MQTT
+        - AMQP
+        - OpenWire
+        - NATS
+        - Pulsar
+        - ZMTP
+        - DNS
+        - TLS
+        - Custom
+      # type: section
+      # name:
+      #   en: Protocol Special Config
+      #   ch: 协议特殊配置
+      # description:
+      protocol_special_config:
+        # type: section
+        # name: Oracle
+        # description:
+        oracle:
+          # type: bool
+          # name:
+          #   en: Integer Byte Order
+          #   ch: Integer 字节序
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Whether the oracle integer encode is big endian.
+          # upgrade_from: static_config.oracle-parse-config.is-be
+          is_be: true
+          # type: bool
+          # name:
+          #   en: Integer Compressed
+          #   ch: Integer 压缩
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Whether the oracle integer encode is compress.
+          # upgrade_from: static_config.oracle-parse-config.int-compress
+          int_compressed: true
+          # type: bool
+          # name:
+          #   en: Response 0x04 with Extra Byte
+          #   ch: 0x04 响应携带额外字节
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Due to the response with data id 0x04 has different struct in
+          #     different version, it may has one byte before row affect.
+          # upgrade_from: static_config.oracle-parse-config.resp-0x04-extra-byte
+          resp_0x04_extra_byte: false
+    # type: section
+    # name:
+    #   en: Filters
+    #   ch: 过滤器
+    # description:
+    filters:
+      # type: dict
+      # name:
+      #   en: Port Number Pre-filters
+      #   ch: 端口号预过滤器
+      # unit:
+      # range: []
+      # enum_options: [_DYNAMIC_OPTIONS_]
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Port-list example: 80,1000-2000
+      #
+      #     HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
+      #     All data obtained through uprobe is not subject to port restrictions.
+      #
+      #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+      #
+      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #
+      #     Attention: use `HTTP2` for `gRPC` Protocol.
+      # upgrade_from: static_config.l7-protocol-ports
+      # TODO: 格式改成和 l7-log-blacklist 一样，不用 dict 了，这样 key 更明确，且默认值的行为更明确。
+      # TODO: 确认一下 SofaRPC 的拼写
+      # TODO: 注意这个配置项有下一级配置，但它不是 section 类型的
+      port_number_prefilters:
+        HTTP: 1-65535
+        HTTP2: 1-65535
+        Dubbo: 1-65535
+        SofaRPC: 1-65535
+        FastCGI: 1-65535
+        bRPC: 1-65535
+        MySQL: 1-65535
+        PostgreSQL: 1-65535
+        Oracle: 1521
+        Redis: 1-65535
+        MongoDB: 1-65535
+        Kafka: 1-65535
+        MQTT: 1-65535
+        AMQP: 1-65535
+        OpenWire: 1-65535
+        NATS: 1-65535
+        Pulsar: 1-65535
+        ZMTP: 1-65535
+        DNS: 53,5353
+        TLS: 443,6443
+        Custom: 1-65535 # plugins
+      # type: dict
+      # name:
+      #   en: Tag Filters
+      #   ch: Tag 过滤器
+      # unit:
+      # range: []
+      # enum_options: [_DYNAMIC_OPTIONS_]
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Tag filter example:
+      #     ```
+      #     tag_filters:
+      #       HTTP:
+      #         - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+      #           operator: equal               # equal, prefix
+      #           value: somevalue
+      #     ```
+      #     A l7_flow_log blacklist can be configured for each protocol, preventing request logs matching
+      #     the blacklist from being collected by the agent or included in application performance metrics.
+      #     It's recommended to only place non-business request logs like heartbeats or health checks in this
+      #     blacklist. Including business request logs might lead to breaks in the distributed tracing tree.
+      #
+      #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+      #
+      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      # upgrade_from: static_config.l7-log-blacklist
+      # TODO: gRPC 要和 HTTP2 合并吗？需要增加 Custom 协议。
+      # TODO: 确认一下 SofaRPC 的拼写
+      tag_filters:
+        # type: dict
+        # name:
+        #   en: "$HTTP Tag Filters"
+        #   ch: "$HTTP Tag 过滤器"
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     HTTP Tag filter example:
+        #     ```
+        #     tag_filters:
+        #       HTTP:
+        #         - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+        #           operator: equal               # equal, prefix
+        #           value: somevalue
+        #       HTTP2: []
+        #       # other protocols ...
+        #     ```
+        #     A l7_flow_log tag_filter can be configured for each protocol, preventing request logs matching
+        #     the blacklist from being collected by the agent or included in application performance metrics.
+        #     It's recommended to only place non-business request logs like heartbeats or health checks in this
+        #     blacklist. Including business request logs might lead to breaks in the distributed tracing tree.
+        #
+        #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+        #
+        #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+        # upgrade_from: static_config.l7-log-blacklist.$protocol
+        # TODO: 注意升级
+        # ---
+        # type: string
+        # name:
+        #   en: Field Name
+        #   ch: 字段名
+        # unit:
+        # range: []
+        # enum_options: [endpoint, request_type, request_domain, request_resource]
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Match field name.
+        # upgrade_from: static_config.l7-log-blacklist.$protocol.field-name
+        # ---
+        # field_name: ""
+        # ---
+        # type: string
+        # name:
+        #   en: Operator
+        #   ch: 匹配操作符
+        # unit:
+        # range: []
+        # enum_options: [equal, prefix]
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Match operator.
+        # upgrade_from: static_config.l7-log-blacklist.$protocol.operator
+        # ---
+        # operator: ""
+        # ---
+        # type: string
+        # name:
+        #   en: Field Value
+        #   ch: 字段值
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Match field value.
+        # upgrade_from: static_config.l7-log-blacklist.$protocol.value
+        # ---
+        # field_value: ""
+        HTTP: []
+        HTTP2: []
+        Dubbo: []
+        gRPC: []
+        SOFARPC: []
+        FastCGI: []
+        bRPC: []
+        MySQL: []
+        PostgreSQL: []
+        Oracle: []
+        Redis: []
+        MongoDB: []
+        Kafka: []
+        MQTT: []
+        AMQP: []
+        OpenWire: []
+        NATS: []
+        Pulsar: []
+        ZMTP: []
+        DNS: []
+        TLS: []
+      # type: string
+      # name:
+      #   en: Unconcerned DNS NXDOMAIN
+      #   ch: 不关心的 DNS NXDOMAIN 错误
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     You might not be concerned about certain DNS NXDOMAIN errors and may wish to ignore
+      #     them. For example, when a K8s Pod tries to resolve an external domain name, it first
+      #     concatenates it with the internal domain suffix of the cluster and attempts to resolve
+      #     it. All these attempts will receive an NXDOMAIN reply before it finally requests the
+      #     original domain name directly, and these errors may not be of concern to you. In such
+      #     cases, you can configure their `response_result` suffix here, so that the corresponding
+      #     `response_status` in the l7_flow_log is forcibly set to `Success`.
+      # upgrade_from: static_config.l7-protocol-advanced-features.unconcerned-dns-nxdomain-response-suffixes
+      unconcerned_dns_nxdomain_response_suffixes: []
+    # type: section
+    # name:
+    #   en: Timeouts
+    #   ch: 超时设置
+    # description:
+    timeouts:
+      # type: duration
+      # name:
+      #   en: TCP Request Timeout
+      #   ch: TCP 调用超时时间
+      # unit:
+      # range: [10s, 3600s]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
+      #     calculate the sum and average and will not merge the request and response in session aggregate. the value
+      #     must greater than session aggregate SLOT_TIME (const 10s) and less than 3600 on tcp.
+      # upgrade_from: static_config.rrt-tcp-timeout
+      tcp_request_timeout: 1800s
+      # type: duration
+      # name:
+      #   en: UDP Request Timeout
+      #   ch: UDP 调用超时时间
+      # unit:
+      # range: [10s, 300s]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The timeout of l7 log info rrt calculate, when rrt exceed the value will act as timeout and will not
+      #     calculate the sum and average and will not merge the request and response in session aggregate. the value
+      #     must greater than session aggregate SLOT_TIME (const 10s) and less than 300 on udp.
+      # upgrade_from: static_config.rrt-udp-timeout
+      udp_request_timeout: 150s
+      # type: duration
+      # name:
+      #   en: Session Aggregate Window Duration
+      #   ch: 会话合并窗口时长
+      # unit:
+      # range: [20s, 300s]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description: |-
+      #   l7_flow_log aggregate window.
+      # upgrade_from: static_config.l7-log-session-aggr-timeout
+      session_aggregate_window_duration: 120s
+    # type: section
+    # name:
+    #   en: Tag Extraction
+    #   ch: 标签提取
+    # description:
+    tag_extraction:
+      # type: section
+      # name:
+      #   en: Tracing Tag
+      #   ch: Tracing 标签
+      # description:
+      tracing_tag:
+        # type: string
+        # name:
+        #   en: HTTP Real Client
+        #   ch: HTTP 真实客户端
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     It is used to extract the real client IP field in the HTTP header,
+        #     such as X-Forwarded-For, etc. Leave it empty to disable this feature.
+        # upgrade_from: http_log_proxy_client
+        # TODO: 支持数组吗？应该要支持。
+        http_real_client: X_Forwarded_For
+        # type: string
+        # name: X-Request-ID
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     It is used to extract the fields in the HTTP header that are used
+        #     to uniquely identify the same request before and after the gateway,
+        #     such as X-Request-ID, etc. This feature can be turned off by setting
+        #     it to empty.
+        # upgrade_from: http_log_x_request_id
+        # TODO: 支持数组吗？应该要支持。
+        x_request_id: X_Request_ID
+        # type: string
+        # name: APM TraceID
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Used to extract the TraceID field in HTTP and RPC headers, supports filling
+        #     in multiple values separated by commas. This feature can be turned off by
+        #     setting it to empty.
+        # upgrade_from: http_log_trace_id
+        # TODO: 以前是一个字符串，支持逗号分割填写多个值，现在变成一个数组
+        apm_trace_id: [traceparent, sw8]
+        # type: string
+        # name: APM SpanID
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Used to extract the SpanID field in HTTP and RPC headers, supports filling
+        #     in multiple values separated by commas. This feature can be turned off by
+        #     setting it to empty.
+        # upgrade_from: http_log_span_id
+        # TODO: 以前是一个字符串，支持逗号分割填写多个值，现在变成一个数组
+        apm_span_id: [traceparent, sw8]
+      # type: section
+      # name:
+      #   en: HTTP Endpoint
+      #   ch: HTTP 端点
+      # description:
+      http_endpoint:
+        # type: bool
+        # name:
+        #   en: Extraction Disabled
+        #   ch: 禁用提取
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     HTTP endpoint extration is enabled by default.
+        # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.disabled
+        extraction_disabled: false
+        # type: dict
+        # name:
+        #   en: Match Rules
+        #   ch: 匹配规则
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Extract endpoint according to the following rules:
+        #     - Find a longest prefix that can match according to the principle of
+        #       "longest prefix matching"
+        #     - Intercept the first few paragraphs in URL (the content between two
+        #       / is regarded as one paragraph) as endpoint
+        #
+        #     By default, two segments are extracted from the URL. For example, the
+        #     URL is /a/b/c?query=xxx", whose segment is 3, extracts "/a/b" as the
+        #     endpoint.
+        # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.match-rules
+        # TODO: 注意 dict 字段的升级。
+        # ---
+        # type: string
+        # name:
+        #   en: URL Prefix
+        #   ch: URL 前缀
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     HTTP URL prefix.
+        # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.match-rules.prefix
+        # ---
+        # url_prefix: ""
+        # ---
+        # type: int
+        # name:
+        #   en: Keep Segments
+        #   ch: 截取 Segment 数
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Keep how many segments.
+        # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.match-rules.keep-segments
+        # ---
+        # keep_segments: 0
+        match_rules:
+        - url_prefix: ""
+          keep_segments: 2
+      # type: dict
+      # name:
+      #   en: Custom Fields
+      #   ch: 自定义字段
+      # unit:
+      # range: []
+      # enum_options: [HTTP, HTTP2]
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Configuration to extract the customized header fields of HTTP, HTTP2, gRPC protocol etc.
+      #
+      #     Example:
+      #     ```yaml
+      #     custom_fields:
+      #       HTTP:
+      #         - field-name: "user-agent"
+      #         - field-name: "cookie"
+      #     ```
+      #
+      #     Attention: use `HTTP2` for `gRPC` Protocol.
+      # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields
+      # TODO: http 和 http2 的大小写调整了一下。
+      custom_fields:
+        # type: dict
+        # name:
+        #   en: "$HTTP Custom Fields"
+        #   ch: "$HTTP 自定义字段"
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Configuration to extract the customized header fields of HTTP, HTTP2, gRPC protocol etc.
+        #
+        #     Example:
+        #     ```yaml
+        #     custom_fields:
+        #       HTTP:
+        #         - field-name: "user-agent"
+        #         - field-name: "cookie"
+        #       HTTP2: []
+        #     ```
+        #
+        #     Attention: use `HTTP2` for `gRPC` Protocol.
+        # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields.$protocol
+        # ---
+        # type: string
+        # name:
+        #   en: Field Name
+        #   ch: 字段名
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Field name.
+        # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields.$protocol.field-name
+        # ---
+        # field_name: ""
+        HTTP: []
+        HTTP2: []
+      # type: string
+      # name:
+      #   en: Obfuscate Protocols
+      #   ch: 脱敏协议列表
+      # unit:
+      # range: []
+      # enum_options: [MySQL, PostgreSQL, HTTP, HTTP2, Redis]
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     For the sake of data security, the data of the protocol that needs
+      #     to be desensitized is configured here and is not processed by default.
+      # upgrade_from: static_config.l7-protocol-advanced-features.obfuscate-enabled-protocols
+      obfuscate_protocols: [Redis]
+    # type: section
+    # name:
+    #   en: Tunning
+    #   ch: 调优
+    # description:
+    tunning:
+      # type: int
+      # name:
+      #   en: Payload Truncation
+      #   ch: Payload 截取
+      # unit: byte
+      # range: [256, 65535]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The maximum data length used for application protocol identification,
+      #     note that the effective value is less than or equal to the value of
+      #     capture_packet_size.
+      #
+      #     NOTE: For eBPF data, the largest valid value is 16384.
+      # upgrade_from: l7_log_packet_size
+      payload_truncation: 1024
+      # type: int
+      # name:
+      #   en: Session Aggregate Slot Capacity
+      #   ch: 会话聚合桶容量
+      # unit:
+      # range: [1024, 1000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     By default, unidirectional l7_flow_log is aggregated into bidirectional
+      #     request_log (session) with a caching time window of 2 minutes. During this
+      #     period, every 5 seconds is considered as a time slot (i.e., a LRU). This
+      #     configuration is used to specify the maximum number of unidirectional l7_flow_log
+      #     entries that can be cached in each time slot.
+      #
+      #     If the number of l7_flow_log entries cached in a time slot exceeds this
+      #     configuration, 10% of the data in that time slot will be evicted based on the
+      #     LRU strategy to reduce memory consumption. Note that the evicted data will not be
+      #     discarded; instead, they will be sent to the deepflow-server as unidirectional
+      #     request_log.
+      #
+      #     The following metrics can be used as reference data for adjusting this configuration:
+      #     - Metric `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource`
+      #       Used to record the total memory occupied by the request_resource field of the
+      #       unidirectional l7_flow_log cached in all time slots at the current moment, in bytes.
+      #     - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
+      #       Used to record the number of times eviction is triggered due to reaching the
+      #       LRU capacity limit.
+      # upgrade_from: static_config.l7-log-session-slot-capacity
+      # TODO: 增加了最大值
+      session_aggregate_slot_capacity: 1024
+  # type: section
+  # name:
+  #   en: Flow Metrics
+  #   ch: Flow 性能指标
+  # description:
+  flow_metrics:
+    # type: section
+    # name:
+    #   en: Time Window
+    #   ch: 时间窗口
+    # description:
+    time_window:
+      # type: duration
+      # name:
+      #   en: Maximum Tolerable Packet Delay
+      #   ch: 最大可容忍的 Packet 延迟
+      # unit:
+      # range: [1s, 10s]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description: |-
+      #   Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
+      # upgrade_from: static_config.packet-delay
+      max_tolerable_packet_delay: 1s
+      # type: duration
+      # name:
+      #   en: Extra Tolerable Flow Delay
+      #   ch: 额外可容忍的 Flow 延迟
+      # unit:
+      # range: [1s, 10s]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
+      # upgrade_from: static_config.second-flow-extra-delay-second
+      # TODO: 增加了最小、最大限制
+      extra_tolerable_flow_delay: 0s
+    # type: section
+    # name:
+    #   en: Conntrack (a.k.a. Flow Map)
+    #   ch: Conntrack（即 Flow Map）
+    # description:
+    conntrack:
+      # type: duration
+      # name:
+      #   en: Flow Flush Interval
+      #   ch: Flow Flush 间隔
+      # unit:
+      # range: [1s, 1m]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Flush interval of the queue connected to the collector.
+      # upgrade_from: static_config.flow.flush-interval
+      # TODO: 增加了最小、最大值
+      flow_flush_interval: 1s
+      # type: section
+      # name:
+      #   en: Flow Generation
+      #   ch: Flow 生成逻辑
+      # description:
+      flow_generation:
+        # type: bool
+        # name:
+        #   en: Cloud Traffic Ignore MAC
+        #   ch: 云流量忽略 MAC
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the MAC addresses of the two-way traffic collected at the same
+        #     location are asymmetrical, the traffic cannot be aggregated into a Flow.
+        #     You can set this value at this time. Only valid for Cloud (not IDC) traffic.
+        # upgrade_from: static_config.flow.ignore-tor-mac
+        # TODO: 命名对吗？所有流量都适用？
+        cloud_traffic_ignore_mac: false
+        # type: bool
+        # name:
+        #   en: Ignore L2End
+        #   ch: 忽略 L2End
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     For Cloud traffic, only the MAC address corresponding to the side with
+        #     L2End = true is matched when generating the flow. Set this value to true to
+        #     force a double-sided MAC address match and only aggregate traffic with
+        #     exactly equal MAC addresses.
+        # upgrade_from: static_config.flow.ignore-l2-end
+        ignore_l2_end: false
+        # type: bool
+        # name:
+        #   en: IDC Traffic Ignore VLAN
+        #   ch: IDC 流量忽略 VLAN
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     When the VLAN of the two-way traffic collected at the same location
+        #     are asymmetrical, the traffic cannot be aggregated into a Flow. You can
+        #     set this value at this time. Only valid for IDC (not Cloud) traffic.
+        # upgrade_from: static_config.flow.ignore-idc-vlan
+        # TODO: 命名对吗？所有镜像流量都适用？
+        idc_traffic_ignore_vlan: false
+      # type: section
+      # name:
+      #   en: Timeouts
+      #   ch: 超时设置
+      # description:
+      timeouts:
+        # type: duration
+        # name: Established
+        # unit:
+        # range: [1s, 1d]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Timeouts for TCP State Machine - Established.
+        # upgrade_from: static_config.flow.established-timeout
+        # TODO: 增加了最小、最大值。描述信息要修改
+        established: 300s
+        # type: duration
+        # name: Closing RST
+        # unit:
+        # range: [1s, 1d]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Timeouts for TCP State Machine - Closing Reset.
+        # upgrade_from: static_config.flow.closing-rst-timeout
+        # TODO: 增加了最小、最大值。描述信息要修改
+        closing_rst: 35s
+        # type: duration
+        # name: Opening RST
+        # unit:
+        # range: [1s, 1d]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Timeouts for TCP State Machine - Opening Reset.
+        # upgrade_from: static_config.flow.opening-rst-timeout
+        # TODO: 增加了最小、最大值。描述信息要修改
+        opening_rst: 1s
+        # type: duration
+        # name: Others
+        # unit:
+        # range: [1s, 1d]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Timeouts for TCP State Machine - Others.
+        # upgrade_from: static_config.flow.others-timeout
+        # TODO: 增加了最小、最大值。描述信息要修改
+        others: 5s
+    # type: section
+    # name:
+    #   en: Tunning
+    #   ch: 调优
+    # description:
+    tunning:
+      # type: int
+      # name:
+      #   en: FlowMap Hash Slots
+      #   ch: FlowMap 哈希桶
+      # unit:
+      # range: [1024, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Since FlowAggregator is the first step in all processing, this value
+      #     is also widely used in other hash tables such as QuadrupleGenerator,
+      #     Collector, etc.
+      # upgrade_from: static_config.flow.flow-slots-size
+      # TODO: 增加了最小、最大值
+      flow_map_hash_slots: 131072
+      # type: int
+      # name:
+      #   en: Concurrent Flow Limit
+      #   ch: 并发 Flow 数量限制
+      # unit:
+      # range: [1024, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
+      #     the RRT cache, Example: rrt-cache-capacity = flow-count-limit. When rrt-cache-capacity is
+      #     not enough, it will be unable to calculate the rrt of l7.
+      # upgrade_from: static_config.flow.flow-count-limit
+      # TODO: 增加了最小、最大值
+      concurrent_flow_limit: 65535
+      # type: int
+      # name:
+      #   en: Memory Pool Size
+      #   ch: 内存池大小
+      # unit:
+      # range: [1024, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     This value is used to set max length of memory pool in FlowMap
+      #     Memory pools are used for frequently create and destroy objects like
+      #     FlowNode, FlowLog, etc.
+      # upgrade_from: static_config.flow.memory-pool-size
+      # TODO: 增加了最小、最大值
+      memory_pool_size: 65536
+      # type: int
+      # name:
+      #   en: Maximum Size of Batched Buffer
+      #   ch: Batched Buffer 最大大小
+      # unit:
+      # range: [1024, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Only TaggedFlow allocation is affected at the moment.
+      #     Structs will be allocated in batch to minimalize malloc calls.
+      #     Total memory size of a batch will not exceed this limit.
+      #     A number larger than 128K is not recommended because the default
+      #     MMAP_THRESHOLD is 128K, allocating chunks larger than 128K will
+      #     result in calling mmap and more page faults.
+      # upgrade_from: static_config.batched-buffer-size-limit
+      # TODO: 增加了最大值
+      max_batched_buffer_size: 131072
+      # type: int
+      # name:
+      #   en: FlowAggregator Queue Size
+      #   ch: FlowAggregator 队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 2-second-flow-to-minute-aggrer
+      # upgrade_from: static_config.flow.flow-aggr-queue-size
+      # TODO: 增加了最大值
+      flow_aggregator_queue_size: 65535
+      # type: int
+      # name:
+      #   en: FlowGenerator Queue Size
+      #   ch: FlowGenerator 队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 1-tagged-flow-to-quadruple-generator
+      #     - 1-tagged-flow-to-app-protocol-logs
+      #     - 0-{flow_type}-{port}-packet-to-tagged-flow (flow_type: sflow, netflow)
+      # upgrade_from: static_config.flow-queue-size
+      # TODO: 以前没有设最大值，现在加上了
+      flow_generator_queue_size: 65536
+      # type: int
+      # name:
+      #   en: QuadrupleGenerator Queue Size
+      #   ch: QuadrupleGenerator 队列大小
+      # unit:
+      # range: [262144, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 2-flow-with-meter-to-second-collector
+      #     - 2-flow-with-meter-to-minute-collector
+      # upgrade_from: static_config.quadruple-queue-size
+      # TODO: 以前没有设最大值，现在加上了
+      quadruple_generator_queue_size: 262144
+
+# type: section
+# name:
+#   en: Outputs
+#   ch: 输出
+# description:
+outputs:
+  # type: section
+  # name: Socket
+  # description:
+  socket:
+    # type: string
+    # name:
+    #   en: Data Socket Type
+    #   ch: Data Socket 类型
+    # unit:
+    # range: []
+    # enum_options: [TCP, UDP, FILE]
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     It can only be set to FILE in standalone mode, in which case
+    #     l4_flow_log and l7_flow_log will be written to local files.
+    # upgrade_from: collector_socket_type
+    data_socket_type: TCP
+    # type: string
+    # name:
+    #   en: PCAP Socket Type
+    #   ch: PCAP Socket 类型
+    # unit:
+    # range: []
+    # enum_options: [TCP, UDP, RAW_UDP]
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     RAW_UDP uses RawSocket to send UDP packets, which has the highest
+    #     performance, but there may be compatibility issues in some environments.
+    # upgrade_from: compressor_socket_type
+    # TODO: 待确认，还用吗？
+    pcap_socket_type: TCP
+    # type: bool
+    # name: RAW_UDP QoS Bypass
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When sender uses RAW_UDP to send data, this feature can be enabled to
+    #     improve performance. Linux Kernel >= 3.14 is required. Note that the data
+    #     sent when this feature is enabled cannot be captured by tcpdump.
+    # upgrade_from: static_config.enable-qos-bypass
+    raw_udp_qos_bypass: false
+  # type: section
+  # name:
+  #   en: Flow Log and Request Log
+  #   ch: 流日志及调用日志
+  # description:
+  flow_log:
+    # type: section
+    # name:
+    #   en: Filters
+    #   ch: 过滤器
+    # description:
+    filters:
+      # type: int
+      # name:
+      #   en: Capture Network Types for L4
+      #   ch: 流日志采集网络类型
+      # unit:
+      # range: []
+      # enum_options:
+      #   - -1:
+      #       en: Disabled
+      #       ch: 关闭
+      #   - 0:
+      #       en: All TAPs
+      #       ch: 所有网络类型
+      #   - _DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The list of TAPs to collect l4_flow_log, you can also set a list of TAPs to
+      #     be collected.
+      # upgrade_from: l4_log_tap_types
+      # TODO: 候选项需要特殊处理
+      l4_capture_network_types: [0]
+      # type: int
+      # name:
+      #   en: Capture Network Types for L7
+      #   ch: 调用日志采集网络类型
+      # unit:
+      # range: []
+      # enum_options:
+      #   - -1:
+      #       en: Disabled
+      #       ch: 关闭
+      #   - 0:
+      #       en: All TAPs
+      #       ch: 所有网络类型
+      #   - _DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The list of TAPs to collect l7_flow_log, you can also set a list of TAPs to
+      #     be collected.
+      # upgrade_from: l7_log_store_tap_types
+      # TODO: 候选项需要特殊处理
+      l7_capture_network_types: []
+      # type: int
+      # name:
+      #   en: Ignored Observation Points for L4
+      #   ch: 流日志忽略的观测点
+      # unit:
+      # range: []
+      # enum_options:
+      #   - 0:
+      #       en: rest, Other NIC
+      #       ch: rest，其他网卡
+      #   - 1:
+      #       en: c, Client NIC
+      #       ch: c，客户端网卡
+      #   - 2:
+      #       en: s, Server NIC
+      #       ch: s，服务端网卡
+      #   - 4:
+      #       en: local, Local NIC
+      #       ch: local，本机网卡
+      #   - 9:
+      #       en: c-nd, Client K8s Node
+      #       ch: c-nd，客户端容器节点
+      #   - 10:
+      #       en: s-nd, Server K8s Node
+      #       ch: s-nd，服务端容器节点
+      #   - 17:
+      #       en: c-hv, Client VM Hypervisor
+      #       ch: c-hv，客户端宿主机
+      #   - 18:
+      #       en: s-hv, Server VM Hypervisor
+      #       ch: s-hv，服务端宿主机
+      #   - 25:
+      #       en: c-gw-hv, Client-side Gateway Hypervisor
+      #       ch: c-gw-hv, 客户端到网关宿主机
+      #   - 26:
+      #       en: s-gw-hv, Server-side Gateway Hypervisor
+      #       ch: s-gw-hv, 网关宿主机到服务端
+      #   - 33:
+      #       en: c-gw, Client-side Gateway
+      #       ch: c-gw，客户端到网关
+      #   - 34:
+      #       en: s-gw, Server-side Gateway
+      #       ch: s-gw, 网关到服务端
+      #   - 41:
+      #       en: c-p, Client Process
+      #       ch: c-p，客户端进程
+      #   - 42:
+      #       en: s-p, Server Process
+      #       ch: s-p, 服务端进程
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Use the value of tap_side to control which l4_flow_log should be ignored for
+      #     collection. This configuration also applies to tcp_sequence and pcap data in
+      #     the Enterprise Edition. Default value `[]` means store everything.
+      # upgrade_from: l4_log_ignore_tap_sides
+      l4_ignored_observation_points: []
+      # type: int
+      # name:
+      #   en: Ignored Observation Points for L7
+      #   ch: 调用日志忽略的观测点
+      # unit:
+      # range: []
+      # enum_options:
+      #   - 0:
+      #       en: rest, Other NIC
+      #       ch: rest，其他网卡
+      #   - 1:
+      #       en: c, Client NIC
+      #       ch: c，客户端网卡
+      #   - 2:
+      #       en: s, Server NIC
+      #       ch: s，服务端网卡
+      #   - 4:
+      #       en: local, Local NIC
+      #       ch: local，本机网卡
+      #   - 9:
+      #       en: c-nd, Client K8s Node
+      #       ch: c-nd，客户端容器节点
+      #   - 10:
+      #       en: s-nd, Server K8s Node
+      #       ch: s-nd，服务端容器节点
+      #   - 17:
+      #       en: c-hv, Client VM Hypervisor
+      #       ch: c-hv，客户端宿主机
+      #   - 18:
+      #       en: s-hv, Server VM Hypervisor
+      #       ch: s-hv，服务端宿主机
+      #   - 25:
+      #       en: c-gw-hv, Client-side Gateway Hypervisor
+      #       ch: c-gw-hv, 客户端到网关宿主机
+      #   - 26:
+      #       en: s-gw-hv, Server-side Gateway Hypervisor
+      #       ch: s-gw-hv, 网关宿主机到服务端
+      #   - 33:
+      #       en: c-gw, Client-side Gateway
+      #       ch: c-gw，客户端到网关
+      #   - 34:
+      #       en: s-gw, Server-side Gateway
+      #       ch: s-gw, 网关到服务端
+      #   - 41:
+      #       en: c-p, Client Process
+      #       ch: c-p，客户端进程
+      #   - 42:
+      #       en: s-p, Server Process
+      #       ch: s-p, 服务端进程
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Use the value of tap_side to control which l7_flow_log should be ignored for
+      #     collection.
+      # upgrade_from: l7_log_ignore_tap_sides
+      l7_ignored_observation_points: []
+    # type: section
+    # name:
+    #   en: Throttles
+    #   ch: 限速器
+    # description:
+    throttles:
+      # type: int
+      # name:
+      #   en: L4 Throttle
+      #   ch: 流日志限速器
+      # unit: Per Second
+      # range: [100, 1000000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The maximum number of rows of l4_flow_log sent per second, when the actual
+      #     number of rows exceeds this value, sampling is triggered.
+      # upgrade_from: l4_log_collect_nps_threshold
+      l4_throttle: 10000
+      # type: int
+      # name:
+      #   en: L7 Throttle
+      #   ch: 调用日志限速器
+      # unit: Per Second
+      # range: [100, 1000000]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The maximum number of rows of l7_flow_log sent per second, when the actual
+      #     number of rows exceeds this value, sampling is triggered.
+      # upgrade_from: l7_log_collect_nps_threshold
+      l7_throttle: 10000
+    # type: section
+    # name:
+    #   en: Tunning
+    #   ch: 调优
+    # description:
+    tunning:
+      # type: int
+      # name:
+      #   en: Collector Queue Size
+      #   ch: Collector 队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 3-flow-to-collector-sender
+      #     - 3-protolog-to-collector-sender
+      # upgrade_from: static_config.flow-sender-queue-size
+      # TODO: 增加了最大值限制
+      collector_queue_size: 65536
+      # type: int
+      # name:
+      #   en: Collector Queue Count
+      #   ch: Collector 队列数量
+      # unit:
+      # range: [1, 64]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The number of replicas for each output queue of the
+      #     FlowAggregator/SessionAggregator.
+      # upgrade_from: static_config.flow-sender-queue-count
+      collector_queue_count: 1
+  # type: section
+  # name:
+  #   en: Flow Metrics
+  #   ch: Flow 性能指标
+  # description:
+  flow_metrics:
+    # type: bool
+    # name: Enabled
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When disabled, deepflow-agent will not send metrics and logging data
+    #     collected using eBPF and cBPF.
+    #
+    #     Attention: set to false will also disable l4_flow_log and l7_flow_log.
+    # upgrade_from: collector_enabled
+    # TODO: 原来是 int，需要改为 bool
+    enabled: true
+    # type: section
+    # name:
+    #   en: Filters
+    #   ch: 过滤器
+    # description:
+    filters:
+      # type: bool
+      # name:
+      #   en: Inactive Server Port Aggregation
+      #   ch: 不活跃服务端端口号聚合
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When enabled, deepflow-agent will not generate detailed metrics for each
+      #     inactive port (ports that only receive data, not send data), and the data of
+      #     all inactive ports will be aggregated into the metrics with a tag
+      #     'server_port = 0'.
+      # upgrade_from: inactive_server_port_enabled
+      # TODO: 原来是 int，需要改为 bool
+      # TODO: 注意字面默认值改了，但是默认行为没改，因为逻辑反过来了
+      inactive_server_port_aggregation: false
+      # type: bool
+      # name:
+      #   en: Inactive IP Aggregation
+      #   ch: 不活跃 IP 地址聚合
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When enabled, deepflow-agent will not generate detailed metrics for each
+      #     inactive IP address (IP addresses that only receive data, not send data), and
+      #     the data of all inactive IP addresses will be aggregated into the metrics with
+      #     a tag 'ip = 0'.
+      # upgrade_from: inactive_ip_enabled
+      # TODO: 原来是 int，需要改为 bool
+      # TODO: 注意字面默认值改了，但是默认行为没改，因为逻辑反过来了
+      inactive_ip_aggregation: false
+      # type: bool
+      # name:
+      #   en: NPM Metrics
+      #   ch: NPM 指标
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When closed, deepflow-agent only collects some basic throughput metrics.
+      # upgrade_from: l4_performance_enabled
+      # TODO: 原来是 int，需要改为 bool
+      npm_metrics: true
+      # type: bool
+      # name:
+      #   en: APM Metrics
+      #   ch: APM 指标
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When closed, deepflow-agent will not collect RED (request/error/delay) metrics.
+      # upgrade_from: l7_metrics_enabled
+      # TODO: 原来是 int，需要改为 bool
+      apm_metrics: true
+      # type: bool
+      # name:
+      #   en: Second Metrics
+      #   ch: 秒粒度指标
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Second granularity metrics.
+      # upgrade_from: vtap_flow_1s_enabled
+      # TODO: 原来是 int，需要改为 bool
+      second_metrics: true
+    # type: section
+    # name:
+    #   en: Tunning
+    #   ch: 调优
+    # description:
+    tunning:
+      # type: int
+      # name:
+      #   en: Sender Queue Size
+      #   ch: Sender 队列大小
+      # unit:
+      # range: [65536, 64000000]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The length of the following queues:
+      #     - 2-doc-to-collector-sender
+      # upgrade_from: static_config.collector-sender-queue-size
+      # TODO: 增加了最大值限制
+      sender_queue_size: 65536
+      # type: int
+      # name:
+      #   en: Sender Queue Count
+      #   ch: Sender 队列数量
+      # unit:
+      # range: [1, 64]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The number of replicas for each output queue of the collector.
+      # upgrade_from: static_config.collector-sender-queue-count
+      # TODO: 增加了最大值限制
+      sender_queue_count: 1
+  # type: section
+  # name: NPB (Network Packet Broker)
+  # description:
+  npb:
+    # type: int
+    # name:
+    #   en: Maximum MTU
+    #   ch: 最大 MTU
+    # unit: byte
+    # range: [500, 10000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     Maximum MTU allowed when using UDP to transfer data.
+    #
+    #     Attention: Public cloud service providers may modify the content of the
+    #     tail of the UDP packet whose packet length is close to 1500 bytes. When
+    #     using UDP transmission, it is recommended to set a slightly smaller value.
+    # upgrade_from: mtu
+    max_mtu: 1500
+    # type: int
+    # name:
+    #   en: RAW_UDP VLAN Tag
+    #   ch: RAW_UDP 的 VLAN 标签
+    # unit:
+    # range: [0, 4095]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     When using RAW_UDP Socket to transmit UDP data, this value can be used to
+    #     set the VLAN tag. Default value `0` means no VLAN tag.
+    # upgrade_from: output_vlan
+    raw_udp_vlan_tag: 0
+    # type: string
+    # name:
+    #   en: Socket Type
+    #   ch: Socket 类型
+    # unit:
+    # range: []
+    # enum_options: [UDP, RAW_UDP]
+    # modification: hot_update
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     RAW_UDP uses RawSocket to send UDP packets, which has the highest
+    #     performance, but there may be compatibility issues in some environments.
+    # upgrade_from: npb_socket_type
+    socket_type: RAW_UDP
+    # type: int
+    # name:
+    #   en: Extra VLAN Header
+    #   ch: 额外的 VLAN 头
+    # unit:
+    # range: []
+    # enum_options:
+    #   - 0:
+    #       en: None
+    #       ch: 无
+    #   - 1: 802.1Q
+    #   - 2: QinQ
+    # modification: hot_update
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     Whether to add an extra 802.1Q header to NPB traffic, when this value is
+    #     set, deepflow-agent will insert a VLAN Tag into the NPB traffic header, and
+    #     the value is the lower 12 bits of TunnelID in the VXLAN header.
+    # upgrade_from: npb_vlan_mode
+    extra_vlan_header: 0
+    # type: bool
+    # name:
+    #   en: Traffic Global Dedup
+    #   ch: 流量全局去重
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     Whether to enable global (distributed) traffic deduplication for the
+    #     NPB feature.
+    # upgrade_from: npb_dedup_enabled
+    # TODO: 原来是 int，需要改为 bool
+    traffic_global_dedup: true
+    # type: int
+    # name:
+    #   en: Target Port
+    #   ch: 目的端口号
+    # unit:
+    # range: [1, 65535]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     Server port for NPB.
+    # upgrade_from: static_config.npb-port
+    target_port: 4789
+    # type: int
+    # name:
+    #   en: Custom VXLAN Flags
+    #   ch: 自定义 VXLAN Flags
+    # unit:
+    # range: [0, 255]
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     NPB uses the first byte of the VXLAN Flag to identify the sending traffic to
+    #     prevent the traffic sent by NPB from being collected by deepflow-agent.
+    #
+    #     Attention: To ensure that the VNI bit is set, the value configured here will
+    #     be used after |= 0b1000_0000. Therefore, this value cannot be directly
+    #     configured as 0b1000_0000.
+    # upgrade_from: static_config.vxlan-flags
+    # TODO: 这个值域要刨除 0x08，需要注意处理。
+    custom_vxlan_flags: 0b1111_1111
+    # type: bool
+    # name:
+    #   en: Overlay VLAN Header Trimming
+    #   ch: Overlay VLAN 头剥离
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     This configuration only ignores the VLAN header in the captured original message
+    #     and does not affect the configuration item: npb_vlan_mode
+    # upgrade_from: static_config.ignore-overlay-vlan
+    overlay_vlan_header_trimming: false
+    # type: int
+    # name:
+    #   en: Maximum Tx Throughput
+    #   ch: 最大 Tx 吞吐量
+    # unit: Mbps
+    # range: [1, 100000]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     Maximum traffic rate allowed for npb sender.
+    # upgrade_from: max_npb_bps
+    max_tx_throughput: 1000
+
+# type: section
+# name:
+#   en: Plugins
+#   ch: 插件
+# description:
+plugins:
+  # type: string
+  # name:
+  #   en: Wasm Plugins
+  #   ch: Wasm 插件列表
+  # unit:
+  # range: []
+  # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+  # modification: hot_update
+  # ee_feature: false
+  # description:
+  #   en: |-
+  #     Wasm plugin need to load in agent
+  # upgrade_from: wasm_plugins
+  # TODO: 候选项需要特殊处理
+  wasm_plugins: []
+  # type: string
+  # name:
+  #   en: SO Plugins
+  #   ch: SO 插件列表
+  # unit:
+  # range: []
+  # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+  # modification: hot_update
+  # ee_feature: false
+  # description:
+  #   en: |-
+  #     so plugin need to load in agent. so plugin use dlopen flag RTLD_LOCAL
+  #     and RTLD_LAZY to open the so file, it mean that the so must solve the
+  #     link problem by itself
+  # upgrade_from: so_plugins
+  # TODO: 候选项需要特殊处理
+  so_plugins: []
+
+# type: section
+# name:
+#   en: Dev
+#   ch: 开发
+# description:
+dev:
+  # type: string
+  # name: Feature Flags
+  # unit:
+  # range: []
+  # enum_options: []
+  # modification: agent_restart
+  # ee_feature: false
+  # description:
+  #   en: |-
+  #     Unreleased deepflow-agent features can be turned on by setting this switch.
+  # upgrade_from: static_config.feature-flags
+  feature_flags: []
