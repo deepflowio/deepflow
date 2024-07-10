@@ -1240,7 +1240,7 @@ impl HttpLog {
                     info.method =
                         Method::from_frame_type(httpv2_header.frame_type, param.direction);
                 }
-                if !param.is_from_ebpf() && info.headers_offset.is_none() {
+                if info.headers_offset.is_none() || info.grpc_status_code.is_some() {
                     info.headers_offset = Some(headers_offset as u32);
                 }
 
