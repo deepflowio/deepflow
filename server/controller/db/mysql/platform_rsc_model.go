@@ -120,6 +120,7 @@ type SubDomain struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	TeamID       int        `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID" mapstructure:"TEAM_ID"`
+	UserID       int        `gorm:"column:user_id;type:int;default:1" json:"USER_ID" mapstructure:"USER_ID"`
 	SyncedAt     *time.Time `gorm:"column:synced_at" json:"SYNCED_AT" mapstructure:"SYNCED_AT"`
 	Domain       string     `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 	Name         string     `gorm:"column:name;type:varchar(64);default:''" json:"NAME" mapstructure:"NAME"`
