@@ -32,6 +32,11 @@ type SimpleEncoder struct {
 	pool.ReferenceCount
 }
 
+func (d *SimpleEncoder) Init(buf []byte) {
+	d.buf = buf
+	d.ReferenceCount.Reset()
+}
+
 type PBCodec interface {
 	Size() int
 	MarshalTo([]byte) (int, error)

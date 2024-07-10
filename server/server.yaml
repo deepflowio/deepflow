@@ -480,6 +480,9 @@ ingester:
   #  l7-flow-log: 72
   #  l4-packet: 72
 
+  ## whether to store trace tree information
+  #flow-log-trace-tree-disabled: false
+
   ## resource event data write config
   #event-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
