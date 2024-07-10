@@ -8,6 +8,12 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - incorrect grpc ebpf tcp seq [#7333](https://github.com/deepflowio/deepflow/pull/7333) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: Remove useless output from CLI [#7331](https://github.com/deepflowio/deepflow/pull/7331) by [roryye](https://github.com/roryye)
+* fix: agent - missing mysql log [#7323](https://github.com/deepflowio/deepflow/pull/7323) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: if OrgID is set, deepflow-server stats should be stored in deepflow_tenant [#7321](https://github.com/deepflowio/deepflow/pull/7321) by [lzf575](https://github.com/lzf575)
+* fix: manually created ips are deleted unexpectedly [#7312](https://github.com/deepflowio/deepflow/pull/7312) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: filter invalid sql and fix debug return result [#7308](https://github.com/deepflowio/deepflow/pull/7308) by [duandaa](https://github.com/duandaa)
 * fix: Fix missing pod interface in macvlan mode [#7315](https://github.com/deepflowio/deepflow/pull/7315) by [rvql](https://github.com/rvql)
 * fix: agent - incorrect http2 log [#7296](https://github.com/deepflowio/deepflow/pull/7296) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: the flow_tag of prometheus may be lost under multiple organizations [#7294](https://github.com/deepflowio/deepflow/pull/7294) by [lzf575](https://github.com/lzf575)
@@ -46,6 +52,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add raw trace map model [#7339](https://github.com/deepflowio/deepflow/pull/7339) by [taloric](https://github.com/taloric)
+* feat: Return stderr for remote exec [#7337](https://github.com/deepflowio/deepflow/pull/7337) by [rvql](https://github.com/rvql)
+* feat: Querier add tracemap [#7330](https://github.com/deepflowio/deepflow/pull/7330) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: Update remote command param regex [#7326](https://github.com/deepflowio/deepflow/pull/7326) by [rvql](https://github.com/rvql)
 * feat: agent - eBPF Whitelist implementation reassembly [#7316](https://github.com/deepflowio/deepflow/pull/7316) by [yinjiping](https://github.com/yinjiping)
 * feat: Change remote exec param to use regex [#7314](https://github.com/deepflowio/deepflow/pull/7314) by [rvql](https://github.com/rvql)
 * feat: mark the resource information of loopback traffic by Agent info [#7305](https://github.com/deepflowio/deepflow/pull/7305) by [lzf575](https://github.com/lzf575)
