@@ -142,6 +142,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 				continue
 			}
 		}
+
 		nameDBField, err := GetTagDBField(name, db, table, orgID)
 		if err != nil {
 			return err
@@ -592,9 +593,7 @@ func GetTagDBField(name, db, table, orgID string) (string, error) {
 			if strings.HasPrefix(name, "tag.") {
 				if db == ckcommon.DB_NAME_PROMETHEUS {
 					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table, orgID)
-					if err != nil {
-						return tagTranslatorStr, err
-					}
+					return tagTranslatorStr, err
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
