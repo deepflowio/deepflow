@@ -15,9 +15,11 @@
  */
 package tracemap
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/model"
+)
 
-func TraceMap(ctx *gin.Context) {
-	// Only the Enterprise Edition supports this feature.
+func TraceMap(args model.TraceMap, cfg *config.QuerierConfig) (result model.TraceMapTree, debug interface{}, err error) {
 	return
 }

@@ -88,7 +88,7 @@ func Start(configPath, serverLogFile string) {
 	profile_router.ProfileRouter(r, &cfg)
 	prometheus_router.PrometheusRouter(r)
 	tracing_adapter.TracingAdapterRouter(r)
-	distributed_tracing.TraceMapRouter(r)
+	distributed_tracing.TraceMapRouter(r, &cfg)
 	registerRouterCounter(r.Routes())
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
