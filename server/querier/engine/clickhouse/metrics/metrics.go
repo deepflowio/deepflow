@@ -142,6 +142,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 				continue
 			}
 		}
+
 		nameDBField, err := GetTagDBField(name, db, table, orgID)
 		if err != nil {
 			return err

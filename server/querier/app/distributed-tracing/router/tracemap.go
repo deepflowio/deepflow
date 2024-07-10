@@ -17,10 +17,36 @@
 package router
 
 import (
-	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/tracemap"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+
+	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/common"
+	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/model"
+	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/tracemap"
+	"github.com/deepflowio/deepflow/server/querier/config"
+	"github.com/deepflowio/deepflow/server/querier/router"
 )
 
-func TraceMapRouter(e *gin.Engine) {
-	e.GET("/trace_map", tracemap.TraceMap)
+func TraceMapRouter(e *gin.Engine, cfg *config.QuerierConfig) {
+	e.GET("/trace_map", traceMap(cfg))
+}
+
+func traceMap(cfg *config.QuerierConfig) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		var traceMap model.TraceMap
+
+		// 参数校验
+		err := c.ShouldBindBodyWith(&traceMap, binding.JSON)
+		if err != nil {
+			router.BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			return
+		}
+		traceMap.Context = c.Request.Context()
+		traceMap.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		result, debug, err := tracemap.TraceMap(traceMap, cfg)
+		if err == nil && !traceMap.Debug {
+			debug = nil
+		}
+		router.JsonResponse(c, result, debug, err)
+	})
 }
