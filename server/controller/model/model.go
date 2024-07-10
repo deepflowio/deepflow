@@ -349,6 +349,8 @@ type DomainUpdate struct {
 
 type SubDomain struct {
 	ID           int                    `json:"ID"`
+	TeamID       int                    `json:"TEAM_ID"`
+	UserID       int                    `json:"USER_ID"`
 	Name         string                 `json:"NAME"`
 	DisplayName  string                 `json:"DISPLAY_NAME"`
 	ClusterID    string                 `json:"CLUSTER_ID"`
@@ -366,11 +368,13 @@ type SubDomain struct {
 
 type SubDomainCreate struct {
 	Name   string                 `json:"NAME" binding:"required"`
+	TeamID int                    `json:"TEAM_ID"`
 	Config map[string]interface{} `json:"CONFIG" binding:"required"`
 	Domain string                 `json:"DOMAIN" binding:"required"`
 }
 
 type SubDomainUpdate struct {
+	UserID int                    `json:"USER_ID"`
 	Config map[string]interface{} `json:"CONFIG"`
 }
 
