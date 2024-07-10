@@ -465,25 +465,14 @@ impl Stream for Responser {
                             continue;
                         }
                         Ok(output) => {
+                            let err_msg = match String::from_utf8(output.stderr) {
+                                Ok(msg) if !msg.is_empty() => msg,
+                                _ => format!("command '{}' failed", get_cmdline(&id).unwrap()),
+                            };
                             if let Some(code) = output.status.code() {
-                                return self.command_failed_helper(
-                                    request_id,
-                                    Some(code),
-                                    format!(
-                                        "command '{}' failed with {}",
-                                        get_cmdline(&id).unwrap(),
-                                        code
-                                    ),
-                                );
+                                return self.command_failed_helper(request_id, Some(code), err_msg);
                             } else {
-                                return self.command_failed_helper(
-                                    request_id,
-                                    None,
-                                    format!(
-                                        "command '{}' execute terminated without errno",
-                                        get_cmdline(&id).unwrap()
-                                    ),
-                                );
+                                return self.command_failed_helper(request_id, None, err_msg);
                             }
                         }
                         Err(e) => {
