@@ -65,11 +65,11 @@ pub use public::rpc::remote_exec::*;
 const MIN_BATCH_LEN: usize = 1024;
 const KUBERNETES_NAMESPACE_PARAM: &'static Parameter = &Parameter {
     name: "ns",
-    regex: "[-0-9a-z]{1,64}", // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
+    regex: "^[\\-0-9a-z]{1,64}$", // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
 };
 const KUBERNETES_POD_PARAM: &'static Parameter = &Parameter {
     name: "pod",
-    regex: "[.-0-9a-z]{1,256}", // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    regex: "^[\\-.0-9a-z]{1,256}$", // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
 };
 
 fn all_supported_commands() -> Vec<Command> {
