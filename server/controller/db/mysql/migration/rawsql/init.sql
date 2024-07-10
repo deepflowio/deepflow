@@ -483,6 +483,7 @@ TRUNCATE TABLE domain;
 CREATE TABLE IF NOT EXISTS sub_domain (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id             INTEGER DEFAULT 1,
+    user_id             INTEGER DEFAULT 1,
     domain              CHAR(64) DEFAULT '',
     name                VARCHAR(64) DEFAULT '',
     display_name        VARCHAR(64) DEFAULT '',

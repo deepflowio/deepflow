@@ -703,6 +703,7 @@ const (
 
 const (
 	SET_RESOURCE_TYPE_DOMAIN             = "domain"
+	SET_RESOURCE_TYPE_SUB_DOMAIN         = "sub_domain"
 	SET_RESOURCE_TYPE_AGENT              = "agent"
 	SET_RESOURCE_TYPE_AGENT_GROUP        = "agent_group"
 	SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG = "agent_group_config"
