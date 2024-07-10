@@ -65,14 +65,14 @@ var whereRegexp = regexp.MustCompile(`(?i)where\s+(\S.*)`)
 // show databases
 var showPatterns = []string{
 	//if there are new pattern strings to match, add regular expressions directly here
-	`^show\s+language`, // 1. show language
-	`^show\s+metrics\s+functions\s*(?:from\s+.*?\s*)?(?:where\s+.*?\s*)?`,           // 2. show metrics functions
-	`^show\s+metrics(?: from ([^\\s]+))?(?: where .+)?|^show\s+metrics on db`,       // 3. show metrics or show metrics on db
-	`^show\s+tag\s+\S+\s+values\s+from\s+\S+.*`,                                     // 4. show tag X values Y, X,Y not nil
-	`^show\s+tags(?: from ([^\\s]+))?(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?`, // 5. show tags ...
-	`^show\s+tables`,    // 6. show tables
-	`^show\s+databases`, // 7. show databases
-	`^show\s+tag-values(?: where .+)?(?: limit\\s+\\d+(,\\s+\\d+)?)?`, // 8. show tag-values
+	`^show\s+language$`, // 1. show language
+	`^show\s+metrics\s+functions\s*(?:from\s+.*?\s*)?(?:where\s+.*?\s*)?$`,                                                // 2. show metrics functions
+	`(^show\s+metrics(?: from [^\s]+)?(?: where .+)?$)|(^show\s+metrics on db$)`,                                          // 3. show metrics or show metrics on db
+	`^show\s+tag\s+\S+\s+values\s+from\s+\S+(?: where .+)?(?: order by \w+)?(?: limit\s+\d+(,\s+\d+)?)?(?: offset \d+)?$`, // 4. show tag X values Y, X,Y not nil
+	`^show\s+tags(?: from ([^\s]+))?(?: where .+)?(?: limit\s+\d+(,\s+\d+)?)?$`,                                           // 5. show tags ...
+	`^show\s+tables$`,    // 6. show tables
+	`^show\s+databases$`, // 7. show databases
+	`^show\s+tag-values(?: where .+)?(?: limit\s+\d+(,\s+\d+)?)?$`, // 8. show tag-values
 }
 var res []*regexp.Regexp
 
