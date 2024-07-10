@@ -293,6 +293,7 @@ const (
 	NFVO              = 28
 	SUGON             = 29
 	VOLCENGINE        = 30
+	H3C               = 31
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -323,6 +324,7 @@ const (
 	NFVO_EN              = "nfvo"
 	SUGON_EN             = "sugon"
 	VOLCENGINE_EN        = "volcengine"
+	H3C_EN               = "h3c"
 
 	TENCENT_CH          = "腾讯云"
 	ALIYUN_CH           = "阿里云"
@@ -335,6 +337,7 @@ const (
 	NFVO_CH             = "华为NFVO+"
 	SUGON_CH            = "曙光云"
 	VOLCENGINE_CH       = "火山云"
+	H3C_CH              = "华三云"
 
 	OPENSTACK_CH   = "OpenStack"
 	VSPHERE_CH     = "vSphere"
