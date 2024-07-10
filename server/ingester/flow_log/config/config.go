@@ -53,6 +53,7 @@ type Config struct {
 	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
 	DecoderQueueCount int                   `yaml:"flow-log-decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"flow-log-decoder-queue-size"`
+	TraceTreeDisabled bool                  `yaml:"flow-log-trace-tree-disabled"`
 }
 
 type FlowLogConfig struct {
