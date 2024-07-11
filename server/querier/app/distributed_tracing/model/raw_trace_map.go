@@ -24,12 +24,12 @@ type RawTraceMap struct {
 	// aggregate from `trace_tree`
 	ResponseTotal uint `json:"response_total"`
 	// aggregate from `trace_tree`
-	ResponseDurationSum            uint `json:"response_duration_sum"`
-	ResponseStatusServerErrorCount uint `json:"response_status_server_error_count"`
-	AutoService0                   uint `json:"auto_service_0"`
-	AutoService1                   uint `json:"auto_service_1"`
-	ClientIconId                   uint `json:"client_icon_id"`
-	ServerIconId                   uint `json:"server_icon_id"`
+	ResponseStatusServerErrorCount uint   `json:"response_status_server_error_count"`
+	ClientIconId                   int    `json:"client_icon_id"`
+	ServerIconId                   int    `json:"server_icon_id"`
+	ResponseDurationSum            uint64 `json:"response_duration_sum"`
+	AutoService0                   string `json:"auto_service_0"`
+	AutoService1                   string `json:"auto_service_1"`
 	// encoding: auto_service_type+auto_service_id+auto_service+app_service+layer
 	Uid0           string `json:"uid_0"`
 	Uid1           string `json:"uid_1"`
