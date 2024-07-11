@@ -61,14 +61,14 @@ func spanToL7FlowLog(vtapID, orgId, teamId uint16, span *v1.Span, resAttributes 
 	return h
 }
 
-func spanKindToTapSide(spanKind v1.Span_SpanKind) string {
+func spanKindToTapSide(spanKind v1.Span_SpanKind) flow_metrics.TAPSideEnum {
 	switch spanKind {
 	case v1.Span_SPAN_KIND_PRODUCER, v1.Span_SPAN_KIND_CLIENT:
-		return "c-app"
+		return flow_metrics.ClientApp
 	case v1.Span_SPAN_KIND_CONSUMER, v1.Span_SPAN_KIND_SERVER:
-		return "s-app"
+		return flow_metrics.ServerApp
 	default:
-		return "app"
+		return flow_metrics.App
 	}
 }
 
@@ -343,7 +343,8 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
-	h.TapSide = spanKindToTapSide(l.Kind)
+	h.TapSideEnum = uint8(spanKindToTapSide(l.Kind))
+	h.TapSide = flow_metrics.TAPSideEnum(h.TapSideEnum).String()
 	h.Endpoint = l.Name
 	h.SpanKind = uint8(l.Kind)
 	h.spanKind = &h.SpanKind

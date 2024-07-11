@@ -39,6 +39,7 @@ func (t *SpanWithTraceID) WriteBlock(block *ckdb.Block) {
 	t.Encode()
 	block.WriteDateTime(t.Time)
 	block.Write(
+		t.TraceId,
 		tracetree.HashSearchIndex(t.TraceId),
 		utils.String(t.EncodedSpan),
 	)
@@ -47,6 +48,7 @@ func (t *SpanWithTraceID) WriteBlock(block *ckdb.Block) {
 func SpanWithTraceIDColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
+		ckdb.NewColumn("trace_id", ckdb.String),
 		ckdb.NewColumn("search_index", ckdb.UInt64),
 		ckdb.NewColumn("encoded_span", ckdb.String),
 	}
@@ -66,7 +68,6 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.Init(t.EncodedSpan)
 	encoder.WriteU8(tracetree.SPAN_TRACE_VERSION)
 	encoder.WriteU32(uint32(t.EndTime % 1000000)) // only encode microsecond part less than 1 second
-	encoder.WriteString255(t.TraceId)
 	encoder.WriteU8(t.AutoServiceType0)
 	encoder.WriteU8(t.AutoServiceType1)
 	encoder.WriteVarintU32(t.AutoServiceID0)
@@ -101,7 +102,7 @@ func GenSpanWithTraceIDCKTable(cluster, storagePolicy string, ttl int, coldStora
 	table := SPAN_WITH_TRACE_ID_TABLE
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"search_index", "time"}
+	orderKeys := []string{"trace_id", "time", "search_index"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
@@ -135,7 +136,7 @@ type SpanWriter struct {
 }
 
 func NewSpanWriter(config *config.Config) (*SpanWriter, error) {
-	if config.TraceTreeDisabled {
+	if !config.TraceTreeEnabled {
 		return nil, nil
 	}
 	w := &SpanWriter{
