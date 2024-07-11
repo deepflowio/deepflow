@@ -200,11 +200,11 @@ impl MirrorModeDispatcherListener {
     }
 }
 
-pub(super) struct MirrorPipeline {
+pub struct MirrorPipeline {
     pub handlers: Vec<PacketHandler>,
 }
 
-pub(super) struct LastTimestamps {
+pub struct LastTimestamps {
     pub if_index: isize,
     pub last_timestamp: Duration,
 }
