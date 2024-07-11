@@ -20,8 +20,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/common"
-	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/model"
+	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/common"
+	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/model"
 	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/tracemap"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/router"

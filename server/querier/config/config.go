@@ -26,7 +26,7 @@ import (
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
-	tracemap "github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/service/config"
+	tracemap "github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/config"
 	prometheus "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
 	profile "github.com/deepflowio/deepflow/server/querier/profile/config"
