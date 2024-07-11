@@ -582,7 +582,7 @@ pub struct Pipeline {
     timestamp: Duration,
 }
 
-struct PacketCounter {
+pub struct PacketCounter {
     terminated: Arc<AtomicBool>,
 
     rx: AtomicU64,
