@@ -30,7 +30,7 @@ import (
 
 var log = logging.MustGetLogger("tracemap")
 
-func TraceMapRouter(e *gin.Engine, cfg *config.QuerierConfig) {
+func TraceMapRouter(e *gin.Engine, cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) {
 	e.POST("/trace_map", traceMap(cfg))
 }
 

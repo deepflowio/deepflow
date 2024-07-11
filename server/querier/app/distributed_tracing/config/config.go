@@ -38,6 +38,8 @@ type Config struct {
 type TraceMapConfig struct {
 	TotalTracesCountMax int     `default:"100000" yaml:"total_traces_count_max"`
 	BatchTracesCountMax int     `default:"1000" yaml:"batch_traces_count_max"`
+	WriteInterval       int     `default:"60" yaml:"write_interval"`
+	WriteBatchSize      int     `default:"1000" yaml:"write_batch_size"`
 	Querier             Querier `yaml:"querier"`
 }
 
