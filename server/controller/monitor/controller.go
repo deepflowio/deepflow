@@ -179,7 +179,9 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.exceptionControllerDict[controller.IP]; ok {
 					if c.exceptionControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.exceptionControllerDict, controller.IP)
-						mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION)
+						if err := mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION).Error; err != nil {
+							log.Errorf("update controller(name: %s, ip: %s) state error: %v", controller.Name, controller.IP, err)
+						}
 						exceptionIPs = append(exceptionIPs, controller.IP)
 						log.Infof("set controller (%s) state to exception", controller.IP)
 						// 根据exceptionIP，重新分配对应采集器的控制器
@@ -200,7 +202,9 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {
 					if c.normalControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalControllerDict, controller.IP)
-						mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_COMPLETE)
+						if err := mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_COMPLETE).Error; err != nil {
+							log.Errorf("update controller(name: %s, ip: %s) state error: %v", controller.Name, controller.IP, err)
+						}
 						log.Infof("set controller (%s) state to normal", controller.IP)
 						delete(checkExceptionControllers, controller.IP)
 					}
@@ -221,7 +225,9 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 	controllerIPs := []string{}
 	for ip, dfhostCheck := range checkExceptionControllers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			orgDB.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip)
+			if err := orgDB.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip).Error; err != nil {
+				log.Errorf("delete az_controller_connection(ip: %s) error: %s", ip, err.Error())
+			}
 			err := mysql.DefaultDB.Delete(mysql.Controller{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete controller(%s) failed, err:%s", ip, err)
@@ -251,13 +257,18 @@ func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
 		log.Error(err)
 	}
 
-	orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
+	if err := orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {
+		log.Error(err)
+		return
+	}
 	for _, vtap := range vtaps {
 		// check vtap.controller_ip is not in controller.ip, set to empty if not exist
 		if _, ok := ipMap[vtap.ControllerIP]; !ok {
 			log.Infof("controller ip(%s) in vtap(%s) is invalid", vtap.ControllerIP, vtap.Name)
 			vtap.ControllerIP = ""
-			orgDB.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "")
+			if err := orgDB.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "").Error; err != nil {
+				log.Errorf("update vtap(lcuuid: %s, name: %s) controller ip to empty error: %v", vtap.Lcuuid, vtap.Name, err)
+			}
 		}
 
 		if vtap.ControllerIP == "" {
@@ -283,8 +294,14 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 
 	log.Info("vtap controller alloc start")
 
-	orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
-	orgDB.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers)
+	if err := orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {
+		log.Error(err)
+		return
+	}
+	if err := orgDB.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers).Error; err != nil {
+		log.Error(err)
+		return
+	}
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取控制器当前已分配的采集器个数
@@ -309,7 +326,10 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 	}
 
 	// 根据可用区查询region信息
-	orgDB.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
+	if err := orgDB.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs).Error; err != nil {
+		log.Error(err)
+		return
+	}
 	regionToAZLcuuids := make(map[string][]string)
 	regionLcuuids := mapset.NewSet()
 	for _, az := range azs {
@@ -352,7 +372,9 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 			if len(controllerAvailableVTapNum) == 0 {
 				log.Warningf("no available controller for vtap (%s)", vtap.Name)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				orgDB.Model(&vtap).Update("exceptions", exceptions)
+				if err := orgDB.Model(&vtap).Update("exceptions", exceptions).Error; err != nil {
+					log.Errorf("update vtap(name: %s) exceptions(%d) error: %v", vtap.Name, exceptions, err)
+				}
 				continue
 			}
 			sort.Slice(controllerAvailableVTapNum, func(i, j int) bool {
@@ -370,10 +392,14 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 
 			// 分配控制器成功，更新控制器IP + 清空控制器分配失败的错误码
 			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[0].Key, vtap.Name)
-			orgDB.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
+			if err := orgDB.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key).Error; err != nil {
+				log.Error(err)
+			}
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				orgDB.Model(&vtap).Update("exceptions", exceptions)
+				if err := orgDB.Model(&vtap).Update("exceptions", exceptions).Error; err != nil {
+					log.Error(err)
+				}
 			}
 		}
 	}
@@ -386,20 +412,30 @@ func (c *ControllerCheck) azConnectionCheck(orgDB *mysql.DB) {
 
 	log.Info("az connection check start")
 
-	orgDB.Find(&azs)
+	if err := orgDB.Find(&azs).Error; err != nil {
+		log.Error(err)
+		return
+	}
 	azLcuuidToName := make(map[string]string)
 	for _, az := range azs {
 		azLcuuidToName[az.Lcuuid] = az.Name
 	}
 
-	orgDB.Find(&azControllerConns)
+	if err := orgDB.Find(&azControllerConns).Error; err != nil {
+		log.Error(err)
+	}
 	for _, conn := range azControllerConns {
 		if conn.AZ == "ALL" {
 			continue
 		}
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
-			orgDB.Delete(&conn)
-			log.Infof("delete controller (%s) az (%s) connection", conn.ControllerIP, name)
+			if err := orgDB.Delete(&conn).Error; err != nil {
+				log.Infof("fail to delete controller (ip: %s) az (name: %s, lcuuid: %s, region: %s) connection, err: %s",
+					conn.ControllerIP, name, conn.AZ, conn.Region, err.Error())
+				continue
+			}
+			log.Infof("delete controller (ip: %s) az (name: %s, lcuuid: %s, region: %s) connection",
+				conn.ControllerIP, name, conn.AZ, conn.Region)
 		}
 	}
 	log.Info("az connection check end")
