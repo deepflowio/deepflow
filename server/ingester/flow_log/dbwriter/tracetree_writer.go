@@ -36,7 +36,7 @@ func GenTraceTreeCKTable(cluster, storagePolicy string, ttl int, coldStorage *ck
 	table := TRACE_TREE_TABLE
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"search_index", "time"}
+	orderKeys := []string{"trace_id", "time", "search_index"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
@@ -71,7 +71,7 @@ type TraceTreeWriter struct {
 }
 
 func NewTraceTreeWriter(config *config.Config, traceTreeQueue queue.QueueReader) (*TraceTreeWriter, error) {
-	if config.TraceTreeDisabled {
+	if !config.TraceTreeEnabled {
 		return nil, nil
 	}
 
@@ -104,6 +104,10 @@ func (s *TraceTreeWriter) Put(items []interface{}) {
 }
 
 func (s *TraceTreeWriter) Start() {
+	go s.run()
+}
+
+func (s *TraceTreeWriter) run() {
 	log.Infof("flow log trace tree writer starting")
 	s.traceWriter.Run()
 	buffer := make([]interface{}, BUFFER_SIZE)
@@ -121,7 +125,6 @@ func (s *TraceTreeWriter) Start() {
 			s.traceWriter.Put(traceTree)
 		}
 	}
-
 }
 
 func (s *TraceTreeWriter) Close() {

@@ -57,6 +57,9 @@ type SpanInfo struct {
 	IP41   uint32
 	IP61   net.IP
 
+	Level0 uint8
+	Level1 uint8
+
 	ResponseDuration uint64
 	ResponseStatus   uint8
 }
@@ -74,6 +77,7 @@ func (t *TraceTree) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(t.Time)
 	block.Write(
 		HashSearchIndex(t.TraceId),
+		t.TraceId,
 		utils.String(t.encodedSpans),
 	)
 }
@@ -82,7 +86,8 @@ func TraceTreeColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
 		ckdb.NewColumn("search_index", ckdb.UInt64),
-		ckdb.NewColumn("encoded_span", ckdb.String),
+		ckdb.NewColumn("trace_id", ckdb.String),
+		ckdb.NewColumn("encoded_span_list", ckdb.String),
 	}
 }
 
@@ -109,7 +114,6 @@ func (t *TraceTree) Encode() {
 	t.encodedSpans = t.encodedSpans[:0]
 	encoder.Init(t.encodedSpans)
 	encoder.WriteU8(TRACE_TREE_VERSION)
-	encoder.WriteString255(t.TraceId)
 	encoder.WriteU16(uint16(len(t.SpanInfos)))
 	for _, s := range t.SpanInfos {
 		encoder.WriteU8(s.AutoServiceType0)
@@ -127,9 +131,12 @@ func (t *TraceTree) Encode() {
 			encoder.WriteIPv6(s.IP60)
 			encoder.WriteIPv6(s.IP61)
 		}
+		encoder.WriteU8(s.Level0)
+		encoder.WriteU8(s.Level1)
 		encoder.WriteVarintU64(s.ResponseDuration)
 		encoder.WriteU8(s.ResponseStatus)
 	}
+	t.encodedSpans = encoder.Bytes()
 }
 
 func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
@@ -137,7 +144,6 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 	if version != TRACE_TREE_VERSION {
 		return fmt.Errorf("trace tree data version is %d expect version is %d", version, TRACE_TREE_VERSION)
 	}
-	t.TraceId = decoder.ReadString255()
 	spanCount := int(decoder.ReadU16())
 	for i := 0; i < spanCount; i++ {
 		s := SpanInfo{}
@@ -158,6 +164,11 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 			decoder.ReadIPv6(s.IP60)
 			decoder.ReadIPv6(s.IP61)
 		}
+		s.Level0 = decoder.ReadU8()
+		s.Level1 = decoder.ReadU8()
+		s.ResponseDuration = decoder.ReadVarintU64()
+		s.ResponseStatus = decoder.ReadU8()
+
 		t.SpanInfos = append(t.SpanInfos, s)
 	}
 	if decoder.Failed() {

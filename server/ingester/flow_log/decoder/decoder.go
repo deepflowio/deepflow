@@ -405,6 +405,6 @@ func (d *Decoder) flush() {
 	}
 	d.export(nil)
 	if d.spanWriter != nil {
-		d.spanWriter.Put(nil)
+		d.spanWrite(nil)
 	}
 }
