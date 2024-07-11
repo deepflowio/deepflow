@@ -29,7 +29,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/stats"
-	distributed_tracing "github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/router"
+	distributed_tracing "github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/router"
 	prometheus_router "github.com/deepflowio/deepflow/server/querier/app/prometheus/router"
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/router"
 	"github.com/deepflowio/deepflow/server/querier/common"

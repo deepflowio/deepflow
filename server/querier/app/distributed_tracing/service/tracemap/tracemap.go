@@ -16,7 +16,7 @@
 package tracemap
 
 import (
-	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/model"
+	"github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
