@@ -26,20 +26,3 @@ type TraceMap struct {
 	Context        context.Context
 	OrgID          string
 }
-
-type Debug struct {
-	IP        string `json:"ip"`
-	Sql       string `json:"sql"`
-	SqlCH     string `json:"sql_CH"`
-	QueryTime string `json:"query_time"`
-	QueryUUID string `json:"query_uuid"`
-	Error     string `json:"error"`
-}
-
-type TraceMapDebug struct {
-	QuerierDebug []Debug `json:"querier_debug"`
-	FormatTime   string  `json:"format_time"`
-}
-
-type TraceMapTree struct {
-}
