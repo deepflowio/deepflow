@@ -13,13 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package tracemap
+
+package distributed_tracing
 
 import (
-	"github.com/deepflowio/deepflow/server/querier/app/distributed-tracing/model"
-	"github.com/deepflowio/deepflow/server/querier/config"
+	"encoding/json"
 )
 
-func TraceMap(args model.TraceMap, cfg *config.QuerierConfig) (result model.TraceMapTree, debug interface{}, err error) {
-	return
+type ServiceError struct {
+	Status  string
+	Message string
+}
+
+func (e *ServiceError) Error() string {
+	err, _ := json.Marshal(e)
+	return string(err)
+}
+
+func NewError(status string, message string) error {
+	return &ServiceError{
+		Status:  status,
+		Message: message,
+	}
 }
