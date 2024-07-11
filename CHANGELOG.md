@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - windows compile error [#7360](https://github.com/deepflowio/deepflow/pull/7360) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - vm mac address not updated [#7355](https://github.com/deepflowio/deepflow/pull/7355) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: modify system alarm_policy filter conditions and tag_conditions [#7351](https://github.com/deepflowio/deepflow/pull/7351) by [Ericsssss](https://github.com/Ericsssss)
+* fix: update member type of rawtracemap [#7349](https://github.com/deepflowio/deepflow/pull/7349) by [taloric](https://github.com/taloric)
 * fix: agent - incorrect grpc ebpf tcp seq [#7333](https://github.com/deepflowio/deepflow/pull/7333) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Remove useless output from CLI [#7331](https://github.com/deepflowio/deepflow/pull/7331) by [roryye](https://github.com/roryye)
 * fix: agent - missing mysql log [#7323](https://github.com/deepflowio/deepflow/pull/7323) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -52,6 +56,9 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - add inner queue to mirror dispatcher [#7352](https://github.com/deepflowio/deepflow/pull/7352) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: recorder supports updating vinterface device id [#7346](https://github.com/deepflowio/deepflow/pull/7346) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: Agent remote exec returns specific errors [#7298](https://github.com/deepflowio/deepflow/pull/7298) by [roryye](https://github.com/roryye)
 * feat: add raw trace map model [#7339](https://github.com/deepflowio/deepflow/pull/7339) by [taloric](https://github.com/taloric)
 * feat: Return stderr for remote exec [#7337](https://github.com/deepflowio/deepflow/pull/7337) by [rvql](https://github.com/rvql)
 * feat: Querier add tracemap [#7330](https://github.com/deepflowio/deepflow/pull/7330) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -88,6 +95,8 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: rename package name [#7344](https://github.com/deepflowio/deepflow/pull/7344) by [taloric](https://github.com/taloric)
+* refactor: move trace-map dir path [#7343](https://github.com/deepflowio/deepflow/pull/7343) by [taloric](https://github.com/taloric)
 * refactor: OTel HTTP l7_protocol_str change from http to HTTP [#7292](https://github.com/deepflowio/deepflow/pull/7292) by [lzf575](https://github.com/lzf575)
 * refactor: server recorder polishes id allocator [#7168](https://github.com/deepflowio/deepflow/pull/7168) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * refactor: Change crate name [#7155](https://github.com/deepflowio/deepflow/pull/7155) by [rvql](https://github.com/rvql)
