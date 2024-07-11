@@ -995,6 +995,20 @@ fn component_on_config_change(
             }
         }
         TapMode::Mirror | TapMode::Analyzer => {
+            for d in components.dispatcher_components.iter() {
+                d.dispatcher_listener.on_tap_interface_change(
+                    &vec![],
+                    conf.if_mac_source,
+                    conf.trident_type,
+                    &blacklist,
+                );
+                d.dispatcher_listener
+                    .on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+            }
+            if conf.tap_mode == TapMode::Analyzer {
+                parse_tap_type(components, tap_types);
+            }
+
             #[cfg(target_os = "linux")]
             if conf.tap_mode == TapMode::Mirror
                 && (!config_handler
@@ -1083,9 +1097,6 @@ fn component_on_config_change(
                 }
             }
             components.last_dispatcher_component_id = id;
-            if conf.tap_mode == TapMode::Analyzer {
-                parse_tap_type(components, tap_types);
-            }
             components.tap_interfaces = current_interfaces;
         }
 
