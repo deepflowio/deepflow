@@ -95,6 +95,8 @@ controller:
     user-password: deepflow
     host: mysql
     port: 30130
+    proxy-host:
+    proxy-port:
     timeout: 30
     # whether drop database when init failed
     drop-database-enabled: false
