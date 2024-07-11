@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - windows compile error [#7359](https://github.com/deepflowio/deepflow/pull/7359) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - vm mac address not updated [#7356](https://github.com/deepflowio/deepflow/pull/7356) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Fix missing pod interface in macvlan mode [#7336](https://github.com/deepflowio/deepflow/pull/7336) by [rvql](https://github.com/rvql)
 * fix: agent - incorrect grpc ebpf tcp seq (#7333) [#7335](https://github.com/deepflowio/deepflow/pull/7335) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Remove useless output from CLI [#7332](https://github.com/deepflowio/deepflow/pull/7332) by [roryye](https://github.com/roryye)
@@ -57,6 +59,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - add inner queue to mirror dispatcher [#7345](https://github.com/deepflowio/deepflow/pull/7345) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: Agent remote exec returns specific errors [#7334](https://github.com/deepflowio/deepflow/pull/7334) by [roryye](https://github.com/roryye)
 * feat: Add command for java stack/heap dump [#7319](https://github.com/deepflowio/deepflow/pull/7319) by [rvql](https://github.com/rvql)
 * feat: agent - eBPF Whitelist implementation reassembly [#7309](https://github.com/deepflowio/deepflow/pull/7309) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - support vhost user [#7269](https://github.com/deepflowio/deepflow/pull/7269) by [yuanchaoa](https://github.com/yuanchaoa)
