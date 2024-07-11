@@ -403,7 +403,6 @@ func (m *TrisolarisManager) getTeamData(orgIDs []int) {
 		}
 		teams, err := dbmgr.DBMgr[mysql.Team](db.DB).Gets()
 		if err != nil {
-			log.Errorf("get org(id=%d) team failed, err(%s)", orgID, err)
 			continue
 		}
 		for _, team := range teams {
