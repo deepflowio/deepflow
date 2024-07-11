@@ -26,9 +26,7 @@ use std::{
 };
 
 use arc_swap::access::Access;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use log::debug;
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use super::mirror_mode_dispatcher::{
     get_key as mirror_get_key, handler as mirror_handler, swap_last_timestamp,
