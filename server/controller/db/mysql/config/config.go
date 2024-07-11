@@ -20,6 +20,8 @@ type MySqlConfig struct {
 	Database               string `default:"deepflow" yaml:"database"`
 	Host                   string `default:"mysql" yaml:"host"`
 	Port                   uint32 `default:"30130" yaml:"port"`
+	ProxyHost              string `default:"" yaml:"proxy-host"`
+	ProxyPort              uint32 `default:"0" yaml:"proxy-port"`
 	UserName               string `default:"root" yaml:"user-name"`
 	UserPassword           string `default:"deepflow" yaml:"user-password"`
 	TimeOut                uint32 `default:"30" yaml:"timeout"`

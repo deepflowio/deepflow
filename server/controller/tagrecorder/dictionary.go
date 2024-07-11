@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -152,7 +151,15 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 	var ckDatabaseName string
 	// 在本区域所有数据节点更新字典
 	// Update the dictionary at all data nodes in the region
-	replicaSQL := fmt.Sprintf("REPLICA (HOST '%s' PRIORITY %s)", c.cfg.MySqlCfg.Host, "1")
+	var replicaSQL string
+	var mysqlPort uint32
+	if c.cfg.MySqlCfg.ProxyHost != "" {
+		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.ProxyHost)
+		mysqlPort = c.cfg.MySqlCfg.ProxyPort
+	} else {
+		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.Host)
+		mysqlPort = c.cfg.MySqlCfg.Port
+	}
 
 	ckDb, err := clickhouse.Connect(*clickHouseCfg)
 	if err != nil {
@@ -305,8 +312,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			dictName := dict.(string)
 			chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
 			createSQL := CREATE_SQL_MAP[dictName]
-			mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 			log.Infof("create dictionary %s", dictName)
 			log.Info(createSQL)
 			_, err = ckDb.Exec(createSQL)
@@ -337,8 +343,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 				break
 			}
 			createSQL := CREATE_SQL_MAP[dictName]
-			mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 			// In the new version of CK (version after 23.8), when ‘SHOW CREATE DICTIONARY’ does not display plain text password information, the password is fixedly displayed as ‘[HIDDEN]’, and password comparison needs to be repair.
 			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.cfg.MySqlCfg.UserPassword, 1)
 			if createSQL == checkDictSQL {
