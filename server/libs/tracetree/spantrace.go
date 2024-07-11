@@ -29,7 +29,6 @@ const SPAN_TRACE_VERSION = 0x11
 
 type SpanTrace struct {
 	EndTimeUsPart uint32 // The microsecond part less than 1 second
-	TraceId       string
 
 	AutoServiceType0 uint8
 	AutoServiceType1 uint8
@@ -65,7 +64,6 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 		return fmt.Errorf("span trace data version is %d expect version is %d", version, SPAN_TRACE_VERSION)
 	}
 	t.EndTimeUsPart = decoder.ReadU32()
-	t.TraceId = decoder.ReadString255()
 	t.AutoServiceType0 = decoder.ReadU8()
 	t.AutoServiceType1 = decoder.ReadU8()
 	t.AutoServiceID0 = decoder.ReadVarintU32()
