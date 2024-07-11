@@ -537,6 +537,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 			ProcessName: p.GetProcessName(),
 			CMDLine:     p.GetCmdline(),
 			User:        p.GetUser(),
+			Language:    p.GetLanguage(),
 			ContainerID: p.GetContainerId(),
 			VtapID:      vtapID,
 			OSAPPTags:   osAppTagString,

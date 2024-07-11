@@ -618,6 +618,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 			ProcessName: processName,
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.User,
+			Language:    sProcess.Language,
 			ContainerID: sProcess.ContainerID,
 			StartTime:   sProcess.StartTime,
 			OSAPPTags:   sProcess.OSAPPTags,

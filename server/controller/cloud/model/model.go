@@ -460,6 +460,7 @@ type Process struct {
 	ProcessName     string    `json:"process_name" binding:"required"`
 	CommandLine     string    `json:"command_line"`
 	UserName        string    `json:"user_name"`
+	Language        string    `json:"language"`
 	StartTime       time.Time `json:"start_time" binding:"required"`
 	OSAPPTags       string    `json:"os_app_tags"`
 	NetnsID         uint32    `json:"netns_id"`

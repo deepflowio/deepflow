@@ -80,6 +80,7 @@ type Process struct {
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME" mapstructure:"PROCESS_NAME"`
 	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE" mapstructure:"COMMAND_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME" mapstructure:"USER_NAME"`
+	Language       string    `gorm:"column:language;type:varchar(256);default:''" json:"LANGUAGE" mapstructure:"LANGUAGE"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME" mapstructure:"START_TIME"`
 	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS" mapstructure:"OS_APP_TAGS"`
 	ContainerID    string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID" mapstructure:"CONTAINER_ID"`

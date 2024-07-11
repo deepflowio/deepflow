@@ -718,6 +718,7 @@ message ProcessInfo {
     optional uint32 netns_id = 7 [default = 0];
     optional string container_id = 8 [default = ""];
     repeated Tag os_app_tags = 11;
+    optional string language = 12;
 }
 
 message GenesisProcessData {
