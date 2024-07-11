@@ -477,7 +477,7 @@ ingester:
   #  l4-packet: 72
 
   ## whether to store trace tree information
-  #flow-log-trace-tree-disabled: false
+  #flow-log-trace-tree-enabled: false
 
   ## resource event data write config
   #event-ck-writer:

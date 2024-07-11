@@ -44,7 +44,7 @@ func NewControllerIngesterShared() *ControllerIngesterShared {
 			queue.OptionFlushIndicator(time.Second*3),
 			queue.OptionRelease(func(p interface{}) { p.(*eventapi.ResourceEvent).Release() })),
 		TraceTreeQueue: queue.NewOverwriteQueue(
-			"controller-to-ingester-trace_tree", QUEUE_SIZE,
+			"querier-to-ingester-trace_tree", QUEUE_SIZE,
 			queue.OptionFlushIndicator(time.Second*3),
 			queue.OptionRelease(func(p interface{}) { p.(*tracetree.TraceTree).Release() })),
 	}
