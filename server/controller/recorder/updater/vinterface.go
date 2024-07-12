@@ -33,8 +33,9 @@ import (
 type VInterface struct {
 	UpdaterBase[
 		cloudmodel.VInterface,
-		mysql.VInterface,
 		*diffbase.VInterface,
+		*mysql.VInterface,
+		mysql.VInterface,
 		*message.VInterfaceAdd,
 		message.VInterfaceAdd,
 		*message.VInterfaceUpdate,
@@ -49,8 +50,9 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 	updater := &VInterface{
 		newUpdaterBase[
 			cloudmodel.VInterface,
-			mysql.VInterface,
 			*diffbase.VInterface,
+			*mysql.VInterface,
+			mysql.VInterface,
 			*message.VInterfaceAdd,
 			message.VInterfaceAdd,
 			*message.VInterfaceUpdate,

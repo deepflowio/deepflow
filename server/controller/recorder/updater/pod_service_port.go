@@ -29,8 +29,9 @@ import (
 type PodServicePort struct {
 	UpdaterBase[
 		cloudmodel.PodServicePort,
-		mysql.PodServicePort,
 		*diffbase.PodServicePort,
+		*mysql.PodServicePort,
+		mysql.PodServicePort,
 		*message.PodServicePortAdd,
 		message.PodServicePortAdd,
 		*message.PodServicePortUpdate,
@@ -45,8 +46,9 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 	updater := &PodServicePort{
 		newUpdaterBase[
 			cloudmodel.PodServicePort,
-			mysql.PodServicePort,
 			*diffbase.PodServicePort,
+			*mysql.PodServicePort,
+			mysql.PodServicePort,
 			*message.PodServicePortAdd,
 			message.PodServicePortAdd,
 			*message.PodServicePortUpdate,

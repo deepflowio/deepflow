@@ -29,8 +29,9 @@ import (
 type VPC struct {
 	UpdaterBase[
 		cloudmodel.VPC,
-		mysql.VPC,
 		*diffbase.VPC,
+		*mysql.VPC,
+		mysql.VPC,
 		*message.VPCAdd,
 		message.VPCAdd,
 		*message.VPCUpdate,
@@ -45,8 +46,9 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 	updater := &VPC{
 		newUpdaterBase[
 			cloudmodel.VPC,
-			mysql.VPC,
 			*diffbase.VPC,
+			*mysql.VPC,
+			mysql.VPC,
 			*message.VPCAdd,
 			message.VPCAdd,
 			*message.VPCUpdate,

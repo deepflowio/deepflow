@@ -22,15 +22,15 @@ import (
 )
 
 type PodGroupPort struct {
-	OperatorBase[mysql.PodGroupPort]
+	OperatorBase[*mysql.PodGroupPort, mysql.PodGroupPort]
 }
 
 func NewPodGroupPort() *PodGroupPort {
 	return &PodGroupPort{
-		OperatorBase[mysql.PodGroupPort]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.PodGroupPort](
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
+			false,
+			false,
+		),
 	}
 }

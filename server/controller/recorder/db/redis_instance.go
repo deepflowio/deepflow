@@ -22,21 +22,16 @@ import (
 )
 
 type RedisInstance struct {
-	OperatorBase[mysql.RedisInstance]
+	OperatorBase[*mysql.RedisInstance, mysql.RedisInstance]
 }
 
 func NewRedisInstance() *RedisInstance {
 	operater := &RedisInstance{
-		OperatorBase[mysql.RedisInstance]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.RedisInstance](
+			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *RedisInstance) setDBItemID(dbItem *mysql.RedisInstance, id int) {
-	dbItem.ID = id
 }

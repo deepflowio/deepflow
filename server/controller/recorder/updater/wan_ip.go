@@ -33,8 +33,9 @@ import (
 type WANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
-		mysql.WANIP,
 		*diffbase.WANIP,
+		*mysql.WANIP,
+		mysql.WANIP,
 		*message.WANIPAdd,
 		message.WANIPAdd,
 		*message.WANIPUpdate,
@@ -49,8 +50,9 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 	updater := &WANIP{
 		newUpdaterBase[
 			cloudmodel.IP,
-			mysql.WANIP,
 			*diffbase.WANIP,
+			*mysql.WANIP,
+			mysql.WANIP,
 			*message.WANIPAdd,
 			message.WANIPAdd,
 			*message.WANIPUpdate,

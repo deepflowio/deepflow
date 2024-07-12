@@ -29,8 +29,9 @@ import (
 type Pod struct {
 	UpdaterBase[
 		cloudmodel.Pod,
-		mysql.Pod,
 		*diffbase.Pod,
+		*mysql.Pod,
+		mysql.Pod,
 		*message.PodAdd,
 		message.PodAdd,
 		*message.PodUpdate,
@@ -45,8 +46,9 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 	updater := &Pod{
 		newUpdaterBase[
 			cloudmodel.Pod,
-			mysql.Pod,
 			*diffbase.Pod,
+			*mysql.Pod,
+			mysql.Pod,
 			*message.PodAdd,
 			message.PodAdd,
 			*message.PodUpdate,

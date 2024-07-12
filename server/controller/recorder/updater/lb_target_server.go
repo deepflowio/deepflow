@@ -29,8 +29,9 @@ import (
 type LBTargetServer struct {
 	UpdaterBase[
 		cloudmodel.LBTargetServer,
-		mysql.LBTargetServer,
 		*diffbase.LBTargetServer,
+		*mysql.LBTargetServer,
+		mysql.LBTargetServer,
 		*message.LBTargetServerAdd,
 		message.LBTargetServerAdd,
 		*message.LBTargetServerUpdate,
@@ -45,8 +46,9 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 	updater := &LBTargetServer{
 		newUpdaterBase[
 			cloudmodel.LBTargetServer,
-			mysql.LBTargetServer,
 			*diffbase.LBTargetServer,
+			*mysql.LBTargetServer,
+			mysql.LBTargetServer,
 			*message.LBTargetServerAdd,
 			message.LBTargetServerAdd,
 			*message.LBTargetServerUpdate,

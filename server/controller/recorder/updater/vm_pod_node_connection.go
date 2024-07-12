@@ -29,8 +29,9 @@ import (
 type VMPodNodeConnection struct {
 	UpdaterBase[
 		cloudmodel.VMPodNodeConnection,
-		mysql.VMPodNodeConnection,
 		*diffbase.VMPodNodeConnection,
+		*mysql.VMPodNodeConnection,
+		mysql.VMPodNodeConnection,
 		*message.VMPodNodeConnectionAdd,
 		message.VMPodNodeConnectionAdd,
 		*message.VMPodNodeConnectionUpdate,
@@ -45,8 +46,9 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 	updater := &VMPodNodeConnection{
 		newUpdaterBase[
 			cloudmodel.VMPodNodeConnection,
-			mysql.VMPodNodeConnection,
 			*diffbase.VMPodNodeConnection,
+			*mysql.VMPodNodeConnection,
+			mysql.VMPodNodeConnection,
 			*message.VMPodNodeConnectionAdd,
 			message.VMPodNodeConnectionAdd,
 			*message.VMPodNodeConnectionUpdate,

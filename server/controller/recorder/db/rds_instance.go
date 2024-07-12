@@ -22,21 +22,16 @@ import (
 )
 
 type RDSInstance struct {
-	OperatorBase[mysql.RDSInstance]
+	OperatorBase[*mysql.RDSInstance, mysql.RDSInstance]
 }
 
 func NewRDSInstance() *RDSInstance {
 	operater := &RDSInstance{
-		OperatorBase[mysql.RDSInstance]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.RDSInstance](
+			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *RDSInstance) setDBItemID(dbItem *mysql.RDSInstance, id int) {
-	dbItem.ID = id
 }

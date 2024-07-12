@@ -30,8 +30,9 @@ import (
 type CEN struct {
 	UpdaterBase[
 		cloudmodel.CEN,
-		mysql.CEN,
 		*diffbase.CEN,
+		*mysql.CEN,
+		mysql.CEN,
 		*message.CENAdd,
 		message.CENAdd,
 		*message.CENUpdate,
@@ -46,8 +47,9 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	updater := &CEN{
 		newUpdaterBase[
 			cloudmodel.CEN,
-			mysql.CEN,
 			*diffbase.CEN,
+			*mysql.CEN,
+			mysql.CEN,
 			*message.CENAdd,
 			message.CENAdd,
 			*message.CENUpdate,

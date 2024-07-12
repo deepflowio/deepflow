@@ -22,15 +22,15 @@ import (
 )
 
 type LANIP struct {
-	OperatorBase[mysql.LANIP]
+	OperatorBase[*mysql.LANIP, mysql.LANIP]
 }
 
 func NewLANIP() *LANIP {
 	return &LANIP{
-		OperatorBase[mysql.LANIP]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.LANIP](
+			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
+			false,
+			false,
+		),
 	}
 }

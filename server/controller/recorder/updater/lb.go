@@ -29,8 +29,9 @@ import (
 type LB struct {
 	UpdaterBase[
 		cloudmodel.LB,
-		mysql.LB,
 		*diffbase.LB,
+		*mysql.LB,
+		mysql.LB,
 		*message.LBAdd,
 		message.LBAdd,
 		*message.LBUpdate,
@@ -45,8 +46,9 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	updater := &LB{
 		newUpdaterBase[
 			cloudmodel.LB,
-			mysql.LB,
 			*diffbase.LB,
+			*mysql.LB,
+			mysql.LB,
 			*message.LBAdd,
 			message.LBAdd,
 			*message.LBUpdate,

@@ -29,8 +29,9 @@ import (
 type PrometheusTarget struct {
 	UpdaterBase[
 		cloudmodel.PrometheusTarget,
-		mysql.PrometheusTarget,
 		*diffbase.PrometheusTarget,
+		*mysql.PrometheusTarget,
+		mysql.PrometheusTarget,
 		*message.PrometheusTargetAdd,
 		message.PrometheusTargetAdd,
 		*message.PrometheusTargetUpdate,
@@ -45,8 +46,9 @@ func NewPrometheusTarget(wholeCache *cache.Cache, cloudData []cloudmodel.Prometh
 	updater := &PrometheusTarget{
 		newUpdaterBase[
 			cloudmodel.PrometheusTarget,
-			mysql.PrometheusTarget,
 			*diffbase.PrometheusTarget,
+			*mysql.PrometheusTarget,
+			mysql.PrometheusTarget,
 			*message.PrometheusTargetAdd,
 			message.PrometheusTargetAdd,
 			*message.PrometheusTargetUpdate,

@@ -22,21 +22,16 @@ import (
 )
 
 type PrometheusTarget struct {
-	OperatorBase[mysql.PrometheusTarget]
+	OperatorBase[*mysql.PrometheusTarget, mysql.PrometheusTarget]
 }
 
 func NewPrometheusTarget() *PrometheusTarget {
 	operator := &PrometheusTarget{
-		OperatorBase[mysql.PrometheusTarget]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PrometheusTarget](
+			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
+			true,
+			true,
+		),
 	}
-	operator.setter = operator
 	return operator
-}
-
-func (p *PrometheusTarget) setDBItemID(dbItem *mysql.PrometheusTarget, id int) {
-	dbItem.ID = id
 }

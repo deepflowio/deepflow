@@ -30,8 +30,9 @@ import (
 type VRouter struct {
 	UpdaterBase[
 		cloudmodel.VRouter,
-		mysql.VRouter,
 		*diffbase.VRouter,
+		*mysql.VRouter,
+		mysql.VRouter,
 		*message.VRouterAdd,
 		message.VRouterAdd,
 		*message.VRouterUpdate,
@@ -46,8 +47,9 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 	updater := &VRouter{
 		newUpdaterBase[
 			cloudmodel.VRouter,
-			mysql.VRouter,
 			*diffbase.VRouter,
+			*mysql.VRouter,
+			mysql.VRouter,
 			*message.VRouterAdd,
 			message.VRouterAdd,
 			*message.VRouterUpdate,

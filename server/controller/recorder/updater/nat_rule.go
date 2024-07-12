@@ -29,8 +29,9 @@ import (
 type NATRule struct {
 	UpdaterBase[
 		cloudmodel.NATRule,
-		mysql.NATRule,
 		*diffbase.NATRule,
+		*mysql.NATRule,
+		mysql.NATRule,
 		*message.NATRuleAdd,
 		message.NATRuleAdd,
 		*message.NATRuleUpdate,
@@ -45,8 +46,9 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 	updater := &NATRule{
 		newUpdaterBase[
 			cloudmodel.NATRule,
-			mysql.NATRule,
 			*diffbase.NATRule,
+			*mysql.NATRule,
+			mysql.NATRule,
 			*message.NATRuleAdd,
 			message.NATRuleAdd,
 			*message.NATRuleUpdate,

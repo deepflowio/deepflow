@@ -22,21 +22,16 @@ import (
 )
 
 type Host struct {
-	OperatorBase[mysql.Host]
+	OperatorBase[*mysql.Host, mysql.Host]
 }
 
 func NewHost() *Host {
 	operater := &Host{
-		OperatorBase[mysql.Host]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_HOST_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.Host](
+			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *Host) setDBItemID(dbItem *mysql.Host, id int) {
-	dbItem.ID = id
 }

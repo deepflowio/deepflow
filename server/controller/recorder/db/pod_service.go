@@ -22,21 +22,16 @@ import (
 )
 
 type PodService struct {
-	OperatorBase[mysql.PodService]
+	OperatorBase[*mysql.PodService, mysql.PodService]
 }
 
 func NewPodService() *PodService {
 	operater := &PodService{
-		OperatorBase[mysql.PodService]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PodService](
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *PodService) setDBItemID(dbItem *mysql.PodService, id int) {
-	dbItem.ID = id
 }

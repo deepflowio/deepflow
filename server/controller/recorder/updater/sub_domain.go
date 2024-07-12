@@ -29,8 +29,9 @@ import (
 type SubDomain struct {
 	UpdaterBase[
 		cloudmodel.SubDomain,
-		mysql.SubDomain,
 		*diffbase.SubDomain,
+		*mysql.SubDomain,
+		mysql.SubDomain,
 		*message.SubDomainAdd,
 		message.SubDomainAdd,
 		*message.SubDomainUpdate,
@@ -45,8 +46,9 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 	updater := &SubDomain{
 		newUpdaterBase[
 			cloudmodel.SubDomain,
-			mysql.SubDomain,
 			*diffbase.SubDomain,
+			*mysql.SubDomain,
+			mysql.SubDomain,
 			*message.SubDomainAdd,
 			message.SubDomainAdd,
 			*message.SubDomainUpdate,

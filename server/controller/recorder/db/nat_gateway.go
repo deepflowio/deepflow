@@ -22,21 +22,16 @@ import (
 )
 
 type NATGateway struct {
-	OperatorBase[mysql.NATGateway]
+	OperatorBase[*mysql.NATGateway, mysql.NATGateway]
 }
 
 func NewNATGateway() *NATGateway {
 	operater := &NATGateway{
-		OperatorBase[mysql.NATGateway]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.NATGateway](
+			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *NATGateway) setDBItemID(dbItem *mysql.NATGateway, id int) {
-	dbItem.ID = id
 }

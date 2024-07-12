@@ -29,8 +29,9 @@ import (
 type PodCluster struct {
 	UpdaterBase[
 		cloudmodel.PodCluster,
-		mysql.PodCluster,
 		*diffbase.PodCluster,
+		*mysql.PodCluster,
+		mysql.PodCluster,
 		*message.PodClusterAdd,
 		message.PodClusterAdd,
 		*message.PodClusterUpdate,
@@ -45,8 +46,9 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 	updater := &PodCluster{
 		newUpdaterBase[
 			cloudmodel.PodCluster,
-			mysql.PodCluster,
 			*diffbase.PodCluster,
+			*mysql.PodCluster,
+			mysql.PodCluster,
 			*message.PodClusterAdd,
 			message.PodClusterAdd,
 			*message.PodClusterUpdate,

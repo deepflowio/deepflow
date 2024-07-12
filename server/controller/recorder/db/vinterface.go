@@ -22,16 +22,16 @@ import (
 )
 
 type VInterface struct {
-	OperatorBase[mysql.VInterface]
+	OperatorBase[*mysql.VInterface, mysql.VInterface]
 }
 
 func NewVInterface() *VInterface {
 	o := &VInterface{
-		OperatorBase[mysql.VInterface]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.VInterface](
+			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
+			false,
+			false,
+		),
 	}
 	o.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "subnetid", "devicetype", "deviceid", "mac", "ifindex", "iftype", "tap_mac", "region", "sub_domain"})
 	return o

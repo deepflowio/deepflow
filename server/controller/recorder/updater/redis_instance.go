@@ -29,8 +29,9 @@ import (
 type RedisInstance struct {
 	UpdaterBase[
 		cloudmodel.RedisInstance,
-		mysql.RedisInstance,
 		*diffbase.RedisInstance,
+		*mysql.RedisInstance,
+		mysql.RedisInstance,
 		*message.RedisInstanceAdd,
 		message.RedisInstanceAdd,
 		*message.RedisInstanceUpdate,
@@ -45,8 +46,9 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 	updater := &RedisInstance{
 		newUpdaterBase[
 			cloudmodel.RedisInstance,
-			mysql.RedisInstance,
 			*diffbase.RedisInstance,
+			*mysql.RedisInstance,
+			mysql.RedisInstance,
 			*message.RedisInstanceAdd,
 			message.RedisInstanceAdd,
 			*message.RedisInstanceUpdate,

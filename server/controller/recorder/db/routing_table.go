@@ -22,15 +22,15 @@ import (
 )
 
 type RoutingTable struct {
-	OperatorBase[mysql.RoutingTable]
+	OperatorBase[*mysql.RoutingTable, mysql.RoutingTable]
 }
 
 func NewRoutingTable() *RoutingTable {
 	return &RoutingTable{
-		OperatorBase[mysql.RoutingTable]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.RoutingTable](
+			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
+			false,
+			false,
+		),
 	}
 }

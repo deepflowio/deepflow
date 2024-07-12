@@ -29,8 +29,9 @@ import (
 type RoutingTable struct {
 	UpdaterBase[
 		cloudmodel.RoutingTable,
-		mysql.RoutingTable,
 		*diffbase.RoutingTable,
+		*mysql.RoutingTable,
+		mysql.RoutingTable,
 		*message.RoutingTableAdd,
 		message.RoutingTableAdd,
 		*message.RoutingTableUpdate,
@@ -45,8 +46,9 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 	updater := &RoutingTable{
 		newUpdaterBase[
 			cloudmodel.RoutingTable,
-			mysql.RoutingTable,
 			*diffbase.RoutingTable,
+			*mysql.RoutingTable,
+			mysql.RoutingTable,
 			*message.RoutingTableAdd,
 			message.RoutingTableAdd,
 			*message.RoutingTableUpdate,

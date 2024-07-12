@@ -29,8 +29,9 @@ import (
 type RDSInstance struct {
 	UpdaterBase[
 		cloudmodel.RDSInstance,
-		mysql.RDSInstance,
 		*diffbase.RDSInstance,
+		*mysql.RDSInstance,
+		mysql.RDSInstance,
 		*message.RDSInstanceAdd,
 		message.RDSInstanceAdd,
 		*message.RDSInstanceUpdate,
@@ -45,8 +46,9 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 	updater := &RDSInstance{
 		newUpdaterBase[
 			cloudmodel.RDSInstance,
-			mysql.RDSInstance,
 			*diffbase.RDSInstance,
+			*mysql.RDSInstance,
+			mysql.RDSInstance,
 			*message.RDSInstanceAdd,
 			message.RDSInstanceAdd,
 			*message.RDSInstanceUpdate,

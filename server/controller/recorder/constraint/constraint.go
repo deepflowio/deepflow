@@ -18,10 +18,22 @@
 package constraint
 
 import (
+	"time"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
+
+type MySQLModelPtr[T MySQLModel] interface {
+	*T
+
+	GetLcuuid() string
+	GetID() int
+
+	SetID(int)
+	SetUpdatedAt(time.Time)
+}
 
 // 资源的MySQL orm对象
 type MySQLModel interface {
@@ -34,9 +46,8 @@ type MySQLModel interface {
 		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
 		mysql.PodIngressRule | mysql.PodIngressRuleBackend | mysql.PodService |
 		mysql.PodServicePort | mysql.PodGroup | mysql.PodGroupPort | mysql.PodReplicaSet |
-		mysql.Pod | mysql.Process | mysql.PrometheusTarget | mysql.VIP | mysql.VTap
+		mysql.Pod | mysql.Process | mysql.PrometheusTarget | mysql.VIP
 
-	GetLcuuid() string
 	GetID() int
 }
 

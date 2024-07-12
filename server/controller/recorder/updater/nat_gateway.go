@@ -29,8 +29,9 @@ import (
 type NATGateway struct {
 	UpdaterBase[
 		cloudmodel.NATGateway,
-		mysql.NATGateway,
 		*diffbase.NATGateway,
+		*mysql.NATGateway,
+		mysql.NATGateway,
 		*message.NATGatewayAdd,
 		message.NATGatewayAdd,
 		*message.NATGatewayUpdate,
@@ -45,8 +46,9 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 	updater := &NATGateway{
 		newUpdaterBase[
 			cloudmodel.NATGateway,
-			mysql.NATGateway,
 			*diffbase.NATGateway,
+			*mysql.NATGateway,
+			mysql.NATGateway,
 			*message.NATGatewayAdd,
 			message.NATGatewayAdd,
 			*message.NATGatewayUpdate,

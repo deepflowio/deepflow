@@ -22,15 +22,15 @@ import (
 )
 
 type PodServicePort struct {
-	OperatorBase[mysql.PodServicePort]
+	OperatorBase[*mysql.PodServicePort, mysql.PodServicePort]
 }
 
 func NewPodServicePort() *PodServicePort {
 	return &PodServicePort{
-		OperatorBase[mysql.PodServicePort]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.PodServicePort](
+			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
+			false,
+			false,
+		),
 	}
 }
