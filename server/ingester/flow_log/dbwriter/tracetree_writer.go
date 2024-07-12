@@ -71,7 +71,7 @@ type TraceTreeWriter struct {
 }
 
 func NewTraceTreeWriter(config *config.Config, traceTreeQueue queue.QueueReader) (*TraceTreeWriter, error) {
-	if !config.TraceTreeEnabled {
+	if !*config.TraceTreeEnabled {
 		return nil, nil
 	}
 
