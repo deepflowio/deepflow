@@ -75,7 +75,7 @@ type DiffBase interface {
 // 软删除资源的MySQL orm对象
 type MySQLSoftDeleteModel interface {
 	mysql.Region | mysql.AZ | mysql.Host | mysql.VM | mysql.VPC | mysql.Network |
-		mysql.VRouter | mysql.DHCPPort | mysql.SecurityGroup | mysql.NATGateway |
+		mysql.VRouter | mysql.DHCPPort | mysql.NATGateway |
 		mysql.LB | mysql.LBListener | mysql.CEN | mysql.PeerConnection | mysql.RDSInstance |
 		mysql.RedisInstance | mysql.PodCluster | mysql.PodNode | mysql.PodNamespace |
 		mysql.PodIngress | mysql.PodService | mysql.PodGroup | mysql.PodReplicaSet | mysql.Pod |

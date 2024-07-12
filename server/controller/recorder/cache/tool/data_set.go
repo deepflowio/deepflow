@@ -75,8 +75,6 @@ type DataSet struct {
 	vinterfaceLcuuidToDeviceID   map[string]int
 	vinterfaceLcuuidToMac        map[string]string
 
-	securityGroupLcuuidToID map[string]int
-
 	natGatewayLcuuidToID map[string]int
 	natGatewayIDToLcuuid map[int]string
 
@@ -156,8 +154,6 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		vinterfaceLcuuidToDeviceType: make(map[string]int),
 		vinterfaceLcuuidToDeviceID:   make(map[string]int),
 		vinterfaceLcuuidToMac:        make(map[string]string),
-
-		securityGroupLcuuidToID: make(map[string]int),
 
 		natGatewayLcuuidToID: make(map[string]int),
 		natGatewayIDToLcuuid: make(map[int]string),
@@ -550,16 +546,6 @@ func (t *DataSet) DeleteLANIP(lcuuid string) {
 	delete(t.lanIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.lanIPLcuuidToIP, lcuuid)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid)))
-}
-
-func (t *DataSet) AddSecurityGroup(item *mysql.SecurityGroup) {
-	t.securityGroupLcuuidToID[item.Lcuuid] = item.ID
-	t.GetLogFunc()(t.metadata.Logf(addToToolMap(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, item.Lcuuid)))
-}
-
-func (t *DataSet) DeleteSecurityGroup(lcuuid string) {
-	delete(t.securityGroupLcuuidToID, lcuuid)
-	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid)))
 }
 
 func (t *DataSet) AddNATGateway(item *mysql.NATGateway) {
@@ -1486,23 +1472,6 @@ func (t *DataSet) GetDeviceNameByDeviceID(deviceType, deviceID int) (string, err
 		return t.GetPodNameByID(deviceID)
 	} else {
 		return "", fmt.Errorf(t.metadata.Logf("device type %d not supported", deviceType))
-	}
-}
-
-func (t *DataSet) GetSecurityGroupIDByLcuuid(lcuuid string) (int, bool) {
-	id, exists := t.securityGroupLcuuidToID[lcuuid]
-	if exists {
-		return id, true
-	}
-	log.Warning(t.metadata.Logf(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid)))
-	var securityGroup mysql.SecurityGroup
-	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&securityGroup)
-	if result.RowsAffected == 1 {
-		t.AddSecurityGroup(&securityGroup)
-		return securityGroup.ID, true
-	} else {
-		log.Error(t.metadata.Logf(dbResourceByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid)))
-		return id, false
 	}
 }
 
