@@ -19,13 +19,12 @@
 
 #include "config.h"
 
-#define BUFSIZE 1024
+#define STRING_BUFFER_SIZE 2000
 #define UNIX_PATH_MAX 108
 
 typedef uint64_t(*agent_test_t) (void);
 
 typedef struct options {
-	int perf_map_size_limit;
 	char perf_map_path[PERF_PATH_SZ];
 	char perf_log_path[PERF_PATH_SZ];
 } options_t;
@@ -34,11 +33,11 @@ typedef struct receiver_args {
 	options_t *opts;
 	int map_socket;
 	int log_socket;
-	bool *done;
+	int *attach_ret;
 } receiver_args_t;
 
 void clear_target_ns_tmp_file(const char *target_path);
-void clear_target_ns(int pid, int target_ns_pid);
+void clear_target_ns(int pid);
 void clear_target_ns_so(int pid, int target_ns_pid);
 void clear_local_perf_files(int pid);
 bool is_same_mntns(int target_pid);

@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/epoll.h>
 #include <dlfcn.h>
 #include <dirent.h>
 
@@ -31,6 +32,8 @@
 #include "config.h"
 #include "df_jattach.h"
 
+#define MAX_EVENTS 4
+
 #define jattach_log(fmt, ...)				\
 	do {						\
 		fprintf(stdout, fmt, ##__VA_ARGS__);	\
@@ -39,6 +42,8 @@
 
 static char agent_lib_so_path[MAX_PATH_LENGTH];
 extern int jattach(int pid, int argc, char **argv);
+static int attach_and_recv_data(pid_t pid, options_t * opts,
+				bool is_same_mntns);
 
 static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 {
@@ -63,7 +68,7 @@ static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 					  int target_gid)
 {
-	
+
 	/*
 	 * Call this function only when the target process is in a subordinate
 	 * namespace. Here, we copy the agent.so to a temporary path within t-
@@ -96,8 +101,6 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 
 	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
 		 "/%s", AGENT_LIB_NAME);
-
-	printf("src:%s dst:%s\n", AGENT_LIB_SRC_PATH, copy_target_path);
 	if ((ret =
 	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
@@ -294,12 +297,23 @@ void clear_local_perf_files(int pid)
 	clear_target_ns_tmp_file(local_path);
 }
 
-void clear_target_ns(int pid, int my_pid)
+static void clear_map_and_log_files(int pid)
+{
+	char target_path[MAX_PATH_LENGTH];
+	snprintf(target_path, sizeof(target_path),
+		 DF_AGENT_MAP_PATH_FMT, pid, pid);
+	clear_target_ns_tmp_file(target_path);
+	snprintf(target_path, sizeof(target_path),
+		 DF_AGENT_LOG_PATH_FMT, pid, pid);
+	clear_target_ns_tmp_file(target_path);
+}
+
+void clear_target_ns(int pid)
 {
 	/*
 	 * Delete files:
-	 *  path/df-perf-<pid>.map
-	 *  path/df-perf-<pid>.log
+	 *  path/.deepflow-java-symbols-pid<pid>.socket
+	 *  path/.deepflow-java-jvmti-logs-ipd<pid>.socket
 	 *  path/df_java_agent.so
 	 *  path/df_java_agent_musl.so
 	 */
@@ -307,14 +321,9 @@ void clear_target_ns(int pid, int my_pid)
 	if (is_same_mntns(pid))
 		return;
 
-	char target_path[MAX_PATH_LENGTH];
-	snprintf(target_path, sizeof(target_path),
-		 DF_AGENT_MAP_PATH_FMT, pid, my_pid);
-	clear_target_ns_tmp_file(target_path);
-	snprintf(target_path, sizeof(target_path),
-		 DF_AGENT_LOG_PATH_FMT, pid, my_pid);
-	clear_target_ns_tmp_file(target_path);
+	clear_map_and_log_files(pid);
 
+	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
 		 AGENT_MUSL_LIB_TARGET_PATH);
 	clear_target_ns_tmp_file(target_path);
@@ -362,8 +371,7 @@ static inline void switch_to_root_ns(int root_fd)
 static inline i64 get_symbol_file_size(int pid, int ns_pid)
 {
 	char path[PERF_PATH_SZ];
-	snprintf(path, sizeof(path),
-		 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
+	snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".map", pid);
 
 	if (access(path, F_OK)) {
 		return -1;
@@ -380,8 +388,7 @@ static inline i64 get_symbol_file_size(int pid, int ns_pid)
 int target_symbol_file_access(int pid, int ns_pid)
 {
 	char path[PERF_PATH_SZ];
-	snprintf(path, sizeof(path),
-		 DF_AGENT_LOCAL_PATH_FMT ".map", pid);
+	snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".map", pid);
 
 	return access(path, F_OK);
 }
@@ -392,20 +399,13 @@ i64 get_local_symbol_file_sz(int pid, int ns_pid)
 }
 
 // parse comma separated arguments
-int parse_config(char *opts, options_t *parsed)
+int parse_config(char *opts, options_t * parsed)
 {
 	char line[PERF_PATH_SZ * 2];
 	strncpy(line, opts, PERF_PATH_SZ * 2);
 	line[PERF_PATH_SZ * 2 - 1] = '\0';
 
 	char *token = strtok(line, ",");
-	if (token == NULL) {
-		jattach_log("Bad argument line %s\n", opts);
-		return -1;
-	}
-	parsed->perf_map_size_limit = atoi(token);
-
-	token = strtok(NULL, ",");
 	if (token == NULL) {
 		jattach_log("Bad argument line %s\n", opts);
 		return -1;
@@ -424,15 +424,10 @@ int parse_config(char *opts, options_t *parsed)
 	return 0;
 }
 
-int java_attach_same_namespace(pid_t pid, options_t *opts)
+int java_attach_same_namespace(pid_t pid, options_t * opts)
 {
-	/*
-	 * If the agent is installed directly on the node or host,
-	 * be careful to delete the perf-pid.map and
-	 * perf-pid.log on them.
-	 */
-	clear_target_ns_tmp_file(opts->perf_map_path);
-	clear_target_ns_tmp_file(opts->perf_log_path);
+	// Clear '/tmp/' unix domain sockets files.
+	clear_map_and_log_files(pid);
 
 	/*
 	 * In containers, different libc implementations may be used to compile agent
@@ -446,36 +441,32 @@ int java_attach_same_namespace(pid_t pid, options_t *opts)
 	if (strlen(agent_lib_so_path) == 0)
 		return -1;
 
-	char buffer[PERF_PATH_SZ * 2];
-	snprintf(buffer, PERF_PATH_SZ * 2, "%d,%s,%s",
-		     opts->perf_map_size_limit,
-		     opts->perf_map_path,
-		     opts->perf_log_path);
-
-	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
-	 * library as a JVMTI agent.*/
-	return attach(pid, buffer);
+	return attach_and_recv_data(pid, opts, true);
 }
 
 int create_ipc_socket(const char *path)
 {
-
-	printf("==========socket path:%s\n", path);
 	int sock = -1;
 	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		jattach_log("Create unix socket failed with %d\n", errno);
+		jattach_log("Create unix socket failed with '%s(%d)'\n",
+			    strerror(errno), errno);
 		return -1;
 	}
 
-	struct sockaddr_un addr = { .sun_family = AF_UNIX };
+	struct sockaddr_un addr = {.sun_family = AF_UNIX };
 	strncpy(addr.sun_path, path, UNIX_PATH_MAX - 1);
+	printf
+	    ("create_ipc_socket : path %s addr.sun_path %s  UNIX_PATH_MAX  %d\n",
+	     path, addr.sun_path, UNIX_PATH_MAX);
 	int len = sizeof(addr.sun_family) + strlen(addr.sun_path);
 	if (bind(sock, (struct sockaddr *)&addr, len) < 0) {
-		jattach_log("Bind unix socket failed with %d\n", errno);
+		jattach_log("Bind unix socket failed with '%s(%d)'\n",
+			    strerror(errno), errno);
 		return -1;
 	}
 	if (listen(sock, 1) < 0) {
-		jattach_log("Listen on unix socket failed with %d\n", errno);
+		jattach_log("Listen on unix socket failed with '%s(%d)'\n",
+			    strerror(errno), errno);
 		unlink(path);
 		return -1;
 	}
@@ -483,111 +474,145 @@ int create_ipc_socket(const char *path)
 	return sock;
 }
 
+static inline int add_fd_to_epoll(int epoll_fd, int fd)
+{
+	if (fd <= 0) {
+		jattach_log("fd must be a value greater than 0, fd %d\n", fd);
+		return -1;
+	}
+
+	struct epoll_event event;
+	event.events = EPOLLIN;
+	event.data.fd = fd;
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
+		jattach_log("epoll_ctl() failed with '%s(%d)'\n",
+			    strerror(errno), errno);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int epoll_events_process(int epoll_fd, struct epoll_event *ev,
+				int map_sock, int log_sock, FILE * map_fp,
+				FILE * log_fp, int *map_client, int *log_client)
+{
+	errno = 0;
+	char rcv_buf[STRING_BUFFER_SIZE];
+	if (ev->data.fd == map_sock) {
+		if ((*map_client = accept(ev->data.fd, NULL, NULL)) < 0) {
+			jattach_log("accept() failed with '%s(%d)'\n",
+				    strerror(errno), errno);
+			return -1;
+		}
+		if (add_fd_to_epoll(epoll_fd, *map_client) == -1)
+			return -1;
+	} else if (ev->data.fd == log_sock) {
+		if ((*log_client = accept(ev->data.fd, NULL, NULL)) < 0) {
+			jattach_log("accept() failed with '%s(%d)'\n",
+				    strerror(errno), errno);
+			return -1;
+		}
+		if (add_fd_to_epoll(epoll_fd, *log_client) == -1)
+			return -1;
+	} else {
+		FILE *fp;
+		if (ev->data.fd == *map_client) {
+			fp = map_fp;
+		} else if (ev->data.fd == *log_client) {
+			fp = log_fp;
+		} else {
+			jattach_log("Unexpected event, event fd %d\n",
+				    ev->data.fd);
+			return 0;
+		}
+		int n = recv(ev->data.fd, rcv_buf, sizeof(rcv_buf), 0);
+		if (n > 0) {
+			if (fp) {
+				//fprintf(stdout, "> %s", rcv_buf);
+				//fflush(stdout);
+				fwrite(rcv_buf, sizeof(char), n, fp);
+			}
+		} else if (n == 0
+			   || (n < 0 && errno != EINTR
+			       && errno != EAGAIN && errno != EWOULDBLOCK)) {
+			if (n < 0) {
+				jattach_log
+				    ("recv() failed with '%s(%d)', ev->data.fd %d\n",
+				     strerror(errno), errno, ev->data.fd);
+			}
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 static void *ipc_receiver_thread(void *arguments)
 {
-	receiver_args_t *args = (receiver_args_t *)arguments;
-
-	printf("perf_map_path %s\n", args->opts->perf_map_path);
-	printf("perf_log_path %s\n", args->opts->perf_log_path);
-
+	receiver_args_t *args = (receiver_args_t *) arguments;
+	/*
+	 * If the file already exists, opening it in "w" mode will clear its contents
+	 * (truncate it to zero length). If the file does not exist, opening it in "w"
+	 * mode will create a new file.
+	 */
 	FILE *map_fp = fopen(args->opts->perf_map_path, "w");
 	if (!map_fp) {
 		// byte stream in socket needs to be consumed to avoid client stuck
 		// even if file open fails
-		jattach_log("fopen() %s failed with %d\n", args->opts->perf_map_path, errno);
+		jattach_log("fopen() %s failed with '%s(%d)'\n",
+			    args->opts->perf_map_path, strerror(errno), errno);
+		return NULL;
 	}
 	FILE *log_fp = fopen(args->opts->perf_log_path, "w");
 	if (!log_fp) {
 		// byte stream in socket needs to be consumed to avoid client stuck
 		// even if file open fails
-		jattach_log("fopen() %s failed with %d\n", args->opts->perf_log_path, errno);
+		jattach_log("fopen() %s failed with '%s(%d)'\n",
+			    args->opts->perf_log_path, strerror(errno), errno);
+		return NULL;
 	}
 
 	int map_sock = args->map_socket;
 	int log_sock = args->log_socket;
 	int map_client = -1;
 	int log_client = -1;
-	bool map_done = false, log_done = false;
+	int epoll_fd = epoll_create1(0);
+	if (epoll_fd == -1) {
+		jattach_log("epoll_create1() failed with '%s(%d)'\n",
+			    strerror(errno), errno);
+		goto error;
+	}
 
-	int max_fd = map_sock > log_sock ? map_sock : log_sock;
-	fd_set fds;
-	FD_ZERO(&fds);
-	FD_SET(map_sock, &fds);
-	FD_SET(log_sock, &fds);
+	if (add_fd_to_epoll(epoll_fd, map_sock) == -1) {
+		goto error;
+	}
 
-	struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
-
-	char rcv_buf[BUFSIZE];
-
-	while (!*args->done && !(map_done && log_done)) {
-		struct timeval tv = timeout;
-		fd_set read_fds = fds;
-		if (map_client >= 0) {
-			FD_SET(map_client, &read_fds);
-		}
-		if (log_client >= 0) {
-			FD_SET(log_client, &read_fds);
-		}
-
-		int ret = select(max_fd + 1, &read_fds, 0, 0, &tv);
-		if (ret == -1) {
-			jattach_log("select() failed with %d\n", errno);
-			continue;
+	if (add_fd_to_epoll(epoll_fd, log_sock) == -1) {
+		goto error;
+	}
+	static const int timeout = 1000;	// 1 second timeout, in milliseconds
+	struct epoll_event events[MAX_EVENTS];
+	while (!*args->attach_ret) {
+		int n = epoll_wait(epoll_fd, events, MAX_EVENTS, timeout);
+		if (n == -1) {
+			jattach_log("epoll_wait() failed with '%s(%d)'\n",
+				    strerror(errno), errno);
+			goto error;
 		}
 
-		if (FD_ISSET(map_sock, &read_fds)) {
-			if (map_client >= 0) {
-				jattach_log("map socket already accepted\n");
-			} else if ((map_client = accept(map_sock, NULL, NULL)) < 0) {
-				jattach_log("accept() failed with %d\n", errno);
-			} else {
-				max_fd = map_client > max_fd ? map_client : max_fd;
-			}
-		}
-
-		if (FD_ISSET(log_sock, &read_fds)) {
-			if (log_client >= 0) {
-				jattach_log("log socket already accepted\n");
-			} else if ((log_client = accept(log_sock, NULL, NULL)) < 0) {
-				jattach_log("accept() failed with %d\n", errno);
-			} else {
-				max_fd = log_client > max_fd ? log_client : max_fd;
-			}
-		}
-
-		if (FD_ISSET(map_client, &read_fds)) {
-			int n = recv(map_client, rcv_buf, sizeof(rcv_buf), 0);
-			if (n > 0) {
-				if (map_fp) {
-					fwrite(rcv_buf, sizeof(char), n, map_fp);
-				}
-			} else if (n == 0 || (n < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)) {
-				if (n < 0) {
-					jattach_log("recv() failed with %d\n", errno);
-				}
-				close(map_client);
-				map_client = -1;
-				map_done = true;
-			}
-		}
-
-		if (FD_ISSET(log_client, &read_fds)) {
-			int n = recv(log_client, rcv_buf, sizeof(rcv_buf), 0);
-			if (n > 0) {
-				if (log_fp) {
-					fwrite(rcv_buf, sizeof(char), n, log_fp);
-				}
-			} else if (n == 0 || (n < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)) {
-				if (n < 0) {
-					jattach_log("recv() failed with %d\n", errno);
-				}
-				close(log_client);
-				log_client = -1;
-				log_done = true;
+		for (int i = 0; i < n; ++i) {
+			if (events[i].events & EPOLLIN) {
+				struct epoll_event *ev = &events[i];
+				if (epoll_events_process
+				    (epoll_fd, ev, map_sock, log_sock, map_fp,
+				     log_fp, &map_client, &log_client) < 0)
+					goto error;
 			}
 		}
 	}
 
+error:
 	if (map_fp) {
 		fclose(map_fp);
 		map_fp = NULL;
@@ -597,15 +622,98 @@ static void *ipc_receiver_thread(void *arguments)
 		log_fp = NULL;
 	}
 
+	if (map_client > 0)
+		close(map_client);
+
+	if (log_client > 0)
+		close(log_client);
+
+	printf("return thread!\n");
 	return NULL;
 }
 
-int java_attach_different_namespace(pid_t pid, options_t *opts)
+static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 {
-	int ret = -1;
-	int uid, gid;
 	int map_socket = -1, log_socket = -1;
 
+	// make the sockets accessable from unprivileged user in container
+	umask(0);
+
+	int ret = -1;
+	char buffer[PERF_PATH_SZ * 2];
+	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_MAP_PATH_FMT, pid, pid);
+
+	printf("============map PERF_PATH_SZ %d buffer %s\n", PERF_PATH_SZ,
+	       buffer);
+	if ((map_socket = create_ipc_socket(buffer)) < 0) {
+		goto cleanup;
+	}
+	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_LOG_PATH_FMT, pid, pid);
+
+	printf("============log PERF_PATH_SZ %d buffer %s\n", PERF_PATH_SZ,
+	       buffer);
+	if ((log_socket = create_ipc_socket(buffer)) < 0) {
+		goto cleanup;
+	}
+
+	pthread_t ipc_receiver;
+	int attach_ret_val = 0;
+	receiver_args_t args = {
+		.opts = opts,
+		.map_socket = map_socket,
+		.log_socket = log_socket,
+		.attach_ret = &attach_ret_val,
+	};
+
+	if ((ret =
+	     pthread_create(&ipc_receiver, NULL, &ipc_receiver_thread,
+			    &args)) < 0) {
+		jattach_log
+		    ("Create ipc receiver thread failed with '%s(%d)'\n",
+		     strerror(errno), errno);
+		goto cleanup;
+	}
+
+	snprintf(buffer, PERF_PATH_SZ * 2,
+		 PERF_MAP_FILE_FMT "," PERF_MAP_LOG_FILE_FMT, pid, pid);
+
+	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
+	 * library as a JVMTI agent.*/
+	printf("prev attach\n");
+	attach_ret_val = attach(pid, buffer);
+
+	printf("prev pthread_join\n");
+	pthread_join(ipc_receiver, NULL);
+	printf("post pthread_join\n");
+
+cleanup:
+	if (map_socket >= 0) {
+		close(map_socket);
+	}
+	if (log_socket >= 0) {
+		close(log_socket);
+	}
+	// attach() may change euid/egid, restore them to remove tmp files
+	if (seteuid(getuid()) < 0) {
+		jattach_log("seteuid() failed with '%s(%d)'\n",
+			    strerror(errno), errno);
+	}
+	if (setegid(getgid()) < 0) {
+		jattach_log("seteuid() failed with '%s(%d)'\n",
+			    strerror(errno), errno);
+	}
+
+	if (!is_same_mntns)
+		clear_target_ns(pid);
+	else
+		clear_map_and_log_files(pid);
+
+	return ret;
+}
+
+int java_attach_different_namespace(pid_t pid, options_t * opts)
+{
+	int uid, gid;
 	if (get_target_uid_and_gid(pid, &uid, &gid)) {
 		return -1;
 	}
@@ -616,13 +724,11 @@ int java_attach_different_namespace(pid_t pid, options_t *opts)
 		return -1;
 	}
 
-	int my_pid = getpid();
-
 	/*
 	 * Delete the files on the target file system if they
 	 * are not on the same mount point.
 	 */
-	clear_target_ns(pid, my_pid);
+	clear_target_ns(pid);
 
 	/*
 	 * Here, the original method of determination (based on whether the net
@@ -638,9 +744,9 @@ int java_attach_different_namespace(pid_t pid, options_t *opts)
 	 */
 	jattach_log("[PID %d] copy agent so library ...\n", pid);
 	if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
-		jattach_log("[PID %d] copy agent os library failed.\n",
-			    pid);
-		goto cleanup;
+		jattach_log("[PID %d] copy agent os library failed.\n", pid);
+		clear_target_ns(pid);
+		return -1;
 	}
 	jattach_log("[PID %d] copy agent so library success.\n", pid);
 
@@ -653,62 +759,13 @@ int java_attach_different_namespace(pid_t pid, options_t *opts)
 	 */
 	select_suitable_agent_lib(pid, false);
 
-	if (strlen(agent_lib_so_path) == 0)
-		goto cleanup;
-
-	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
-	 * library as a JVMTI agent.*/
-
-	// make the sockets accessable from unprivileged user in container
-	umask(0);
-
-	char buffer[PERF_PATH_SZ * 2];
-	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_MAP_PATH_FMT, pid, my_pid);
-	if ((map_socket = create_ipc_socket(buffer)) < 0) {
-		goto cleanup;
-	}
-	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_LOG_PATH_FMT, pid, my_pid);
-	if ((log_socket = create_ipc_socket(buffer)) < 0) {
-		goto cleanup;
+	if (strlen(agent_lib_so_path) == 0) {
+		jattach_log("[PID %d] agent_lib_so_path is NULL.\n", pid);
+		clear_target_ns(pid);
+		return -1;
 	}
 
-	pthread_t ipc_receiver;
-	bool done = false;
-	receiver_args_t args = {
-		.opts = opts,
-		.map_socket = map_socket,
-		.log_socket = log_socket,
-		.done = &done,
-	};
-	if ((ret = pthread_create(&ipc_receiver, NULL, &ipc_receiver_thread, &args)) < 0) {
-		jattach_log("Create ipc receiver thread failed with errno(%d)\n", errno);
-		goto cleanup;
-	}
-
-	snprintf(buffer, PERF_PATH_SZ * 2,
-	         "%d," PERF_MAP_FILE_FMT "," PERF_MAP_LOG_FILE_FMT,
-		     opts->perf_map_size_limit, my_pid, my_pid);
-	ret = attach(pid, buffer);
-
-	done = true;
-	pthread_join(ipc_receiver, NULL);
-
-cleanup:
-	if (map_socket >= 0) {
-		close(map_socket);
-	}
-	if (log_socket >= 0) {
-		close(log_socket);
-	}
-	// attach() may change euid/egid, restore them to remove tmp files
-	if (seteuid(getuid()) < 0) {
-		jattach_log("seteuid() failed with errno(%d)\n", errno);
-	}
-	if (setegid(getgid()) < 0) {
-		jattach_log("seteuid() failed with errno(%d)\n", errno);
-	}
-	clear_target_ns(pid, my_pid);
-	return ret;
+	return attach_and_recv_data(pid, opts, false);
 }
 
 int java_attach(pid_t pid, char *opts)

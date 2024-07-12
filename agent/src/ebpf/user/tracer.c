@@ -1223,7 +1223,6 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 		reader_idx = perf_reader->readers_count++;
 		perf_reader->reader_fds[reader_idx] = perf_fd;
 		perf_reader->readers[reader_idx] = reader;
-		event.data.fd = perf_fd;
 		event.data.ptr = reader;
 		event.events = EPOLLIN;
 

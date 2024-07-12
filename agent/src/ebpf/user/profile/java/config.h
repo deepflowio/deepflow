@@ -17,6 +17,15 @@
 #ifndef DF_JAVA_CONFIG_H
 #define DF_JAVA_CONFIG_H
 
+// Maximum length of Java symbol information string
+#define STRING_BUFFER_SIZE 2000
+/*
+ * In Unix domain sockets, the maximum length of the path is defined by
+ * the macro UNIX_PATH_MAX. For most systems (e.g., Linux), this maximum
+ * length is typically 108 characters. 
+ */
+#define UNIX_PATH_MAX 108
+
 #define TARGET_NS_STORAGE_PATH "/proc/%d/root/deepflow"
 
 #if !defined(AGENT_LIB_NAME) || !defined(AGENT_MUSL_LIB_NAME)
@@ -32,12 +41,12 @@
 #define JAVA_LOG_TAG "[JAVA]"
 
 #define PERF_PATH_SZ 256
-#define DF_AGENT_MAP_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-symbols-%d.socket"
-#define DF_AGENT_LOG_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-jvmti-logs-%d.socket"
+#define DF_AGENT_MAP_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-symbols-pid%d.socket"
+#define DF_AGENT_LOG_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-jvmti-logs-pid%d.socket"
 
 #define DF_AGENT_LOCAL_PATH_FMT "/tmp/perf-%d"
 
-#define PERF_MAP_FILE_FMT "/tmp/.deepflow-java-symbols-%d.socket"
-#define PERF_MAP_LOG_FILE_FMT "/tmp/.deepflow-java-jvmti-logs-%d.socket"
+#define PERF_MAP_FILE_FMT "/tmp/.deepflow-java-symbols-pid%d.socket"
+#define PERF_MAP_LOG_FILE_FMT "/tmp/.deepflow-java-jvmti-logs-pid%d.socket"
 
 #endif /* DF_JAVA_CONFIG_H */

@@ -38,11 +38,7 @@
 #include <jvmticmlr.h>
 
 #include "../../config.h"
-
-#define STRING_BUFFER_SIZE 2000
-#define BIG_STRING_BUFFER_SIZE 20000
-
-#define UNIX_PATH_MAX 108
+#include "config.h"
 
 /*
  * HotSpot JVM does not support agent unloading. However, you
@@ -56,15 +52,13 @@
  */
 
 pthread_mutex_t g_df_lock;
+jvmtiEnv *g_jvmti;
 
 char perf_map_file_path[128];
 char perf_log_file_path[128];
 
 FILE *perf_map_file_ptr = NULL;
 FILE *perf_map_log_file_ptr = NULL;
-
-int g_perf_map_file_size_limit;
-int g_perf_map_file_size;
 
 #define _(e)                                                                \
 	if (e != JNI_OK) {                                                  \
@@ -127,6 +121,13 @@ jint df_open_socket_as_file(const char *path, FILE **ptr)
 		return JNI_ERR;
 	}
 
+	// Set file stream to line buffering
+	if (setvbuf(file_ptr, NULL, _IONBF, 0) != 0) {
+		fprintf(stderr, "Call setvbuf() failed: errno(%d)\n", errno);
+		return JNI_ERR;
+	}
+
+	fprintf(stderr, "df_open_socket_as_file  === OK - s %d file_ptr %p ath %s\n", s, file_ptr, path);
 	*ptr = file_ptr;
 
 	return JNI_OK;
@@ -162,33 +163,31 @@ jint open_perf_map_log_file(pid_t pid)
 
 jint df_agent_config(char *opts)
 {
-	g_perf_map_file_size = 0;
-
 	char buf[300];
 	char *start;
 	start = buf;
 	snprintf(buf, sizeof(buf), "%s", opts);
 
-	/* g_perf_map_file_size_limit */
+	fprintf(stderr, "buf: %s\n", buf);
+
+///tmp/.deepflow-java-symbols-pid39899-39982.socket,/tmp/.deepflow-java-jvmti-logs-pid39899-39982.socket
+
+
+	/* perf_map_file_path[] */
 	char *p = strchr(start, ',');
 	if (p == NULL)
 		return JNI_ERR;
 	*p = '\0';
-	g_perf_map_file_size_limit = atoi(start);
-
-	/* perf_map_file_path[] */
-	start = ++p;
-	p = strchr(start, ',');
-	if (p == NULL)
-		return JNI_ERR;
-	*p = '\0';
 	snprintf(perf_map_file_path, sizeof(perf_map_file_path), "%s", start);
+
+	fprintf(stderr, "----- perf_map_file_path %s\n", perf_map_file_path);
 
 	/* perf_log_file_path[] */
 	start = ++p;
 	if (start == NULL)
 		return JNI_ERR;
 	snprintf(perf_log_file_path, sizeof(perf_log_file_path), "%s", start);
+	fprintf(stderr, "----- perf_log_file_path %s\n", perf_log_file_path);
 
 	return JNI_OK;
 }
@@ -226,7 +225,6 @@ jint get_jvmti_env(JavaVM * jvm, jvmtiEnv ** jvmti)
 
 	jint error = (*jvm)->GetEnv(jvm, (void **)jvmti, JVMTI_VERSION_1_0);
 	if (error != JNI_OK || *jvmti == NULL) {
-		df_log("[error] Unable to access JVMTI.");
 		return JNI_ERR;
 	}
 	return JNI_OK;
@@ -278,30 +276,36 @@ void deallocate(jvmtiEnv * jvmti, void *string)
 		(*jvmti)->Deallocate(jvmti, (unsigned char *)string);
 }
 
-void df_write_symbol(const void *code_addr, unsigned int code_size,
+void df_write_symbol(const char *tag, const void *code_addr, unsigned int code_size,
 		     const char *entry)
 {
 	if (!perf_map_file_ptr) {
+//		fprintf(stderr, "perf_map_file_ptr = NULL\n");
 		return;
 	}
-
-	char symbol_str[1024];
-	int bytes_all = 0;
+#if 0
+	if (fflush(perf_map_file_ptr) != 0) {
+		fprintf(stderr, "perf_map_file_ptr fflush failed.\n");
+		close_files();	
+        	return;
+    	}
+#endif
+	char symbol_str[STRING_BUFFER_SIZE] = { 0 };
 	pthread_mutex_lock(&g_df_lock);
+	if (strchr(entry, '\n'))
+		df_log("ERR %s", entry);
 	snprintf(symbol_str, sizeof(symbol_str), "%lx %x %s\n",
 		 (unsigned long)code_addr, code_size, entry);
-	bytes_all = g_perf_map_file_size + strlen(symbol_str);
-	if (bytes_all >= g_perf_map_file_size_limit) {
-		pthread_mutex_unlock(&g_df_lock);
-		return;
+	int n = fprintf(perf_map_file_ptr, "%s%s", tag, symbol_str);
+	if (n == -1) {
+		close_files();
+		fprintf(stderr, "count %d", n);
 	}
-	fprintf(perf_map_file_ptr, "%s", symbol_str);
 	fflush(perf_map_file_ptr);
-	g_perf_map_file_size = bytes_all;
 	pthread_mutex_unlock(&g_df_lock);
 }
 
-void generate_single_entry(jvmtiEnv * jvmti,
+void generate_single_entry(const char *tag, jvmtiEnv * jvmti,
 			   jmethodID method, const void *code_addr,
 			   jint code_size)
 {
@@ -311,7 +315,6 @@ void generate_single_entry(jvmtiEnv * jvmti,
 	char *csig = NULL;
 
 	char output[STRING_BUFFER_SIZE];
-	char source_info[1000] = "";
 	char *method_signature = "";
 	size_t noutput = sizeof(output);
 
@@ -330,8 +333,8 @@ void generate_single_entry(jvmtiEnv * jvmti,
 		} else {
 			memcpy(class_name, csig, sizeof(class_name) - 1);
 		}
-		snprintf(output, noutput, "%s::%s%s%s", class_name,
-			 method_name, method_signature, source_info);
+		snprintf(output, noutput, "%s::%s%s", class_name,
+			 method_name, method_signature);
 
 		deallocate(jvmti, (unsigned char *)csig);
 	}
@@ -339,7 +342,7 @@ void generate_single_entry(jvmtiEnv * jvmti,
 	deallocate(jvmti, (unsigned char *)method_name);
 	deallocate(jvmti, (unsigned char *)msig);
 
-	df_write_symbol(code_addr, (unsigned int)code_size, output);
+	df_write_symbol(tag, code_addr, (unsigned int)code_size, output);
 }
 
 void JNICALL
@@ -350,7 +353,7 @@ cbCompiledMethodLoad(jvmtiEnv * jvmti,
 		     jint map_length,
 		     const jvmtiAddrLocationMap * map, const void *compile_info)
 {
-	generate_single_entry(jvmti, method, code_addr, code_size);
+	generate_single_entry("", jvmti, method, code_addr, code_size);
 }
 
 void JNICALL
@@ -358,14 +361,14 @@ cbDynamicCodeGenerated(jvmtiEnv * jvmti,
 		       const char *name, const void *address, jint length)
 {
 
-	df_write_symbol(address, (unsigned int)length, name);
+	df_write_symbol("", address, (unsigned int)length, name);
 }
 
 void JNICALL
 cbCompiledMethodUnload(jvmtiEnv * jvmti, jmethodID method, const void *address)
 {
 
-	df_write_symbol(address, 0, "");
+	df_write_symbol("Unload", address, 0, "");
 }
 
 jvmtiError set_callback_funs(jvmtiEnv * jvmti)
@@ -384,7 +387,6 @@ jvmtiError set_callback_funs(jvmtiEnv * jvmti)
 			      "Unable to attach CompiledMethodLoad callback.");
 		return JNI_ERR;
 	}
-
 	return JNI_OK;
 }
 
@@ -392,11 +394,14 @@ jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 {
 	jvmtiError error;
 
+// err = jvmti->SetEventNotificationMode(JVMTI_DISABLE, JVMTI_EVENT_COMPILED_METHOD_LOAD, NULL);
+// check_jvmti_error(jvmti, err, "Unable to disable JVMTI_EVENT_COMPILED_METHOD_LOAD");
 	error =
 	    (*jvmti)->SetEventNotificationMode(jvmti, mode,
 					       JVMTI_EVENT_COMPILED_METHOD_LOAD,
 					       NULL);
 	if (error != JVMTI_ERROR_NONE) {
+		fprintf(stderr, "JVMTI_EVENT_COMPILED_METHOD_LOAD NotificationMode error\n");
 		jvmti_err_log(jvmti, error,
 			      "Unable to set notification mode for CompiledMethodLoad.");
 		return JNI_ERR;
@@ -407,6 +412,7 @@ jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 					       JVMTI_EVENT_COMPILED_METHOD_UNLOAD,
 					       NULL);
 	if (error != JVMTI_ERROR_NONE) {
+		fprintf(stderr, "JVMTI_EVENT_COMPILED_METHOD_UNLOAD NotificationMode error\n");
 		jvmti_err_log(jvmti, error,
 			      "Unable to set notification mode for CompiledMethodUnload.");
 		return JNI_ERR;
@@ -417,6 +423,7 @@ jint set_notification_modes(jvmtiEnv * jvmti, jvmtiEventMode mode)
 					       JVMTI_EVENT_DYNAMIC_CODE_GENERATED,
 					       NULL);
 	if (error != JVMTI_ERROR_NONE) {
+		fprintf(stderr, "JVMTI_EVENT_COMPILED_CODE_GEN NotificationMode error\n");
 		jvmti_err_log(jvmti, error,
 			      "Unable to set notification mode for DynamicCodeGenerated.");
 		return JNI_ERR;
@@ -465,22 +472,40 @@ JNIEXPORT jint JNICALL
 Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 {
 	jvmtiEnv *jvmti;
+	if (g_jvmti) {
+ 		   fprintf(stderr, "Agent_OnAttach(). g_callbacks_attached=true\n");
+		   close_files();
+		   // Terminate the previous replay event to prevent multiple replay events from running simultaneously.
+		   _(set_notification_modes(g_jvmti, JVMTI_DISABLE));
+	           g_jvmti = NULL;
+		   _(get_jvmti_env(vm, &jvmti));
+		  goto enable_replay;
+  	}
+
+	fprintf(stderr, "=========================== start =========\n");
 	pthread_mutex_init(&g_df_lock, NULL);
+	_(get_jvmti_env(vm, &jvmti));
+
+enable_replay:
 	_(df_agent_config(options));
 	_(open_perf_map_log_file(getpid()));
-	df_log("- JVMTI g_perf_map_file_size_limit: %d, "
-	       "perf_map_file_path: %s perf_log_file_path: %s",
-	       g_perf_map_file_size_limit,
-	       perf_map_file_path, perf_log_file_path);
 	_(open_perf_map_file(getpid()));
-	_(get_jvmti_env(vm, &jvmti));
+
+        fprintf(stderr, "- JVMTI perf_map_file_path: %s perf_log_file_path: %s\n",
+               perf_map_file_path, perf_log_file_path);
+
+        df_log("- JVMTI perf_map_file_path: %s perf_log_file_path: %s",
+               perf_map_file_path, perf_log_file_path);
+
 	_(enable_capabilities(jvmti));
 	_(set_callback_funs(jvmti));
 	_(set_notification_modes(jvmti, JVMTI_ENABLE));
+	if (g_jvmti == NULL)
+		g_jvmti = jvmti;
 	_(replay_callbacks(jvmti));
 
-	df_log("- JVMTI symbolization agent startup sequence complete.");
+	fprintf(stderr, "- JVMTI symbolization agent startup sequence complete.jvmti : %p\n", jvmti);
+	df_log("- JVMTI symbolization agent startup sequence complete. jvmti : %p\n", jvmti);
 
-	close_files();
-	return 0;
+	return JNI_OK;
 }
