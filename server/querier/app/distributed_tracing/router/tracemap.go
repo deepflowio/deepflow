@@ -31,10 +31,10 @@ import (
 var log = logging.MustGetLogger("tracemap")
 
 func TraceMapRouter(e *gin.Engine, cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) {
-	e.POST("/trace_map", traceMap(cfg))
+	e.POST("/trace_map", traceMap(cfg, generator))
 }
 
-func traceMap(cfg *config.QuerierConfig) gin.HandlerFunc {
+func traceMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var args model.TraceMap
 
@@ -48,7 +48,7 @@ func traceMap(cfg *config.QuerierConfig) gin.HandlerFunc {
 		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		c.Header("Content-Type", "application/json")
 		done := make(chan bool)
-		go tracemap.TraceMap(args, cfg, c, done)
+		go tracemap.TraceMap(args, cfg, c, done, generator)
 		<-done
 	})
 }
