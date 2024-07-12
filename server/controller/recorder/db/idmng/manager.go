@@ -27,7 +27,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
 var log = logging.MustGetLogger("recorder.idmng")

@@ -22,21 +22,16 @@ import (
 )
 
 type VPC struct {
-	OperatorBase[mysql.VPC]
+	OperatorBase[*mysql.VPC, mysql.VPC]
 }
 
 func NewVPC() *VPC {
 	operater := &VPC{
-		OperatorBase[mysql.VPC]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VPC_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.VPC](
+			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *VPC) setDBItemID(dbItem *mysql.VPC, id int) {
-	dbItem.ID = id
 }

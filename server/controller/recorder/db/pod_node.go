@@ -23,23 +23,18 @@ import (
 )
 
 type PodNode struct {
-	OperatorBase[mysql.PodNode]
+	OperatorBase[*mysql.PodNode, mysql.PodNode]
 }
 
 func NewPodNode() *PodNode {
 	operater := &PodNode{
-		OperatorBase[mysql.PodNode]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PodNode](
+			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *PodNode) setDBItemID(dbItem *mysql.PodNode, id int) {
-	dbItem.ID = id
 }
 
 func (n *PodNode) DeleteBatch(lcuuids []string) ([]*mysql.PodNode, bool) {

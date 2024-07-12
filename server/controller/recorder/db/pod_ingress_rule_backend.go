@@ -22,15 +22,15 @@ import (
 )
 
 type PodIngressRuleBackend struct {
-	OperatorBase[mysql.PodIngressRuleBackend]
+	OperatorBase[*mysql.PodIngressRuleBackend, mysql.PodIngressRuleBackend]
 }
 
 func NewPodIngressRuleBackend() *PodIngressRuleBackend {
 	return &PodIngressRuleBackend{
-		OperatorBase[mysql.PodIngressRuleBackend]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.PodIngressRuleBackend](
+			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
+			false,
+			false,
+		),
 	}
 }

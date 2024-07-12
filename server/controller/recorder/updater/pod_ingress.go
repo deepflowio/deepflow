@@ -29,8 +29,9 @@ import (
 type PodIngress struct {
 	UpdaterBase[
 		cloudmodel.PodIngress,
-		mysql.PodIngress,
 		*diffbase.PodIngress,
+		*mysql.PodIngress,
+		mysql.PodIngress,
 		*message.PodIngressAdd,
 		message.PodIngressAdd,
 		*message.PodIngressUpdate,
@@ -45,8 +46,9 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 	updater := &PodIngress{
 		newUpdaterBase[
 			cloudmodel.PodIngress,
-			mysql.PodIngress,
 			*diffbase.PodIngress,
+			*mysql.PodIngress,
+			mysql.PodIngress,
 			*message.PodIngressAdd,
 			message.PodIngressAdd,
 			*message.PodIngressUpdate,

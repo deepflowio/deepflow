@@ -22,15 +22,15 @@ import (
 )
 
 type NATRule struct {
-	OperatorBase[mysql.NATRule]
+	OperatorBase[*mysql.NATRule, mysql.NATRule]
 }
 
 func NewNATRule() *NATRule {
 	return &NATRule{
-		OperatorBase[mysql.NATRule]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.NATRule](
+			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
+			false,
+			false,
+		),
 	}
 }

@@ -31,8 +31,9 @@ import (
 type LANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
-		mysql.LANIP,
 		*diffbase.LANIP,
+		*mysql.LANIP,
+		mysql.LANIP,
 		*message.LANIPAdd,
 		message.LANIPAdd,
 		*message.LANIPUpdate,
@@ -47,8 +48,9 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 	updater := &LANIP{
 		newUpdaterBase[
 			cloudmodel.IP,
-			mysql.LANIP,
 			*diffbase.LANIP,
+			*mysql.LANIP,
+			mysql.LANIP,
 			*message.LANIPAdd,
 			message.LANIPAdd,
 			*message.LANIPUpdate,

@@ -29,8 +29,9 @@ import (
 type LBListener struct {
 	UpdaterBase[
 		cloudmodel.LBListener,
-		mysql.LBListener,
 		*diffbase.LBListener,
+		*mysql.LBListener,
+		mysql.LBListener,
 		*message.LBListenerAdd,
 		message.LBListenerAdd,
 		*message.LBListenerUpdate,
@@ -45,8 +46,9 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 	updater := &LBListener{
 		newUpdaterBase[
 			cloudmodel.LBListener,
-			mysql.LBListener,
 			*diffbase.LBListener,
+			*mysql.LBListener,
+			mysql.LBListener,
 			*message.LBListenerAdd,
 			message.LBListenerAdd,
 			*message.LBListenerUpdate,

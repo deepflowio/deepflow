@@ -30,8 +30,9 @@ import (
 type Subnet struct {
 	UpdaterBase[
 		cloudmodel.Subnet,
-		mysql.Subnet,
 		*diffbase.Subnet,
+		*mysql.Subnet,
+		mysql.Subnet,
 		*message.SubnetAdd,
 		message.SubnetAdd,
 		*message.SubnetUpdate,
@@ -46,8 +47,9 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 	updater := &Subnet{
 		newUpdaterBase[
 			cloudmodel.Subnet,
-			mysql.Subnet,
 			*diffbase.Subnet,
+			*mysql.Subnet,
+			mysql.Subnet,
 			*message.SubnetAdd,
 			message.SubnetAdd,
 			*message.SubnetUpdate,

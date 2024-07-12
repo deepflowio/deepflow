@@ -30,8 +30,9 @@ import (
 type FloatingIP struct {
 	UpdaterBase[
 		cloudmodel.FloatingIP,
-		mysql.FloatingIP,
 		*diffbase.FloatingIP,
+		*mysql.FloatingIP,
+		mysql.FloatingIP,
 		*message.FloatingIPAdd,
 		message.FloatingIPAdd,
 		*message.FloatingIPUpdate,
@@ -46,8 +47,9 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 	updater := &FloatingIP{
 		newUpdaterBase[
 			cloudmodel.FloatingIP,
-			mysql.FloatingIP,
 			*diffbase.FloatingIP,
+			*mysql.FloatingIP,
+			mysql.FloatingIP,
 			*message.FloatingIPAdd,
 			message.FloatingIPAdd,
 			*message.FloatingIPUpdate,

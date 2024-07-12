@@ -29,8 +29,9 @@ import (
 type PodGroupPort struct {
 	UpdaterBase[
 		cloudmodel.PodGroupPort,
-		mysql.PodGroupPort,
 		*diffbase.PodGroupPort,
+		*mysql.PodGroupPort,
+		mysql.PodGroupPort,
 		*message.PodGroupPortAdd,
 		message.PodGroupPortAdd,
 		*message.PodGroupPortUpdate,
@@ -45,8 +46,9 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 	updater := &PodGroupPort{
 		newUpdaterBase[
 			cloudmodel.PodGroupPort,
-			mysql.PodGroupPort,
 			*diffbase.PodGroupPort,
+			*mysql.PodGroupPort,
+			mysql.PodGroupPort,
 			*message.PodGroupPortAdd,
 			message.PodGroupPortAdd,
 			*message.PodGroupPortUpdate,

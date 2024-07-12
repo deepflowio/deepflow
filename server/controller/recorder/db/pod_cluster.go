@@ -22,21 +22,16 @@ import (
 )
 
 type PodCluster struct {
-	OperatorBase[mysql.PodCluster]
+	OperatorBase[*mysql.PodCluster, mysql.PodCluster]
 }
 
 func NewPodCluster() *PodCluster {
 	operater := &PodCluster{
-		OperatorBase[mysql.PodCluster]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PodCluster](
+			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *PodCluster) setDBItemID(dbItem *mysql.PodCluster, id int) {
-	dbItem.ID = id
 }

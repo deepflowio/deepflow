@@ -29,8 +29,9 @@ import (
 type PodReplicaSet struct {
 	UpdaterBase[
 		cloudmodel.PodReplicaSet,
-		mysql.PodReplicaSet,
 		*diffbase.PodReplicaSet,
+		*mysql.PodReplicaSet,
+		mysql.PodReplicaSet,
 		*message.PodReplicaSetAdd,
 		message.PodReplicaSetAdd,
 		*message.PodReplicaSetUpdate,
@@ -45,8 +46,9 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 	updater := &PodReplicaSet{
 		newUpdaterBase[
 			cloudmodel.PodReplicaSet,
-			mysql.PodReplicaSet,
 			*diffbase.PodReplicaSet,
+			*mysql.PodReplicaSet,
+			mysql.PodReplicaSet,
 			*message.PodReplicaSetAdd,
 			message.PodReplicaSetAdd,
 			*message.PodReplicaSetUpdate,

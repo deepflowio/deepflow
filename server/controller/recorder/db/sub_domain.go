@@ -22,15 +22,15 @@ import (
 )
 
 type SubDomain struct {
-	OperatorBase[mysql.SubDomain]
+	OperatorBase[*mysql.SubDomain, mysql.SubDomain]
 }
 
 func NewSubDomain() *SubDomain {
 	return &SubDomain{
-		OperatorBase[mysql.SubDomain]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.SubDomain](
+			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
+			false,
+			false,
+		),
 	}
 }

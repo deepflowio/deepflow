@@ -32,8 +32,9 @@ import (
 type PodNamespace struct {
 	UpdaterBase[
 		cloudmodel.PodNamespace,
-		mysql.PodNamespace,
 		*diffbase.PodNamespace,
+		*mysql.PodNamespace,
+		mysql.PodNamespace,
 		*message.PodNamespaceAdd,
 		message.PodNamespaceAdd,
 		*message.PodNamespaceUpdate,
@@ -48,8 +49,9 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 	updater := &PodNamespace{
 		newUpdaterBase[
 			cloudmodel.PodNamespace,
-			mysql.PodNamespace,
 			*diffbase.PodNamespace,
+			*mysql.PodNamespace,
+			mysql.PodNamespace,
 			*message.PodNamespaceAdd,
 			message.PodNamespaceAdd,
 			*message.PodNamespaceUpdate,

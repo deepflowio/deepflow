@@ -32,8 +32,9 @@ import (
 type VM struct {
 	UpdaterBase[
 		cloudmodel.VM,
-		mysql.VM,
 		*diffbase.VM,
+		*mysql.VM,
+		mysql.VM,
 		*message.VMAdd,
 		message.VMAdd,
 		*message.VMUpdate,
@@ -48,8 +49,9 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 	updater := &VM{
 		newUpdaterBase[
 			cloudmodel.VM,
-			mysql.VM,
 			*diffbase.VM,
+			*mysql.VM,
+			mysql.VM,
 			*message.VMAdd,
 			message.VMAdd,
 			*message.VMUpdate,

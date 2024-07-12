@@ -29,8 +29,9 @@ import (
 type PeerConnection struct {
 	UpdaterBase[
 		cloudmodel.PeerConnection,
-		mysql.PeerConnection,
 		*diffbase.PeerConnection,
+		*mysql.PeerConnection,
+		mysql.PeerConnection,
 		*message.PeerConnectionAdd,
 		message.PeerConnectionAdd,
 		*message.PeerConnectionUpdate,
@@ -45,8 +46,9 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 	updater := &PeerConnection{
 		newUpdaterBase[
 			cloudmodel.PeerConnection,
-			mysql.PeerConnection,
 			*diffbase.PeerConnection,
+			*mysql.PeerConnection,
+			mysql.PeerConnection,
 			*message.PeerConnectionAdd,
 			message.PeerConnectionAdd,
 			*message.PeerConnectionUpdate,

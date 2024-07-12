@@ -22,15 +22,15 @@ import (
 )
 
 type VMPodNodeConnection struct {
-	OperatorBase[mysql.VMPodNodeConnection]
+	OperatorBase[*mysql.VMPodNodeConnection, mysql.VMPodNodeConnection]
 }
 
 func NewVMPodNodeConnection() *VMPodNodeConnection {
 	return &VMPodNodeConnection{
-		OperatorBase[mysql.VMPodNodeConnection]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.VMPodNodeConnection](
+			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
+			false,
+			false,
+		),
 	}
 }

@@ -23,23 +23,18 @@ import (
 )
 
 type VM struct {
-	OperatorBase[mysql.VM]
+	OperatorBase[*mysql.VM, mysql.VM]
 }
 
 func NewVM() *VM {
 	operater := &VM{
-		OperatorBase[mysql.VM]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VM_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.VM](
+			ctrlrcommon.RESOURCE_TYPE_VM_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *VM) setDBItemID(dbItem *mysql.VM, id int) {
-	dbItem.ID = id
 }
 
 func (v *VM) DeleteBatch(lcuuids []string) ([]*mysql.VM, bool) {

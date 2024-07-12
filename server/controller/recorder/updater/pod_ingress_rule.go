@@ -29,8 +29,9 @@ import (
 type PodIngressRule struct {
 	UpdaterBase[
 		cloudmodel.PodIngressRule,
-		mysql.PodIngressRule,
 		*diffbase.PodIngressRule,
+		*mysql.PodIngressRule,
+		mysql.PodIngressRule,
 		*message.PodIngressRuleAdd,
 		message.PodIngressRuleAdd,
 		*message.PodIngressRuleUpdate,
@@ -45,8 +46,9 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 	updater := &PodIngressRule{
 		newUpdaterBase[
 			cloudmodel.PodIngressRule,
-			mysql.PodIngressRule,
 			*diffbase.PodIngressRule,
+			*mysql.PodIngressRule,
+			mysql.PodIngressRule,
 			*message.PodIngressRuleAdd,
 			message.PodIngressRuleAdd,
 			*message.PodIngressRuleUpdate,

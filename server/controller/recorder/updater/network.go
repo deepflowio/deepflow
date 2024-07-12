@@ -29,8 +29,9 @@ import (
 type Network struct {
 	UpdaterBase[
 		cloudmodel.Network,
-		mysql.Network,
 		*diffbase.Network,
+		*mysql.Network,
+		mysql.Network,
 		*message.NetworkAdd,
 		message.NetworkAdd,
 		*message.NetworkUpdate,
@@ -45,8 +46,9 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 	updater := &Network{
 		newUpdaterBase[
 			cloudmodel.Network,
-			mysql.Network,
 			*diffbase.Network,
+			*mysql.Network,
+			mysql.Network,
 			*message.NetworkAdd,
 			message.NetworkAdd,
 			*message.NetworkUpdate,

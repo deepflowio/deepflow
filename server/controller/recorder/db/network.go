@@ -22,21 +22,16 @@ import (
 )
 
 type Network struct {
-	OperatorBase[mysql.Network]
+	OperatorBase[*mysql.Network, mysql.Network]
 }
 
 func NewNetwork() *Network {
 	operater := &Network{
-		OperatorBase[mysql.Network]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.Network](
+			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *Network) setDBItemID(dbItem *mysql.Network, id int) {
-	dbItem.ID = id
 }

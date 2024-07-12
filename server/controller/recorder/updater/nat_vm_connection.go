@@ -29,8 +29,9 @@ import (
 type NATVMConnection struct {
 	UpdaterBase[
 		cloudmodel.NATVMConnection,
-		mysql.NATVMConnection,
 		*diffbase.NATVMConnection,
+		*mysql.NATVMConnection,
+		mysql.NATVMConnection,
 		*message.NATVMConnectionAdd,
 		message.NATVMConnectionAdd,
 		*message.NATVMConnectionUpdate,
@@ -45,8 +46,9 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 	updater := &NATVMConnection{
 		newUpdaterBase[
 			cloudmodel.NATVMConnection,
-			mysql.NATVMConnection,
 			*diffbase.NATVMConnection,
+			*mysql.NATVMConnection,
+			mysql.NATVMConnection,
 			*message.NATVMConnectionAdd,
 			message.NATVMConnectionAdd,
 			*message.NATVMConnectionUpdate,

@@ -29,8 +29,9 @@ import (
 type PodGroup struct {
 	UpdaterBase[
 		cloudmodel.PodGroup,
-		mysql.PodGroup,
 		*diffbase.PodGroup,
+		*mysql.PodGroup,
+		mysql.PodGroup,
 		*message.PodGroupAdd,
 		message.PodGroupAdd,
 		*message.PodGroupUpdate,
@@ -45,8 +46,9 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 	updater := &PodGroup{
 		newUpdaterBase[
 			cloudmodel.PodGroup,
-			mysql.PodGroup,
 			*diffbase.PodGroup,
+			*mysql.PodGroup,
+			mysql.PodGroup,
 			*message.PodGroupAdd,
 			message.PodGroupAdd,
 			*message.PodGroupUpdate,

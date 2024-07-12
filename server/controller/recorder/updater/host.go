@@ -29,8 +29,9 @@ import (
 type Host struct {
 	UpdaterBase[
 		cloudmodel.Host,
-		mysql.Host,
 		*diffbase.Host,
+		*mysql.Host,
+		mysql.Host,
 		*message.HostAdd,
 		message.HostAdd,
 		*message.HostUpdate,
@@ -45,8 +46,9 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 	updater := &Host{
 		newUpdaterBase[
 			cloudmodel.Host,
-			mysql.Host,
 			*diffbase.Host,
+			*mysql.Host,
+			mysql.Host,
 			*message.HostAdd,
 			message.HostAdd,
 			*message.HostUpdate,
