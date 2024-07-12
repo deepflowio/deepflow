@@ -490,6 +490,7 @@ static inline int add_fd_to_epoll(int epoll_fd, int fd)
 		return -1;
 	}
 
+	printf("------- add epoll fd %d\n", fd);
 	return 0;
 }
 
@@ -529,9 +530,10 @@ static int epoll_events_process(int epoll_fd, struct epoll_event *ev,
 		int n = recv(ev->data.fd, rcv_buf, sizeof(rcv_buf), 0);
 		if (n > 0) {
 			if (fp) {
-				//fprintf(stdout, "> %s", rcv_buf);
-				//fflush(stdout);
-				fwrite(rcv_buf, sizeof(char), n, fp);
+				size_t written = fwrite(rcv_buf, sizeof(char), n, fp);
+				fprintf(stdout, "> recv %d bytes write %ld bytes to %p (%s) %s\n", n, written, fp, fp == log_fp ? "log" : "map", n == written ? "" : "*");
+				fflush(stdout);
+				fflush(fp); // Ensure data is written to the file promptly, avoiding prolonged residence in the buffer.
 			}
 		} else if (n == 0
 			   || (n < 0 && errno != EINTR
@@ -551,6 +553,7 @@ static int epoll_events_process(int epoll_fd, struct epoll_event *ev,
 static void *ipc_receiver_thread(void *arguments)
 {
 	receiver_args_t *args = (receiver_args_t *) arguments;
+
 	/*
 	 * If the file already exists, opening it in "w" mode will clear its contents
 	 * (truncate it to zero length). If the file does not exist, opening it in "w"
@@ -572,6 +575,9 @@ static void *ipc_receiver_thread(void *arguments)
 			    args->opts->perf_log_path, strerror(errno), errno);
 		return NULL;
 	}
+
+	printf("/// mapfile : %s (%p)\n", args->opts->perf_map_path, map_fp);
+	printf("/// logfile : %s (%p)\n", args->opts->perf_log_path, log_fp);
 
 	int map_sock = args->map_socket;
 	int log_sock = args->log_socket;
