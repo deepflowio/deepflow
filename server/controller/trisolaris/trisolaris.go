@@ -393,6 +393,10 @@ func (m *TrisolarisManager) Start() error {
 }
 
 func (m *TrisolarisManager) getTeamData(orgIDs []int) {
+	// Community Edition does not support multi-organization and multi-team features
+	if m.config.GetFPermitConfig().Enabled == false {
+		return
+	}
 	teamIDToOrgID := make(map[string]int)
 	teamIDStrToInt := make(map[string]int)
 	for _, orgID := range orgIDs {
