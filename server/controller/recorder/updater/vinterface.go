@@ -149,18 +149,16 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 		structInfo.NetworkID.SetNew(mapInfo["subnetid"].(int))
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
-	if cloudItem.DeviceType == ctrlrcommon.VIF_DEVICE_TYPE_VM {
-		if diffBase.DeviceLcuuid != cloudItem.DeviceLcuuid {
-			vmID, exists := i.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.DeviceLcuuid)
-			if !exists {
-				log.Errorf(resourceAForResourceBNotFound(
-					common.RESOURCE_TYPE_VM_EN, cloudItem.DeviceLcuuid,
-					common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-				))
-				return nil, nil, false
-			}
-			mapInfo["deviceid"] = vmID
+	if diffBase.DeviceLcuuid != cloudItem.DeviceLcuuid {
+		deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
+		if !exists {
+			log.Errorf(resourceAForResourceBNotFound(
+				common.VIF_DEVICE_TYPE_TO_RESOURCE_TYPE[cloudItem.DeviceType], cloudItem.DeviceLcuuid,
+				common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+			))
+			return nil, nil, false
 		}
+		mapInfo["deviceid"] = deviceID
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

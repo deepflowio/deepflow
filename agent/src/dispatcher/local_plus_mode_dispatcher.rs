@@ -32,6 +32,7 @@ use log::{debug, info, log_enabled, warn};
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
 use super::error::Result;
 use super::local_mode_dispatcher::{LocalModeDispatcherListener, MacRewriter};
+use super::Packet;
 
 #[cfg(target_os = "linux")]
 use crate::platform::LibvirtXmlExtractor;
@@ -51,21 +52,12 @@ use crate::{
     },
 };
 use public::{
-    buffer::{Allocator, BatchedBuffer},
+    buffer::Allocator,
     debug::QueueDebugger,
     proto::{common::TridentType, trident::IfMacSource},
     queue::{self, bounded_with_debug, DebugSender, Receiver},
     utils::net::{Link, MacAddr},
 };
-
-#[derive(Debug)]
-struct Packet {
-    timestamp: Duration,
-    raw: BatchedBuffer<u8>,
-    original_length: u32,
-    raw_length: u32,
-    if_index: isize,
-}
 
 const HANDLER_BATCH_SIZE: usize = 64;
 
@@ -202,7 +194,7 @@ impl LocalPlusModeDispatcher {
                                     || MacAddr::is_multicast(&packet.raw));
 
                             // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
-                            let cur_tunnel_type_bitmap = tunnel_type_bitmap.lock().unwrap().clone();
+                            let cur_tunnel_type_bitmap = tunnel_type_bitmap.read().unwrap().clone();
                             let decap_length = match BaseDispatcher::decap_tunnel(
                                 &mut packet.raw,
                                 &tap_type_handler,
