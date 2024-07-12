@@ -1,3 +1,4 @@
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod remote_exec {
     use std::fmt::{self, Write};
     use std::process::Output;
