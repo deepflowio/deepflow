@@ -16,6 +16,8 @@
 
 mod comment_parser;
 
+use std::str;
+
 use log::{debug, trace};
 use serde::Serialize;
 
@@ -197,13 +199,13 @@ impl MysqlInfo {
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::MysqlLogParseFailed);
         };
+        if let Some(c) = config {
+            self.extract_trace_and_span_id(&c.l7_log_dynamic, str::from_utf8(payload)?);
+        }
         let context = attempt_obfuscation(obfuscate_cache, payload)
             .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
                 String::from_utf8_lossy(&m).to_string()
             });
-        if let Some(c) = config {
-            self.extract_trace_and_span_id(&c.l7_log_dynamic, context.as_str());
-        }
         self.context = context;
         Ok(())
     }
