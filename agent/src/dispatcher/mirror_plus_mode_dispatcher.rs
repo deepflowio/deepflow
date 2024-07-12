@@ -46,7 +46,6 @@ use crate::{
     rpc::get_timestamp,
     utils::stats::{self, Countable, QueueStats},
 };
-use packet_dedup::PacketDedupMap;
 use public::{
     buffer::Allocator,
     debug::QueueDebugger,
@@ -136,7 +135,11 @@ impl MirrorPlusModeDispatcherListener {
         self.updated.store(true, Ordering::Relaxed);
     }
 
-    pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr], gateway_vmac_addrs: &[MacAddr]) {
+    pub fn on_vm_change(
+        &self,
+        vm_mac_addrs: &[MacAddr],
+        #[allow(unused)] gateway_vmac_addrs: &[MacAddr],
+    ) {
         #[cfg(target_os = "linux")]
         self.on_vm_change_with_bridge_macs(
             vm_mac_addrs,
@@ -282,7 +285,7 @@ impl MirrorPlusModeDispatcher {
         let trident_type = self.trident_type.clone();
         let local_vm_mac_set = self.local_vm_mac_set.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        let mut dedup = PacketDedupMap::new();
+        let mut dedup = packet_dedup::PacketDedupMap::new();
 
         self.flow_generator_thread_handler.replace(
             thread::Builder::new()
