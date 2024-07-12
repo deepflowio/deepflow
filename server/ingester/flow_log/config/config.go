@@ -53,7 +53,7 @@ type Config struct {
 	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
 	DecoderQueueCount int                   `yaml:"flow-log-decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"flow-log-decoder-queue-size"`
-	TraceTreeEnabled  bool                  `yaml:"flow-log-trace-tree-enabled"`
+	TraceTreeEnabled  *bool                 `yaml:"flow-log-trace-tree-enabled"`
 }
 
 type FlowLogConfig struct {
@@ -76,6 +76,11 @@ func (c *Config) Validate() error {
 
 	if c.FlowLogTTL.L4Packet == 0 {
 		c.FlowLogTTL.L4Packet = DefaultFlowLogTTL
+	}
+
+	if c.TraceTreeEnabled == nil {
+		value := false
+		c.TraceTreeEnabled = &value
 	}
 
 	return nil

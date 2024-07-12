@@ -136,7 +136,7 @@ type SpanWriter struct {
 }
 
 func NewSpanWriter(config *config.Config) (*SpanWriter, error) {
-	if !config.TraceTreeEnabled {
+	if !*config.TraceTreeEnabled {
 		return nil, nil
 	}
 	w := &SpanWriter{
