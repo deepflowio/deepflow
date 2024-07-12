@@ -147,7 +147,22 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 		log.Errorf("agent(key: %s) run command error: %s",
 			key, *resp.Errmsg)
 		service.AppendErrorMessage(key, resp.Errmsg)
-		manager.ExecDoneCH <- struct{}{}
+
+		result := resp.CommandResult
+		// get commands and linux namespace error
+		if result == nil {
+			manager.ExecDoneCH <- struct{}{}
+			return
+		}
+
+		// run command error and handle content
+		if result.Content != nil {
+			service.AppendContent(key, result.Content)
+		}
+		if result.Md5 != nil {
+			manager.ExecDoneCH <- struct{}{}
+			return
+		}
 		return
 	case len(resp.LinuxNamespaces) > 0:
 		if len(service.GetNamespaces(key)) > 0 {

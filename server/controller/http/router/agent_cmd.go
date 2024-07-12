@@ -227,7 +227,7 @@ func cmdRunHandler(c *gin.Context) {
 	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 	content, err := service.RunAgentCMD(orgID.(int), agentID, &agentReq, req.CMD)
 	if err != nil {
-		BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+		InternalErrorResponse(c, content, httpcommon.SERVER_ERROR, err.Error())
 		return
 	}
 
