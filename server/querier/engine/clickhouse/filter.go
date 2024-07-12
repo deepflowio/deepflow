@@ -333,6 +333,12 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 		}
 		switch strings.ToLower(op) {
 		case "=", "!=":
+			tokenRegStr := "^[\u4E00-\u9FA5a-zA-Z0-9\\s]+$"
+			tokenReg := regexp.MustCompile(tokenRegStr)
+			if !tokenReg.MatchString(strings.Trim(value, "'")) {
+				tokenErr := fmt.Errorf("body can only contain letters or numbers and be separated by whitespace， please check:  %s", value)
+				return "", tokenErr
+			}
 			if strings.Contains(value, " ") {
 				valueSlice := strings.Split(strings.Trim(value, "'"), " ")
 				var filterSlice []string
