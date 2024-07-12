@@ -47,6 +47,7 @@ func traceMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) 
 		args.Context = c.Request.Context()
 		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		c.Header("Content-Type", "application/json")
+		c.Header("Transfer-Encoding", "chunked")
 		done := make(chan bool)
 		go tracemap.TraceMap(args, cfg, c, done, generator)
 		<-done
