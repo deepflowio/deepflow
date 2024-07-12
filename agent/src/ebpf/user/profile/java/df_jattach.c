@@ -238,7 +238,6 @@ static int attach(pid_t pid, char *opts)
 {
 	char *argv[] = { "load", agent_lib_so_path, "true", opts };
 	int argc = sizeof(argv) / sizeof(argv[0]);
-	printf("argc %d opts %s\n", argc, argv[3]);
 	int ret = jattach(pid, argc, (char **)argv);
 	jattach_log(JAVA_LOG_TAG
 		    "jattach pid %d argv: \"load %s true\" return %d\n", pid,
@@ -490,16 +489,94 @@ static inline int add_fd_to_epoll(int epoll_fd, int fd)
 		return -1;
 	}
 
-	printf("------- add epoll fd %d\n", fd);
+	return 0;
+}
+
+static inline int receive_msg(int sock_fd, char *buf, size_t buf_size,
+			      bool received_once)
+{
+	int recv_bytes = 0;
+	int n = 0;		// Initialize n
+
+	do {
+		if ((n =
+		     recv(sock_fd, buf + recv_bytes, buf_size - recv_bytes,
+			  0)) == -1) {
+			if (errno == EINTR) {
+				// Retry on interrupt or temporary failure
+				continue;
+			} else {
+				// Handle other errors
+				jattach_log("recv() failed with '%s(%d)'\n",
+					    strerror(errno), errno);
+				return -1;
+			}
+		} else if (n == 0) {
+			return -1;
+		}
+
+		recv_bytes += n;
+	} while (recv_bytes < buf_size && !received_once);
+
+	return recv_bytes;	// Return total bytes received
+}
+
+static void update_java_perf_map_file(FILE * fp, char *addr_str)
+{
+}
+
+static int symbol_msg_process(int sock_fd, FILE * fp, bool replay_done)
+{
+	struct symbol_metadata meta;
+	int n = receive_msg(sock_fd, (char *)&meta, sizeof(meta), false);
+	if (n != sizeof(meta))
+		return -1;
+
+	char rcv_buf[STRING_BUFFER_SIZE];
+	if (meta.len > STRING_BUFFER_SIZE)
+		return -1;
+
+	n = receive_msg(sock_fd, rcv_buf, meta.len, false);
+	if (n != meta.len)
+		return -1;
+	rcv_buf[meta.len] = '\0';
+
+	fprintf(stdout, "> %s", rcv_buf);
+	fflush(stdout);
+
+	/*
+	 * If the replay is complete and the event type is
+	 * JVMTI_EVENT_COMPILED_METHOD_UNLOAD, the map file
+	 * needs to be updated.
+	 */
+	if (replay_done && meta.type == METHOD_UNLOAD) {
+		update_java_perf_map_file(fp, rcv_buf);
+	} else {
+		fwrite(rcv_buf, sizeof(char), n, fp);
+		fflush(fp);	// Ensure data is written to the file promptly,
+		// avoiding prolonged residence in the buffer.
+	}
+
+	return 0;
+}
+
+static int symbol_log_process(int sock_fd, FILE * fp)
+{
+	char rcv_buf[STRING_BUFFER_SIZE];
+	int n = receive_msg(sock_fd, rcv_buf, sizeof(rcv_buf), true);
+	if (n == -1)
+		return -1;
+	fwrite(rcv_buf, sizeof(char), n, fp);
+	fflush(fp);
 	return 0;
 }
 
 static int epoll_events_process(int epoll_fd, struct epoll_event *ev,
 				int map_sock, int log_sock, FILE * map_fp,
-				FILE * log_fp, int *map_client, int *log_client)
+				FILE * log_fp, int *map_client,
+				int *log_client, bool replay_done)
 {
 	errno = 0;
-	char rcv_buf[STRING_BUFFER_SIZE];
 	if (ev->data.fd == map_sock) {
 		if ((*map_client = accept(ev->data.fd, NULL, NULL)) < 0) {
 			jattach_log("accept() failed with '%s(%d)'\n",
@@ -517,33 +594,17 @@ static int epoll_events_process(int epoll_fd, struct epoll_event *ev,
 		if (add_fd_to_epoll(epoll_fd, *log_client) == -1)
 			return -1;
 	} else {
-		FILE *fp;
 		if (ev->data.fd == *map_client) {
-			fp = map_fp;
+			if (symbol_msg_process
+			    (ev->data.fd, map_fp, replay_done))
+				return -1;
 		} else if (ev->data.fd == *log_client) {
-			fp = log_fp;
+			if (symbol_log_process(ev->data.fd, log_fp))
+				return -1;
 		} else {
 			jattach_log("Unexpected event, event fd %d\n",
 				    ev->data.fd);
 			return 0;
-		}
-		int n = recv(ev->data.fd, rcv_buf, sizeof(rcv_buf), 0);
-		if (n > 0) {
-			if (fp) {
-				size_t written = fwrite(rcv_buf, sizeof(char), n, fp);
-				fprintf(stdout, "> recv %d bytes write %ld bytes to %p (%s) %s\n", n, written, fp, fp == log_fp ? "log" : "map", n == written ? "" : "*");
-				fflush(stdout);
-				fflush(fp); // Ensure data is written to the file promptly, avoiding prolonged residence in the buffer.
-			}
-		} else if (n == 0
-			   || (n < 0 && errno != EINTR
-			       && errno != EAGAIN && errno != EWOULDBLOCK)) {
-			if (n < 0) {
-				jattach_log
-				    ("recv() failed with '%s(%d)', ev->data.fd %d\n",
-				     strerror(errno), errno, ev->data.fd);
-			}
-			return -1;
 		}
 	}
 
@@ -612,10 +673,12 @@ static void *ipc_receiver_thread(void *arguments)
 				struct epoll_event *ev = &events[i];
 				if (epoll_events_process
 				    (epoll_fd, ev, map_sock, log_sock, map_fp,
-				     log_fp, &map_client, &log_client) < 0)
+				     log_fp, &map_client, &log_client,
+				     *args->replay_done) < 0)
 					goto error;
 			}
 		}
+
 	}
 
 error:
@@ -634,7 +697,6 @@ error:
 	if (log_client > 0)
 		close(log_client);
 
-	printf("return thread!\n");
 	return NULL;
 }
 
@@ -649,26 +711,24 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 	char buffer[PERF_PATH_SZ * 2];
 	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_MAP_PATH_FMT, pid, pid);
 
-	printf("============map PERF_PATH_SZ %d buffer %s\n", PERF_PATH_SZ,
-	       buffer);
 	if ((map_socket = create_ipc_socket(buffer)) < 0) {
 		goto cleanup;
 	}
 	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_LOG_PATH_FMT, pid, pid);
 
-	printf("============log PERF_PATH_SZ %d buffer %s\n", PERF_PATH_SZ,
-	       buffer);
 	if ((log_socket = create_ipc_socket(buffer)) < 0) {
 		goto cleanup;
 	}
 
 	pthread_t ipc_receiver;
 	int attach_ret_val = 0;
+	bool replay_done = false;
 	receiver_args_t args = {
 		.opts = opts,
 		.map_socket = map_socket,
 		.log_socket = log_socket,
 		.attach_ret = &attach_ret_val,
+		.replay_done = &replay_done,
 	};
 
 	if ((ret =
@@ -685,12 +745,9 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 
 	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
 	 * library as a JVMTI agent.*/
-	printf("prev attach\n");
 	attach_ret_val = attach(pid, buffer);
-
-	printf("prev pthread_join\n");
+	replay_done = true;
 	pthread_join(ipc_receiver, NULL);
-	printf("post pthread_join\n");
 
 cleanup:
 	if (map_socket >= 0) {

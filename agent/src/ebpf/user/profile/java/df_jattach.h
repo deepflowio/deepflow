@@ -34,6 +34,7 @@ typedef struct receiver_args {
 	int map_socket;
 	int log_socket;
 	int *attach_ret;
+	bool *replay_done;
 } receiver_args_t;
 
 void clear_target_ns_tmp_file(const char *target_path);

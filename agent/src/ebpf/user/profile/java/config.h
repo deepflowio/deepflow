@@ -26,10 +26,21 @@
  */
 #define UNIX_PATH_MAX 108
 
+enum event_type {
+	METHOD_LOAD,
+	METHOD_UNLOAD,
+	DYNAMIC_CODE_GEN
+};
+
+struct symbol_metadata {
+	unsigned short len;
+	unsigned short type;
+};
+
 #define TARGET_NS_STORAGE_PATH "/proc/%d/root/deepflow"
 
 #if !defined(AGENT_LIB_NAME) || !defined(AGENT_MUSL_LIB_NAME)
-	#error Makefile should define "AGENT_LIB_NAME" and "AGENT_MUSL_LIB_NAME"
+#error Makefile should define "AGENT_LIB_NAME" and "AGENT_MUSL_LIB_NAME"
 #endif
 
 #define AGENT_LIB_SRC_PATH "/tmp/" AGENT_LIB_NAME
