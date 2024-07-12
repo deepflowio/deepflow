@@ -272,13 +272,13 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string)
 	for {
 		select {
 		case <-time.After(agentCommandTimeout):
-			return "", fmt.Errorf("%stimeout(%vs) to run agent command", agentCommandTimeout.Seconds())
+			return "", fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, agentCommandTimeout.Seconds())
 		case <-manager.ExecDoneCH:
 			if msg := GetErrormessage(key); msg != "" {
-				return "", fmt.Errorf("The deepflow-agent is unable to execute the `%s` command."+
+				return GetContent(key), fmt.Errorf("The deepflow-agent is unable to execute the `%s` command."+
 					" Detailed error information is as follows:\n\n%s", CMD, msg)
 			}
-			content = manager.resp.Content
+			content = GetContent(key)
 			log.Infof("command run content len: %d", len(content))
 			return content, nil
 		}
