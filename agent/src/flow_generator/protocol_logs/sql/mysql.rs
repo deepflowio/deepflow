@@ -216,6 +216,9 @@ impl MysqlInfo {
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::MysqlLogParseFailed);
         };
+        if let Some(c) = config {
+            self.extract_trace_and_span_id(&c.l7_log_dynamic, str::from_utf8(payload)?);
+        }
         let context = match attempt_obfuscation(obfuscate_cache, payload) {
             Some(mut m) => {
                 let valid_len = match str::from_utf8(&m) {
@@ -230,9 +233,6 @@ impl MysqlInfo {
             }
             _ => String::from_utf8_lossy(payload).to_string(),
         };
-        if let Some(c) = config {
-            self.extract_trace_and_span_id(&c.l7_log_dynamic, context.as_str());
-        }
         self.context = context;
         Ok(())
     }

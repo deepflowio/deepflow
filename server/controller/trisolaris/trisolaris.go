@@ -393,6 +393,10 @@ func (m *TrisolarisManager) Start() error {
 }
 
 func (m *TrisolarisManager) getTeamData(orgIDs []int) {
+	//  The CE does not involve organization-related data
+	if m.config.GetFPermitConfig().Enabled == false {
+		return
+	}
 	teamIDToOrgID := make(map[string]int)
 	teamIDStrToInt := make(map[string]int)
 	for _, orgID := range orgIDs {

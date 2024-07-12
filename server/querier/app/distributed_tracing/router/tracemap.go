@@ -19,6 +19,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/common"
 	"github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/model"
@@ -27,26 +28,27 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/router"
 )
 
+var log = logging.MustGetLogger("tracemap")
+
 func TraceMapRouter(e *gin.Engine, cfg *config.QuerierConfig) {
-	e.GET("/trace_map", traceMap(cfg))
+	e.POST("/trace_map", traceMap(cfg))
 }
 
 func traceMap(cfg *config.QuerierConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		var traceMap model.TraceMap
+		var args model.TraceMap
 
 		// 参数校验
-		err := c.ShouldBindBodyWith(&traceMap, binding.JSON)
+		err := c.ShouldBindBodyWith(&args, binding.JSON)
 		if err != nil {
 			router.BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
 			return
 		}
-		traceMap.Context = c.Request.Context()
-		traceMap.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
-		result, debug, err := tracemap.TraceMap(traceMap, cfg)
-		if err == nil && !traceMap.Debug {
-			debug = nil
-		}
-		router.JsonResponse(c, result, debug, err)
+		args.Context = c.Request.Context()
+		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
+		c.Header("Content-Type", "application/json")
+		done := make(chan bool)
+		go tracemap.TraceMap(args, cfg, c, done)
+		<-done
 	})
 }
