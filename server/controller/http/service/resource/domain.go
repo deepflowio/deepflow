@@ -500,7 +500,6 @@ func cleanSoftDeletedResource(db *mysql.DB, lcuuid string) {
 	forceDelete[mysql.LBListener](db, condition, lcuuid)
 	forceDelete[mysql.LB](db, condition, lcuuid)
 	forceDelete[mysql.NATGateway](db, condition, lcuuid)
-	forceDelete[mysql.SecurityGroup](db, condition, lcuuid)
 	forceDelete[mysql.DHCPPort](db, condition, lcuuid)
 	forceDelete[mysql.VRouter](db, condition, lcuuid)
 	forceDelete[mysql.Pod](db, condition, lcuuid)
@@ -576,15 +575,6 @@ func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *httpcommon.UserI
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Process{})
 	// db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VIP{})
-	var sgs []mysql.SecurityGroup
-	db.Unscoped().Where("domain = ?", lcuuid).Find(&sgs)
-	sgIDs := make([]int, len(sgs))
-	for _, sg := range sgs {
-		sgIDs = append(sgIDs, sg.ID)
-	}
-	db.Unscoped().Where("sg_id IN ?", sgIDs).Delete(&mysql.VMSecurityGroup{})
-	db.Unscoped().Where("sg_id IN ?", sgIDs).Delete(&mysql.SecurityGroupRule{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.SecurityGroup{})
 	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.DHCPPort{})
 	var vRouters []mysql.VRouter
 	db.Unscoped().Where("domain = ?", lcuuid).Find(&vRouters)

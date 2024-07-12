@@ -248,18 +248,6 @@ type VMPodNodeConnection struct {
 	SubDomain string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 }
 
-type VMSecurityGroup struct {
-	Base            `gorm:"embedded" mapstructure:",squash"`
-	SecurityGroupID int    `gorm:"column:sg_id;type:int;not null" json:"SG_ID" mapstructure:"SG_ID"`
-	VMID            int    `gorm:"column:vm_id;type:int;not null" json:"VM_ID" mapstructure:"VM_ID"`
-	Priority        int    `gorm:"column:priority;type:int;not null" json:"PRIORITY" mapstructure:"PRIORITY"`
-	Domain          string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
-}
-
-func (VMSecurityGroup) TableName() string {
-	return "vm_security_group"
-}
-
 type Contact struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
 	Name         string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
@@ -504,41 +492,6 @@ type FloatingIP struct {
 
 func (FloatingIP) TableName() string {
 	return "floatingip"
-}
-
-type SecurityGroup struct {
-	Base           `gorm:"embedded" mapstructure:",squash"`
-	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
-	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL" mapstructure:"LABEL"`
-	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
-	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
-	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
-	Topped         int    `gorm:"column:topped;type:int;default:0" json:"TOPPED" mapstructure:"TOPPED"`
-}
-
-func (s SecurityGroup) GetDomainLcuuid() string {
-	return s.Domain
-}
-
-func (s SecurityGroup) GetSubDomainLcuuid() string {
-	return ""
-}
-
-type SecurityGroupRule struct {
-	Base            `gorm:"embedded" mapstructure:",squash"`
-	SecurityGroupID int    `gorm:"column:sg_id;type:int;not null" json:"SG_ID" mapstructure:"SG_ID"`
-	Direction       int    `gorm:"column:direction;type:tinyint(1);not null;default:0" json:"DIRECTION" mapstructure:"DIRECTION"` // 0.Unknow 1.Ingress 2.Egress
-	Protocol        string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL" mapstructure:"PROTOCOL"`
-	EtherType       int    `gorm:"column:ethertype;type:tinyint(1);not null;default:0" json:"ETHERTYPE" mapstructure:"ETHERTYPE"` // 0.Unknow 1.IPv4 2.IPv6
-	LocalPortRange  string `gorm:"column:local_port_range;type:text;default:''" json:"LOCAL_PORT_RANGE" mapstructure:"LOCAL_PORT_RANGE"`
-	RemotePortRange string `gorm:"column:remote_port_range;type:text;default:''" json:"REMOTE_PORT_RANGE" mapstructure:"REMOTE_PORT_RANGE"`
-	Local           string `gorm:"column:local;type:text;default:''" json:"LOCAL" mapstructure:"LOCAL"`
-	Remote          string `gorm:"column:remote;type:text;default:''" json:"REMOTE" mapstructure:"REMOTE"`
-	Priority        int    `gorm:"column:priority;type:int;not null" json:"PRIORITY" mapstructure:"PRIORITY"`
-	Action          int    `gorm:"column:action;type:tinyint(1);not null;default:0" json:"ACTION" mapstructure:"ACTION"` // 0.Unknow 1.Accept 2.Drop
-	Domain          string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type NATGateway struct {
