@@ -44,7 +44,6 @@ use kube::{
 use log::{debug, info, trace, warn};
 use md5::{Digest, Md5};
 use parking_lot::RwLock;
-use thiserror::Error;
 use tokio::{
     process::Command as TokioCommand,
     runtime::Runtime,
@@ -71,6 +70,8 @@ const KUBERNETES_POD_PARAM: &'static Parameter = &Parameter {
     name: "pod",
     regex: "^[\\-.0-9a-z]{1,256}$", // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
 };
+const CMD_TYPE_SYSTEM: &'static str = "system";
+const CMD_TYPE_KUBERNETES: &'static str = "kubernetes";
 
 fn all_supported_commands() -> Vec<Command> {
     #[allow(unused_mut)]
@@ -78,48 +79,64 @@ fn all_supported_commands() -> Vec<Command> {
         Command {
             cmdline: "lsns",
             output_format: OutputFormat::Text,
-            command_type: CommandType::System,
+            command_type: CMD_TYPE_SYSTEM,
+            override_cmdline: Some(|_| Box::pin(lsns_command())),
             ..Default::default()
         },
         Command {
             cmdline: "top -b -n 1 -c -w 512",
             output_format: OutputFormat::Text,
             desc: "top",
-            command_type: CommandType::System,
+            command_type: CMD_TYPE_SYSTEM,
             ..Default::default()
         },
         Command {
             cmdline: "ps auxf",
             output_format: OutputFormat::Text,
             desc: "ps",
-            command_type: CommandType::System,
+            command_type: CMD_TYPE_SYSTEM,
             ..Default::default()
         },
         Command {
             cmdline: "ip address",
             output_format: OutputFormat::Text,
-            command_type: CommandType::System,
+            command_type: CMD_TYPE_SYSTEM,
             ..Default::default()
         },
         Command {
             cmdline: "kubectl -n $ns describe pod $pod",
             output_format: OutputFormat::Text,
-            command_type: CommandType::Kubernetes(KubeCmd::DescribePod),
+            command_type: CMD_TYPE_KUBERNETES,
             params: vec![*KUBERNETES_NAMESPACE_PARAM, *KUBERNETES_POD_PARAM],
+            override_cmdline: Some(|params| {
+                let namespace = params.get("ns").unwrap().to_owned();
+                let pod = params.get("pod").unwrap().to_owned();
+                Box::pin(kubectl_describe_pod(namespace, pod))
+            }),
             ..Default::default()
         },
         Command {
             cmdline: "kubectl -n $ns logs --tail=10000 $pod",
             output_format: OutputFormat::Text,
-            command_type: CommandType::Kubernetes(KubeCmd::Log),
+            command_type: CMD_TYPE_KUBERNETES,
             params: vec![*KUBERNETES_NAMESPACE_PARAM, *KUBERNETES_POD_PARAM],
+            override_cmdline: Some(|params| {
+                let namespace = params.get("ns").unwrap().to_owned();
+                let pod = params.get("pod").unwrap().to_owned();
+                Box::pin(kubectl_log(namespace, pod, false))
+            }),
             ..Default::default()
         },
         Command {
             cmdline: "kubectl -n $ns logs --tail=10000 -p $pod",
             output_format: OutputFormat::Text,
-            command_type: CommandType::Kubernetes(KubeCmd::LogPrevious),
+            command_type: CMD_TYPE_KUBERNETES,
             params: vec![*KUBERNETES_NAMESPACE_PARAM, *KUBERNETES_POD_PARAM],
+            override_cmdline: Some(|params| {
+                let namespace = params.get("ns").unwrap().to_owned();
+                let pod = params.get("pod").unwrap().to_owned();
+                Box::pin(kubectl_log(namespace, pod, true))
+            }),
             ..Default::default()
         },
     ];
@@ -173,22 +190,6 @@ fn max_param_nums() -> usize {
             })
         })
     })
-}
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("command `{0}` execution failed")]
-    CmdExecFailed(#[from] std::io::Error),
-    #[error("command `{0}` failed with code {1:?}")]
-    CmdFailed(String, Option<i32>),
-    #[error("param `{0}` not found")]
-    ParamNotFound(String),
-    #[error("kubernetes failed with {0}")]
-    KubeError(#[from] kube::Error),
-    #[error("serialize failed with {0}")]
-    SerializeError(#[from] serde_json::Error),
-    #[error("transparent")]
-    SyscallFailed(String),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -331,6 +332,8 @@ struct CommandResult {
     output: VecDeque<u8>,
     total_len: usize,
     digest: Md5,
+
+    err_msg: Option<String>,
 }
 
 struct Responser {
@@ -364,7 +367,7 @@ impl Responser {
         }
     }
 
-    fn generate_result_batch(&mut self) -> Option<pb::CommandResult> {
+    fn generate_result_batch(&mut self) -> Option<(pb::CommandResult, Option<String>)> {
         let batch_len = self.batch_len;
         let r = &mut self.result;
         if r.output.is_empty() {
@@ -383,12 +386,13 @@ impl Responser {
             r.digest.update(&content[..]);
             pb_result.content = Some(content);
             pb_result.md5 = Some(format!("{:x}", r.digest.finalize_reset()));
+            Some((pb_result, r.err_msg.take()))
         } else {
             let content = r.output.drain(..batch_len).collect::<Vec<_>>();
             r.digest.update(&content[..]);
             pb_result.content = Some(content);
+            Some((pb_result, None))
         }
-        Some(pb_result)
     }
 
     fn command_failed_helper<'a, S: Into<Cow<'a, str>>>(
@@ -426,7 +430,7 @@ impl Stream for Responser {
          */
 
         loop {
-            if let Some(batch) = self.as_mut().generate_result_batch() {
+            if let Some((batch, errmsg)) = self.as_mut().generate_result_batch() {
                 trace!(
                     "send buffer {} bytes",
                     batch.content.as_ref().unwrap().len()
@@ -435,6 +439,7 @@ impl Stream for Responser {
                     agent_id: Some(self.agent_id.read().deref().into()),
                     request_id: self.result.request_id,
                     command_result: Some(batch),
+                    errmsg,
                     ..Default::default()
                 }));
             }
@@ -446,34 +451,39 @@ impl Stream for Responser {
                 if let Poll::Ready(res) = p {
                     let (request_id, id, _) = self.pending_command.take().unwrap();
                     match res {
-                        Ok(output) if output.status.success() => {
-                            debug!("command '{}' succeeded", get_cmdline(&id).unwrap());
+                        Ok(output) => {
+                            let err_msg = if output.status.success() {
+                                None
+                            } else {
+                                Some(match String::from_utf8(output.stderr) {
+                                    Ok(msg) if !msg.is_empty() => msg,
+                                    _ => format!("command '{}' failed", get_cmdline(&id).unwrap()),
+                                })
+                            };
                             if output.stdout.is_empty() {
-                                return Poll::Ready(Some(pb::RemoteExecResponse {
-                                    agent_id: Some(self.agent_id.read().deref().into()),
-                                    request_id: request_id,
-                                    command_result: Some(pb::CommandResult::default()),
-                                    ..Default::default()
-                                }));
+                                if let Some(e_msg) = err_msg {
+                                    return self.command_failed_helper(
+                                        request_id,
+                                        output.status.code(),
+                                        e_msg,
+                                    );
+                                } else {
+                                    return Poll::Ready(Some(pb::RemoteExecResponse {
+                                        agent_id: Some(self.agent_id.read().deref().into()),
+                                        request_id: request_id,
+                                        command_result: Some(pb::CommandResult::default()),
+                                        ..Default::default()
+                                    }));
+                                }
                             }
                             let r = &mut self.result;
                             r.request_id = request_id;
-                            r.errno = 0;
+                            r.errno = output.status.code().unwrap_or_default();
+                            r.err_msg = err_msg;
                             r.output = output.stdout.into();
                             r.total_len = r.output.len();
                             r.digest.reset();
                             continue;
-                        }
-                        Ok(output) => {
-                            let err_msg = match String::from_utf8(output.stderr) {
-                                Ok(msg) if !msg.is_empty() => msg,
-                                _ => format!("command '{}' failed", get_cmdline(&id).unwrap()),
-                            };
-                            if let Some(code) = output.status.code() {
-                                return self.command_failed_helper(request_id, Some(code), err_msg);
-                            } else {
-                                return self.command_failed_helper(request_id, None, err_msg);
-                            }
                         }
                         Err(e) => {
                             return self.command_failed_helper(
@@ -599,6 +609,16 @@ impl Stream for Responser {
                                     ),
                                 );
                             }
+                            if let Err(e) = cmd.check_params(&params) {
+                                return self.command_failed_helper(
+                                    msg.request_id,
+                                    None,
+                                    format!(
+                                        "rejected run command '{}' with invalid params: {}",
+                                        cmdline, e
+                                    ),
+                                );
+                            }
 
                             let nsfile_fp = match msg.linux_ns_pid {
                                 Some(pid) if pid != process::id() => {
@@ -629,77 +649,35 @@ impl Stream for Responser {
                                 params
                             );
 
-                            if *cmdline == "lsns" {
-                                self.pending_command =
-                                    Some((msg.request_id, cmd_id, Box::pin(lsns_command())));
-                                continue;
-                            }
-
-                            match cmd.command_type {
-                                CommandType::Kubernetes(kcmd) => {
-                                    match kubectl_execute(kcmd, &params) {
-                                        Ok(future) => {
-                                            self.pending_command =
-                                                Some((msg.request_id, cmd_id, future));
-                                            continue;
-                                        }
-                                        Err(e) => {
-                                            return self.command_failed_helper(
-                                                msg.request_id,
-                                                None,
-                                                e.to_string(),
-                                            )
-                                        }
-                                    }
-                                }
-                                _ => (),
-                            }
-
-                            // split the whole command line to enable PATH lookup
-                            let mut args = cmdline.split_whitespace();
-                            let mut cmd = TokioCommand::new(args.next().unwrap());
-                            for arg in args {
-                                if arg.starts_with('$') {
-                                    let name = arg.split_at(1).1;
-                                    match params
-                                        .0
-                                        .iter()
-                                        .position(|p| p.key.as_ref().unwrap() == name)
-                                    {
-                                        Some(pos) => {
-                                            cmd.arg(params.0[pos].value.as_ref().unwrap());
-                                        }
-                                        None => {
-                                            return self.command_failed_helper(
-                                                msg.request_id,
-                                                None,
-                                                format!(
-                                                    "parameter {} not found in command '{}'",
-                                                    arg, cmdline
-                                                ),
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    cmd.arg(arg);
-                                }
-                            }
                             if let Some(f) = nsfile_fp.as_ref() {
                                 if let Err(e) = set_netns(f) {
                                     warn!("set_netns failed when executing {}: {}", cmdline, e);
                                 }
                             }
-                            let output = cmd.output();
+
+                            let output = if let Some(func) = cmd.override_cmdline.as_ref() {
+                                func(&params)
+                            } else {
+                                // split the whole command line to enable PATH lookup
+                                let mut args = cmdline.split_whitespace();
+                                let mut cmd = TokioCommand::new(args.next().unwrap());
+                                for arg in args {
+                                    if arg.starts_with('$') {
+                                        let name = arg.split_at(1).1;
+                                        cmd.arg(params.get(name).unwrap());
+                                    } else {
+                                        cmd.arg(arg);
+                                    }
+                                }
+                                Box::pin(cmd.output().map_err(|e| e.into()))
+                            };
+
                             if nsfile_fp.is_some() {
                                 if let Err(e) = reset_netns() {
                                     warn!("reset_netns failed when executing {}: {}", cmdline, e);
                                 }
                             }
-                            self.pending_command = Some((
-                                msg.request_id,
-                                cmd_id,
-                                Box::pin(output.map_err(|e| e.into())),
-                            ));
+                            self.pending_command = Some((msg.request_id, cmd_id, output));
                             continue;
                         }
                     }
@@ -1013,84 +991,6 @@ async fn lsns_command() -> Result<Output> {
         status: Default::default(),
         stdout: output,
         stderr: vec![],
-    })
-}
-
-struct Params<'a>(&'a [pb::Parameter]);
-
-impl Params<'_> {
-    fn is_valid(&self) -> bool {
-        for p in self.0.iter() {
-            if p.key.is_none() {
-                return false;
-            }
-            let Some(value) = p.value.as_ref() else {
-                return false;
-            };
-            for c in value.as_bytes() {
-                match c {
-                    b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' => (),
-                    _ => return false,
-                }
-            }
-        }
-        true
-    }
-}
-
-impl fmt::Debug for Params<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{")?;
-        let mut empty = true;
-        for p in self.0.iter() {
-            let Some(key) = p.key.as_ref() else {
-                continue;
-            };
-            if empty {
-                write!(f, " ")?;
-            } else {
-                write!(f, ", ")?;
-            }
-            if let Some(value) = p.value.as_ref() {
-                write!(f, "{}: \"{}\"", key, value)?;
-            } else {
-                write!(f, "{}: null", key)?;
-            }
-            empty = false;
-        }
-        if !empty {
-            write!(f, " ")?;
-        }
-        write!(f, "}}")
-    }
-}
-
-fn kubectl_execute<'a>(
-    cmd: KubeCmd,
-    params: &Params<'a>,
-) -> Result<BoxFuture<'static, Result<Output>>> {
-    // requires `ns` and `pod`
-    let mut ns = None;
-    let mut pod = None;
-    for p in params.0.iter() {
-        if let Some(key) = p.key.as_ref() {
-            if key == "ns" {
-                ns = p.value.clone();
-            } else if key == "pod" {
-                pod = p.value.clone();
-            }
-        }
-    }
-    let Some(ns) = ns else {
-        return Err(Error::ParamNotFound("ns".to_owned()));
-    };
-    let Some(pod) = pod else {
-        return Err(Error::ParamNotFound("pod".to_owned()));
-    };
-    Ok(match cmd {
-        KubeCmd::DescribePod => Box::pin(kubectl_describe_pod(ns, pod)),
-        KubeCmd::Log => Box::pin(kubectl_log(ns, pod, false)),
-        KubeCmd::LogPrevious => Box::pin(kubectl_log(ns, pod, true)),
     })
 }
 
