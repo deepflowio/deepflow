@@ -8,6 +8,11 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: handle agent command content when error occurs [#7381](https://github.com/deepflowio/deepflow/pull/7381) by [roryye](https://github.com/roryye)
+* fix: Optimized error message #25736 [#7380](https://github.com/deepflowio/deepflow/pull/7380) by [Ericsssss](https://github.com/Ericsssss)
+* fix: CE does not involve organization-related data [#7373](https://github.com/deepflowio/deepflow/pull/7373) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: agent wrong desensitized mysql trace_id [#7365](https://github.com/deepflowio/deepflow/pull/7365) by [TomatoMr](https://github.com/TomatoMr)
+* fix: Add mysql error log to monitor module [#7357](https://github.com/deepflowio/deepflow/pull/7357) by [roryye](https://github.com/roryye)
 * fix: agent - windows compile error [#7360](https://github.com/deepflowio/deepflow/pull/7360) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - vm mac address not updated [#7355](https://github.com/deepflowio/deepflow/pull/7355) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: modify system alarm_policy filter conditions and tag_conditions [#7351](https://github.com/deepflowio/deepflow/pull/7351) by [Ericsssss](https://github.com/Ericsssss)
@@ -56,6 +61,14 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Tracemap add header [#7386](https://github.com/deepflowio/deepflow/pull/7386) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: Allow overriding remote exec cmdline with async function [#7383](https://github.com/deepflowio/deepflow/pull/7383) by [rvql](https://github.com/rvql)
+* feat: tracemap add generator [#7379](https://github.com/deepflowio/deepflow/pull/7379) by [taloric](https://github.com/taloric)
+* feat: removes redundant security group code [#7377](https://github.com/deepflowio/deepflow/pull/7377) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: Improve tracemap api [#7367](https://github.com/deepflowio/deepflow/pull/7367) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: add querier shared write queue [#7361](https://github.com/deepflowio/deepflow/pull/7361) by [taloric](https://github.com/taloric)
+* feat: sub domain support team [#7338](https://github.com/deepflowio/deepflow/pull/7338) by [askyrie](https://github.com/askyrie)
+* feat: support trace_tree storage [#7313](https://github.com/deepflowio/deepflow/pull/7313) by [lzf575](https://github.com/lzf575)
 * feat: agent - add inner queue to mirror dispatcher [#7352](https://github.com/deepflowio/deepflow/pull/7352) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: recorder supports updating vinterface device id [#7346](https://github.com/deepflowio/deepflow/pull/7346) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Agent remote exec returns specific errors [#7298](https://github.com/deepflowio/deepflow/pull/7298) by [roryye](https://github.com/roryye)
@@ -95,6 +108,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: modify the type of TraceTreeEnabled field [#7378](https://github.com/deepflowio/deepflow/pull/7378) by [lzf575](https://github.com/lzf575)
 * refactor: rename package name [#7344](https://github.com/deepflowio/deepflow/pull/7344) by [taloric](https://github.com/taloric)
 * refactor: move trace-map dir path [#7343](https://github.com/deepflowio/deepflow/pull/7343) by [taloric](https://github.com/taloric)
 * refactor: OTel HTTP l7_protocol_str change from http to HTTP [#7292](https://github.com/deepflowio/deepflow/pull/7292) by [lzf575](https://github.com/lzf575)
