@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Fix windows compilation [#7389](https://github.com/deepflowio/deepflow/pull/7389) by [rvql](https://github.com/rvql)
 * fix: handle agent command content when error occurs [#7381](https://github.com/deepflowio/deepflow/pull/7381) by [roryye](https://github.com/roryye)
 * fix: Optimized error message #25736 [#7380](https://github.com/deepflowio/deepflow/pull/7380) by [Ericsssss](https://github.com/Ericsssss)
 * fix: CE does not involve organization-related data [#7373](https://github.com/deepflowio/deepflow/pull/7373) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
@@ -61,6 +62,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Modify tracemap url [#7391](https://github.com/deepflowio/deepflow/pull/7391) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Tracemap add header [#7386](https://github.com/deepflowio/deepflow/pull/7386) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Allow overriding remote exec cmdline with async function [#7383](https://github.com/deepflowio/deepflow/pull/7383) by [rvql](https://github.com/rvql)
 * feat: tracemap add generator [#7379](https://github.com/deepflowio/deepflow/pull/7379) by [taloric](https://github.com/taloric)
