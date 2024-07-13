@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <ctype.h>		/* isdigit() */
 #include <linux/types.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1207,6 +1209,194 @@ u64 kallsyms_lookup_name(const char *name)
 
 	fclose(f);
 	return 0;
+}
+
+static inline bool __is_same_ns(int target_pid, const char *tag)
+{
+	struct stat self_st, target_st;
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/self/ns/%s", tag);
+	if (stat(path, &self_st) != 0)
+		return false;
+
+	snprintf(path, sizeof(path), "/proc/%d/ns/%s", target_pid, tag);
+	if (stat(path, &target_st) != 0)
+		return false;
+
+	if (self_st.st_ino == target_st.st_ino) {
+		return true;
+	}
+
+	return false;
+}
+
+bool is_same_netns(int pid)
+{
+	return __is_same_ns(pid, "net");
+}
+
+bool is_same_mntns(int pid)
+{
+	return __is_same_ns(pid, "mnt");
+}
+
+// Function to get the inode number of a Unix socket from /proc/net/unix
+static ino_t get_unix_socket_inode(const char *socket_path)
+{
+	FILE *fp = fopen("/proc/net/unix", "r");
+	if (!fp) {
+		perror("fopen /proc/net/unix");
+		return (ino_t) - 1;
+	}
+
+	char line[PATH_MAX + 100];
+	while (fgets(line, sizeof(line), fp)) {
+		if (strstr(line, socket_path)) {
+			ino_t inode;
+			sscanf(line, "%*p: %*s %*s %*s %*s %*s %lu", &inode);
+			fclose(fp);
+			return inode;
+		}
+	}
+
+	fclose(fp);
+	return (ino_t) - 1;
+}
+
+// Function to check if a process has the specified Unix socket open
+static int is_process_using_unix_socket(const char *file_path, const char *pid)
+{
+	char fd_dir_path[PATH_MAX];
+	char target_path[PATH_MAX];
+	snprintf(fd_dir_path, sizeof(fd_dir_path), "/proc/%s/fd", pid);
+
+	DIR *dir = opendir(fd_dir_path);
+	if (!dir) {
+		return 0;
+	}
+
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL) {
+		if (entry->d_type == DT_LNK) {
+			char link_path[PATH_MAX];
+			ssize_t len;
+			snprintf(link_path, sizeof(link_path), "%s/%s",
+				 fd_dir_path, entry->d_name);
+			if ((len =
+			     readlink(link_path, target_path,
+				      sizeof(target_path) - 1)) == -1) {
+				continue;
+			}
+			target_path[len] = '\0';
+
+			char *inode_start = strstr(target_path, "socket:[");
+			if (inode_start) {
+				inode_start += strlen("socket:[");
+				char *inode_end = strchr(inode_start, ']');
+				if (inode_end) {
+					*inode_end = '\0';
+					ino_t inode_number =
+					    strtoul(inode_start, NULL, 10);
+					ino_t target_inode =
+					    get_unix_socket_inode(file_path);
+					if (target_inode != (ino_t) - 1
+					    && inode_number == target_inode) {
+						closedir(dir);
+						ebpf_info
+						    ("File '%s' is opened by another process (PID: %s).\n",
+						     file_path, pid);
+						return 1;
+					}
+				}
+			}
+		}
+	}
+
+	closedir(dir);
+	return 0;
+}
+
+// Function to check if a regular file is opened by other processes
+int is_file_opened_by_other_processes(const char *filepath)
+{
+	struct stat file_stat;
+	if (stat(filepath, &file_stat) == -1) {
+		return -1;
+	}
+
+	if (!S_ISREG(file_stat.st_mode) && !S_ISSOCK(file_stat.st_mode)) {
+		fprintf(stderr,
+			"The specified file is neither a regular file nor a Unix socket.\n");
+		return -1;
+	}
+
+	DIR *proc_dir = opendir("/proc");
+	if (!proc_dir) {
+		perror("opendir /proc");
+		return -1;
+	}
+
+	struct dirent *proc_entry;
+	while ((proc_entry = readdir(proc_dir)) != NULL) {
+		if (!isdigit(proc_entry->d_name[0]))
+			continue;	// Skip non-numeric entries
+
+		if (S_ISSOCK(file_stat.st_mode)) {
+			if (is_process_using_unix_socket
+			    (filepath, proc_entry->d_name) == 1) {
+				closedir(proc_dir);
+				return 1;
+			}
+			continue;
+		}
+
+		char fd_dir_path[PATH_MAX];
+		snprintf(fd_dir_path, sizeof(fd_dir_path), "/proc/%s/fd",
+			 proc_entry->d_name);
+
+		DIR *fd_dir = opendir(fd_dir_path);
+		if (!fd_dir)
+			continue;	// Skip if unable to open fd directory
+
+		struct dirent *fd_entry;
+		while ((fd_entry = readdir(fd_dir)) != NULL) {
+			if (fd_entry->d_type != DT_LNK)
+				continue;	// Skip non-symlink entries
+
+			char link_path[PATH_MAX], resolved_path[PATH_MAX];
+			snprintf(link_path, sizeof(link_path), "%s/%s",
+				 fd_dir_path, fd_entry->d_name);
+
+			ssize_t len = readlink(link_path, resolved_path,
+					       sizeof(resolved_path) - 1);
+			if (len == -1)
+				continue;
+
+			resolved_path[len] = '\0';
+
+			struct stat link_stat;
+			if (stat(resolved_path, &link_stat) == -1)
+				continue;	// Skip if unable to stat the resolved path
+
+			// Compare device and inode numbers
+			if (file_stat.st_dev == link_stat.st_dev
+			    && file_stat.st_ino == link_stat.st_ino) {
+				if (atoi(proc_entry->d_name) != getpid()) {
+					closedir(fd_dir);
+					closedir(proc_dir);
+					ebpf_info
+					    ("File '%s' is opened by another process (PID: %s).\n",
+					     filepath, proc_entry->d_name);
+					return 1;	// File is opened by another process
+				}
+			}
+		}
+
+		closedir(fd_dir);
+	}
+
+	closedir(proc_dir);
+	return 0;		// File is not opened by any other process
 }
 
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)

@@ -22,6 +22,8 @@
 #include "../../kernel/include/perf_profiler.h"
 
 #define PROFILER_CTX_NUM 2
+// For storing information about continuously running profiling processes.
+#define PROFILER_RUNNING_PID_PATH "/tmp/.deepflow-profiler-pid"
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and
@@ -168,4 +170,6 @@ int set_profiler_cpu_aggregation(int flag);
 struct bpf_tracer *get_profiler_tracer(void);
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
 void cpdbg_process(stack_trace_msg_t * msg);
+int check_profiler_running_pid(void);
+int write_profiler_running_pid(void);
 #endif /* DF_USER_PERF_PROFILER_H */

@@ -296,6 +296,9 @@ int parse_num_range(const char *config_str, int bytes_count,
 int parse_num_range_disorder(const char *config_str,
 			     int bytes_count, bool ** mask);
 int generate_random_integer(int max_value);
+bool is_same_netns(int pid);
+bool is_same_mntns(int pid);
+int is_file_opened_by_other_processes(const char *filename);
 /**
  * @brief Find the address through kernel symbols.
  *

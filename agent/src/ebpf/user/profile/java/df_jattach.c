@@ -255,35 +255,6 @@ void clear_target_ns_tmp_file(const char *target_path)
 	}
 }
 
-static inline bool __is_same_ns(int target_pid, const char *tag)
-{
-	struct stat self_st, target_st;
-	char path[64];
-	snprintf(path, sizeof(path), "/proc/self/ns/%s", tag);
-	if (stat(path, &self_st) != 0)
-		return false;
-
-	snprintf(path, sizeof(path), "/proc/%d/ns/%s", target_pid, tag);
-	if (stat(path, &target_st) != 0)
-		return false;
-
-	if (self_st.st_ino == target_st.st_ino) {
-		return true;
-	}
-
-	return false;
-}
-
-static bool __unused is_same_netns(int pid)
-{
-	return __is_same_ns(pid, "net");
-}
-
-bool is_same_mntns(int pid)
-{
-	return __is_same_ns(pid, "mnt");
-}
-
 void clear_local_perf_files(int pid)
 {
 	char local_path[MAX_PATH_LENGTH];
@@ -296,18 +267,35 @@ void clear_local_perf_files(int pid)
 	clear_target_ns_tmp_file(local_path);
 }
 
-static void clear_map_and_log_files(int pid)
+static int check_and_clear_unix_socket_files(int pid, bool check_in_use)
 {
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path),
 		 DF_AGENT_MAP_PATH_FMT, pid, pid);
+
+	if (check_in_use) {
+		if (is_file_opened_by_other_processes(target_path) == 1) {
+			jattach_log("File '%s' is opened by another process.\n",
+				    target_path);
+			return -1;
+		}
+	}
 	clear_target_ns_tmp_file(target_path);
 	snprintf(target_path, sizeof(target_path),
 		 DF_AGENT_LOG_PATH_FMT, pid, pid);
+	if (check_in_use) {
+		if (is_file_opened_by_other_processes(target_path) == 1) {
+			jattach_log("File '%s' is opened by another process.\n",
+				    target_path);
+			return -1;
+		}
+	}
 	clear_target_ns_tmp_file(target_path);
+
+	return 0;
 }
 
-void clear_target_ns(int pid)
+int check_and_clear_target_ns(int pid, bool check_in_use)
 {
 	/*
 	 * Delete files:
@@ -318,20 +306,37 @@ void clear_target_ns(int pid)
 	 */
 
 	if (is_same_mntns(pid))
-		return;
+		return 0;
 
-	clear_map_and_log_files(pid);
+	if (check_and_clear_unix_socket_files(pid, check_in_use) == -1)
+		return -1;
 
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
 		 AGENT_MUSL_LIB_TARGET_PATH);
+	if (check_in_use) {
+		if (is_file_opened_by_other_processes(target_path) == 1) {
+			jattach_log("File '%s' is opened by another process.\n",
+				    target_path);
+			return -1;
+		}
+	}
 	clear_target_ns_tmp_file(target_path);
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
 		 AGENT_LIB_TARGET_PATH);
+	if (check_in_use) {
+		if (is_file_opened_by_other_processes(target_path) == 1) {
+			jattach_log("File '%s' is opened by another process.\n",
+				    target_path);
+			return -1;
+		}
+	}
 	clear_target_ns_tmp_file(target_path);
 
 	snprintf(target_path, sizeof(target_path), TARGET_NS_STORAGE_PATH, pid);
 	rmdir(target_path);
+
+	return 0;
 }
 
 static int get_target_ns_info(const char *tag, struct stat *st)
@@ -426,7 +431,8 @@ int parse_config(char *opts, options_t * parsed)
 int java_attach_same_namespace(pid_t pid, options_t * opts)
 {
 	// Clear '/tmp/' unix domain sockets files.
-	clear_map_and_log_files(pid);
+	if (check_and_clear_unix_socket_files(pid, false) == -1)
+		return -1;
 
 	/*
 	 * In containers, different libc implementations may be used to compile agent
@@ -552,9 +558,16 @@ static int symbol_msg_process(int sock_fd, FILE * fp, bool replay_done)
 	if (replay_done && meta.type == METHOD_UNLOAD) {
 		update_java_perf_map_file(fp, rcv_buf);
 	} else {
-		fwrite(rcv_buf, sizeof(char), n, fp);
-		fflush(fp);	// Ensure data is written to the file promptly,
-		// avoiding prolonged residence in the buffer.
+		int count = fwrite(rcv_buf, sizeof(char), n, fp);
+		if (count != n) {
+			jattach_log("%s(%d)\n", strerror(errno), errno);
+			return -1;
+		}
+		/*
+		 * Ensure data is written to the file promptly,
+		 * avoiding prolonged residence in the buffer.
+		 */
+		fflush(fp);
 	}
 
 	return 0;
@@ -566,7 +579,11 @@ static int symbol_log_process(int sock_fd, FILE * fp)
 	int n = receive_msg(sock_fd, rcv_buf, sizeof(rcv_buf), true);
 	if (n == -1)
 		return -1;
-	fwrite(rcv_buf, sizeof(char), n, fp);
+	int count = fwrite(rcv_buf, sizeof(char), n, fp);
+	if (count != n) {
+		jattach_log("%s(%d)\n", strerror(errno), errno);
+		return -1;
+	}
 	fflush(fp);
 	return 0;
 }
@@ -615,6 +632,12 @@ static void *ipc_receiver_thread(void *arguments)
 {
 	receiver_args_t *args = (receiver_args_t *) arguments;
 
+	if (is_file_opened_by_other_processes(args->opts->perf_map_path) == 1) {
+		jattach_log("File '%s' is opened by another process.\n",
+			    args->opts->perf_map_path);
+		return NULL;
+	}
+
 	/*
 	 * If the file already exists, opening it in "w" mode will clear its contents
 	 * (truncate it to zero length). If the file does not exist, opening it in "w"
@@ -628,6 +651,13 @@ static void *ipc_receiver_thread(void *arguments)
 			    args->opts->perf_map_path, strerror(errno), errno);
 		return NULL;
 	}
+
+	if (is_file_opened_by_other_processes(args->opts->perf_log_path) == 1) {
+		jattach_log("File '%s' is opened by another process.\n",
+			    args->opts->perf_log_path);
+		return NULL;
+	}
+
 	FILE *log_fp = fopen(args->opts->perf_log_path, "w");
 	if (!log_fp) {
 		// byte stream in socket needs to be consumed to avoid client stuck
@@ -797,9 +827,9 @@ cleanup:
 	}
 
 	if (!is_same_mntns)
-		clear_target_ns(pid);
+		check_and_clear_target_ns(pid, false);
 	else
-		clear_map_and_log_files(pid);
+		check_and_clear_unix_socket_files(pid, false);
 
 	return ret;
 }
@@ -821,7 +851,8 @@ int java_attach_different_namespace(pid_t pid, options_t * opts)
 	 * Delete the files on the target file system if they
 	 * are not on the same mount point.
 	 */
-	clear_target_ns(pid);
+	if (check_and_clear_target_ns(pid, false) == -1)
+		return -1;
 
 	/*
 	 * Here, the original method of determination (based on whether the net
@@ -838,7 +869,7 @@ int java_attach_different_namespace(pid_t pid, options_t * opts)
 	jattach_log("[PID %d] copy agent so library ...\n", pid);
 	if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
 		jattach_log("[PID %d] copy agent os library failed.\n", pid);
-		clear_target_ns(pid);
+		check_and_clear_target_ns(pid, false);
 		return -1;
 	}
 	jattach_log("[PID %d] copy agent so library success.\n", pid);
@@ -854,7 +885,7 @@ int java_attach_different_namespace(pid_t pid, options_t * opts)
 
 	if (strlen(agent_lib_so_path) == 0) {
 		jattach_log("[PID %d] agent_lib_so_path is NULL.\n", pid);
-		clear_target_ns(pid);
+		check_and_clear_target_ns(pid, false);
 		return -1;
 	}
 

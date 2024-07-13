@@ -38,10 +38,9 @@ typedef struct receiver_args {
 } receiver_args_t;
 
 void clear_target_ns_tmp_file(const char *target_path);
-void clear_target_ns(int pid);
+int check_and_clear_target_ns(int pid, bool check_in_use);
 void clear_target_ns_so(int pid, int target_ns_pid);
 void clear_local_perf_files(int pid);
-bool is_same_mntns(int target_pid);
 i64 get_target_symbol_file_sz(int pid, int ns_pid);
 i64 get_local_symbol_file_sz(int pid, int ns_pid);
 int target_symbol_file_access(int pid, int ns_pid);
