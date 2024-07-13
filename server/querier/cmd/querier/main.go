@@ -23,6 +23,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	"github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/querier/querier"
 )
@@ -40,6 +41,6 @@ func main() {
 	if os.Getppid() != 1 {
 		logger.EnableStdoutLog()
 	}
-
-	querier.Start(*configPath, "")
+	shared := common.NewControllerIngesterShared()
+	querier.Start(*configPath, "", shared)
 }
