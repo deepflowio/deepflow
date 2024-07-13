@@ -700,6 +700,31 @@ error:
 	return NULL;
 }
 
+static bool check_target_jvmti(pid_t pid)
+{
+	/*
+	 * Check for the existence of different types of JVM dependency files
+	 * before attaching to prevent exceptions from occurring.
+	 *  hotspot: <target-path>/tmp/.java_pid<target-pid>
+	 *  openj9:  <target-path>/tmp/.com_ibm_tools_attach/<target-pid> 
+	 */
+	char path[MAX_PATH_LENGTH];
+	pid_t ns_pid = get_nspid(pid);
+
+	// Check for HotSpot JVM dependency file
+	snprintf(path, sizeof(path), "/proc/%d/root/tmp/.java_pid%d", pid,
+		 ns_pid);
+	bool hotspot_exist = (access(path, F_OK) == 0);
+
+	// Check for OpenJ9 JVM dependency file
+	snprintf(path, sizeof(path),
+		 "/proc/%d/root/tmp/.com_ibm_tools_attach/%d", pid, ns_pid);
+	bool openj9_exist = (access(path, F_OK) == 0);
+
+	// Return true if any of the dependency files exist
+	return hotspot_exist || openj9_exist;
+}
+
 static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 {
 	int map_socket = -1, log_socket = -1;
@@ -742,6 +767,11 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 
 	snprintf(buffer, PERF_PATH_SZ * 2,
 		 PERF_MAP_FILE_FMT "," PERF_MAP_LOG_FILE_FMT, pid, pid);
+
+	if (!check_target_jvmti(pid)) {
+		jattach_log("Miss HotSpot/OpenJ9 JVM dependency file.\n");
+		goto cleanup;
+	}
 
 	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
 	 * library as a JVMTI agent.*/
