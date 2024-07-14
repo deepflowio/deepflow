@@ -289,8 +289,15 @@ void df_send_symbol(enum event_type type, const void *code_addr,
 
 	struct symbol_metadata *meta;
 	char symbol_str[STRING_BUFFER_SIZE];
-	snprintf(symbol_str + sizeof(*meta), sizeof(symbol_str) - sizeof(*meta),
-		 "%lx %x %s\n", (unsigned long)code_addr, code_size, entry);
+	if (type == METHOD_UNLOAD) {
+		snprintf(symbol_str + sizeof(*meta),
+			 sizeof(symbol_str) - sizeof(*meta), "%lx",
+			 (unsigned long)code_addr);
+	} else {
+		snprintf(symbol_str + sizeof(*meta),
+			 sizeof(symbol_str) - sizeof(*meta), "%lx %x %s\n",
+			 (unsigned long)code_addr, code_size, entry);
+	}
 	meta = (struct symbol_metadata *)symbol_str;
 	meta->len = strlen(symbol_str + sizeof(*meta));
 	meta->type = type;

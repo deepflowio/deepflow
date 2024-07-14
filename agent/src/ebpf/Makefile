@@ -134,7 +134,8 @@ endif
 
 all: build
 
-SOCKET_TRACE_ELFS := user/socket_trace_bpf_5_2_plus.c
+SOCKET_TRACE_ELFS := 
+#user/socket_trace_bpf_5_2_plus.c
 #	user/socket_trace_bpf_common.c \
 #	user/socket_trace_bpf_3_10_0.c \
 #	user/socket_trace_bpf_5_2_plus.c \
@@ -214,9 +215,9 @@ tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-$(JAVA_TOOL): $(JAVA_AGENT_SO) user/profile/java/df_jattach.c user/log.c user/common.c libs/jattach/build/libjattach.a
+$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/common.c user/mem.c user/vec.c user/profile/java/df_jattach.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)
-	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
+	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/common.c user/mem.c user/vec.c user/profile/java/df_jattach.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 

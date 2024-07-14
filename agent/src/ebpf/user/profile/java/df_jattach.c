@@ -29,6 +29,8 @@
 #include "../../config.h"
 #include "../../common.h"
 #include "../../log.h"
+#include "../../mem.h"
+#include "../../vec.h"
 #include "config.h"
 #include "df_jattach.h"
 
@@ -39,6 +41,13 @@
 		fprintf(stdout, fmt, ##__VA_ARGS__);	\
 		fflush(stdout);				\
 	} while(0)
+
+/*
+ * Use a dynamic array to store the addresses of 'COMPILED_METHOD_UNLOAD'
+ * sent by the Java JVM. This is a per-thread variable, with each thread
+ * handling the data sent by the corresponding JVM.
+ */
+static __thread java_unload_addr_str_t *unload_addrs;
 
 static char agent_lib_so_path[MAX_PATH_LENGTH];
 extern int jattach(int pid, int argc, char **argv);
@@ -460,9 +469,6 @@ int create_ipc_socket(const char *path)
 
 	struct sockaddr_un addr = {.sun_family = AF_UNIX };
 	strncpy(addr.sun_path, path, UNIX_PATH_MAX - 1);
-	printf
-	    ("create_ipc_socket : path %s addr.sun_path %s  UNIX_PATH_MAX  %d\n",
-	     path, addr.sun_path, UNIX_PATH_MAX);
 	int len = sizeof(addr.sun_family) + strlen(addr.sun_path);
 	if (bind(sock, (struct sockaddr *)&addr, len) < 0) {
 		jattach_log("Bind unix socket failed with '%s(%d)'\n",
@@ -498,7 +504,7 @@ static inline int add_fd_to_epoll(int epoll_fd, int fd)
 	return 0;
 }
 
-static inline int receive_msg(pid_t pid, int sock_fd, char *buf,
+static inline int receive_msg(receiver_args_t *args, int sock_fd, char *buf,
 			      size_t buf_size, bool received_once)
 {
 	int recv_bytes = 0;
@@ -515,14 +521,14 @@ static inline int receive_msg(pid_t pid, int sock_fd, char *buf,
 				// Handle other errors
 				jattach_log
 				    ("Receive Java process(PID: %d) message"
-				     " failed with '%s(%d)'\n", pid,
+				     " failed with '%s(%d)'\n", args->pid,
 				     strerror(errno), errno);
 				return -1;
 			}
 		} else if (n == 0) {
 			jattach_log("The target Java process (PID: %d) has"
 				    " disconnected. The Java process may have exited.\n",
-				    pid);
+				    args->pid);
 			return -1;
 		}
 
@@ -532,15 +538,103 @@ static inline int receive_msg(pid_t pid, int sock_fd, char *buf,
 	return recv_bytes;	// Return total bytes received
 }
 
-static void update_java_perf_map_file(FILE * fp, char *addr_str)
+static bool is_unload_address(const char *sym_str)
 {
+	java_unload_addr_str_t *jaddr;
+	vec_foreach(jaddr, unload_addrs) {
+		if (jaddr->is_verified)
+			continue;
+		if (substring_starts_with(sym_str, jaddr->addr)) {
+			jaddr->is_verified = true;
+			return true;
+		}
+	}
+
+	return false;
 }
 
-static int symbol_msg_process(pid_t pid, int sock_fd, FILE * fp,
+static int delete_method_unload_symbol(receiver_args_t *args)
+{
+	const char *path = args->opts->perf_map_path;
+	size_t delete_count = 0;
+	FILE *fp_in = fopen(path, "r");
+	if (!fp_in) {
+		jattach_log("Error opening input file, '%s(%d)'\n",
+			    strerror(errno), errno);
+		return -1;
+	}
+
+	char temp_path[MAX_PATH_LENGTH];
+	snprintf(temp_path, sizeof(temp_path), "%s.temp", path);
+	FILE *fp_out = fopen(temp_path, "w");
+	if (!fp_out) {
+		jattach_log("Error creating temporary file, '%s(%d)'\n",
+			    strerror(errno), errno);
+		fclose(fp_in);
+		return -1;
+	}
+
+	char buffer[STRING_BUFFER_SIZE];
+	while (fgets(buffer, sizeof(buffer), fp_in)) {
+		if (!is_unload_address(buffer))
+			fputs(buffer, fp_out);
+		else
+			delete_count++;
+	}
+
+	fclose(fp_in);
+	fclose(fp_out);
+
+	if (remove(path) != 0) {
+		jattach_log("Error deleting original file, '%s(%d)'\n",
+			    strerror(errno), errno);
+		return -1;
+	}
+	if (rename(temp_path, path) != 0) {
+		jattach_log("Error renaming temporary file '%s(%d)'\n",
+			    strerror(errno), errno);
+		return -1;
+	}
+
+	return delete_count;
+}
+
+static int update_java_perf_map_file(receiver_args_t *args, char *addr_str)
+{
+	java_unload_addr_str_t java_addr = { 0 };
+	snprintf(java_addr.addr, sizeof(java_addr.addr), "%s", addr_str);
+
+	int ret = VEC_OK;
+	vec_add1(unload_addrs, java_addr, ret);
+	if (ret != VEC_OK) {
+		ebpf_warning(" Java unload_addrs add failed.\n");
+	}
+
+	if (vec_len(unload_addrs) >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH) {
+		fclose(args->map_fp);
+		if (delete_method_unload_symbol(args) < 0) {
+			vec_free(unload_addrs);
+			return -1;
+		}
+		vec_free(unload_addrs);
+		args->map_fp = fopen(args->opts->perf_map_path, "a");
+		if (!args->map_fp) {
+			jattach_log("fopen() %s failed with '%s(%d)'\n",
+				    args->opts->perf_map_path, strerror(errno),
+				    errno);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static int symbol_msg_process(receiver_args_t *args, int sock_fd,
 			      bool replay_done)
 {
+	FILE *fp = args->map_fp;
 	struct symbol_metadata meta;
-	int n = receive_msg(pid, sock_fd, (char *)&meta, sizeof(meta), false);
+	int n = receive_msg(args, sock_fd, (char *)&meta, sizeof(meta), false);
 	if (n != sizeof(meta))
 		return -1;
 
@@ -548,13 +642,13 @@ static int symbol_msg_process(pid_t pid, int sock_fd, FILE * fp,
 	if (meta.len > STRING_BUFFER_SIZE)
 		return -1;
 
-	n = receive_msg(pid, sock_fd, rcv_buf, meta.len, false);
+	n = receive_msg(args, sock_fd, rcv_buf, meta.len, false);
 	if (n != meta.len)
 		return -1;
 	rcv_buf[meta.len] = '\0';
 
-	fprintf(stdout, "> %s", rcv_buf);
-	fflush(stdout);
+	//fprintf(stdout, "> %s", rcv_buf);
+	//fflush(stdout);
 
 	/*
 	 * If the replay is complete and the event type is
@@ -562,10 +656,10 @@ static int symbol_msg_process(pid_t pid, int sock_fd, FILE * fp,
 	 * needs to be updated.
 	 */
 	if (replay_done && meta.type == METHOD_UNLOAD) {
-		update_java_perf_map_file(fp, rcv_buf);
+		update_java_perf_map_file(args, rcv_buf);
 	} else {
-		int count = fwrite(rcv_buf, sizeof(char), n, fp);
-		if (count != n) {
+		int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
+		if (written_count != n) {
 			jattach_log("%s(%d)\n", strerror(errno), errno);
 			return -1;
 		}
@@ -579,14 +673,15 @@ static int symbol_msg_process(pid_t pid, int sock_fd, FILE * fp,
 	return 0;
 }
 
-static int symbol_log_process(pid_t pid, int sock_fd, FILE * fp)
+static int symbol_log_process(receiver_args_t *args, int sock_fd)
 {
+	FILE *fp = args->log_fp;
 	char rcv_buf[STRING_BUFFER_SIZE];
-	int n = receive_msg(pid, sock_fd, rcv_buf, sizeof(rcv_buf), true);
+	int n = receive_msg(args, sock_fd, rcv_buf, sizeof(rcv_buf), true);
 	if (n == -1)
 		return -1;
-	int count = fwrite(rcv_buf, sizeof(char), n, fp);
-	if (count != n) {
+	int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
+	if (written_count != n) {
 		jattach_log("%s(%d)\n", strerror(errno), errno);
 		return -1;
 	}
@@ -594,10 +689,11 @@ static int symbol_log_process(pid_t pid, int sock_fd, FILE * fp)
 	return 0;
 }
 
-static int epoll_events_process(pid_t pid, int epoll_fd, struct epoll_event *ev,
-				int map_sock, int log_sock, FILE * map_fp,
-				FILE * log_fp, int *map_client,
-				int *log_client, bool replay_done)
+static int epoll_events_process(receiver_args_t *args, int epoll_fd,
+				struct epoll_event *ev, int map_sock,
+				int log_sock,
+				int *map_client, int *log_client,
+				bool replay_done)
 {
 	errno = 0;
 	if (ev->data.fd == map_sock) {
@@ -618,11 +714,10 @@ static int epoll_events_process(pid_t pid, int epoll_fd, struct epoll_event *ev,
 			return -1;
 	} else {
 		if (ev->data.fd == *map_client) {
-			if (symbol_msg_process
-			    (pid, ev->data.fd, map_fp, replay_done))
+			if (symbol_msg_process(args, ev->data.fd, replay_done))
 				return -1;
 		} else if (ev->data.fd == *log_client) {
-			if (symbol_log_process(pid, ev->data.fd, log_fp))
+			if (symbol_log_process(args, ev->data.fd))
 				return -1;
 		} else {
 			jattach_log("Unexpected event, event fd %d\n",
@@ -673,6 +768,9 @@ static void *ipc_receiver_thread(void *arguments)
 		return NULL;
 	}
 
+	args->map_fp = map_fp;
+	args->log_fp = log_fp;
+
 	printf("/// mapfile : %s (%p)\n", args->opts->perf_map_path, map_fp);
 	printf("/// logfile : %s (%p)\n", args->opts->perf_log_path, log_fp);
 
@@ -697,9 +795,8 @@ static void *ipc_receiver_thread(void *arguments)
 
 	struct epoll_event events[MAX_EVENTS];
 	while (!*args->attach_ret) {
-		int n =
-		    epoll_wait(epoll_fd, events, MAX_EVENTS,
-			       PROFILER_READER_EPOLL_TIMEOUT);
+		int n = epoll_wait(epoll_fd, events, MAX_EVENTS,
+				   PROFILER_READER_EPOLL_TIMEOUT);
 		if (n == -1) {
 			jattach_log("epoll_wait() failed with '%s(%d)'\n",
 				    strerror(errno), errno);
@@ -710,8 +807,8 @@ static void *ipc_receiver_thread(void *arguments)
 			if (events[i].events & EPOLLIN) {
 				struct epoll_event *ev = &events[i];
 				if (epoll_events_process
-				    (args->pid, epoll_fd, ev, map_sock,
-				     log_sock, map_fp, log_fp, &map_client,
+				    (args, epoll_fd, ev, map_sock,
+				     log_sock, &map_client,
 				     &log_client, *args->replay_done) < 0)
 					goto error;
 			}

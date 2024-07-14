@@ -26,6 +26,9 @@
  */
 #define UNIX_PATH_MAX 108
 
+// The upper limit for updating Java symbol files during method unload events.
+#define UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH 100
+
 enum event_type {
 	METHOD_LOAD,
 	METHOD_UNLOAD,

@@ -1399,6 +1399,24 @@ int is_file_opened_by_other_processes(const char *filepath)
 	return 0;		// File is not opened by any other process
 }
 
+// Check if the substring starts with the main string
+bool substring_starts_with(const char *haystack, const char *needle)
+{
+	int needle_len = strlen(needle);	// Length of the substring
+	int haystack_len = strlen(haystack);	// Length of the main string
+
+	// If the substring length is greater than the main string length, return false
+	if (needle_len > haystack_len) {
+		return false;
+	}
+	// Compare the first needle_len characters
+	if (strncmp(haystack, needle, needle_len) == 0) {
+		return true;	// Substring starts with the main string
+	}
+
+	return false;		// Substring does not start with the main string
+}
+
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
 {

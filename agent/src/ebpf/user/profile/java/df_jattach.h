@@ -21,6 +21,17 @@
 
 #define STRING_BUFFER_SIZE 2000
 #define UNIX_PATH_MAX 108
+#define JAVA_ADDR_STR_SIZE 13
+
+/*
+ * The address range of the 64-bit user space is from 0x0000000000000000
+ * to 0x00007fffffffffff, which effectively uses only 48 bits. We use 13
+ * bytes to represent the address string, with the last byte used as '\0'.
+ */
+typedef struct {
+	char addr[JAVA_ADDR_STR_SIZE];
+	bool is_verified;
+} java_unload_addr_str_t;
 
 typedef uint64_t(*agent_test_t) (void);
 
@@ -34,6 +45,8 @@ typedef struct receiver_args {
 	options_t *opts;
 	int map_socket;
 	int log_socket;
+	FILE *map_fp;
+	FILE *log_fp;
 	int *attach_ret;
 	bool *replay_done;
 } receiver_args_t;
