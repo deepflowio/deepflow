@@ -30,6 +30,7 @@ typedef struct options {
 } options_t;
 
 typedef struct receiver_args {
+	pid_t pid;
 	options_t *opts;
 	int map_socket;
 	int log_socket;

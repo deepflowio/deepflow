@@ -498,8 +498,8 @@ static inline int add_fd_to_epoll(int epoll_fd, int fd)
 	return 0;
 }
 
-static inline int receive_msg(int sock_fd, char *buf, size_t buf_size,
-			      bool received_once)
+static inline int receive_msg(pid_t pid, int sock_fd, char *buf,
+			      size_t buf_size, bool received_once)
 {
 	int recv_bytes = 0;
 	int n = 0;		// Initialize n
@@ -513,11 +513,16 @@ static inline int receive_msg(int sock_fd, char *buf, size_t buf_size,
 				continue;
 			} else {
 				// Handle other errors
-				jattach_log("recv() failed with '%s(%d)'\n",
-					    strerror(errno), errno);
+				jattach_log
+				    ("Receive Java process(PID: %d) message"
+				     " failed with '%s(%d)'\n", pid,
+				     strerror(errno), errno);
 				return -1;
 			}
 		} else if (n == 0) {
+			jattach_log("The target Java process (PID: %d) has"
+				    " disconnected. The Java process may have exited.\n",
+				    pid);
 			return -1;
 		}
 
@@ -531,10 +536,11 @@ static void update_java_perf_map_file(FILE * fp, char *addr_str)
 {
 }
 
-static int symbol_msg_process(int sock_fd, FILE * fp, bool replay_done)
+static int symbol_msg_process(pid_t pid, int sock_fd, FILE * fp,
+			      bool replay_done)
 {
 	struct symbol_metadata meta;
-	int n = receive_msg(sock_fd, (char *)&meta, sizeof(meta), false);
+	int n = receive_msg(pid, sock_fd, (char *)&meta, sizeof(meta), false);
 	if (n != sizeof(meta))
 		return -1;
 
@@ -542,7 +548,7 @@ static int symbol_msg_process(int sock_fd, FILE * fp, bool replay_done)
 	if (meta.len > STRING_BUFFER_SIZE)
 		return -1;
 
-	n = receive_msg(sock_fd, rcv_buf, meta.len, false);
+	n = receive_msg(pid, sock_fd, rcv_buf, meta.len, false);
 	if (n != meta.len)
 		return -1;
 	rcv_buf[meta.len] = '\0';
@@ -573,10 +579,10 @@ static int symbol_msg_process(int sock_fd, FILE * fp, bool replay_done)
 	return 0;
 }
 
-static int symbol_log_process(int sock_fd, FILE * fp)
+static int symbol_log_process(pid_t pid, int sock_fd, FILE * fp)
 {
 	char rcv_buf[STRING_BUFFER_SIZE];
-	int n = receive_msg(sock_fd, rcv_buf, sizeof(rcv_buf), true);
+	int n = receive_msg(pid, sock_fd, rcv_buf, sizeof(rcv_buf), true);
 	if (n == -1)
 		return -1;
 	int count = fwrite(rcv_buf, sizeof(char), n, fp);
@@ -588,7 +594,7 @@ static int symbol_log_process(int sock_fd, FILE * fp)
 	return 0;
 }
 
-static int epoll_events_process(int epoll_fd, struct epoll_event *ev,
+static int epoll_events_process(pid_t pid, int epoll_fd, struct epoll_event *ev,
 				int map_sock, int log_sock, FILE * map_fp,
 				FILE * log_fp, int *map_client,
 				int *log_client, bool replay_done)
@@ -613,10 +619,10 @@ static int epoll_events_process(int epoll_fd, struct epoll_event *ev,
 	} else {
 		if (ev->data.fd == *map_client) {
 			if (symbol_msg_process
-			    (ev->data.fd, map_fp, replay_done))
+			    (pid, ev->data.fd, map_fp, replay_done))
 				return -1;
 		} else if (ev->data.fd == *log_client) {
-			if (symbol_log_process(ev->data.fd, log_fp))
+			if (symbol_log_process(pid, ev->data.fd, log_fp))
 				return -1;
 		} else {
 			jattach_log("Unexpected event, event fd %d\n",
@@ -688,10 +694,12 @@ static void *ipc_receiver_thread(void *arguments)
 	if (add_fd_to_epoll(epoll_fd, log_sock) == -1) {
 		goto error;
 	}
-	static const int timeout = 1000;	// 1 second timeout, in milliseconds
+
 	struct epoll_event events[MAX_EVENTS];
 	while (!*args->attach_ret) {
-		int n = epoll_wait(epoll_fd, events, MAX_EVENTS, timeout);
+		int n =
+		    epoll_wait(epoll_fd, events, MAX_EVENTS,
+			       PROFILER_READER_EPOLL_TIMEOUT);
 		if (n == -1) {
 			jattach_log("epoll_wait() failed with '%s(%d)'\n",
 				    strerror(errno), errno);
@@ -702,9 +710,9 @@ static void *ipc_receiver_thread(void *arguments)
 			if (events[i].events & EPOLLIN) {
 				struct epoll_event *ev = &events[i];
 				if (epoll_events_process
-				    (epoll_fd, ev, map_sock, log_sock, map_fp,
-				     log_fp, &map_client, &log_client,
-				     *args->replay_done) < 0)
+				    (args->pid, epoll_fd, ev, map_sock,
+				     log_sock, map_fp, log_fp, &map_client,
+				     &log_client, *args->replay_done) < 0)
 					goto error;
 			}
 		}
@@ -779,6 +787,7 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 	int attach_ret_val = 0;
 	bool replay_done = false;
 	receiver_args_t args = {
+		.pid = pid,
 		.opts = opts,
 		.map_socket = map_socket,
 		.log_socket = log_socket,
