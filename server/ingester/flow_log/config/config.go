@@ -24,6 +24,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/config/configdefaults"
 )
 
 var log = logging.MustGetLogger("flow_log.config")
@@ -79,7 +80,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.TraceTreeEnabled == nil {
-		value := false
+		value := configdefaults.FLOG_LOG_TRACE_TREE_ENABLED_DEFAULT
 		c.TraceTreeEnabled = &value
 	}
 
