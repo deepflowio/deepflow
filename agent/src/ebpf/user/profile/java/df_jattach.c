@@ -306,22 +306,8 @@ static int check_and_clear_unix_socket_files(int pid, bool check_in_use)
 	return 0;
 }
 
-int check_and_clear_target_ns(int pid, bool check_in_use)
+static int clear_so_target_ns(int pid, bool check_in_use)
 {
-	/*
-	 * Delete files:
-	 *  path/.deepflow-java-symbols-pid<pid>.socket
-	 *  path/.deepflow-java-jvmti-logs-ipd<pid>.socket
-	 *  path/df_java_agent.so
-	 *  path/df_java_agent_musl.so
-	 */
-
-	if (is_same_mntns(pid))
-		return 0;
-
-	if (check_and_clear_unix_socket_files(pid, check_in_use) == -1)
-		return -1;
-
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path), "/proc/%d/root%s", pid,
 		 AGENT_MUSL_LIB_TARGET_PATH);
@@ -350,6 +336,25 @@ int check_and_clear_target_ns(int pid, bool check_in_use)
 	rmdir(target_path);
 
 	return 0;
+}
+
+int check_and_clear_target_ns(int pid, bool check_in_use)
+{
+	/*
+	 * Delete files:
+	 *  path/.deepflow-java-symbols-pid<pid>.socket
+	 *  path/.deepflow-java-jvmti-logs-ipd<pid>.socket
+	 *  path/df_java_agent.so
+	 *  path/df_java_agent_musl.so
+	 */
+
+	if (is_same_mntns(pid))
+		return 0;
+
+	if (check_and_clear_unix_socket_files(pid, check_in_use) == -1)
+		return -1;
+
+	return clear_so_target_ns(pid, check_in_use);
 }
 
 static int get_target_ns_info(const char *tag, struct stat *st)
@@ -1067,13 +1072,8 @@ static int create_symbol_mgmt_task(pid_t pid, options_t * opts,
 	task->args.replay_done = false;
 	task->args.task = task;
 
-	/*
-	 * The thread_pool_add_task() return -2, indicating thread creation
-	 * error, If the thread is successfully created, the resource cleanup
-	 * will be handled by the thread itself upon exit.
-	 */
 	ret = thread_pool_add_task(g_mgmt_pool, task);
-	if (ret == -2) {
+	if (ret < 0) {
 		goto cleanup;
 	}
 
@@ -1086,6 +1086,11 @@ static int create_symbol_mgmt_task(pid_t pid, options_t * opts,
 	task->args.replay_done = true;
 	task->args.attach_ret = ret;
 	CLIB_MEMORY_STORE_BARRIER();
+
+	/* After successfully attaching, clean up the residual .so files
+	 * in the target namespace. */
+	if (!is_same_mntns)
+		clear_so_target_ns(pid, false);
 
 	if (!check_target_jvmti_attach_files(pid)) {
 		ebpf_warning(JAVA_LOG_TAG
