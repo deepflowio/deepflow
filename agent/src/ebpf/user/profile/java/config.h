@@ -52,7 +52,7 @@ struct symbol_metadata {
 #define AGENT_MUSL_LIB_SRC_PATH "/tmp/" AGENT_MUSL_LIB_NAME
 #define AGENT_MUSL_LIB_TARGET_PATH "/deepflow/" AGENT_MUSL_LIB_NAME
 
-#define JAVA_LOG_TAG "[JAVA]"
+#define JAVA_LOG_TAG "[JAVA] "
 
 #define PERF_PATH_SZ 256
 #define DF_AGENT_MAP_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-symbols-pid%d.socket"

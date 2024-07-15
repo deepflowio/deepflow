@@ -36,12 +36,6 @@
 
 #define MAX_EVENTS 4
 
-#define jattach_log(fmt, ...)				\
-	do {						\
-		fprintf(stdout, fmt, ##__VA_ARGS__);	\
-		fflush(stdout);				\
-	} while(0)
-
 /*
  * Use a dynamic array to store the addresses of 'COMPILED_METHOD_UNLOAD'
  * sent by the Java JVM. This is a per-thread variable, with each thread
@@ -57,7 +51,8 @@ static int attach_and_recv_data(pid_t pid, options_t * opts,
 static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 {
 	if (access(src, F_OK)) {
-		jattach_log("Fun %s src file '%s' not exist.\n", __func__, src);
+		ebpf_warning(JAVA_LOG_TAG "Fun %s src file '%s' not exist.\n",
+			     __func__, src);
 		return ETR_NOTEXIST;
 	}
 
@@ -66,8 +61,9 @@ static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 	}
 
 	if (chown(dst, uid, gid) != 0) {
-		jattach_log
-		    ("Failed to change ownership and group. file '%s'\n", dst);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Failed to change ownership and group. file '%s'\n",
+			     dst);
 		return ETR_INVAL;
 	}
 
@@ -101,8 +97,9 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 		umask(0);
 
 		if (mkdir(copy_target_path, 0777) != 0) {
-			jattach_log(JAVA_LOG_TAG "Fun %s cannot mkdir() '%s'\n",
-				    __func__, copy_target_path);
+			ebpf_warning(JAVA_LOG_TAG
+				     "Fun %s cannot mkdir() '%s'\n", __func__,
+				     copy_target_path);
 
 			return ETR_NOTEXIST;
 		}
@@ -114,8 +111,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
 			       target_gid)) != ETR_OK) {
-		jattach_log("cp '%s' to '%s' failed.\n", AGENT_LIB_SRC_PATH,
-			    copy_target_path);
+		ebpf_warning(JAVA_LOG_TAG "cp '%s' to '%s' failed.\n",
+			     AGENT_LIB_SRC_PATH, copy_target_path);
 		return ret;
 	}
 
@@ -126,8 +123,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	     agent_so_lib_copy(AGENT_MUSL_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
 			       target_gid)) != ETR_OK) {
-		jattach_log("cp '%s' to '%s' failed.\n",
-			    AGENT_MUSL_LIB_SRC_PATH, copy_target_path);
+		ebpf_warning(JAVA_LOG_TAG "cp '%s' to '%s' failed.\n",
+			     AGENT_MUSL_LIB_SRC_PATH, copy_target_path);
 		return ret;
 	}
 
@@ -137,8 +134,8 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 bool test_dl_open(const char *so_lib_file_path)
 {
 	if (access(so_lib_file_path, F_OK)) {
-		jattach_log(JAVA_LOG_TAG "Fun %s file '%s' not exist.\n",
-			    __func__, so_lib_file_path);
+		ebpf_warning(JAVA_LOG_TAG "Fun %s file '%s' not exist.\n",
+			     __func__, so_lib_file_path);
 
 		return false;
 	}
@@ -153,9 +150,9 @@ bool test_dl_open(const char *so_lib_file_path)
 	void *h = dlopen(so_lib_file_path, RTLD_LAZY);
 
 	if (h == NULL) {
-		jattach_log(JAVA_LOG_TAG
-			    "Fuc '%s' dlopen() path %s failure: %s.", __func__,
-			    so_lib_file_path, dlerror());
+		ebpf_warning(JAVA_LOG_TAG
+			     "Fuc '%s' dlopen() path %s failure: %s.", __func__,
+			     so_lib_file_path, dlerror());
 		return false;
 	}
 
@@ -164,9 +161,9 @@ bool test_dl_open(const char *so_lib_file_path)
 	    (uint64_t(*)(void))dlsym(h, "df_java_agent_so_libs_test");
 
 	if (test_fn == NULL) {
-		jattach_log(JAVA_LOG_TAG
-			    "Func '%s' dlsym() path %s failure: %s.", __func__,
-			    so_lib_file_path, dlerror());
+		ebpf_warning(JAVA_LOG_TAG
+			     "Func '%s' dlsym() path %s failure: %s.", __func__,
+			     so_lib_file_path, dlerror());
 		return false;
 	}
 
@@ -175,15 +172,15 @@ bool test_dl_open(const char *so_lib_file_path)
 	const uint64_t observed_test_fn_result = test_fn();
 
 	if (observed_test_fn_result != expected_test_fn_result) {
-		jattach_log(JAVA_LOG_TAG
-			    "%s test '%s' function returned: %lu, expected %lu.",
-			    __func__, so_lib_file_path, observed_test_fn_result,
-			    expected_test_fn_result);
+		ebpf_warning(JAVA_LOG_TAG
+			     "%s test '%s' function returned: %lu, expected %lu.",
+			     __func__, so_lib_file_path,
+			     observed_test_fn_result, expected_test_fn_result);
 		return false;
 	}
 
-	jattach_log(JAVA_LOG_TAG "%s: Success for %s.\n", __func__,
-		    so_lib_file_path);
+	ebpf_info(JAVA_LOG_TAG "%s: Success for %s.\n", __func__,
+		  so_lib_file_path);
 	return true;
 }
 
@@ -206,9 +203,9 @@ static void select_suitable_agent_lib(pid_t pid, bool is_same_mntns)
 
 	if (test_dl_open(test_path)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
-		jattach_log(JAVA_LOG_TAG
-			    "Func %s target PID %d test %s, success.\n",
-			    __func__, pid, test_path);
+		ebpf_info(JAVA_LOG_TAG
+			  "Func %s target PID %d test %s, success.\n",
+			  __func__, pid, test_path);
 		goto found;
 	}
 
@@ -221,13 +218,13 @@ static void select_suitable_agent_lib(pid_t pid, bool is_same_mntns)
 
 	if (test_dl_open(test_path)) {
 		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
-		jattach_log(JAVA_LOG_TAG
-			    "Func %s target PID %d test %s, success.\n",
-			    __func__, pid, test_path);
+		ebpf_info(JAVA_LOG_TAG
+			  "Func %s target PID %d test %s, success.\n",
+			  __func__, pid, test_path);
 		goto found;
 	}
 
-	jattach_log(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
+	ebpf_warning(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
 
 found:
 
@@ -248,9 +245,9 @@ static int attach(pid_t pid, char *opts)
 	char *argv[] = { "load", agent_lib_so_path, "true", opts };
 	int argc = sizeof(argv) / sizeof(argv[0]);
 	int ret = jattach(pid, argc, (char **)argv);
-	jattach_log(JAVA_LOG_TAG
-		    "jattach pid %d argv: \"load %s true\" return %d\n", pid,
-		    agent_lib_so_path, ret);
+	ebpf_info(JAVA_LOG_TAG
+		  "jattach pid %d argv: \"load %s true\" return %d\n", pid,
+		  agent_lib_so_path, ret);
 
 	return ret;
 }
@@ -259,8 +256,8 @@ void clear_target_ns_tmp_file(const char *target_path)
 {
 	if (access(target_path, F_OK) == 0) {
 		if (unlink(target_path) != 0)
-			jattach_log(JAVA_LOG_TAG "rm file %s failed\n",
-				    target_path);
+			ebpf_warning(JAVA_LOG_TAG "rm file %s failed\n",
+				     target_path);
 	}
 }
 
@@ -284,8 +281,9 @@ static int check_and_clear_unix_socket_files(int pid, bool check_in_use)
 
 	if (check_in_use) {
 		if (is_file_opened_by_other_processes(target_path) == 1) {
-			jattach_log("File '%s' is opened by another process.\n",
-				    target_path);
+			ebpf_warning(JAVA_LOG_TAG
+				     "File '%s' is opened by another process.\n",
+				     target_path);
 			return -1;
 		}
 	}
@@ -294,8 +292,9 @@ static int check_and_clear_unix_socket_files(int pid, bool check_in_use)
 		 DF_AGENT_LOG_PATH_FMT, pid, pid);
 	if (check_in_use) {
 		if (is_file_opened_by_other_processes(target_path) == 1) {
-			jattach_log("File '%s' is opened by another process.\n",
-				    target_path);
+			ebpf_warning(JAVA_LOG_TAG
+				     "File '%s' is opened by another process.\n",
+				     target_path);
 			return -1;
 		}
 	}
@@ -325,8 +324,9 @@ int check_and_clear_target_ns(int pid, bool check_in_use)
 		 AGENT_MUSL_LIB_TARGET_PATH);
 	if (check_in_use) {
 		if (is_file_opened_by_other_processes(target_path) == 1) {
-			jattach_log("File '%s' is opened by another process.\n",
-				    target_path);
+			ebpf_warning(JAVA_LOG_TAG
+				     "File '%s' is opened by another process.\n",
+				     target_path);
 			return -1;
 		}
 	}
@@ -335,8 +335,9 @@ int check_and_clear_target_ns(int pid, bool check_in_use)
 		 AGENT_LIB_TARGET_PATH);
 	if (check_in_use) {
 		if (is_file_opened_by_other_processes(target_path) == 1) {
-			jattach_log("File '%s' is opened by another process.\n",
-				    target_path);
+			ebpf_warning(JAVA_LOG_TAG
+				     "File '%s' is opened by another process.\n",
+				     target_path);
 			return -1;
 		}
 	}
@@ -420,7 +421,7 @@ int parse_config(char *opts, options_t * parsed)
 
 	char *token = strtok(line, ",");
 	if (token == NULL) {
-		jattach_log("Bad argument line %s\n", opts);
+		ebpf_warning(JAVA_LOG_TAG "Bad argument line %s\n", opts);
 		return -1;
 	}
 	strncpy(parsed->perf_map_path, token, PERF_PATH_SZ);
@@ -428,7 +429,7 @@ int parse_config(char *opts, options_t * parsed)
 
 	token = strtok(NULL, ",");
 	if (token == NULL) {
-		jattach_log("Bad argument line %s\n", opts);
+		ebpf_warning(JAVA_LOG_TAG "Bad argument line %s\n", opts);
 		return -1;
 	}
 	strncpy(parsed->perf_log_path, token, PERF_PATH_SZ);
@@ -462,8 +463,9 @@ int create_ipc_socket(const char *path)
 {
 	int sock = -1;
 	if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		jattach_log("Create unix socket failed with '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Create unix socket failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 		return -1;
 	}
 
@@ -471,13 +473,15 @@ int create_ipc_socket(const char *path)
 	strncpy(addr.sun_path, path, UNIX_PATH_MAX - 1);
 	int len = sizeof(addr.sun_family) + strlen(addr.sun_path);
 	if (bind(sock, (struct sockaddr *)&addr, len) < 0) {
-		jattach_log("Bind unix socket failed with '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Bind unix socket failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 		return -1;
 	}
 	if (listen(sock, 1) < 0) {
-		jattach_log("Listen on unix socket failed with '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Listen on unix socket failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 		unlink(path);
 		return -1;
 	}
@@ -488,7 +492,8 @@ int create_ipc_socket(const char *path)
 static inline int add_fd_to_epoll(int epoll_fd, int fd)
 {
 	if (fd <= 0) {
-		jattach_log("fd must be a value greater than 0, fd %d\n", fd);
+		ebpf_warning(JAVA_LOG_TAG
+			     "fd must be a value greater than 0, fd %d\n", fd);
 		return -1;
 	}
 
@@ -496,15 +501,15 @@ static inline int add_fd_to_epoll(int epoll_fd, int fd)
 	event.events = EPOLLIN;
 	event.data.fd = fd;
 	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
-		jattach_log("epoll_ctl() failed with '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG "epoll_ctl() failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 		return -1;
 	}
 
 	return 0;
 }
 
-static inline int receive_msg(receiver_args_t *args, int sock_fd, char *buf,
+static inline int receive_msg(receiver_args_t * args, int sock_fd, char *buf,
 			      size_t buf_size, bool received_once)
 {
 	int recv_bytes = 0;
@@ -519,16 +524,17 @@ static inline int receive_msg(receiver_args_t *args, int sock_fd, char *buf,
 				continue;
 			} else {
 				// Handle other errors
-				jattach_log
-				    ("Receive Java process(PID: %d) message"
-				     " failed with '%s(%d)'\n", args->pid,
-				     strerror(errno), errno);
+				ebpf_warning(JAVA_LOG_TAG
+					     "Receive Java process(PID: %d) message"
+					     " failed with '%s(%d)'\n",
+					     args->pid, strerror(errno), errno);
 				return -1;
 			}
 		} else if (n == 0) {
-			jattach_log("The target Java process (PID: %d) has"
-				    " disconnected. The Java process may have exited.\n",
-				    args->pid);
+			ebpf_warning(JAVA_LOG_TAG
+				     "The target Java process (PID: %d) has"
+				     " disconnected. The Java process may have exited.\n",
+				     args->pid);
 			return -1;
 		}
 
@@ -553,14 +559,15 @@ static bool is_unload_address(const char *sym_str)
 	return false;
 }
 
-static int delete_method_unload_symbol(receiver_args_t *args)
+static int delete_method_unload_symbol(receiver_args_t * args)
 {
 	const char *path = args->opts->perf_map_path;
 	size_t delete_count = 0;
 	FILE *fp_in = fopen(path, "r");
 	if (!fp_in) {
-		jattach_log("Error opening input file, '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Error opening input file, '%s(%d)'\n",
+			     strerror(errno), errno);
 		return -1;
 	}
 
@@ -568,8 +575,9 @@ static int delete_method_unload_symbol(receiver_args_t *args)
 	snprintf(temp_path, sizeof(temp_path), "%s.temp", path);
 	FILE *fp_out = fopen(temp_path, "w");
 	if (!fp_out) {
-		jattach_log("Error creating temporary file, '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Error creating temporary file, '%s(%d)'\n",
+			     strerror(errno), errno);
 		fclose(fp_in);
 		return -1;
 	}
@@ -586,20 +594,22 @@ static int delete_method_unload_symbol(receiver_args_t *args)
 	fclose(fp_out);
 
 	if (remove(path) != 0) {
-		jattach_log("Error deleting original file, '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Error deleting original file, '%s(%d)'\n",
+			     strerror(errno), errno);
 		return -1;
 	}
 	if (rename(temp_path, path) != 0) {
-		jattach_log("Error renaming temporary file '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Error renaming temporary file '%s(%d)'\n",
+			     strerror(errno), errno);
 		return -1;
 	}
 
 	return delete_count;
 }
 
-static int update_java_perf_map_file(receiver_args_t *args, char *addr_str)
+static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 {
 	java_unload_addr_str_t java_addr = { 0 };
 	snprintf(java_addr.addr, sizeof(java_addr.addr), "%s", addr_str);
@@ -621,9 +631,10 @@ static int update_java_perf_map_file(receiver_args_t *args, char *addr_str)
 		//fflush(stdout);
 		args->map_fp = fopen(args->opts->perf_map_path, "a");
 		if (!args->map_fp) {
-			jattach_log("fopen() %s failed with '%s(%d)'\n",
-				    args->opts->perf_map_path, strerror(errno),
-				    errno);
+			ebpf_warning(JAVA_LOG_TAG
+				     "fopen() %s failed with '%s(%d)'\n",
+				     args->opts->perf_map_path, strerror(errno),
+				     errno);
 			return -1;
 		}
 	}
@@ -631,7 +642,7 @@ static int update_java_perf_map_file(receiver_args_t *args, char *addr_str)
 	return 0;
 }
 
-static int symbol_msg_process(receiver_args_t *args, int sock_fd,
+static int symbol_msg_process(receiver_args_t * args, int sock_fd,
 			      bool replay_done)
 {
 	FILE *fp = args->map_fp;
@@ -661,7 +672,8 @@ static int symbol_msg_process(receiver_args_t *args, int sock_fd,
 		//fflush(stdout);
 		int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
 		if (written_count != n) {
-			jattach_log("%s(%d)\n", strerror(errno), errno);
+			ebpf_warning(JAVA_LOG_TAG "%s(%d)\n", strerror(errno),
+				     errno);
 			return -1;
 		}
 		/*
@@ -674,7 +686,7 @@ static int symbol_msg_process(receiver_args_t *args, int sock_fd,
 	return 0;
 }
 
-static int symbol_log_process(receiver_args_t *args, int sock_fd)
+static int symbol_log_process(receiver_args_t * args, int sock_fd)
 {
 	FILE *fp = args->log_fp;
 	char rcv_buf[STRING_BUFFER_SIZE];
@@ -683,14 +695,14 @@ static int symbol_log_process(receiver_args_t *args, int sock_fd)
 		return -1;
 	int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
 	if (written_count != n) {
-		jattach_log("%s(%d)\n", strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG "%s(%d)\n", strerror(errno), errno);
 		return -1;
 	}
 	fflush(fp);
 	return 0;
 }
 
-static int epoll_events_process(receiver_args_t *args, int epoll_fd,
+static int epoll_events_process(receiver_args_t * args, int epoll_fd,
 				struct epoll_event *ev, int map_sock,
 				int log_sock,
 				int *map_client, int *log_client,
@@ -699,16 +711,18 @@ static int epoll_events_process(receiver_args_t *args, int epoll_fd,
 	errno = 0;
 	if (ev->data.fd == map_sock) {
 		if ((*map_client = accept(ev->data.fd, NULL, NULL)) < 0) {
-			jattach_log("accept() failed with '%s(%d)'\n",
-				    strerror(errno), errno);
+			ebpf_warning(JAVA_LOG_TAG
+				     "accept() failed with '%s(%d)'\n",
+				     strerror(errno), errno);
 			return -1;
 		}
 		if (add_fd_to_epoll(epoll_fd, *map_client) == -1)
 			return -1;
 	} else if (ev->data.fd == log_sock) {
 		if ((*log_client = accept(ev->data.fd, NULL, NULL)) < 0) {
-			jattach_log("accept() failed with '%s(%d)'\n",
-				    strerror(errno), errno);
+			ebpf_warning(JAVA_LOG_TAG
+				     "accept() failed with '%s(%d)'\n",
+				     strerror(errno), errno);
 			return -1;
 		}
 		if (add_fd_to_epoll(epoll_fd, *log_client) == -1)
@@ -721,8 +735,9 @@ static int epoll_events_process(receiver_args_t *args, int epoll_fd,
 			if (symbol_log_process(args, ev->data.fd))
 				return -1;
 		} else {
-			jattach_log("Unexpected event, event fd %d\n",
-				    ev->data.fd);
+			ebpf_warning(JAVA_LOG_TAG
+				     "Unexpected event, event fd %d\n",
+				     ev->data.fd);
 			return 0;
 		}
 	}
@@ -735,8 +750,9 @@ static void *ipc_receiver_thread(void *arguments)
 	receiver_args_t *args = (receiver_args_t *) arguments;
 
 	if (is_file_opened_by_other_processes(args->opts->perf_map_path) == 1) {
-		jattach_log("File '%s' is opened by another process.\n",
-			    args->opts->perf_map_path);
+		ebpf_warning(JAVA_LOG_TAG
+			     "File '%s' is opened by another process.\n",
+			     args->opts->perf_map_path);
 		return NULL;
 	}
 
@@ -749,14 +765,15 @@ static void *ipc_receiver_thread(void *arguments)
 	if (!map_fp) {
 		// byte stream in socket needs to be consumed to avoid client stuck
 		// even if file open fails
-		jattach_log("fopen() %s failed with '%s(%d)'\n",
-			    args->opts->perf_map_path, strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG "fopen() %s failed with '%s(%d)'\n",
+			     args->opts->perf_map_path, strerror(errno), errno);
 		return NULL;
 	}
 
 	if (is_file_opened_by_other_processes(args->opts->perf_log_path) == 1) {
-		jattach_log("File '%s' is opened by another process.\n",
-			    args->opts->perf_log_path);
+		ebpf_warning(JAVA_LOG_TAG
+			     "File '%s' is opened by another process.\n",
+			     args->opts->perf_log_path);
 		return NULL;
 	}
 
@@ -764,16 +781,16 @@ static void *ipc_receiver_thread(void *arguments)
 	if (!log_fp) {
 		// byte stream in socket needs to be consumed to avoid client stuck
 		// even if file open fails
-		jattach_log("fopen() %s failed with '%s(%d)'\n",
-			    args->opts->perf_log_path, strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG "fopen() %s failed with '%s(%d)'\n",
+			     args->opts->perf_log_path, strerror(errno), errno);
 		return NULL;
 	}
 
 	args->map_fp = map_fp;
 	args->log_fp = log_fp;
 
-	printf("/// mapfile : %s (%p)\n", args->opts->perf_map_path, map_fp);
-	printf("/// logfile : %s (%p)\n", args->opts->perf_log_path, log_fp);
+	ebpf_info(JAVA_LOG_TAG "mapfile : %s\n", args->opts->perf_map_path);
+	ebpf_info(JAVA_LOG_TAG "logfile : %s\n", args->opts->perf_log_path);
 
 	int map_sock = args->map_socket;
 	int log_sock = args->log_socket;
@@ -781,8 +798,9 @@ static void *ipc_receiver_thread(void *arguments)
 	int log_client = -1;
 	int epoll_fd = epoll_create1(0);
 	if (epoll_fd == -1) {
-		jattach_log("epoll_create1() failed with '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "epoll_create1() failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 		goto error;
 	}
 
@@ -799,8 +817,9 @@ static void *ipc_receiver_thread(void *arguments)
 		int n = epoll_wait(epoll_fd, events, MAX_EVENTS,
 				   PROFILER_READER_EPOLL_TIMEOUT);
 		if (n == -1) {
-			jattach_log("epoll_wait() failed with '%s(%d)'\n",
-				    strerror(errno), errno);
+			ebpf_warning(JAVA_LOG_TAG
+				     "epoll_wait() failed with '%s(%d)'\n",
+				     strerror(errno), errno);
 			goto error;
 		}
 
@@ -851,7 +870,8 @@ static bool check_target_jvmti_attach_files(pid_t pid)
 		 "/proc/%d/root/tmp/.java_pid%d", pid, ns_pid);
 	bool hotspot_exist = (access(hotspot_path, F_OK) == 0);
 	if (hotspot_exist) {
-		jattach_log("Java process (PID:%d) is HotSpot JVM.\n", pid);
+		ebpf_info(JAVA_LOG_TAG
+			  "Java process (PID:%d) is HotSpot JVM.\n", pid);
 		return true;
 	}
 	// Check for OpenJ9 JVM dependency file
@@ -859,13 +879,14 @@ static bool check_target_jvmti_attach_files(pid_t pid)
 		 "/proc/%d/root/tmp/.com_ibm_tools_attach/%d", pid, ns_pid);
 	bool openj9_exist = (access(openj9_path, F_OK) == 0);
 	if (openj9_exist) {
-		jattach_log("Java process (PID:%d) is OpenJ9 JVM.\n", pid);
+		ebpf_info(JAVA_LOG_TAG "Java process (PID:%d) is OpenJ9 JVM.\n",
+			  pid);
 		return true;
 	}
 
-	jattach_log("Check HotSpot JVM, file '%s' not exist.\n"
-		    "Check OpenJ9 JVM, file '%s' not exist.\n",
-		    hotspot_path, openj9_path);
+	ebpf_warning(JAVA_LOG_TAG "Check HotSpot JVM, file '%s' not exist.\n"
+		     "Check OpenJ9 JVM, file '%s' not exist.\n",
+		     hotspot_path, openj9_path);
 
 	return false;
 }
@@ -905,9 +926,9 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 	if ((ret =
 	     pthread_create(&ipc_receiver, NULL, &ipc_receiver_thread,
 			    &args)) < 0) {
-		jattach_log
-		    ("Create ipc receiver thread failed with '%s(%d)'\n",
-		     strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG
+			     "Create ipc receiver thread failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 		goto cleanup;
 	}
 
@@ -919,7 +940,8 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 	attach_ret_val = attach(pid, buffer);
 	replay_done = true;
 	if (!check_target_jvmti_attach_files(pid)) {
-		jattach_log("Miss HotSpot/OpenJ9 JVM dependency file.\n");
+		ebpf_warning(JAVA_LOG_TAG
+			     "Miss HotSpot/OpenJ9 JVM dependency file.\n");
 	}
 	pthread_join(ipc_receiver, NULL);
 
@@ -932,12 +954,12 @@ cleanup:
 	}
 	// attach() may change euid/egid, restore them to remove tmp files
 	if (seteuid(getuid()) < 0) {
-		jattach_log("seteuid() failed with '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG "seteuid() failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 	}
 	if (setegid(getgid()) < 0) {
-		jattach_log("seteuid() failed with '%s(%d)'\n",
-			    strerror(errno), errno);
+		ebpf_warning(JAVA_LOG_TAG "seteuid() failed with '%s(%d)'\n",
+			     strerror(errno), errno);
 	}
 
 	if (!is_same_mntns)
@@ -980,13 +1002,15 @@ int java_attach_different_namespace(pid_t pid, options_t * opts)
 	 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
 	 * (for visibility to the target process).
 	 */
-	jattach_log("[PID %d] copy agent so library ...\n", pid);
+	ebpf_info(JAVA_LOG_TAG "[PID %d] copy agent so library ...\n", pid);
 	if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
-		jattach_log("[PID %d] copy agent os library failed.\n", pid);
+		ebpf_warning(JAVA_LOG_TAG
+			     "[PID %d] copy agent os library failed.\n", pid);
 		check_and_clear_target_ns(pid, false);
 		return -1;
 	}
-	jattach_log("[PID %d] copy agent so library success.\n", pid);
+	ebpf_info(JAVA_LOG_TAG "[PID %d] copy agent so library success.\n",
+		  pid);
 
 	/*
 	 * In containers, different libc implementations may be used to compile agent
@@ -998,7 +1022,8 @@ int java_attach_different_namespace(pid_t pid, options_t * opts)
 	select_suitable_agent_lib(pid, false);
 
 	if (strlen(agent_lib_so_path) == 0) {
-		jattach_log("[PID %d] agent_lib_so_path is NULL.\n", pid);
+		ebpf_warning(JAVA_LOG_TAG
+			     "[PID %d] agent_lib_so_path is NULL.\n", pid);
 		check_and_clear_target_ns(pid, false);
 		return -1;
 	}
