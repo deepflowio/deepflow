@@ -120,6 +120,7 @@ func newUpdaterBase[
 		message.MetadataTeamID(u.metadata.GetTeamID()),
 		message.MetadataDomainID(u.metadata.Domain.ID),
 		message.MetadataSubDomainID(u.metadata.SubDomain.ID),
+		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
 	)
 
 	log.Infof(u.metadata.Logf("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata)) // TODO debug
@@ -265,7 +266,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 		msgData := MDPT(new(MDT))
 		msgData.SetLcuuids(lcuuids)
 		msgData.SetMySQLItems(dbItems)
-		u.pubsub.PublishBatchDeleted(u.msgMetadata, msgData, u.dbOperator.GetSoftDelete())
+		u.pubsub.PublishBatchDeleted(u.msgMetadata, msgData)
 		u.Changed = true
 	}
 }
