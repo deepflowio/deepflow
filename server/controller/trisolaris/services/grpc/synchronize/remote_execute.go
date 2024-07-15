@@ -154,6 +154,10 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 			manager.ExecDoneCH <- struct{}{}
 			return
 		}
+		if result.Content == nil {
+			manager.ExecDoneCH <- struct{}{}
+			return
+		}
 
 		// run command error and handle content
 		if result.Content != nil {
