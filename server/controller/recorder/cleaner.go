@@ -499,7 +499,7 @@ func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItem
 	}
 	for _, sub := range tagrecorder.GetSubscriberManager().GetSubscribers(resourceType) {
 		for msgMetadata, dbItems := range msgMetadataToDBItems {
-			sub.OnResourceBatchDeleted(msgMetadata, dbItems, false)
+			sub.OnResourceBatchDeleted(msgMetadata, dbItems)
 		}
 	}
 }
