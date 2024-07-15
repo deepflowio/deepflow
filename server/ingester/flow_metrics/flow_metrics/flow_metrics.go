@@ -75,12 +75,9 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 	flowMetrics.unmarshallers = make([]*unmarshaller.Unmarshaller, unmarshallQueueCount)
 	flowMetrics.platformDatas = make([]*grpc.PlatformInfoTable, unmarshallQueueCount)
 	for i := 0; i < unmarshallQueueCount; i++ {
+		flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable("flowMetrics-" + strconv.Itoa(i))
 		if i == 0 {
-			// 只第一个上报数据节点信息
-			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable("ingester")
 			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_METRIC, flowMetrics.platformDatas[i])
-		} else {
-			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable("flowMetrics-" + strconv.Itoa(i))
 		}
 		if err != nil {
 			return nil, err
