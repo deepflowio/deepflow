@@ -603,7 +603,6 @@ static int update_java_perf_map_file(receiver_args_t *args, char *addr_str)
 {
 	java_unload_addr_str_t java_addr = { 0 };
 	snprintf(java_addr.addr, sizeof(java_addr.addr), "%s", addr_str);
-
 	int ret = VEC_OK;
 	vec_add1(unload_addrs, java_addr, ret);
 	if (ret != VEC_OK) {
@@ -612,11 +611,14 @@ static int update_java_perf_map_file(receiver_args_t *args, char *addr_str)
 
 	if (vec_len(unload_addrs) >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH) {
 		fclose(args->map_fp);
-		if (delete_method_unload_symbol(args) < 0) {
+		int count;
+		if ((count = delete_method_unload_symbol(args)) < 0) {
 			vec_free(unload_addrs);
 			return -1;
 		}
 		vec_free(unload_addrs);
+		//fprintf(stdout, "---- delete count %d\n", count);
+		//fflush(stdout);
 		args->map_fp = fopen(args->opts->perf_map_path, "a");
 		if (!args->map_fp) {
 			jattach_log("fopen() %s failed with '%s(%d)'\n",
@@ -647,9 +649,6 @@ static int symbol_msg_process(receiver_args_t *args, int sock_fd,
 		return -1;
 	rcv_buf[meta.len] = '\0';
 
-	//fprintf(stdout, "> %s", rcv_buf);
-	//fflush(stdout);
-
 	/*
 	 * If the replay is complete and the event type is
 	 * JVMTI_EVENT_COMPILED_METHOD_UNLOAD, the map file
@@ -658,6 +657,8 @@ static int symbol_msg_process(receiver_args_t *args, int sock_fd,
 	if (replay_done && meta.type == METHOD_UNLOAD) {
 		update_java_perf_map_file(args, rcv_buf);
 	} else {
+		//fprintf(stdout, "> %s", rcv_buf);
+		//fflush(stdout);
 		int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
 		if (written_count != n) {
 			jattach_log("%s(%d)\n", strerror(errno), errno);
@@ -835,29 +836,38 @@ error:
 	return NULL;
 }
 
-static bool check_target_jvmti(pid_t pid)
+static bool check_target_jvmti_attach_files(pid_t pid)
 {
 	/*
-	 * Check for the existence of different types of JVM dependency files
-	 * before attaching to prevent exceptions from occurring.
-	 *  hotspot: <target-path>/tmp/.java_pid<target-pid>
-	 *  openj9:  <target-path>/tmp/.com_ibm_tools_attach/<target-pid> 
+	 * After a successful attach, the following files will be generated.
+	 *  HotSpot: <target-path>/tmp/.java_pid<target-pid>
+	 *  OpenJ9:  <target-path>/tmp/.com_ibm_tools_attach/<target-pid> 
 	 */
-	char path[MAX_PATH_LENGTH];
+	char hotspot_path[MAX_PATH_LENGTH], openj9_path[MAX_PATH_LENGTH];
 	pid_t ns_pid = get_nspid(pid);
 
 	// Check for HotSpot JVM dependency file
-	snprintf(path, sizeof(path), "/proc/%d/root/tmp/.java_pid%d", pid,
-		 ns_pid);
-	bool hotspot_exist = (access(path, F_OK) == 0);
-
+	snprintf(hotspot_path, sizeof(hotspot_path),
+		 "/proc/%d/root/tmp/.java_pid%d", pid, ns_pid);
+	bool hotspot_exist = (access(hotspot_path, F_OK) == 0);
+	if (hotspot_exist) {
+		jattach_log("Java process (PID:%d) is HotSpot JVM.\n", pid);
+		return true;
+	}
 	// Check for OpenJ9 JVM dependency file
-	snprintf(path, sizeof(path),
+	snprintf(openj9_path, sizeof(openj9_path),
 		 "/proc/%d/root/tmp/.com_ibm_tools_attach/%d", pid, ns_pid);
-	bool openj9_exist = (access(path, F_OK) == 0);
+	bool openj9_exist = (access(openj9_path, F_OK) == 0);
+	if (openj9_exist) {
+		jattach_log("Java process (PID:%d) is OpenJ9 JVM.\n", pid);
+		return true;
+	}
 
-	// Return true if any of the dependency files exist
-	return hotspot_exist || openj9_exist;
+	jattach_log("Check HotSpot JVM, file '%s' not exist.\n"
+		    "Check OpenJ9 JVM, file '%s' not exist.\n",
+		    hotspot_path, openj9_path);
+
+	return false;
 }
 
 static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
@@ -904,15 +914,13 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 	snprintf(buffer, PERF_PATH_SZ * 2,
 		 PERF_MAP_FILE_FMT "," PERF_MAP_LOG_FILE_FMT, pid, pid);
 
-	if (!check_target_jvmti(pid)) {
-		jattach_log("Miss HotSpot/OpenJ9 JVM dependency file.\n");
-		goto cleanup;
-	}
-
 	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
 	 * library as a JVMTI agent.*/
 	attach_ret_val = attach(pid, buffer);
 	replay_done = true;
+	if (!check_target_jvmti_attach_files(pid)) {
+		jattach_log("Miss HotSpot/OpenJ9 JVM dependency file.\n");
+	}
 	pthread_join(ipc_receiver, NULL);
 
 cleanup:
