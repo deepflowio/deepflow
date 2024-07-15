@@ -734,6 +734,12 @@ func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]inte
 	if fClusterID, ok := filter["cluster_id"]; ok {
 		db = db.Where("cluster_id = ?", fClusterID)
 	}
+	if fTeamID, ok := filter["team_id"]; ok {
+		db = db.Where("team_id = ?", fTeamID)
+	}
+	if fUserID, ok := filter["user_id"]; ok {
+		db = db.Where("user_id = ?", fUserID)
+	}
 	err := db.Not(map[string]interface{}{"team_id": excludeTeamIDs}).Order("created_at DESC").Find(&subDomains).Error
 	if err != nil {
 		return response, err
