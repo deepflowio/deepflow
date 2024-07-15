@@ -36,6 +36,9 @@
 
 #define MAX_EVENTS 4
 
+// Use thread pool to manage threads for obtaining Java symbols.
+symbol_mgmt_thread_pool_t *g_mgmt_pool;
+
 /*
  * Use a dynamic array to store the addresses of 'COMPILED_METHOD_UNLOAD'
  * sent by the Java JVM. This is a per-thread variable, with each thread
@@ -45,8 +48,8 @@ static __thread java_unload_addr_str_t *unload_addrs;
 
 static char agent_lib_so_path[MAX_PATH_LENGTH];
 extern int jattach(int pid, int argc, char **argv);
-static int attach_and_recv_data(pid_t pid, options_t * opts,
-				bool is_same_mntns);
+static int create_symbol_mgmt_task(pid_t pid, options_t * opts,
+				   bool is_same_mntns);
 
 static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 {
@@ -456,7 +459,7 @@ int java_attach_same_namespace(pid_t pid, options_t * opts)
 	if (strlen(agent_lib_so_path) == 0)
 		return -1;
 
-	return attach_and_recv_data(pid, opts, true);
+	return create_symbol_mgmt_task(pid, opts, true);
 }
 
 int create_ipc_socket(const char *path)
@@ -642,8 +645,7 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 	return 0;
 }
 
-static int symbol_msg_process(receiver_args_t * args, int sock_fd,
-			      bool replay_done)
+static int symbol_msg_process(receiver_args_t * args, int sock_fd)
 {
 	FILE *fp = args->map_fp;
 	struct symbol_metadata meta;
@@ -665,7 +667,7 @@ static int symbol_msg_process(receiver_args_t * args, int sock_fd,
 	 * JVMTI_EVENT_COMPILED_METHOD_UNLOAD, the map file
 	 * needs to be updated.
 	 */
-	if (replay_done && meta.type == METHOD_UNLOAD) {
+	if (args->replay_done && meta.type == METHOD_UNLOAD) {
 		update_java_perf_map_file(args, rcv_buf);
 	} else {
 		//fprintf(stdout, "> %s", rcv_buf);
@@ -702,36 +704,33 @@ static int symbol_log_process(receiver_args_t * args, int sock_fd)
 	return 0;
 }
 
-static int epoll_events_process(receiver_args_t * args, int epoll_fd,
-				struct epoll_event *ev, int map_sock,
-				int log_sock,
-				int *map_client, int *log_client,
-				bool replay_done)
+int epoll_events_process(receiver_args_t * args, int epoll_fd,
+			 struct epoll_event *ev)
 {
 	errno = 0;
-	if (ev->data.fd == map_sock) {
-		if ((*map_client = accept(ev->data.fd, NULL, NULL)) < 0) {
+	if (ev->data.fd == args->map_socket) {
+		if ((args->map_client = accept(ev->data.fd, NULL, NULL)) < 0) {
 			ebpf_warning(JAVA_LOG_TAG
 				     "accept() failed with '%s(%d)'\n",
 				     strerror(errno), errno);
 			return -1;
 		}
-		if (add_fd_to_epoll(epoll_fd, *map_client) == -1)
+		if (add_fd_to_epoll(epoll_fd, args->map_client) == -1)
 			return -1;
-	} else if (ev->data.fd == log_sock) {
-		if ((*log_client = accept(ev->data.fd, NULL, NULL)) < 0) {
+	} else if (ev->data.fd == args->log_socket) {
+		if ((args->log_client = accept(ev->data.fd, NULL, NULL)) < 0) {
 			ebpf_warning(JAVA_LOG_TAG
 				     "accept() failed with '%s(%d)'\n",
 				     strerror(errno), errno);
 			return -1;
 		}
-		if (add_fd_to_epoll(epoll_fd, *log_client) == -1)
+		if (add_fd_to_epoll(epoll_fd, args->log_client) == -1)
 			return -1;
 	} else {
-		if (ev->data.fd == *map_client) {
-			if (symbol_msg_process(args, ev->data.fd, replay_done))
+		if (ev->data.fd == args->map_client) {
+			if (symbol_msg_process(args, ev->data.fd))
 				return -1;
-		} else if (ev->data.fd == *log_client) {
+		} else if (ev->data.fd == args->log_client) {
 			if (symbol_log_process(args, ev->data.fd))
 				return -1;
 		} else {
@@ -745,16 +744,60 @@ static int epoll_events_process(receiver_args_t * args, int epoll_fd,
 	return 0;
 }
 
-static void *ipc_receiver_thread(void *arguments)
+static int destroy_task(symbol_mgmt_task_t * task,
+			symbol_mgmt_thread_pool_t * pool)
+{
+	receiver_args_t *args = (receiver_args_t *) & task->args;
+	if (args->map_fp) {
+		fclose(args->map_fp);
+	}
+
+	if (args->log_fp) {
+		fclose(args->log_fp);
+	}
+
+	if (args->map_client > 0)
+		close(args->map_client);
+
+	if (args->log_client > 0)
+		close(args->log_client);
+
+	if (args->map_socket > 0) {
+		close(args->map_socket);
+	}
+
+	if (args->log_socket > 0) {
+		close(args->log_socket);
+	}
+
+	if (args->epoll_fd > 0) {
+		close(args->epoll_fd);
+	}
+	// attach() may change euid/egid, restore them to remove tmp files
+	if (seteuid(getuid()) < 0) {
+		ebpf_warning(JAVA_LOG_TAG "seteuid() failed with '%s(%d)'\n",
+			     strerror(errno), errno);
+	}
+	if (setegid(getgid()) < 0) {
+		ebpf_warning(JAVA_LOG_TAG "seteuid() failed with '%s(%d)'\n",
+			     strerror(errno), errno);
+	}
+
+	if (!task->is_local_mntns)
+		check_and_clear_target_ns(args->pid, false);
+	else
+		check_and_clear_unix_socket_files(args->pid, false);
+
+	ebpf_info(JAVA_LOG_TAG "All resources cleaned up for symbol table"
+		  " management task (associated with JAVA PID: %d).\n",
+		  args->pid);
+	free(task);
+	return 0;
+}
+
+static void *ipc_receiver_main(void *arguments)
 {
 	receiver_args_t *args = (receiver_args_t *) arguments;
-
-	if (is_file_opened_by_other_processes(args->opts->perf_map_path) == 1) {
-		ebpf_warning(JAVA_LOG_TAG
-			     "File '%s' is opened by another process.\n",
-			     args->opts->perf_map_path);
-		return NULL;
-	}
 
 	/*
 	 * If the file already exists, opening it in "w" mode will clear its contents
@@ -767,15 +810,9 @@ static void *ipc_receiver_thread(void *arguments)
 		// even if file open fails
 		ebpf_warning(JAVA_LOG_TAG "fopen() %s failed with '%s(%d)'\n",
 			     args->opts->perf_map_path, strerror(errno), errno);
-		return NULL;
+		goto cleanup;
 	}
-
-	if (is_file_opened_by_other_processes(args->opts->perf_log_path) == 1) {
-		ebpf_warning(JAVA_LOG_TAG
-			     "File '%s' is opened by another process.\n",
-			     args->opts->perf_log_path);
-		return NULL;
-	}
+	args->map_fp = map_fp;
 
 	FILE *log_fp = fopen(args->opts->perf_log_path, "w");
 	if (!log_fp) {
@@ -783,74 +820,107 @@ static void *ipc_receiver_thread(void *arguments)
 		// even if file open fails
 		ebpf_warning(JAVA_LOG_TAG "fopen() %s failed with '%s(%d)'\n",
 			     args->opts->perf_log_path, strerror(errno), errno);
-		return NULL;
+		goto cleanup;
 	}
-
-	args->map_fp = map_fp;
 	args->log_fp = log_fp;
 
 	ebpf_info(JAVA_LOG_TAG "mapfile : %s\n", args->opts->perf_map_path);
 	ebpf_info(JAVA_LOG_TAG "logfile : %s\n", args->opts->perf_log_path);
 
-	int map_sock = args->map_socket;
-	int log_sock = args->log_socket;
-	int map_client = -1;
-	int log_client = -1;
 	int epoll_fd = epoll_create1(0);
 	if (epoll_fd == -1) {
 		ebpf_warning(JAVA_LOG_TAG
 			     "epoll_create1() failed with '%s(%d)'\n",
 			     strerror(errno), errno);
-		goto error;
+		goto cleanup;
+	}
+	args->epoll_fd = epoll_fd;
+
+	if (add_fd_to_epoll(epoll_fd, args->map_socket) == -1) {
+		goto cleanup;
 	}
 
-	if (add_fd_to_epoll(epoll_fd, map_sock) == -1) {
-		goto error;
-	}
-
-	if (add_fd_to_epoll(epoll_fd, log_sock) == -1) {
-		goto error;
+	if (add_fd_to_epoll(epoll_fd, args->log_socket) == -1) {
+		goto cleanup;
 	}
 
 	struct epoll_event events[MAX_EVENTS];
-	while (!*args->attach_ret) {
+	while (args->attach_ret == 0) {
 		int n = epoll_wait(epoll_fd, events, MAX_EVENTS,
 				   PROFILER_READER_EPOLL_TIMEOUT);
 		if (n == -1) {
 			ebpf_warning(JAVA_LOG_TAG
 				     "epoll_wait() failed with '%s(%d)'\n",
 				     strerror(errno), errno);
-			goto error;
+			goto cleanup;
 		}
 
 		for (int i = 0; i < n; ++i) {
 			if (events[i].events & EPOLLIN) {
 				struct epoll_event *ev = &events[i];
 				if (epoll_events_process
-				    (args, epoll_fd, ev, map_sock,
-				     log_sock, &map_client,
-				     &log_client, *args->replay_done) < 0)
-					goto error;
+				    (args, epoll_fd, ev) < 0)
+					goto cleanup;
 			}
 		}
 
 	}
 
-error:
-	if (map_fp) {
-		fclose(map_fp);
-		map_fp = NULL;
-	}
-	if (log_fp) {
-		fclose(log_fp);
-		log_fp = NULL;
-	}
+cleanup:
+	/* Return to worker_thread() to handle unified resource cleanup. */
+	return NULL;
+}
 
-	if (map_client > 0)
-		close(map_client);
+static void *worker_thread(void *arg)
+{
+	symbol_mgmt_thread_pool_t *pool = arg;
+	pthread_t thread = pthread_self();
+	int thread_idx = pool->thread_count - 1;
 
-	if (log_client > 0)
-		close(log_client);
+	while (1) {
+		pthread_mutex_lock(&pool->lock);
+		while (pool->task_count == 0 && !pool->stop) {
+			pthread_cond_wait(&pool->cond, &pool->lock);
+		}
+
+		if (pool->stop && pool->task_count == 0) {
+			pthread_mutex_unlock(&pool->lock);
+			pthread_exit(NULL);
+		}
+
+		if (pool->threads[thread_idx].thread != thread) {
+			if (pool->thread_count > (thread_idx + 1)
+			    && pool->threads[thread_idx + 1].thread == thread) {
+				thread_idx++;
+			} else {
+				pthread_mutex_unlock(&pool->lock);
+				pthread_exit(NULL);
+			}
+		}
+		// Get task from queue
+		symbol_mgmt_task_t *task;
+		task = list_first_entry(&pool->task_list_head,
+					symbol_mgmt_task_t, list);
+		list_head_del(&task->list);
+		pool->task_count--;
+		task->thread = thread;
+		pool->threads[thread_idx].task = task;
+		pthread_mutex_unlock(&pool->lock);
+
+		// Execute task
+		ebpf_info(JAVA_LOG_TAG
+			  "Thread %ld executing task for java processes (PID: %d)\n",
+			  task->thread, task->pid);
+		task->func(&task->args);
+
+		ebpf_info(JAVA_LOG_TAG
+			  "Thread %ld finished task for java processes (PID: %d)\n",
+			  task->thread, task->pid);
+		pthread_mutex_lock(&pool->lock);
+		pool->threads[thread_idx].task = NULL;
+		pthread_mutex_unlock(&pool->lock);
+		destroy_task(task, pool);
+	}
 
 	return NULL;
 }
@@ -891,14 +961,73 @@ static bool check_target_jvmti_attach_files(pid_t pid)
 	return false;
 }
 
-static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
+static int thread_pool_add_task(symbol_mgmt_thread_pool_t * pool,
+				symbol_mgmt_task_t * task)
 {
+	pthread_mutex_lock(&pool->lock);
+	list_add_tail(&task->list, &pool->task_list_head);
+	pool->task_count++;
+	// Wake up threads in the thread pool to execute tasks.
+	pthread_cond_signal(&pool->cond);
+
+	// If there are no threads available in the thread pool,
+	// new threads need to be added to the thread pool.
+	if (pool->task_count > pool->thread_count) {
+		int ret;
+		pthread_t thread;
+
+		if ((ret =
+		     pthread_create(&thread, NULL, &worker_thread, pool)) < 0) {
+			ebpf_warning(JAVA_LOG_TAG
+				     "Create worker thread failed with '%s(%d)'\n",
+				     strerror(errno), errno);
+			pthread_mutex_unlock(&pool->lock);
+			return -2;
+		}
+
+		if (pthread_detach(thread) != 0) {
+			ebpf_warning(JAVA_LOG_TAG
+				     "Failed to detach thread with '%s(%d)'\n",
+				     strerror(errno), errno);
+			pthread_mutex_unlock(&pool->lock);
+			return -1;
+		}
+
+		task_thread_t *new_threads = realloc(pool->threads,
+						     (++pool->thread_count) *
+						     sizeof(task_thread_t));
+		if (new_threads == NULL) {
+			ebpf_warning
+			    (JAVA_LOG_TAG
+			     "Failed to reallocate memory for threads with '%s(%d)'\n",
+			     strerror(errno), errno);
+			pthread_mutex_unlock(&pool->lock);
+			return -1;
+		}
+
+		pool->threads = new_threads;
+		pool->threads[pool->thread_count - 1].task = NULL;
+		pool->threads[pool->thread_count - 1].thread = thread;
+		ebpf_info(JAVA_LOG_TAG
+			  "Created new thread. Current thread count: %d\n",
+			  pool->thread_count);
+	}
+
+	pthread_mutex_unlock(&pool->lock);
+
+	return 0;
+}
+
+static int create_symbol_mgmt_task(pid_t pid, options_t * opts,
+				   bool is_same_mntns)
+{
+	int ret = -1;
+	symbol_mgmt_task_t *task = NULL;
 	int map_socket = -1, log_socket = -1;
 
 	// make the sockets accessable from unprivileged user in container
 	umask(0);
 
-	int ret = -1;
 	char buffer[PERF_PATH_SZ * 2];
 	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_MAP_PATH_FMT, pid, pid);
 
@@ -911,24 +1040,40 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 		goto cleanup;
 	}
 
-	pthread_t ipc_receiver;
-	int attach_ret_val = 0;
-	bool replay_done = false;
-	receiver_args_t args = {
-		.pid = pid,
-		.opts = opts,
-		.map_socket = map_socket,
-		.log_socket = log_socket,
-		.attach_ret = &attach_ret_val,
-		.replay_done = &replay_done,
-	};
-
-	if ((ret =
-	     pthread_create(&ipc_receiver, NULL, &ipc_receiver_thread,
-			    &args)) < 0) {
-		ebpf_warning(JAVA_LOG_TAG
-			     "Create ipc receiver thread failed with '%s(%d)'\n",
+	task = malloc(sizeof(symbol_mgmt_task_t) + sizeof(*opts));
+	if (task == NULL) {
+		ebpf_warning(JAVA_LOG_TAG "malloc() failed, with %s(%d)\n",
 			     strerror(errno), errno);
+		goto cleanup;
+	}
+	memset(task, 0, sizeof(symbol_mgmt_task_t) + sizeof(*opts));
+	task->pid = pid;
+	task->is_local_mntns = is_same_mntns;
+	task->pid_start_time = get_process_starttime_and_comm(pid, NULL, 0);
+	if (task->pid_start_time == 0) {
+		ebpf_warning("The Java process(PID: %d) no longer exists.\n",
+			     pid);
+		goto cleanup;
+	}
+	task->func = ipc_receiver_main;
+	options_t *__opts = (options_t *) (task + 1);
+	*__opts = *opts;
+
+	task->args.pid = pid;
+	task->args.opts = __opts;
+	task->args.map_socket = map_socket;
+	task->args.log_socket = log_socket;
+	task->args.attach_ret = 0;
+	task->args.replay_done = false;
+	task->args.task = task;
+
+	/*
+	 * The thread_pool_add_task() return -2, indicating thread creation
+	 * error, If the thread is successfully created, the resource cleanup
+	 * will be handled by the thread itself upon exit.
+	 */
+	ret = thread_pool_add_task(g_mgmt_pool, task);
+	if (ret == -2) {
 		goto cleanup;
 	}
 
@@ -937,15 +1082,22 @@ static int attach_and_recv_data(pid_t pid, options_t * opts, bool is_same_mntns)
 
 	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
 	 * library as a JVMTI agent.*/
-	attach_ret_val = attach(pid, buffer);
-	replay_done = true;
+	ret = attach(pid, buffer);
+	task->args.replay_done = true;
+	task->args.attach_ret = ret;
+	CLIB_MEMORY_STORE_BARRIER();
+
 	if (!check_target_jvmti_attach_files(pid)) {
 		ebpf_warning(JAVA_LOG_TAG
 			     "Miss HotSpot/OpenJ9 JVM dependency file.\n");
 	}
-	pthread_join(ipc_receiver, NULL);
+
+	return ret;
 
 cleanup:
+	if (task)
+		free(task);
+
 	if (map_socket >= 0) {
 		close(map_socket);
 	}
@@ -1028,13 +1180,75 @@ int java_attach_different_namespace(pid_t pid, options_t * opts)
 		return -1;
 	}
 
-	return attach_and_recv_data(pid, opts, false);
+	return create_symbol_mgmt_task(pid, opts, false);
 }
 
-int java_attach(pid_t pid, char *opts)
+static int symbol_mgmt_thread_pool_init(void)
 {
+	symbol_mgmt_thread_pool_t *pool =
+	    malloc(sizeof(symbol_mgmt_thread_pool_t));
+	if (pool == NULL) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "Failed to allocate memory for thread pool\n");
+		return -1;
+	}
+
+	if (pthread_mutex_init(&pool->lock, NULL) != 0) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "Failed to initialize mutex, %s(%d)\n",
+			     strerror(errno), errno);
+		free(pool);
+		return -1;
+	}
+
+	if (pthread_cond_init(&pool->cond, NULL) != 0) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "Failed to initialize cond, %s(%d)\n",
+			     strerror(errno), errno);
+		free(pool);
+		return -1;
+	}
+
+	pool->task_count = 0;
+	pool->thread_count = 0;	// Initial thread count is 0
+	pool->threads = NULL;	// Initial thread array is empty
+	pool->stop = 0;
+	init_list_head(&pool->task_list_head);
+	g_mgmt_pool = pool;
+
+	return 0;
+}
+
+static symbol_mgmt_task_t *get_task_by_pid(pid_t pid)
+{
+	if (g_mgmt_pool == NULL)
+		return NULL;
+
+	symbol_mgmt_task_t *task = NULL;
+	pthread_mutex_lock(&g_mgmt_pool->lock);
+	for (int i = 0; i < g_mgmt_pool->thread_count; i++) {
+		if (g_mgmt_pool->threads[i].task == NULL)
+			continue;
+		if (g_mgmt_pool->threads[i].task->pid == pid) {
+			task = g_mgmt_pool->threads[i].task;
+			break;
+		}
+	}
+	pthread_mutex_unlock(&g_mgmt_pool->lock);
+
+	return task;
+}
+
+int java_attach(pid_t pid, const char *opts)
+{
+	// Initialize a thread pool for managing Java symbols.
+	if (g_mgmt_pool == NULL) {
+		if (symbol_mgmt_thread_pool_init())
+			return -1;
+	}
+
 	options_t parsed_opts;
-	if (parse_config(opts, &parsed_opts) != 0) {
+	if (parse_config((char *)opts, &parsed_opts) != 0) {
 		return -1;
 	}
 
@@ -1045,16 +1259,52 @@ int java_attach(pid_t pid, char *opts)
 	}
 }
 
+int update_java_symbol_table(pid_t pid)
+{
+	char opts[PERF_PATH_SZ * 2];
+	snprintf(opts, sizeof(opts),
+		 DF_AGENT_LOCAL_PATH_FMT ".map,"
+		 DF_AGENT_LOCAL_PATH_FMT ".log", pid, pid);
+
+	symbol_mgmt_task_t *task = get_task_by_pid(pid);
+	if (task == NULL) {
+		return java_attach(pid, opts);
+	}
+
+	u64 start_time = get_process_starttime_and_comm(pid, NULL, 0);
+	if (start_time == 0) {
+		ebpf_warning("The Java process(PID: %d) no longer exists.\n",
+			     pid);
+		task->args.attach_ret = -1;	// Force the thread to exit the task it is executing. 
+		return -1;
+	}
+	// The task is stale and needs to be cleaned up.
+	if (task->pid_start_time != start_time) {
+		task->args.attach_ret = -1;
+		return java_attach(pid, opts);
+	}
+
+	return 0;
+}
+
 #ifdef JAVA_AGENT_ATTACH_TOOL
+/*
+ * Command-line execution, for example:
+ * cp ./df_java_agent_v2.so /tmp/
+ * ./deepflow-jattach $PID
+ */
 int main(int argc, char **argv)
 {
-	if (argc != 3) {
-		fprintf(stderr, "Usage: %s <pid> <opts>\n", argv[0]);
+	if (argc != 2) {
+		fprintf(stderr, "Usage: %s <pid>\n", argv[0]);
 		return -1;
 	}
 
 	log_to_stdout = true;
 	int pid = atoi(argv[1]);
-	return java_attach(pid, argv[2]);
+	update_java_symbol_table(pid);
+	for (;;)
+		sleep(1);
+	return 0;
 }
 #endif /* JAVA_AGENT_ATTACH_TOOL */

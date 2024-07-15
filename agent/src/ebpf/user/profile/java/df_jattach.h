@@ -40,16 +40,46 @@ typedef struct options {
 	char perf_log_path[PERF_PATH_SZ];
 } options_t;
 
+typedef struct task_s symbol_mgmt_task_t;
 typedef struct receiver_args {
 	pid_t pid;
 	options_t *opts;
 	int map_socket;
 	int log_socket;
+	int map_client;
+	int log_client;
+	int epoll_fd;
 	FILE *map_fp;
 	FILE *log_fp;
-	int *attach_ret;
-	bool *replay_done;
+	volatile int attach_ret;
+	volatile bool replay_done;
+	symbol_mgmt_task_t *task;
 } receiver_args_t;
+
+struct task_s {
+	struct list_head list;
+	pid_t pid;
+	bool is_local_mntns;
+	u64 pid_start_time;
+	pthread_t thread;
+	void *(*func) (void *);	// task entry function
+	receiver_args_t args;
+};
+
+typedef struct {
+	pthread_t thread;
+	symbol_mgmt_task_t *task;
+} task_thread_t;
+
+typedef struct {
+	task_thread_t *threads;
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+	struct list_head task_list_head;
+	int task_count;
+	int thread_count;
+	int stop;
+} symbol_mgmt_thread_pool_t;
 
 void clear_target_ns_tmp_file(const char *target_path);
 int check_and_clear_target_ns(int pid, bool check_in_use);
