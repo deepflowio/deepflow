@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Resolve cover show metrics use query cache can be configured problem [#7405](https://github.com/deepflowio/deepflow/pull/7405) by [duandaa](https://github.com/duandaa)
+* fix: lo interface eBPF data needs to use Agent info to match resources [#7404](https://github.com/deepflowio/deepflow/pull/7404) by [lzf575](https://github.com/lzf575)
+* fix: deepflow-server may panic when updating platform information [#7400](https://github.com/deepflowio/deepflow/pull/7400) by [lzf575](https://github.com/lzf575)
+* fix: Add return processing to agent command [#7396](https://github.com/deepflowio/deepflow/pull/7396) by [roryye](https://github.com/roryye)
 * fix: Fix windows compilation [#7389](https://github.com/deepflowio/deepflow/pull/7389) by [rvql](https://github.com/rvql)
 * fix: handle agent command content when error occurs [#7381](https://github.com/deepflowio/deepflow/pull/7381) by [roryye](https://github.com/roryye)
 * fix: Optimized error message #25736 [#7380](https://github.com/deepflowio/deepflow/pull/7380) by [Ericsssss](https://github.com/Ericsssss)
@@ -62,6 +66,9 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: sub domain support filter user id [#7406](https://github.com/deepflowio/deepflow/pull/7406) by [askyrie](https://github.com/askyrie)
+* feat: controller recorder updates updated_at field when soft deleted data is recreated [#7376](https://github.com/deepflowio/deepflow/pull/7376) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: controller supports syncronizing clickhouse data from proxysql [#7354](https://github.com/deepflowio/deepflow/pull/7354) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Modify tracemap url [#7391](https://github.com/deepflowio/deepflow/pull/7391) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Tracemap add header [#7386](https://github.com/deepflowio/deepflow/pull/7386) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Allow overriding remote exec cmdline with async function [#7383](https://github.com/deepflowio/deepflow/pull/7383) by [rvql](https://github.com/rvql)
@@ -110,6 +117,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: Ingester add default value config [#7395](https://github.com/deepflowio/deepflow/pull/7395) by [lzf575](https://github.com/lzf575)
 * refactor: modify the type of TraceTreeEnabled field [#7378](https://github.com/deepflowio/deepflow/pull/7378) by [lzf575](https://github.com/lzf575)
 * refactor: rename package name [#7344](https://github.com/deepflowio/deepflow/pull/7344) by [taloric](https://github.com/taloric)
 * refactor: move trace-map dir path [#7343](https://github.com/deepflowio/deepflow/pull/7343) by [taloric](https://github.com/taloric)
