@@ -27,6 +27,11 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
 
 use super::mirror_mode_dispatcher::{
     get_key as mirror_get_key, handler as mirror_handler, swap_last_timestamp,
@@ -286,6 +291,8 @@ impl MirrorPlusModeDispatcher {
         let trident_type = self.trident_type.clone();
         let local_vm_mac_set = self.local_vm_mac_set.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut dedup = PacketDedupMap::new();
 
         self.flow_generator_thread_handler.replace(
@@ -307,6 +314,13 @@ impl MirrorPlusModeDispatcher {
                     );
                     let mut pipelines = HashMap::new();
                     let mut last_timestamp_array = vec![];
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    if cpu_set != CpuSet::new() {
+                        if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+                        }
+                    }
+
                     while !terminated.load(Ordering::Relaxed) {
                         let config = Config {
                             flow: &flow_map_config.load(),
@@ -462,7 +476,12 @@ impl MirrorPlusModeDispatcher {
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let id = base.id;
         let mut allocator = Allocator::new(self.raw_packet_block_size);
-
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+        }
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();

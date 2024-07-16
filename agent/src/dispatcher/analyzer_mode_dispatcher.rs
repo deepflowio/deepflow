@@ -25,6 +25,11 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
 use packet_dedup::PacketDedupMap;
 
 use super::base_dispatcher::BaseDispatcher;
@@ -265,6 +270,8 @@ impl AnalyzerModeDispatcher {
         let collector_config = base.collector_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
 
         self.flow_generator_thread_handler.replace(
             thread::Builder::new()
@@ -285,6 +292,12 @@ impl AnalyzerModeDispatcher {
                         stats,
                         false, // !from_ebpf
                     );
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    if cpu_set != CpuSet::new() {
+                        if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+                        }
+                    }
 
                     while !terminated.load(Ordering::Relaxed) {
                         let config = Config {
@@ -436,6 +449,8 @@ impl AnalyzerModeDispatcher {
         let terminated = base.terminated.clone();
         let handler_builder = self.base.handler_builder.clone();
         let id = base.id;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
 
         self.pipeline_thread_handler.replace(
             thread::Builder::new()
@@ -443,6 +458,13 @@ impl AnalyzerModeDispatcher {
                 .spawn(move || {
                     let mut tap_pipelines: HashMap<TapType, AnalyzerPipeline> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    if cpu_set != CpuSet::new() {
+                        if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+                        }
+                    }
+
                     while !terminated.load(Ordering::Relaxed) {
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
@@ -528,6 +550,14 @@ impl AnalyzerModeDispatcher {
         let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let mut allocator = Allocator::new(self.raw_packet_block_size);
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if cpu_set != CpuSet::new() {
+            if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+            }
+        }
 
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
