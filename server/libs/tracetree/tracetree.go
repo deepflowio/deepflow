@@ -145,6 +145,9 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		return fmt.Errorf("trace tree data version is %d expect version is %d", version, TRACE_TREE_VERSION)
 	}
 	spanCount := int(decoder.ReadU16())
+	if cap(t.SpanInfos) < spanCount {
+		t.SpanInfos = make([]SpanInfo, 0, spanCount)
+	}
 	for i := 0; i < spanCount; i++ {
 		s := SpanInfo{}
 		s.AutoServiceType0 = decoder.ReadU8()
