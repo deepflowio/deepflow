@@ -620,9 +620,6 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 		},
 		Values: []interface{}{},
 	}
-	if table == ckcommon.TABLE_NAME_TRACE_TREE {
-		return
-	}
 	for _, key := range TAG_DESCRIPTION_KEYS {
 		if key.DB != db || (key.Table != table && !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROMETHEUS}, db)) {
 			continue
@@ -682,7 +679,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		Values: []interface{}{},
 	}
 
-	if table == "alarm_event" || table == ckcommon.TABLE_NAME_TRACE_TREE {
+	if table == "alarm_event" {
 		return response, nil
 	}
 	// 查询 k8s_label

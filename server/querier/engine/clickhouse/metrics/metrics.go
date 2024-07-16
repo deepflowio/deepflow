@@ -206,7 +206,9 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	// time is not a metric
 	// flow_tag database has no metrics
-	if field == "time" || db == ckcommon.DB_NAME_FLOW_TAG {
+	// trace_tree table has no metrics
+	// span_with_trace_id table has no metrics
+	if field == "time" || db == ckcommon.DB_NAME_FLOW_TAG || slices.Contains([]string{ckcommon.TABLE_NAME_TRACE_TREE, ckcommon.TABLE_NAME_SPAN_WITH_TRACE_ID}, table) {
 		return nil, false
 	}
 	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG}, db) || table == "l7_flow_log" {
