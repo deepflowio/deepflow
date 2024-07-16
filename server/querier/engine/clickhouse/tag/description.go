@@ -611,9 +611,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
-	// 把`1m`的反引号去掉
-	table = strings.Trim(table, "`")
+// Get static tags
+func GetStaticTagDescriptions(db, table string) (response *common.Result, err error) {
 	response = &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
@@ -621,7 +620,9 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		},
 		Values: []interface{}{},
 	}
-
+	if table == ckcommon.TABLE_NAME_TRACE_TREE {
+		return
+	}
 	for _, key := range TAG_DESCRIPTION_KEYS {
 		if key.DB != db || (key.Table != table && !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROMETHEUS}, db)) {
 			continue
@@ -637,6 +638,51 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	}
 
 	if table == "alarm_event" {
+		return
+	}
+
+	// auto_custom_tag
+	if len(config.Cfg.AutoCustomTags) != 0 {
+		for _, AutoCustomTag := range config.Cfg.AutoCustomTags {
+			tagName := AutoCustomTag.TagName
+			tagDisplayName := tagName
+			if AutoCustomTag.DisplayName != "" {
+				tagDisplayName = AutoCustomTag.DisplayName
+			}
+			if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
+				response.Values = append(response.Values, []interface{}{
+					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
+				})
+			} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
+				response.Values = append(response.Values, []interface{}{
+					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
+					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
+				})
+			}
+		}
+	}
+
+	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
+		response.Values = append(response.Values, []interface{}{
+			"tag", "tag", "tag", "tag", "map",
+			"Native Tag", []string{}, []bool{true, true, true}, "tag", "", false, []string{}, "",
+		})
+	}
+	return
+}
+
+// Get dynamic tags
+func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
+	response = &common.Result{
+		Columns: []interface{}{
+			"name", "client_name", "server_name", "display_name", "type", "category",
+			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+		},
+		Values: []interface{}{},
+	}
+
+	if table == "alarm_event" || table == ckcommon.TABLE_NAME_TRACE_TREE {
 		return response, nil
 	}
 	// 查询 k8s_label
@@ -652,7 +698,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	chClient.Debug = client.NewDebug(k8sLabelSql)
 	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
-		return nil, err
+		return
 	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
@@ -683,7 +729,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 		ORGID:         orgID,
 	})
 	if err != nil {
-		return nil, err
+		return
 	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
@@ -710,7 +756,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	podK8senvRst, err := chClient.DoQuery(&client.QueryParams{
 		Sql: podK8senvSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
-		return nil, err
+		return
 	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
@@ -736,7 +782,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	chClient.Debug = client.NewDebug(cloudTagSql)
 	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
-		return nil, err
+		return
 	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
@@ -762,7 +808,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	chClient.Debug = client.NewDebug(osAPPTagSql)
 	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
-		return nil, err
+		return
 	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
@@ -782,28 +828,6 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 			})
 		}
 
-	}
-
-	// auto_custom_tag
-	if len(config.Cfg.AutoCustomTags) != 0 {
-		for _, AutoCustomTag := range config.Cfg.AutoCustomTags {
-			tagName := AutoCustomTag.TagName
-			tagDisplayName := tagName
-			if AutoCustomTag.DisplayName != "" {
-				tagDisplayName = AutoCustomTag.DisplayName
-			}
-			if db == ckcommon.DB_NAME_EXT_METRICS || db == ckcommon.DB_NAME_EVENT || db == ckcommon.DB_NAME_PROFILE || db == ckcommon.DB_NAME_PROMETHEUS || table == "vtap_flow_port" || table == "vtap_app_port" {
-				response.Values = append(response.Values, []interface{}{
-					tagName, tagName, tagName, tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
-				})
-			} else if !slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) && table != "traffic_policy" && table != "l4_packet" && table != "l7_packet" {
-				response.Values = append(response.Values, []interface{}{
-					tagName, tagName + "_0", tagName + "_1", tagDisplayName, "auto_custom_tag",
-					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
-				})
-			}
-		}
 	}
 
 	// 查询外部字段
@@ -858,7 +882,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	externalChClient.Debug = client.NewDebug(externalSql)
 	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
-		return nil, err
+		return
 	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *externalChClient.Debug)
@@ -886,13 +910,31 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 			})
 		}
 	}
-	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}, db) {
-		response.Values = append(response.Values, []interface{}{
-			"tag", "tag", "tag", "tag", "map",
-			"Native Tag", []string{}, []bool{true, true, true}, "tag", "", false, []string{}, "",
-		})
+	return
+}
+
+func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
+	// 把`1m`的反引号去掉
+	table = strings.Trim(table, "`")
+	response = &common.Result{
+		Columns: []interface{}{
+			"name", "client_name", "server_name", "display_name", "type", "category",
+			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+		},
+		Values: []interface{}{},
 	}
-	return response, nil
+
+	staticResponse, err := GetStaticTagDescriptions(db, table)
+	if err != nil {
+		return
+	}
+	DynamicResponse, err := GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)
+	if err != nil {
+		return
+	}
+	response.Values = append(response.Values, staticResponse.Values...)
+	response.Values = append(response.Values, DynamicResponse.Values...)
+	return
 }
 
 func GetTagValuesDescriptions(db, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (sqlList []string, err error) {
