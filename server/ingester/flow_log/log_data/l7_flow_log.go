@@ -370,7 +370,7 @@ func base64ToHexString(str string) string {
 var lastTraceIdIndex uint64
 
 func parseTraceIdIndex(traceId string, traceIdIndexCfg *config.TraceIdWithIndex) uint64 {
-	if !traceIdIndexCfg.Enabled {
+	if traceIdIndexCfg.Disabled {
 		return 0
 	}
 	if len(traceId) == 0 {

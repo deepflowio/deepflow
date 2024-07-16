@@ -40,7 +40,7 @@ func (t *SpanWithTraceID) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(t.Time)
 	block.Write(
 		t.TraceId,
-		tracetree.HashSearchIndex(t.TraceId),
+		t.TraceIdIndex,
 		utils.String(t.EncodedSpan),
 	)
 }
