@@ -79,3 +79,4 @@ RUN source /opt/rh/devtoolset-8/enable && \
     cargo install sccache
 
 CMD bash
+
