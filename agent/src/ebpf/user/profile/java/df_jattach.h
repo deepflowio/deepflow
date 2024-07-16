@@ -81,6 +81,7 @@ typedef struct {
 	int stop;
 } symbol_mgmt_thread_pool_t;
 
+int update_java_symbol_table(pid_t pid);
 void clear_target_ns_tmp_file(const char *target_path);
 int check_and_clear_target_ns(int pid, bool check_in_use);
 void clear_target_ns_so(int pid, int target_ns_pid);

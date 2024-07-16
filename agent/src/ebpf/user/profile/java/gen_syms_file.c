@@ -59,16 +59,9 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 		return;
 	}
 
-	char args[PERF_PATH_SZ * 2];
-	snprintf(args, sizeof(args),
-		 "%d " DF_AGENT_LOCAL_PATH_FMT ".map,"
-		 DF_AGENT_LOCAL_PATH_FMT ".log", pid,
-		 pid, pid);
-
-	char ret_buf[1024];
-	memset(ret_buf, 0, sizeof(ret_buf));
 	u64 start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-	exec_command(DF_JAVA_ATTACH_CMD, args, ret_buf, sizeof(ret_buf));
+	if (update_java_symbol_table(pid))
+		goto error;
 	u64 end_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 
 	if (target_symbol_file_access(pid, target_ns_pid) != 0) {
@@ -80,18 +73,15 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
 		goto error;
 	}
 
-	fprintf(stdout, "%s\n", ret_buf);
 	ebpf_info("Refreshing JAVA symbol file: " DF_AGENT_LOCAL_PATH_FMT
 		  ".map, PID %d, size %ld, cost %lu us",
 		  pid, pid, new_file_sz, (end_time - start_time) / 1000ULL);
 
 	*ret_val = JAVA_SYMS_NEED_UPDATE;
-	fflush(stdout);
 	return;
 error:
 	*ret_val = JAVA_SYMS_ERR;
-	ebpf_warning("Generate Java symbol files failed. PID %d\n%s\n", pid,
-		     ret_buf);
+	ebpf_warning("Generate Java symbol files failed. PID %d\n\n", pid);
 }
 
 void clean_local_java_symbols_files(int pid)

@@ -97,6 +97,7 @@ fn set_build_libtrace() -> Result<(), Box<dyn Error>> {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let library_dir = dunce::canonicalize(root.join("src/ebpf/"))?;
     println!("cargo:rustc-link-lib=static={}", library_name);
+    println!("cargo:rustc-link-lib=static=jattach");
     println!(
         "cargo:rustc-link-search=native={}",
         env::join_paths(&[library_dir])?.to_str().unwrap()

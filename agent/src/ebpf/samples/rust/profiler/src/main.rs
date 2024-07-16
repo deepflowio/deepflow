@@ -173,9 +173,9 @@ fn main() {
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
             64, /* Number of page frames occupied by kernel-shared memory, must be a power of 2. Used for perf data transfer */
             65536, /* Size of the circular buffer queue, must be a power of 2. e.g: 2, 4, 8, 16, 32, 64, 128 */
-            524288, /* Maximum number of hash table entries for socket tracing, depends on the actual number of concurrent requests in the scenario */
-            524288, /* Maximum number of hash table entries for thread/coroutine tracing sessions */
-            520000, /* Maximum threshold for cleaning socket map entries. If the current number of map entries exceeds this value, map cleaning operation is performed */
+            131072, /* Maximum number of hash table entries for socket tracing, depends on the actual number of concurrent requests in the scenario */
+            131072, /* Maximum number of hash table entries for thread/coroutine tracing sessions */
+            120000, /* Maximum threshold for cleaning socket map entries. If the current number of map entries exceeds this value, map cleaning operation is performed */
         ) != 0
         {
             println!("running_socket_tracer() error.");
@@ -184,7 +184,7 @@ fn main() {
 
         // Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
-        if start_continuous_profiler(97, 300, continuous_profiler_callback) != 0 {
+        if start_continuous_profiler(97, 60, continuous_profiler_callback) != 0 {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
