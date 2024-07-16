@@ -66,6 +66,11 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Get metrics ignore certain databases [#7427](https://github.com/deepflowio/deepflow/pull/7427) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: Get metrics ignore time [#7425](https://github.com/deepflowio/deepflow/pull/7425) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: agent - dispatcher support set cpu affinity [#7424](https://github.com/deepflowio/deepflow/pull/7424) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: create sub domian set default team id [#7420](https://github.com/deepflowio/deepflow/pull/7420) by [askyrie](https://github.com/askyrie)
+* feat: Optimize get metrics performance [#7419](https://github.com/deepflowio/deepflow/pull/7419) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: sub domain support filter user id [#7406](https://github.com/deepflowio/deepflow/pull/7406) by [askyrie](https://github.com/askyrie)
 * feat: controller recorder updates updated_at field when soft deleted data is recreated [#7376](https://github.com/deepflowio/deepflow/pull/7376) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: controller supports syncronizing clickhouse data from proxysql [#7354](https://github.com/deepflowio/deepflow/pull/7354) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -117,6 +122,8 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: trace_tree add topic field [#7418](https://github.com/deepflowio/deepflow/pull/7418) by [lzf575](https://github.com/lzf575)
+* refactor: trace-id-with-index is enabled by default and the type is hash [#7416](https://github.com/deepflowio/deepflow/pull/7416) by [lzf575](https://github.com/lzf575)
 * refactor: Ingester add default value config [#7395](https://github.com/deepflowio/deepflow/pull/7395) by [lzf575](https://github.com/lzf575)
 * refactor: modify the type of TraceTreeEnabled field [#7378](https://github.com/deepflowio/deepflow/pull/7378) by [lzf575](https://github.com/lzf575)
 * refactor: rename package name [#7344](https://github.com/deepflowio/deepflow/pull/7344) by [taloric](https://github.com/taloric)
@@ -126,6 +133,8 @@
 * refactor: Change crate name [#7155](https://github.com/deepflowio/deepflow/pull/7155) by [rvql](https://github.com/rvql)
 
 #### Performance
+* perf: optimize trace_tree slice assignment [#7414](https://github.com/deepflowio/deepflow/pull/7414) by [lzf575](https://github.com/lzf575)
+* perf: improve trace_tree search index [#7413](https://github.com/deepflowio/deepflow/pull/7413) by [lzf575](https://github.com/lzf575)
 * perf: add setting ttl_only_drop_parts to the CK table to make TTL more efficient [#7265](https://github.com/deepflowio/deepflow/pull/7265) by [lzf575](https://github.com/lzf575)
 * perf: improve parsing RequestResource from http.url of OTel data [#7172](https://github.com/deepflowio/deepflow/pull/7172) by [lzf575](https://github.com/lzf575)
 
