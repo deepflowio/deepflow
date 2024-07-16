@@ -36,7 +36,7 @@ func GenTraceTreeCKTable(cluster, storagePolicy string, ttl int, coldStorage *ck
 	table := TRACE_TREE_TABLE
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"trace_id", "time", "search_index"}
+	orderKeys := []string{"search_index", "time"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
