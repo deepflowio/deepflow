@@ -1022,17 +1022,23 @@ int df_enter_ns(int pid, const char *type, int *self_fd)
 			int newns;
 			newns = open(path, O_RDONLY);
 			if (newns < 0) {
+				ebpf_warning("open() failed with %s(%d)\n",
+					     strerror(errno), errno);
 				return -1;
 			}
 
 			*self_fd = open(selfpath, O_RDONLY);
 			if (*self_fd < 0) {
+				ebpf_warning("open() failed with %s(%d)\n",
+					     strerror(errno), errno);
 				return -1;
 			}
 			// Some ancient Linux distributions do not have setns() function
 			int result = syscall(__NR_setns, newns, 0);
 			close(newns);
 			if (result < 0) {
+				ebpf_warning("setns() failed with %s(%d)\n",
+					     strerror(errno), errno);
 				close(*self_fd);
 				*self_fd = -1;
 			}

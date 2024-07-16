@@ -118,7 +118,15 @@ jint df_open_socket(const char *path, int *ptr)
 		fprintf(stderr, "Call socket() failed: errno(%d)\n", errno);
 		return JNI_ERR;
 	}
-	// Set to non-blocking mode to prevent Java threads from being blocked.
+
+	/*
+	 * The reason for setting non-blocking mode:
+	 * 1 To prevent Java threads from being blocked.
+	 * 2 When attempts to write data to a closed writing port of a pipe or
+         *   socket, the operating system detects this situation and sends the
+	 *   SIGPIPE signal to Java process, which causes the program to exit.
+	 *   Use non-blocking mode to avoid this issue.
+         */
 	int flags = fcntl(s, F_GETFL, 0);
 	if (flags == -1) {
 		fprintf(stderr, "Call fcntl() get failed: errno(%d)\n", errno);
