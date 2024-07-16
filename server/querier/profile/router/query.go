@@ -29,7 +29,6 @@ import (
 
 func ProfileRouter(e *gin.Engine, cfg *config.QuerierConfig) {
 	e.POST("/v1/profile/ProfileTracing", profileTracing(cfg))
-
 }
 
 func profileTracing(cfg *config.QuerierConfig) gin.HandlerFunc {
