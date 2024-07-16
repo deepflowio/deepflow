@@ -239,14 +239,27 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	}
 
 	// tag metrics
-	tagDescriptions, err := tag.GetTagDescriptions(db, table, "", "", orgID, true, context.Background())
+	// Static tag metrics
+	staticTagDescriptions, err := tag.GetStaticTagDescriptions(db, table)
 	if err != nil {
-		log.Error("Failed to get tag type metrics")
+		log.Error("Failed to get tag type static metrics")
 		return nil, false
 	}
-	GetTagTypeMetrics(tagDescriptions, newAllMetrics, db, table, orgID)
+	GetTagTypeMetrics(staticTagDescriptions, newAllMetrics, db, table, orgID)
 	metric, ok := newAllMetrics[field]
-	return metric, ok
+	if ok {
+		return metric, ok
+	} else {
+		// Dynamic tag metrics
+		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background(), nil)
+		if err != nil {
+			log.Error("Failed to get tag type dynamic metrics")
+			return nil, false
+		}
+		GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
+		metric, ok := newAllMetrics[field]
+		return metric, ok
+	}
 }
 
 func GetMetricsByDBTableStatic(db string, table string, where string) (map[string]*Metrics, error) {
