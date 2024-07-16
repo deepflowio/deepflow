@@ -568,9 +568,7 @@ func GetTagDBField(name, db, table string) (string, error) {
 			if strings.HasPrefix(name, "tag.") {
 				if db == ckcommon.DB_NAME_PROMETHEUS {
 					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table)
-					if err != nil {
-						return tagTranslatorStr, err
-					}
+					return tagTranslatorStr, err
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
