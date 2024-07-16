@@ -2981,10 +2981,11 @@ fn build_dispatchers(
             libpcap_enabled: yaml_config.libpcap_enabled,
             snap_len: dispatcher_config.capture_packet_size as usize,
             dpdk_enabled: dispatcher_config.dpdk_enabled,
-            dpdk_core_list: dispatcher_config.dpdk_core_list.clone(),
             dispatcher_queue: dispatcher_config.dispatcher_queue,
             packet_fanout_mode: yaml_config.packet_fanout_mode,
             vhost_socket_path: yaml_config.vhost_socket_path.clone(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            cpu_set: dispatcher_config.cpu_set,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
