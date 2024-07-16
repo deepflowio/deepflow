@@ -332,7 +332,7 @@ type DomainCreate struct {
 	Name                string                 `json:"NAME" binding:"required"`
 	Type                int                    `json:"TYPE" binding:"required"`
 	TeamID              int                    `json:"TEAM_ID"`
-	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
+	KubernetesClusterID string                 `json:"CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required
 	Config              map[string]interface{} `json:"CONFIG"`
@@ -367,10 +367,11 @@ type SubDomain struct {
 }
 
 type SubDomainCreate struct {
-	Name   string                 `json:"NAME" binding:"required"`
-	TeamID int                    `json:"TEAM_ID"`
-	Config map[string]interface{} `json:"CONFIG" binding:"required"`
-	Domain string                 `json:"DOMAIN" binding:"required"`
+	Domain    string                 `json:"DOMAIN" binding:"required"`
+	Name      string                 `json:"NAME" binding:"required"`
+	ClusterID string                 `json:"CLUSTER_ID"`
+	TeamID    int                    `json:"TEAM_ID"`
+	Config    map[string]interface{} `json:"CONFIG" binding:"required"`
 }
 
 type SubDomainUpdate struct {
