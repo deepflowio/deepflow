@@ -25,6 +25,11 @@ use std::time::Duration;
 
 use arc_swap::access::Access;
 use log::{debug, info, log_enabled, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
 use regex::Regex;
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
@@ -63,7 +68,14 @@ impl LocalModeDispatcher {
         info!("Start dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
-
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if cpu_set != CpuSet::new() {
+            if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+            }
+        }
         let mut flow_map = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),

@@ -28,6 +28,11 @@ use std::time::Duration;
 
 use arc_swap::access::Access;
 use log::{debug, info, log_enabled, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
 use super::error::Result;
@@ -110,6 +115,8 @@ impl LocalPlusModeDispatcher {
         let ctrl_mac = base.ctrl_mac;
         let pool_raw_size = self.pool_raw_size;
         let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
 
         self.flow_generator_thread_handler.replace(
             thread::Builder::new()
@@ -129,6 +136,12 @@ impl LocalPlusModeDispatcher {
                         stats,
                         false, // !from_ebpf
                     );
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    if cpu_set != CpuSet::new() {
+                        if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+                        }
+                    }
 
                     while !terminated.load(Ordering::Relaxed) {
                         let config = Config {

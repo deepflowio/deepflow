@@ -38,6 +38,8 @@ use std::{
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use log::error;
 use log::{debug, info, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::sched::CpuSet;
 use packet_dedup::*;
 use public::debug::QueueDebugger;
 #[cfg(target_os = "linux")]
@@ -555,7 +557,6 @@ pub struct Options {
     pub snap_len: usize,
     pub tap_mode: TapMode,
     pub dpdk_enabled: bool,
-    pub dpdk_core_list: String,
     pub libpcap_enabled: bool,
     pub dispatcher_queue: bool,
     pub packet_fanout_mode: u32,
@@ -565,6 +566,8 @@ pub struct Options {
     pub npb_port: u16,
     pub controller_port: u16,
     pub controller_tls_port: u16,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub cpu_set: CpuSet,
 }
 
 pub struct Pipeline {
@@ -1250,12 +1253,7 @@ impl DispatcherBuilder {
                 ));
                 #[cfg(not(target_arch = "s390x"))]
                 {
-                    Ok(RecvEngine::Dpdk(Dpdk::new(
-                        None,
-                        None,
-                        options.snap_len,
-                        options.dpdk_core_list.clone(),
-                    )))
+                    Ok(RecvEngine::Dpdk(Dpdk::new(None, None, options.snap_len)))
                 }
             }
             #[cfg(any(target_os = "linux", target_os = "android"))]

@@ -2094,13 +2094,10 @@ impl AgentComponents {
                         .dispatcher
                         .capture_packet_size as usize,
                     dpdk_enabled: config_handler.candidate_config.dispatcher.dpdk_enabled,
-                    dpdk_core_list: config_handler
-                        .candidate_config
-                        .dispatcher
-                        .dpdk_core_list
-                        .clone(),
                     dispatcher_queue: config_handler.candidate_config.dispatcher.dispatcher_queue,
                     packet_fanout_mode: yaml_config.packet_fanout_mode,
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    cpu_set: config_handler.candidate_config.dispatcher.cpu_set,
                     ..Default::default()
                 })))
                 .bpf_options(bpf_options.clone())

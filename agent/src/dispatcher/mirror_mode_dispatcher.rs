@@ -28,6 +28,11 @@ use arc_swap::access::Access;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use log::debug;
 use log::{info, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
 
 use super::TapTypeHandler;
 use crate::common::decapsulate::TunnelTypeBitmap;
@@ -548,6 +553,14 @@ impl MirrorModeDispatcher {
             self.base.stats.clone(),
             false, // !from_ebpf
         );
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = self.base.options.lock().unwrap().cpu_set;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if cpu_set != CpuSet::new() {
+            if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+            }
+        }
 
         while !self.base.terminated.load(Ordering::Relaxed) {
             let config = Config {
