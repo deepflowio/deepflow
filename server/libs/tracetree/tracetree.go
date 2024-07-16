@@ -50,6 +50,7 @@ type SpanInfo struct {
 	AutoServiceID1   uint32
 	AppService0      string
 	AppService1      string
+	Topic            string
 
 	IsIPv4 bool
 	IP40   uint32
@@ -122,6 +123,7 @@ func (t *TraceTree) Encode() {
 		encoder.WriteVarintU32(s.AutoServiceID1)
 		encoder.WriteString255(s.AppService0)
 		encoder.WriteString255(s.AppService1)
+		encoder.WriteString255(s.Topic)
 
 		encoder.WriteBool(s.IsIPv4)
 		if s.IsIPv4 {
@@ -158,6 +160,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		s.AutoServiceID1 = decoder.ReadVarintU32()
 		s.AppService0 = decoder.ReadString255()
 		s.AppService1 = decoder.ReadString255()
+		s.Topic = decoder.ReadString255()
 
 		s.IsIPv4 = decoder.ReadBool()
 		if s.IsIPv4 {

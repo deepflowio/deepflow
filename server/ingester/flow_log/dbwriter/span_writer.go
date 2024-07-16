@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/tracetree"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -91,6 +92,12 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.WriteString255(t.SpanId)
 	encoder.WriteString255(t.ParentSpanId)
 	encoder.WriteString255(t.AppService)
+	// topic: currently only taken from Kafka's RequestDomain
+	if t.L7Protocol == uint8(datatype.L7_PROTOCOL_KAFKA) {
+		encoder.WriteString255(t.RequestDomain)
+	} else {
+		encoder.WriteString255("")
+	}
 	encoder.WriteVarintU64(t.SyscallTraceIDRequest)
 	encoder.WriteVarintU64(t.SyscallTraceIDResponse)
 	encoder.WriteVarintU64(t.ResponseDuration)
