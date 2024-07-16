@@ -204,6 +204,11 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
+	// time is not a metric
+	// flow_tag database has no metrics
+	if field == "time" || db == ckcommon.DB_NAME_FLOW_TAG {
+		return nil, false
+	}
 	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG}, db) || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
@@ -250,15 +255,22 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	if ok {
 		return metric, ok
 	} else {
-		// Dynamic tag metrics
-		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background(), nil)
-		if err != nil {
-			log.Error("Failed to get tag type dynamic metrics")
+		// xx_id is not a metric
+		noIDField := strings.ReplaceAll(field, "_id", "")
+		_, ok = newAllMetrics[noIDField]
+		if ok {
 			return nil, false
+		} else {
+			// Dynamic tag metrics
+			dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background(), nil)
+			if err != nil {
+				log.Error("Failed to get tag type dynamic metrics")
+				return nil, false
+			}
+			GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
+			metric, ok := newAllMetrics[field]
+			return metric, ok
 		}
-		GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
-		metric, ok := newAllMetrics[field]
-		return metric, ok
 	}
 }
 
