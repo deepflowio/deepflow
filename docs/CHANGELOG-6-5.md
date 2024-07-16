@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: Uniq operator error [#7402](https://github.com/deepflowio/deepflow/pull/7402) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: deepflow-server may panic when updating platform information [#7399](https://github.com/deepflowio/deepflow/pull/7399) by [lzf575](https://github.com/lzf575)
 * fix: Add return processing to agent command [#7397](https://github.com/deepflowio/deepflow/pull/7397) by [roryye](https://github.com/roryye)
 * fix: Fix windows compilation [#7390](https://github.com/deepflowio/deepflow/pull/7390) by [rvql](https://github.com/rvql)
@@ -48,6 +49,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - dispatcher support set cpu affinity [#7423](https://github.com/deepflowio/deepflow/pull/7423) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: create sub domian set default team id [#7421](https://github.com/deepflowio/deepflow/pull/7421) by [askyrie](https://github.com/askyrie)
 * feat: sub domain support filter user id [#7408](https://github.com/deepflowio/deepflow/pull/7408) by [askyrie](https://github.com/askyrie)
 * feat: sub domain support team [#7394](https://github.com/deepflowio/deepflow/pull/7394) by [askyrie](https://github.com/askyrie)
 * feat: server uses sub_domain team id first when publishing message to tagrecorder [#7384](https://github.com/deepflowio/deepflow/pull/7384) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
