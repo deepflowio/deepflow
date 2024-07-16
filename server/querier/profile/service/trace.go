@@ -49,7 +49,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result []*mo
 	whereSlice = append(whereSlice, fmt.Sprintf(" profile_language_type='%s'", args.ProfileLanguageType))
 	whereSlice = append(whereSlice, fmt.Sprintf(" profile_event_type='%s'", args.ProfileEventType))
 	if args.TagFilter != "" {
-		whereSlice = append(whereSlice, " "+args.TagFilter)
+		whereSlice = append(whereSlice, " ("+args.TagFilter+")")
 	}
 	whereSql := strings.Join(whereSlice, " AND")
 	limitSql := cfg.Profile.FlameQueryLimit
