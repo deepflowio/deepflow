@@ -160,8 +160,7 @@ struct stack_ids_bitmap {
 } __attribute__((packed));
 
 int stop_continuous_profiler(void);
-int start_continuous_profiler(int freq, int java_syms_space_limit,
-			      int java_syms_update_delay,
+int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      tracer_callback_t callback);
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val);
 void release_flame_graph_hash(void);

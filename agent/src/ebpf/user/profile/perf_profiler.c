@@ -61,9 +61,6 @@ extern int sys_cpus_count;
 struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 static struct profiler_context oncpu_ctx;
 
-/* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
-int g_java_syms_write_bytes_max;
-
 static bool g_enable_oncpu = true;
 
 /* Used for handling updates to JAVA symbol files */
@@ -643,8 +640,6 @@ int write_profiler_running_pid(void)
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @java_syms_space_limit The maximum space occupied by the Java symbol files
- *                        in the target POD. 
  * @java_syms_update_delay To allow Java to run for an extended period and gather
  *                    more symbol information, we delay symbol retrieval when
  *                    encountering unknown symbols. The default value is
@@ -654,8 +649,7 @@ int write_profiler_running_pid(void)
  * @returns 0 on success, < 0 on error
  */
 
-int start_continuous_profiler(int freq, int java_syms_space_limit,
-			      int java_syms_update_delay,
+int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
@@ -680,15 +674,6 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 			      MAP_STACK_B_NAME, false, true,
 			      NANOSEC_PER_SEC / freq);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
-
-	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
-	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
-	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
-		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
-	g_java_syms_write_bytes_max =
-	    java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
-	ebpf_info("set java_syms_write_bytes_max : %d\n",
-		  g_java_syms_write_bytes_max);
 
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
 	    (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
@@ -912,7 +897,6 @@ int disable_oncpu_profiler(void)
 #include "perf_profiler.h"
 
 int start_continuous_profiler(int freq,
-			      int java_syms_space_limit,
 			      int java_syms_update_delay,
 			      tracer_callback_t callback)
 {
