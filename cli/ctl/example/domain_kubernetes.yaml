@@ -2,6 +2,9 @@
 name: kubernetes
 # 云平台类型
 type: kubernetes
+# cluster id [选填]
+# 格式：d- 开头，加长度为10的数字或字母组合，例如：d-1yhIguXABC
+cluster_id:
 config:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff

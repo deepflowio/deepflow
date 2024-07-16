@@ -36,6 +36,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	svc "github.com/deepflowio/deepflow/server/controller/http/service"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -257,6 +258,10 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 
 	k8sClusterIDCreate := domainCreate.KubernetesClusterID
 	if domainCreate.KubernetesClusterID != "" {
+		if !routercommon.CheckClusterID(domainCreate.KubernetesClusterID) {
+			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("domain cluster_id (%s) invalid", domainCreate.KubernetesClusterID))
+		}
+
 		db.Model(&mysql.Domain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
@@ -264,8 +269,9 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 
 		db.Model(&mysql.SubDomain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
 		if count > 0 {
-			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in sub_domain", domainCreate.KubernetesClusterID))
 		}
+
 		if db.ORGID != mysqlcommon.DEFAULT_ORG_ID {
 			k8sClusterIDCreate += strconv.Itoa(db.ORGID)
 		}
@@ -816,6 +822,21 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 	if count > 0 {
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))
 	}
+	if subDomainCreate.ClusterID != "" {
+		if !routercommon.CheckClusterID(subDomainCreate.ClusterID) {
+			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("sub_domain cluster_id (%s) invalid", subDomainCreate.ClusterID))
+		}
+		db.Model(&mysql.Domain{}).Where("cluster_id = ?", subDomainCreate.ClusterID).Count(&count)
+		if count > 0 {
+			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in domain", subDomainCreate.ClusterID))
+		}
+		db.Model(&mysql.SubDomain{}).Where("cluster_id = ?", subDomainCreate.ClusterID).Count(&count)
+		if count > 0 {
+			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist", subDomainCreate.ClusterID))
+		}
+	} else {
+		subDomainCreate.ClusterID = "d-" + common.GenerateShortUUID()
+	}
 
 	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
@@ -836,7 +857,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 	subDomain.Name = subDomainCreate.Name
 	subDomain.DisplayName = displayName
 	subDomain.CreateMethod = common.CREATE_METHOD_USER_DEFINE
-	subDomain.ClusterID = "d-" + common.GenerateShortUUID()
+	subDomain.ClusterID = subDomainCreate.ClusterID
 	subDomain.Domain = subDomainCreate.Domain
 	configStr, _ := json.Marshal(subDomainCreate.Config)
 	subDomain.Config = string(configStr)

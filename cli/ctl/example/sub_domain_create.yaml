@@ -2,6 +2,9 @@
 name: sub-domain-test
 # 所属云平台的名称 [必填]
 domain_name: xxxxxx
+# cluster id [选填]
+# 格式：d- 开头，加长度为10的数字或字母组合，例如：d-1yhIguXABC
+cluster_id:
 config:
   # 所属 vpc [必填]
   vpc_uuid: xxxxxx
