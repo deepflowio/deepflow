@@ -146,10 +146,12 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 	}
 	spanCount := int(decoder.ReadU16())
 	if cap(t.SpanInfos) < spanCount {
-		t.SpanInfos = make([]SpanInfo, 0, spanCount)
+		t.SpanInfos = make([]SpanInfo, spanCount)
+	} else {
+		t.SpanInfos = t.SpanInfos[:spanCount]
 	}
 	for i := 0; i < spanCount; i++ {
-		s := SpanInfo{}
+		s := &t.SpanInfos[i]
 		s.AutoServiceType0 = decoder.ReadU8()
 		s.AutoServiceType1 = decoder.ReadU8()
 		s.AutoServiceID0 = decoder.ReadVarintU32()
@@ -171,8 +173,6 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		s.Level1 = decoder.ReadU8()
 		s.ResponseDuration = decoder.ReadVarintU64()
 		s.ResponseStatus = decoder.ReadU8()
-
-		t.SpanInfos = append(t.SpanInfos, s)
 	}
 	if decoder.Failed() {
 		return fmt.Errorf("trace tree decode failed, offset is %d, buf length is %d ", decoder.Offset(), len(decoder.Bytes()))
