@@ -620,9 +620,6 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 		},
 		Values: []interface{}{},
 	}
-	if table == ckcommon.TABLE_NAME_TRACE_TREE {
-		return
-	}
 	for _, key := range TAG_DESCRIPTION_KEYS {
 		if key.DB != db || (key.Table != table && !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROMETHEUS}, db)) {
 			continue
@@ -673,7 +670,7 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 }
 
 // Get dynamic tags
-func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
+func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (response *common.Result, err error) {
 	response = &common.Result{
 		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
@@ -682,7 +679,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		Values: []interface{}{},
 	}
 
-	if table == "alarm_event" || table == ckcommon.TABLE_NAME_TRACE_TREE {
+	if table == "alarm_event" {
 		return response, nil
 	}
 
@@ -888,7 +885,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	return
 }
 
-func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
+func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (response *common.Result, err error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	response = &common.Result{
@@ -903,7 +900,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return
 	}
-	DynamicResponse, err := GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)
+	DynamicResponse, err := GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID, useQueryCache, ctx)
 	if err != nil {
 		return
 	}
