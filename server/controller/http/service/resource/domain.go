@@ -819,6 +819,9 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 
 	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
+	if subDomainCreate.TeamID == 0 {
+		subDomainCreate.TeamID = domain.TeamID
+	}
 	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanAddSubDomainResource(domain.TeamID, subDomainCreate.TeamID, lcuuid)
 	if err != nil {
 		return nil, err
