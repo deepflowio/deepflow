@@ -51,6 +51,7 @@ type SpanTrace struct {
 	SpanId                 string
 	ParentSpanId           string
 	AppService             string
+	Topic                  string
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
 
@@ -89,6 +90,8 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 	t.SpanId = decoder.ReadString255()
 	t.ParentSpanId = decoder.ReadString255()
 	t.AppService = decoder.ReadString255()
+	t.Topic = decoder.ReadString255()
+
 	t.SyscallTraceIDRequest = decoder.ReadVarintU64()
 	t.SyscallTraceIDResponse = decoder.ReadVarintU64()
 	t.ResponseDuration = decoder.ReadVarintU64()
