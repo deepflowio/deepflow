@@ -76,7 +76,7 @@ func (t *TraceTree) WriteBlock(block *ckdb.Block) {
 	t.Encode()
 	block.WriteDateTime(t.Time)
 	block.Write(
-		HashSearchIndex(t.TraceId),
+		t.SearchIndex,
 		t.TraceId,
 		utils.String(t.encodedSpans),
 	)

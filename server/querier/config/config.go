@@ -23,8 +23,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/op/go-logging"
-	"gopkg.in/yaml.v2"
+	logging "github.com/op/go-logging"
+	yaml "gopkg.in/yaml.v2"
 
 	prometheus "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
@@ -74,7 +74,7 @@ type Location struct {
 }
 
 type TraceIdWithIndex struct {
-	Enabled               bool     `yaml:"enabled"`
+	Disabled              bool     `yaml:"disabled"`
 	Type                  string   `yaml:"type"`
 	IncrementalIdLocation Location `yaml:"incremental-id-location"`
 }
@@ -119,6 +119,9 @@ func (c *Config) expendEnv() {
 }
 
 func (c *Config) Validate() error {
+	if c.TraceIdWithIndex.Type == "" {
+		c.TraceIdWithIndex.Type = "hash"
+	}
 	return nil
 }
 

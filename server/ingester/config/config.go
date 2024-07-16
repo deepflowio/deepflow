@@ -162,7 +162,7 @@ type Location struct {
 }
 
 type TraceIdWithIndex struct {
-	Enabled               bool     `yaml:"enabled"`
+	Disabled              bool     `yaml:"disabled"`
 	Type                  string   `yaml:"type"`
 	IncrementalIdLocation Location `yaml:"incremental-id-location"`
 	FormatIsHex           bool
@@ -186,7 +186,11 @@ func (c *Config) Validate() error {
 	// in standalone mode, only supports single node and does not support horizontal expansion
 	c.IsRunningModeStandalone = runningMode == RunningModeStandalone
 
-	if c.TraceIdWithIndex.Enabled {
+	if !c.TraceIdWithIndex.Disabled {
+		if c.TraceIdWithIndex.Type == "" {
+			c.TraceIdWithIndex.Type = IndexTypeHash
+		}
+
 		if c.TraceIdWithIndex.Type != IndexTypeIncremetalIdLocation && c.TraceIdWithIndex.Type != IndexTypeHash {
 			log.Errorf("invalid 'type'(%s) of 'trace-id-with-index', must be '%s' or '%s'", c.TraceIdWithIndex.Type, IndexTypeIncremetalIdLocation, IndexTypeHash)
 			sleepAndExit()
