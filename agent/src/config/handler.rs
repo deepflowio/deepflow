@@ -341,9 +341,10 @@ pub struct DispatcherConfig {
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
     pub dpdk_enabled: bool,
-    pub dpdk_core_list: String,
     pub dispatcher_queue: bool,
     pub bond_group: Vec<String>,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub cpu_set: CpuSet,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1462,7 +1463,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 global_pps_threshold: conf.global_pps_threshold,
                 capture_packet_size: conf.capture_packet_size,
                 dpdk_enabled: conf.yaml_config.dpdk_enabled,
-                dpdk_core_list: conf.yaml_config.dpdk_core_list.clone(),
                 dispatcher_queue: conf.yaml_config.dispatcher_queue,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
@@ -1499,6 +1499,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .tap_interfaces
                         .clone()
                 },
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                cpu_set: CpuSet::new(),
             },
             sender: SenderConfig {
                 mtu: conf.mtu,
@@ -2043,7 +2045,7 @@ impl ConfigHandler {
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity {
+        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity || components.is_none() {
             info!(
                 "CPU Affinity set to {}.",
                 new_config.yaml_config.cpu_affinity
@@ -2089,6 +2091,7 @@ impl ConfigHandler {
                 if let Err(e) = sched_setaffinity(Pid::from_raw(pid), &cpu_set) {
                     warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                 }
+                new_config.dispatcher.cpu_set = cpu_set;
             }
         }
 

@@ -924,17 +924,6 @@ vtap_group_id: g-xxxxxx
   ##   https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
   #dpdk-enabled: false
 
-  ## Map lcore set to physical cpu set
-  ## Example: 1,2,3,4 or 1-4
-  ## Note: The argument format is
-  ##   '<lcores[@cpus]>[<,lcores[@cpus]>...]'
-  ##   lcores and cpus list are grouped by '(' and ')'
-  ##   Within the group, '-' is used for range separator,
-  ##   ',' is used for single number separator.
-  ##   '( )' can be omitted for single element group,
-  ##   '@' can be omitted if cpus and lcores have the same value
-  #dpdk-core-list:
-
   ########################
   ## Libpcap RecvEngine ##
   ########################
