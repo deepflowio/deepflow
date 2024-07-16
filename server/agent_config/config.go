@@ -127,7 +127,6 @@ type StaticConfig struct {
 	QuadrupleQueueSize                 *int                         `yaml:"quadruple-queue-size,omitempty"`
 	AnalyzerQueueSize                  *int                         `yaml:"analyzer-queue-size,omitempty"`
 	DpdkEnabled                        *bool                        `yaml:"dpdk-enabled,omitempty"`
-	DpdkCoreList                       *string                      `yaml:"dpdk-core-list,omitempty"`
 	LibpcapEnabled                     *bool                        `yaml:"libpcap-enabled,omitempty"`
 	VhostSocketPath                    *string                      `yaml:"vhost-socket-path,omitempty"`
 	XflowCollector                     *XflowCollectorConfig        `yaml:"xflow-collector,omitempty"`
