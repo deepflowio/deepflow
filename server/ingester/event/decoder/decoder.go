@@ -24,7 +24,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowio/deepflow/message/alarm_event"
+	"github.com/deepflowio/deepflow/message/alert_event"
 	"github.com/deepflowio/deepflow/message/trident"
 	ingestercommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
@@ -148,14 +148,14 @@ func (d *Decoder) Run() {
 				d.orgId, d.teamId = uint16(recvBytes.OrgID), uint16(recvBytes.TeamID)
 				d.handlePerfEvent(recvBytes.VtapID, decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
-			case common.ALARM_EVENT:
+			case common.ALERT_EVENT:
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
-					log.Warning("get alarm event decode queue data type wrong")
+					log.Warning("get alert event decode queue data type wrong")
 					continue
 				}
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
-				d.handleAlarmEvent(decoder)
+				d.handleAlertEvent(decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
 			case common.K8S_EVENT:
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
@@ -426,62 +426,48 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	d.eventWriter.Write(s)
 }
 
-func (d *Decoder) handleAlarmEvent(decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleAlertEvent(decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		bytes := decoder.ReadBytes()
 		if decoder.Failed() {
 			if d.counter.ErrorCount == 0 {
-				log.Errorf("alarm event decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+				log.Errorf("alert event decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
 			}
 			d.counter.ErrorCount++
 			return
 		}
-		pbAlarmEvent := &alarm_event.AlarmEvent{}
-		if err := pbAlarmEvent.Unmarshal(bytes); err != nil {
+		pbAlertEvent := &alert_event.AlertEvent{}
+		if err := pbAlertEvent.Unmarshal(bytes); err != nil {
 			if d.counter.ErrorCount == 0 {
-				log.Errorf("alarm event unmarshal failed, err: %s", err)
+				log.Errorf("alert event unmarshal failed, err: %s", err)
 			}
 			d.counter.ErrorCount++
 			continue
 		}
 		d.counter.OutCount++
-		d.writeAlarmEvent(pbAlarmEvent)
+		d.writeAlertEvent(pbAlertEvent)
 	}
 }
 
-func (d *Decoder) writeAlarmEvent(event *alarm_event.AlarmEvent) {
-	s := dbwriter.AcquireAlarmEventStore()
-	s.Time = event.GetTimestamp()
+func (d *Decoder) writeAlertEvent(event *alert_event.AlertEvent) {
+	s := dbwriter.AcquireAlertEventStore()
+	s.Time = event.GetTime()
 	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
-	s.Lcuuid = event.GetLcuuid()
-	s.User = event.GetUser()
-	s.UserId = event.GetUserId()
 
 	s.PolicyId = event.GetPolicyId()
-	s.PolicyName = event.GetPolicyName()
-	s.PolicyLevel = event.GetPolicyLevel()
-	s.PolicyAppType = event.GetPolicyAppType()
-	s.PolicySubType = event.GetPolicySubType()
-	s.PolicyContrastType = event.GetPolicyContrastType()
-	s.PolicyDataLevel = event.GetPolicyDataLevel()
-	s.PolicyTargetUid = event.GetPolicyTargetUid()
-	s.PolicyTargetName = event.GetPolicyTargetName()
-	s.PolicyGoTo = event.GetPolicyGoTo()
-	s.PolicyTargetField = event.GetPolicyTargetField()
-	s.PolicyEndpoints = event.GetPolicyEndpoints()
-	s.TriggerCondition = event.GetTriggerCondition()
-	s.TriggerValue = event.GetTriggerValue()
-	s.ValueUnit = event.GetValueUnit()
-	s.EventLevel = event.GetEventLevel()
-	s.AlarmTarget = event.GetAlarmTarget()
-	s.RegionId = uint16(d.platformData.QueryRegionID(uint16(event.GetOrgId())))
-	s.PolicyQueryUrl = event.GetPolicyQueryUrl()
-	s.PolicyQueryConditions = event.GetPolicyQueryConditions()
-	s.PolicyThresholdCritical = event.GetPolicyThresholdCritical()
-	s.PolicyThresholdError = event.GetPolicyThresholdError()
-	s.PolicyThresholdWarning = event.GetPolicyThresholdWarning()
+	s.PolicyType = uint8(event.GetPolicyType())
+	s.AlertPlicy = event.GetAlertPolicy()
+	s.MetricValue = event.GetMetricValue()
+	s.EventLevel = uint8(event.GetEventLevel())
+
+	s.TagStrKeys = event.GetTagStrKeys()
+	s.TagStrValues = event.GetTagStrValues()
+	s.TagIntKeys = event.GetTagIntKeys()
+	s.TagIntValues = event.GetTagIntValues()
+
 	s.OrgId = uint16(event.GetOrgId())
 	s.TeamID = uint16(event.GetTeamId())
+	s.UserId = event.GetUserId()
 
-	d.eventWriter.WriteAlarmEvent(s)
+	d.eventWriter.WriteAlertEvent(s)
 }

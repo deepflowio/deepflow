@@ -67,7 +67,7 @@ func (w *EventWriter) Write(e *EventStore) {
 	w.ckWriter.Put(e)
 }
 
-func (w *EventWriter) WriteAlarmEvent(e *AlarmEventStore) {
+func (w *EventWriter) WriteAlertEvent(e *AlertEventStore) {
 	w.ckWriter.Put(e)
 }
 

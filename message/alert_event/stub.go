@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 
-package alarm_event
+package alert_event
 
-//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../alarm_event.proto
+//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../alert_event.proto

@@ -503,9 +503,9 @@ ingester:
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #event-ttl-hour: 720
 
-  ## alarm event table data retention time(unit: hour)
+  ## alert event table data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
-  #alarm-event-ttl-hour: 720
+  #alert-event-ttl-hour: 720
 
   ## perf event data write config
   #perf-event-ck-writer:

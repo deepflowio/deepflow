@@ -28,7 +28,7 @@ type EventType uint8
 const (
 	RESOURCE_EVENT EventType = iota
 	PERF_EVENT
-	ALARM_EVENT
+	ALERT_EVENT
 	K8S_EVENT
 )
 
@@ -38,8 +38,8 @@ func (e EventType) String() string {
 		return "resource_event"
 	case PERF_EVENT:
 		return "perf_event"
-	case ALARM_EVENT:
-		return "alarm_event"
+	case ALERT_EVENT:
+		return "alert_event"
 	case K8S_EVENT:
 		return "k8s_event"
 	default:
@@ -54,8 +54,8 @@ func (e EventType) TableName() string {
 		return "event"
 	case PERF_EVENT:
 		return "perf_event"
-	case ALARM_EVENT:
-		return "alarm_event"
+	case ALERT_EVENT:
+		return "alert_event"
 	default:
 		return "unknown_event"
 	}
