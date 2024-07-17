@@ -944,7 +944,7 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	log.Infof("delete sub_domain (%s) resources started", subDomain.Name)
 
 	var podCluster mysql.PodCluster
-	db.Unscoped().Where("lcuuid = ?", lcuuid).Find(&podCluster)
+	db.Unscoped().Where("sub_domain = ?", lcuuid).Find(&podCluster)
 	log.Info(podCluster)
 	if podCluster.ID != 0 {
 		log.Infof("delete pod_cluster (%+v) resources", podCluster)
