@@ -61,8 +61,9 @@ type SpanInfo struct {
 	Level0 uint8
 	Level1 uint8
 
-	ResponseDuration uint64
-	ResponseStatus   uint8
+	ResponseDurationSum            uint64
+	ResponseTotal                  uint32
+	ResponseStatusServerErrorCount uint32
 }
 
 func (t *TraceTree) Release() {
@@ -135,8 +136,9 @@ func (t *TraceTree) Encode() {
 		}
 		encoder.WriteU8(s.Level0)
 		encoder.WriteU8(s.Level1)
-		encoder.WriteVarintU64(s.ResponseDuration)
-		encoder.WriteU8(s.ResponseStatus)
+		encoder.WriteVarintU64(s.ResponseDurationSum)
+		encoder.WriteVarintU32(s.ResponseTotal)
+		encoder.WriteVarintU32(s.ResponseStatusServerErrorCount)
 	}
 	t.encodedSpans = encoder.Bytes()
 }
@@ -174,8 +176,9 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		}
 		s.Level0 = decoder.ReadU8()
 		s.Level1 = decoder.ReadU8()
-		s.ResponseDuration = decoder.ReadVarintU64()
-		s.ResponseStatus = decoder.ReadU8()
+		s.ResponseDurationSum = decoder.ReadVarintU64()
+		s.ResponseTotal = decoder.ReadVarintU32()
+		s.ResponseStatusServerErrorCount = decoder.ReadVarintU32()
 	}
 	if decoder.Failed() {
 		return fmt.Errorf("trace tree decode failed, offset is %d, buf length is %d ", decoder.Offset(), len(decoder.Bytes()))
