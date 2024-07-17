@@ -675,7 +675,7 @@ func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPerm
 	} else {
 		db.Find(&allVTapGroups)
 	}
-	vtapGroups, err := getAgentGroupByUser(userInfo, fpermitCfg, allVTapGroups)
+	vtapGroups, err := GetAgentGroupByUser(userInfo, fpermitCfg, allVTapGroups)
 	if err != nil {
 		return nil, err
 	}
