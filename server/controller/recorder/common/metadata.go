@@ -43,7 +43,7 @@ func (m *Metadata) Copy() *Metadata {
 	return &Metadata{
 		ORGID:     m.ORGID,
 		DB:        m.DB,
-		Logger:    m.Logger,
+		Logger:    m.Logger.Copy(),
 		Domain:    m.Domain,
 		SubDomain: m.SubDomain,
 	}
@@ -53,13 +53,23 @@ func (m *Metadata) GetORGID() int {
 	return m.ORGID
 }
 
+func (m *Metadata) GetTeamID() int {
+	if m.SubDomain.TeamID != 0 {
+		return m.SubDomain.TeamID
+	} else {
+		return m.Domain.TeamID
+	}
+}
+
 func (m *Metadata) SetDomain(domain mysql.Domain) {
 	m.Domain = &DomainInfo{domain}
+	m.Logger.SetTeamID(domain.TeamID)
 	m.Logger.SetDomainName(domain.Name)
 }
 
 func (m *Metadata) SetSubDomain(subDomain mysql.SubDomain) {
 	m.SubDomain = &SubDomainInfo{subDomain}
+	m.Logger.SetTeamID(subDomain.TeamID)
 	m.Logger.SetSubDomainName(subDomain.Name)
 }
 
