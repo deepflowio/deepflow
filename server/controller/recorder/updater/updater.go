@@ -113,13 +113,9 @@ func newUpdaterBase[
 		cloudData:    cloudData,
 	}
 	// use teamID from subDomain if updater is for subDomain
-	teamID := u.metadata.SubDomain.TeamID
-	if teamID == 0 {
-		teamID = u.metadata.Domain.TeamID
-	}
 	u.msgMetadata = message.NewMetadata(
 		u.metadata.GetORGID(),
-		message.MetadataTeamID(teamID),
+		message.MetadataTeamID(u.metadata.GetTeamID()),
 		message.MetadataDomainID(u.metadata.Domain.ID),
 		message.MetadataSubDomainID(u.metadata.SubDomain.ID),
 	)
