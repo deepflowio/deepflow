@@ -165,6 +165,7 @@ impl TryFrom<&Process> for ProcessData {
 impl From<&ProcessData> for ProcessInfo {
     fn from(p: &ProcessData) -> Self {
         Self {
+            language: None,
             name: Some(p.name.clone()),
             pid: Some(p.pid),
             process_name: Some(p.process_name.clone()),

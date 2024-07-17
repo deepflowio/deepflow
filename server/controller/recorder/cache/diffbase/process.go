@@ -34,6 +34,8 @@ func (b *DataSet) AddProcess(dbItem *mysql.Process, seq int) {
 		ContainerID: dbItem.ContainerID,
 		DeviceType:  dbItem.DeviceType,
 		DeviceID:    dbItem.DeviceID,
+		User:        dbItem.UserName,
+		Language:    dbItem.Language,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
 }
@@ -50,6 +52,8 @@ type Process struct {
 	ContainerID string `json:"container_id"`
 	DeviceType  int    `json:"device_type"`
 	DeviceID    int    `json:"device_id"`
+	User        string `json:"user"`
+	Language    string `json:"language"`
 }
 
 func (p *Process) Update(cloudItem *cloudmodel.Process, toolDataSet *tool.DataSet) {
@@ -61,5 +65,7 @@ func (p *Process) Update(cloudItem *cloudmodel.Process, toolDataSet *tool.DataSe
 		p.DeviceType = deviceType
 		p.DeviceID = deviceID
 	}
+	p.User = cloudItem.UserName
+	p.Language = cloudItem.Language
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, p))
 }

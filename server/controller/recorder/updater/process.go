@@ -118,6 +118,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysql.Pro
 		ProcessName: cloudItem.ProcessName,
 		CommandLine: cloudItem.CommandLine,
 		UserName:    cloudItem.UserName,
+		Language:    cloudItem.Language,
 		ContainerID: cloudItem.ContainerID,
 		OSAPPTags:   cloudItem.OSAPPTags,
 		Domain:      p.metadata.Domain.Lcuuid,
@@ -153,6 +154,12 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 	if diffBase.DeviceType != deviceType || diffBase.DeviceID != deviceID {
 		mapInfo["devicetype"] = deviceType
 		mapInfo["deviceid"] = deviceID
+	}
+	if diffBase.User != cloudItem.UserName {
+		mapInfo["user_name"] = cloudItem.UserName
+	}
+	if diffBase.Language != cloudItem.Language {
+		mapInfo["language"] = cloudItem.Language
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

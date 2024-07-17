@@ -681,6 +681,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 			ProcessName: &pData.ProcessName,
 			CmdLine:     &pData.CMDLine,
 			User:        &pData.User,
+			Language:    &pData.Language,
 			ContainerId: &pData.ContainerID,
 			OsAppTags:   &pData.OSAPPTags,
 			NodeIp:      &pData.NodeIP,

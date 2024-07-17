@@ -444,6 +444,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 				CMDLine:     p.GetCmdLine(),
 				ContainerID: p.GetContainerId(),
 				User:        p.GetUser(),
+				Language:    p.GetLanguage(),
 				OSAPPTags:   p.GetOsAppTags(),
 				NodeIP:      p.GetNodeIp(),
 				StartTime:   pStartTime,
