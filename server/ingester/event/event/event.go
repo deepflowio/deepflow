@@ -42,7 +42,7 @@ type Event struct {
 	Config          *config.Config
 	ResourceEventor *Eventor
 	PerfEventor     *Eventor
-	AlarmEventor    *Eventor
+	AlertEventor    *Eventor
 	K8sEventor      *Eventor
 }
 
@@ -64,7 +64,7 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 		return nil, err
 	}
 
-	alarmEventor, err := NewAlarmEventor(config, recv, manager, platformDataManager.GetMasterPlatformInfoTable())
+	alertEventor, err := NewAlertEventor(config, recv, manager, platformDataManager.GetMasterPlatformInfoTable())
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, r
 		Config:          config,
 		ResourceEventor: resourceEventor,
 		PerfEventor:     perfEventor,
-		AlarmEventor:    alarmEventor,
+		AlertEventor:    alertEventor,
 		K8sEventor:      k8sEventor,
 	}, nil
 }
@@ -103,24 +103,24 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, config *config.Config, 
 	}, nil
 }
 
-func NewAlarmEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformTable *grpc.PlatformInfoTable) (*Eventor, error) {
-	eventMsg := datatype.MESSAGE_TYPE_ALARM_EVENT
+func NewAlertEventor(config *config.Config, recv *receiver.Receiver, manager *dropletqueue.Manager, platformTable *grpc.PlatformInfoTable) (*Eventor, error) {
+	eventMsg := datatype.MESSAGE_TYPE_ALERT_EVENT
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+eventMsg.String(),
-		2<<17, // 128k, default alarm event queue-size
-		1,     // default alarm event queue-count
+		2<<17, // 128k, default alert event queue-size
+		1,     // default alert event queue-count
 		1,
 		libqueue.OptionFlushIndicator(3*time.Second),
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 	recv.RegistHandler(eventMsg, decodeQueues, 1)
 
-	eventWriter, err := dbwriter.NewAlarmEventWriter(config)
+	eventWriter, err := dbwriter.NewAlertEventWriter(config)
 	if err != nil {
 		return nil, err
 	}
 	d := decoder.NewDecoder(
 		0,
-		common.ALARM_EVENT,
+		common.ALERT_EVENT,
 		queue.QueueReader(decodeQueues.FixedMultiQueue[0]),
 		eventWriter,
 		platformTable,
@@ -208,14 +208,14 @@ func (e *Eventor) Close() {
 func (e *Event) Start() {
 	e.ResourceEventor.Start()
 	e.PerfEventor.Start()
-	e.AlarmEventor.Start()
+	e.AlertEventor.Start()
 	e.K8sEventor.Start()
 }
 
 func (e *Event) Close() error {
 	e.ResourceEventor.Close()
 	e.PerfEventor.Close()
-	e.AlarmEventor.Close()
+	e.AlertEventor.Close()
 	e.K8sEventor.Close()
 	return nil
 }

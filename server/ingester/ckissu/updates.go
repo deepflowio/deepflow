@@ -133,7 +133,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	},
 	{
 		Dbs:         []string{"event"},
-		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local", "alarm_event", "alarm_event_local"},
+		Tables:      []string{"perf_event", "perf_event_local", "event", "event_local"},
 		ColumnNames: []string{"_id"},
 		ColumnType:  ckdb.UInt64,
 	},
@@ -160,7 +160,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	},
 	{
 		Dbs:          []string{"event"},
-		Tables:       []string{"event_local", "event", "alarm_event_local", "alarm_event", "perf_event", "perf_event_local"},
+		Tables:       []string{"event_local", "event", "perf_event", "perf_event_local"},
 		ColumnNames:  []string{"team_id"},
 		ColumnType:   ckdb.UInt16,
 		DefaultValue: "1",
