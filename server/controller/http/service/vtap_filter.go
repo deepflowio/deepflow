@@ -47,7 +47,7 @@ func getAgentByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, v
 	return results, nil
 }
 
-func getAgentGroupByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtapGroups []*mysql.VTapGroup) ([]*mysql.VTapGroup, error) {
+func GetAgentGroupByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtapGroups []*mysql.VTapGroup) ([]*mysql.VTapGroup, error) {
 	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
 		return vtapGroups, nil
 	}
