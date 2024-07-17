@@ -40,15 +40,33 @@ import (
 const (
 	ForwardControllerTimes        = "ForwardControllerTimes"
 	DefaultForwardControllerTimes = 3
+
+	AgentCommandTypeProbe   = AgentCommandType("probe")
+	AgentCommandTypeProfile = AgentCommandType("profile")
 )
 
+type AgentCommandType string
+
 var (
+	agentCommandMap = map[AgentCommandType]map[string]struct{}{
+		AgentCommandTypeProbe:   probeCommandMap,
+		AgentCommandTypeProfile: profileCommandMap,
+	}
+
 	profileCommandMap = map[string]struct{}{
 		"ps":              struct{}{},
 		"java-dump-stack": struct{}{},
 		"java-dump-gc":    struct{}{},
 		"java-dump-heap":  struct{}{},
 		"ebpf-dump-stack": struct{}{},
+	}
+	probeCommandMap = map[string]struct{}{
+		"ping":       struct{}{},
+		"tcpping":    struct{}{},
+		"curl":       struct{}{},
+		"dig":        struct{}{},
+		"nslookup":   struct{}{},
+		"traceroute": struct{}{},
 	}
 )
 
@@ -178,17 +196,17 @@ func getCMDAndNamespaceHandler(c *gin.Context) {
 		JsonResponse(c, data, err)
 		return
 	}
-	switch c.Query("type") {
-	case "profile":
+
+	if filterCommandMap, ok := agentCommandMap[AgentCommandType(c.Query("type"))]; ok {
 		var cmds []*trident.RemoteCommand
 		for _, item := range data.RemoteCommand {
-			if _, ok := profileCommandMap[*item.Cmd]; ok {
+			if _, ok := filterCommandMap[*item.Cmd]; ok {
 				cmds = append(cmds, item)
 			}
 		}
 		data.RemoteCommand = cmds
 		data.LinuxNamespace = nil
-	default:
+
 	}
 	JsonResponse(c, data, nil)
 }
