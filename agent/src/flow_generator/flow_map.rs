@@ -874,7 +874,6 @@ impl FlowMap {
             return false;
         }
         let flow_config = config.flow;
-        let collector_config = config.collector;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
         if flow_config.collector_enabled {
             let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
@@ -898,9 +897,7 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled
-            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
-        {
+        if self.packet_sequence_enabled {
             self.append_to_block(flow_config, node, meta_packet);
         }
 
@@ -1264,7 +1261,9 @@ impl FlowMap {
         // tag
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
-
+        node.tagged_flow.flow.need_to_store = (self.packet_sequence_enabled
+            && meta_packet.lookup_key.proto == IpProtocol::TCP)
+            || node.contain_pcap_policy();
         // Currently, only virtual traffic's tap_side is counted
         node.tagged_flow
             .flow
@@ -1449,6 +1448,9 @@ impl FlowMap {
             node.tagged_flow
                 .flow
                 .set_tap_side(config.flow.trident_type, config.flow.cloud_gateway_traffic);
+            node.tagged_flow.flow.need_to_store = (self.packet_sequence_enabled
+                && meta_packet.lookup_key.proto == IpProtocol::TCP)
+                || node.contain_pcap_policy();
         } else {
             // copy endpoint and policy data
             meta_packet.policy_data =
@@ -1701,7 +1703,6 @@ impl FlowMap {
 
     fn new_tcp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
         let flow_config = &config.flow;
-        let collector_config = &config.collector;
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.second_in_minute =
@@ -1754,9 +1755,7 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled
-            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
-        {
+        if self.packet_sequence_enabled {
             self.append_to_block(flow_config, &mut node, meta_packet);
         }
         node
