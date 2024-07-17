@@ -60,6 +60,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				if resp == nil {
 					continue
 				}
+				log.Debugf("agent command response: %s", resp.String())
 				if resp.AgentId == nil {
 					log.Warningf("recevie agent info from remote command is nil")
 					continue
@@ -79,6 +80,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
 					resp.Commands == nil && resp.Errmsg == nil {
 					manager.ExecCH <- &api.RemoteExecRequest{RequestId: proto.Uint64(0)}
+					continue
 				}
 
 				if err != nil {
