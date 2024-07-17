@@ -58,8 +58,8 @@ pthread_mutex_t g_df_lock;
 jvmtiEnv *g_jvmti;
 bool replay_finish;
 int replay_count;
-char perf_map_file_path[128];
-char perf_log_file_path[128];
+char perf_map_socket_path[128];
+char perf_log_socket_path[128];
 
 int perf_map_socket_fd = -1;
 int perf_map_log_socket_fd = -1;
@@ -123,10 +123,10 @@ jint df_open_socket(const char *path, int *ptr)
 	 * The reason for setting non-blocking mode:
 	 * 1 To prevent Java threads from being blocked.
 	 * 2 When attempts to write data to a closed writing port of a pipe or
-         *   socket, the operating system detects this situation and sends the
+	 *   socket, the operating system detects this situation and sends the
 	 *   SIGPIPE signal to Java process, which causes the program to exit.
 	 *   Use non-blocking mode to avoid this issue.
-         */
+	 */
 	int flags = fcntl(s, F_GETFL, 0);
 	if (flags == -1) {
 		fprintf(stderr, "Call fcntl() get failed: errno(%d)\n", errno);
@@ -156,6 +156,9 @@ bool is_socket_file(const char *path)
 {
 	struct stat sb;
 	if (stat(path, &sb) == -1) {
+		fprintf(stderr, "stat() failed, with %s(%d)\n", strerror(errno),
+			errno);
+		fflush(stderr);
 		return false;
 	}
 
@@ -164,8 +167,9 @@ bool is_socket_file(const char *path)
 
 jint open_perf_map_file(pid_t pid)
 {
-	if (is_socket_file(perf_map_file_path)) {
-		return df_open_socket(perf_map_file_path, &perf_map_socket_fd);
+	if (is_socket_file(perf_map_socket_path)) {
+		return df_open_socket(perf_map_socket_path,
+				      &perf_map_socket_fd);
 	}
 
 	return JNI_ERR;
@@ -173,8 +177,8 @@ jint open_perf_map_file(pid_t pid)
 
 jint open_perf_map_log_file(pid_t pid)
 {
-	if (is_socket_file(perf_log_file_path)) {
-		return df_open_socket(perf_log_file_path,
+	if (is_socket_file(perf_log_socket_path)) {
+		return df_open_socket(perf_log_socket_path,
 				      &perf_map_log_socket_fd);
 	}
 
@@ -188,18 +192,20 @@ jint df_agent_config(char *opts)
 	start = buf;
 	snprintf(buf, sizeof(buf), "%s", opts);
 
-	/* perf_map_file_path[] */
+	/* perf_map_socket_path[] */
 	char *p = strchr(start, ',');
 	if (p == NULL)
 		return JNI_ERR;
 	*p = '\0';
-	snprintf(perf_map_file_path, sizeof(perf_map_file_path), "%s", start);
+	snprintf(perf_map_socket_path, sizeof(perf_map_socket_path), "%s",
+		 start);
 
-	/* perf_log_file_path[] */
+	/* perf_log_socket_path[] */
 	start = ++p;
 	if (start == NULL)
 		return JNI_ERR;
-	snprintf(perf_log_file_path, sizeof(perf_log_file_path), "%s", start);
+	snprintf(perf_log_socket_path, sizeof(perf_log_socket_path), "%s",
+		 start);
 
 	return JNI_OK;
 }
@@ -502,8 +508,8 @@ enable_replay:
 	_(df_agent_config(options));
 	_(open_perf_map_log_file(getpid()));
 	_(open_perf_map_file(getpid()));
-	df_log("- JVMTI perf_map_file_path: %s perf_log_file_path: %s\n",
-	       perf_map_file_path, perf_log_file_path);
+	df_log("- JVMTI perf_map_socket_path: %s perf_log_socket_path: %s\n",
+	       perf_map_socket_path, perf_log_socket_path);
 
 	_(enable_capabilities(jvmti));
 	_(set_callback_funs(jvmti));
