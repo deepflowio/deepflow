@@ -16,15 +16,15 @@
 
 #include <sys/stat.h>
 #include <bcc/perf_reader.h>
-#include "../../config.h"
-#include "../../utils.h"
-#include "../../common.h"
-#include "../../mem.h"
-#include "../../log.h"
-#include "../../types.h"
-#include "../../vec.h"
-#include "../../tracer.h"
-#include "../../socket.h"
+#include "../config.h"
+#include "../utils.h"
+#include "../common.h"
+#include "../mem.h"
+#include "../log.h"
+#include "../types.h"
+#include "../vec.h"
+#include "../tracer.h"
+#include "../socket.h"
 
 int __attribute__ ((weak)) extended_reader_create(struct bpf_tracer *tracer)
 {
@@ -42,3 +42,14 @@ int __attribute__ ((weak)) extended_proc_event_handler(int pid,
 {
 	return 0;
 }
+
+int __attribute__ ((weak)) collect_extended_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
+{
+	return 0;
+}
+
+void __attribute__ ((weak)) extended_process_exec(int pid) {}
+
+void __attribute__ ((weak)) extended_events_handle(void) {}
+
+void __attribute__ ((weak)) extended_process_exit(int pid) {}

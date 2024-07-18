@@ -194,6 +194,44 @@ static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
+void rewrite_java_symbol(char *sym) {
+	int len = strlen(sym);
+	if (len == 0) {
+		return;
+	}
+
+	int i, cls_start = 1;
+	bool is_array = false;
+
+	switch (sym[0]) {
+	case '[':
+		if (len <= 1 || sym[1] != 'L') {
+			break;
+		}
+		is_array = true;
+		cls_start++;
+		// fallthrough to handle "[LClassname;::methodName"
+	case 'L':
+		// LClassName;::methodName
+		for (i = cls_start; i < len; i++) {
+			if (sym[i] == ';') {
+				break;
+			}
+		}
+		if (i != len) {
+			memcpy(sym, sym + cls_start, i - cls_start);
+			memcpy(sym + i - cls_start, sym + i + 1, len - i - 1);
+			memset(sym + len - cls_start - 1, '\0', cls_start + 1);
+			if (is_array) {
+				memcpy(sym + len - cls_start - 1, "[]", 2);
+			}
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 				   struct bcc_symbol *sym, void *info_p,
 				   char **sym_ptr)
@@ -215,6 +253,10 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 			ret = bcc_symcache_resolve(resolver, address, sym);
 			if (ret == 0) {
 				*sym_ptr = proc_symbol_name_fetch(pid, sym);
+				if (p->is_java) {
+					// handle java encoded symbols
+					rewrite_java_symbol(*sym_ptr);
+				}
 				pthread_mutex_unlock(&p->mutex);
 				return ret;
 			}
@@ -321,7 +363,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      int stack_id,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      int *ret_val, void *info_p, u64 ts)
+				      int *ret_val, void *info_p, u64 ts, bool ignore_libs)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -362,6 +404,10 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		    resolve_addr(t, pid, (i == start_idx), ips[i], new_cache,
 				 info_p);
 		if (str) {
+			// ignore frames in library for memory profiling
+			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix) && strncmp(str, lib_sym_prefix, strlen(lib_sym_prefix)) == 0) {
+				continue;
+			}
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
 		}
@@ -406,7 +452,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       pid_t pid,
 				       const char *stack_map_name,
 				       stack_str_hash_t * h,
-				       bool new_cache, void *info_p, u64 ts)
+				       bool new_cache, void *info_p, u64 ts, bool ignore_libs)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -425,7 +471,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	char *str = NULL;
 	int ret_val = 0;
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val, info_p, ts);
+				       h, new_cache, &ret_val, info_p, ts, ignore_libs);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
@@ -474,7 +520,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      const char *stack_map_name,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      char *process_name, void *info_p)
+				      char *process_name, void *info_p, bool ignore_libs)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -530,7 +576,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp);
+							v->timestamp, ignore_libs);
 		if (k_trace_str == NULL)
 			return NULL;
 	}
@@ -540,7 +586,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							v->tgid,
 							stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp);
+							v->timestamp, ignore_libs);
 		if (u_trace_str == NULL)
 			return NULL;
 	}

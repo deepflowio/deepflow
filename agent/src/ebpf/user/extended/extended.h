@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef DF_PROFILE_EXT_H
-#define DF_PROFILE_EXT_H
+#ifndef DF_EXTENDED_H
+#define DF_EXTENDED_H
 
 /**
  * @brief **extended_reader_create()** create an extended reader to
@@ -46,4 +46,29 @@ int extended_maps_set(struct bpf_tracer *tracer);
  */
 int extended_proc_event_handler(int pid, const char *name,
 				enum proc_act_type type);
-#endif /* DF_PROFILE_EXT_H */
+
+/**
+ * @brief **collect_extended_uprobe_syms_from_procfs()** extend the handling of uprobe
+ * @param conf Tracer probes config
+ * @return 0 on success, non-zero on error
+ */
+int collect_extended_uprobe_syms_from_procfs(struct tracer_probes_conf *conf);
+
+/**
+ * @brief **extended_process_exec()** get the process creation event and put the event into the queue
+ * @param pid Process ID
+ */
+void extended_process_exec(int pid);
+
+/**
+ * @brief **extended_events_handle()** process events in the queue
+ */
+void extended_events_handle(void);
+
+/**
+ * @brief **extended_process_exit()** process exit, reclaim resources
+ * @param pid Process ID
+ */
+void extended_process_exit(int pid);
+
+#endif /* DF_EXTENDED_H */

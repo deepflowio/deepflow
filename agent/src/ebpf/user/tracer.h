@@ -123,6 +123,8 @@ enum cfg_feature_idx {
 	FEATURE_UPROBE_OPENSSL,
 	// golang uprobe
 	FEATURE_UPROBE_GOLANG,
+	// java uprobe
+	FEATURE_UPROBE_JAVA,
 	FEATURE_MAX,
 };
 
@@ -624,4 +626,5 @@ int enable_tracer_reader_work(const char *name, int idx,
  * @return 0 on success, non-zero on error
  */
 int enable_ebpf_seg_reasm_protocol(int protocol);
+
 #endif /* DF_USER_TRACER_H */

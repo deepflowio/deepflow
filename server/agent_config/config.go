@@ -265,6 +265,11 @@ type OffCpuProfile struct {
 	MinBlock *string `yaml:"minblock,omitempty"`
 }
 
+type MemoryProfile struct {
+	Disabled *bool   `yaml:"disabled,omitempty"`
+	Regex    *string `yaml:"regex,omitempty"`
+}
+
 type EbpfConfig struct {
 	Disabled                           *bool                              `yaml:"disabled,omitempty"`
 	GlobalEbpfPpsThreshold             *int                               `yaml:"global-ebpf-pps-threshold,omitempty"`
@@ -283,6 +288,7 @@ type EbpfConfig struct {
 	JavaSymbolFileRefreshDeferInterval *string                            `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
 	OnCpuProfile                       *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 	OffCpuProfile                      *OffCpuProfile                     `yaml:"off-cpu-profile,omitempty"`
+	MemoryProfile                      *MemoryProfile                     `yaml:"memory-profile,omitempty"`
 	SyscallOutOfOrderReassembly        []string                           `yaml:"syscall-out-of-order-reassembly,omitempty"`
 	SyscallSegmentationReassembly      []string                           `yaml:"syscall-segmentation-reassembly,omitempty"`
 	SyscallOutOfOrderCacheSize         *int                               `yaml:"syscall-out-of-order-cache-size,omitempty"`

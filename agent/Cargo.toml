@@ -8,6 +8,7 @@ default-run = "deepflow-agent"
 
 [workspace]
 members = ["crates/*"]
+exclude = ["src/ebpf/samples/rust/profiler", "src/ebpf/samples/rust/socket-tracer"]
 
 [dependencies]
 ahash = "0.8"
@@ -141,8 +142,8 @@ dunce = "1"
 tonic-build = "0.8.0"
 
 [features]
-enterprise = ["off_cpu", "enterprise-utils"]
-off_cpu = []
+enterprise = ["extended_profile", "enterprise-utils"]
+extended_profile = []
 
 [[bench]]
 name = "common"

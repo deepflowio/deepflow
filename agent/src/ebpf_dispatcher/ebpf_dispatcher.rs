@@ -472,20 +472,26 @@ impl EbpfCollector {
         }
     }
 
-    #[cfg(not(feature = "off_cpu"))]
-    fn get_event_type(_: u8) -> i32 {
+    #[cfg(not(feature = "extended_profile"))]
+    fn get_event_type(_: u8, _: u8) -> i32 {
         metric::ProfileEventType::EbpfOnCpu.into()
     }
 
-    #[cfg(feature = "off_cpu")]
-    fn get_event_type(profiler_type: u8) -> i32 {
+    #[cfg(feature = "extended_profile")]
+    fn get_event_type(profiler_type: u8, event_type: u8) -> i32 {
         match profiler_type {
             ebpf::PROFILER_TYPE_ONCPU => metric::ProfileEventType::EbpfOnCpu.into(),
             ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
+            ebpf::PROFILER_TYPE_MEMORY if event_type == ebpf::PROFILE_EVENT_MEM_ALLOC => {
+                metric::ProfileEventType::EbpfMemAlloc.into()
+            }
+            ebpf::PROFILER_TYPE_MEMORY if event_type == ebpf::PROFILE_EVENT_MEM_IN_USE => {
+                metric::ProfileEventType::EbpfMemInUse.into()
+            }
             _ => {
                 warn!(
-                    "ebpf profile data with invalid event type: {}",
-                    profiler_type
+                    "ebpf profile data with invalid profiler type: {}, event type: {}",
+                    profiler_type, event_type
                 );
                 metric::ProfileEventType::EbpfOnCpu.into()
             }
@@ -501,7 +507,7 @@ impl EbpfCollector {
             let data = &mut *data;
             profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
             profile.timestamp = data.timestamp;
-            profile.event_type = Self::get_event_type(data.profiler_type);
+            profile.event_type = Self::get_event_type(data.profiler_type, data.event_type);
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
@@ -510,7 +516,8 @@ impl EbpfCollector {
             profile.u_stack_id = data.u_stack_id;
             profile.k_stack_id = data.k_stack_id;
             profile.cpu = data.cpu;
-            profile.count = data.count;
+            profile.count = data.count as u32;
+            profile.wide_count = data.count;
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
@@ -701,9 +708,10 @@ impl EbpfCollector {
             let ebpf_conf = &config.ebpf;
             let on_cpu = &ebpf_conf.on_cpu_profile;
             let off_cpu = &ebpf_conf.off_cpu_profile;
+            let memory = &ebpf_conf.memory_profile;
 
-            let profiler_enabled =
-                !on_cpu.disabled || (cfg!(feature = "off_cpu") && !off_cpu.disabled);
+            let profiler_enabled = !on_cpu.disabled
+                || (cfg!(feature = "extended_profile") && (!off_cpu.disabled || !memory.disabled));
             if profiler_enabled {
                 if !on_cpu.disabled {
                     ebpf::enable_oncpu_profiler();
@@ -711,11 +719,19 @@ impl EbpfCollector {
                     ebpf::disable_oncpu_profiler();
                 }
 
-                #[cfg(feature = "off_cpu")]
-                if !off_cpu.disabled {
-                    ebpf::enable_offcpu_profiler();
-                } else {
-                    ebpf::disable_offcpu_profiler();
+                #[cfg(feature = "extended_profile")]
+                {
+                    if !off_cpu.disabled {
+                        ebpf::enable_offcpu_profiler();
+                    } else {
+                        ebpf::disable_offcpu_profiler();
+                    }
+
+                    if !memory.disabled {
+                        ebpf::enable_memory_profiler();
+                    } else {
+                        ebpf::disable_memory_profiler();
+                    }
                 }
 
                 if ebpf::start_continuous_profiler(
@@ -741,17 +757,28 @@ impl EbpfCollector {
                     ebpf::set_profiler_cpu_aggregation(on_cpu.cpu as i32);
                 }
 
-                #[cfg(feature = "off_cpu")]
-                if !off_cpu.disabled {
-                    ebpf::set_offcpu_profiler_regex(
-                        CString::new(off_cpu.regex.as_bytes())
-                            .unwrap()
-                            .as_c_str()
-                            .as_ptr(),
-                    );
+                #[cfg(feature = "extended_profile")]
+                {
+                    if !off_cpu.disabled {
+                        ebpf::set_offcpu_profiler_regex(
+                            CString::new(off_cpu.regex.as_bytes())
+                                .unwrap()
+                                .as_c_str()
+                                .as_ptr(),
+                        );
 
-                    ebpf::set_offcpu_cpuid_aggregation(off_cpu.cpu as i32);
-                    ebpf::set_offcpu_minblock_time(off_cpu.min_block.as_micros() as u32);
+                        ebpf::set_offcpu_cpuid_aggregation(off_cpu.cpu as i32);
+                        ebpf::set_offcpu_minblock_time(off_cpu.min_block.as_micros() as u32);
+                    }
+
+                    if !memory.disabled {
+                        ebpf::set_memory_profiler_regex(
+                            CString::new(memory.regex.as_bytes())
+                                .unwrap()
+                                .as_c_str()
+                                .as_ptr(),
+                        );
+                    }
                 }
             }
 

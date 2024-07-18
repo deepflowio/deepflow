@@ -362,6 +362,22 @@ impl Default for OffCpuProfile {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct MemoryProfile {
+    pub disabled: bool,
+    pub regex: String,
+}
+
+impl Default for MemoryProfile {
+    fn default() -> Self {
+        MemoryProfile {
+            disabled: true,
+            regex: "^java".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
@@ -385,6 +401,7 @@ pub struct EbpfYamlConfig {
     pub java_symbol_file_refresh_defer_interval: Duration,
     pub on_cpu_profile: OnCpuProfile,
     pub off_cpu_profile: OffCpuProfile,
+    pub memory_profile: MemoryProfile,
     pub syscall_out_of_order_cache_size: usize,
     pub syscall_out_of_order_reassembly: Vec<String>,
     pub syscall_segmentation_reassembly: Vec<String>,
@@ -412,6 +429,7 @@ impl Default for EbpfYamlConfig {
             java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),
+            memory_profile: MemoryProfile::default(),
             syscall_out_of_order_reassembly: vec![],
             syscall_segmentation_reassembly: vec![],
             syscall_out_of_order_cache_size: 16,
