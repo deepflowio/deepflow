@@ -48,6 +48,11 @@ func (k *ChPodK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodK8sLabel
 
 	keyToItem := make(map[K8sLabelsKey]mysql.ChPodK8sLabels)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod)
+		}
+
 		labelsMap := map[string]string{}
 		splitLabel := strings.Split(pod.Label, ", ")
 		for _, singleLabel := range splitLabel {
@@ -70,7 +75,7 @@ func (k *ChPodK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodK8sLabel
 				Labels:      string(labelsStr),
 				L3EPCID:     pod.VPCID,
 				PodNsID:     pod.PodNamespaceID,
-				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
