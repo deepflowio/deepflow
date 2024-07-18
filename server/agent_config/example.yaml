@@ -28,8 +28,13 @@ vtap_group_id: g-xxxxxx
 ## System Free Memory Limit
 ## Unit: %. Default: 0. Range: [0, 100]
 ## Note: The limit of the percentage of system free memory.
-##   When the free percentage is lower than 90% of this value,
-##   the agent will automatically restart.
+##   Setting sys_free_memory_limit to 0 indicates that the system free memory ratio is not checked.
+##   1. When the current system free memory ratio is below sys_free_memory_limit * 70%, 
+##      the agent will automatically restart.
+##   2. When the current system free memory ratio is below sys_free_memory_limit but above 70%, 
+##      the agent enters the disabled state.
+##   3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
+##      the agent recovers from the disabled state.
 #sys_free_memory_limit: 0
 
 ## Packet Capture Rate Limit
