@@ -22,11 +22,11 @@ import (
 	"os"
 	"runtime"
 	"time"
-
+ 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
-
+ 
 	servercommon "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/stats"
@@ -42,7 +42,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/statsd"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
-
+ 
 var log = logging.MustGetLogger("querier")
 
 func Start(configPath, serverLogFile string, shared *servercommon.ControllerIngesterShared) {
@@ -55,32 +55,32 @@ func Start(configPath, serverLogFile string, shared *servercommon.ControllerInge
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("==================== Launching DeepFlow-Server-Querier ====================")
 	log.Infof("querier config:\n%s", string(bytes))
-
+ 
 	// statsd
 	statsd.QuerierCounter = statsd.NewCounter()
 	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
-
+ 
 	// engine加载数据库tag/metric等信息
 	err := Load()
 	if err != nil {
 		log.Error(err)
 		os.Exit(0)
 	}
-
+ 
 	// prometheus dict cache
 	go trans_prometheus.GeneratePrometheusMap()
-
+ 
 	// init opentelemetry
 	if cfg.OtelEndpoint != "" {
 		log.Infof("init opentelemetry: otel-endpoint(%s)", cfg.OtelEndpoint)
 		initTraceProvider(cfg.OtelEndpoint)
 	}
-
+ 
 	ginLogFile, _ := os.OpenFile(serverLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	gin.DefaultWriter = io.MultiWriter(ginLogFile, os.Stdout)
 	tracemap_generator := tracemap.NewTraceMapGenerator(shared.TraceTreeQueue, &cfg)
 	tracemap_generator.Start()
-
+ 
 	// 注册router
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -101,7 +101,7 @@ func Start(configPath, serverLogFile string, shared *servercommon.ControllerInge
 		os.Exit(0)
 	}
 }
-
+ 
 func registerRouterCounter(routers gin.RoutesInfo) {
 	statsd.ApiCounters = make(map[string]*statsd.ApiCounter, len(routers))
 	for _, v := range routers {
@@ -113,7 +113,7 @@ func registerRouterCounter(routers gin.RoutesInfo) {
 		})
 	}
 }
-
+ 
 func ErrHandle() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
@@ -148,7 +148,7 @@ func ErrHandle() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
+ 
 func StatdHandle() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
