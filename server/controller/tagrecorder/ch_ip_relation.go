@@ -400,6 +400,11 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 		return false
 	}
 	for _, podService := range podServices {
+		teamID, err := GetTeamID(podService.Domain, podService.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", i.resourceTypeName, err.Error(), podService)
+		}
+
 		// VPCID：容器服务VPC
 		// IP：容器服务自身IP
 		for _, vifID := range toolDS.podServiceIDToVIFIDs[podService.ID] {
@@ -409,7 +414,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 					IP:             ip,
 					PodServiceID:   podService.ID,
 					PodServiceName: podService.Name,
-					TeamID:         DomainToTeamID[podService.Domain],
+					TeamID:         teamID,
 				}
 				if podService.PodIngressID != 0 {
 					dbItem.PodIngressID = podService.PodIngressID

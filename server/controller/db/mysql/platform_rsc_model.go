@@ -76,13 +76,13 @@ type Process struct {
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	VTapID         uint32    `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID" mapstructure:"VTAP_ID"`
 	PID            uint64    `gorm:"column:pid;type:int;not null;default:0" json:"PID" mapstructure:"PID"`
-	DeviceType     int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICE_TYPE" mapstructure:"DEVICE_TYPE"`
-	DeviceID       int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"DEVICE_ID"`
+	DeviceType     int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICE_TYPE" mapstructure:"RESOURCE_TYPE"`
+	DeviceID       int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"RESOURCE_ID"`
 	PodNodeID      int       `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	VMID           int       `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
 	VPCID          int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID" mapstructure:"EPC_ID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME" mapstructure:"PROCESS_NAME"`
-	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE" mapstructure:"COMMAND_LINE"`
+	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE" mapstructure:"CMD_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME" mapstructure:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME" mapstructure:"START_TIME"`
 	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS" mapstructure:"OS_APP_TAGS"`
