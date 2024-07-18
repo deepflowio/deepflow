@@ -61,6 +61,11 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChPod)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), pod)
+		}
+
 		podServiceID := groupToService[pod.PodGroupID]
 		if pod.DeletedAt.Valid {
 			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
@@ -72,7 +77,7 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 				PodNodeID:    pod.PodNodeID,
 				PodGroupID:   pod.PodGroupID,
 				PodServiceID: podServiceID,
-				TeamID:       tagrecorder.DomainToTeamID[pod.Domain],
+				TeamID:       teamID,
 				DomainID:     tagrecorder.DomainToDomainID[pod.Domain],
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
@@ -86,7 +91,7 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 				PodNodeID:    pod.PodNodeID,
 				PodGroupID:   pod.PodGroupID,
 				PodServiceID: podServiceID,
-				TeamID:       tagrecorder.DomainToTeamID[pod.Domain],
+				TeamID:       teamID,
 				DomainID:     tagrecorder.DomainToDomainID[pod.Domain],
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}

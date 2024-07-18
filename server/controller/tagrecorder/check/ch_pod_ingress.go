@@ -47,11 +47,16 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 	}
 	keyToItem := make(map[IDKey]mysql.ChPodIngress)
 	for _, podIngress := range podIngresses {
+		teamID, err := tagrecorder.GetTeamID(podIngress.Domain, podIngress.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podIngress)
+		}
+
 		if podIngress.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
 				ID:          podIngress.ID,
 				Name:        podIngress.Name + " (deleted)",
-				TeamID:      tagrecorder.DomainToTeamID[podIngress.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[podIngress.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podIngress.SubDomain],
 			}
@@ -59,7 +64,7 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
 				ID:          podIngress.ID,
 				Name:        podIngress.Name,
-				TeamID:      tagrecorder.DomainToTeamID[podIngress.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[podIngress.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podIngress.SubDomain],
 			}

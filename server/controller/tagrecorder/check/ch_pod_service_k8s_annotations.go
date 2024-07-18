@@ -48,6 +48,11 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 
 	keyToItem := make(map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations)
 	for _, podService := range podServices {
+		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), podService)
+		}
+
 		annotationsMap := map[string]string{}
 		annotations := strings.Split(podService.Annotation, ", ")
 		for _, singleAnnotation := range annotations {
@@ -70,7 +75,7 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 				Annotations: string(annotationStr),
 				L3EPCID:     podService.VPCID,
 				PodNsID:     podService.PodNamespaceID,
-				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}

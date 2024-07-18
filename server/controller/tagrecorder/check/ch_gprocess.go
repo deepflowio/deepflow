@@ -47,6 +47,11 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChGProcess)
 	for _, process := range processes {
+		teamID, err := tagrecorder.GetTeamID(process.Domain, process.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), process)
+		}
+
 		if process.DeletedAt.Valid {
 			keyToItem[IDKey{ID: process.ID}] = mysql.ChGProcess{
 				ID:          process.ID,
@@ -54,7 +59,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID:     process.VMID,
 				L3EPCID:     process.VPCID,
-				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
@@ -65,7 +70,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
 				CHostID:     process.VMID,
 				L3EPCID:     process.VPCID,
-				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
