@@ -34,10 +34,10 @@
 #include "config.h"
 #include "df_jattach.h"
 
-#define MAX_EVENTS 4
+#define SYM_COLLECT_MAX_EVENTS 4
 
 // Use thread pool to manage threads for obtaining Java symbols.
-symbol_mgmt_thread_pool_t *g_mgmt_pool;
+symbol_collect_thread_pool_t *g_collect_pool;
 
 /*
  * Use a dynamic array to store the addresses of 'COMPILED_METHOD_UNLOAD'
@@ -48,8 +48,8 @@ static __thread java_unload_addr_str_t *unload_addrs;
 
 static char agent_lib_so_path[MAX_PATH_LENGTH];
 extern int jattach(int pid, int argc, char **argv);
-static int create_symbol_mgmt_task(pid_t pid, options_t * opts,
-				   bool is_same_mntns);
+static int create_symbol_collect_task(pid_t pid, options_t * opts,
+				      bool is_same_mntns);
 
 static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
 {
@@ -280,7 +280,7 @@ static int check_and_clear_unix_socket_files(int pid, bool check_in_use)
 {
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path),
-		 DF_AGENT_MAP_PATH_FMT, pid, pid);
+		 DF_AGENT_MAP_SOCKET_PATH_FMT, pid, pid);
 
 	if (check_in_use) {
 		if (is_file_opened_by_other_processes(target_path) == 1) {
@@ -292,7 +292,7 @@ static int check_and_clear_unix_socket_files(int pid, bool check_in_use)
 	}
 	clear_target_ns_tmp_file(target_path);
 	snprintf(target_path, sizeof(target_path),
-		 DF_AGENT_LOG_PATH_FMT, pid, pid);
+		 DF_AGENT_LOG_SOCKET_PATH_FMT, pid, pid);
 	if (check_in_use) {
 		if (is_file_opened_by_other_processes(target_path) == 1) {
 			ebpf_warning(JAVA_LOG_TAG
@@ -446,7 +446,7 @@ int parse_config(char *opts, options_t * parsed)
 	return 0;
 }
 
-int java_attach_same_namespace(pid_t pid, options_t * opts)
+int symbol_collect_same_namespace(pid_t pid, options_t * opts)
 {
 	// Clear '/tmp/' unix domain sockets files.
 	if (check_and_clear_unix_socket_files(pid, false) == -1)
@@ -464,7 +464,7 @@ int java_attach_same_namespace(pid_t pid, options_t * opts)
 	if (strlen(agent_lib_so_path) == 0)
 		return -1;
 
-	return create_symbol_mgmt_task(pid, opts, true);
+	return create_symbol_collect_task(pid, opts, true);
 }
 
 int create_ipc_socket(const char *path)
@@ -749,8 +749,8 @@ int epoll_events_process(receiver_args_t * args, int epoll_fd,
 	return 0;
 }
 
-static int destroy_task(symbol_mgmt_task_t * task,
-			symbol_mgmt_thread_pool_t * pool)
+static int destroy_task(symbol_collect_task_t * task,
+			symbol_collect_thread_pool_t * pool)
 {
 	receiver_args_t *args = (receiver_args_t *) & task->args;
 	if (args->map_fp) {
@@ -849,15 +849,20 @@ static void *ipc_receiver_main(void *arguments)
 		goto cleanup;
 	}
 
-	struct epoll_event events[MAX_EVENTS];
+	struct epoll_event events[SYM_COLLECT_MAX_EVENTS];
 	while (args->attach_ret == 0) {
-		int n = epoll_wait(epoll_fd, events, MAX_EVENTS,
+		int n = epoll_wait(epoll_fd, events, SYM_COLLECT_MAX_EVENTS,
 				   PROFILER_READER_EPOLL_TIMEOUT);
 		if (n == -1) {
-			ebpf_warning(JAVA_LOG_TAG
-				     "epoll_wait() failed with '%s(%d)'\n",
-				     strerror(errno), errno);
-			goto cleanup;
+			if (errno == EINTR) {
+				// If epoll_wait was interrupted by a signal, retry
+				continue;
+			} else {
+				ebpf_warning(JAVA_LOG_TAG
+					     "epoll_wait() failed with '%s(%d)'\n",
+					     strerror(errno), errno);
+				goto cleanup;
+			}
 		}
 
 		for (int i = 0; i < n; ++i) {
@@ -878,7 +883,7 @@ cleanup:
 
 static void *worker_thread(void *arg)
 {
-	symbol_mgmt_thread_pool_t *pool = arg;
+	symbol_collect_thread_pool_t *pool = arg;
 	pthread_t thread = pthread_self();
 	int thread_idx = pool->thread_count - 1;
 
@@ -903,11 +908,10 @@ static void *worker_thread(void *arg)
 			}
 		}
 		// Get task from queue
-		symbol_mgmt_task_t *task;
+		symbol_collect_task_t *task;
 		task = list_first_entry(&pool->task_list_head,
-					symbol_mgmt_task_t, list);
+					symbol_collect_task_t, list);
 		list_head_del(&task->list);
-		pool->task_count--;
 		task->thread = thread;
 		pool->threads[thread_idx].task = task;
 		pthread_mutex_unlock(&pool->lock);
@@ -922,6 +926,7 @@ static void *worker_thread(void *arg)
 			  "Thread %ld finished task for java processes (PID: %d)\n",
 			  task->thread, task->pid);
 		pthread_mutex_lock(&pool->lock);
+		pool->task_count--;
 		pool->threads[thread_idx].task = NULL;
 		pthread_mutex_unlock(&pool->lock);
 		destroy_task(task, pool);
@@ -966,8 +971,8 @@ static bool check_target_jvmti_attach_files(pid_t pid)
 	return false;
 }
 
-static int thread_pool_add_task(symbol_mgmt_thread_pool_t * pool,
-				symbol_mgmt_task_t * task)
+static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
+				symbol_collect_task_t * task)
 {
 	pthread_mutex_lock(&pool->lock);
 	list_add_tail(&task->list, &pool->task_list_head);
@@ -1023,35 +1028,35 @@ static int thread_pool_add_task(symbol_mgmt_thread_pool_t * pool,
 	return 0;
 }
 
-static int create_symbol_mgmt_task(pid_t pid, options_t * opts,
-				   bool is_same_mntns)
+static int create_symbol_collect_task(pid_t pid, options_t * opts,
+				      bool is_same_mntns)
 {
 	int ret = -1;
-	symbol_mgmt_task_t *task = NULL;
+	symbol_collect_task_t *task = NULL;
 	int map_socket = -1, log_socket = -1;
 
 	// make the sockets accessable from unprivileged user in container
 	umask(0);
 
 	char buffer[PERF_PATH_SZ * 2];
-	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_MAP_PATH_FMT, pid, pid);
+	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_MAP_SOCKET_PATH_FMT, pid, pid);
 
 	if ((map_socket = create_ipc_socket(buffer)) < 0) {
 		goto cleanup;
 	}
-	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_LOG_PATH_FMT, pid, pid);
+	snprintf(buffer, PERF_PATH_SZ, DF_AGENT_LOG_SOCKET_PATH_FMT, pid, pid);
 
 	if ((log_socket = create_ipc_socket(buffer)) < 0) {
 		goto cleanup;
 	}
 
-	task = malloc(sizeof(symbol_mgmt_task_t) + sizeof(*opts));
+	task = malloc(sizeof(symbol_collect_task_t) + sizeof(*opts));
 	if (task == NULL) {
 		ebpf_warning(JAVA_LOG_TAG "malloc() failed, with %s(%d)\n",
 			     strerror(errno), errno);
 		goto cleanup;
 	}
-	memset(task, 0, sizeof(symbol_mgmt_task_t) + sizeof(*opts));
+	memset(task, 0, sizeof(symbol_collect_task_t) + sizeof(*opts));
 	task->pid = pid;
 	task->is_local_mntns = is_same_mntns;
 	task->pid_start_time = get_process_starttime_and_comm(pid, NULL, 0);
@@ -1072,13 +1077,14 @@ static int create_symbol_mgmt_task(pid_t pid, options_t * opts,
 	task->args.replay_done = false;
 	task->args.task = task;
 
-	ret = thread_pool_add_task(g_mgmt_pool, task);
+	ret = thread_pool_add_task(g_collect_pool, task);
 	if (ret < 0) {
 		goto cleanup;
 	}
 
 	snprintf(buffer, PERF_PATH_SZ * 2,
-		 PERF_MAP_FILE_FMT "," PERF_MAP_LOG_FILE_FMT, pid, pid);
+		 JVM_AGENT_SYMS_SOCKET_PATH_FMT ","
+		 JVM_AGENT_LOG_SOCKET_PATH_FMT, pid, pid);
 
 	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
 	 * library as a JVMTI agent.*/
@@ -1127,7 +1133,7 @@ cleanup:
 	return ret;
 }
 
-int java_attach_different_namespace(pid_t pid, options_t * opts)
+int symbol_collect_different_namespace(pid_t pid, options_t * opts)
 {
 	int uid, gid;
 	if (get_target_uid_and_gid(pid, &uid, &gid)) {
@@ -1185,13 +1191,13 @@ int java_attach_different_namespace(pid_t pid, options_t * opts)
 		return -1;
 	}
 
-	return create_symbol_mgmt_task(pid, opts, false);
+	return create_symbol_collect_task(pid, opts, false);
 }
 
-static int symbol_mgmt_thread_pool_init(void)
+static int symbol_collect_thread_pool_init(void)
 {
-	symbol_mgmt_thread_pool_t *pool =
-	    malloc(sizeof(symbol_mgmt_thread_pool_t));
+	symbol_collect_thread_pool_t *pool =
+	    malloc(sizeof(symbol_collect_thread_pool_t));
 	if (pool == NULL) {
 		ebpf_warning(JAVA_LOG_TAG
 			     "Failed to allocate memory for thread pool\n");
@@ -1219,37 +1225,40 @@ static int symbol_mgmt_thread_pool_init(void)
 	pool->threads = NULL;	// Initial thread array is empty
 	pool->stop = 0;
 	init_list_head(&pool->task_list_head);
-	g_mgmt_pool = pool;
+	g_collect_pool = pool;
 
 	return 0;
 }
 
-static symbol_mgmt_task_t *get_task_by_pid(pid_t pid)
+static symbol_collect_task_t *get_task_by_pid(pid_t pid)
 {
-	if (g_mgmt_pool == NULL)
+	if (g_collect_pool == NULL)
 		return NULL;
 
-	symbol_mgmt_task_t *task = NULL;
-	pthread_mutex_lock(&g_mgmt_pool->lock);
-	for (int i = 0; i < g_mgmt_pool->thread_count; i++) {
-		if (g_mgmt_pool->threads[i].task == NULL)
+	symbol_collect_task_t *task = NULL;
+	pthread_mutex_lock(&g_collect_pool->lock);
+	for (int i = 0; i < g_collect_pool->thread_count; i++) {
+		if (g_collect_pool->threads[i].task == NULL)
 			continue;
-		if (g_mgmt_pool->threads[i].task->pid == pid) {
-			task = g_mgmt_pool->threads[i].task;
+		if (g_collect_pool->threads[i].task->pid == pid) {
+			task = g_collect_pool->threads[i].task;
 			break;
 		}
 	}
-	pthread_mutex_unlock(&g_mgmt_pool->lock);
+	pthread_mutex_unlock(&g_collect_pool->lock);
 
 	return task;
 }
 
-int java_attach(pid_t pid, const char *opts)
+int start_java_symbol_collection(pid_t pid, const char *opts)
 {
 	// Initialize a thread pool for managing Java symbols.
-	if (g_mgmt_pool == NULL) {
-		if (symbol_mgmt_thread_pool_init())
+	if (g_collect_pool == NULL) {
+		if (symbol_collect_thread_pool_init()) {
+			ebpf_warning
+			    ("symbol_collect_thread_pool_init() failed.\n");
 			return -1;
+		}
 	}
 
 	options_t parsed_opts;
@@ -1258,9 +1267,9 @@ int java_attach(pid_t pid, const char *opts)
 	}
 
 	if (is_same_mntns(pid)) {
-		return java_attach_same_namespace(pid, &parsed_opts);
+		return symbol_collect_same_namespace(pid, &parsed_opts);
 	} else {
-		return java_attach_different_namespace(pid, &parsed_opts);
+		return symbol_collect_different_namespace(pid, &parsed_opts);
 	}
 }
 
@@ -1271,9 +1280,9 @@ int update_java_symbol_table(pid_t pid)
 		 DF_AGENT_LOCAL_PATH_FMT ".map,"
 		 DF_AGENT_LOCAL_PATH_FMT ".log", pid, pid);
 
-	symbol_mgmt_task_t *task = get_task_by_pid(pid);
+	symbol_collect_task_t *task = get_task_by_pid(pid);
 	if (task == NULL) {
-		return java_attach(pid, opts);
+		return start_java_symbol_collection(pid, opts);
 	}
 
 	u64 start_time = get_process_starttime_and_comm(pid, NULL, 0);
@@ -1286,7 +1295,7 @@ int update_java_symbol_table(pid_t pid)
 	// The task is stale and needs to be cleaned up.
 	if (task->pid_start_time != start_time) {
 		task->args.attach_ret = -1;
-		return java_attach(pid, opts);
+		return start_java_symbol_collection(pid, opts);
 	}
 
 	return 0;

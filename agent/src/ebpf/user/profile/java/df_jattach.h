@@ -40,7 +40,7 @@ typedef struct options {
 	char perf_log_path[PERF_PATH_SZ];
 } options_t;
 
-typedef struct task_s symbol_mgmt_task_t;
+typedef struct task_s symbol_collect_task_t;
 typedef struct receiver_args {
 	pid_t pid;
 	options_t *opts;
@@ -53,7 +53,7 @@ typedef struct receiver_args {
 	FILE *log_fp;
 	volatile int attach_ret;
 	volatile bool replay_done;
-	symbol_mgmt_task_t *task;
+	symbol_collect_task_t *task;
 } receiver_args_t;
 
 struct task_s {
@@ -68,7 +68,7 @@ struct task_s {
 
 typedef struct {
 	pthread_t thread;
-	symbol_mgmt_task_t *task;
+	symbol_collect_task_t *task;
 } task_thread_t;
 
 typedef struct {
@@ -79,7 +79,7 @@ typedef struct {
 	int task_count;
 	int thread_count;
 	int stop;
-} symbol_mgmt_thread_pool_t;
+} symbol_collect_thread_pool_t;
 
 int update_java_symbol_table(pid_t pid);
 void clear_target_ns_tmp_file(const char *target_path);

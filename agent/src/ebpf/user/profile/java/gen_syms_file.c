@@ -28,13 +28,20 @@
 #include "gen_syms_file.h"
 #include "config.h"
 #include "df_jattach.h"
+#include "../perf_profiler.h"
+#include "../../elf.h"
+#include "../../load.h"
+#include "../../perf_reader.h"
+#include "../../bihash_8_8.h"
+#include "../stringifier.h"
+#include "../profile_common.h"
 
 static pthread_mutex_t list_lock;
 
 /* For Java symbols update task. */
 static struct list_head java_syms_update_tasks_head;
 
-/** Generate Java symbol file.
+/** Collect Java symbols.
  *
  * @pid Process ID
  * @ret_val
@@ -43,7 +50,7 @@ static struct list_head java_syms_update_tasks_head;
  *   'true' indicates that an error has occurred at some point,
  *   'false' indicates that no error has occurred.
  */
-void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
+void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 {
 	/*
 	 * If an error has occurred at some point, no further retries will
@@ -109,6 +116,10 @@ void add_java_syms_update_task(struct symbolizer_proc_info *p_info)
 
 void java_syms_update_main(void *arg)
 {
+	// Ensure the profiler is initialized and currently running
+	while (!profiler_is_running())
+		CLIB_PAUSE();
+
 	pthread_mutex_init(&list_lock, NULL);
 	init_list_head(&java_syms_update_tasks_head);
 	struct java_syms_update_task *task;
@@ -131,8 +142,8 @@ void java_syms_update_main(void *arg)
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
 				int ret;
-				gen_java_symbols_file(p->pid, &ret,
-						      p->gen_java_syms_file_err);
+				collect_java_symbols(p->pid, &ret,
+						     p->gen_java_syms_file_err);
 				if (ret != JAVA_SYMS_ERR) {
 					if (ret == JAVA_SYMS_NEED_UPDATE)
 						p->cache_need_update = true;

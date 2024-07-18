@@ -861,14 +861,13 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			if (ctx->use_delta_time) {
 				if (ctx->sample_period > 0) {
-					((stack_trace_msg_t *) kv.
-					 msg_ptr)->count +=
-		   				(ctx->sample_period / 1000);
+					((stack_trace_msg_t *) kv.msg_ptr)->
+					    count +=
+					    (ctx->sample_period / 1000);
 				} else {
 					// Using microseconds for storage.
-					((stack_trace_msg_t *) kv.
-					 msg_ptr)->count +=
-		 				(v->duration_ns / 1000);
+					((stack_trace_msg_t *) kv.msg_ptr)->
+					    count += (v->duration_ns / 1000);
 				}
 
 			} else {
@@ -1109,6 +1108,19 @@ bool check_profiler_regex(struct profiler_context *ctx, const char *name)
 				return true;
 			}
 		}
+	}
+
+	return false;
+}
+
+bool profiler_is_running(void)
+{
+	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
+		if (g_ctx_array[i] == NULL)
+			continue;
+		if (g_ctx_array[i]->enable_bpf_profile == 1)
+			return true;
+
 	}
 
 	return false;

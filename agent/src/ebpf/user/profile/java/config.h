@@ -55,12 +55,12 @@ struct symbol_metadata {
 #define JAVA_LOG_TAG "[JAVA] "
 
 #define PERF_PATH_SZ 256
-#define DF_AGENT_MAP_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-symbols-pid%d.socket"
-#define DF_AGENT_LOG_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-jvmti-logs-pid%d.socket"
+#define DF_AGENT_MAP_SOCKET_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-symbols-pid%d.socket"
+#define DF_AGENT_LOG_SOCKET_PATH_FMT "/proc/%d/root/tmp/.deepflow-java-jvmti-logs-pid%d.socket"
 
 #define DF_AGENT_LOCAL_PATH_FMT "/tmp/perf-%d"
 
-#define PERF_MAP_FILE_FMT "/tmp/.deepflow-java-symbols-pid%d.socket"
-#define PERF_MAP_LOG_FILE_FMT "/tmp/.deepflow-java-jvmti-logs-pid%d.socket"
+#define JVM_AGENT_SYMS_SOCKET_PATH_FMT "/tmp/.deepflow-java-symbols-pid%d.socket"
+#define JVM_AGENT_LOG_SOCKET_PATH_FMT "/tmp/.deepflow-java-jvmti-logs-pid%d.socket"
 
 #endif /* DF_JAVA_CONFIG_H */

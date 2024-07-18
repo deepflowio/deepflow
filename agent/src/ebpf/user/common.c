@@ -1037,8 +1037,8 @@ int df_enter_ns(int pid, const char *type, int *self_fd)
 			int result = syscall(__NR_setns, newns, 0);
 			close(newns);
 			if (result < 0) {
-				ebpf_warning("setns() failed with %s(%d)\n",
-					     strerror(errno), errno);
+				ebpf_warning("setns(%s) failed with %s(%d)\n",
+					     type, strerror(errno), errno);
 				close(*self_fd);
 				*self_fd = -1;
 			}
