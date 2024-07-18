@@ -48,6 +48,7 @@
 #include "java/df_jattach.h"
 #include "profile_common.h"
 #include "../proc.h"
+#include "stringifier.h"
 
 /*
  * This section is for symbolization of Java addresses, and we need
@@ -576,6 +577,10 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	msg->stime = stime;
 	msg->netns_id = ns_id;
 	msg->profiler_type = ctx->type;
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		// TODO: add mem_in_use type
+		msg->event_type = PROFILE_EVENT_MEM_ALLOC;
+	}
 	if (container_id != NULL) {
 		strcpy_s_inline(msg->container_id, sizeof(msg->container_id),
 				container_id, strlen(container_id));
@@ -623,13 +628,15 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	}
 
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
-	if (ctx->use_delta_time) {
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		msg->count = v->ext_data.memory.size;
+	} else if (ctx->use_delta_time) {
 		// If sampling is used
 		if (ctx->sample_period > 0) {
 			msg->count = ctx->sample_period / 1000;
 		} else {
 			// Using microseconds for storage.
-			msg->count = v->duration_ns / 1000;
+			msg->count = v->ext_data.off_cpu.duration_ns / 1000;
 		}
 	} else {
 		msg->count = 1;
@@ -860,7 +867,10 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			if (ctx->use_delta_time) {
-				if (ctx->sample_period > 0) {
+				if (ctx->type == PROFILER_TYPE_MEMORY) {
+					((stack_trace_msg_t *) kv.
+					 msg_ptr)->count += v->ext_data.memory.size;
+				} else if (ctx->sample_period > 0) {
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
 		   				(ctx->sample_period / 1000);
@@ -868,9 +878,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 					// Using microseconds for storage.
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
-		 				(v->duration_ns / 1000);
+		 				(v->ext_data.off_cpu.duration_ns / 1000);
 				}
-
 			} else {
 				((stack_trace_msg_t *) kv.msg_ptr)->count++;
 			}
@@ -891,7 +900,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 						    stack_str_hash, matched,
-						    process_name, info_p);
+						    process_name, info_p, ctx->type == PROFILER_TYPE_MEMORY);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -902,6 +911,11 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			int str_len = strlen(trace_str) + 2;
 			if (matched)
 				str_len += strlen(v->comm) + sizeof(pre_tag);
+
+			if (ctx->type == PROFILER_TYPE_MEMORY) {
+				rewrite_java_symbol(v->ext_data.memory.class_name);
+				str_len += strlen(v->ext_data.memory.class_name) + 1;
+			}
 
 			int len = sizeof(stack_trace_msg_t) + str_len;
 			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
@@ -920,13 +934,16 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 
 			snprintf(pre_tag, sizeof(pre_tag), "%s ",
 				 v->pid == v->tgid ? "[p]" : "[t]");
-			if (matched)
-				snprintf((char *)&msg->data[0], str_len,
-					 "%s%s;%s", pre_tag, v->comm,
-					 trace_str);
-			else
-				snprintf((char *)&msg->data[0], str_len, "%s",
-					 trace_str);
+
+			char *msg_str = (char *)&msg->data[0];
+			int offset = 0;
+			if (matched) {
+				offset += snprintf(msg_str + offset, str_len - offset, "%s%s;", pre_tag, v->comm);
+			}
+			offset += snprintf(msg_str + offset, str_len - offset, "%s", trace_str);
+			if (ctx->type == PROFILER_TYPE_MEMORY) {
+				offset += snprintf(msg_str + offset, str_len - offset, ";%s", v->ext_data.memory.class_name);
+			}
 
 			msg->data_len = strlen((char *)msg->data);
 			clib_mem_free(trace_str);

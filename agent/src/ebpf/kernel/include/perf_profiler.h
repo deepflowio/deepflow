@@ -49,7 +49,16 @@ struct stack_trace_key_t {
 	int kernstack;
 	int userstack;
 	__u64 timestamp;
-	__u64 duration_ns;
+
+	union {
+		struct {
+			__u64 duration_ns;
+		} off_cpu;
+		struct {
+			__u64 size;
+			char class_name[32]; // TODO: change to a symbol id
+		} memory;
+	} ext_data;
 };
 
 #endif /* DF_BPF_PERF_PROFILER_H */

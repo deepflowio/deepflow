@@ -69,7 +69,9 @@ enum {
 //thread index for bihash
 enum {
 	THREAD_PROFILER_READER_IDX = 0,
-	THREAD_PROC_ACT_IDX_BASE = 2,
+	THREAD_OFFCPU_READER_IDX = 1,
+	THREAD_MEMORY_READER_IDX = 2,
+	THREAD_PROC_ACT_IDX_BASE = 3,
 };
 
 /*
@@ -100,6 +102,7 @@ enum {
 #define GO_TRACING_TIMEOUT_DEFAULT      120
 
 #define SK_TRACER_NAME			"socket-trace"
+#define CP_TRACER_NAME	                "continuous_profiler"
 
 #define DATADUMP_FILE_PATH_SIZE		1024
 #define DATADUMP_FILE_PATH_PREFIX	"/var/log"

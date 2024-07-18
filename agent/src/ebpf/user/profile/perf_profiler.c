@@ -51,7 +51,6 @@
 #include "../perf_profiler_bpf_common.c"
 
 #define LOG_CP_TAG	"[CP] "
-#define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
 #define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
@@ -187,7 +186,7 @@ static void print_cp_data(stack_trace_msg_t * msg)
 	snprintf(buff, sizeof(buff),
 		 "%s [cpdbg] type %d netns_id %lu container_id %s pid %u tid %u "
 		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
-		 " %u cpu %u count %u tiemstamp %lu datalen %u data %s\n",
+		 " %u cpu %u count %lu tiemstamp %lu datalen %u data %s\n",
 		 timestamp, msg->profiler_type, msg->netns_id,
 		 cid, msg->pid, msg->tid, msg->process_name, msg->comm,
 		 msg->stime, msg->u_stack_id,
@@ -644,6 +643,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	memset(tps, 0, sizeof(*tps));
 	init_list_head(&tps->uprobe_syms_head);
 	CP_PROFILE_SET_PROBES(tps);
+	collect_extended_uprobe_syms_from_procfs(tps);
 
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
@@ -678,10 +678,10 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * msg)
 	char str[len];
 	/* profile regex match ? */
 	if (msg->stime > 0)
-		snprintf(str, len, "%s (%d);%s %u\n", msg->process_name,
+		snprintf(str, len, "%s (%d);%s %lu\n", msg->process_name,
 			 msg->pid, msg->data, msg->count);
 	else
-		snprintf(str, len, "%s;%s %u\n", msg->process_name,	/*msg->pid, */
+		snprintf(str, len, "%s;%s %lu\n", msg->process_name,	/*msg->pid, */
 			 msg->data, msg->count);
 
 	os_puts(folded_file, str, strlen(str), false);

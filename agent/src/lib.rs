@@ -22,7 +22,7 @@ mod config;
 pub mod debug;
 pub mod dispatcher;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-mod ebpf;
+pub mod ebpf;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 mod ebpf_dispatcher;
 mod error;

@@ -1479,6 +1479,16 @@ vtap_group_id: g-xxxxxx
       ##   time exceeding 1 hour.
       #minblock: 50us
 
+    ## Memory profile configuration, Enterprise Edition Only.
+    #memory-profile:
+      ## eBPF memory Profile Switch
+      ## Default: true
+      #disabled: true
+
+      ## Memory trace process name
+      ## Default: ^java
+      #regex: ^java
+
     ## eBPF OOOR (Out-Of-Order-Reassembly) Cache Size
     ## Default: 16. Range: [8, 1024]
     ## Note: When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size` eBPF

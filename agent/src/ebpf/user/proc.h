@@ -168,4 +168,30 @@ void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
 void get_container_id_from_procs_cache(pid_t pid, uint8_t * id, int id_size);
 void update_proc_info_cache(pid_t pid, enum proc_act_type type);
+
+// Lower version kernels do not support hooking so files in containers
+bool kernel_version_check(void);
+bool process_probing_check(int pid);
+
+struct process_create_event {
+	struct list_head list;
+	int pid;
+	uint32_t expire_time;
+	struct bpf_tracer *tracer;
+};
+
+typedef struct {
+	struct list_head head;
+	pthread_mutex_t m;
+} proc_event_list_t;
+
+void add_event_to_proc_list(proc_event_list_t *list, struct bpf_tracer *tracer, int pid);
+void remove_event(proc_event_list_t *list, struct process_create_event *event);
+struct process_create_event *get_first_event(proc_event_list_t *list);
+
+char *get_so_path_by_pid_and_name(int pid, const char *so_name);
+int add_probe_sym_to_tracer_probes(int pid, const char *path,
+					  struct tracer_probes_conf *conf,
+					  struct symbol symbols[], size_t n_symbols);
+
 #endif /* _USER_PROC_H_ */

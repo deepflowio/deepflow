@@ -17,11 +17,11 @@
 #ifndef DF_USER_PERF_PROFILER_H
 #define DF_USER_PERF_PROFILER_H
 #define CP_PROFILE_SET_PROBES(T)
-#include "extended/extended.h"
+#include "../extended/extended.h"
 #include "../bihash_24_8.h"
 #include "../../kernel/include/perf_profiler.h"
 
-#define PROFILER_CTX_NUM 2
+#define PROFILER_CTX_NUM 3
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and
@@ -86,7 +86,16 @@ typedef struct {
 enum {
 	PROFILER_TYPE_UNKNOWN,
 	PROFILER_TYPE_ONCPU,
+	PROFILER_TYPE_OFFCPU,
+	PROFILER_TYPE_MEMORY,
 	PROFILER_TYPE_NUM,
+};
+
+enum {
+	PROFILE_EVENT_UNKNOWN,
+	PROFILE_EVENT_MEM_ALLOC,
+	PROFILE_EVENT_MEM_IN_USE,
+	PROFILE_EVENT_NUM,
 };
 
 /*
@@ -135,6 +144,7 @@ enum {
  */
 typedef struct {
 	u8 profiler_type;
+	u8 event_type;
 	u64 time_stamp;
 	u32 pid;
 	u32 tid;
@@ -143,7 +153,7 @@ typedef struct {
 	u32 u_stack_id;
 	u32 k_stack_id;
 	u32 cpu;
-	u32 count;
+	u64 count;
 	u8 comm[TASK_COMM_LEN];
 	u8 process_name[TASK_COMM_LEN];
 	u8 container_id[CONTAINER_ID_SIZE];

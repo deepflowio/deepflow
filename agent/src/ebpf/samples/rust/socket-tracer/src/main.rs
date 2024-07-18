@@ -420,6 +420,10 @@ fn main() {
         //    FEATURE_UPROBE_GOLANG,
         //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
         //);
+        set_feature_regex(
+            FEATURE_UPROBE_JAVA,
+            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+        );
 
         //set_io_event_collect_mode(1);
 
