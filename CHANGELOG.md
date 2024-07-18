@@ -8,6 +8,12 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Fix query error when database is prometheus [#7467](https://github.com/deepflowio/deepflow/pull/7467) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: stats_interval default should be 10 [#7465](https://github.com/deepflowio/deepflow/pull/7465) by [lzf575](https://github.com/lzf575)
+* fix: update tagrecorder check subdomain team id [#7461](https://github.com/deepflowio/deepflow/pull/7461) by [roryye](https://github.com/roryye)
+* fix: process resource api does not response sub_domain field [#7450](https://github.com/deepflowio/deepflow/pull/7450) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: remove agent group name check [#7444](https://github.com/deepflowio/deepflow/pull/7444) by [roryye](https://github.com/roryye)
+* fix: agent command heart beat [#7438](https://github.com/deepflowio/deepflow/pull/7438) by [roryye](https://github.com/roryye)
 * fix: recorder reports wrong sub_domain infomation in domain logs [#7441](https://github.com/deepflowio/deepflow/pull/7441) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: unable to delete sub_domain related resource [#7439](https://github.com/deepflowio/deepflow/pull/7439) by [SongZhen0704](https://github.com/SongZhen0704)
 * fix: Fix the problem of duplicate fields in select [#7434](https://github.com/deepflowio/deepflow/pull/7434) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -70,6 +76,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Tracemap add trace_id_query_iterations config [#7458](https://github.com/deepflowio/deepflow/pull/7458) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: add agent command type probe [#7433](https://github.com/deepflowio/deepflow/pull/7433) by [roryye](https://github.com/roryye)
 * feat: Alarm event field optimization [#7409](https://github.com/deepflowio/deepflow/pull/7409) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * feat: Get metrics ignore certain databases [#7427](https://github.com/deepflowio/deepflow/pull/7427) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -128,6 +135,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: agent modify the system free memory alert logic [#7455](https://github.com/deepflowio/deepflow/pull/7455) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: trace_tree add topic field [#7418](https://github.com/deepflowio/deepflow/pull/7418) by [lzf575](https://github.com/lzf575)
 * refactor: trace-id-with-index is enabled by default and the type is hash [#7416](https://github.com/deepflowio/deepflow/pull/7416) by [lzf575](https://github.com/lzf575)
 * refactor: Ingester add default value config [#7395](https://github.com/deepflowio/deepflow/pull/7395) by [lzf575](https://github.com/lzf575)
@@ -139,6 +147,7 @@
 * refactor: Change crate name [#7155](https://github.com/deepflowio/deepflow/pull/7155) by [rvql](https://github.com/rvql)
 
 #### Performance
+* perf: enhance profile api performance [#7401](https://github.com/deepflowio/deepflow/pull/7401) by [sharang](https://github.com/sharang)
 * perf: optimize trace_tree slice assignment [#7414](https://github.com/deepflowio/deepflow/pull/7414) by [lzf575](https://github.com/lzf575)
 * perf: improve trace_tree search index [#7413](https://github.com/deepflowio/deepflow/pull/7413) by [lzf575](https://github.com/lzf575)
 * perf: add setting ttl_only_drop_parts to the CK table to make TTL more efficient [#7265](https://github.com/deepflowio/deepflow/pull/7265) by [lzf575](https://github.com/lzf575)

@@ -11,6 +11,12 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: Fix query error when database is prometheus [#7469](https://github.com/deepflowio/deepflow/pull/7469) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: stats_interval default should be 10 [#7466](https://github.com/deepflowio/deepflow/pull/7466) by [lzf575](https://github.com/lzf575)
+* fix: update tagrecorder check subdomain team id [#7463](https://github.com/deepflowio/deepflow/pull/7463) by [roryye](https://github.com/roryye)
+* fix: unable delete sub_domain related resource [#7456](https://github.com/deepflowio/deepflow/pull/7456) by [askyrie](https://github.com/askyrie)
+* fix: remove agent group name check [#7446](https://github.com/deepflowio/deepflow/pull/7446) by [roryye](https://github.com/roryye)
+* fix: unable delete sub_domain related resource [#7442](https://github.com/deepflowio/deepflow/pull/7442) by [SongZhen0704](https://github.com/SongZhen0704)
 * fix: process resource api does not response sub_domain field [#7448](https://github.com/deepflowio/deepflow/pull/7448) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Fix the problem of duplicate fields in select [#7436](https://github.com/deepflowio/deepflow/pull/7436) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: recorder reports wrong sub_domain infomation in domain logs [#7435](https://github.com/deepflowio/deepflow/pull/7435) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -71,6 +77,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: Tracemap add trace_id_query_iterations config [#7460](https://github.com/deepflowio/deepflow/pull/7460) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: Get metrics ignore certain databases [#7453](https://github.com/deepflowio/deepflow/pull/7453) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: add agent command type probe [#7440](https://github.com/deepflowio/deepflow/pull/7440) by [roryye](https://github.com/roryye)
 * feat:  Ingester support trace_tree [#7443](https://github.com/deepflowio/deepflow/pull/7443) by [lzf575](https://github.com/lzf575)
 * feat: agent - dispatcher support set cpu affinity [#7423](https://github.com/deepflowio/deepflow/pull/7423) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: create sub domian set default team id [#7421](https://github.com/deepflowio/deepflow/pull/7421) by [askyrie](https://github.com/askyrie)
