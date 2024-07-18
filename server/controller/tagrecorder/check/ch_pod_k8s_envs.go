@@ -48,6 +48,11 @@ func (k *ChPodK8sEnvs) generateNewData() (map[K8sEnvsKey]mysql.ChPodK8sEnvs, boo
 
 	keyToItem := make(map[K8sEnvsKey]mysql.ChPodK8sEnvs)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod)
+		}
+
 		envsMap := map[string]string{}
 		envs := strings.Split(pod.ENV, ", ")
 		for _, singleEnv := range envs {
@@ -70,7 +75,7 @@ func (k *ChPodK8sEnvs) generateNewData() (map[K8sEnvsKey]mysql.ChPodK8sEnvs, boo
 				Envs:        string(envStr),
 				L3EPCID:     pod.VPCID,
 				PodNsID:     pod.PodNamespaceID,
-				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
