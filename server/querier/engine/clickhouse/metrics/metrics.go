@@ -225,7 +225,7 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 				newAllMetrics[field] = metric
 			}
 		}
-	} else if db == ckcommon.DB_NAME_PROMETHEUS {
+	} else if db == ckcommon.DB_NAME_PROMETHEUS && field == "value" {
 		metric := NewMetrics(
 			0, field,
 			field, "", METRICS_TYPE_COUNTER,
@@ -258,21 +258,22 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 		return metric, ok
 	} else {
 		// xx_id is not a metric
-		noIDField := strings.ReplaceAll(field, "_id", "")
-		_, ok = newAllMetrics[noIDField]
-		if ok {
-			return nil, false
-		} else {
-			// Dynamic tag metrics
-			dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background())
-			if err != nil {
-				log.Error("Failed to get tag type dynamic metrics")
+		if strings.Contains(field, "_id") {
+			noIDField := strings.ReplaceAll(field, "_id", "")
+			_, ok = newAllMetrics[noIDField]
+			if ok {
 				return nil, false
 			}
-			GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
-			metric, ok := newAllMetrics[field]
-			return metric, ok
 		}
+		// Dynamic tag metrics
+		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background())
+		if err != nil {
+			log.Error("Failed to get tag type dynamic metrics")
+			return nil, false
+		}
+		GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
+		metric, ok := newAllMetrics[field]
+		return metric, ok
 	}
 }
 
