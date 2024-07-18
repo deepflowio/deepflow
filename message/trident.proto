@@ -1075,9 +1075,17 @@ enum CommandType {
     KUBERNETES = 1;
 }
 
+enum ParamType {
+    PF_TEXT = 0;
+    PF_BOOLEAN = 1;
+}
+
 message CommandParam {
     optional string name = 1;
     optional string regex = 2;
+    optional bool required = 3;
+    optional ParamType param_type = 4;
+    optional string description = 5;
 }
 
 message RemoteCommand {

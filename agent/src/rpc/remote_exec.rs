@@ -64,11 +64,17 @@ pub use public::rpc::remote_exec::*;
 const MIN_BATCH_LEN: usize = 1024;
 const KUBERNETES_NAMESPACE_PARAM: &'static Parameter = &Parameter {
     name: "ns",
-    regex: "^[\\-0-9a-z]{1,64}$", // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
+    regex: Some("^[\\-0-9a-z]{1,64}$"), // k8s ns regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'
+    required: true,
+    param_type: ParamType::Text,
+    description: "The Kubernetes namespace to run the command in",
 };
 const KUBERNETES_POD_PARAM: &'static Parameter = &Parameter {
     name: "pod",
-    regex: "^[\\-.0-9a-z]{1,256}$", // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    regex: Some("^[\\-.0-9a-z]{1,256}$"), // k8s pod regex is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    required: true,
+    param_type: ParamType::Text,
+    description: "The Kubernetes pod to run the command in",
 };
 const CMD_TYPE_SYSTEM: &'static str = "system";
 const CMD_TYPE_KUBERNETES: &'static str = "kubernetes";
@@ -557,7 +563,19 @@ impl Stream for Responser {
                                             .iter()
                                             .map(|p| pb::CommandParam {
                                                 name: Some(p.name.to_owned()),
-                                                regex: Some(p.regex.to_owned()),
+                                                regex: Some(
+                                                    p.regex
+                                                        .unwrap_or(DEFAULT_PARAM_REGEX)
+                                                        .to_owned(),
+                                                ),
+                                                required: Some(p.required),
+                                                param_type: match p.param_type {
+                                                    ParamType::Boolean => {
+                                                        Some(pb::ParamType::PfBoolean as i32)
+                                                    }
+                                                    _ => Some(pb::ParamType::PfText as i32),
+                                                },
+                                                description: Some(p.description.to_owned()),
                                             })
                                             .collect(),
                                         type_name: Some(c.command_type.to_string()),
@@ -599,16 +617,6 @@ impl Stream for Responser {
                             let cmdline = &cmd.cmdline;
                             let params =
                                 Params(&msg.params[..msg.params.len().min(max_param_nums())]);
-                            if !params.is_valid() {
-                                return self.command_failed_helper(
-                                    msg.request_id,
-                                    None,
-                                    format!(
-                                        "rejected run command '{}' with invalid params: {:?}",
-                                        cmdline, params
-                                    ),
-                                );
-                            }
                             if let Err(e) = cmd.check_params(&params) {
                                 return self.command_failed_helper(
                                     msg.request_id,
