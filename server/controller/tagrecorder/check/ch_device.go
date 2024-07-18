@@ -442,7 +442,10 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 	}
 
 	for _, podService := range podServices {
-
+		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", d.resourceTypeName, err.Error(), podService)
+		}
 		if podService.DeletedAt.Valid {
 			podServiceKey := DeviceKey{
 				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
@@ -453,7 +456,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:    podService.ID,
 				Name:        podService.Name + " (deleted)",
 				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
@@ -468,7 +471,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:    podService.ID,
 				Name:        podService.Name + " (deleted)",
 				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}

@@ -45,6 +45,11 @@ func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudT
 
 	keyToItem := make(map[CloudTagKey]mysql.ChPodNSCloudTag)
 	for _, podNamespace := range podNamespaces {
+		teamID, err := tagrecorder.GetTeamID(podNamespace.Domain, podNamespace.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podNamespace)
+		}
+
 		for k, v := range podNamespace.CloudTags {
 			key := CloudTagKey{
 				ID:  podNamespace.ID,
@@ -54,7 +59,7 @@ func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudT
 				ID:          podNamespace.ID,
 				Key:         k,
 				Value:       v,
-				TeamID:      tagrecorder.DomainToTeamID[podNamespace.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[podNamespace.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNamespace.SubDomain],
 			}
