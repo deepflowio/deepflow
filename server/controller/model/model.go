@@ -754,7 +754,7 @@ type RemoteExecReq struct {
 
 	OutputFormat   *trident.OutputFormat `json:"output_format"` // 0: "TEXT", 1: "BINARY"
 	OutputFilename string                `json:"output_filename"`
-	CMD            string                `json:"cmd"`
+	CMD            string                `json:"cmd" binding:"required"`
 }
 
 type RemoteExecResp struct {

@@ -62,7 +62,7 @@ var (
 	}
 	probeCommandMap = map[string]struct{}{
 		"ping":       struct{}{},
-		"tcpping":    struct{}{},
+		"tcping":     struct{}{},
 		"curl":       struct{}{},
 		"dig":        struct{}{},
 		"nslookup":   struct{}{},
@@ -78,7 +78,6 @@ func NewAgentCMD() *AgentCMD {
 
 func (c *AgentCMD) RegisterTo(e *gin.Engine) {
 	agentRoutes := e.Group("/v1/agent/:id-or-name")
-	agentRoutes.Use(AdminPermissionVerificationMiddleware())
 
 	agentRoutes.GET("/cmd", forwardToServerConnectedByAgent(), getCMDAndNamespaceHandler)
 	agentRoutes.POST("/cmd/run", forwardToServerConnectedByAgent(), cmdRunHandler)
@@ -197,6 +196,19 @@ func getCMDAndNamespaceHandler(c *gin.Context) {
 		return
 	}
 
+	userType, _ := c.Get(common.HEADER_KEY_X_USER_TYPE)
+	if !(userType == common.USER_TYPE_SUPER_ADMIN || userType == common.USER_TYPE_ADMIN) {
+		var cmds []*trident.RemoteCommand
+		for _, item := range data.RemoteCommand {
+			_, ok1 := profileCommandMap[*item.Cmd]
+			_, ok2 := probeCommandMap[*item.Cmd]
+			if ok1 || ok2 {
+				cmds = append(cmds, item)
+			}
+		}
+		data.RemoteCommand = cmds
+	}
+
 	if filterCommandMap, ok := agentCommandMap[AgentCommandType(c.Query("type"))]; ok {
 		var cmds []*trident.RemoteCommand
 		for _, item := range data.RemoteCommand {
@@ -233,6 +245,17 @@ func cmdRunHandler(c *gin.Context) {
 		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 		return
 	}
+	// Profile commands and probe commands are available to everyone.
+	userType, _ := c.Get(common.HEADER_KEY_X_USER_TYPE)
+	if !(userType == common.USER_TYPE_SUPER_ADMIN || userType == common.USER_TYPE_ADMIN) {
+		_, ok1 := profileCommandMap[req.CMD]
+		_, ok2 := probeCommandMap[req.CMD]
+		if !(ok1 || ok2) {
+			StatusForbiddenResponse(c, fmt.Sprintf("only super admin and admin can operate command(%s)", req.CMD))
+			return
+		}
+	}
+
 	agentReq := trident.RemoteExecRequest{
 		ExecType: trident.ExecutionType_RUN_COMMAND.Enum(),
 		// CommandId:    req.CommandId, // deprecated
