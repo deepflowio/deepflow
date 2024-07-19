@@ -682,6 +682,7 @@ extern "C" {
     pub fn enable_oncpu_profiler() -> c_int;
 
     pub fn disable_oncpu_profiler() -> c_int;
+    pub fn show_collect_pool();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "off_cpu")] {

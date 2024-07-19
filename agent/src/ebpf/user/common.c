@@ -673,7 +673,7 @@ unsigned int fetch_kernel_version_code(void)
 	int major, minor, rev, num;
 	ret = fetch_kernel_version(&major, &minor, &rev, &num);
 	if (ret != ETR_OK) {
-		printf("fetch_kernel_version error\n");
+		ebpf_warning("fetch_kernel_version error\n");
 		return 0;
 	}
 
@@ -891,6 +891,101 @@ u64 get_netns_id_from_pid(pid_t pid)
 	return strtoull(netns_id_str, NULL, 10);
 }
 
+// Function to retrieve the host PID from the first line of /proc/pid/sched
+// The expected format is "java (1234, #threads: 12)"
+// where 1234 is the host PID (before Linux 4.1)
+static int get_host_pid_from_sched(const char *path)
+{
+	static char *line = NULL;
+	size_t size = 0;
+	int host_pid = -1;
+
+	FILE *sched_file = fopen(path, "r");
+	if (sched_file == NULL) {
+		ebpf_warning("Error opening file %s: %s (errno: %d)\n", path,
+			     strerror(errno), errno);
+		return -1;
+	}
+	// Read the first line of the file
+	if (getline(&line, &size, sched_file) != -1) {
+		// Locate the last '(' character in the line
+		char *pid_start = strrchr(line, '(');
+		if (pid_start != NULL) {
+			// Convert the PID string to an integer
+			host_pid = atoi(pid_start + 1);
+		} else {
+			ebpf_warning("Error parsing PID from line: %s\n", line);
+		}
+	} else {
+		ebpf_warning("Error reading from file %s: %s (errno: %d)\n",
+			     path, strerror(errno), errno);
+	}
+
+	fclose(sched_file);
+	free(line);		// Free the allocated memory for line
+	return host_pid;
+}
+
+// Linux kernels < 4.1 do not export NStgid field in /proc/pid/status.
+// Resolve by traversing /proc/pid/sched in the container.
+static int find_nspid_in_container(int host_pid)
+{
+	char path[300];
+
+	// Check if we are already in the same PID namespace
+	struct stat self_ns_stat, target_ns_stat;
+	if (stat("/proc/self/ns/pid", &self_ns_stat) == -1) {
+		ebpf_warning("stat /proc/self/ns/pid failed: %s (errno: %d)\n",
+			     strerror(errno), errno);
+		return -1;
+	}
+	snprintf(path, sizeof(path), "/proc/%d/ns/pid", host_pid);
+	if (stat(path, &target_ns_stat) == -1) {
+		ebpf_warning("stat %s failed: %s (errno: %d)\n", path,
+			     strerror(errno), errno);
+		return -1;
+	}
+	if (self_ns_stat.st_ino == target_ns_stat.st_ino) {
+		return host_pid;
+	}
+	// Browse all PIDs in the namespace of the target process to find the matching PID
+	snprintf(path, sizeof(path), "/proc/%d/root/proc", host_pid);
+	DIR *dir = opendir(path);
+	if (dir == NULL) {
+		ebpf_warning("opendir %s failed: %s (errno: %d)\n", path,
+			     strerror(errno), errno);
+		return -1;
+	}
+
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL) {
+		if (isdigit(entry->d_name[0])) {
+			// Check if /proc/<container-pid>/sched points back to <host_pid>
+			snprintf(path, sizeof(path),
+				 "/proc/%d/root/proc/%s/sched", host_pid,
+				 entry->d_name);
+			if (get_host_pid_from_sched(path) == host_pid) {
+				int nspid = atoi(entry->d_name);
+				if (closedir(dir) == -1) {
+					ebpf_warning
+					    ("closedir failed: %s (errno: %d)\n",
+					     strerror(errno), errno);
+				}
+				return nspid;
+			}
+		}
+	}
+
+	if (closedir(dir) == -1) {
+		ebpf_warning("closedir failed: %s (errno: %d)\n",
+			     strerror(errno), errno);
+	}
+
+	ebpf_warning("No matching PID found in container for host PID %d\n",
+		     host_pid);
+	return -1;		// Return -1 if no matching PID is found
+}
+
 int get_nspid(int pid)
 {
 	int ns_pid_1, ns_pid_2;
@@ -922,8 +1017,7 @@ int get_nspid(int pid)
 	}
 
 	fclose(file);
-	ebpf_info("Not find NSpid\n", status_path);
-	return ETR_NOTEXIST;
+	return find_nspid_in_container(pid);
 }
 
 int get_target_uid_and_gid(int target_pid, int *uid, int *gid)

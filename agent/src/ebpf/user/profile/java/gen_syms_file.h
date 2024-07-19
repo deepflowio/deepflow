@@ -21,8 +21,6 @@
 #define JAVA_SYMS_ERR		1
 #define JAVA_SYMS_NEED_UPDATE	2
 
-#define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
-
 struct java_syms_update_task {
 	struct list_head list;
 	struct symbolizer_proc_info *p;

@@ -213,17 +213,16 @@ tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/common.c user/mem.c user/vec.c user/profile/java/df_jattach.c libjattach.a
+$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/common.c user/mem.c user/vec.c user/profile/java/df_jattach.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)
-	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/common.c user/mem.c user/vec.c user/profile/java/df_jattach.c libjattach.a -o $@ -ldl -lpthread
+	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/common.c user/mem.c user/vec.c user/profile/java/df_jattach.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 
-libjattach.a:
+libs/jattach/build/libjattach.a:
 	$(call msg,MAKE,$@)
 	$(Q)patch -p1 -d libs/jattach -Ns --no-backup-if-mismatch <libs/0001-Add-compilation-for-static-lib.patch || true
 	$(Q)$(MAKE) -sC libs/jattach dll --no-print-directory
-	$(Q)mv libs/jattach/build/libjattach.a ./
 
 rust-sample: .socket-tracer .profiler
 socket-tracer: .socket-tracer

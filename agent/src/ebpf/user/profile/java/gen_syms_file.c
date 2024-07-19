@@ -47,7 +47,8 @@ static struct list_head java_syms_update_tasks_head;
  * @ret_val
  *   Return address, used by the caller to determine subsequent processing.
  * @error_occurred
- *   'true' indicates that an error has occurred at some point,
+ *   'true' indicates that an error has occurred at some point, 
+ *          no symbol collection for this process.
  *   'false' indicates that no error has occurred.
  */
 void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
@@ -57,25 +58,22 @@ void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 	 * be attempted.
 	 */
 	if (error_occurred) {
-		goto error;
-	}
-
-	*ret_val = JAVA_SYMS_OK;
-	int target_ns_pid = get_nspid(pid);
-	if (target_ns_pid < 0) {
+		*ret_val = JAVA_SYMS_ERR;
 		return;
 	}
 
+	*ret_val = JAVA_SYMS_OK;
+
 	u64 start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-	if (update_java_symbol_table(pid))
+	if (update_java_symbol_file(pid))
 		goto error;
 	u64 end_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 
-	if (target_symbol_file_access(pid, target_ns_pid) != 0) {
+	if (target_symbol_file_access(pid) != 0) {
 		goto error;
 	}
 
-	i64 new_file_sz = get_local_symbol_file_sz(pid, target_ns_pid);
+	i64 new_file_sz = get_local_symbol_file_sz(pid);
 	if (new_file_sz == 0) {
 		goto error;
 	}
@@ -88,7 +86,7 @@ void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 	return;
 error:
 	*ret_val = JAVA_SYMS_ERR;
-	ebpf_warning("Generate Java symbol files failed. PID %d\n\n", pid);
+	ebpf_warning("Generate Java symbol files failed. PID %d\n", pid);
 }
 
 void clean_local_java_symbols_files(int pid)
@@ -152,6 +150,10 @@ void java_syms_update_main(void *arg)
 
 					p->gen_java_syms_file_err = false;
 				} else {
+					/*
+					 * Mark an error occurred, no further
+					 * symbol collection for this process.
+					 */
 					p->gen_java_syms_file_err = true;
 					p->cache_need_update = false;
 				}

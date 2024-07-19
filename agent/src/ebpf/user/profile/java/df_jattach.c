@@ -25,7 +25,6 @@
 #include <sys/epoll.h>
 #include <dlfcn.h>
 #include <dirent.h>
-
 #include "../../config.h"
 #include "../../common.h"
 #include "../../log.h"
@@ -45,94 +44,9 @@ symbol_collect_thread_pool_t *g_collect_pool;
  * handling the data sent by the corresponding JVM.
  */
 static __thread java_unload_addr_str_t *unload_addrs;
-
-static char agent_lib_so_path[MAX_PATH_LENGTH];
-extern int jattach(int pid, int argc, char **argv);
+extern int jattach(int pid, int argc, char **argv, int print_output);
 static int create_symbol_collect_task(pid_t pid, options_t * opts,
 				      bool is_same_mntns);
-
-static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
-{
-	if (access(src, F_OK)) {
-		ebpf_warning(JAVA_LOG_TAG "Fun %s src file '%s' not exist.\n",
-			     __func__, src);
-		return ETR_NOTEXIST;
-	}
-
-	if (copy_file(src, dst)) {
-		return ETR_INVAL;
-	}
-
-	if (chown(dst, uid, gid) != 0) {
-		ebpf_warning(JAVA_LOG_TAG
-			     "Failed to change ownership and group. file '%s'\n",
-			     dst);
-		return ETR_INVAL;
-	}
-
-	return ETR_OK;
-}
-
-static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
-					  int target_gid)
-{
-
-	/*
-	 * Call this function only when the target process is in a subordinate
-	 * namespace. Here, we copy the agent.so to a temporary path within t-
-	 * he mounted namespace. We also change the file ownership so that the
-	 * target process sees itself as the owner of the file (this is neces-
-	 * sary because some versions of Java might reject proxy injection
-	 * otherwise).
-	 */
-	int ret;
-	char copy_target_path[MAX_PATH_LENGTH];
-	int len = snprintf(copy_target_path, sizeof(copy_target_path),
-			   TARGET_NS_STORAGE_PATH, target_pid);
-	if (access(copy_target_path, F_OK)) {
-		/*
-		 * The purpose of umask(0); is to set the current process's file
-		 * creation mask (umask) to 0, which means that no permission
-		 * bits will be cleared when creating a file or directory. Files
-		 * and directories will have the permission bits specified at the
-		 * time of creation.
-		 */
-		umask(0);
-
-		if (mkdir(copy_target_path, 0777) != 0) {
-			ebpf_warning(JAVA_LOG_TAG
-				     "Fun %s cannot mkdir() '%s'\n", __func__,
-				     copy_target_path);
-
-			return ETR_NOTEXIST;
-		}
-	}
-
-	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
-		 "/%s", AGENT_LIB_NAME);
-	if ((ret =
-	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
-			       copy_target_path, target_uid,
-			       target_gid)) != ETR_OK) {
-		ebpf_warning(JAVA_LOG_TAG "cp '%s' to '%s' failed.\n",
-			     AGENT_LIB_SRC_PATH, copy_target_path);
-		return ret;
-	}
-
-	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
-		 "/%s", AGENT_MUSL_LIB_NAME);
-
-	if ((ret =
-	     agent_so_lib_copy(AGENT_MUSL_LIB_SRC_PATH,
-			       copy_target_path, target_uid,
-			       target_gid)) != ETR_OK) {
-		ebpf_warning(JAVA_LOG_TAG "cp '%s' to '%s' failed.\n",
-			     AGENT_MUSL_LIB_SRC_PATH, copy_target_path);
-		return ret;
-	}
-
-	return ETR_OK;
-}
 
 bool test_dl_open(const char *so_lib_file_path)
 {
@@ -187,74 +101,6 @@ bool test_dl_open(const char *so_lib_file_path)
 	return true;
 }
 
-static void select_suitable_agent_lib(pid_t pid, bool is_same_mntns)
-{
-	/* Enter pid & mount namespace for target pid,
-	 * and use dlopen() in that namespace.*/
-	int pid_self_fd, mnt_self_fd;
-	df_enter_ns(pid, "pid", &pid_self_fd);
-	df_enter_ns(pid, "mnt", &mnt_self_fd);
-
-	agent_lib_so_path[0] = '\0';
-	char test_path[PERF_PATH_SZ];
-	if (!is_same_mntns)
-		snprintf(test_path, sizeof(test_path), "%s",
-			 AGENT_LIB_TARGET_PATH);
-	else
-		snprintf(test_path, sizeof(test_path), "%s",
-			 AGENT_LIB_SRC_PATH);
-
-	if (test_dl_open(test_path)) {
-		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
-		ebpf_info(JAVA_LOG_TAG
-			  "Func %s target PID %d test %s, success.\n",
-			  __func__, pid, test_path);
-		goto found;
-	}
-
-	if (!is_same_mntns)
-		snprintf(test_path, sizeof(test_path), "%s",
-			 AGENT_MUSL_LIB_TARGET_PATH);
-	else
-		snprintf(test_path, sizeof(test_path), "%s",
-			 AGENT_MUSL_LIB_SRC_PATH);
-
-	if (test_dl_open(test_path)) {
-		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
-		ebpf_info(JAVA_LOG_TAG
-			  "Func %s target PID %d test %s, success.\n",
-			  __func__, pid, test_path);
-		goto found;
-	}
-
-	ebpf_warning(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
-
-found:
-
-	if (!is_same_mntns) {
-		if (strcmp(agent_lib_so_path, AGENT_LIB_TARGET_PATH) == 0) {
-			clear_target_ns_tmp_file(AGENT_MUSL_LIB_TARGET_PATH);
-		} else {
-			clear_target_ns_tmp_file(AGENT_LIB_TARGET_PATH);
-		}
-	}
-
-	df_exit_ns(pid_self_fd);
-	df_exit_ns(mnt_self_fd);
-}
-
-static int attach(pid_t pid, char *opts)
-{
-	char *argv[] = { "load", agent_lib_so_path, "true", opts };
-	int argc = sizeof(argv) / sizeof(argv[0]);
-	int ret = jattach(pid, argc, (char **)argv);
-	ebpf_info(JAVA_LOG_TAG
-		  "jattach pid %d argv: \"load %s true\" return %d\n", pid,
-		  agent_lib_so_path, ret);
-
-	return ret;
-}
-
 void clear_target_ns_tmp_file(const char *target_path)
 {
 	if (access(target_path, F_OK) == 0) {
@@ -276,7 +122,7 @@ void clear_local_perf_files(int pid)
 	clear_target_ns_tmp_file(local_path);
 }
 
-static int check_and_clear_unix_socket_files(int pid, bool check_in_use)
+int check_and_clear_unix_socket_files(int pid, bool check_in_use)
 {
 	char target_path[MAX_PATH_LENGTH];
 	snprintf(target_path, sizeof(target_path),
@@ -390,7 +236,7 @@ static inline void switch_to_root_ns(int root_fd)
 	df_exit_ns(root_fd);
 }
 
-static inline i64 get_symbol_file_size(int pid, int ns_pid)
+static inline i64 get_symbol_file_size(int pid)
 {
 	char path[PERF_PATH_SZ];
 	snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".map", pid);
@@ -407,7 +253,7 @@ static inline i64 get_symbol_file_size(int pid, int ns_pid)
 	return -1;
 }
 
-int target_symbol_file_access(int pid, int ns_pid)
+int target_symbol_file_access(int pid)
 {
 	char path[PERF_PATH_SZ];
 	snprintf(path, sizeof(path), DF_AGENT_LOCAL_PATH_FMT ".map", pid);
@@ -415,9 +261,9 @@ int target_symbol_file_access(int pid, int ns_pid)
 	return access(path, F_OK);
 }
 
-i64 get_local_symbol_file_sz(int pid, int ns_pid)
+i64 get_local_symbol_file_sz(int pid)
 {
-	return get_symbol_file_size(pid, ns_pid);
+	return get_symbol_file_size(pid);
 }
 
 // parse comma separated arguments
@@ -450,18 +296,6 @@ int symbol_collect_same_namespace(pid_t pid, options_t * opts)
 {
 	// Clear '/tmp/' unix domain sockets files.
 	if (check_and_clear_unix_socket_files(pid, false) == -1)
-		return -1;
-
-	/*
-	 * In containers, different libc implementations may be used to compile agent
-	 * libraries, primarily two types: glibc and musl. We must provide both vers-
-	 * ions of the agent library. So, which one should we choose? To determine t-
-	 * his, we need to enter the target process's namespace and test each library
-	 * until we find one that can be successfully loaded using dlopen.
-	 */
-	select_suitable_agent_lib(pid, true);
-
-	if (strlen(agent_lib_so_path) == 0)
 		return -1;
 
 	return create_symbol_collect_task(pid, opts, true);
@@ -509,7 +343,27 @@ static inline int add_fd_to_epoll(int epoll_fd, int fd)
 	event.events = EPOLLIN;
 	event.data.fd = fd;
 	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
-		ebpf_warning(JAVA_LOG_TAG "epoll_ctl() failed with '%s(%d)'\n",
+		ebpf_warning(JAVA_LOG_TAG
+			     "epoll_ctl() ADD failed with '%s(%d)'\n",
+			     strerror(errno), errno);
+		return -1;
+	}
+
+	return 0;
+}
+
+static inline int del_fd_from_epoll(int epoll_fd, int fd)
+{
+	if (fd <= 0 || epoll_fd <= 0) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "fd must be a value greater than 0, fd %d, epoll fd %d\n",
+			     fd, epoll_fd);
+		return -1;
+	}
+
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL) == -1) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "epoll_ctl() DEL failed with '%s(%d)'\n",
 			     strerror(errno), errno);
 		return -1;
 	}
@@ -619,6 +473,9 @@ static int delete_method_unload_symbol(receiver_args_t * args)
 
 static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 {
+	if (addr_str == NULL)
+		goto update_file;
+
 	java_unload_addr_str_t java_addr = { 0 };
 	snprintf(java_addr.addr, sizeof(java_addr.addr), "%s", addr_str);
 	int ret = VEC_OK;
@@ -627,7 +484,10 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 		ebpf_warning(" Java unload_addrs add failed.\n");
 	}
 
-	if (vec_len(unload_addrs) >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH) {
+update_file:
+	int unload_count = vec_len(unload_addrs);
+	if ((args->task->need_refresh && unload_count > 0)
+	    || unload_count >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH) {
 		fclose(args->map_fp);
 		int count;
 		if ((count = delete_method_unload_symbol(args)) < 0) {
@@ -635,8 +495,6 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 			return -1;
 		}
 		vec_free(unload_addrs);
-		//fprintf(stdout, "---- delete count %d\n", count);
-		//fflush(stdout);
 		args->map_fp = fopen(args->opts->perf_map_path, "a");
 		if (!args->map_fp) {
 			ebpf_warning(JAVA_LOG_TAG
@@ -645,6 +503,9 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 				     errno);
 			return -1;
 		}
+		ebpf_info
+		    ("=== file update args->task->need_refresh %d pid %d unload_count %d\n",
+		     args->task->need_refresh, args->task->pid, unload_count);
 	}
 
 	return 0;
@@ -675,8 +536,6 @@ static int symbol_msg_process(receiver_args_t * args, int sock_fd)
 	if (args->replay_done && meta.type == METHOD_UNLOAD) {
 		update_java_perf_map_file(args, rcv_buf);
 	} else {
-		//fprintf(stdout, "> %s", rcv_buf);
-		//fflush(stdout);
 		int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
 		if (written_count != n) {
 			ebpf_warning(JAVA_LOG_TAG "%s(%d)\n", strerror(errno),
@@ -761,31 +620,28 @@ static int destroy_task(symbol_collect_task_t * task,
 		fclose(args->log_fp);
 	}
 
-	if (args->map_client > 0)
+	if (args->map_client > 0) {
+		del_fd_from_epoll(args->epoll_fd, args->map_client);
 		close(args->map_client);
+	}
 
-	if (args->log_client > 0)
+	if (args->log_client > 0) {
+		del_fd_from_epoll(args->epoll_fd, args->log_client);
 		close(args->log_client);
+	}
 
 	if (args->map_socket > 0) {
+		del_fd_from_epoll(args->epoll_fd, args->map_socket);
 		close(args->map_socket);
 	}
 
 	if (args->log_socket > 0) {
+		del_fd_from_epoll(args->epoll_fd, args->log_socket);
 		close(args->log_socket);
 	}
 
 	if (args->epoll_fd > 0) {
 		close(args->epoll_fd);
-	}
-	// attach() may change euid/egid, restore them to remove tmp files
-	if (seteuid(getuid()) < 0) {
-		ebpf_warning(JAVA_LOG_TAG "seteuid() failed with '%s(%d)'\n",
-			     strerror(errno), errno);
-	}
-	if (setegid(getgid()) < 0) {
-		ebpf_warning(JAVA_LOG_TAG "seteuid() failed with '%s(%d)'\n",
-			     strerror(errno), errno);
 	}
 
 	if (!task->is_local_mntns)
@@ -829,9 +685,6 @@ static void *ipc_receiver_main(void *arguments)
 	}
 	args->log_fp = log_fp;
 
-	ebpf_info(JAVA_LOG_TAG "mapfile : %s\n", args->opts->perf_map_path);
-	ebpf_info(JAVA_LOG_TAG "logfile : %s\n", args->opts->perf_log_path);
-
 	int epoll_fd = epoll_create1(0);
 	if (epoll_fd == -1) {
 		ebpf_warning(JAVA_LOG_TAG
@@ -874,6 +727,14 @@ static void *ipc_receiver_main(void *arguments)
 			}
 		}
 
+		if (args->task->need_refresh) {
+			int ret_val = update_java_perf_map_file(args, NULL);
+			pthread_mutex_lock(&args->task->mutex);
+			args->task->update_status = ret_val;
+			args->task->need_refresh = false;
+			pthread_cond_signal(&args->task->cond);
+			pthread_mutex_unlock(&args->task->mutex);
+		}
 	}
 
 cleanup:
@@ -885,11 +746,11 @@ static void *worker_thread(void *arg)
 {
 	symbol_collect_thread_pool_t *pool = arg;
 	pthread_t thread = pthread_self();
-	int thread_idx = pool->thread_count - 1;
+	int thread_idx = pool->thread_index;
 
 	while (1) {
 		pthread_mutex_lock(&pool->lock);
-		while (pool->task_count == 0 && !pool->stop) {
+		while (pool->pending_tasks <= 0 && !pool->stop) {
 			pthread_cond_wait(&pool->cond, &pool->lock);
 		}
 
@@ -899,19 +760,15 @@ static void *worker_thread(void *arg)
 		}
 
 		if (pool->threads[thread_idx].thread != thread) {
-			if (pool->thread_count > (thread_idx + 1)
-			    && pool->threads[thread_idx + 1].thread == thread) {
-				thread_idx++;
-			} else {
-				pthread_mutex_unlock(&pool->lock);
-				pthread_exit(NULL);
-			}
+			pthread_mutex_unlock(&pool->lock);
+			pthread_exit(NULL);
 		}
 		// Get task from queue
 		symbol_collect_task_t *task;
 		task = list_first_entry(&pool->task_list_head,
 					symbol_collect_task_t, list);
 		list_head_del(&task->list);
+		pool->pending_tasks--;
 		task->thread = thread;
 		pool->threads[thread_idx].task = task;
 		pthread_mutex_unlock(&pool->lock);
@@ -926,8 +783,8 @@ static void *worker_thread(void *arg)
 			  "Thread %ld finished task for java processes (PID: %d)\n",
 			  task->thread, task->pid);
 		pthread_mutex_lock(&pool->lock);
-		pool->task_count--;
 		pool->threads[thread_idx].task = NULL;
+		pool->task_count--;
 		pthread_mutex_unlock(&pool->lock);
 		destroy_task(task, pool);
 	}
@@ -977,6 +834,8 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 	pthread_mutex_lock(&pool->lock);
 	list_add_tail(&task->list, &pool->task_list_head);
 	pool->task_count++;
+	pool->pending_tasks++;
+
 	// Wake up threads in the thread pool to execute tasks.
 	pthread_cond_signal(&pool->cond);
 
@@ -985,6 +844,7 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 	if (pool->task_count > pool->thread_count) {
 		int ret;
 		pthread_t thread;
+		pool->thread_index = pool->thread_count;
 
 		if ((ret =
 		     pthread_create(&thread, NULL, &worker_thread, pool)) < 0) {
@@ -1018,6 +878,8 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 		pool->threads = new_threads;
 		pool->threads[pool->thread_count - 1].task = NULL;
 		pool->threads[pool->thread_count - 1].thread = thread;
+		pool->threads[pool->thread_count - 1].index =
+		    pool->thread_count - 1;
 		ebpf_info(JAVA_LOG_TAG
 			  "Created new thread. Current thread count: %d\n",
 			  pool->thread_count);
@@ -1066,6 +928,9 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 		goto cleanup;
 	}
 	task->func = ipc_receiver_main;
+	pthread_mutex_init(&task->mutex, NULL);
+	pthread_cond_init(&task->cond, NULL);
+	task->need_refresh = false;
 	options_t *__opts = (options_t *) (task + 1);
 	*__opts = *opts;
 
@@ -1082,13 +947,14 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 		goto cleanup;
 	}
 
-	snprintf(buffer, PERF_PATH_SZ * 2,
-		 JVM_AGENT_SYMS_SOCKET_PATH_FMT ","
-		 JVM_AGENT_LOG_SOCKET_PATH_FMT, pid, pid);
-
-	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
-	 * library as a JVMTI agent.*/
-	ret = attach(pid, buffer);
+	snprintf(buffer, sizeof(buffer), "%d", pid);
+	char ret_buf[1024];
+	memset(ret_buf, 0, sizeof(ret_buf));
+	ret =
+	    exec_command(DF_JAVA_ATTACH_CMD, buffer, ret_buf, sizeof(ret_buf));
+	if (ret != 0) {
+		ebpf_info(JAVA_LOG_TAG "ret %d: %s", ret, ret_buf);
+	}
 	task->args.replay_done = true;
 	task->args.attach_ret = ret;
 	CLIB_MEMORY_STORE_BARRIER();
@@ -1135,61 +1001,12 @@ cleanup:
 
 int symbol_collect_different_namespace(pid_t pid, options_t * opts)
 {
-	int uid, gid;
-	if (get_target_uid_and_gid(pid, &uid, &gid)) {
-		return -1;
-	}
-
-	/* if pid == target_ns_pid, run in same namespace */
-	int target_ns_pid = get_nspid(pid);
-	if (target_ns_pid < 0) {
-		return -1;
-	}
-
 	/*
 	 * Delete the files on the target file system if they
 	 * are not on the same mount point.
 	 */
 	if (check_and_clear_target_ns(pid, false) == -1)
 		return -1;
-
-	/*
-	 * Here, the original method of determination (based on whether the net
-	 * namespace is the same) is modified to use the mnt namespace for comparison,
-	 * thus avoiding situations where both the net namespace and pid namespace are
-	 * the same but the file system is different.
-	 */
-
-	/*
-	 * If the target Java process is in a subordinate namespace, copy the
-	 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
-	 * (for visibility to the target process).
-	 */
-	ebpf_info(JAVA_LOG_TAG "[PID %d] copy agent so library ...\n", pid);
-	if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
-		ebpf_warning(JAVA_LOG_TAG
-			     "[PID %d] copy agent os library failed.\n", pid);
-		check_and_clear_target_ns(pid, false);
-		return -1;
-	}
-	ebpf_info(JAVA_LOG_TAG "[PID %d] copy agent so library success.\n",
-		  pid);
-
-	/*
-	 * In containers, different libc implementations may be used to compile agent
-	 * libraries, primarily two types: glibc and musl. We must provide both vers-
-	 * ions of the agent library. So, which one should we choose? To determine t-
-	 * his, we need to enter the target process's namespace and test each library
-	 * until we find one that can be successfully loaded using dlopen.
-	 */
-	select_suitable_agent_lib(pid, false);
-
-	if (strlen(agent_lib_so_path) == 0) {
-		ebpf_warning(JAVA_LOG_TAG
-			     "[PID %d] agent_lib_so_path is NULL.\n", pid);
-		check_and_clear_target_ns(pid, false);
-		return -1;
-	}
 
 	return create_symbol_collect_task(pid, opts, false);
 }
@@ -1224,6 +1041,7 @@ static int symbol_collect_thread_pool_init(void)
 	pool->thread_count = 0;	// Initial thread count is 0
 	pool->threads = NULL;	// Initial thread array is empty
 	pool->stop = 0;
+	pool->pending_tasks = 0;
 	init_list_head(&pool->task_list_head);
 	g_collect_pool = pool;
 
@@ -1273,7 +1091,7 @@ int start_java_symbol_collection(pid_t pid, const char *opts)
 	}
 }
 
-int update_java_symbol_table(pid_t pid)
+int update_java_symbol_file(pid_t pid)
 {
 	char opts[PERF_PATH_SZ * 2];
 	snprintf(opts, sizeof(opts),
@@ -1287,7 +1105,7 @@ int update_java_symbol_table(pid_t pid)
 
 	u64 start_time = get_process_starttime_and_comm(pid, NULL, 0);
 	if (start_time == 0) {
-		ebpf_warning("The Java process(PID: %d) no longer exists.\n",
+		ebpf_warning("The process with PID %d no longer exists.\n",
 			     pid);
 		task->args.attach_ret = -1;	// Force the thread to exit the task it is executing. 
 		return -1;
@@ -1295,13 +1113,302 @@ int update_java_symbol_table(pid_t pid)
 	// The task is stale and needs to be cleaned up.
 	if (task->pid_start_time != start_time) {
 		task->args.attach_ret = -1;
-		return start_java_symbol_collection(pid, opts);
+		ebpf_warning("The task for the process with PID %d"
+			     " is invalid and needs to be recreated.\n", pid);
+		return -1;
+	}
+	// Notify to refresh the file
+	task->need_refresh = true;
+	// Refresh the file again; needs to wait for completion.
+	pthread_mutex_lock(&task->mutex);
+	pthread_cond_wait(&task->cond, &task->mutex);
+	pthread_mutex_unlock(&task->mutex);
+
+	return task->update_status;
+}
+
+void show_collect_pool(void)
+{
+	if (g_collect_pool == NULL)
+		return;
+
+	task_thread_t *task_thread;
+	symbol_collect_task_t *task = NULL;
+	int online_task_cnt = 0;
+	pthread_mutex_lock(&g_collect_pool->lock);
+	fprintf(stdout,
+		"-------------------------------------------------------\n");
+	for (int i = 0; i < g_collect_pool->thread_count; i++) {
+		if (g_collect_pool->threads[i].task == NULL)
+			continue;
+		task_thread = &g_collect_pool->threads[i];
+		task = task_thread->task;
+		fprintf(stdout, "Thread %ld Task %p JavaPID %d\n",
+			task_thread->thread, task, task->pid);
+		online_task_cnt++;
+	}
+	fprintf(stdout,
+		"-------------------------------------------------------\n");
+	fprintf(stdout, "pool threads %d tasks %d pending_task %d\n",
+		g_collect_pool->thread_count, g_collect_pool->task_count,
+		g_collect_pool->pending_tasks);
+	pthread_mutex_unlock(&g_collect_pool->lock);
+	fflush(stdout);
+}
+
+#ifdef JAVA_AGENT_ATTACH_TOOL
+static char agent_lib_so_path[MAX_PATH_LENGTH];
+static int agent_so_lib_copy(const char *src, const char *dst, int uid, int gid)
+{
+	if (access(src, F_OK)) {
+		ebpf_warning(JAVA_LOG_TAG "Fun %s src file '%s' not exist.\n",
+			     __func__, src);
+		return ETR_NOTEXIST;
+	}
+
+	if (copy_file(src, dst)) {
+		return ETR_INVAL;
+	}
+
+	if (chown(dst, uid, gid) != 0) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "Failed to change ownership and group. file '%s'\n",
+			     dst);
+		return ETR_INVAL;
+	}
+
+	return ETR_OK;
+}
+
+static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
+					  int target_gid)
+{
+
+	/*
+	 * Call this function only when the target process is in a subordinate
+	 * namespace. Here, we copy the agent.so to a temporary path within t-
+	 * he mounted namespace. We also change the file ownership so that the
+	 * target process sees itself as the owner of the file (this is neces-
+	 * sary because some versions of Java might reject proxy injection
+	 * otherwise).
+	 */
+	int ret;
+	char copy_target_path[MAX_PATH_LENGTH];
+	int len = snprintf(copy_target_path, sizeof(copy_target_path),
+			   TARGET_NS_STORAGE_PATH, target_pid);
+	if (access(copy_target_path, F_OK)) {
+		/*
+		 * The purpose of umask(0); is to set the current process's file
+		 * creation mask (umask) to 0, which means that no permission
+		 * bits will be cleared when creating a file or directory. Files
+		 * and directories will have the permission bits specified at the
+		 * time of creation.
+		 */
+		umask(0);
+
+		if (mkdir(copy_target_path, 0777) != 0) {
+			ebpf_warning(JAVA_LOG_TAG
+				     "Fun %s cannot mkdir() '%s'\n", __func__,
+				     copy_target_path);
+
+			return ETR_NOTEXIST;
+		}
+	}
+
+	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
+		 "/%s", AGENT_LIB_NAME);
+	if ((ret =
+	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
+			       copy_target_path, target_uid,
+			       target_gid)) != ETR_OK) {
+		ebpf_warning(JAVA_LOG_TAG "cp '%s' to '%s' failed.\n",
+			     AGENT_LIB_SRC_PATH, copy_target_path);
+		return ret;
+	}
+
+	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
+		 "/%s", AGENT_MUSL_LIB_NAME);
+
+	if ((ret =
+	     agent_so_lib_copy(AGENT_MUSL_LIB_SRC_PATH,
+			       copy_target_path, target_uid,
+			       target_gid)) != ETR_OK) {
+		ebpf_warning(JAVA_LOG_TAG "cp '%s' to '%s' failed.\n",
+			     AGENT_MUSL_LIB_SRC_PATH, copy_target_path);
+		return ret;
+	}
+
+	return ETR_OK;
+}
+
+static void select_suitable_agent_lib(pid_t pid, bool is_same_mntns)
+{
+	/* Enter pid & mount namespace for target pid,
+	 * and use dlopen() in that namespace.*/
+	int pid_self_fd, mnt_self_fd;
+	df_enter_ns(pid, "pid", &pid_self_fd);
+	df_enter_ns(pid, "mnt", &mnt_self_fd);
+
+	agent_lib_so_path[0] = '\0';
+	char test_path[PERF_PATH_SZ];
+	if (!is_same_mntns)
+		snprintf(test_path, sizeof(test_path), "%s",
+			 AGENT_LIB_TARGET_PATH);
+	else
+		snprintf(test_path, sizeof(test_path), "%s",
+			 AGENT_LIB_SRC_PATH);
+
+	if (test_dl_open(test_path)) {
+		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
+		ebpf_info(JAVA_LOG_TAG
+			  "Func %s target PID %d test %s, success.\n",
+			  __func__, pid, test_path);
+		goto found;
+	}
+
+	if (!is_same_mntns)
+		snprintf(test_path, sizeof(test_path), "%s",
+			 AGENT_MUSL_LIB_TARGET_PATH);
+	else
+		snprintf(test_path, sizeof(test_path), "%s",
+			 AGENT_MUSL_LIB_SRC_PATH);
+
+	if (test_dl_open(test_path)) {
+		snprintf(agent_lib_so_path, MAX_PATH_LENGTH, "%s", test_path);
+		ebpf_info(JAVA_LOG_TAG
+			  "Func %s target PID %d test %s, success.\n",
+			  __func__, pid, test_path);
+		goto found;
+	}
+
+	ebpf_warning(JAVA_LOG_TAG "%s test agent so libs, failure.", __func__);
+
+found:
+
+	if (!is_same_mntns) {
+		if (strcmp(agent_lib_so_path, AGENT_LIB_TARGET_PATH) == 0) {
+			clear_target_ns_tmp_file(AGENT_MUSL_LIB_TARGET_PATH);
+		} else {
+			clear_target_ns_tmp_file(AGENT_LIB_TARGET_PATH);
+		}
+	}
+
+	df_exit_ns(pid_self_fd);
+	df_exit_ns(mnt_self_fd);
+}
+
+static int prepare_for_attach_same_ns(pid_t pid)
+{
+	/*
+	 * In containers, different libc implementations may be used to compile agent
+	 * libraries, primarily two types: glibc and musl. We must provide both vers-
+	 * ions of the agent library. So, which one should we choose? To determine t-
+	 * his, we need to enter the target process's namespace and test each library
+	 * until we find one that can be successfully loaded using dlopen.
+	 */
+	select_suitable_agent_lib(pid, true);
+
+	if (strlen(agent_lib_so_path) == 0)
+		return -1;
+	return 0;
+}
+
+static int prepare_for_attach_different_ns(pid_t pid)
+{
+	int uid, gid;
+	if (get_target_uid_and_gid(pid, &uid, &gid)) {
+		return -1;
+	}
+
+	/* if pid == target_ns_pid, run in same namespace */
+	int target_ns_pid = get_nspid(pid);
+	if (target_ns_pid < 0) {
+		return -1;
+	}
+
+	/*
+	 * Here, the original method of determination (based on whether the net
+	 * namespace is the same) is modified to use the mnt namespace for comparison,
+	 * thus avoiding situations where both the net namespace and pid namespace are
+	 * the same but the file system is different.
+	 */
+
+	/*
+	 * If the target Java process is in a subordinate namespace, copy the
+	 * 'agent.so' into the artifacts path (in /tmp) inside of that namespace
+	 * (for visibility to the target process).
+	 */
+	ebpf_info(JAVA_LOG_TAG "[PID %d] copy agent so library ...\n", pid);
+	if (copy_agent_libs_into_target_ns(pid, uid, gid)) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "[PID %d] copy agent os library failed.\n", pid);
+		check_and_clear_target_ns(pid, false);
+		return -1;
+	}
+	ebpf_info(JAVA_LOG_TAG "[PID %d] copy agent so library success.\n",
+		  pid);
+
+	/*
+	 * In containers, different libc implementations may be used to compile agent
+	 * libraries, primarily two types: glibc and musl. We must provide both vers-
+	 * ions of the agent library. So, which one should we choose? To determine t-
+	 * his, we need to enter the target process's namespace and test each library
+	 * until we find one that can be successfully loaded using dlopen.
+	 */
+	select_suitable_agent_lib(pid, false);
+
+	if (strlen(agent_lib_so_path) == 0) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "[PID %d] agent_lib_so_path is NULL.\n", pid);
+		check_and_clear_target_ns(pid, false);
+		return -1;
 	}
 
 	return 0;
 }
 
-#ifdef JAVA_AGENT_ATTACH_TOOL
+static int attach(pid_t pid, char *opts)
+{
+	char *argv[] = { "load", agent_lib_so_path, "true", opts };
+	int argc = sizeof(argv) / sizeof(argv[0]);
+	int ret = jattach(pid, argc, (char **)argv, 1);
+	ebpf_info(JAVA_LOG_TAG
+		  "jattach pid %d argv: \"load %s true\" return %d\n", pid,
+		  agent_lib_so_path, ret);
+
+	return ret;
+}
+
+int java_attach(pid_t pid)
+{
+	int ret = -1;
+	bool is_same_mnt = is_same_mntns(pid);
+	if (is_same_mnt) {
+		ret = prepare_for_attach_same_ns(pid);
+	} else {
+		/*
+		 * Clean up the '*.so' files to prevent exceptions in
+		 * the target JVM when using jattach.
+		 */
+		clear_so_target_ns(pid, false);
+		ret = prepare_for_attach_different_ns(pid);
+	}
+
+	if (ret < 0)
+		return -1;
+
+	char buffer[PERF_PATH_SZ * 2];
+	snprintf(buffer, sizeof(buffer),
+		 JVM_AGENT_SYMS_SOCKET_PATH_FMT ","
+		 JVM_AGENT_LOG_SOCKET_PATH_FMT, pid, pid);
+
+	/* Invoke the jattach (https://github.com/apangin/jattach) to inject the
+	 * library as a JVMTI agent.*/
+	return attach(pid, buffer);
+
+	/* Resource cleanup is performed in the thread executing 'deepflow-jattach' */
+}
+
 /*
  * Command-line execution, for example:
  * cp ./df_java_agent_v2.so /tmp/
@@ -1316,9 +1423,6 @@ int main(int argc, char **argv)
 
 	log_to_stdout = true;
 	int pid = atoi(argv[1]);
-	update_java_symbol_table(pid);
-	for (;;)
-		sleep(1);
-	return 0;
+	return java_attach(pid);
 }
 #endif /* JAVA_AGENT_ATTACH_TOOL */

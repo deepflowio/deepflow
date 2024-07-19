@@ -79,6 +79,7 @@ fn cp_container_id_safe(cp: *mut stack_profile_data) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn increment_counter(num: u32, counter_type: u32) {
     if counter_type == 0 {
         let mut counter = COUNTER.lock().unwrap();
@@ -121,7 +122,7 @@ extern "C" fn socket_trace_callback(_sd: *mut SK_BPF_DATA) {}
 
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
-        process_stack_trace_data_for_flame_graph(cp);
+        //process_stack_trace_data_for_flame_graph(cp);
         increment_counter((*cp).count, 1);
         increment_counter(1, 0);
         //let data = sk_data_str_safe(cp);
@@ -143,6 +144,7 @@ extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     }
 }
 
+#[allow(dead_code)]
 fn get_counter(counter_type: u32) -> u32 {
     if counter_type == 0 {
         *COUNTER.lock().unwrap()
@@ -215,17 +217,20 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        thread::sleep(Duration::from_secs(150));
-        stop_continuous_profiler();
-        print!(
-            "====== capture count {}, sum {}\n",
-            get_counter(0),
-            get_counter(1)
-        );
-        release_flame_graph_hash();
+        //thread::sleep(Duration::from_secs(150));
+        //stop_continuous_profiler();
+        //print!(
+        //  "====== capture count {}, sum {}\n",
+        //  get_counter(0),
+        //  get_counter(1)
+        //);
+        //release_flame_graph_hash();
     }
 
     loop {
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(Duration::from_secs(15));
+	unsafe {
+            show_collect_pool();
+	}
     }
 }
