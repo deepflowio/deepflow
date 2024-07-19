@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: update agent commands permission [#7481](https://github.com/deepflowio/deepflow/pull/7481) by [roryye](https://github.com/roryye)
 * fix: process resource api does not response sub_domain field [#7448](https://github.com/deepflowio/deepflow/pull/7448) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Fix the problem of duplicate fields in select [#7436](https://github.com/deepflowio/deepflow/pull/7436) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: recorder reports wrong sub_domain infomation in domain logs [#7435](https://github.com/deepflowio/deepflow/pull/7435) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -53,6 +54,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: Querier support no limit [#7479](https://github.com/deepflowio/deepflow/pull/7479) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat:  Ingester support trace_tree [#7443](https://github.com/deepflowio/deepflow/pull/7443) by [lzf575](https://github.com/lzf575)
 * feat: agent - dispatcher support set cpu affinity [#7423](https://github.com/deepflowio/deepflow/pull/7423) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: create sub domian set default team id [#7421](https://github.com/deepflowio/deepflow/pull/7421) by [askyrie](https://github.com/askyrie)
