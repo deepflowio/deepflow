@@ -19,6 +19,8 @@ package view
 import (
 	"bytes"
 	"strings"
+
+	"github.com/deepflowio/deepflow/server/querier/common"
 )
 
 type Orders struct {
@@ -99,13 +101,12 @@ func (n *Limit) ToString() string {
 }
 
 func (n *Limit) WriteTo(buf *bytes.Buffer) {
-	if n.Limit != "" {
+	if n.Limit != "" && n.Limit != common.NO_LIMIT {
 		buf.WriteString(" LIMIT ")
 		if n.Offset != "" {
 			buf.WriteString(n.Offset)
 			buf.WriteString(", ")
 		}
 		buf.WriteString(n.Limit)
-
 	}
 }
