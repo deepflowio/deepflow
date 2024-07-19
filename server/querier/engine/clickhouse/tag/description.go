@@ -634,7 +634,7 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 		)
 	}
 
-	if table == "alarm_event" {
+	if table == "alert_event" {
 		return
 	}
 
