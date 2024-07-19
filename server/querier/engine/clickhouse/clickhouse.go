@@ -339,8 +339,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		return nil, []string{}, false, nil
 	}
 	sql = strings.Join(sqlSplit, " ")
-	sql = strings.ToLower(sql)
-	index, flag := MatchPattern(sql)
+	index, flag := MatchPattern(strings.ToLower(sql))
 	if flag == false {
 		err := fmt.Errorf("not support sql: '%s', please check", sql)
 		return nil, []string{}, true, err
