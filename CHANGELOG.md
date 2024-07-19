@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: update agent commands permission [#7480](https://github.com/deepflowio/deepflow/pull/7480) by [roryye](https://github.com/roryye)
+* fix: Delete an alarm policy #25866 [#7478](https://github.com/deepflowio/deepflow/pull/7478) by [Ericsssss](https://github.com/Ericsssss)
+* fix: solve the problem that sql is changed to lowercase [#7475](https://github.com/deepflowio/deepflow/pull/7475) by [duandaa](https://github.com/duandaa)
 * fix: recorder reports wrong sub_domain infomation in domain logs [#7441](https://github.com/deepflowio/deepflow/pull/7441) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: unable to delete sub_domain related resource [#7439](https://github.com/deepflowio/deepflow/pull/7439) by [SongZhen0704](https://github.com/SongZhen0704)
 * fix: Fix the problem of duplicate fields in select [#7434](https://github.com/deepflowio/deepflow/pull/7434) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -70,6 +73,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Querier support no limit [#7473](https://github.com/deepflowio/deepflow/pull/7473) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: agent adds the CommandParam fields, modifies the param validation method [#7464](https://github.com/deepflowio/deepflow/pull/7464) by [TomatoMr](https://github.com/TomatoMr)
 * feat: add agent command type probe [#7433](https://github.com/deepflowio/deepflow/pull/7433) by [roryye](https://github.com/roryye)
 * feat: Alarm event field optimization [#7409](https://github.com/deepflowio/deepflow/pull/7409) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * feat: Get metrics ignore certain databases [#7427](https://github.com/deepflowio/deepflow/pull/7427) by [xiaochaoren1](https://github.com/xiaochaoren1)
