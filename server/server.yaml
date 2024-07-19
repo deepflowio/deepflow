@@ -769,15 +769,6 @@ ingester:
   #  queue-size: 100000
   #  batch-size: 32
   #  flush-timeout: 10
-  #  tag-filters:
-  #  export-fields:
-  #  - $tag
-  #  - $metrics
-  #  - $k8s.label
-  #  export-empty-tag: false
-  #  export-empty-metrics-disabled: false
-  #  enum-translate-to-name-disabled: false
-  #  universal-tag-translate-to-name-disabled: false
   #  extra-headers:  # type: map[string]string, extra http request headers
   #    key1: value1
   #    key2: value2
