@@ -184,7 +184,8 @@ struct conn_info_s {
 	__u32 message_type: 4;
 	// Is this segment of data reassembled?
 	__u32 is_reasm_seg: 1;
-	__u32 reserved: 27;
+	__u32 no_trace: 1;    /* When set to 1 (or true), tracing will not be performed. */
+	__u32 reserved: 26;
 
 	union {
 		__u8  encoding_type;    // Currently used for OpenWire encoding inference
