@@ -74,7 +74,7 @@ func (e EventManagerBase) fillEvent(
 	eventType, instanceName string, instanceType, instanceID int, options ...eventapi.TagFieldOption,
 ) {
 	event.ORGID = uint16(e.metadata.GetORGID())
-	event.TeamID = uint16(e.metadata.Domain.TeamID)
+	event.TeamID = uint16(e.metadata.GetTeamID())
 	event.Time = time.Now().Unix()
 	event.TimeMilli = time.Now().UnixMilli()
 	event.Type = eventType

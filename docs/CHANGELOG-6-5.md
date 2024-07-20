@@ -11,6 +11,10 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: process resource api does not response sub_domain field [#7448](https://github.com/deepflowio/deepflow/pull/7448) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Fix the problem of duplicate fields in select [#7436](https://github.com/deepflowio/deepflow/pull/7436) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: recorder reports wrong sub_domain infomation in domain logs [#7435](https://github.com/deepflowio/deepflow/pull/7435) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Fix concurrent request command for the same agent [#7431](https://github.com/deepflowio/deepflow/pull/7431) by [roryye](https://github.com/roryye)
 * fix: Uniq operator error [#7402](https://github.com/deepflowio/deepflow/pull/7402) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: deepflow-server may panic when updating platform information [#7399](https://github.com/deepflowio/deepflow/pull/7399) by [lzf575](https://github.com/lzf575)
 * fix: Add return processing to agent command [#7397](https://github.com/deepflowio/deepflow/pull/7397) by [roryye](https://github.com/roryye)
@@ -67,6 +71,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat:  Ingester support trace_tree [#7443](https://github.com/deepflowio/deepflow/pull/7443) by [lzf575](https://github.com/lzf575)
 * feat: agent - dispatcher support set cpu affinity [#7423](https://github.com/deepflowio/deepflow/pull/7423) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: create sub domian set default team id [#7421](https://github.com/deepflowio/deepflow/pull/7421) by [askyrie](https://github.com/askyrie)
 * feat: sub domain support filter user id [#7408](https://github.com/deepflowio/deepflow/pull/7408) by [askyrie](https://github.com/askyrie)
@@ -103,8 +108,8 @@
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* V65 trace map [#7445](https://github.com/deepflowio/deepflow/pull/7445) by [taloric](https://github.com/taloric)
 * bump golang.org/x/net to v0.26.0 [#7234](https://github.com/deepflowio/deepflow/pull/7234) by [zhangzujian](https://github.com/zhangzujian)
-
 
 #### Performance
 * perf: add setting ttl_only_drop_parts to the CK table to make TTL more efficient [#7266](https://github.com/deepflowio/deepflow/pull/7266) by [lzf575](https://github.com/lzf575)
