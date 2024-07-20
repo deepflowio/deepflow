@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
 * fix: update agent commands permission [#7481](https://github.com/deepflowio/deepflow/pull/7481) by [roryye](https://github.com/roryye)
 * fix: process resource api does not response sub_domain field [#7448](https://github.com/deepflowio/deepflow/pull/7448) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Fix the problem of duplicate fields in select [#7436](https://github.com/deepflowio/deepflow/pull/7436) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -54,6 +55,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Remove tracing for HEAD type requests in NGINX [#7489](https://github.com/deepflowio/deepflow/pull/7489) by [yinjiping](https://github.com/yinjiping)
 * feat: Querier support no limit [#7479](https://github.com/deepflowio/deepflow/pull/7479) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat:  Ingester support trace_tree [#7443](https://github.com/deepflowio/deepflow/pull/7443) by [lzf575](https://github.com/lzf575)
 * feat: agent - dispatcher support set cpu affinity [#7423](https://github.com/deepflowio/deepflow/pull/7423) by [yuanchaoa](https://github.com/yuanchaoa)
