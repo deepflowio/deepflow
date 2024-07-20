@@ -119,7 +119,13 @@ struct socket_info_t {
 	__u8 direction: 1;
 	__u8 pre_direction: 1;
 	__u8 msg_type: 2;	// 保存数据类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	__u8 role: 4;           // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	__u8 role: 3;           // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
+	/*
+	 * Indicates whether this socket participates in tracing.
+	 * If set to 1 (or true), it means the socket does not
+	 * participate in tracing.
+	 */
+	__u8 no_trace: 1;
 	bool need_reconfirm;    // l7协议推断是否需要再次确认。
 	__s32 correlation_id;   // 目前用于kafka协议推断。
 

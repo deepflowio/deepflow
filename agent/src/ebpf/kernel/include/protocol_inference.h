@@ -28,6 +28,17 @@
 static __inline void save_prev_data(const char *buf,
 				    struct conn_info_t *conn_info, size_t count);
 
+static __inline bool is_nginx_process(void)
+{
+	char comm[TASK_COMM_LEN];
+	bpf_get_current_comm(comm, sizeof(comm));
+
+	if (comm[0] == 'n' && comm[1] == 'g' && comm[2] == 'i' &&
+	    comm[3] == 'n' && comm[4] == 'x' && comm[5] == '\0')
+		return true;
+	return false;
+}
+
 static __inline bool is_same_command(char *a, char *b)
 {
 	static const int KERNEL_COMM_MAX = 16;
@@ -65,7 +76,8 @@ static __inline int is_http_response(const char *data)
 		&& data[6] == '.' && data[8] == ' ');
 }
 
-static __inline int is_http_request(const char *data, int data_len)
+static __inline int is_http_request(const char *data, int data_len,
+				    struct conn_info_t *conn_info)
 {
 	switch (data[0]) {
 		/* DELETE */
@@ -90,6 +102,16 @@ static __inline int is_http_request(const char *data, int data_len)
 		    || (data[4] != ' ')) {
 			return 0;
 		}
+
+		/*
+		 * In the context of NGINX, we exclude tracking of HEAD type requests
+		 * in the HTTP protocol, as HEAD requests are often used for health
+		 * checks. This avoids generating excessive HEAD type data in the call
+		 * chain tree.
+		 */
+		if (is_nginx_process())
+			conn_info->no_trace = true;
+
 		break;
 
 		/* OPTIONS */
@@ -429,7 +451,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 		return MSG_RESPONSE;
 	}
 
-	if (is_http_request(buf, count)) {
+	if (is_http_request(buf, count, conn_info)) {
 		return MSG_REQUEST;
 	}
 

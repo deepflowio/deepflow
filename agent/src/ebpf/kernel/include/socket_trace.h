@@ -127,7 +127,8 @@ struct conn_info_t {
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only : 1;
 	__u8 infer_reliable : 1; // Is protocol inference reliable?
-	__u8 padding : 6;
+	__u8 no_trace : 1; // When set to 1 (or true), tracing will not be performed.
+	__u8 padding : 5;
 	__u8 skc_state;
 	bool need_reconfirm; // socket l7协议类型是否需要再次确认。
 	bool keep_data_seq;  // 保持捕获数据的序列号不变为true，否则为false。
@@ -136,7 +137,7 @@ struct conn_info_t {
 
 	DNS 1 req ---->
 	DNS 1 res <-------
-	DNS 2 req ----> ​
+	DNS 2 req ----> 
 	DNS 2 res <-------
 
 	and now it is
