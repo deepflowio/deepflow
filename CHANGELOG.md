@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7486](https://github.com/deepflowio/deepflow/pull/7486) by [yinjiping](https://github.com/yinjiping)
 * fix: update agent commands permission [#7480](https://github.com/deepflowio/deepflow/pull/7480) by [roryye](https://github.com/roryye)
 * fix: Delete an alarm policy #25866 [#7478](https://github.com/deepflowio/deepflow/pull/7478) by [Ericsssss](https://github.com/Ericsssss)
 * fix: solve the problem that sql is changed to lowercase [#7475](https://github.com/deepflowio/deepflow/pull/7475) by [duandaa](https://github.com/duandaa)
@@ -73,6 +74,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: support alarm event updated to alert event [#7457](https://github.com/deepflowio/deepflow/pull/7457) by [lzf575](https://github.com/lzf575)
+* feat: agent - support ingore vlan pcp [#7449](https://github.com/deepflowio/deepflow/pull/7449) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: Querier support no limit [#7473](https://github.com/deepflowio/deepflow/pull/7473) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent adds the CommandParam fields, modifies the param validation method [#7464](https://github.com/deepflowio/deepflow/pull/7464) by [TomatoMr](https://github.com/TomatoMr)
 * feat: add agent command type probe [#7433](https://github.com/deepflowio/deepflow/pull/7433) by [roryye](https://github.com/roryye)
