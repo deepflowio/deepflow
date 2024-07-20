@@ -130,7 +130,8 @@ struct conn_info_s {
 	__u16 skc_family;	/* PF_INET, PF_INET6... */
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only:1;
-	__u8 reserved:1;
+	__u8 no_trace:1;    /* When set to 1 (or true), tracing will not be performed. */
+
 	/*
 	 * Whether the socket l7 protocol type needs
 	 * to be confirmed again.
