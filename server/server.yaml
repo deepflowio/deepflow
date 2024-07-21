@@ -726,6 +726,10 @@ ingester:
   #  enum-translate-to-name-disabled: false
   #  # whether the id value of universal-tag is not converted into a resource name for output
   #  universal-tag-translate-to-name-disabled: false
+  #  tag-filter-condition:
+  #    # Condition type, default is "and"
+  #    # and: Logical AND between tag-filters / or: Logical OR between tag-filters
+  #    type: "and"
   #  tag-filters:
   #  #- field-name: signal_source # database column name
   #  #  operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
