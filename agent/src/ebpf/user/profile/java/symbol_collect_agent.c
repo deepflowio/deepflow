@@ -69,7 +69,7 @@ jint close_files(void);
 	if (e != JNI_OK) {                                                  \
 		df_log("DF java agent failed, %s, error code: %d.", #e, e); \
 		close_files();                                              \
-		return e;                                                   \
+		return e;                                                  \
 	}
 
 #define df_log(format, ...)                           \

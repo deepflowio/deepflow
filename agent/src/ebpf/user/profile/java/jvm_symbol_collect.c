@@ -31,7 +31,7 @@
 #include "../../mem.h"
 #include "../../vec.h"
 #include "config.h"
-#include "df_jattach.h"
+#include "jvm_symbol_collect.h"
 
 #define SYM_COLLECT_MAX_EVENTS 4
 
@@ -473,18 +473,17 @@ static int delete_method_unload_symbol(receiver_args_t * args)
 
 static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 {
-	if (addr_str == NULL)
-		goto update_file;
-
-	java_unload_addr_str_t java_addr = { 0 };
-	snprintf(java_addr.addr, sizeof(java_addr.addr), "%s", addr_str);
-	int ret = VEC_OK;
-	vec_add1(unload_addrs, java_addr, ret);
-	if (ret != VEC_OK) {
-		ebpf_warning(" Java unload_addrs add failed.\n");
+	if (addr_str != NULL) {
+		int ret = VEC_OK;
+		java_unload_addr_str_t java_addr = { 0 };
+		snprintf(java_addr.addr, sizeof(java_addr.addr), "%s",
+			 addr_str);
+		vec_add1(unload_addrs, java_addr, ret);
+		if (ret != VEC_OK) {
+			ebpf_warning(" Java unload_addrs add failed.\n");
+		}
 	}
 
-update_file:
 	int unload_count = vec_len(unload_addrs);
 	if ((args->task->need_refresh && unload_count > 0)
 	    || unload_count >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH) {
@@ -503,7 +502,7 @@ update_file:
 				     errno);
 			return -1;
 		}
-		ebpf_info
+		ebpf_debug
 		    ("=== file update args->task->need_refresh %d pid %d unload_count %d\n",
 		     args->task->need_refresh, args->task->pid, unload_count);
 	}
@@ -649,9 +648,9 @@ static int destroy_task(symbol_collect_task_t * task,
 	else
 		check_and_clear_unix_socket_files(args->pid, false);
 
-	ebpf_info(JAVA_LOG_TAG "All resources cleaned up for symbol table"
-		  " management task (associated with JAVA PID: %d).\n",
-		  args->pid);
+	ebpf_debug(JAVA_LOG_TAG "All resources cleaned up for symbol table"
+		   " management task (associated with JAVA PID: %d).\n",
+		   args->pid);
 	free(task);
 	return 0;
 }
@@ -774,14 +773,14 @@ static void *worker_thread(void *arg)
 		pthread_mutex_unlock(&pool->lock);
 
 		// Execute task
-		ebpf_info(JAVA_LOG_TAG
-			  "Thread %ld executing task for java processes (PID: %d)\n",
-			  task->thread, task->pid);
+		ebpf_debug(JAVA_LOG_TAG
+			   "Thread %ld executing task for java processes (PID: %d)\n",
+			   task->thread, task->pid);
 		task->func(&task->args);
 
-		ebpf_info(JAVA_LOG_TAG
-			  "Thread %ld finished task for java processes (PID: %d)\n",
-			  task->thread, task->pid);
+		ebpf_debug(JAVA_LOG_TAG
+			   "Thread %ld finished task for java processes (PID: %d)\n",
+			   task->thread, task->pid);
 		pthread_mutex_lock(&pool->lock);
 		pool->threads[thread_idx].task = NULL;
 		pool->task_count--;
@@ -807,8 +806,8 @@ static bool check_target_jvmti_attach_files(pid_t pid)
 		 "/proc/%d/root/tmp/.java_pid%d", pid, ns_pid);
 	bool hotspot_exist = (access(hotspot_path, F_OK) == 0);
 	if (hotspot_exist) {
-		ebpf_info(JAVA_LOG_TAG
-			  "Java process (PID:%d) is HotSpot JVM.\n", pid);
+		ebpf_debug(JAVA_LOG_TAG
+			   "Java process (PID:%d) is HotSpot JVM.\n", pid);
 		return true;
 	}
 	// Check for OpenJ9 JVM dependency file
@@ -816,8 +815,8 @@ static bool check_target_jvmti_attach_files(pid_t pid)
 		 "/proc/%d/root/tmp/.com_ibm_tools_attach/%d", pid, ns_pid);
 	bool openj9_exist = (access(openj9_path, F_OK) == 0);
 	if (openj9_exist) {
-		ebpf_info(JAVA_LOG_TAG "Java process (PID:%d) is OpenJ9 JVM.\n",
-			  pid);
+		ebpf_debug(JAVA_LOG_TAG
+			   "Java process (PID:%d) is OpenJ9 JVM.\n", pid);
 		return true;
 	}
 
@@ -880,9 +879,9 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 		pool->threads[pool->thread_count - 1].thread = thread;
 		pool->threads[pool->thread_count - 1].index =
 		    pool->thread_count - 1;
-		ebpf_info(JAVA_LOG_TAG
-			  "Created new thread. Current thread count: %d\n",
-			  pool->thread_count);
+		ebpf_debug(JAVA_LOG_TAG
+			   "Created new thread. Current thread count: %d\n",
+			   pool->thread_count);
 	}
 
 	pthread_mutex_unlock(&pool->lock);
@@ -953,7 +952,7 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 	ret =
 	    exec_command(DF_JAVA_ATTACH_CMD, buffer, ret_buf, sizeof(ret_buf));
 	if (ret != 0) {
-		ebpf_info(JAVA_LOG_TAG "ret %d: %s", ret, ret_buf);
+		ebpf_warning(JAVA_LOG_TAG "ret %d: %s", ret, ret_buf);
 	}
 	task->args.replay_done = true;
 	task->args.attach_ret = ret;

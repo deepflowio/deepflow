@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef GEN_SYMS_FILE_H
-#define GEN_SYMS_FILE_H
+#ifndef COLLECT_SYMS_FILE_H
+#define COLLECT_SYMS_FILE_H
 
 #define JAVA_SYMS_OK		0
 #define JAVA_SYMS_ERR		1
@@ -30,4 +30,4 @@ void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred);
 void clean_local_java_symbols_files(int pid);
 void add_java_syms_update_task(struct symbolizer_proc_info *p_info);
 void java_syms_update_main(void *arg);
-#endif /* GEN_SYMS_FILE_H */
+#endif /* COLLECT_SYMS_FILE_H */

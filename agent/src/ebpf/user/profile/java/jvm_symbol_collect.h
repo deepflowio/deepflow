@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef DF_JATTACH_H
-#define DF_JATTACH_H
+#ifndef JVM_SYMBOL_COLLECT_H
+#define JVM_SYMBOL_COLLECT_H
 
 #include "config.h"
 
@@ -191,4 +191,4 @@ i64 get_local_symbol_file_sz(int pid);
  */
 int target_symbol_file_access(int pid);
 
-#endif /* DF_JATTACH_H */
+#endif /* JVM_SYMBOL_COLLECT_H */

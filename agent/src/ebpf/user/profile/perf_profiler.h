@@ -23,7 +23,7 @@
 
 #define PROFILER_CTX_NUM 2
 // For storing information about continuously running profiling processes.
-#define PROFILER_RUNNING_PID_PATH "/tmp/.deepflow-profiler-pid"
+#define DEEPFLOW_RUNNING_PID_PATH "/tmp/.deepflow-agent-running-pid"
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and

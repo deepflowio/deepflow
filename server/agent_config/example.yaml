@@ -1402,6 +1402,11 @@ vtap_group_id: g-xxxxxx
     ##   of a Java process, it will trigger the regeneration of the symbol file of the process.
     ##   Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
     ##   Java processes, the regeneration will be deferred for a period of time.
+    ##   At the startup of a Java program, the JVM and JIT compiler are in a "warm-up" phase. During this
+    ##   period, symbol changes are typically frequent due to the dynamic compilation and optimization
+    ##   processes. Therefore, we delay symbol collection for one minute after the Java program starts,
+    ##   allowing the JVM and JIT to "warm up" and for symbol churn to be minimized before proceeding with
+    ##   the collection.
     #java-symbol-file-refresh-defer-interval: 60s
 
     ## On-cpu profile configuration

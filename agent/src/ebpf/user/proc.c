@@ -49,8 +49,8 @@
 #endif
 #include "libGoReSym.h"
 #include "profile/perf_profiler.h"
-#include "profile/java/df_jattach.h"
-#include "profile/java/gen_syms_file.h"
+#include "profile/java/jvm_symbol_collect.h"
+#include "profile/java/collect_symbol_files.h"
 #include "bihash_8_8.h"
 #include "profile/stringifier.h"
 #include "profile/profile_common.h"

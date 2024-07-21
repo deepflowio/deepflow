@@ -34,7 +34,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
-#include "java/gen_syms_file.h"
+#include "java/collect_symbol_files.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -45,7 +45,7 @@
 #include "../table.h"
 #include <regex.h>
 #include "java/config.h"
-#include "java/df_jattach.h"
+#include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
 #include "../proc.h"
 
@@ -569,7 +569,7 @@ static struct tracer_sockopts cpdbg_sockopts = {
 // Function to check if the recorded PID and its start time are correct
 int check_profiler_running_pid(void)
 {
-	FILE *file = fopen(PROFILER_RUNNING_PID_PATH, "r");
+	FILE *file = fopen(DEEPFLOW_RUNNING_PID_PATH, "r");
 	if (!file) {
 		if (errno == ENOENT) {
 			return ETR_NOTEXIST;
@@ -613,7 +613,7 @@ int check_profiler_running_pid(void)
 
 int write_profiler_running_pid(void)
 {
-	FILE *file = fopen(PROFILER_RUNNING_PID_PATH, "w");
+	FILE *file = fopen(DEEPFLOW_RUNNING_PID_PATH, "w");
 	if (!file) {
 		ebpf_warning("fopen failed, with %s(%d)",
 			     strerror(errno), errno);

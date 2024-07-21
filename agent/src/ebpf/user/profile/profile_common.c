@@ -34,7 +34,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
-#include "java/gen_syms_file.h"
+#include "java/collect_symbol_files.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -45,7 +45,7 @@
 #include "../table.h"
 #include <regex.h>
 #include "java/config.h"
-#include "java/df_jattach.h"
+#include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
 #include "../proc.h"
 

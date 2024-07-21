@@ -42,7 +42,7 @@ int main(void)
 	char buf[1024];
 	exec_command("./test_pid_check", "", buf, sizeof(buf));
 	ebpf_info("--- %s\n", buf);
-	if (strstr(buf, "Profiler is already running"))
+	if (strstr(buf, "is already running"))
 		return 0;
 	return -1;
 }
