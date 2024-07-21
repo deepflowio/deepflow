@@ -205,6 +205,78 @@ var operatorStrings = [INVALID_OPERATOR_ID]string{
 	REGEXP_NEQ:   "!~",
 }
 
+const (
+	ConditionOr  = "or"
+	ConditionAnd = "and"
+)
+
+type ConditionHandler interface {
+	Init()
+	Decision(bool) (bool, bool)
+}
+
+type AndConditionHandler struct {
+	result bool
+}
+
+func (a *AndConditionHandler) Init() {
+	a.result = true
+}
+
+func (a *AndConditionHandler) Decision(val bool) (bool, bool) {
+	a.result = a.result && val
+	// 计算结果是 false 就可以提前返回，返回值为 false
+	if !a.result {
+		return true, false
+	}
+	return false, a.result
+}
+
+type OrConditionHandler struct {
+	result bool
+}
+
+func (o *OrConditionHandler) Init() {
+	o.result = false
+}
+
+func (o *OrConditionHandler) Decision(val bool) (bool, bool) {
+	o.result = o.result || val
+	// or 满足任一条件即可提前返回，返回值为 true
+	if o.result {
+		return true, true
+	}
+	return false, o.result
+}
+
+// TagFilterCondition 过滤条件配置，使用 map 结构便于后续扩展配置项
+type TagFilterCondition struct {
+	ConditionType string `yaml:"type"`
+}
+
+func (t *TagFilterCondition) Validate() {
+	// 默认为 AND 逻辑
+	if t.ConditionType != ConditionOr && t.ConditionType != ConditionAnd {
+		t.ConditionType = ConditionAnd
+	}
+}
+
+func (t *TagFilterCondition) NewConditionHandler() ConditionHandler {
+	var conditionHandler ConditionHandler
+	switch t.ConditionType {
+	case ConditionAnd:
+		conditionHandler = &AndConditionHandler{}
+	case ConditionOr:
+		conditionHandler = &OrConditionHandler{}
+	default:
+		conditionHandler = &AndConditionHandler{}
+	}
+
+	conditionHandler.Init()
+
+	return conditionHandler
+}
+
 func (o OperatorID) String() string {
 	return operatorStrings[o]
 }
@@ -373,11 +445,12 @@ type ExporterCfg struct {
 	EnumTranslateToNameDisabled         bool `yaml:"enum-translate-to-name-disabled"`
 	UniversalTagTranslateToNameDisabled bool `yaml:"universal-tag-translate-to-name-disabled"`
 
-	TagFilters              []TagFilter `yaml:"tag-filters"`
-	ExportFields            []string    `yaml:"export-fields"`
-	ExportFieldCategoryBits uint64      // gen by `ExportFields`
-	ExportFieldNames        []string    // gen by `ExportFields`
-	ExportFieldK8s          []string    // gen by `ExportFields`
+	TagFilterCondition      TagFilterCondition `yaml:"tag-filter-condition"`
+	TagFilters              []TagFilter        `yaml:"tag-filters"`
+	ExportFields            []string           `yaml:"export-fields"`
+	ExportFieldCategoryBits uint64             // gen by `ExportFields`
+	ExportFieldNames        []string           // gen by `ExportFields`
+	ExportFieldK8s          []string           // gen by `ExportFields`
 
 	ExportFieldStructTags [MAX_DATASOURCE_ID][]StructTags // gen by `ExportFields` and init when exporting item first time
 	TagFieltertStructTags [MAX_DATASOURCE_ID][]StructTags // gen by `TagFilters`  and init when exporting item first time
@@ -474,6 +547,8 @@ func (cfg *ExporterCfg) Validate() error {
 	for i := range cfg.TagFilters {
 		cfg.TagFilters[i].Validate()
 	}
+
+	cfg.TagFilterCondition.Validate()
 	cfg.Sasl.Validate()
 
 	return nil

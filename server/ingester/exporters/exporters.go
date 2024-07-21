@@ -305,15 +305,16 @@ func (es *Exporters) initStructTags(item interface{}, dataSourceId uint32, expor
 
 func (es *Exporters) IsExportItem(item common.ExportItem, dataSourceId uint32, exporterCfg *config.ExporterCfg) bool {
 	es.initStructTags(item, dataSourceId, exporterCfg)
+
+	conditionHandler := exporterCfg.TagFilterCondition.NewConditionHandler()
 	for _, structTag := range exporterCfg.TagFieltertStructTags[dataSourceId] {
 		value := item.GetFieldValueByOffsetAndKind(structTag.Offset, structTag.DataKind, structTag.DataType)
 		for _, tagFilter := range structTag.TagFilters {
-			if !tagFilter.MatchValue(value) {
-				return false
+			if canExit, ret := conditionHandler.Decision(tagFilter.MatchValue(value)); canExit {
+				return ret
 			}
 		}
 	}
-
 	return true
 }
 
