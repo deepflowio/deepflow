@@ -74,6 +74,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Remove tracing for HEAD type requests in NGINX [#7491](https://github.com/deepflowio/deepflow/pull/7491) by [yinjiping](https://github.com/yinjiping)
 * feat: support alarm event updated to alert event [#7457](https://github.com/deepflowio/deepflow/pull/7457) by [lzf575](https://github.com/lzf575)
 * feat: agent - support ingore vlan pcp [#7449](https://github.com/deepflowio/deepflow/pull/7449) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: Querier support no limit [#7473](https://github.com/deepflowio/deepflow/pull/7473) by [xiaochaoren1](https://github.com/xiaochaoren1)
