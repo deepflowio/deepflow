@@ -68,3 +68,32 @@ ingester:
       username: aaa
       password: aaa
     topic: abcd
+  - protocol: kafka
+    enabled: true
+    endpoints: [http://1.2.3.4:9091/receive]
+    data-sources:
+      - flow_metrics.network.1m
+      - flow_metrics.network.1s
+    queue-count: 4
+    queue-size: 100000
+    batch-size: 1024
+    flush-timeout: 10
+    tag-filter-condition:
+      type: "or"
+    tag-filters:
+    - field-name: server_reset
+      operator: "!="
+      field-values: [ 0 ]
+    - field-name: server_syn_miss
+      operator: "!="
+      field-values: [ 0 ]
+    export-fields:
+      - $tag
+      - $metrics
+    sasl:
+      enabled: false
+      security-protocol: SASL_SSL
+      sasl-mechanism: PLAIN
+      username: aaa
+      password: aaa
+    topic: abcd
