@@ -58,11 +58,11 @@ void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 	 * be attempted.
 	 */
 	if (error_occurred) {
-		*ret_val = JAVA_SYMS_ERR;
+		*ret_val = JAVA_SYMS_COLLECT_ERR;
 		return;
 	}
 
-	*ret_val = JAVA_SYMS_OK;
+	*ret_val = JAVA_SYMS_COLLECT_OK;
 	bool is_new_collector;
 	u64 start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 	if (update_java_symbol_file(pid, &is_new_collector))
@@ -89,8 +89,13 @@ void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 	}
 
 	return;
+
 error:
-	*ret_val = JAVA_SYMS_ERR;
+	if (is_new_collector)
+		*ret_val = JAVA_CREATE_COLLECTOR_ERR;
+	else
+		*ret_val = JAVA_SYMS_COLLECT_ERR;
+
 	ebpf_warning("Generate Java symbol files failed. PID %d\n", pid);
 }
 
@@ -147,7 +152,8 @@ void java_syms_update_main(void *arg)
 				int ret;
 				collect_java_symbols(p->pid, &ret,
 						     p->gen_java_syms_file_err);
-				if (ret != JAVA_SYMS_ERR) {
+				if (ret != JAVA_SYMS_COLLECT_ERR
+				    && ret != JAVA_CREATE_COLLECTOR_ERR) {
 					if (ret == JAVA_SYMS_NEED_UPDATE
 					    || ret == JAVA_SYMS_NEW_COLLECTOR)
 						p->cache_need_update = true;
@@ -162,10 +168,13 @@ void java_syms_update_main(void *arg)
 					p->gen_java_syms_file_err = false;
 				} else {
 					/*
-					 * Mark an error occurred, no further
-					 * symbol collection for this process.
+					 * Mark an error occurred when creating collector,
+					 * no further symbol collection for this process.
 					 */
-					p->gen_java_syms_file_err = true;
+					if (ret == JAVA_CREATE_COLLECTOR_ERR)
+						p->gen_java_syms_file_err =
+						    true;
+
 					p->cache_need_update = false;
 				}
 

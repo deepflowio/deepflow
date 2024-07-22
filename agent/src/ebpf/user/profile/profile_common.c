@@ -381,8 +381,9 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 	}
 }
 
-static void print_profiler_status(struct profiler_context *ctx,
-				  struct bpf_tracer *t, u64 iter_count)
+static void __attribute__ ((__unused__))
+print_profiler_status(struct profiler_context *ctx,
+		      struct bpf_tracer *t, u64 iter_count)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
@@ -1076,7 +1077,7 @@ release_iter:
 	bpf_table_set_value(t, ctx->state_map_name,
 			    sample_count_idx, &sample_cnt_val);
 
-	print_profiler_status(ctx, t, count);
+	//print_profiler_status(ctx, t, count);
 
 	/* free all elems */
 	clean_stack_strs(&ctx->stack_str_hash);

@@ -17,10 +17,11 @@
 #ifndef COLLECT_SYMS_FILE_H
 #define COLLECT_SYMS_FILE_H
 
-#define JAVA_SYMS_OK		0
-#define JAVA_SYMS_ERR		1
-#define JAVA_SYMS_NEED_UPDATE	2
-#define JAVA_SYMS_NEW_COLLECTOR 3
+#define JAVA_SYMS_COLLECT_OK		0
+#define JAVA_SYMS_COLLECT_ERR		1
+#define JAVA_CREATE_COLLECTOR_ERR	2
+#define JAVA_SYMS_NEED_UPDATE		3
+#define JAVA_SYMS_NEW_COLLECTOR		4
 
 struct java_syms_update_task {
 	struct list_head list;

@@ -428,8 +428,8 @@ static int delete_method_unload_symbol(receiver_args_t * args)
 	FILE *fp_in = fopen(path, "r");
 	if (!fp_in) {
 		ebpf_warning(JAVA_LOG_TAG
-			     "Error opening input file, '%s(%d)'\n",
-			     strerror(errno), errno);
+			     "Error opening input file %s, with '%s(%d)'\n",
+			     path, strerror(errno), errno);
 		return -1;
 	}
 
@@ -438,8 +438,8 @@ static int delete_method_unload_symbol(receiver_args_t * args)
 	FILE *fp_out = fopen(temp_path, "w");
 	if (!fp_out) {
 		ebpf_warning(JAVA_LOG_TAG
-			     "Error creating temporary file, '%s(%d)'\n",
-			     strerror(errno), errno);
+			     "Error creating temporary file %s, with '%s(%d)'\n",
+			     temp_path, strerror(errno), errno);
 		fclose(fp_in);
 		return -1;
 	}
@@ -457,8 +457,8 @@ static int delete_method_unload_symbol(receiver_args_t * args)
 
 	if (remove(path) != 0) {
 		ebpf_warning(JAVA_LOG_TAG
-			     "Error deleting original file, '%s(%d)'\n",
-			     strerror(errno), errno);
+			     "Error deleting original file %s, with '%s(%d)'\n",
+			     path, strerror(errno), errno);
 		return -1;
 	}
 	if (rename(temp_path, path) != 0) {
@@ -533,7 +533,8 @@ static int symbol_msg_process(receiver_args_t * args, int sock_fd)
 	 * needs to be updated.
 	 */
 	if (args->replay_done && meta.type == METHOD_UNLOAD) {
-		update_java_perf_map_file(args, rcv_buf);
+		if (update_java_perf_map_file(args, rcv_buf))
+			return -1;
 	} else {
 		int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
 		if (written_count != n) {
@@ -1090,7 +1091,7 @@ int start_java_symbol_collection(pid_t pid, const char *opts)
 	}
 }
 
-int update_java_symbol_file(pid_t pid, bool *is_new_collector)
+int update_java_symbol_file(pid_t pid, bool * is_new_collector)
 {
 	char opts[PERF_PATH_SZ * 2];
 	snprintf(opts, sizeof(opts),
