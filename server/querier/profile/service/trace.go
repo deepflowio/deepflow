@@ -39,7 +39,7 @@ import (
 )
 
 var log = logging.MustGetLogger("profile")
-var InstanceProfileEventType = []string{"inuse_objects", "alloc_objects", "inuse_space", "alloc_space", "goroutines"}
+var InstanceProfileEventType = []string{"inuse_objects", "inuse_space", "goroutines", "mem-inuse"}
 
 const (
 	initLocationCapacity = 1024
@@ -65,51 +65,10 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 	)
 
 	if slices.Contains[[]string, string](InstanceProfileEventType, args.ProfileEventType) {
-		timeSql := fmt.Sprintf(
-			"SELECT time FROM %s WHERE %s ORDER BY time DESC LIMIT 1",
-			common.TABLE_PROFILE, whereSql,
+		sql = fmt.Sprintf(
+			"SELECT %s, Last(%s) AS %s FROM %s WHERE %s GROUP BY %s ,%s, %s LIMIT %d",
+			common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, common.PROFILE_LOCATION_STR, common.TAG_AGENT_ID, common.TAG_PROCESS_ID, limitSql,
 		)
-		timeArgs := querier_common.QuerierParams{
-			DB:      common.DATABASE_PROFILE,
-			Sql:     timeSql,
-			Debug:   strconv.FormatBool(args.Debug),
-			Context: args.Context,
-			ORGID:   args.OrgID,
-		}
-		timeEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
-		timeEngine.Init()
-		timeResult, timeDebug, timeError := timeEngine.ExecuteQuery(&timeArgs)
-		tDebug := timeDebug["query_sqls"].([]client.Debug)[0]
-		if timeError != nil {
-			log.Errorf("ExecuteQuery failed: %v", timeDebug, timeError)
-			return
-		}
-		profileTimeDebug := model.Debug{}
-		profileTimeDebug.Sql = timeSql
-		profileTimeDebug.IP = tDebug.IP
-		profileTimeDebug.QueryUUID = tDebug.QueryUUID
-		profileTimeDebug.SqlCH = tDebug.Sql
-		profileTimeDebug.Error = tDebug.Error
-		profileTimeDebug.QueryTime = tDebug.QueryTime
-		debugs.QuerierDebug = append(debugs.QuerierDebug, profileTimeDebug)
-		var timeValue int64
-		timeValues := timeResult.Values
-		for _, value := range timeValues {
-			switch valueSlice := value.(type) {
-			case []interface{}:
-				if timeValueTime, ok := valueSlice[0].(time.Time); ok {
-					timeValue = timeValueTime.Unix()
-					break
-				}
-			}
-		}
-		if timeValue > 0 {
-			sql = fmt.Sprintf(
-				"SELECT %s, %s FROM %s WHERE %s AND time=%d LIMIT %d",
-				common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, timeValue, limitSql,
-			)
-		}
-
 	}
 	ckEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
 	ckEngine.Init()
