@@ -53,7 +53,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 		for {
 			select {
 			case <-ctx.Done():
-				log.Infof("context done")
+				log.Infof("context done, agent(key: %s)", key)
 				return
 			default:
 				resp, err := stream.Recv()
@@ -79,6 +79,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				// heartbeat
 				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
 					resp.Commands == nil && resp.Errmsg == nil {
+					log.Infof("agent heart beat command response: %s", resp.String())
 					manager.ExecCH <- &api.RemoteExecRequest{RequestId: proto.Uint64(0)}
 					continue
 				}
@@ -109,9 +110,14 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	for {
 		select {
 		case <-ctx.Done():
-			log.Infof("context done")
+			log.Infof("context done, agent(key: %s)", key)
 			return nil
-		case req := <-manager.ExecCH:
+		case req, ok := <-manager.ExecCH:
+			if !ok {
+				err := fmt.Errorf("agent(key: %s) exec channel is closed", key)
+				log.Error(err)
+				return err
+			}
 			b, _ := json.Marshal(req)
 			log.Infof("agent(key: %s) request: %s", key, string(b))
 			if err := stream.Send(req); err != nil {
