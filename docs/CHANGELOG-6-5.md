@@ -55,6 +55,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: prevents dirty data from increasing MySQL IO [#7499](https://github.com/deepflowio/deepflow/pull/7499) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: Server exporters support tag-filter-condition config (#7492) [#7493](https://github.com/deepflowio/deepflow/pull/7493) by [ZhuoZhuoCrayon](https://github.com/ZhuoZhuoCrayon)
 * feat: agent - eBPF Remove tracing for HEAD type requests in NGINX [#7489](https://github.com/deepflowio/deepflow/pull/7489) by [yinjiping](https://github.com/yinjiping)
 * feat: Querier support no limit [#7479](https://github.com/deepflowio/deepflow/pull/7479) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat:  Ingester support trace_tree [#7443](https://github.com/deepflowio/deepflow/pull/7443) by [lzf575](https://github.com/lzf575)
