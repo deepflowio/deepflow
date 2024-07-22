@@ -65,7 +65,6 @@ var (
 		"tcping":     struct{}{},
 		"curl":       struct{}{},
 		"dig":        struct{}{},
-		"nslookup":   struct{}{},
 		"traceroute": struct{}{},
 	}
 )
@@ -120,10 +119,10 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			}
 			forwardTimes = v
 		} else {
-			log.Infof("init %s to 0", ForwardControllerTimes)
+			log.Infof("node ip(%s) init %s to 0", common.NodeIP, ForwardControllerTimes)
 			c.Request.Header.Set(ForwardControllerTimes, "0")
 		}
-		log.Infof("forward times: %d", forwardTimes)
+		log.Infof("node ip(%s) forward times: %d", common.NodeIP, forwardTimes)
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
 			log.Error(err)
@@ -212,6 +211,9 @@ func getCMDAndNamespaceHandler(c *gin.Context) {
 	if filterCommandMap, ok := agentCommandMap[AgentCommandType(c.Query("type"))]; ok {
 		var cmds []*trident.RemoteCommand
 		for _, item := range data.RemoteCommand {
+			if item.Cmd == nil {
+				continue
+			}
 			if _, ok := filterCommandMap[*item.Cmd]; ok {
 				cmds = append(cmds, item)
 			}
