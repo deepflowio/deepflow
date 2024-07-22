@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240527060827-9ad113dbccad
-	github.com/deepflowio/deepflow/server v0.0.0-20240710100134-1852758e8105
+	github.com/deepflowio/deepflow/message v0.0.0-20240718034203-09d6b7d4e926
+	github.com/deepflowio/deepflow/server v0.0.0-20240722004820-198136782148
 	github.com/golang/protobuf v1.5.4
 	github.com/mattn/go-runewidth v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
