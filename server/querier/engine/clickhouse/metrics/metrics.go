@@ -223,6 +223,14 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 					"metrics", []bool{true, true, true}, "", table, "", "",
 				)
 				newAllMetrics[field] = metric
+			} else if fieldSplit[0] == "tag" {
+				fieldName := strings.Replace(field, "tag.", "", 1)
+				metric := NewMetrics(
+					0, fmt.Sprintf("if(indexOf(tag_names, '%s')=0,null,tag_values[indexOf(tag_names, '%s')])", fieldName, fieldName),
+					field, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", []bool{true, true, true}, "", table, "", "",
+				)
+				newAllMetrics[field] = metric
 			}
 		}
 	} else if db == ckcommon.DB_NAME_PROMETHEUS && field == "value" {
