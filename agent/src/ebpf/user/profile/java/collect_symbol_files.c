@@ -63,9 +63,9 @@ void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 	}
 
 	*ret_val = JAVA_SYMS_OK;
-
+	bool is_new_collector;
 	u64 start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-	if (update_java_symbol_file(pid))
+	if (update_java_symbol_file(pid, &is_new_collector))
 		goto error;
 	u64 end_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 
@@ -78,11 +78,16 @@ void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 		goto error;
 	}
 
-	ebpf_info("Refreshing JAVA symbol file: " DF_AGENT_LOCAL_PATH_FMT
-		  ".map, PID %d, size %ld, cost %lu us",
-		  pid, pid, new_file_sz, (end_time - start_time) / 1000ULL);
+	if (is_new_collector) {
+		ebpf_info("Refreshing JAVA symbol file: "
+			  DF_AGENT_LOCAL_PATH_FMT
+			  ".map, PID %d, size %ld, cost %lu us", pid, pid,
+			  new_file_sz, (end_time - start_time) / 1000ULL);
+		*ret_val = JAVA_SYMS_NEW_COLLECTOR;
+	} else {
+		*ret_val = JAVA_SYMS_NEED_UPDATE;
+	}
 
-	*ret_val = JAVA_SYMS_NEED_UPDATE;
 	return;
 error:
 	*ret_val = JAVA_SYMS_ERR;
@@ -143,10 +148,16 @@ void java_syms_update_main(void *arg)
 				collect_java_symbols(p->pid, &ret,
 						     p->gen_java_syms_file_err);
 				if (ret != JAVA_SYMS_ERR) {
-					if (ret == JAVA_SYMS_NEED_UPDATE)
+					if (ret == JAVA_SYMS_NEED_UPDATE
+					    || ret == JAVA_SYMS_NEW_COLLECTOR)
 						p->cache_need_update = true;
 					else
 						p->cache_need_update = false;
+
+					if (ret != JAVA_SYMS_NEW_COLLECTOR) {
+						p->need_new_symbol_collector =
+						    false;
+					}
 
 					p->gen_java_syms_file_err = false;
 				} else {

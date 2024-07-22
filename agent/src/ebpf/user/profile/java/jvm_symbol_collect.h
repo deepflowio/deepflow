@@ -112,10 +112,11 @@ typedef struct {
  * the collection.
  *
  * @param pid The Java process ID for symbol collection.
+ * @param is_new_collector Is it a newly created symbol collector, with the result returned to the caller.
  * @return 0 if the Java symbol file has been successfully updated, 
  *         otherwise returns a failure code.
  */
-int update_java_symbol_file(pid_t pid);
+int update_java_symbol_file(pid_t pid, bool *is_new_collector);
 
 /**
  * @brief Cleans up a single file in the target namespace.

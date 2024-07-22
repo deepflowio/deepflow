@@ -20,6 +20,7 @@
 #define JAVA_SYMS_OK		0
 #define JAVA_SYMS_ERR		1
 #define JAVA_SYMS_NEED_UPDATE	2
+#define JAVA_SYMS_NEW_COLLECTOR 3
 
 struct java_syms_update_task {
 	struct list_head list;

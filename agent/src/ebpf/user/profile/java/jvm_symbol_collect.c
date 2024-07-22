@@ -1090,7 +1090,7 @@ int start_java_symbol_collection(pid_t pid, const char *opts)
 	}
 }
 
-int update_java_symbol_file(pid_t pid)
+int update_java_symbol_file(pid_t pid, bool *is_new_collector)
 {
 	char opts[PERF_PATH_SZ * 2];
 	snprintf(opts, sizeof(opts),
@@ -1099,6 +1099,7 @@ int update_java_symbol_file(pid_t pid)
 
 	symbol_collect_task_t *task = get_task_by_pid(pid);
 	if (task == NULL) {
+		*is_new_collector = true;
 		return start_java_symbol_collection(pid, opts);
 	}
 
@@ -1122,7 +1123,7 @@ int update_java_symbol_file(pid_t pid)
 	pthread_mutex_lock(&task->mutex);
 	pthread_cond_wait(&task->cond, &task->mutex);
 	pthread_mutex_unlock(&task->mutex);
-
+	*is_new_collector = false;
 	return task->update_status;
 }
 
