@@ -396,7 +396,6 @@ pub struct EbpfYamlConfig {
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
-    pub java_symbol_file_max_space_limit: u8,
     #[serde(with = "humantime_serde")]
     pub java_symbol_file_refresh_defer_interval: Duration,
     pub on_cpu_profile: OnCpuProfile,
@@ -425,8 +424,7 @@ impl Default for EbpfYamlConfig {
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
-            java_symbol_file_max_space_limit: 10,
-            java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
+            java_symbol_file_refresh_defer_interval: Duration::from_secs(60),
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),
             memory_profile: MemoryProfile::default(),
@@ -810,23 +808,18 @@ impl YamlConfig {
             c.ebpf.ring_size = 65536;
         }
         if c.ebpf.max_socket_entries < 100000 || c.ebpf.max_socket_entries > 2000000 {
-            c.ebpf.max_socket_entries = 524288;
+            c.ebpf.max_socket_entries = 131072;
         }
         if c.ebpf.socket_map_max_reclaim < 100000 || c.ebpf.socket_map_max_reclaim > 2000000 {
-            c.ebpf.socket_map_max_reclaim = 520000;
+            c.ebpf.socket_map_max_reclaim = 120000;
         }
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
-            c.ebpf.max_trace_entries = 524288;
-        }
-        if c.ebpf.java_symbol_file_max_space_limit < 2
-            || c.ebpf.java_symbol_file_max_space_limit > 100
-        {
-            c.ebpf.java_symbol_file_max_space_limit = 10
+            c.ebpf.max_trace_entries = 131072;
         }
         if c.ebpf.java_symbol_file_refresh_defer_interval < Duration::from_secs(5)
             || c.ebpf.java_symbol_file_refresh_defer_interval > Duration::from_secs(3600)
         {
-            c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
+            c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(60)
         }
         c.ebpf.off_cpu_profile.min_block = c
             .ebpf
