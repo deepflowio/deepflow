@@ -240,7 +240,11 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 				profile = d.filleBPFData(profile)
 				metadata := d.buildMetaData(profile)
 				parser.profileName = metadata.Key.AppName()
-				parser.processTracer = &processTracer{value: profile.Count, pid: profile.Pid, stime: int64(profile.Stime), eventType: eBPFEventType[profile.EventType]}
+				parser.processTracer = &processTracer{value: profile.WideCount, pid: profile.Pid, stime: int64(profile.Stime), eventType: eBPFEventType[profile.EventType]}
+				if profile.WideCount == 0 {
+					// adapt agent version before v6.6
+					parser.processTracer.value = uint64(profile.Count)
+				}
 				err := d.sendProfileData(&pprofile.RawProfile{
 					Format:  ingestion.FormatLines,
 					RawData: profile.Data,
