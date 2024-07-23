@@ -254,6 +254,7 @@ impl FlowMap {
             service_table: ServiceTable::new(
                 SERVICE_TABLE_IPV4_CAPACITY,
                 SERVICE_TABLE_IPV6_CAPACITY,
+                &config.server_ports,
             ),
             app_table: AppTable::new(
                 config.l7_protocol_inference_max_fail_count,

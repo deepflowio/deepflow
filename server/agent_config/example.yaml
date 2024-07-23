@@ -905,6 +905,13 @@ vtap_group_id: g-xxxxxx
     ##   FlowNode, FlowLog, etc.
     #memory-pool-size: 65536
 
+  ## Service port list, priority lower than TCP SYN flags
+  ## Example:
+  ## server-ports:
+  ## - 80
+  ## - 443
+  #server-ports: []
+
   ## Max size of batched buffer
   ## Default: 131072. Range: [1024, +oo)
   ## Note: Only TaggedFlow allocation is affected at the moment.
