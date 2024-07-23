@@ -68,18 +68,25 @@ func RemoveFromCMDManager(key string, requestID uint64) {
 }
 
 func RemoveAllFromCMDManager(key string) {
+	log.Infof("preparing to remove all agent(key: %s) from cmd manager", key)
 	agentCMDMutex.Lock()
 	defer agentCMDMutex.Unlock()
-	if manager, ok := agentCMDManager[key]; ok {
-		for requestID, cmdResp := range manager.requestIDToResp {
-			errMessage := fmt.Sprintf("agent(key: %s) disconnected from the server", key)
-			AppendErrorMessage(key, requestID, &errMessage)
-			log.Error(errMessage)
-			cmdResp.ExecDoneCH <- struct{}{}
-		}
-		delete(agentCMDManager, key)
-		log.Infof("delete agent(key: %s) in manager", key)
+	manager, ok := agentCMDManager[key]
+	if !ok {
+		log.Error("can not find agent command manager(key: %s)", key)
 	}
+
+	for requestID, cmdResp := range manager.requestIDToResp {
+		errMessage := fmt.Sprintf("agent(key: %s) disconnected from the server", key)
+		AppendErrorMessage(key, requestID, &errMessage)
+		log.Error(errMessage)
+		close(cmdResp.ExecDoneCH)
+		close(cmdResp.RemoteCMDDoneCH)
+		close(cmdResp.LinuxNamespaceDoneCH)
+	}
+	close(manager.ExecCH)
+	delete(agentCMDManager, key)
+	log.Infof("delete agent(key: %s) in manager", key)
 }
 
 type CMDManager struct {
@@ -244,6 +251,7 @@ func GetNamespaces(key string, requestID uint64) []*trident.LinuxNamespace {
 }
 
 func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
+	log.Infof("current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -275,13 +283,22 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 		select {
 		case <-timeout:
 			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", agentCommandTimeout.Seconds())
-		case <-cmdResp.RemoteCMDDoneCH:
+		case _, ok := <-cmdResp.RemoteCMDDoneCH:
+			if !ok {
+				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+			}
 			resp.RemoteCommand = GetCommands(key, requestID)
 			namespaceReq := &trident.RemoteExecRequest{RequestId: &requestID, ExecType: trident.ExecutionType_LIST_NAMESPACE.Enum()}
 			manager.ExecCH <- namespaceReq
-		case <-cmdResp.LinuxNamespaceDoneCH:
+		case _, ok := <-cmdResp.LinuxNamespaceDoneCH:
+			if !ok {
+				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+			}
 			resp.LinuxNamespace = GetNamespaces(key, requestID)
-		case <-cmdResp.ExecDoneCH: // error occurred
+		case _, ok := <-cmdResp.ExecDoneCH: // error occurred
+			if !ok {
+				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+			}
 			if len(GetCommands(key, requestID)) != 0 {
 				return &model.RemoteExecResp{RemoteCommand: GetCommands(key, requestID)}, nil
 			}
@@ -324,12 +341,18 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string)
 	req.RequestId = &requestID
 	manager.ExecCH <- req
 
+	timeout := time.After(agentCommandTimeout)
 	content := ""
 	for {
 		select {
-		case <-time.After(agentCommandTimeout):
-			return "", fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, agentCommandTimeout.Seconds())
-		case <-cmdResp.ExecDoneCH:
+		case <-timeout:
+			err = fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, agentCommandTimeout.Seconds())
+			log.Error(err)
+			return "", err
+		case _, ok := <-cmdResp.ExecDoneCH:
+			if !ok {
+				return "", fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+			}
 			if msg := GetErrormessage(key, requestID); msg != "" {
 				return GetContent(key, requestID), fmt.Errorf("The deepflow-agent is unable to execute the `%s` command."+
 					" Detailed error information is as follows:\n\n%s", CMD, msg)

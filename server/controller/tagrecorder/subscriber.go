@@ -230,14 +230,14 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *messa
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	items := msg.([]*MT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
 		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
 	keys, chItems := s.generateKeyTargets(md, items)
-	if softDelete {
+	if md.SoftDelete {
 		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)

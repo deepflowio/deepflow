@@ -122,9 +122,10 @@ pub mod remote_exec {
                     }
                     _ => continue,
                 };
-                if !regex::Regex::new(&p.regex.unwrap_or(DEFAULT_PARAM_REGEX))
-                    .unwrap()
-                    .is_match(value)
+                if !value.is_empty()
+                    && !regex::Regex::new(&p.regex.unwrap_or(DEFAULT_PARAM_REGEX))
+                        .unwrap()
+                        .is_match(value)
                 {
                     return Err(Error::ParamInvalid(p.name.to_owned()));
                 }

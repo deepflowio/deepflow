@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +14,32 @@
  * limitations under the License.
  */
 
-package pubsub
+package logger
 
-import "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+import (
+	"fmt"
+)
 
-type ResourceChangedSubscriber interface {
-	OnResourceChanged(md *message.Metadata, msg interface{})
+// Prefix is an interface that can be implemented by types that want to provide a prefix to a log message.
+type Prefix interface {
+	// Prefix returns the prefix string.
+	Prefix() string
 }
 
-type ResourceBatchAddedSubscriber interface {
-	OnResourceBatchAdded(md *message.Metadata, msg interface{})
+var defaultORGID = 1
+
+// ORGPrefix implements LogPrefix to provide a prefix for log messages with an organization ID.
+type ORGPrefix struct {
+	ID int
 }
 
-type ResourceUpdatedSubscriber interface {
-	OnResourceUpdated(md *message.Metadata, msg interface{})
+func NewORGPrefix(id int) Prefix {
+	return &ORGPrefix{id}
 }
 
-type ResourceBatchDeletedSubscriber interface {
-	OnResourceBatchDeleted(md *message.Metadata, msg interface{})
+func (o *ORGPrefix) Prefix() string {
+	if o.ID == 0 || o.ID == defaultORGID {
+		return ""
+	}
+	return fmt.Sprintf("[ORGID-%d]", o.ID)
 }

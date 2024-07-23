@@ -348,6 +348,15 @@ querier:
   # profile相关配置
   profile:
     flame_query_limit: 1000000
+  
+  # trace-map 相关配置
+  trace-map:
+    max_trace_per_iteration: 100000
+    batch_traces_count_max: 1000
+    trace_id_query_iterations: 8
+    write_interval: 60
+    write_batch_size: 1000
+    debug_sql_len_max: 1000
 
   # deepflow-app相关配置
   deepflow-app:
