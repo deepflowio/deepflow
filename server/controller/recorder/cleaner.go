@@ -451,14 +451,14 @@ func deleteExpired[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt t
 	var dbItems []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&dbItems).Error
 	if err != nil {
-		log.Error(db.Logf("mysql delete resource failed: %s", err.Error()))
+		log.Errorf("mysql delete resource failed: %s", err.Error(), db.LogPrefixORG)
 		return nil
 	}
 	if len(dbItems) == 0 {
 		return nil
 	}
 	if err := db.Unscoped().Delete(&dbItems).Error; err != nil {
-		log.Error(db.Logf("mysql delete resource failed: %s", err.Error()))
+		log.Errorf("mysql delete resource failed: %s", err.Error(), db.LogPrefixORG)
 		return nil
 	}
 	return dbItems
@@ -476,7 +476,7 @@ func getIDs[MT constraint.MySQLModel](db *mysql.DB) (ids []int) {
 func deleteAndPublish[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData) {
 	dbItems := deleteExpired[MT](db, expiredAt)
 	publishTagrecorder(db, dbItems, resourceType, toolData)
-	log.Info(db.Logf("clean %s completed: %d", resourceType, len(dbItems)))
+	log.Infof("clean %s completed: %d", resourceType, len(dbItems), db.LogPrefixORG)
 }
 
 func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItems []*MT, resourceType string, toolData *toolData) {
@@ -489,7 +489,7 @@ func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItem
 			msgMetadata = toolData.domainLcuuidToMsgMetadata[(*item).GetDomainLcuuid()]
 		}
 		if msgMetadata == nil {
-			log.Error(db.Logf("failed to get metadata for %s: %#v", resourceType, item))
+			log.Errorf("failed to get metadata for %s: %#v", resourceType, item, db.LogPrefixORG)
 			continue
 		}
 		msgMetadataToDBItems[msgMetadata] = append(msgMetadataToDBItems[msgMetadata], item)
@@ -531,7 +531,7 @@ func (t *toolData) load(db *mysql.DB) error {
 
 	var domains []*mysql.Domain
 	if err := db.Find(&domains).Error; err != nil {
-		log.Error(db.Logf("failed to get domain: %s", err.Error()))
+		log.Errorf("failed to get domain: %s", err.Error(), db.LogPrefixORG)
 		return err
 	}
 	domainLcuuidToID := make(map[string]int)
@@ -541,7 +541,7 @@ func (t *toolData) load(db *mysql.DB) error {
 	}
 	var subDomains []*mysql.SubDomain
 	if err := db.Find(&subDomains).Error; err != nil {
-		log.Error(db.Logf("failed to get sub_domain: %s", err.Error())) // TODO
+		log.Errorf("failed to get sub_domain: %s", err.Error(), db.LogPrefixORG)
 		return err
 	}
 	for _, subDomain := range subDomains {

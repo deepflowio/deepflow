@@ -216,7 +216,7 @@ func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
 		}
 		parts := strings.Split(l, labelKVJoiner)
 		if len(parts) != 2 {
-			log.Warning(t.org.Logf("invalid label: %s", l))
+			log.Warningf("invalid label: %s", l, t.org.LogPrefix)
 			continue
 		}
 		lns = append(lns, parts[0])

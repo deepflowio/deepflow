@@ -73,13 +73,13 @@ func (ml *metricLabelName) IfLinked(metricID, labelNameID int) bool {
 func (ml *metricLabelName) GetLabelNameIDsByMetricName(metricName string) []int {
 	mni, ok := ml.metricNameCache.GetIDByName(metricName)
 	if !ok {
-		log.Debug(ml.org.Logf("metric_name: %s id not found", metricName))
+		log.Debugf("metric_name: %s id not found", metricName, ml.org.LogPrefix)
 		return nil
 	}
 	if labelNameIDs, ok := ml.metricNameIDToLabelNameIDs.Get(mni); ok {
 		return labelNameIDs.ToSlice()
 	}
-	log.Debug(ml.org.Logf("metric_name: %s label_ids not found", metricName))
+	log.Debugf("metric_name: %s label_ids not found", metricName, ml.org.LogPrefix)
 	return []int{}
 }
 

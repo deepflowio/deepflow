@@ -119,11 +119,11 @@ func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
 	var domain *mysql.Domain
 	result := db.Limit(1).Find(&domain)
 	if result.Error != nil {
-		log.Error(db.Logf("failed to get domain: %v", err))
+		log.Errorf("failed to get domain: %v", err, db.LogPrefixORG)
 		return nil, err
 	}
 	if result.RowsAffected == 0 {
-		log.Info(db.Logf("no domain in db, skip creating id manager"))
+		log.Infof("no domain in db, skip creating id manager", db.LogPrefixORG)
 		return nil, nil
 	}
 	return m.NewIDManagerAndInitIfNotExists(orgID)

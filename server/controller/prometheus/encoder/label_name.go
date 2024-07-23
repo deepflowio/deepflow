@@ -85,7 +85,7 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 	}
 	err = addBatch(ln.org.DB, dbToAdd, ln.resourceType)
 	if err != nil {
-		log.Error(ln.org.Logf("add %s error: %s", ln.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", ln.resourceType, err.Error(), ln.org.LogPrefix)
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -101,7 +101,7 @@ func (ln *labelName) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusLabelName
 	err = ln.org.DB.Find(&items).Error
 	if err != nil {
-		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
+		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return nil, err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
@@ -116,14 +116,14 @@ func (ln *labelName) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusLabelName
 	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
+		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, item.ID)
 		}
-		log.Info(ln.org.Logf("%s ids: %+v are in use.", ln.resourceType, inUseIDs))
+		log.Infof("%s ids: %+v are in use.", ln.resourceType, inUseIDs, ln.org.LogPrefix)
 	}
 	return
 }
