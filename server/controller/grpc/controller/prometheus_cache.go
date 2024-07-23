@@ -23,7 +23,7 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/controller"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
-	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
+	"github.com/deepflowio/deepflow/server/controller/tagingestrant/prometheus/cache"
 )
 
 type prometheusService struct{}

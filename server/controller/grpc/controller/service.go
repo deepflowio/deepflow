@@ -20,7 +20,7 @@ import (
 	api "github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
-	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/service/grpc"
+	prometheus "github.com/deepflowio/deepflow/server/controller/tagingestrant/prometheus/service/grpc"
 
 	"github.com/op/go-logging"
 	"golang.org/x/net/context"

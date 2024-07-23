@@ -30,8 +30,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 	"github.com/deepflowio/deepflow/server/controller/monitor/vtap"
-	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
+	"github.com/deepflowio/deepflow/server/controller/tagingestrant/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 	tagrecordercheck "github.com/deepflowio/deepflow/server/controller/tagrecorder/check"
 )

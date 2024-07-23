@@ -27,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
-	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/service/grpc"
+	prometheus "github.com/deepflowio/deepflow/server/controller/tagingestrant/prometheus/service/grpc"
 	trisolaris "github.com/deepflowio/deepflow/server/controller/trisolaris/services/grpc/synchronize"
 )
 

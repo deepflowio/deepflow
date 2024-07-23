@@ -33,8 +33,8 @@ import (
 	http "github.com/deepflowio/deepflow/server/controller/http/config"
 	manager "github.com/deepflowio/deepflow/server/controller/manager/config"
 	monitor "github.com/deepflowio/deepflow/server/controller/monitor/config"
-	prometheus "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 	statsd "github.com/deepflowio/deepflow/server/controller/statsd/config"
+	prometheus "github.com/deepflowio/deepflow/server/controller/tagingestrant/prometheus/config"
 	tagrecorder "github.com/deepflowio/deepflow/server/controller/tagrecorder/config"
 	trisolaris "github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 )
