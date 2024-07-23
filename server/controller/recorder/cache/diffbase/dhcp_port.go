@@ -35,12 +35,12 @@ func (b *DataSet) AddDHCPPort(dbItem *mysql.DHCPPort, seq int, toolDataSet *tool
 		AZLcuuid:     dbItem.AZ,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteDHCPPort(lcuuid string) {
 	delete(b.DHCPPorts, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type DHCPPort struct {

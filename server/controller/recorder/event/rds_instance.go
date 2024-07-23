@@ -78,7 +78,7 @@ func (r *RDSInstance) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = r.ToolDataSet.GetRDSInstanceNameByID(id)
 			if err != nil {
-				log.Error(r.metadata.Logf("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err, r.metadata.LogPrefixes)
 			}
 		} else {
 			log.Error(nameByIDNotFound(r.resourceType, id))

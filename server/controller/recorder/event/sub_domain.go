@@ -52,14 +52,14 @@ func (r *SubDomain) ProduceFromMySQL() {
 	var dbItems []mysql.ResourceEvent
 	err := r.metadata.DB.Where("domain = ? AND sub_domain = ?", r.domainLcuuid, r.subDomainLcuuid).Find(&dbItems).Error
 	if err != nil {
-		log.Error(r.metadata.Logf("db query resource_event failed:%s", err.Error()))
+		log.Errorf("db query resource_event failed: %s", err.Error(), r.metadata.LogPrefixes)
 		return
 	}
 	for _, item := range dbItems {
 		var event *eventapi.ResourceEvent
 		err = json.Unmarshal([]byte(item.Content), &event)
 		if err != nil {
-			log.Error(r.metadata.Logf("json marshal event (detail: %#v) failed: %s", item, err.Error()))
+			log.Errorf("json marshal event (detail: %#v) failed: %s", item, err, r.metadata.LogPrefixes)
 			r.metadata.DB.Delete(&item)
 			continue
 		}
@@ -93,7 +93,7 @@ func (r *SubDomain) fillL3DeviceInfo(event *eventapi.ResourceEvent) bool {
 	} else if event.InstanceType == common.VIF_DEVICE_TYPE_POD {
 		podInfo, err := r.ToolDataSet.GetPodInfoByID(int(event.InstanceID))
 		if err != nil {
-			log.Error(r.metadata.Logf("get pod (id: %d) pod node ID failed: %s", event.InstanceID, err.Error()))
+			log.Errorf("get pod (id: %d) pod node ID failed: %s", event.InstanceID, err.Error(), r.metadata.LogPrefixes)
 			return false
 		}
 		podNodeID = podInfo.PodNodeID

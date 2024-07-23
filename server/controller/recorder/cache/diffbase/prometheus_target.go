@@ -36,12 +36,12 @@ func (b *DataSet) AddPrometheusTarget(dbItem *mysql.PrometheusTarget, seq int, t
 		OtherLabels: dbItem.OtherLabels,
 		VPCLcuuid:   vpcLcuuid,
 	}
-	log.Info(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, b.PrometheusTarget[dbItem.Lcuuid]))
+	log.Info(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, b.PrometheusTarget[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePrometheusTarget(lcuuid string) {
 	delete(b.PrometheusTarget, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PrometheusTarget struct {

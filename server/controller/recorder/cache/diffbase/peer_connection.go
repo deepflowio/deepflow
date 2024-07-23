@@ -35,12 +35,12 @@ func (b *DataSet) AddPeerConnection(dbItem *mysql.PeerConnection, seq int, toolD
 		RemoteRegionLcuuid: remoteRegionLcuuid,
 		LocalRegionLcuuid:  localRegionLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePeerConnection(lcuuid string) {
 	delete(b.PeerConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PeerConnection struct {

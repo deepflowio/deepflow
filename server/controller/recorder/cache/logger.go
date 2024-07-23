@@ -20,9 +20,11 @@ import (
 	"fmt"
 
 	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("recorder.cache")
+var log = logger.MustGetLogger("recorder.cache")
 
 func dbQueryResourceFailed(resource string, err error) string {
 	return fmt.Sprintf("db query %s failed: %v", resource, err)

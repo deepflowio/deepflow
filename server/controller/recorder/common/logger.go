@@ -20,72 +20,9 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/logger"
-	"github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("recorder.common")
-
-type Logger struct {
-	orgID         int
-	teamID        int
-	DomainName    string
-	SubDomainName string
-	MsgPre        string
-}
-
-func NewLogger(orgID int) *Logger {
-	return &Logger{
-		orgID:  orgID,
-		MsgPre: fmt.Sprintf("[OID-%d] ", orgID),
-	}
-}
-
-func (l *Logger) InitMsgPre() {
-	if l.orgID != 0 {
-		l.MsgPre = fmt.Sprintf("[OID-%d] ", l.orgID)
-	}
-	if l.teamID != 0 {
-		l.MsgPre += fmt.Sprintf("[TID-%d] ", l.teamID)
-	}
-	if l.DomainName != "" {
-		l.MsgPre += fmt.Sprintf("[DN-%s] ", l.DomainName)
-	}
-	if l.SubDomainName != "" {
-		l.MsgPre += fmt.Sprintf("[SDN-%s] ", l.SubDomainName)
-	}
-}
-
-func (l *Logger) SetTeamID(id int) {
-	l.teamID = id
-	l.InitMsgPre()
-}
-
-func (l *Logger) SetDomainName(n string) {
-	l.DomainName = n
-	l.InitMsgPre()
-}
-
-func (l *Logger) SetSubDomainName(n string) {
-	l.SubDomainName = n
-	l.InitMsgPre()
-}
-
-func (l *Logger) GetMsgPre() string {
-	return l.MsgPre
-}
-
-func (l *Logger) AddPre(format string, a ...any) string {
-	return l.MsgPre + fmt.Sprintf(format, a...)
-}
-
-func (l *Logger) Copy() *Logger {
-	return &Logger{
-		orgID:         l.orgID,
-		DomainName:    l.DomainName,
-		SubDomainName: l.SubDomainName,
-		MsgPre:        l.MsgPre,
-	}
-}
+var log = logger.MustGetLogger("recorder.common")
 
 func LogAdd(resourceType string) string {
 	return fmt.Sprintf("add %s", resourceType)

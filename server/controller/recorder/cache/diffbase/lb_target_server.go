@@ -32,12 +32,12 @@ func (b *DataSet) AddLBTargetServer(dbItem *mysql.LBTargetServer, seq int) {
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteLBTargetServer(lcuuid string) {
 	delete(b.LBTargetServers, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type LBTargetServer struct {

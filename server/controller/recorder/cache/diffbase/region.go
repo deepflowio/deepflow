@@ -31,12 +31,12 @@ func (b *DataSet) AddRegion(dbItem *mysql.Region, seq int) {
 		Name:  dbItem.Name,
 		Label: dbItem.Label,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteRegion(lcuuid string) {
 	delete(b.Regions, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type Region struct {

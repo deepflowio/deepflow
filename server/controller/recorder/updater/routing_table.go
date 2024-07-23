@@ -76,10 +76,10 @@ func (t *RoutingTable) getDiffBaseByCloudItem(cloudItem *cloudmodel.RoutingTable
 func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*mysql.RoutingTable, bool) {
 	vrouterID, exists := t.cache.ToolDataSet.GetVRouterIDByLcuuid(cloudItem.VRouterLcuuid)
 	if !exists {
-		log.Error(t.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.VRouterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, cloudItem.Lcuuid,
-		)))
+		), t.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.RoutingTable{

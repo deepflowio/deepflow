@@ -31,12 +31,12 @@ func (b *DataSet) AddVIP(dbItem *mysql.VIP, seq int) {
 		IP:     dbItem.IP,
 		VTapID: dbItem.VTapID,
 	}
-	log.Info(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, b.VIP[dbItem.Lcuuid]))
+	log.Info(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, b.VIP[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteVIP(lcuuid string) {
 	delete(b.VIP, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type VIP struct {

@@ -17,7 +17,7 @@
 package common
 
 import (
-	"fmt"
+	// "fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/logger"
@@ -26,7 +26,6 @@ import (
 type ORG struct {
 	ID        int       // org id
 	DB        *mysql.DB // org database connection
-	Logger    *Logger   // log controller
 	LogPrefix logger.Prefix
 }
 
@@ -35,20 +34,6 @@ func NewORG(id int) (*ORG, error) {
 	return &ORG{
 		ID:        id,
 		DB:        db,
-		Logger:    NewLogger(id),
 		LogPrefix: logger.NewORGPrefix(id),
 	}, err
-}
-
-// Logf adds org id, domain info, sub_domain info to logs
-func (o *ORG) Logf(format string, a ...any) string {
-	return o.Logger.AddPre(format, a...)
-}
-
-func (o *ORG) Log(format string) string {
-	return o.Logger.AddPre(format)
-}
-
-func FmtORGID(id int) string {
-	return fmt.Sprintf("[OID-%d] ", id)
 }

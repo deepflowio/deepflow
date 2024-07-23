@@ -34,12 +34,12 @@ func (b *DataSet) AddPodCluster(dbItem *mysql.PodCluster, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodCluster(lcuuid string) {
 	delete(b.PodClusters, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodCluster struct {

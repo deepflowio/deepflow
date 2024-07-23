@@ -34,12 +34,12 @@ func (b *DataSet) AddVPC(dbItem *mysql.VPC, seq int) {
 		CIDR:         dbItem.CIDR,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteVPC(lcuuid string) {
 	delete(b.VPCs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type VPC struct {

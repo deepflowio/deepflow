@@ -17,7 +17,7 @@
 package idmng
 
 import (
-	"errors"
+	"fmt"
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -73,13 +73,13 @@ func (a *allocator) SetAllocationCountStrict(allocationCountStrict bool) {
 }
 
 func (a *allocator) Refresh() error {
-	log.Info(a.org.Logf("refresh %s ids pool started", a.resourceType))
+	log.Infof("refresh %s ids pool started", a.resourceType, a.org.LogPrefix)
 	inUseIDSet, err := a.inUseIDsProvider.load()
 	if err != nil {
 		return err
 	}
 	a.usableIDs = a.generateSortedUsableIDs(a.generateAllIDSet(), inUseIDSet)
-	log.Info(a.org.Logf("refresh %s ids pool (usable ids count: %d) completed", a.resourceType, len(a.usableIDs)))
+	log.Infof("refresh %s ids pool (usable ids count: %d) completed", a.resourceType, len(a.usableIDs), a.org.LogPrefix)
 	return nil
 }
 
@@ -121,13 +121,15 @@ func (a *allocator) generateSortedUsableIDs(allIDSet, inUseIDSet mapset.Set[int]
 
 func (a *allocator) Allocate(count int) ([]int, error) {
 	if len(a.usableIDs) == 0 {
-		return nil, errors.New(a.org.Logf("%s has no more usable ids, usable ids count: 0", a.resourceType))
+		log.Errorf("%s has no more usable ids, usable ids count: 0", a.resourceType, a.org.LogPrefix)
+		return nil, fmt.Errorf("%s has no more usable ids, usable ids count: 0", a.resourceType)
 	}
 
 	trueCount := count
 	if len(a.usableIDs) < count {
 		if a.allocationCountStrict {
-			return nil, errors.New(a.org.Logf("%s has no more usable ids, usable ids count: %d, except ids count: %d", a.resourceType, len(a.usableIDs), count))
+			log.Errorf("%s has no more usable ids, usable ids count: %d, except ids count: %d", a.resourceType, len(a.usableIDs), count, a.org.LogPrefix)
+			return nil, fmt.Errorf("%s has no more usable ids, usable ids count: %d, except ids count: %d", a.resourceType, len(a.usableIDs), count)
 		}
 		trueCount = len(a.usableIDs)
 	}
@@ -141,12 +143,13 @@ func (a *allocator) Allocate(count int) ([]int, error) {
 	}
 	if len(inUseIDs) != 0 {
 		if a.allocationCountStrict {
-			return nil, errors.New(a.org.Logf("%s ids: %v are in use", a.resourceType, inUseIDs))
+			log.Errorf("%s ids: %v are in use", a.resourceType, inUseIDs, a.org.LogPrefix)
+			return nil, fmt.Errorf("%s ids: %v are in use", a.resourceType, inUseIDs)
 		}
 		ids = mapset.NewSet(ids...).Difference(mapset.NewSet(inUseIDs...)).ToSlice()
 	}
 
-	log.Info(a.org.Logf("allocated %s ids: %v (expected count: %d, true count: %d)", a.resourceType, ids, trueCount, len(ids)))
+	log.Infof("allocated %s ids: %v (expected count: %d, true count: %d)", a.resourceType, ids, trueCount, len(ids), a.org.LogPrefix)
 	a.usableIDs = a.usableIDs[trueCount:]
 	return ids, nil
 }
@@ -154,7 +157,7 @@ func (a *allocator) Allocate(count int) ([]int, error) {
 func (a *allocator) Recycle(ids []int) {
 	a.sorter.sort(ids)
 	a.usableIDs = append(a.usableIDs, ids...)
-	log.Info(a.org.Logf("recycled %s ids: %v", a.resourceType, ids))
+	log.Infof("recycled %s ids: %v", a.resourceType, ids, a.org.LogPrefix)
 }
 
 type sorter interface {

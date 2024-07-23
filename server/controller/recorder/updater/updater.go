@@ -123,7 +123,7 @@ func newUpdaterBase[
 		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
 	)
 
-	log.Infof(u.metadata.Logf("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata)) // TODO debug
+	log.Infof("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata, u.metadata.LogPrefixes)
 	u.initPubSub()
 	return u
 }
@@ -131,7 +131,7 @@ func newUpdaterBase[
 func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) initPubSub() {
 	ps := pubsub.GetPubSub(u.resourceType)
 	if ps == nil {
-		log.Error(u.metadata.Logf("pubsub not found for resource type: %s", u.resourceType))
+		log.Errorf("pubsub not found for resource type: %s", u.resourceType, u.metadata.LogPrefixes)
 		return
 	}
 	u.pubsub = ps.(pubsub.ResourcePubSub[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT])
@@ -155,11 +155,11 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 	logDebug := logDebugResourceTypeEnabled(u.resourceType)
 	for _, cloudItem := range u.cloudData {
 		if logDebug {
-			log.Info(u.metadata.Logf(debugCloudItem(u.resourceType, cloudItem)))
+			log.Info(debugCloudItem(u.resourceType, cloudItem), u.metadata.LogPrefixes)
 		}
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
-			log.Info(u.metadata.Logf("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), cloudItem))
+			log.Infof("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), cloudItem, u.metadata.LogPrefixes)
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)
 			if ok {
 				dbItemsToAdd = append(dbItemsToAdd, dbItem)
@@ -168,7 +168,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 			diffBase.SetSequence(u.cache.GetSequence())
 			structInfo, mapInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
-				log.Info(u.metadata.Logf("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase))
+				log.Infof("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase, u.metadata.LogPrefixes)
 				u.update(&cloudItem, diffBase, mapInfo, structInfo)
 			}
 		}
@@ -182,7 +182,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 	lcuuidsOfBatchToDelete := []string{}
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
-			log.Info(u.metadata.Logf("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase))
+			log.Infof("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase, u.metadata.LogPrefixes)
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}

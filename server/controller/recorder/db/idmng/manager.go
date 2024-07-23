@@ -20,16 +20,16 @@ import (
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/op/go-logging"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	. "github.com/deepflowio/deepflow/server/controller/recorder/config"
 )
 
-var log = logging.MustGetLogger("recorder.idmng")
+var log = logger.MustGetLogger("recorder.idmng")
 
 var minID = 1
 
@@ -76,8 +76,8 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 }
 
 func (m *IDManager) Refresh() error {
-	log.Info(m.org.Logf("refresh id pools started"))
-	defer log.Info(m.org.Logf("refresh id pools completed"))
+	log.Info("refresh id pools started", m.org.LogPrefix)
+	defer log.Info("refresh id pools completed", m.org.LogPrefix)
 
 	var result error
 	for _, idPool := range m.resourceTypeToIDPool {
@@ -92,7 +92,7 @@ func (m *IDManager) Refresh() error {
 func (m *IDManager) AllocateIDs(resourceType string, count int) []int {
 	idPool, ok := m.resourceTypeToIDPool[resourceType]
 	if !ok {
-		log.Error(m.org.Logf("resource type (%s) does not need to allocate id", resourceType))
+		log.Errorf("resource type: %s does not need to allocate id", resourceType, m.org.LogPrefix)
 		return []int{}
 	}
 	ids, _ := idPool.allocate(count)
@@ -102,7 +102,7 @@ func (m *IDManager) AllocateIDs(resourceType string, count int) []int {
 func (m *IDManager) RecycleIDs(resourceType string, ids []int) {
 	idPool, ok := m.resourceTypeToIDPool[resourceType]
 	if !ok {
-		log.Error(m.org.Logf("resource type (%s) does not need to allocate id", resourceType))
+		log.Errorf("resource type: %s does not need to allocate id", resourceType, m.org.LogPrefix)
 		return
 	}
 	idPool.recycle(ids)
@@ -132,14 +132,14 @@ func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *ID
 func (p *IDPool[MT]) load() (mapset.Set[int], error) {
 	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select("id"))
 	if err != nil {
-		log.Error(p.org.Logf("failed to query %s: %v", p.resourceType, err))
+		log.Errorf("failed to query %s: %v", p.resourceType, err, p.org.LogPrefix)
 		return nil, err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDsSet.Add((*item).GetID())
 	}
-	log.Info(p.org.Logf("loaded %s ids successfully", p.resourceType))
+	log.Infof("loaded %s ids successfully", p.resourceType, p.org.LogPrefix)
 	return inUseIDsSet, nil
 }
 
@@ -147,7 +147,7 @@ func (p *IDPool[MT]) check(ids []int) ([]int, error) {
 	var dbItems []*MT
 	err := p.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Error(p.org.Logf("failed to query %s: %v", p.resourceType, err))
+		log.Errorf("failed to query %s: %v", p.resourceType, err, p.org.LogPrefix)
 		return nil, err
 	}
 	inUseIDs := make([]int, 0)
@@ -155,7 +155,7 @@ func (p *IDPool[MT]) check(ids []int) ([]int, error) {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, (*item).GetID())
 		}
-		log.Info(p.org.Logf("%s ids: %+v are in use.", p.resourceType, inUseIDs))
+		log.Infof("%s ids: %+v are in use.", p.resourceType, inUseIDs, p.org.LogPrefix)
 	}
 	return inUseIDs, nil
 }

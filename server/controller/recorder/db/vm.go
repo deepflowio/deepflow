@@ -41,25 +41,25 @@ func (v *VM) DeleteBatch(lcuuids []string) ([]*mysql.VM, bool) {
 	var vmPodNodeConns []*mysql.VMPodNodeConnection
 	err := v.metadata.DB.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN vm On vm_pod_node_connection.vm_id = vm.id").Where("vm.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
 	if err != nil {
-		log.Error(v.metadata.Logf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err))
+		log.Errorf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuids, err.Error(), v.metadata.LogPrefixes)
 		return nil, false
 	} else {
 		for _, con := range vmPodNodeConns {
 			err = v.metadata.DB.Delete(con).Error
 			if err != nil {
-				log.Error(v.metadata.Logf("%s (info: %+v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con, err))
+				log.Errorf("%s (info: %+v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con, err.Error(), v.metadata.LogPrefixes)
 				continue
 			}
-			log.Info(v.metadata.Logf("%s (info: %+v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con))
+			log.Infof("%s (info: %+v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con, v.metadata.LogPrefixes)
 		}
 	}
 
 	var dbItems []*mysql.VM
 	err = v.metadata.DB.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
-		log.Error(v.metadata.Logf("%s (lcuuids: %v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_EN), lcuuids, err))
+		log.Errorf("%s (lcuuids: %v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_EN), lcuuids, err.Error(), v.metadata.LogPrefixes)
 		return nil, false
 	}
-	log.Info(v.metadata.Logf("%s (lcuuids: %v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_EN), lcuuids))
+	log.Infof("%s (lcuuids: %v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_EN), lcuuids, v.metadata.LogPrefixes)
 	return dbItems, true
 }

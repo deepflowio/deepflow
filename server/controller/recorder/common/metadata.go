@@ -24,7 +24,6 @@ import (
 type Metadata struct {
 	ORGID       int       // org id
 	DB          *mysql.DB // org database connection
-	Logger      *Logger   // log controller // TODO delete
 	Domain      *DomainInfo
 	SubDomain   *SubDomainInfo
 	LogPrefixes []logger.Prefix
@@ -35,7 +34,6 @@ func NewMetadata(orgID int) (*Metadata, error) {
 	return &Metadata{
 		ORGID:       orgID,
 		DB:          db,
-		Logger:      NewLogger(orgID),
 		Domain:      new(DomainInfo),
 		SubDomain:   new(SubDomainInfo),
 		LogPrefixes: []logger.Prefix{logger.NewORGPrefix(orgID)},
@@ -46,7 +44,6 @@ func (m *Metadata) Copy() *Metadata {
 	return &Metadata{
 		ORGID:       m.ORGID,
 		DB:          m.DB,
-		Logger:      m.Logger.Copy(),
 		Domain:      m.Domain,
 		SubDomain:   m.SubDomain,
 		LogPrefixes: m.LogPrefixes[:],
@@ -67,25 +64,16 @@ func (m *Metadata) GetTeamID() int {
 
 func (m *Metadata) SetDomain(domain mysql.Domain) {
 	m.Domain = &DomainInfo{domain}
-	m.Logger.SetTeamID(domain.TeamID)
-	m.Logger.SetDomainName(domain.Name)
+	m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(domain.TeamID))
 	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name))
 }
 
 func (m *Metadata) SetSubDomain(subDomain mysql.SubDomain) {
 	m.SubDomain = &SubDomainInfo{subDomain}
-	m.Logger.SetTeamID(subDomain.TeamID)
-	m.Logger.SetSubDomainName(subDomain.Name)
+	if subDomain.TeamID != 0 {
+		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(subDomain.TeamID))
+	}
 	m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(subDomain.Name))
-}
-
-// Logf adds org id, domain info, sub_domain info to logs
-func (m *Metadata) Logf(format string, a ...any) string {
-	return m.Logger.AddPre(format, a...)
-}
-
-func (m *Metadata) Log(format string) string {
-	return m.Logger.AddPre(format)
 }
 
 type DomainInfo struct {

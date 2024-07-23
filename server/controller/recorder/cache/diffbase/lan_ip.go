@@ -35,12 +35,12 @@ func (b *DataSet) AddLANIP(dbItem *mysql.LANIP, seq int, toolDataSet *tool.DataS
 		SubDomainLcuuid: dbItem.SubDomain,
 		// SubnetLcuuid:    subnetLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteLANIP(lcuuid string) {
 	delete(b.LANIPs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type LANIP struct {

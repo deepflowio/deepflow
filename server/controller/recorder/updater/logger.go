@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/op/go-logging"
 	"golang.org/x/exp/slices"
 
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
-var log = logging.MustGetLogger("recorder.updater")
+var log = logger.MustGetLogger("recorder.updater")
 
 func resourceAForResourceBNotFound(resourceA, lcuuidA, resourceB, lcuuidB string) string {
 	return fmt.Sprintf("%s (lcuuid: %s) for %s (lcuuid: %s) not found", resourceA, lcuuidA, resourceB, lcuuidB)

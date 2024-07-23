@@ -17,13 +17,12 @@
 package pubsub
 
 import (
-	"github.com/op/go-logging"
-
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 )
 
-var log = logging.MustGetLogger("recorder.pubsub")
+var log = logger.MustGetLogger("recorder.pubsub")
 
 type PubSub interface {
 	Subscribe(topic int, subscriber interface{})
