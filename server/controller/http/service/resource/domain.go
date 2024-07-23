@@ -262,14 +262,16 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("domain cluster_id (%s) invalid", domainCreate.KubernetesClusterID))
 		}
 
-		db.Model(&mysql.Domain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
+		var domainCheck mysql.Domain
+		count = db.Where("cluster_id = ?", domainCreate.KubernetesClusterID).First(&domainCheck).RowsAffected
 		if count > 0 {
-			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in domain (%s)", domainCreate.KubernetesClusterID, domainCheck.Name))
 		}
 
-		db.Model(&mysql.SubDomain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
+		var subDomainCheck mysql.SubDomain
+		count = db.Where("cluster_id = ?", domainCreate.KubernetesClusterID).First(&subDomainCheck).RowsAffected
 		if count > 0 {
-			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in sub_domain", domainCreate.KubernetesClusterID))
+			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in sub_domain (%s)", domainCreate.KubernetesClusterID, subDomainCheck.Name))
 		}
 
 		if db.ORGID != mysqlcommon.DEFAULT_ORG_ID {
@@ -826,13 +828,17 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 		if !routercommon.CheckClusterID(subDomainCreate.ClusterID) {
 			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("sub_domain cluster_id (%s) invalid", subDomainCreate.ClusterID))
 		}
-		db.Model(&mysql.Domain{}).Where("cluster_id = ?", subDomainCreate.ClusterID).Count(&count)
+
+		var domainCheck mysql.Domain
+		count = db.Where("cluster_id = ?", subDomainCreate.ClusterID).First(&domainCheck).RowsAffected
 		if count > 0 {
-			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in domain", subDomainCreate.ClusterID))
+			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in domain (%s)", subDomainCreate.ClusterID, domainCheck.Name))
 		}
-		db.Model(&mysql.SubDomain{}).Where("cluster_id = ?", subDomainCreate.ClusterID).Count(&count)
+
+		var subDomainCheck mysql.SubDomain
+		count = db.Where("cluster_id = ?", subDomainCreate.ClusterID).First(&subDomainCheck).RowsAffected
 		if count > 0 {
-			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist", subDomainCreate.ClusterID))
+			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in sub_domain (%s)", subDomainCreate.ClusterID, subDomainCheck.Name))
 		}
 	} else {
 		subDomainCreate.ClusterID = "d-" + common.GenerateShortUUID()
