@@ -42,6 +42,7 @@ type TraceMapConfig struct {
 	WriteInterval          int     `default:"60" yaml:"write_interval"`
 	WriteBatchSize         int     `default:"1000" yaml:"write_batch_size"`
 	Querier                Querier `yaml:"querier"`
+	DebugSqlLenMax         int     `default:"1000" yaml:"debug_sql_len_max"`
 }
 
 type Querier struct {

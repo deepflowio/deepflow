@@ -20,20 +20,23 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 type ORG struct {
-	ID     int       // org id
-	DB     *mysql.DB // org database connection
-	Logger *Logger   // log controller
+	ID        int       // org id
+	DB        *mysql.DB // org database connection
+	Logger    *Logger   // log controller
+	LogPrefix logger.Prefix
 }
 
 func NewORG(id int) (*ORG, error) {
 	db, err := mysql.GetDB(id)
 	return &ORG{
-		ID:     id,
-		DB:     db,
-		Logger: NewLogger(id),
+		ID:        id,
+		DB:        db,
+		Logger:    NewLogger(id),
+		LogPrefix: logger.NewORGPrefix(id),
 	}, err
 }
 
