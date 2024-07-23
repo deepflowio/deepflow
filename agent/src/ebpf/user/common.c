@@ -1517,6 +1517,80 @@ bool substring_starts_with(const char *haystack, const char *needle)
 	return false;		// Substring does not start with the main string
 }
 
+static int find_proc_form_status_file(const char *status_path,
+				      const char *process_name)
+{
+#define LINE_SIZE 256
+#define NAME_SIZE 16
+#define STATUS_PATH_SIZE 256
+
+	FILE *status_file = fopen(status_path, "r");
+	if (status_file == NULL) {
+		ebpf_warning
+		    ("Failed to open status file:%s, with %s(%d)\n",
+		     status_file, strerror(errno), errno);
+		return -1;
+	}
+
+	char line[LINE_SIZE];
+	while (fgets(line, sizeof(line), status_file)) {
+		if (strncmp(line, "Name:", 5) == 0) {
+			char name[NAME_SIZE];
+			if (sscanf(line, "Name:\t%15s", name) == 1) {
+				if (strcmp(name, process_name)
+				    == 0) {
+					return 0;
+				}
+			}
+			break;
+		}
+	}
+
+	fclose(status_file);
+	return -1;
+}
+
+int find_pid_by_name(const char *process_name, int exclude_pid)
+{
+	struct dirent *entry;
+	DIR *proc = opendir("/proc");
+	if (proc == NULL) {
+		ebpf_warning("Failed to open /proc directory, with %s(%d)\n",
+			     strerror(errno), errno);
+		return -1;
+	}
+
+	while ((entry = readdir(proc)) != NULL) {
+		if (entry->d_type == DT_DIR) {
+			// Check if the directory name is a number (process ID)
+			char *endptr;
+			int pid = (int)strtol(entry->d_name, &endptr, 10);
+			if (exclude_pid > 0 && pid == exclude_pid)
+				continue;
+
+			if (*endptr == '\0' && pid > 0) {
+				char status_path[STATUS_PATH_SIZE];
+				snprintf(status_path, sizeof(status_path),
+					 "/proc/%d/status", pid);
+				if (find_proc_form_status_file
+				    (status_path, process_name) == 0)
+					return pid;
+			}
+		}
+	}
+
+	if (closedir(proc) == -1) {
+		ebpf_warning("Failed to close /proc directory, with %s(%d)\n",
+			     strerror(errno), errno);
+	}
+
+	return -1;
+
+#undef STATUS_PATH_SIZE
+#undef LINE_SIZE
+#undef NAME_SIZE
+}
+
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
 {

@@ -309,6 +309,7 @@ int is_file_opened_by_other_processes(const char *filename);
 u64 kallsyms_lookup_name(const char *name);
 bool substring_starts_with(const char *haystack, const char *needle);
 char *get_timestamp_from_us(u64 microseconds);
+int find_pid_by_name(const char *process_name, int exclude_pid);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */

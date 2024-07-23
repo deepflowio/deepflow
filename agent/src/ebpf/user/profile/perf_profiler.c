@@ -56,6 +56,7 @@
 #define CP_PERF_PG_NUM	16
 #define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
+#define DEEPFLOW_AGENT_NAME "deepflow-agent"
 
 extern int sys_cpus_count;
 struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
@@ -569,68 +570,16 @@ static struct tracer_sockopts cpdbg_sockopts = {
 // Function to check if the recorded PID and its start time are correct
 int check_profiler_running_pid(void)
 {
-	FILE *file = fopen(DEEPFLOW_RUNNING_PID_PATH, "r");
-	if (!file) {
-		if (errno == ENOENT) {
-			return ETR_NOTEXIST;
-		}
-		ebpf_warning("fopen() failed, with %s(%d)\n", strerror(errno),
-			     errno);
-		return ETR_IO;
-	}
-
-	pid_t recorded_pid;
-	u64 recorded_start_time;
-	if (fscanf(file, "%d,%lu", &recorded_pid, &recorded_start_time) != 2) {
-		ebpf_warning("fscanf() failed, with %s(%d)\n", strerror(errno),
-			     errno);
-		fclose(file);
-		return ETR_INVAL;
-	}
-	fclose(file);
-
-	// Check if the process exists
-	if (kill(recorded_pid, 0) == -1 && errno == ESRCH) {
-		return ETR_NOTEXIST;
-	}
-	// Get the actual start time of the process
-	u64 actual_start_time =
-	    get_process_starttime_and_comm(recorded_pid, NULL, 0);
-	if (actual_start_time == 0) {
-		return ETR_NOTEXIST;
-	}
-	// Compare the recorded and actual start times
-	if (recorded_start_time == actual_start_time) {
+	int pid = find_pid_by_name(DEEPFLOW_AGENT_NAME, getpid());
+	if (pid > 0) {
 		ebpf_warning("The deepflow-agent with process ID %d is already "
 			     "running. You can disable the continuous profiling "
 			     "feature of the deepflow-agent to skip this check.\n",
-			     recorded_pid);
+			     pid);
 		return ETR_EXIST;
 	}
 
 	return ETR_NOTEXIST;
-}
-
-int write_profiler_running_pid(void)
-{
-	FILE *file = fopen(DEEPFLOW_RUNNING_PID_PATH, "w");
-	if (!file) {
-		ebpf_warning("fopen failed, with %s(%d)",
-			     strerror(errno), errno);
-		return ETR_IO;
-	}
-
-	pid_t pid = getpid();
-	u64 start_time = get_process_starttime_and_comm(pid, NULL, 0);
-	if (start_time == 0) {
-		ebpf_warning("get_process_starttime_and_comm() failed.");
-		fclose(file);
-		return ETR_INVAL;
-	}
-
-	fprintf(file, "%d,%lu", pid, start_time);
-	fclose(file);
-	return ETR_OK;
 }
 
 /*
@@ -657,7 +606,7 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	 * one profiler can be active due to the persistence required for Java symbol
 	 * generation, which is incompatible with multiple agents.
 	 */
-	if (check_profiler_running_pid() != ETR_NOTEXIST)
+	if (check_profiler_running_pid() == ETR_EXIST)
 		exit(EXIT_FAILURE);
 
 	if (!run_conditions_check())
@@ -715,9 +664,6 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 		return (-1);
 
 	if (sockopt_register(&cpdbg_sockopts) != ETR_OK)
-		return (-1);
-
-	if (write_profiler_running_pid() != ETR_OK)
 		return (-1);
 
 	tracer->state = TRACER_RUNNING;
