@@ -949,11 +949,15 @@ impl HttpLog {
         } else {
             None
         };
+
         if self.proto == L7Protocol::Grpc {
             info.method = Method::from_ebpf_type(param.ebpf_type, param.direction);
-            return Self::modify_http2_and_grpc(direction, content_length, stream_id, info);
+            Self::modify_http2_and_grpc(direction, content_length, stream_id, info)
+        } else {
+            info.version = Version::V2;
+            info.stream_id = Some(stream_id);
+            Ok(())
         }
-        Ok(())
     }
 
     pub fn parse_http2_go_uprobe(
@@ -1224,7 +1228,7 @@ impl HttpLog {
                     info.method =
                         Method::from_frame_type(httpv2_header.frame_type, param.direction);
                 }
-                if !param.is_from_ebpf() && info.headers_offset.is_none() {
+                if info.headers_offset.is_none() || info.grpc_status_code.is_some() {
                     info.headers_offset = Some(headers_offset as u32);
                 }
 

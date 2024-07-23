@@ -50,6 +50,17 @@
 #define L7_PROTO_INFER_PROG_1	0
 #define L7_PROTO_INFER_PROG_2	1
 
+static __inline bool is_nginx_process(void)
+{
+	char comm[TASK_COMM_LEN];
+	bpf_get_current_comm(comm, sizeof(comm));
+
+	if (comm[0] == 'n' && comm[1] == 'g' && comm[2] == 'i' &&
+	    comm[3] == 'n' && comm[4] == 'x' && comm[5] == '\0')
+		return true;
+	return false;
+}
+
 static __inline bool is_set_ports_bitmap(ports_bitmap_t * ports, __u16 port)
 {
 	/* 
@@ -230,7 +241,8 @@ static __inline int is_http_response(const char *data)
 		&& data[6] == '.' && data[8] == ' ');
 }
 
-static __inline int is_http_request(const char *data, int data_len)
+static __inline int is_http_request(const char *data, int data_len,
+				    struct conn_info_s *conn_info)
 {
 	switch (data[0]) {
 		/* DELETE */
@@ -255,6 +267,15 @@ static __inline int is_http_request(const char *data, int data_len)
 		    || (data[4] != ' ')) {
 			return 0;
 		}
+
+		/*
+		 * In the context of NGINX, we exclude tracking of HEAD type requests
+		 * in the HTTP protocol, as HEAD requests are often used for health
+		 * checks. This avoids generating excessive HEAD type data in the call
+		 * chain tree.
+		 */
+		if (is_nginx_process())
+			conn_info->no_trace = true;
 		break;
 
 		/* OPTIONS */
@@ -463,7 +484,6 @@ static __inline enum message_type parse_http2_headers_frame(const char
 		if (offset >= count)
 			break;
 
-		conn_info->tcpseq_offset = offset;
 		bpf_probe_read_user(buf, sizeof(buf), buf_src + offset);
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +
 		    HTTPV2_FRAME_PROTO_SZ;
@@ -623,7 +643,7 @@ static __inline enum message_type infer_http_message(const char *buf,
 		return MSG_RESPONSE;
 	}
 
-	if (is_http_request(buf, count)) {
+	if (is_http_request(buf, count, conn_info)) {
 		return MSG_REQUEST;
 	}
 
@@ -3210,13 +3230,6 @@ check:
 		return MSG_PRESTORE;
 	}
 
-	/*
-	 * Encrypted Alert unidirectional transmission, retain tracking information
-	 * without removal.
-	 */
-	if (handshake.content_type == 0x15)
-		conn_info->keep_trace = 1;
-
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		/* If it has been completed, give up collecting subsequent data. */
 		if (handshake.content_type != 0x15 &&
@@ -3257,6 +3270,13 @@ check:
 	    && is_socket_info_valid(conn_info->socket_info_ptr)) {
 		conn_info->socket_info_ptr->tls_end = 1;
 	}
+
+	/*
+	 * Encrypted Alert unidirectional transmission, retain tracking information
+	 * without removal.
+	 */
+	if (handshake.content_type == 0x15)
+		conn_info->keep_trace = 1;
 
 	/*
 	 * 0x01: handshake type=Client Hello

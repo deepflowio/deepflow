@@ -25,9 +25,15 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
 use packet_dedup::PacketDedupMap;
 
 use super::base_dispatcher::BaseDispatcher;
+use super::Packet;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
@@ -48,7 +54,7 @@ use crate::{
     },
 };
 use public::{
-    buffer::{Allocator, BatchedBuffer},
+    buffer::Allocator,
     debug::QueueDebugger,
     proto::trident::IfMacSource,
     queue::{self, bounded_with_debug, DebugSender, Receiver},
@@ -139,14 +145,6 @@ pub(super) struct AnalyzerPipeline {
     tap_type: TapType,
     handlers: Vec<PacketHandler>,
     timestamp: Duration,
-}
-
-#[derive(Debug)]
-struct Packet {
-    timestamp: Duration,
-    raw: BatchedBuffer<u8>,
-    original_length: u32,
-    raw_length: u32,
 }
 
 pub(super) struct AnalyzerModeDispatcher {
@@ -272,6 +270,8 @@ impl AnalyzerModeDispatcher {
         let collector_config = base.collector_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
 
         self.flow_generator_thread_handler.replace(
             thread::Builder::new()
@@ -292,6 +292,12 @@ impl AnalyzerModeDispatcher {
                         stats,
                         false, // !from_ebpf
                     );
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    if cpu_set != CpuSet::new() {
+                        if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+                        }
+                    }
 
                     while !terminated.load(Ordering::Relaxed) {
                         let config = Config {
@@ -317,7 +323,7 @@ impl AnalyzerModeDispatcher {
                             let raw_length = (packet.raw_length as usize)
                                 .min(packet.raw.len())
                                 .min(pool_raw_size);
-                            let tunnel_type_bitmap = tunnel_type_bitmap.lock().unwrap().clone();
+                            let tunnel_type_bitmap = tunnel_type_bitmap.read().unwrap().clone();
                             let mut tunnel_info = TunnelInfo::default();
 
                             let (decap_length, tap_type) = match Self::decap_tunnel(
@@ -443,6 +449,8 @@ impl AnalyzerModeDispatcher {
         let terminated = base.terminated.clone();
         let handler_builder = self.base.handler_builder.clone();
         let id = base.id;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
 
         self.pipeline_thread_handler.replace(
             thread::Builder::new()
@@ -450,6 +458,13 @@ impl AnalyzerModeDispatcher {
                 .spawn(move || {
                     let mut tap_pipelines: HashMap<TapType, AnalyzerPipeline> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    if cpu_set != CpuSet::new() {
+                        if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                            warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+                        }
+                    }
+
                     while !terminated.load(Ordering::Relaxed) {
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
                             Ok(_) => {}
@@ -466,7 +481,7 @@ impl AnalyzerModeDispatcher {
                                         | ((id as u64) << 8)
                                         | (u16::from(tap_type) as u64);
                                     let handlers = handler_builder
-                                        .lock()
+                                        .read()
                                         .unwrap()
                                         .iter()
                                         .map(|b| {
@@ -527,6 +542,14 @@ impl AnalyzerModeDispatcher {
         let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let mut allocator = Allocator::new(self.raw_packet_block_size);
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if cpu_set != CpuSet::new() {
+            if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+            }
+        }
 
         while !base.terminated.load(Ordering::Relaxed) {
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
@@ -575,6 +598,7 @@ impl AnalyzerModeDispatcher {
                 raw: buffer,
                 original_length: packet.capture_length as u32,
                 raw_length: packet.data.len() as u32,
+                if_index: 0,
             };
             batch.push(info);
         }

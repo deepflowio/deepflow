@@ -227,10 +227,7 @@ impl NsEntry {
         let mut changed = false;
         self.expire_count = 0;
         for info in rhs.into_iter() {
-            match self
-                .info
-                .binary_search_by(|(probe, _)| probe.tap_idx.cmp(&info.tap_idx))
-            {
+            match self.info.binary_search_by_key(&&info, |(probe, _)| probe) {
                 Ok(replace_idx) => {
                     let old_info = &mut self.info[replace_idx];
                     if old_info.0 != info {
@@ -260,7 +257,7 @@ impl PartialEq<Vec<InterfaceInfo>> for NsEntry {
 
 impl From<Vec<InterfaceInfo>> for NsEntry {
     fn from(mut info: Vec<InterfaceInfo>) -> Self {
-        info.sort_unstable_by_key(|iface| iface.tap_idx);
+        info.sort_unstable();
         Self {
             info: info.into_iter().map(|iface| (iface, 0)).collect(),
             expire_count: 0,

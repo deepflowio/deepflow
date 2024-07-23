@@ -32,7 +32,7 @@ import (
 func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) error {
 	key := ""
 	defer func() {
-		service.RemoveFromCMDManager(key)
+		service.RemoveAllFromCMDManager(key)
 	}()
 
 	var manager *service.CMDManager
@@ -60,17 +60,14 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				if resp == nil {
 					continue
 				}
+				log.Debugf("agent command response: %s", resp.String())
 				if resp.AgentId == nil {
 					log.Warningf("recevie agent info from remote command is nil")
 					continue
 				}
 				key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 				if manager = service.GetAgentCMDManager(key); manager == nil {
-					requestID := uint64(0)
-					if resp.RequestId != nil {
-						requestID = *resp.RequestId
-					}
-					service.AddToCMDManager(key, requestID)
+					service.AddToCMDManager(key, uint64(1))
 					log.Infof("add agent(key:%s) to cmd manager", key)
 					initDone <- struct{}{}
 				}
@@ -82,7 +79,8 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				// heartbeat
 				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
 					resp.Commands == nil && resp.Errmsg == nil {
-					manager.ExecCH <- &api.RemoteExecRequest{}
+					manager.ExecCH <- &api.RemoteExecRequest{RequestId: proto.Uint64(0)}
+					continue
 				}
 
 				if err != nil {
@@ -114,9 +112,6 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 			log.Infof("context done")
 			return nil
 		case req := <-manager.ExecCH:
-			if req.ExecType != nil {
-				req.RequestId = proto.Uint64(service.GetRequestID(key) + 1)
-			}
 			b, _ := json.Marshal(req)
 			log.Infof("agent(key: %s) request: %s", key, string(b))
 			if err := stream.Send(req); err != nil {
@@ -129,50 +124,59 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 
 func handleResponse(resp *trident.RemoteExecResponse) {
 	key := resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
-	manager := service.GetAgentCMDManager(key)
-	if manager == nil {
-		log.Errorf("agent(key: %s) remote exec map not found", key)
+	if resp.RequestId == nil {
+		log.Errorf("agent(key: %s) command resp request id not found", key, resp.RequestId)
+		return
+	}
+	cmdResp := service.GetAgentCMDResp(key, *resp.RequestId)
+	if cmdResp == nil {
+		log.Errorf("agent(key: %s, request id: %v) remote exec map not found", key, resp.RequestId)
 		return
 	}
 
 	b, _ := json.Marshal(resp)
 	log.Infof("agent(key: %s) resp: %s", key, string(b))
 
-	if resp.RequestId != nil {
-		service.SetRequestID(key, *resp.RequestId)
-	}
-
 	switch {
 	case resp.Errmsg != nil:
 		log.Errorf("agent(key: %s) run command error: %s",
 			key, *resp.Errmsg)
-		service.AppendErr(key, resp.Errmsg)
-		manager.ExecDoneCH <- struct{}{}
+		service.AppendErrorMessage(key, *resp.RequestId, resp.Errmsg)
+
+		result := resp.CommandResult
+		// get commands and linux namespace error
+		if result == nil {
+			cmdResp.ExecDoneCH <- struct{}{}
+			return
+		}
+		if result.Content == nil {
+			cmdResp.ExecDoneCH <- struct{}{}
+			return
+		}
+
+		// run command error and handle content
+		if result.Content != nil {
+			service.AppendContent(key, *resp.RequestId, result.Content)
+		}
+		if result.Md5 != nil {
+			cmdResp.ExecDoneCH <- struct{}{}
+			return
+		}
 		return
 	case len(resp.LinuxNamespaces) > 0:
-		if resp.Errmsg != nil {
-			service.AppendErr(key, resp.Errmsg)
-			manager.RemoteCMDDoneCH <- struct{}{}
-			return
-		}
-		if len(service.GetNamespaces(key)) > 0 {
-			service.InitNamespaces(key, resp.LinuxNamespaces)
+		if len(service.GetNamespaces(key, *resp.RequestId)) > 0 {
+			service.InitNamespaces(key, *resp.RequestId, resp.LinuxNamespaces)
 		} else {
-			service.AppendNamespaces(key, resp.LinuxNamespaces)
+			service.AppendNamespaces(key, *resp.RequestId, resp.LinuxNamespaces)
 		}
-		manager.LinuxNamespaceDoneCH <- struct{}{}
+		cmdResp.LinuxNamespaceDoneCH <- struct{}{}
 	case len(resp.Commands) > 0:
-		if resp.Errmsg != nil {
-			service.AppendErr(key, resp.Errmsg)
-			manager.RemoteCMDDoneCH <- struct{}{}
-			return
-		}
-		if len(service.GetCommands(key)) > 0 {
-			service.InitCommands(key, resp.Commands)
+		if len(service.GetCommands(key, *resp.RequestId)) > 0 {
+			service.InitCommands(key, *resp.RequestId, resp.Commands)
 		} else {
-			service.AppendCommands(key, resp.Commands)
+			service.AppendCommands(key, *resp.RequestId, resp.Commands)
 		}
-		manager.RemoteCMDDoneCH <- struct{}{}
+		cmdResp.RemoteCMDDoneCH <- struct{}{}
 	default:
 		result := resp.CommandResult
 		if resp.CommandResult == nil {
@@ -180,10 +184,10 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 		}
 
 		if result.Content != nil {
-			service.AppendContent(key, result.Content)
+			service.AppendContent(key, *resp.RequestId, result.Content)
 		}
 		if result.Md5 != nil {
-			manager.ExecDoneCH <- struct{}{}
+			cmdResp.ExecDoneCH <- struct{}{}
 			return
 		}
 	}

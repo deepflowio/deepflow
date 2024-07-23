@@ -249,6 +249,22 @@ func getSubDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 			common.BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
 			return
 		}
+		if uValue, ok := c.GetQuery("user_id"); ok {
+			userID, err := strconv.Atoi(uValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				return
+			}
+			args["user_id"] = userID
+		}
+		if tValue, ok := c.GetQuery("team_id"); ok {
+			teamID, err := strconv.Atoi(tValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				return
+			}
+			args["team_id"] = teamID
+		}
 		excludeTeamIDs := []int{}
 		teamIDs, err := httpcommon.GetUnauthorizedTeamIDs(httpcommon.GetUserInfo(c), &cfg.FPermit)
 		if err != nil {
@@ -271,6 +287,22 @@ func getSubDomains(cfg *config.ControllerConfig) gin.HandlerFunc {
 		}
 		if value, ok := c.GetQuery("cluster_id"); ok {
 			args["cluster_id"] = value
+		}
+		if uValue, ok := c.GetQuery("user_id"); ok {
+			userID, err := strconv.Atoi(uValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				return
+			}
+			args["user_id"] = userID
+		}
+		if tValue, ok := c.GetQuery("team_id"); ok {
+			teamID, err := strconv.Atoi(tValue)
+			if err != nil {
+				common.BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+				return
+			}
+			args["team_id"] = teamID
 		}
 		db, err := common.GetContextOrgDB(c)
 		if err != nil {

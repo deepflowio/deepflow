@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
-    Arc, Condvar, Mutex, Weak,
+    Arc, Condvar, Mutex, RwLock, Weak,
 };
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -995,6 +995,20 @@ fn component_on_config_change(
             }
         }
         TapMode::Mirror | TapMode::Analyzer => {
+            for d in components.dispatcher_components.iter() {
+                d.dispatcher_listener.on_tap_interface_change(
+                    &vec![],
+                    conf.if_mac_source,
+                    conf.trident_type,
+                    &blacklist,
+                );
+                d.dispatcher_listener
+                    .on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+            }
+            if conf.tap_mode == TapMode::Analyzer {
+                parse_tap_type(components, tap_types);
+            }
+
             #[cfg(target_os = "linux")]
             if conf.tap_mode == TapMode::Mirror
                 && (!config_handler
@@ -1083,9 +1097,6 @@ fn component_on_config_change(
                 }
             }
             components.last_dispatcher_component_id = id;
-            if conf.tap_mode == TapMode::Analyzer {
-                parse_tap_type(components, tap_types);
-            }
             components.tap_interfaces = current_interfaces;
         }
 
@@ -1364,7 +1375,7 @@ pub struct DispatcherComponent {
     pub l7_collector: L7CollectorThread,
     pub packet_sequence_parser: PacketSequenceParser,
     pub pcap_assembler: PcapAssembler,
-    pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    pub handler_builders: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     pub src_link: Link, // The original src_interface
 }
 
@@ -1377,7 +1388,7 @@ impl DispatcherComponent {
         self.packet_sequence_parser.start();
         self.pcap_assembler.start();
         self.handler_builders
-            .lock()
+            .write()
             .unwrap()
             .iter_mut()
             .for_each(|y| {
@@ -1392,7 +1403,7 @@ impl DispatcherComponent {
         self.packet_sequence_parser.stop();
         self.pcap_assembler.stop();
         self.handler_builders
-            .lock()
+            .write()
             .unwrap()
             .iter_mut()
             .for_each(|y| {
@@ -2931,7 +2942,7 @@ fn build_dispatchers(
         id,
     );
 
-    let handler_builders = Arc::new(Mutex::new(vec![
+    let handler_builders = Arc::new(RwLock::new(vec![
         PacketHandlerBuilder::Pcap(mini_packet_sender),
         PacketHandlerBuilder::Npb(NpbBuilder::new(
             id,
@@ -2973,6 +2984,8 @@ fn build_dispatchers(
             dispatcher_queue: dispatcher_config.dispatcher_queue,
             packet_fanout_mode: yaml_config.packet_fanout_mode,
             vhost_socket_path: yaml_config.vhost_socket_path.clone(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            cpu_set: dispatcher_config.cpu_set,
             ..Default::default()
         })))
         .bpf_options(bpf_options)

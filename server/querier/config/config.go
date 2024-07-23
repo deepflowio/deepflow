@@ -23,9 +23,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/op/go-logging"
-	"gopkg.in/yaml.v2"
+	logging "github.com/op/go-logging"
+	yaml "gopkg.in/yaml.v2"
 
+	tracemap "github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/config"
 	prometheus "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
 	profile "github.com/deepflowio/deepflow/server/querier/profile/config"
@@ -48,6 +49,7 @@ type QuerierConfig struct {
 	ListenPort                      int                           `default:"20416" yaml:"listen-port"`
 	Clickhouse                      Clickhouse                    `yaml:clickhouse`
 	Profile                         profile.ProfileConfig         `yaml:profile`
+	Tracemap                        tracemap.TraceMapConfig       `yaml:tracemap`
 	DeepflowApp                     DeepflowApp                   `yaml:"deepflow-app"`
 	Prometheus                      prometheus.Prometheus         `yaml:"prometheus"`
 	ExternalAPM                     []tracing_adapter.ExternalAPM `yaml:"external-apm"`
@@ -74,7 +76,7 @@ type Location struct {
 }
 
 type TraceIdWithIndex struct {
-	Enabled               bool     `yaml:"enabled"`
+	Disabled              bool     `yaml:"disabled"`
 	Type                  string   `yaml:"type"`
 	IncrementalIdLocation Location `yaml:"incremental-id-location"`
 }
@@ -119,6 +121,9 @@ func (c *Config) expendEnv() {
 }
 
 func (c *Config) Validate() error {
+	if c.TraceIdWithIndex.Type == "" {
+		c.TraceIdWithIndex.Type = "hash"
+	}
 	return nil
 }
 

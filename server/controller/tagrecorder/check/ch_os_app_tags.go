@@ -48,6 +48,11 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 
 	keyToItem := make(map[OSAPPTagsKey]mysql.ChOSAppTags)
 	for _, process := range processes {
+		teamID, err := tagrecorder.GetTeamID(process.Domain, process.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", o.resourceTypeName, err.Error(), process)
+		}
+
 		osAppTagsMap := map[string]string{}
 		splitOsAppTags := strings.Split(process.OSAPPTags, ", ")
 		for _, singleOsAppTag := range splitOsAppTags {
@@ -68,7 +73,7 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 			keyToItem[key] = mysql.ChOSAppTags{
 				PID:         process.ID,
 				OSAPPTags:   string(osAppTagsStr),
-				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}

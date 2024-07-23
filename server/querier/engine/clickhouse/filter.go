@@ -1383,7 +1383,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 		traceConfig := config.TraceConfig
 		TypeIsIncrementalId := traceConfig.Type == chCommon.IndexTypeIncremetalId
 		FormatIsHex := traceConfig.IncrementalIdLocation.Format == chCommon.FormatHex
-		if !traceConfig.Enabled {
+		if traceConfig.Disabled {
 			filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
 			return &view.Expr{Value: "(" + filter + ")"}, nil
 		}

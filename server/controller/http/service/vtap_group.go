@@ -73,7 +73,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 		}
 	}
 	Db.Order("created_at DESC").Find(&allVTapGroups)
-	vtapGroups, err := getAgentGroupByUser(userInfo, &a.cfg.FPermit, allVTapGroups)
+	vtapGroups, err := GetAgentGroupByUser(userInfo, &a.cfg.FPermit, allVTapGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -153,10 +153,6 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 		return model.VtapGroup{}, err
 	}
 	db := dbInfo.DB
-	db.Model(&mysql.VTapGroup{}).Where("name = ?", vtapGroupCreate.Name).Count(&vtapGroupCount)
-	if vtapGroupCount > 0 {
-		return model.VtapGroup{}, NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("vtap_group (%s) already exist", vtapGroupCreate.Name))
-	}
 
 	db.Model(&mysql.VTapGroup{}).Count(&vtapGroupCount)
 	if int(vtapGroupCount) > cfg.Spec.VTapGroupMax {

@@ -636,7 +636,7 @@ func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *httpcommon.UserI
 	db.Delete(&domain)
 
 	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, domain.TeamID, domain.ID)
+	metadata := message.NewMetadata(db.ORGID, message.MetadataTeamID(domain.TeamID), message.MetadataDomainID(domain.ID))
 	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("domain") {
 		s.OnDomainDeleted(metadata)
 	}
@@ -744,6 +744,12 @@ func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]inte
 	if fClusterID, ok := filter["cluster_id"]; ok {
 		db = db.Where("cluster_id = ?", fClusterID)
 	}
+	if fTeamID, ok := filter["team_id"]; ok {
+		db = db.Where("team_id = ?", fTeamID)
+	}
+	if fUserID, ok := filter["user_id"]; ok {
+		db = db.Where("user_id = ?", fUserID)
+	}
 	err := db.Not(map[string]interface{}{"team_id": excludeTeamIDs}).Order("created_at DESC").Find(&subDomains).Error
 	if err != nil {
 		return response, err
@@ -762,6 +768,8 @@ func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]inte
 		}
 		subDomainResp := model.SubDomain{
 			ID:           subDomain.ID,
+			TeamID:       subDomain.TeamID,
+			UserID:       subDomain.UserID,
 			Name:         subDomain.Name,
 			DisplayName:  subDomain.DisplayName,
 			ClusterID:    subDomain.ClusterID,
@@ -821,7 +829,10 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 
 	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
-	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanOperateDomainResource(domain.TeamID, subDomainCreate.Domain)
+	if subDomainCreate.TeamID == 0 {
+		subDomainCreate.TeamID = domain.TeamID
+	}
+	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanAddSubDomainResource(domain.TeamID, subDomainCreate.TeamID, lcuuid)
 	if err != nil {
 		return nil, err
 	}
@@ -830,7 +841,8 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 
 	subDomain := mysql.SubDomain{}
 	subDomain.Lcuuid = lcuuid
-	subDomain.TeamID = domain.TeamID
+	subDomain.TeamID = subDomainCreate.TeamID
+	subDomain.UserID = domain.UserID
 	subDomain.Name = subDomainCreate.Name
 	subDomain.DisplayName = displayName
 	subDomain.CreateMethod = common.CREATE_METHOD_USER_DEFINE
@@ -854,16 +866,28 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	if _, ok := subDomainUpdate["DOMAIN_NAME"]; ok {
 		return nil, errors.New("domain_name field cannot be modified")
 	}
+
+	var domain mysql.Domain
 	var subDomain mysql.SubDomain
 	var dbUpdateMap = make(map[string]interface{})
+	var resourceUp = make(map[string]interface{})
+	if userID, ok := subDomainUpdate["USER_ID"]; ok {
+		dbUpdateMap["user_id"] = userID
+		resourceUp["owner_user_id"] = userID
+	}
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
 		return nil, servicecommon.NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found", lcuuid),
 		)
 	}
+	if ret := db.Where("lcuuid = ?", subDomain.Domain).First(&domain); ret.Error != nil {
+		return nil, servicecommon.NewError(
+			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found domain", lcuuid),
+		)
+	}
 
-	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanOperateDomainResource(subDomain.TeamID, subDomain.Domain)
+	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanUpdateSubDomainResource(domain.TeamID, subDomain.TeamID, lcuuid, resourceUp)
 	if err != nil {
 		return nil, err
 	}
@@ -899,14 +923,20 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 }
 
 func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
+	var domain mysql.Domain
 	var subDomain mysql.SubDomain
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
 		return nil, servicecommon.NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found", lcuuid),
 		)
 	}
+	if ret := db.Where("lcuuid = ?", subDomain.Domain).First(&domain); ret.Error != nil {
+		return nil, servicecommon.NewError(
+			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found domain", lcuuid),
+		)
+	}
 
-	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanOperateDomainResource(subDomain.TeamID, subDomain.Domain)
+	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanDeleteSubDomainResource(domain.TeamID, subDomain.TeamID, lcuuid)
 	if err != nil {
 		return nil, err
 	}
@@ -914,7 +944,7 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	log.Infof("delete sub_domain (%s) resources started", subDomain.Name)
 
 	var podCluster mysql.PodCluster
-	db.Unscoped().Where("lcuuid = ?", lcuuid).Find(&podCluster)
+	db.Unscoped().Where("sub_domain = ?", lcuuid).Find(&podCluster)
 	log.Info(podCluster)
 	if podCluster.ID != 0 {
 		log.Infof("delete pod_cluster (%+v) resources", podCluster)
@@ -946,7 +976,7 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	}
 
 	// pub to tagrecorder
-	metadata := message.NewMetadata(db.ORGID, 0, 0, message.MetadataSubDomainID(subDomain.ID))
+	metadata := message.NewMetadata(db.ORGID, message.MetadataSubDomainID(subDomain.ID))
 	for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
 		s.OnSubDomainDeleted(metadata)
 	}

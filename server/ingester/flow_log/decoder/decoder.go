@@ -32,6 +32,7 @@ import (
 	exportcommon "github.com/deepflowio/deepflow/server/ingester/exporters/common"
 	exportconfig "github.com/deepflowio/deepflow/server/ingester/exporters/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -82,6 +83,8 @@ type Decoder struct {
 	inQueue       queue.QueueReader
 	throttler     *throttler.ThrottlingQueue
 	flowTagWriter *flow_tag.FlowTagWriter
+	spanWriter    *dbwriter.SpanWriter
+	spanBuf       []interface{}
 	exporters     *exporters.Exporters
 	cfg           *config.Config
 	debugEnabled  bool
@@ -101,6 +104,7 @@ func NewDecoder(
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
 	flowTagWriter *flow_tag.FlowTagWriter,
+	spanWriter *dbwriter.SpanWriter,
 	exporters *exporters.Exporters,
 	cfg *config.Config,
 ) *Decoder {
@@ -112,6 +116,8 @@ func NewDecoder(
 		inQueue:        inQueue,
 		throttler:      throttler,
 		flowTagWriter:  flowTagWriter,
+		spanWriter:     spanWriter,
+		spanBuf:        make([]interface{}, 0, BUFFER_SIZE),
 		exporters:      exporters,
 		cfg:            cfg,
 		debugEnabled:   log.IsEnabledFor(logging.DEBUG),
@@ -262,6 +268,7 @@ func (d *Decoder) sendOpenMetetry(tracesData *v1.TracesData) {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+			d.spanWrite(l)
 		}
 		l.Release()
 	}
@@ -314,6 +321,31 @@ func (d *Decoder) export(l exportcommon.ExportItem) {
 	}
 }
 
+func (d *Decoder) spanWrite(l *log_data.L7FlowLog) {
+	if d.spanWriter == nil {
+		return
+	}
+
+	if l == nil {
+		if len(d.spanBuf) == 0 {
+			return
+		}
+		d.spanWriter.Put(d.spanBuf)
+		d.spanBuf = d.spanBuf[:0]
+		return
+	}
+
+	if (l.SignalSource == uint16(datatype.SIGNAL_SOURCE_EBPF) ||
+		l.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL)) && l.TraceId != "" {
+		l.AddReferenceCount()
+		d.spanBuf = append(d.spanBuf, (*dbwriter.SpanWithTraceID)(l))
+		if len(d.spanBuf) >= BUFFER_SIZE {
+			d.spanWriter.Put(d.spanBuf)
+			d.spanBuf = d.spanBuf[:0]
+		}
+	}
+}
+
 func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
@@ -329,6 +361,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 		}
 		d.export(l)
+		d.spanWrite(l)
 	}
 	d.updateCounter(datatype.L7Protocol(proto.Base.Head.Proto), !sent)
 	l.Release()
@@ -371,4 +404,7 @@ func (d *Decoder) flush() {
 		d.throttler.SendWithoutThrottling(nil)
 	}
 	d.export(nil)
+	if d.spanWriter != nil {
+		d.spanWrite(nil)
+	}
 }

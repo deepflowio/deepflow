@@ -67,6 +67,7 @@ type L7Base struct {
 	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
 	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
 	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	TapSideEnum  uint8
 	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
 	ReqTcpSeq    uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
 	RespTcpSeq   uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
@@ -88,6 +89,8 @@ type L7Base struct {
 	SyscallCoroutine1      uint64 `json:"syscall_coroutine_1" category:"$tag" sub:"tracing_info"`
 	SyscallCapSeq0         uint32 `json:"syscall_cap_seq_0" category:"$tag" sub:"tracing_info"`
 	SyscallCapSeq1         uint32 `json:"syscall_cap_seq_1" category:"$tag" sub:"tracing_info"`
+
+	EncodedSpan []byte
 }
 
 func L7BaseColumns() []*ckdb.Column {
@@ -367,7 +370,7 @@ func base64ToHexString(str string) string {
 var lastTraceIdIndex uint64
 
 func parseTraceIdIndex(traceId string, traceIdIndexCfg *config.TraceIdWithIndex) uint64 {
-	if !traceIdIndexCfg.Enabled {
+	if traceIdIndexCfg.Disabled {
 		return 0
 	}
 	if len(traceId) == 0 {
@@ -584,6 +587,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	}
 	b.TunnelType = uint8(tunnelType)
 	b.TapSide = flow_metrics.TAPSideEnum(l.TapSide).String()
+	b.TapSideEnum = uint8(l.TapSide)
+
 	b.VtapID = uint16(l.VtapId)
 	b.ReqTcpSeq = l.ReqTcpSeq
 	b.RespTcpSeq = l.RespTcpSeq

@@ -174,7 +174,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		}
 
 		// 写流日志数据
-		flowLog, err := flowlog.NewFlowLog(flowLogConfig, receiver, platformDataManager, exporters)
+		flowLog, err := flowlog.NewFlowLog(flowLogConfig, shared.TraceTreeQueue, receiver, platformDataManager, exporters)
 		checkError(err)
 		flowLog.Start()
 		closers = append(closers, flowLog)

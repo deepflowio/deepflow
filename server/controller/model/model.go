@@ -349,6 +349,8 @@ type DomainUpdate struct {
 
 type SubDomain struct {
 	ID           int                    `json:"ID"`
+	TeamID       int                    `json:"TEAM_ID"`
+	UserID       int                    `json:"USER_ID"`
 	Name         string                 `json:"NAME"`
 	DisplayName  string                 `json:"DISPLAY_NAME"`
 	ClusterID    string                 `json:"CLUSTER_ID"`
@@ -366,11 +368,13 @@ type SubDomain struct {
 
 type SubDomainCreate struct {
 	Name   string                 `json:"NAME" binding:"required"`
+	TeamID int                    `json:"TEAM_ID"`
 	Config map[string]interface{} `json:"CONFIG" binding:"required"`
 	Domain string                 `json:"DOMAIN" binding:"required"`
 }
 
 type SubDomainUpdate struct {
+	UserID int                    `json:"USER_ID"`
 	Config map[string]interface{} `json:"CONFIG"`
 }
 
@@ -750,10 +754,12 @@ type RemoteExecReq struct {
 
 	OutputFormat   *trident.OutputFormat `json:"output_format"` // 0: "TEXT", 1: "BINARY"
 	OutputFilename string                `json:"output_filename"`
+	CMD            string                `json:"cmd" binding:"required"`
 }
 
 type RemoteExecResp struct {
-	Content        string                    `json:"content,omitempty"`          // RUN_COMMAND
+	Content        string                    `json:"content,omitempty"` // RUN_COMMAND
+	ErrorMessage   string                    `json:"-"`
 	RemoteCommand  []*trident.RemoteCommand  `json:"remote_commands,omitempty"`  // LIST_COMMAND
 	LinuxNamespace []*trident.LinuxNamespace `json:"linux_namespaces,omitempty"` // LIST_NAMESPACE
 }

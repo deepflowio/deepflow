@@ -142,6 +142,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 				continue
 			}
 		}
+
 		nameDBField, err := GetTagDBField(name, db, table, orgID)
 		if err != nil {
 			return err
@@ -203,6 +204,13 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
+	// time is not a metric
+	// flow_tag database has no metrics
+	// trace_tree table has no metrics
+	// span_with_trace_id table has no metrics
+	if field == "time" || db == ckcommon.DB_NAME_FLOW_TAG || slices.Contains([]string{ckcommon.TABLE_NAME_TRACE_TREE, ckcommon.TABLE_NAME_SPAN_WITH_TRACE_ID}, table) {
+		return nil, false
+	}
 	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG}, db) || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
@@ -215,9 +223,17 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 					"metrics", []bool{true, true, true}, "", table, "", "",
 				)
 				newAllMetrics[field] = metric
+			} else if fieldSplit[0] == "tag" {
+				fieldName := strings.Replace(field, "tag.", "", 1)
+				metric := NewMetrics(
+					0, fmt.Sprintf("if(indexOf(tag_names, '%s')=0,null,tag_values[indexOf(tag_names, '%s')])", fieldName, fieldName),
+					field, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", []bool{true, true, true}, "", table, "", "",
+				)
+				newAllMetrics[field] = metric
 			}
 		}
-	} else if db == ckcommon.DB_NAME_PROMETHEUS {
+	} else if db == ckcommon.DB_NAME_PROMETHEUS && field == "value" {
 		metric := NewMetrics(
 			0, field,
 			field, "", METRICS_TYPE_COUNTER,
@@ -238,14 +254,35 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	}
 
 	// tag metrics
-	tagDescriptions, err := tag.GetTagDescriptions(db, table, "", "", orgID, true, context.Background())
+	// Static tag metrics
+	staticTagDescriptions, err := tag.GetStaticTagDescriptions(db, table)
 	if err != nil {
-		log.Error("Failed to get tag type metrics")
+		log.Error("Failed to get tag type static metrics")
 		return nil, false
 	}
-	GetTagTypeMetrics(tagDescriptions, newAllMetrics, db, table, orgID)
+	GetTagTypeMetrics(staticTagDescriptions, newAllMetrics, db, table, orgID)
 	metric, ok := newAllMetrics[field]
-	return metric, ok
+	if ok {
+		return metric, ok
+	} else {
+		// xx_id is not a metric
+		if strings.Contains(field, "_id") {
+			noIDField := strings.ReplaceAll(field, "_id", "")
+			_, ok = newAllMetrics[noIDField]
+			if ok {
+				return nil, false
+			}
+		}
+		// Dynamic tag metrics
+		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background())
+		if err != nil {
+			log.Error("Failed to get tag type dynamic metrics")
+			return nil, false
+		}
+		GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
+		metric, ok := newAllMetrics[field]
+		return metric, ok
+	}
 }
 
 func GetMetricsByDBTableStatic(db string, table string, where string) (map[string]*Metrics, error) {
@@ -592,9 +629,7 @@ func GetTagDBField(name, db, table, orgID string) (string, error) {
 			if strings.HasPrefix(name, "tag.") {
 				if db == ckcommon.DB_NAME_PROMETHEUS {
 					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table, orgID)
-					if err != nil {
-						return tagTranslatorStr, err
-					}
+					return tagTranslatorStr, err
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {

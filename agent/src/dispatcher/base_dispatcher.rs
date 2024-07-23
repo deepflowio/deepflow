@@ -20,7 +20,7 @@ use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
-    Arc, Mutex,
+    Arc, Mutex, RwLock,
 };
 use std::thread;
 use std::time::Duration;
@@ -77,14 +77,14 @@ pub(super) struct BaseDispatcher {
     pub(super) bpf_options: Arc<Mutex<BpfOptions>>,
 
     pub(super) leaky_bucket: Arc<LeakyBucket>,
-    pub(super) handler_builder: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    pub(super) handler_builder: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     pub(super) pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
     pub(super) log_parse_config: LogParserAccess,
     pub(super) collector_config: CollectorAccess,
 
-    pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
+    pub(super) tunnel_type_bitmap: Arc<RwLock<TunnelTypeBitmap>>,
     pub(super) tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub(super) tunnel_info: TunnelInfo,
 
@@ -632,13 +632,13 @@ pub struct BaseDispatcherListener {
     pub src_interface_index: usize,
     pub options: Arc<Mutex<Options>>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
-    pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    pub handler_builders: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_bpf: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
     pub platform_poller: Arc<crate::platform::GenericPoller>,
-    pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
+    pub tunnel_type_bitmap: Arc<RwLock<TunnelTypeBitmap>>,
     pub tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
@@ -658,7 +658,7 @@ pub struct BaseDispatcherListener {
 
 impl BaseDispatcherListener {
     fn on_decap_type_change(&mut self, config: &DispatcherConfig) {
-        let mut old_map = self.tunnel_type_bitmap.lock().unwrap();
+        let mut old_map = self.tunnel_type_bitmap.write().unwrap();
         if *old_map != config.tunnel_type_bitmap {
             info!("Decap tunnel type change to {}", config.tunnel_type_bitmap);
             *old_map = config.tunnel_type_bitmap;
@@ -778,7 +778,7 @@ impl BaseDispatcherListener {
             added.push(vm_mac);
             let handlers = self
                 .handler_builders
-                .lock()
+                .read()
                 .unwrap()
                 .iter()
                 .map(|b| b.build_with(self.id, *key, vm_mac))

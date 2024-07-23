@@ -107,7 +107,7 @@ func main() {
 
 	go controller.Start(ctx, *configPath, cfg.LogFile, shared)
 
-	go querier.Start(*configPath, cfg.LogFile)
+	go querier.Start(*configPath, cfg.LogFile, shared)
 	closers := ingester.Start(*configPath, shared)
 
 	common.NewMonitor(cfg.MonitorPaths)

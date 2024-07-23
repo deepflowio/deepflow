@@ -216,6 +216,9 @@ impl MysqlInfo {
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::MysqlLogParseFailed);
         };
+        if let Some(c) = config {
+            self.extract_trace_and_span_id(&c.l7_log_dynamic, str::from_utf8(payload)?);
+        }
         let context = match attempt_obfuscation(obfuscate_cache, payload) {
             Some(mut m) => {
                 let valid_len = match str::from_utf8(&m) {
@@ -230,9 +233,6 @@ impl MysqlInfo {
             }
             _ => String::from_utf8_lossy(payload).to_string(),
         };
-        if let Some(c) = config {
-            self.extract_trace_and_span_id(&c.l7_log_dynamic, context.as_str());
-        }
         self.context = context;
         Ok(())
     }
@@ -357,7 +357,6 @@ pub struct MysqlLog {
     parameter_counter: u32,
     has_request: bool,
 
-    last_is_greeting: bool,
     last_is_on_blacklist: bool,
 }
 
@@ -765,6 +764,11 @@ impl MysqlLog {
         let Some(context) = Self::string_null(&payload[LOGIN_USERNAME_OFFSET..]) else {
             return Err(Error::MysqlLogParseFailed);
         };
+
+        if !context.is_ascii() {
+            return Err(Error::MysqlLogParseFailed);
+        }
+
         info.context = format!("Login username: {}", context);
         info.status = L7ResponseStatus::Ok;
 
@@ -777,23 +781,27 @@ impl MysqlLog {
         }
 
         let mut header = MysqlHeader::default();
-        let Some(offset) = header.decode(payload, false) else {
+        let Some(offset) = header.decode(payload, true) else {
             return false;
         };
 
-        if header.number != 0 || offset + header.length as usize > payload.len() {
+        if offset + header.length as usize > payload.len() {
             return false;
         }
 
         let protocol_version_or_query_type = payload[offset];
         match protocol_version_or_query_type {
-            COM_QUERY | COM_STMT_PREPARE => {
+            COM_QUERY | COM_STMT_PREPARE if header.number == 0 => {
                 let context = mysql_string(&payload[offset + 1..]);
                 return context.is_ascii() && is_mysql(context);
             }
-            _ => {}
+            _ if header.number != 0 => {
+                let mut mysql = MysqlLog::default();
+                let mut log_info = MysqlInfo::default();
+                mysql.login(&payload[offset..], &mut log_info).is_ok()
+            }
+            _ => false,
         }
-        false
     }
 
     // return is_greeting?
@@ -810,10 +818,8 @@ impl MysqlLog {
         }
 
         let mut header = MysqlHeader::default();
-        let Some(offset) = header.decode(
-            payload,
-            self.last_is_greeting && direction == PacketDirection::ClientToServer,
-        ) else {
+        let Some(offset) = header.decode(payload, direction == PacketDirection::ClientToServer)
+        else {
             return Err(Error::MysqlLogParseFailed);
         };
         let mut msg_type = header
@@ -826,20 +832,16 @@ impl MysqlLog {
                 if msg_type == LogMessageType::Request {
                     self.has_request = true;
                 }
-                self.last_is_greeting = false;
             }
-            LogMessageType::Session if self.last_is_greeting => {
+            LogMessageType::Session if direction == PacketDirection::ClientToServer => {
                 self.login(&payload[offset..], info)?;
-                self.last_is_greeting = false;
             }
             LogMessageType::Response if self.has_request => {
                 self.response(&payload[offset..], info)?;
                 self.has_request = false;
-                self.last_is_greeting = false;
             }
             LogMessageType::Other => {
                 self.greeting(&payload[offset..])?;
-                self.last_is_greeting = true;
                 return Ok(true);
             }
             _ => return Err(Error::MysqlLogParseFailed),

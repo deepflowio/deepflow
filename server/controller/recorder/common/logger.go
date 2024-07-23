@@ -26,6 +26,7 @@ var log = logging.MustGetLogger("recorder.common")
 
 type Logger struct {
 	orgID         int
+	teamID        int
 	DomainName    string
 	SubDomainName string
 	MsgPre        string
@@ -42,12 +43,20 @@ func (l *Logger) InitMsgPre() {
 	if l.orgID != 0 {
 		l.MsgPre = fmt.Sprintf("[OID-%d] ", l.orgID)
 	}
+	if l.teamID != 0 {
+		l.MsgPre += fmt.Sprintf("[TID-%d] ", l.teamID)
+	}
 	if l.DomainName != "" {
 		l.MsgPre += fmt.Sprintf("[DN-%s] ", l.DomainName)
 	}
 	if l.SubDomainName != "" {
 		l.MsgPre += fmt.Sprintf("[SDN-%s] ", l.SubDomainName)
 	}
+}
+
+func (l *Logger) SetTeamID(id int) {
+	l.teamID = id
+	l.InitMsgPre()
 }
 
 func (l *Logger) SetDomainName(n string) {

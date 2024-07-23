@@ -24,6 +24,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/ingester/config/configdefaults"
 )
 
 var log = logging.MustGetLogger("flow_log.config")
@@ -53,6 +54,7 @@ type Config struct {
 	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl-hour"`
 	DecoderQueueCount int                   `yaml:"flow-log-decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"flow-log-decoder-queue-size"`
+	TraceTreeEnabled  *bool                 `yaml:"flow-log-trace-tree-enabled"`
 }
 
 type FlowLogConfig struct {
@@ -75,6 +77,11 @@ func (c *Config) Validate() error {
 
 	if c.FlowLogTTL.L4Packet == 0 {
 		c.FlowLogTTL.L4Packet = DefaultFlowLogTTL
+	}
+
+	if c.TraceTreeEnabled == nil {
+		value := configdefaults.FLOG_LOG_TRACE_TREE_ENABLED_DEFAULT
+		c.TraceTreeEnabled = &value
 	}
 
 	return nil

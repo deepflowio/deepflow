@@ -14,19 +14,25 @@
  * limitations under the License.
  */
 
-// Package configuration is only provided for enterprise edition.
-package configuration
+package distributed_tracing
 
 import (
-	"github.com/gin-gonic/gin"
+	"encoding/json"
 )
 
-type Configuration struct{}
-
-func NewConfiguration() *Configuration {
-	return new(Configuration)
+type ServiceError struct {
+	Status  string
+	Message string
 }
 
-func (c *Configuration) RegisterTo(e *gin.Engine) {
-	agentGroupConfigRouter(e)
+func (e *ServiceError) Error() string {
+	err, _ := json.Marshal(e)
+	return string(err)
+}
+
+func NewError(status string, message string) error {
+	return &ServiceError{
+		Status:  status,
+		Message: message,
+	}
 }

@@ -254,6 +254,7 @@ impl FlowMap {
             service_table: ServiceTable::new(
                 SERVICE_TABLE_IPV4_CAPACITY,
                 SERVICE_TABLE_IPV6_CAPACITY,
+                &config.server_ports,
             ),
             app_table: AppTable::new(
                 config.l7_protocol_inference_max_fail_count,
@@ -655,7 +656,11 @@ impl FlowMap {
         true
     }
 
-    fn lookup_without_flow(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
+    fn lookup_without_flow(
+        &mut self,
+        #[allow(unused)] config: &Config,
+        meta_packet: &mut MetaPacket,
+    ) {
         // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let local_epc_id = match config.ebpf.as_ref() {

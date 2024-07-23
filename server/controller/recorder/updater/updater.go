@@ -112,7 +112,13 @@ func newUpdaterBase[
 		diffBaseData: diffBaseData,
 		cloudData:    cloudData,
 	}
-	u.msgMetadata = message.NewMetadata(u.metadata.GetORGID(), u.metadata.Domain.TeamID, u.metadata.Domain.ID, message.MetadataSubDomainID(u.metadata.SubDomain.ID))
+	// use teamID from subDomain if updater is for subDomain
+	u.msgMetadata = message.NewMetadata(
+		u.metadata.GetORGID(),
+		message.MetadataTeamID(u.metadata.GetTeamID()),
+		message.MetadataDomainID(u.metadata.Domain.ID),
+		message.MetadataSubDomainID(u.metadata.SubDomain.ID),
+	)
 
 	log.Infof(u.metadata.Logf("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata)) // TODO debug
 	u.initPubSub()

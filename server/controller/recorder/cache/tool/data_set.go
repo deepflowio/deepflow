@@ -479,24 +479,27 @@ func (t *DataSet) DeleteVInterface(lcuuid string) {
 func (t *DataSet) AddWANIP(item *mysql.WANIP) {
 	t.wanIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
 	t.wanIPLcuuidToIP[item.Lcuuid] = item.IP
-	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID)
-	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
-	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
-	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
-	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
+	if vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID); vifLcuuid != "" {
+		deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+		deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+		mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
+		networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+		t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
+	}
 	t.GetLogFunc()(t.metadata.Logf(addToToolMap(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, item.Lcuuid)))
 }
 
 func (t *DataSet) DeleteWANIP(lcuuid string) {
-	vifID, _ := t.GetVInterfaceIDByWANIPLcuuid(lcuuid)
-	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID)
-	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
-	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
-	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
-	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	ip, _ := t.GetWANIPByLcuuid(lcuuid)
-	t.DeleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Mac: mac, Lcuuid: lcuuid})
+	if vifID, ok := t.GetVInterfaceIDByWANIPLcuuid(lcuuid); ok {
+		if vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID); vifLcuuid != "" {
+			deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+			deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+			mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
+			networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+			ip, _ := t.GetWANIPByLcuuid(lcuuid)
+			t.DeleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Mac: mac, Lcuuid: lcuuid})
+		}
+	}
 	delete(t.wanIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.wanIPLcuuidToIP, lcuuid)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid)))
@@ -505,24 +508,27 @@ func (t *DataSet) DeleteWANIP(lcuuid string) {
 func (t *DataSet) AddLANIP(item *mysql.LANIP) {
 	t.lanIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
 	t.lanIPLcuuidToIP[item.Lcuuid] = item.IP
-	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID)
-	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
-	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
-	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
-	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
+	if vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID); vifLcuuid != "" {
+		deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+		mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
+		deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+		networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+		t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Mac: mac, Lcuuid: item.Lcuuid})
+	}
 	t.GetLogFunc()(t.metadata.Logf(addToToolMap(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid)))
 }
 
 func (t *DataSet) DeleteLANIP(lcuuid string) {
-	vifID, _ := t.GetVInterfaceIDByLANIPLcuuid(lcuuid)
-	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID)
-	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
-	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
-	mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
-	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	ip, _ := t.GetLANIPByLcuuid(lcuuid)
-	t.DeleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Mac: mac, Lcuuid: lcuuid})
+	if vifID, ok := t.GetVInterfaceIDByLANIPLcuuid(lcuuid); ok {
+		if vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID); vifLcuuid != "" {
+			deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+			deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+			mac, _ := t.GetMacByVInterfaceLcuuid(vifLcuuid)
+			networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+			ip, _ := t.GetLANIPByLcuuid(lcuuid)
+			t.DeleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Mac: mac, Lcuuid: lcuuid})
+		}
+	}
 	delete(t.lanIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.lanIPLcuuidToIP, lcuuid)
 	log.Info(t.metadata.Logf(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid)))
@@ -1064,7 +1070,7 @@ func (t *DataSet) GetVMLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id))
 	var vm mysql.VM
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&vm)
+	result := t.metadata.DB.Where("id = ?", id).Find(&vm)
 	if result.RowsAffected == 1 {
 		t.AddVM(&vm)
 		return vm.Lcuuid, true
@@ -1098,7 +1104,7 @@ func (t *DataSet) GetVPCLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, id)))
 	var vpc mysql.VPC
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&vpc)
+	result := t.metadata.DB.Where("id = ?", id).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
 		return vpc.Lcuuid, true
@@ -1152,7 +1158,7 @@ func (t *DataSet) GetSubnetLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, id)))
 	var subnet mysql.Subnet
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&subnet)
+	result := t.metadata.DB.Where("id = ?", id).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
 		return subnet.Lcuuid, true
@@ -1240,7 +1246,7 @@ func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id)))
 	var network mysql.Network
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&network)
+	result := t.metadata.DB.Where("id = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
 		return network.Lcuuid, true
@@ -1623,7 +1629,7 @@ func (t *DataSet) GetPodServiceLcuuidByID(id int) (string, bool) {
 	}
 	log.Warning(t.metadata.Logf(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id)))
 	var podService mysql.PodService
-	result := t.metadata.DB.Where("lcuuid = ?", id).Find(&podService)
+	result := t.metadata.DB.Where("id = ?", id).Find(&podService)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&podService)
 		return podService.Lcuuid, true

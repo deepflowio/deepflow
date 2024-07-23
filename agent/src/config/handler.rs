@@ -343,6 +343,8 @@ pub struct DispatcherConfig {
     pub dpdk_enabled: bool,
     pub dispatcher_queue: bool,
     pub bond_group: Vec<String>,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub cpu_set: CpuSet,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -467,6 +469,7 @@ pub struct FlowConfig {
     pub oracle_parse_conf: OracleParseConfig,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
+    pub server_ports: Vec<u16>,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -568,6 +571,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                     .l7_protocol_advanced_features
                     .obfuscate_enabled_protocols,
             ),
+            server_ports: conf.yaml_config.server_ports.clone(),
         }
     }
 }
@@ -616,6 +620,7 @@ impl fmt::Debug for FlowConfig {
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .field("plugins", &self.plugins)
+            .field("server_ports", &self.server_ports)
             .finish()
     }
 }
@@ -1497,6 +1502,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .tap_interfaces
                         .clone()
                 },
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                cpu_set: CpuSet::new(),
             },
             sender: SenderConfig {
                 mtu: conf.mtu,
@@ -2041,7 +2048,7 @@ impl ConfigHandler {
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity {
+        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity || components.is_none() {
             info!(
                 "CPU Affinity set to {}.",
                 new_config.yaml_config.cpu_affinity
@@ -2087,6 +2094,7 @@ impl ConfigHandler {
                 if let Err(e) = sched_setaffinity(Pid::from_raw(pid), &cpu_set) {
                     warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                 }
+                new_config.dispatcher.cpu_set = cpu_set;
             }
         }
 
@@ -2967,7 +2975,7 @@ impl ConfigHandler {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 let dispatcher_builders = &components.dispatcher_components;
                 for e in dispatcher_builders {
-                    let mut builders = e.handler_builders.lock().unwrap();
+                    let mut builders = e.handler_builders.write().unwrap();
                     for e in builders.iter_mut() {
                         match e {
                             PacketHandlerBuilder::Npb(n) => {

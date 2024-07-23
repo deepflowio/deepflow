@@ -32,6 +32,8 @@
 #include <linux/perf_event.h>
 #include <linux/unistd.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <ctype.h>		/* isdigit() */
 #include <time.h>
 #include <sys/time.h>
 #include <string.h>

@@ -20,8 +20,8 @@ log-level: info
 
 ## extract an integer (generally used timestamp) from traceId as an additional index to speed up traceId queries.
 #trace-id-with-index:
-#  enabled: false
-#  type: hash           # hash/incremental-id
+#  disabled: false
+#  type: hash           # hash/incremental-id, default: hash
 #  #eg. traceId: 'abcdef1234',  if want to match index '1234', 'format' must set 'decimal', `start` can be set as 6 or -4 , and `length` must set: 4
 #  incremental-id-location:      # it is valid when 'type' is 'incremental-id'
 #    start: 0           # >= 0 means counting from the beginning, < 0 means counting from the end.
@@ -476,6 +476,9 @@ ingester:
   #  l7-flow-log: 72
   #  l4-packet: 72
 
+  ## whether to store trace tree information
+  #flow-log-trace-tree-enabled: false
+
   ## resource event data write config
   #event-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
@@ -708,6 +711,10 @@ ingester:
   #  enum-translate-to-name-disabled: false
   #  # whether the id value of universal-tag is not converted into a resource name for output
   #  universal-tag-translate-to-name-disabled: false
+  #  tag-filter-condition:
+  #    # Condition type, default is "and"
+  #    # and: Logical AND between tag-filters / or: Logical OR between tag-filters
+  #    type: "and"
   #  tag-filters:
   #  #- field-name: signal_source # database column name
   #  #  operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"

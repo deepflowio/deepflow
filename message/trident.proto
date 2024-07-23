@@ -201,7 +201,7 @@ message Config {
     optional uint32 max_cpus = 2 [default = 1];
     optional uint32 max_memory = 3 [default = 768];  // in MiB
     optional uint32 sync_interval = 4 [default = 60];
-    optional uint32 stats_interval = 5 [default = 60];
+    optional uint32 stats_interval = 5 [default = 10];
     optional uint64 global_pps_threshold = 6 [default = 200000];
 
     // capture network namespace regex besides root ns
@@ -1075,12 +1075,29 @@ enum CommandType {
     KUBERNETES = 1;
 }
 
+enum ParamType {
+    PF_TEXT = 0;
+    PF_BOOLEAN = 1;
+}
+
+message CommandParam {
+    optional string name = 1;
+    optional string regex = 2;
+    optional bool required = 3;
+    optional ParamType param_type = 4;
+    optional string description = 5;
+}
+
 message RemoteCommand {
-    optional uint32 id = 1;
     optional string cmd = 2;
-    repeated string param_names = 3;
     optional OutputFormat output_format = 4;
-    optional CommandType cmd_type = 5;
+    optional string ident = 6;
+    repeated CommandParam params = 7;
+    optional string type_name = 8;
+
+    optional uint32 id = 1; // deprecated, use `ident` instead
+    repeated string param_names = 3; // deprecated, use `params` instead
+    optional CommandType cmd_type = 5; // deprecated, use `type_name` instead
 }
 
 message LinuxNamespace {
@@ -1117,10 +1134,12 @@ message RemoteExecRequest {
     optional uint64 request_id = 1;
 
     optional ExecutionType exec_type = 2;
-    optional uint32 command_id = 3;
     repeated Parameter params = 4; // parameters to use in commands
     optional uint32 linux_ns_pid = 5; // execute command in agent namespace if null
     optional uint32 batch_len = 6 [default = 1048576]; // batch len of command execution results, min 1024
+    optional string command_ident = 7;
+
+    optional uint32 command_id = 3; // deprecated, use `command_ident` instead
 }
 
 // message from agent to server

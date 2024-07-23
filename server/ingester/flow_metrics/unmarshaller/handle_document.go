@@ -174,8 +174,8 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 			}
 		}
 	}
-	t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint8(t.L3DeviceType1), t.L3EpcID1)
-	t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.GPID1, uint32(t.PodClusterID1), t.L3DeviceID1, uint8(t.L3DeviceType1), podGroupType1, t.L3EpcID1)
+	t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint32(t.SubnetID1), uint8(t.L3DeviceType1), t.L3EpcID1)
+	t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(t.ServiceID1, t.PodGroupID1, t.GPID1, uint32(t.PodClusterID1), t.L3DeviceID1, uint32(t.SubnetID1), uint8(t.L3DeviceType1), podGroupType1, t.L3EpcID1)
 
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
@@ -229,8 +229,8 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 			}
 		}
 	}
-	t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
-	t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, uint32(t.PodClusterID), t.L3DeviceID, uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
+	t.AutoInstanceID, t.AutoInstanceType = common.GetAutoInstance(t.PodID, t.GPID, t.PodNodeID, t.L3DeviceID, uint32(t.SubnetID), uint8(t.L3DeviceType), t.L3EpcID)
+	t.AutoServiceID, t.AutoServiceType = common.GetAutoService(t.ServiceID, t.PodGroupID, t.GPID, uint32(t.PodClusterID), t.L3DeviceID, uint32(t.SubnetID), uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
 
 	if t.SignalSource == SIGNAL_SOURCE_OTEL {
 		// only show OTel data for services as 'server side'

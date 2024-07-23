@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
+	"github.com/deepflowio/deepflow/server/libs/tracetree"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -33,6 +34,7 @@ const QUEUE_SIZE = 1 << 16
 
 type ControllerIngesterShared struct {
 	ResourceEventQueue *queue.OverwriteQueue
+	TraceTreeQueue     *queue.OverwriteQueue
 }
 
 func NewControllerIngesterShared() *ControllerIngesterShared {
@@ -41,6 +43,10 @@ func NewControllerIngesterShared() *ControllerIngesterShared {
 			"controller-to-ingester-resource_event", QUEUE_SIZE,
 			queue.OptionFlushIndicator(time.Second*3),
 			queue.OptionRelease(func(p interface{}) { p.(*eventapi.ResourceEvent).Release() })),
+		TraceTreeQueue: queue.NewOverwriteQueue(
+			"querier-to-ingester-trace_tree", QUEUE_SIZE,
+			queue.OptionFlushIndicator(time.Second*3),
+			queue.OptionRelease(func(p interface{}) { p.(*tracetree.TraceTree).Release() })),
 	}
 }
 
