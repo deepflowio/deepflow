@@ -640,6 +640,7 @@ pub struct YamlConfig {
     pub ntp_min_interval: Duration,
     pub l7_protocol_advanced_features: L7ProtocolAdvancedFeatures,
     pub oracle_parse_config: OracleParseConfig,
+    pub server_ports: Vec<u16>,
 }
 
 impl YamlConfig {
@@ -1074,6 +1075,7 @@ impl Default for YamlConfig {
                 resp_0x04_extra_byte: false,
             },
             ebpf_collector_queue_size: 65535,
+            server_ports: vec![],
         }
     }
 }
