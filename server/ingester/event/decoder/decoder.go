@@ -459,6 +459,7 @@ func (d *Decoder) writeAlertEvent(event *alert_event.AlertEvent) {
 	s.AlertPlicy = event.GetAlertPolicy()
 	s.MetricValue = event.GetMetricValue()
 	s.EventLevel = uint8(event.GetEventLevel())
+	s.TargetTags = event.GetTargetTags()
 
 	s.TagStrKeys = event.GetTagStrKeys()
 	s.TagStrValues = event.GetTagStrValues()
