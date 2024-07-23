@@ -28,6 +28,8 @@ import (
 const SPAN_TRACE_VERSION = 0x11
 
 type SpanTrace struct {
+	Time uint32 // not store, easy to use when calculating
+
 	EndTimeUsPart uint32 // The microsecond part less than 1 second
 
 	AutoServiceType0 uint8
