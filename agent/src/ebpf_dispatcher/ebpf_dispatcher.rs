@@ -736,7 +736,6 @@ impl EbpfCollector {
 
                 if ebpf::start_continuous_profiler(
                     on_cpu.frequency as i32,
-                    ebpf_conf.java_symbol_file_max_space_limit as i32,
                     ebpf_conf.java_symbol_file_refresh_defer_interval.as_secs() as i32,
                     Self::ebpf_profiler_callback,
                 ) != 0

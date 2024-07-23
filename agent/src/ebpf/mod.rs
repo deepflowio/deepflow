@@ -573,11 +573,6 @@ extern "C" {
     /*
      * start continuous profiler
      * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
-     * @java_syms_space_limit The maximum space occupied by the Java symbol files
-     *   in the '/' directory of the target POD container.The recommended range for
-     *   values is [2, 100], which means it falls within the interval of 2Mi to 100Mi.
-     *   If the configuration value is outside this range, the default value of
-     *   10(10Mi), will be used.
      * @java_syms_update_delay To allow Java to run for an extended period and gather
      *   more symbol information, we delay symbol retrieval when encountering unknown
      *   symbols. The unit of measurement used is seconds.
@@ -587,7 +582,6 @@ extern "C" {
      */
     pub fn start_continuous_profiler(
         freq: c_int,
-        java_syms_space_limit: c_int,
         java_syms_update_delay: c_int,
         callback: extern "C" fn(_data: *mut stack_profile_data),
     ) -> c_int;
@@ -709,6 +703,7 @@ extern "C" {
     pub fn enable_oncpu_profiler() -> c_int;
 
     pub fn disable_oncpu_profiler() -> c_int;
+    pub fn show_collect_pool();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_profile")] {

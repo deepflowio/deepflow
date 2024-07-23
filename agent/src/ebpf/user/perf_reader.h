@@ -36,40 +36,39 @@ struct perf_reader {
 
 static inline int
 __reader_epoll_wait(struct bpf_perf_reader *r,
-		    struct epoll_event *events,
-		    int epoll_id, int timeout)
+		    struct epoll_event *events, int epoll_id, int timeout)
 {
-	int nfds = epoll_wait(r->epoll_fds[epoll_id], events,
-			      r->readers_count, timeout);
+	int nfds;
+retry:
+	nfds = epoll_wait(r->epoll_fds[epoll_id], events,
+			  r->readers_count, timeout);
 	if (nfds == -1) {
-		ebpf_warning("epoll_wait() failed\n");
+		ebpf_warning("epoll_wait() failed, with %s(%d)\n",
+			     strerror(errno), errno);
+		if (errno == EINTR) {
+			goto retry;
+		}
 		return ETR_EPOLL;
-        }
+	}
 
 	return nfds;
 }
 
 static inline int
 reader_epoll_wait(struct bpf_perf_reader *r,
-		  struct epoll_event *events,
-		  int epoll_id)
+		  struct epoll_event *events, int epoll_id)
 {
-	return __reader_epoll_wait(r, events, epoll_id,
-				   r->epoll_timeout);
+	return __reader_epoll_wait(r, events, epoll_id, r->epoll_timeout);
 }
 
 static inline bool
 reader_epoll_short_wait(struct bpf_perf_reader *r,
-			struct epoll_event *events,
-			int epoll_id)
+			struct epoll_event *events, int epoll_id)
 {
-	return __reader_epoll_wait(r, events, epoll_id,
-				   EPOLL_SHORT_TIMEOUT);
+	return __reader_epoll_wait(r, events, epoll_id, EPOLL_SHORT_TIMEOUT);
 }
 
-static inline void
-reader_event_read(struct epoll_event *events,
-		  int nfds)
+static inline void reader_event_read(struct epoll_event *events, int nfds)
 {
 	int i;
 	for (i = 0; i < nfds; ++i) {
@@ -78,8 +77,7 @@ reader_event_read(struct epoll_event *events,
 }
 
 static inline void
-reader_event_read_polling(struct epoll_event *events,
-			  int nfds)
+reader_event_read_polling(struct epoll_event *events, int nfds)
 {
 	int i;
 	for (i = 0; i < nfds; ++i) {

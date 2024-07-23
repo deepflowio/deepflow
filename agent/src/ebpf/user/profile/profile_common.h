@@ -178,4 +178,6 @@ void push_and_release_stack_trace_msg(struct profiler_context *ctx,
  * @return true successfully passed the check, false otherwise
  */
 bool check_profiler_regex(struct profiler_context *ctx, const char *name);
+// Check if the profiler is currently running.
+bool profiler_is_running(void);
 #endif /*DF_USER_PROFILE_COMMON_H */

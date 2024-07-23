@@ -1414,23 +1414,19 @@ vtap_group_id: g-xxxxxx
     #io-event-minimal-duration: 1ms
 
     ## Java compliant update latency time
-    ## Default: 600s. Range: [5, 3600]s
+    ## Default: 60s. Range: [5, 3600]s
     ## Note:
     ##   When deepflow-agent finds that an unresolved function name appears in the function call stack
     ##   of a Java process, it will trigger the regeneration of the symbol file of the process.
     ##   Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain more symbols for
     ##   Java processes, the regeneration will be deferred for a period of time.
-    #java-symbol-file-refresh-defer-interval: 600s
-
-    ## Maximum size limit for Java symbol file.
-    ## Default: 10. Range: [2, 100]
-    ## Note:
-    ##   Which means it falls within the interval of 2Mi to 100Mi. If the configuration value is outside
-    ##   this range, the default value of 10(10Mi), will be used.
-    ##   All Java symbol files are stored in the '/tmp' directory mounted by the deepflow-agent. To prevent
-    ##   excessive occupation of host node space due to large Java symbol files, a maximum size limit is set
-    ##   for each generated Java symbol file.
-    #java-symbol-file-max-space-limit: 10
+    ##
+    ##   At the startup of a Java program, the JVM and JIT compiler are in a "warm-up" phase. During this
+    ##   period, symbol changes are typically frequent due to the dynamic compilation and optimization
+    ##   processes. Therefore, deepflow-agent delay symbol collection for one minute after the Java program
+    ##   starts, allowing the JVM and JIT to "warm up" and for symbol churn to be minimized before proceeding
+    ##   with the collection.
+    #java-symbol-file-refresh-defer-interval: 60s
 
     ## On-cpu profile configuration
     #on-cpu-profile:
