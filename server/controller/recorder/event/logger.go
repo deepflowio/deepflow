@@ -19,10 +19,10 @@ package event
 import (
 	"fmt"
 
-	"github.com/op/go-logging"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("recorder.event")
+var log = logger.MustGetLogger("recorder.event")
 
 func putEventIntoQueueFailed(resource string, err error) string {
 	return fmt.Sprintf("put %s event into queue failed: %s", resource, err.Error())

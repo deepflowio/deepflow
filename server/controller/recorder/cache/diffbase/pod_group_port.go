@@ -31,12 +31,12 @@ func (b *DataSet) AddPodGroupPort(dbItem *mysql.PodGroupPort, seq int) {
 		Name:            dbItem.Name,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodGroupPort(lcuuid string) {
 	delete(b.PodGroupPorts, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodGroupPort struct {

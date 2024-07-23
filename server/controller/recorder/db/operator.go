@@ -19,16 +19,15 @@ package db
 import (
 	"time"
 
-	"github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 )
 
-var log = logging.MustGetLogger("recorder.db")
+var log = logger.MustGetLogger("recorder.db")
 
 type Operator[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] interface {
 	// 批量插入数据
@@ -79,8 +78,8 @@ func (o *OperatorBase[MPT, MT]) AddBatch(items []*MT) ([]*MT, bool) {
 
 	err := o.metadata.DB.Create(&itemsToAdd).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("%s batch failed: %v", rcommon.LogAdd(o.resourceTypeName), err))
-		log.Error(o.metadata.Logf("%s (lcuuids: %v) failed", rcommon.LogAdd(o.resourceTypeName), lcuuidsToAdd))
+		log.Errorf("%s batch failed: %v", rcommon.LogAdd(o.resourceTypeName), err.Error(), o.metadata.LogPrefixes)
+		log.Errorf("%s (lcuuids: %v) failed", rcommon.LogAdd(o.resourceTypeName), lcuuidsToAdd, o.metadata.LogPrefixes)
 
 		if o.allocateID && len(allocatedIDs) > 0 {
 			idmng.ReleaseIDs(o.metadata.GetORGID(), o.resourceTypeName, allocatedIDs)
@@ -100,7 +99,7 @@ func (o *OperatorBase[MPT, MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	}
 
 	for _, item := range itemsToAdd {
-		log.Info(o.metadata.Logf("%s (detail: %+v) success", rcommon.LogAdd(o.resourceTypeName), item))
+		log.Infof("%s (detail: %+v) success", rcommon.LogAdd(o.resourceTypeName), item, o.metadata.LogPrefixes)
 	}
 
 	return itemsToAdd, true
@@ -110,10 +109,10 @@ func (o *OperatorBase[MPT, MT]) Update(lcuuid string, updateInfo map[string]inte
 	dbItem := new(MT)
 	err := o.metadata.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("%s (lcuuid: %s, detail: %+v) failed: %s", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, err.Error()))
+		log.Errorf("%s (lcuuid: %s, detail: %+v) failed: %s", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, err.Error(), o.metadata.LogPrefixes)
 		return dbItem, false
 	}
-	log.Info(o.metadata.Logf("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo))
+	log.Infof("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, o.metadata.LogPrefixes)
 	o.metadata.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	return dbItem, true
 }
@@ -122,18 +121,18 @@ func (o *OperatorBase[MPT, MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {
 	var deletedItems []*MT
 	err := o.metadata.DB.Where("lcuuid IN ?", lcuuids).Find(&deletedItems).Error
 	if err != nil {
-		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err)
+		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err.Error(), o.metadata.LogPrefixes)
 		return nil, false
 	}
 	err = o.metadata.DB.Delete(&deletedItems).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err))
+		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err.Error(), o.metadata.LogPrefixes)
 		return nil, false
 	}
 	if o.softDelete {
-		log.Info(o.metadata.Logf("%s (lcuuids: %v) deleted_at success", rcommon.LogUpdate(o.resourceTypeName), lcuuids))
+		log.Infof("%s (lcuuids: %v) deleted_at success", rcommon.LogUpdate(o.resourceTypeName), lcuuids, o.metadata.LogPrefixes)
 	} else {
-		log.Info(o.metadata.Logf("%s (lcuuids: %v) success", rcommon.LogDelete(o.resourceTypeName), lcuuids))
+		log.Infof("%s (lcuuids: %v) success", rcommon.LogDelete(o.resourceTypeName), lcuuids, o.metadata.LogPrefixes)
 	}
 
 	o.returnUsedIDs(deletedItems)
@@ -162,7 +161,7 @@ func (o OperatorBase[MPT, MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[st
 	for _, item := range items {
 		lcuuid := MPT(item).GetLcuuid()
 		if common.Contains(lcuuids, lcuuid) {
-			log.Info(o.metadata.Logf("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid))
+			log.Infof("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid, o.metadata.LogPrefixes)
 		} else {
 			dedupItems = append(dedupItems, item)
 			lcuuids = append(lcuuids, lcuuid)
@@ -176,7 +175,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 	var dupItems []*MT
 	err := o.metadata.DB.Unscoped().Where("lcuuid IN ?", lcuuids).Find(&dupItems).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("get %s duplicate data failed: %v", o.resourceTypeName, err))
+		log.Errorf("get %s duplicate data failed: %v", o.resourceTypeName, err.Error(), o.metadata.LogPrefixes)
 		return nil, nil, false
 	}
 
@@ -198,10 +197,10 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 				MPT(item).SetID(id)
 				MPT(item).SetUpdatedAt(time.Now())
 			}
-			log.Info(o.metadata.Logf("%s data is duplicated with db data (lcuuids: %v, ids: %v, one detail: %+v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs, dupItems[0]))
+			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v, one detail: %+v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs, dupItems[0], o.metadata.LogPrefixes)
 			err = o.metadata.DB.Unscoped().Delete(&dupItems).Error
 			if err != nil {
-				log.Error(o.metadata.Logf("%s duplicated data failed: %+v", rcommon.LogDelete(o.resourceTypeName), err))
+				log.Errorf("%s duplicated data failed: %+v", rcommon.LogDelete(o.resourceTypeName), err.Error(), o.metadata.LogPrefixes)
 				return items, lcuuids, false
 			}
 		} else {
@@ -212,7 +211,7 @@ func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidTo
 					dupLcuuids = append(dupLcuuids, lcuuid)
 				}
 			}
-			log.Error(o.metadata.Logf("%s data is duplicated with db data (lcuuids: %v, one detail: %+v)", o.resourceTypeName, dupLcuuids, dupItems[0]))
+			log.Errorf("%s data is duplicated with db data (lcuuids: %v, one detail: %+v)", o.resourceTypeName, dupLcuuids, dupItems[0], o.metadata.LogPrefixes)
 
 			count := len(lcuuids) - len(dupLcuuids)
 			dedupItems := make([]*MT, 0, count)
@@ -245,17 +244,17 @@ func (o *OperatorBase[MPT, MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 		if count > 0 {
 			ids, err := idmng.GetIDs(o.metadata.GetORGID(), o.resourceTypeName, count)
 			if err != nil {
-				log.Error(o.metadata.Logf("%s request ids failed", o.resourceTypeName))
+				log.Errorf("%s request ids failed", o.resourceTypeName, o.metadata.LogPrefixes)
 				return itemsHasID, []int{}, false
 			}
 			for i, id := range ids {
 				MPT(itemsHasNoID[i]).SetID(id)
 				itemsHasID = append(itemsHasID, itemsHasNoID[i])
 			}
-			log.Info(o.metadata.Logf("%s use ids: %v", o.resourceTypeName, ids))
+			log.Infof("%s use ids: %v", o.resourceTypeName, ids, o.metadata.LogPrefixes)
 			return itemsHasID, ids, true
 		} else {
-			log.Info(o.metadata.Logf("%s not use any id", o.resourceTypeName))
+			log.Infof("%s not use any id", o.resourceTypeName, o.metadata.LogPrefixes)
 			return itemsHasID, []int{}, true
 		}
 	}
@@ -271,8 +270,8 @@ func (o *OperatorBase[MPT, MT]) returnUsedIDs(deletedItems []*MT) {
 		}
 		err := idmng.ReleaseIDs(o.metadata.GetORGID(), o.resourceTypeName, ids)
 		if err != nil {
-			log.Error(o.metadata.Logf("%s release ids: %v failed", o.resourceTypeName, ids))
+			log.Errorf("%s release ids: %v failed", o.resourceTypeName, ids, o.metadata.LogPrefixes)
 		}
-		log.Info(o.metadata.Logf("%s return used ids: %v", o.resourceTypeName, ids))
+		log.Infof("%s return used ids: %v", o.resourceTypeName, ids, o.metadata.LogPrefixes)
 	}
 }

@@ -44,12 +44,12 @@ func (b *DataSet) AddVM(dbItem *mysql.VM, seq int, toolDataSet *tool.DataSet) {
 		CloudTags:    dbItem.CloudTags,
 	}
 	b.VMs[dbItem.Lcuuid] = newItem
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteVM(lcuuid string) {
 	delete(b.VMs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type VM struct {

@@ -87,7 +87,7 @@ func (p *PodService) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = p.ToolDataSet.GetPodServiceNameByID(id)
 			if err != nil {
-				log.Error(p.metadata.Logf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err, p.metadata.LogPrefixes)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

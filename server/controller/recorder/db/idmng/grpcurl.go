@@ -26,7 +26,7 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	recordercommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func GetMasterGRPCConn() (*grpc.ClientConn, error) {
@@ -42,7 +42,7 @@ func GetMasterGRPCConn() (*grpc.ClientConn, error) {
 func GetIDs(orgID int, resourceType string, count int) (ids []int, err error) {
 	conn, err := GetMasterGRPCConn()
 	if err != nil {
-		log.Errorf("%s create grpc connection failed: %s", recordercommon.FmtORGID(orgID), err.Error())
+		log.Errorf("create grpc connection failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 	defer conn.Close()
@@ -50,20 +50,20 @@ func GetIDs(orgID int, resourceType string, count int) (ids []int, err error) {
 	client := api.NewControllerClient(conn)
 	resp, err := client.GetResourceID(context.Background(), &api.GetResourceIDRequest{Type: &resourceType, Count: proto.Uint32(uint32(count)), OrgId: proto.Uint32(uint32(orgID))})
 	if err != nil {
-		log.Error("%s get %s id failed: %s", recordercommon.FmtORGID(orgID), resourceType, err.Error())
+		log.Errorf("%s get %s id failed: %s", resourceType, err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
 	for _, uID := range resp.GetIds() {
 		ids = append(ids, int(uID))
 	}
-	log.Infof("%s get %s ids: %v (expected count: %d, true count: %d)", recordercommon.FmtORGID(orgID), resourceType, ids, count, len(ids))
+	log.Infof("%s get %s ids: %v (expected count: %d, true count: %d)", resourceType, ids, count, len(ids), logger.NewORGPrefix(orgID))
 	return
 }
 
 func ReleaseIDs(orgID int, resourceType string, ids []int) (err error) {
 	conn, err := GetMasterGRPCConn()
 	if err != nil {
-		log.Errorf("%s create grpc connection failed: %s", recordercommon.FmtORGID(orgID), err.Error())
+		log.Errorf("%s create grpc connection failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return err
 	}
 	defer conn.Close()
@@ -75,8 +75,8 @@ func ReleaseIDs(orgID int, resourceType string, ids []int) (err error) {
 	client := api.NewControllerClient(conn)
 	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs, Type: &resourceType, OrgId: proto.Uint32(uint32(orgID))})
 	if err != nil {
-		log.Errorf("%s release %s id failed: %s", recordercommon.FmtORGID(orgID), resourceType, err.Error())
+		log.Errorf("%s release %s id failed: %s", resourceType, err.Error(), logger.NewORGPrefix(orgID))
 	}
-	log.Infof("%s release %s ids: %v (count: %d)", recordercommon.FmtORGID(orgID), resourceType, ids, len(ids))
+	log.Infof("%s release %s ids: %v (count: %d)", resourceType, ids, len(ids), logger.NewORGPrefix(orgID))
 	return
 }

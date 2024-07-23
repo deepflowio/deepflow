@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/op/go-logging"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -33,7 +35,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/libs/queue"
-	"github.com/op/go-logging"
 )
 
 const (

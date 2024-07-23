@@ -30,12 +30,12 @@ func (b *DataSet) AddSubDomain(dbItem *mysql.SubDomain, seq int) {
 		},
 		Name: dbItem.Name,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteSubDomain(lcuuid string) {
 	delete(b.SubDomains, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type SubDomain struct {

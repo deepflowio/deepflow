@@ -84,7 +84,7 @@ func (n *NATGateway) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = n.ToolDataSet.GetNATGatewayNameByID(id)
 			if err != nil {
-				log.Error(n.metadata.Logf("%v, %v", idByLcuuidNotFound(n.resourceType, lcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(n.resourceType, lcuuid), err, n.metadata.LogPrefixes)
 			}
 		} else {
 			log.Error(nameByIDNotFound(n.resourceType, id))

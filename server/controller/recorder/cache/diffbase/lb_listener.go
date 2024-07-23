@@ -34,12 +34,12 @@ func (b *DataSet) AddLBListener(dbItem *mysql.LBListener, seq int) {
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteLBListener(lcuuid string) {
 	delete(b.LBListeners, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type LBListener struct {

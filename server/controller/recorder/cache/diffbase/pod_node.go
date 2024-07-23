@@ -38,12 +38,12 @@ func (b *DataSet) AddPodNode(dbItem *mysql.PodNode, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, b.PodNodes[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, b.PodNodes[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodNode(lcuuid string) {
 	delete(b.PodNodes, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodNode struct {

@@ -32,12 +32,12 @@ func (b *DataSet) AddAZ(dbItem *mysql.AZ, seq int) {
 		Label:        dbItem.Label,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteAZ(lcuuid string) {
 	delete(b.AZs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_AZ_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_AZ_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type AZ struct {

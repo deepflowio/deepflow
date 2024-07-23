@@ -43,3 +43,18 @@ func (o *ORGPrefix) Prefix() string {
 	}
 	return fmt.Sprintf("[ORGID-%d]", o.ID)
 }
+
+type TeamPrefix struct {
+	ID int
+}
+
+func NewTeamPrefix(id int) Prefix {
+	return &TeamPrefix{id}
+}
+
+func (t *TeamPrefix) Prefix() string {
+	if t.ID == 0 {
+		return ""
+	}
+	return fmt.Sprintf("[TeamID-%d]", t.ID)
+}

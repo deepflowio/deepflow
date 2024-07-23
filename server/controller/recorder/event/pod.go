@@ -64,7 +64,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 		}
 		podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(item.PodGroupID)
 		if !ok {
-			log.Error(p.metadata.Logf(fmt.Sprintf("db pod_group type(id: %d) not found", item.PodGroupID)))
+			log.Errorf("db pod_group type(id: %d) not found", item.PodGroupID, p.metadata.LogPrefixes)
 		}
 
 		opts = append(opts, []eventapi.TagFieldOption{
@@ -114,7 +114,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod)
 		if ok {
 			name, err = p.ToolDataSet.GetPodNameByID(id)
 			if err != nil {
-				log.Error(p.metadata.Logf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.Lcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.Lcuuid), err, p.metadata.LogPrefixes)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))
@@ -125,7 +125,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod)
 		if oldPodNodeID != 0 {
 			oldPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(oldPodNodeID)
 			if err != nil {
-				log.Error(p.metadata.Logf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.PodNodeLcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.PodNodeLcuuid), err, p.metadata.LogPrefixes)
 			}
 		}
 
@@ -134,7 +134,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *diffbase.Pod)
 		if newPodNodeID != 0 {
 			newPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(newPodNodeID)
 			if err != nil {
-				log.Error(p.metadata.Logf("%v, %v", idByLcuuidNotFound(p.resourceType, cloudItem.PodNodeLcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, cloudItem.PodNodeLcuuid), err, p.metadata.LogPrefixes)
 			}
 		}
 
@@ -180,7 +180,7 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 		if ok {
 			name, err = p.ToolDataSet.GetPodNameByID(id)
 			if err != nil {
-				log.Error(p.metadata.Logf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err, p.metadata.LogPrefixes)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

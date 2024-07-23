@@ -79,10 +79,10 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 		vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 		if !exists {
-			log.Error(c.metadata.Logf(resourceAForResourceBNotFound(
+			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
-			)))
+			), c.metadata.LogPrefixes)
 			continue
 		}
 		vpcIDs = append(vpcIDs, vpcID)
@@ -109,10 +109,10 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.C
 		for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 			vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 			if !exists {
-				log.Error(c.metadata.Logf(resourceAForResourceBNotFound(
+				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
-				)))
+				), c.metadata.LogPrefixes)
 				continue
 			}
 			vpcIDs = append(vpcIDs, vpcID)
