@@ -29,9 +29,9 @@ vtap_group_id: g-xxxxxx
 ## Unit: %. Default: 0. Range: [0, 100]
 ## Note: The limit of the percentage of system free memory.
 ##   Setting sys_free_memory_limit to 0 indicates that the system free memory ratio is not checked.
-##   1. When the current system free memory ratio is below sys_free_memory_limit * 70%, 
+##   1. When the current system free memory ratio is below sys_free_memory_limit * 70%,
 ##      the agent will automatically restart.
-##   2. When the current system free memory ratio is below sys_free_memory_limit but above 70%, 
+##   2. When the current system free memory ratio is below sys_free_memory_limit but above 70%,
 ##      the agent enters the disabled state.
 ##   3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
 ##      the agent recovers from the disabled state.
@@ -910,6 +910,13 @@ vtap_group_id: g-xxxxxx
     ##   Memory pools are used for frequently create and destroy objects like
     ##   FlowNode, FlowLog, etc.
     #memory-pool-size: 65536
+
+  ## Service port list, priority lower than TCP SYN flags
+  ## Example:
+  ## server-ports:
+  ## - 80
+  ## - 443
+  #server-ports: []
 
   ## Max size of batched buffer
   ## Default: 131072. Range: [1024, +oo)

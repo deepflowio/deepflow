@@ -17,6 +17,7 @@
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use ahash::{HashSet, HashSetExt};
 use lru::LruCache;
 
 use crate::common::enums::TcpFlags;
@@ -82,18 +83,28 @@ impl Hash for Ipv6Key {
 pub struct ServiceTable {
     ipv4: LruCache<Ipv4Key, u8>,
     ipv6: LruCache<Ipv6Key, u8>,
+
+    port_map: HashSet<u16>,
 }
 
 impl ServiceTable {
     const MIN_SCORE: u8 = 0;
     pub const MAX_SCORE: u8 = 0xff;
+    pub const MAX_SCORE_FROM_CONFIG: u8 = Self::MAX_SCORE - 1;
     const SCORE_DIFF_THRESHOLD: u8 = 8;
     const PORT_MSB: u16 = 1 << 15;
 
-    pub fn new(ipv4_capacity: usize, ipv6_capacity: usize) -> Self {
+    pub fn new(ipv4_capacity: usize, ipv6_capacity: usize, server_ports: &Vec<u16>) -> Self {
+        let mut port_map = HashSet::new();
+        for port in server_ports {
+            if *port != 0 {
+                port_map.insert(*port);
+            }
+        }
         Self {
             ipv4: LruCache::new(ipv4_capacity.try_into().unwrap()),
             ipv6: LruCache::new(ipv6_capacity.try_into().unwrap()),
+            port_map,
         }
     }
 
@@ -377,10 +388,14 @@ impl ServiceTable {
 
         match (flow_src_key, flow_dst_key) {
             (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
-                if let Some(score) = self.ipv4.get(&flow_src_key) {
+                if self.port_map.contains(&flow_src_key.port) {
+                    flow_src_score = Self::MAX_SCORE_FROM_CONFIG;
+                } else if let Some(score) = self.ipv4.get(&flow_src_key) {
                     flow_src_score = *score;
                 }
-                if let Some(score) = self.ipv4.get(&flow_dst_key) {
+                if self.port_map.contains(&flow_dst_key.port) {
+                    flow_dst_score = Self::MAX_SCORE_FROM_CONFIG;
+                } else if let Some(score) = self.ipv4.get(&flow_dst_key) {
                     flow_dst_score = *score;
                 }
                 if flow_src_score == Self::MAX_SCORE || flow_dst_score == Self::MAX_SCORE {
@@ -410,10 +425,14 @@ impl ServiceTable {
                 )
             }
             (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
-                if let Some(score) = self.ipv6.get(&flow_src_key) {
+                if self.port_map.contains(&flow_src_key.port) {
+                    flow_src_score = Self::MAX_SCORE_FROM_CONFIG;
+                } else if let Some(score) = self.ipv6.get(&flow_src_key) {
                     flow_src_score = *score;
                 }
-                if let Some(score) = self.ipv6.get(&flow_dst_key) {
+                if self.port_map.contains(&flow_dst_key.port) {
+                    flow_dst_score = Self::MAX_SCORE_FROM_CONFIG;
+                } else if let Some(score) = self.ipv6.get(&flow_dst_key) {
                     flow_dst_score = *score;
                 }
                 if flow_src_score == Self::MAX_SCORE || flow_dst_score == Self::MAX_SCORE {
@@ -477,7 +496,7 @@ impl ServiceTable {
         flow_src_key: ServiceKey,
         flow_dst_key: ServiceKey,
     ) -> (u8, bool) {
-        let mut score = Self::MIN_SCORE;
+        let score;
         let mut need_reverse = false;
         match (flow_src_key, flow_dst_key) {
             (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
@@ -502,12 +521,25 @@ impl ServiceTable {
                     self.ipv4.pop(&flow_dst_key);
                     score = Self::MAX_SCORE;
                     need_reverse = true;
-                } else if let Some(s) = self.ipv4.get(&flow_dst_key) {
-                    score = *s;
-                } else if let Some(s) = self.ipv4.get(&flow_src_key) {
-                    // if get score from flow_src_key, it indicate that the packet maybe disorder, the flow should be reversed
-                    score = *s;
-                    need_reverse = score == Self::MAX_SCORE;
+                } else {
+                    let source_score = if self.port_map.contains(&flow_src_key.port) {
+                        Self::MAX_SCORE_FROM_CONFIG
+                    } else if let Some(s) = self.ipv4.get(&flow_src_key) {
+                        *s
+                    } else {
+                        0
+                    };
+
+                    let dest_score = if self.port_map.contains(&flow_dst_key.port) {
+                        Self::MAX_SCORE_FROM_CONFIG
+                    } else if let Some(s) = self.ipv4.get(&flow_dst_key) {
+                        *s
+                    } else {
+                        0
+                    };
+
+                    need_reverse = source_score > dest_score;
+                    score = source_score.max(dest_score);
                 }
             }
             (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
@@ -529,12 +561,25 @@ impl ServiceTable {
                     self.ipv6.pop(&flow_dst_key);
                     score = Self::MAX_SCORE;
                     need_reverse = true;
-                } else if let Some(s) = self.ipv6.get(&flow_dst_key) {
-                    score = *s;
-                } else if let Some(s) = self.ipv6.get(&flow_src_key) {
-                    // if get score from flow_src_key, it indicate that the packet maybe disorder, the flow should be reversed
-                    score = *s;
-                    need_reverse = score == Self::MAX_SCORE;
+                } else {
+                    let source_score = if self.port_map.contains(&flow_src_key.port) {
+                        Self::MAX_SCORE_FROM_CONFIG
+                    } else if let Some(s) = self.ipv6.get(&flow_src_key) {
+                        *s
+                    } else {
+                        0
+                    };
+
+                    let dest_score = if self.port_map.contains(&flow_dst_key.port) {
+                        Self::MAX_SCORE_FROM_CONFIG
+                    } else if let Some(s) = self.ipv6.get(&flow_dst_key) {
+                        *s
+                    } else {
+                        0
+                    };
+
+                    need_reverse = source_score > dest_score;
+                    score = source_score.max(dest_score);
                 }
             }
             _ => unimplemented!(),
@@ -604,7 +649,7 @@ mod tests {
             ),
         ];
 
-        let mut table = ServiceTable::new(10, 10);
+        let mut table = ServiceTable::new(10, 10, &vec![]);
         for (src_key, dst_key) in key_pairs {
             let (src_score, dst_score) = table.get_tcp_score(
                 true,
@@ -759,7 +804,7 @@ mod tests {
             ),
         ];
 
-        let mut table = ServiceTable::new(10, 10);
+        let mut table = ServiceTable::new(10, 10, &vec![]);
         for (src_key, dst_key) in key_pairs {
             let (src_score, dst_score) = table.get_udp_score(
                 true,
@@ -795,5 +840,79 @@ mod tests {
                 "对UDP非首包累加的判断不正确"
             );
         }
+    }
+
+    #[test]
+    fn port_map() {
+        let server_port = vec![80];
+        let mut table = ServiceTable::new(10, 10, &server_port);
+        let flow_src_key = ServiceKey::new(
+            Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee")
+                .unwrap()
+                .into(),
+            EPC_DEEPFLOW as i16,
+            80,
+        );
+        let flow_dst_key = ServiceKey::new(
+            Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee")
+                .unwrap()
+                .into(),
+            EPC_DEEPFLOW as i16,
+            53,
+        );
+
+        let (src_score, _) = table.get_tcp_score(
+            true,
+            false,
+            PacketDirection::ClientToServer,
+            TcpFlags::PSH,
+            false,
+            false,
+            flow_src_key,
+            flow_dst_key,
+        );
+        assert_eq!(src_score, ServiceTable::MAX_SCORE_FROM_CONFIG - 1);
+        let (src_score, dst_score) = table.get_tcp_score(
+            false,
+            false,
+            PacketDirection::ClientToServer,
+            TcpFlags::SYN_ACK,
+            false,
+            false,
+            flow_dst_key,
+            flow_src_key,
+        );
+        assert_eq!(src_score, ServiceTable::MAX_SCORE);
+        assert_eq!(dst_score, 0);
+
+        let (src_score, dst_score) = table.get_tcp_score(
+            true,
+            false,
+            PacketDirection::ClientToServer,
+            TcpFlags::PSH,
+            false,
+            false,
+            flow_src_key,
+            flow_dst_key,
+        );
+        assert_eq!(src_score, ServiceTable::MAX_SCORE_FROM_CONFIG);
+        assert_eq!(dst_score, ServiceTable::MAX_SCORE);
+
+        let (src_score, dst_score) = table.get_tcp_score(
+            false,
+            false,
+            PacketDirection::ClientToServer,
+            TcpFlags::PSH,
+            false,
+            false,
+            flow_src_key,
+            flow_dst_key,
+        );
+        assert_eq!(src_score, 0);
+        assert_eq!(dst_score, ServiceTable::MAX_SCORE);
+
+        let (score, reverse) = table.get_ebpf_tcp_score(0, true, false, flow_dst_key, flow_src_key);
+        assert_eq!(score, ServiceTable::MAX_SCORE);
+        assert_eq!(reverse, true);
     }
 }
