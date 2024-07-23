@@ -469,6 +469,7 @@ pub struct FlowConfig {
     pub oracle_parse_conf: OracleParseConfig,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
+    pub server_ports: Vec<u16>,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -570,6 +571,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                     .l7_protocol_advanced_features
                     .obfuscate_enabled_protocols,
             ),
+            server_ports: conf.yaml_config.server_ports.clone(),
         }
     }
 }
@@ -618,6 +620,7 @@ impl fmt::Debug for FlowConfig {
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .field("plugins", &self.plugins)
+            .field("server_ports", &self.server_ports)
             .finish()
     }
 }
