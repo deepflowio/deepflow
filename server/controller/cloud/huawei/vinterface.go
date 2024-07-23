@@ -24,6 +24,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 const (
@@ -56,14 +57,14 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 			jPort := jPorts[i]
 			mac := jPort.Get("mac_address").MustString()
 			if !cloudcommon.CheckJsonAttributes(jPort, vifRequiredAttrs) {
-				log.Infof("exclude vinterface: %s, missing attr", mac)
+				log.Infof("exclude vinterface: %s, missing attr", mac, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			id := common.IDGenerateUUID(h.orgID, jPort.Get("id").MustString())
 			networkLcuuid := common.IDGenerateUUID(h.orgID, jPort.Get("network_id").MustString())
 			network := h.toolDataSet.lcuuidToNetwork[networkLcuuid]
 			if network.Lcuuid == "" {
-				log.Infof("exclude vinterface: %s, missing network info", mac)
+				log.Infof("exclude vinterface: %s, missing network info", mac, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			var deviceID string
@@ -73,7 +74,7 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 			h.formatVInterfaceRelatedToolDataSet(jPort, deviceID, deviceOwner, network.VPCLcuuid)
 
 			if !common.Contains([]string{DEVICE_OWNER_DHCP, DEVICE_OWNER_ROUTER_GW, DEVICE_OWNER_VM, DEVICE_OWNER_ROUTER_IFACE}, deviceOwner) && !strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
-				log.Infof("exclude vinterface: %s, %s", mac, deviceOwner)
+				log.Infof("exclude vinterface: %s, %s", mac, deviceOwner, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			var deviceType int
@@ -220,7 +221,7 @@ func (h *HuaWei) formatPublicIPs(project Project, token string) error {
 	for i := range jIPs {
 		jIP := jIPs[i]
 		if !cloudcommon.CheckJsonAttributes(jIP, requiredAttrs) {
-			log.Infof("exclude public ip, missing attr")
+			log.Infof("exclude public ip, missing attr", logger.NewORGPrefix(h.orgID))
 			continue
 		}
 		h.toolDataSet.vinterfaceLcuuidToPublicIP[jIP.Get("port_id").MustString()] = jIP.Get("public_ip_address").MustString()

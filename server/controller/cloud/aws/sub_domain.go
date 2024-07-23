@@ -24,12 +24,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 	var retSubDomains []model.SubDomain
 
-	log.Debug("get sub_domains starting")
+	log.Debug("get sub_domains starting", logger.NewORGPrefix(a.orgID))
 
 	eksClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(region.name), config.WithHTTPClient(a.httpClient))
 
@@ -45,7 +46,7 @@ func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 		}
 		result, err := eks.NewFromConfig(eksClientConfig).ListClusters(context.TODO(), input)
 		if err != nil {
-			log.Errorf("subdomains request aws api error: (%s)", err.Error())
+			log.Errorf("subdomains request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.SubDomain{}, err
 		}
 		retClusterNames = append(retClusterNames, result.Clusters...)
@@ -60,14 +61,14 @@ func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 		clusterInput := &eks.DescribeClusterInput{Name: &clusterName}
 		clusterResult, err := eks.NewFromConfig(eksClientConfig).DescribeCluster(context.TODO(), clusterInput)
 		if err != nil {
-			log.Errorf("subdomain info request aws api error: (%s)", err.Error())
+			log.Errorf("subdomain info request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.SubDomain{}, err
 		}
 
 		vpcID := a.getStringPointerValue(clusterResult.Cluster.ResourcesVpcConfig.VpcId)
 		vpcLcuuid, ok := a.vpcIDToLcuuid[vpcID]
 		if vpcID == "" || !ok {
-			log.Debugf("cluster (%s) vpc (%s) not found", name, vpcID)
+			log.Debugf("cluster (%s) vpc (%s) not found", name, vpcID, logger.NewORGPrefix(a.orgID))
 			continue
 		}
 		config := map[string]interface{}{
@@ -89,6 +90,6 @@ func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 			Config:      string(configJson),
 		})
 	}
-	log.Debug("get sub_domains complete")
+	log.Debug("get sub_domains complete", logger.NewORGPrefix(a.orgID))
 	return retSubDomains, nil
 }

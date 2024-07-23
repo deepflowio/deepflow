@@ -20,10 +20,11 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []model.PeerConnection) ([]model.PeerConnection, error) {
-	log.Debug("get peer connections starting")
+	log.Debug("get peer connections starting", logger.NewORGPrefix(t.orgID))
 	var pConnections []model.PeerConnection
 	peerConnectionLcuuids := mapset.NewSet()
 	for _, p := range peerConnections {
@@ -34,7 +35,7 @@ func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []mod
 
 	resp, err := t.getResponse("bmvpc", "2018-06-25", "DescribeVpcPeerConnections", region.name, "VpcPeerConnectionSet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("peer connection request tencent api error: (%s)", err.Error())
+		log.Errorf("peer connection request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.PeerConnection{}, err
 	}
 	for _, pData := range resp {
@@ -53,7 +54,7 @@ func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []mod
 		localRegionLcuuid := t.vpcIDToRegionLcuuid[localVpcID]
 		remoteRegionLcuuid := t.vpcIDToRegionLcuuid[remoteVpcID]
 		if localRegionLcuuid == "" || remoteRegionLcuuid == "" {
-			log.Infof("peer connection (%s) region not found", peerName)
+			log.Infof("peer connection (%s) region not found", peerName, logger.NewORGPrefix(t.orgID))
 			continue
 		}
 
@@ -67,6 +68,6 @@ func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []mod
 			RemoteRegionLcuuid: remoteRegionLcuuid,
 		})
 	}
-	log.Debug("get peer connections complete")
+	log.Debug("get peer connections complete", logger.NewORGPrefix(t.orgID))
 	return pConnections, nil
 }

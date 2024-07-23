@@ -24,11 +24,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"inet.af/netaddr"
 )
 
 func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []model.IP, []model.NATRule, error) {
-	log.Debug("get vinterfaces,ips starting")
+	log.Debug("get vinterfaces,ips starting", logger.NewORGPrefix(a.orgID))
 	a.publicIPToVinterface = map[string]model.VInterface{}
 	var vinterfaces []model.VInterface
 	var ips []model.IP
@@ -46,7 +47,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 		}
 		result, err := a.ec2Client.DescribeNetworkInterfaces(context.TODO(), input)
 		if err != nil {
-			log.Errorf("vinterface request aws api error: (%s)", err.Error())
+			log.Errorf("vinterface request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VInterface{}, []model.IP{}, []model.NATRule{}, err
 		}
 		retVinterfaces = append(retVinterfaces, result.NetworkInterfaces...)
@@ -91,7 +92,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 	for _, vData := range retVinterfaces {
 		mac := a.getStringPointerValue(vData.MacAddress)
 		if vData.Attachment == nil {
-			log.Debugf("vinterface (%s) not binding device", mac)
+			log.Debugf("vinterface (%s) not binding device", mac, logger.NewORGPrefix(a.orgID))
 			continue
 		}
 		description := a.getStringPointerValue(vData.Description)
@@ -116,7 +117,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 				privateIP := a.getStringPointerValue(ip.PrivateIpAddress)
 				netPrivateIP, err := netaddr.ParseIP(privateIP)
 				if err != nil || !netPrivateIP.Is4() {
-					log.Infof("ip (%s) not support or (%s)", privateIP, err.Error())
+					log.Infof("ip (%s) not support or (%s)", privateIP, err.Error(), logger.NewORGPrefix(a.orgID))
 					continue
 				}
 				primary := a.getBoolPointerValue(ip.Primary)
@@ -126,7 +127,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 							a.instanceIDToPrimaryIP[instanceID] = privateIP
 						}
 					} else {
-						log.Debugf("eks node (%s) don't need secondary ip (%s)", instanceID, privateIP)
+						log.Debugf("eks node (%s) don't need secondary ip (%s)", instanceID, privateIP, logger.NewORGPrefix(a.orgID))
 						continue
 					}
 				} else {
@@ -143,7 +144,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 				})
 
 				if ip.Association == nil {
-					log.Debugf("ip (%s) association is nil", privateIP)
+					log.Debugf("ip (%s) association is nil", privateIP, logger.NewORGPrefix(a.orgID))
 					continue
 				}
 				publicIP := a.getStringPointerValue(ip.Association.PublicIp)
@@ -182,6 +183,6 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 			}
 		}
 	}
-	log.Debug("get vinterfaces,ips complete")
+	log.Debug("get vinterfaces,ips complete", logger.NewORGPrefix(a.orgID))
 	return vinterfaces, ips, vNatRules, nil
 }

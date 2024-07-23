@@ -26,7 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
 	api "github.com/deepflowio/deepflow/message/controller"
@@ -35,12 +34,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	gconfig "github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-var log = logging.MustGetLogger("genesis")
+var log = logger.MustGetLogger("genesis")
 var GenesisService *Genesis
 var Synchronizer *SynchronizerServer
 
@@ -191,7 +191,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 		if err != nil {
 			msg := "create grpc connection faild:" + err.Error()
-			log.Error(msg)
+			log.Error(msg, logger.NewORGPrefix(orgID))
 			return retGenesisSyncData, errors.New(msg)
 		}
 		defer conn.Close()
@@ -204,7 +204,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 		ret, err := client.GenesisSharingSync(context.Background(), req)
 		if err != nil {
 			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
-			log.Warning(msg)
+			log.Warning(msg, logger.NewORGPrefix(orgID))
 			return retGenesisSyncData, errors.New(msg)
 		}
 
@@ -456,12 +456,12 @@ func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 	nodeIP := os.Getenv(common.NODE_IP_KEY)
 	err = db.Find(&azControllerConns).Error
 	if err != nil {
-		log.Warningf("query az_controller_connection failed (%s)", err.Error())
+		log.Warningf("query az_controller_connection failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 	err = db.Where("ip <> ? AND state <> ?", nodeIP, common.CONTROLLER_STATE_EXCEPTION).Find(&controllers).Error
 	if err != nil {
-		log.Warningf("query controller failed (%s)", err.Error())
+		log.Warningf("query controller failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 
@@ -501,12 +501,12 @@ func (g *Genesis) receiveKubernetesData(kChan chan KubernetesInfo) {
 func (g *Genesis) GetKubernetesData(orgID int, clusterID string) (KubernetesInfo, bool) {
 	k8sDataInterface, ok := g.kubernetesData.Load(fmt.Sprintf("%d-%s", orgID, clusterID))
 	if !ok {
-		log.Warningf("kubernetes data not found org_id (%d) cluster id (%s)", orgID, clusterID)
+		log.Warningf("kubernetes data not found org_id (%d) cluster id (%s)", orgID, clusterID, logger.NewORGPrefix(orgID))
 		return KubernetesInfo{}, false
 	}
 	k8sData, ok := k8sDataInterface.(KubernetesInfo)
 	if !ok {
-		log.Error("kubernetes data interface assert failed")
+		log.Error("kubernetes data interface assert failed", logger.NewORGPrefix(orgID))
 		return KubernetesInfo{}, false
 	}
 	return k8sData, true
@@ -527,7 +527,7 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 		if err != nil {
 			msg := "create grpc connection faild:" + err.Error()
-			log.Error(msg)
+			log.Error(msg, logger.NewORGPrefix(orgID))
 			return k8sResp, errors.New(msg)
 		}
 		defer conn.Close()
@@ -541,18 +541,18 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		ret, err := client.GenesisSharingK8S(context.Background(), req)
 		if err != nil {
 			msg := fmt.Sprintf("get (%s) genesis sharing k8s failed (%s) ", serverIP, err.Error())
-			log.Error(msg)
+			log.Error(msg, logger.NewORGPrefix(orgID), logger.NewORGPrefix(orgID))
 			return k8sResp, errors.New(msg)
 		}
 		entries := ret.GetEntries()
 		if len(entries) == 0 {
-			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP)
+			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP, logger.NewORGPrefix(orgID))
 			continue
 		}
 		epochStr := ret.GetEpoch()
 		epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
 		if err != nil {
-			log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
+			log.Error("genesis api sharing k8s format timestr faild:"+err.Error(), logger.NewORGPrefix(orgID))
 			return k8sResp, err
 		}
 		if !epoch.After(k8sInfo.Epoch) {
@@ -570,7 +570,7 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
 	}
 	if k8sInfo.ErrorMSG != "" {
-		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG)
+		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG, logger.NewORGPrefix(orgID))
 		return k8sResp, errors.New(k8sInfo.ErrorMSG)
 	}
 	if len(k8sInfo.Entries) == 0 {
@@ -588,7 +588,7 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		eType := e.GetType()
 		out, err := genesiscommon.ParseCompressedInfo(e.GetCompressedInfo())
 		if err != nil {
-			log.Warningf("decode decompress error: %s", err.Error())
+			log.Warningf("decode decompress error: %s", err.Error(), logger.NewORGPrefix(orgID))
 			return map[string][]string{}, err
 		}
 		k8sResp[eType] = append(k8sResp[eType], string(out.Bytes()))

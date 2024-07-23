@@ -23,10 +23,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
-	log.Debug("get vms starting")
+	log.Debug("get vms starting", logger.NewORGPrefix(a.orgID))
 	a.vmIDToPrivateIP = map[string]string{}
 	var vms []model.VM
 	states := map[string]int{
@@ -46,7 +47,7 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
 		}
 		result, err := a.ec2Client.DescribeInstances(context.TODO(), input)
 		if err != nil {
-			log.Errorf("vm request aws api error: (%s)", err.Error())
+			log.Errorf("vm request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VM{}, err
 		}
 		retVMs = append(retVMs, result.Reservations...)
@@ -59,7 +60,7 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
 	for _, reserve := range retVMs {
 		for _, ins := range reserve.Instances {
 			if ins.Placement == nil {
-				log.Debug("placement is nil")
+				log.Debug("placement is nil", logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			azLcuuid := common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(ins.Placement.AvailabilityZone))
@@ -89,6 +90,6 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
 			a.vmIDToPrivateIP[instanceID] = a.getStringPointerValue(ins.PrivateIpAddress)
 		}
 	}
-	log.Debug("get vms complete")
+	log.Debug("get vms complete", logger.NewORGPrefix(a.orgID))
 	return vms, nil
 }

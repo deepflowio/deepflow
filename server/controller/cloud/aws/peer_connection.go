@@ -23,10 +23,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, error) {
-	log.Debug("get peer connections starting")
+	log.Debug("get peer connections starting", logger.NewORGPrefix(a.orgID))
 	var peerConnections []model.PeerConnection
 
 	var retPeerConnections []types.VpcPeeringConnection
@@ -41,7 +42,7 @@ func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, erro
 		}
 		result, err := a.ec2Client.DescribeVpcPeeringConnections(context.TODO(), input)
 		if err != nil {
-			log.Errorf("peer connection request aws api error: (%s)", err.Error())
+			log.Errorf("peer connection request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.PeerConnection{}, err
 		}
 		retPeerConnections = append(retPeerConnections, result.VpcPeeringConnections...)
@@ -58,11 +59,11 @@ func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, erro
 			peerConnectionName = peerConnectionID
 		}
 		if pData.AccepterVpcInfo == nil || pData.RequesterVpcInfo == nil {
-			log.Debug("accepter or requester vpc info is nil")
+			log.Debug("accepter or requester vpc info is nil", logger.NewORGPrefix(a.orgID))
 			continue
 		}
 		if pData.Status.Code != types.VpcPeeringConnectionStateReasonCodeActive {
-			log.Infof("peer connections (%s) status (%s) invalid", peerConnectionName, pData.Status.Code)
+			log.Infof("peer connections (%s) status (%s) invalid", peerConnectionName, pData.Status.Code, logger.NewORGPrefix(a.orgID))
 			continue
 		}
 		peerConnections = append(peerConnections, model.PeerConnection{
@@ -75,6 +76,6 @@ func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, erro
 			LocalRegionLcuuid:  a.getRegionLcuuid(common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.RequesterVpcInfo.Region))),
 		})
 	}
-	log.Debug("get peer connections complete")
+	log.Debug("get peer connections complete", logger.NewORGPrefix(a.orgID))
 	return peerConnections, nil
 }

@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getVMs() ([]model.VM, error) {
-	log.Debug("get vms starting")
+	log.Debug("get vms starting", logger.NewORGPrefix(g.orgID))
 	vms := []model.VM{}
 	vmsData := g.genesisData.VMs
 
@@ -54,6 +55,6 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 		}
 		vms = append(vms, vm)
 	}
-	log.Debug("get vms complete")
+	log.Debug("get vms complete", logger.NewORGPrefix(g.orgID))
 	return vms, nil
 }

@@ -24,35 +24,36 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork, podNetwork model.Network, err error) {
-	log.Debug("get nodes starting")
+	log.Debug("get nodes starting", logger.NewORGPrefix(k.orgID))
 	podNetworkCIDRs := []string{}
 	nodeLcuuidToHostName, err := cloudcommon.GetNodeHostNameByDomain(k.Lcuuid, k.isSubDomain, k.db)
 	if err != nil {
-		log.Warningf("get pod node hostname error : (%s)", err.Error())
+		log.Warningf("get pod node hostname error : (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
 	}
 	for _, n := range k.k8sInfo["*v1.Node"] {
 		nData, nErr := simplejson.NewJson([]byte(n))
 		if nErr != nil {
 			err = nErr
-			log.Errorf("node initialization simplejson error: (%s)", nErr.Error())
+			log.Errorf("node initialization simplejson error: (%s)", nErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 		metaData, ok := nData.CheckGet("metadata")
 		if !ok {
-			log.Info("node metadata not found")
+			log.Info("node metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uID := metaData.Get("uid").MustString()
 		if uID == "" {
-			log.Info("node uid not found")
+			log.Info("node uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		name := metaData.Get("name").MustString()
 		if name == "" {
-			log.Infof("node (%s) name not found", uID)
+			log.Infof("node (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		nodeIPItems := nData.Get("status").Get("addresses")
@@ -66,7 +67,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 			nodeIPs = append(nodeIPs, nIP)
 		}
 		if len(nodeIPs) == 0 {
-			log.Infof("node (%s) ip not found", name)
+			log.Infof("node (%s) ip not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		nodeIP := nodeIPs[0]
@@ -102,7 +103,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		}
 		cpuNum, err := strconv.Atoi(capacity.Get("cpu").MustString())
 		if err != nil {
-			log.Warningf("node (%s) cpu num transition int error", name)
+			log.Warningf("node (%s) cpu num transition int error", name, logger.NewORGPrefix(k.orgID))
 		}
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		podNode := model.PodNode{
@@ -139,7 +140,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		nodeIPv4Prefixes, nodeIPv6Prefixes, tErr := cloudcommon.TidyIPString(nodeIPs)
 		if tErr != nil {
 			err = tErr
-			log.Error("node tidy node ip Error" + tErr.Error())
+			log.Error("node tidy node ip Error"+tErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 		if len(nodeIPv4Prefixes) != 0 {
@@ -177,7 +178,7 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		podIPv4Prefixes, podIPv6Prefixes, tErr := cloudcommon.TidyIPString(podNetworkCIDRs)
 		if tErr != nil {
 			err = tErr
-			log.Error("node tidy pod ip Error" + tErr.Error())
+			log.Error("node tidy pod ip Error"+tErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 		if len(podIPv4Prefixes) != 0 {
@@ -206,6 +207,6 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 		networkLcuuid: podNetworkLcuuid,
 		cidrs:         podCIDRs,
 	}
-	log.Debug("get nodes complete")
+	log.Debug("get nodes complete", logger.NewORGPrefix(k.orgID))
 	return
 }

@@ -20,6 +20,7 @@ import (
 	r_kvstore "github.com/aliyun/alibaba-cloud-sdk-go/services/r-kvstore"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getRedisInstances(region model.Region) (
@@ -29,11 +30,11 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get redis_instances starting")
+	log.Debug("get redis_instances starting", logger.NewORGPrefix(a.orgID))
 	request := r_kvstore.CreateDescribeInstancesRequest()
 	response, err := a.getRedisResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retRedisInstances, retVInterfaces, retIPs, err
 	}
 
@@ -59,7 +60,7 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 			}
 			redisStatus := redis.Get("InstanceStatus").MustString()
 			if redisStatus != "Normal" {
-				log.Infof("redis (%s) invalid status (%s)", redisName, redisStatus)
+				log.Infof("redis (%s) invalid status (%s)", redisName, redisStatus, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			vpcId := redis.Get("VpcId").MustString()
@@ -70,7 +71,7 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 			attrRequest.InstanceId = redisId
 			attrResponse, err := a.getRedisAttributeResponse(region.Label, attrRequest)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(a.orgID))
 				return []model.RedisInstance{}, []model.VInterface{}, []model.IP{}, err
 			}
 
@@ -114,7 +115,7 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 			retIPs = append(retIPs, tmpIPs...)
 		}
 	}
-	log.Debug("get redis_instances complete")
+	log.Debug("get redis_instances complete", logger.NewORGPrefix(a.orgID))
 	return retRedisInstances, retVInterfaces, retIPs, nil
 }
 
@@ -126,7 +127,7 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 	request.InstanceId = redisId
 	response, err := a.getRedisVInterfaceResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return []model.VInterface{}, []model.IP{}, err
 	}
 

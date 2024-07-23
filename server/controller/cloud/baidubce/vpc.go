@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string, map[string]string, error) {
@@ -30,7 +31,7 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 	var vpcIdToLcuuid map[string]string
 	var vpcIdToName map[string]string
 
-	log.Debug("get vpcs starting")
+	log.Debug("get vpcs starting", logger.NewORGPrefix(b.orgID))
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -42,7 +43,7 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 		startTime := time.Now()
 		result, err := vpcClient.ListVPC(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListVPC", len(result.VPCs), startTime)
@@ -71,6 +72,6 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 			b.regionLcuuidToResourceNum[retVPC.RegionLcuuid]++
 		}
 	}
-	log.Debug("get vpcs complete")
+	log.Debug("get vpcs complete", logger.NewORGPrefix(b.orgID))
 	return retVPCs, vpcIdToLcuuid, vpcIdToName, nil
 }

@@ -19,6 +19,7 @@ package qingcloud
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.FloatingIP, error) {
@@ -26,7 +27,7 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 	var retIPs []model.IP
 	var retFloatingIPs []model.FloatingIP
 
-	log.Info("get floating_ips starting")
+	log.Info("get floating_ips starting", logger.NewORGPrefix(q.orgID))
 
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
@@ -35,7 +36,7 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 		}
 		response, err := q.GetResponse("DescribeEips", "eip_set", kwargs)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(q.orgID))
 			return nil, nil, nil, err
 		}
 
@@ -52,7 +53,7 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 				resourceId := eip.Get("resource").Get("resource_id").MustString()
 				vpcLcuuid, ok := q.vmIdToVPCLcuuid[resourceId]
 				if !ok {
-					log.Debugf("eip (%s) vpc not found", ip)
+					log.Debugf("eip (%s) vpc not found", ip, logger.NewORGPrefix(q.orgID))
 					continue
 				}
 				retFloatingIPs = append(retFloatingIPs, model.FloatingIP{
@@ -90,6 +91,6 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 		}
 	}
 
-	log.Info("get floating_ips complete")
+	log.Info("get floating_ips complete", logger.NewORGPrefix(q.orgID))
 	return retVInterfaces, retIPs, retFloatingIPs, nil
 }

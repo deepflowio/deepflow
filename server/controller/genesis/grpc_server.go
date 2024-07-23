@@ -32,6 +32,7 @@ import (
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
@@ -151,7 +152,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 
 	var localVersion uint64 = 0
 	if vtapID == 0 {
-		log.Infof("genesis sync received message with org_id %d vtap_id 0 from %s", orgID, remote)
+		log.Infof("genesis sync received message with vtap_id 0 from %s", remote, logger.NewORGPrefix(orgID))
 	} else {
 		now := time.Now()
 		if lTime, ok := g.vtapToLastSeen.Load(vtap); ok {
@@ -175,7 +176,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 
 	platformData := request.GetPlatformData()
 	if version == localVersion || platformData == nil {
-		log.Debugf("genesis sync renew version %v from ip %s org_id %d vtap_id %v", version, remote, orgID, vtapID)
+		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID, logger.NewORGPrefix(orgID))
 		g.genesisSyncQueue.Put(
 			VIFRPCMessage{
 				peer:    remote,
@@ -189,7 +190,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		return &trident.GenesisSyncResponse{Version: &localVersion}, nil
 	}
 
-	log.Infof("genesis sync received version %v -> %v from ip %s org_id %d vtap_id %v", localVersion, version, remote, orgID, vtapID)
+	log.Infof("genesis sync received version %v -> %v from ip %s vtap_id %v", localVersion, version, remote, vtapID, logger.NewORGPrefix(orgID))
 	g.genesisSyncQueue.Put(
 		VIFRPCMessage{
 			peer:         remote,
@@ -310,7 +311,7 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 		if ok {
 			localVersion = lVersion.(uint64)
 		}
-		log.Infof("kubernetes api sync received version %v -> %v from ip %s org_id %d vtap_id %v len %v", localVersion, version, remote, orgID, vtapID, len(entries))
+		log.Infof("kubernetes api sync received version %v -> %v from ip %s vtap_id %v len %v", localVersion, version, remote, vtapID, len(entries), logger.NewORGPrefix(orgID))
 
 		// 如果version有更新，但消息中没有任何kubernetes数据，触发trident重新上报数据
 		if localVersion != version && len(entries) == 0 {
@@ -331,7 +332,7 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 		g.clusterIDToVersion.Store(clusterID, version)
 		return &trident.KubernetesAPISyncResponse{Version: &version}, nil
 	} else {
-		log.Infof("kubernetes api sync received version %v from ip %s org_id %d no vtap_id", version, remote, orgID)
+		log.Infof("kubernetes api sync received version %v from ip %s no vtap_id", version, remote, logger.NewORGPrefix(orgID))
 		//正常上报数据，才推送消息到队列中
 		if len(entries) > 0 {
 			g.k8sQueue.Put(K8SRPCMessage{

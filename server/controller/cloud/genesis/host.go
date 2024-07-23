@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getHosts() ([]model.Host, error) {
-	log.Debug("get hosts starting")
+	log.Debug("get hosts starting", logger.NewORGPrefix(g.orgID))
 	hosts := []model.Host{}
 	hostsData := g.genesisData.Hosts
 
@@ -44,6 +45,6 @@ func (g *Genesis) getHosts() ([]model.Host, error) {
 		}
 		hosts = append(hosts, host)
 	}
-	log.Debug("get hosts complete")
+	log.Debug("get hosts complete", logger.NewORGPrefix(g.orgID))
 	return hosts, nil
 }

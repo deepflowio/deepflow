@@ -22,14 +22,15 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
-	log.Debug("get nat rules starting")
+	log.Debug("get nat rules starting", logger.NewORGPrefix(t.orgID))
 	var natRules []model.NATRule
 
 	if len(t.natIDs) == 0 {
-		log.Debug("not found nat gateway ids")
+		log.Debug("not found nat gateway ids", logger.NewORGPrefix(t.orgID))
 		return []model.NATRule{}, nil
 	}
 
@@ -41,7 +42,7 @@ func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
 
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGatewayDestinationIpPortTranslationNatRules", region.name, "NatGatewayDestinationIpPortTranslationNatRuleSet", true, params)
 	if err != nil {
-		log.Errorf("nat rule request tencent api error: (%s)", err.Error())
+		log.Errorf("nat rule request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.NATRule{}, err
 	}
 	for _, nData := range resp {
@@ -66,6 +67,6 @@ func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
 			FixedIPPort:      privatePort,
 		})
 	}
-	log.Debug("get nat rules complete")
+	log.Debug("get nat rules complete", logger.NewORGPrefix(t.orgID))
 	return natRules, nil
 }

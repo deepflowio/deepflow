@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RDSInstance, []model.VInterface, []model.IP, error) {
@@ -42,7 +43,7 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 		"Standard":  common.RDS_SERIES_HA,
 	}
 
-	log.Debug("get rds_instances starting")
+	log.Debug("get rds_instances starting", logger.NewORGPrefix(b.orgID))
 
 	rdsClient, _ := rds.NewClient(b.secretID, b.secretKey, "rds."+b.endpoint)
 	rdsClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -54,7 +55,7 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 		startTime := time.Now()
 		result, err := rdsClient.ListRds(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListRds", len(result.Instances), startTime)
@@ -70,21 +71,21 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 		for _, instance := range r.Instances {
 			rds, err := rdsClient.GetDetail(instance.InstanceId)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(b.orgID))
 				return nil, nil, nil, err
 			}
 			vpcLcuuid, ok := vpcIdToLcuuid[rds.VpcId]
 			if !ok {
-				//log.Debugf("rds (%s) vpc (%s) not found", rds.InstanceId, rds.VpcId)
+				//log.Debugf("rds (%s) vpc (%s) not found", rds.InstanceId, rds.VpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			if len(rds.ZoneNames) == 0 {
-				log.Debugf("rds (%s) with no zones", rds.InstanceId)
+				log.Debugf("rds (%s) with no zones", rds.InstanceId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			azLcuuid, ok := zoneNameToAZLcuuid[rds.ZoneNames[0]]
 			if !ok {
-				log.Debugf("rds (%s) zone (%s) not found", rds.InstanceId, rds.ZoneNames[0])
+				log.Debugf("rds (%s) zone (%s) not found", rds.InstanceId, rds.ZoneNames[0], logger.NewORGPrefix(b.orgID))
 				continue
 			}
 
@@ -122,12 +123,12 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 			b.regionLcuuidToResourceNum[region.Lcuuid]++
 
 			if len(rds.Subnets) == 0 {
-				log.Debugf("rds (%s) with no subnets", rds.InstanceId)
+				log.Debugf("rds (%s) with no subnets", rds.InstanceId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			networkLcuuid, ok := networkIdToLcuuid[rds.Subnets[0].SubnetId]
 			if !ok {
-				log.Debugf("rds (%s) network (%s) not found", rds.InstanceId, rds.Subnets[0].SubnetId)
+				log.Debugf("rds (%s) network (%s) not found", rds.InstanceId, rds.Subnets[0].SubnetId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 
@@ -175,6 +176,6 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 			}
 		}
 	}
-	log.Debug("get rds_instances complete")
+	log.Debug("get rds_instances complete", logger.NewORGPrefix(b.orgID))
 	return retRDSInstances, retVInterfaces, retIPs, nil
 }

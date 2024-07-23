@@ -20,16 +20,17 @@ import (
 	cbn "github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
 	var retCens []model.CEN
 
-	log.Debug("get cens starting")
+	log.Debug("get cens starting", logger.NewORGPrefix(a.orgID))
 	request := cbn.CreateDescribeCensRequest()
 	response, err := a.getCenResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return nil, err
 	}
 
@@ -51,7 +52,7 @@ func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
 			childRequest.CenId = cenId
 			childResponse, err := a.getCenAttributeResponse(region.Label, childRequest)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(a.orgID))
 				return nil, err
 			}
 
@@ -81,6 +82,6 @@ func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
 		}
 	}
 
-	log.Debug("get cens complete")
+	log.Debug("get cens complete", logger.NewORGPrefix(a.orgID))
 	return retCens, nil
 }

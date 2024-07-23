@@ -22,16 +22,17 @@ import (
 	ecs "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getRegions() ([]model.Region, error) {
 	var retRegions []model.Region
 
-	log.Debug("get regions starting")
+	log.Debug("get regions starting", logger.NewORGPrefix(a.orgID))
 	request := ecs.CreateDescribeRegionsRequest()
 	response, err := a.getRegionResponse(a.regionName, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retRegions, err
 	}
 
@@ -45,7 +46,7 @@ func (a *Aliyun) getRegions() ([]model.Region, error) {
 			if len(a.includeRegions) > 0 {
 				regionIndex := sort.SearchStrings(a.includeRegions, localName)
 				if regionIndex == len(a.includeRegions) || a.includeRegions[regionIndex] != localName {
-					log.Infof("region (%s) not in include_regions", localName)
+					log.Infof("region (%s) not in include_regions", localName, logger.NewORGPrefix(a.orgID))
 					continue
 				}
 			}
@@ -53,7 +54,7 @@ func (a *Aliyun) getRegions() ([]model.Region, error) {
 			if len(a.excludeRegions) > 0 {
 				regionIndex := sort.SearchStrings(a.excludeRegions, localName)
 				if regionIndex < len(a.excludeRegions) && a.excludeRegions[regionIndex] == localName {
-					log.Infof("region (%s) in exclude_regions", localName)
+					log.Infof("region (%s) in exclude_regions", localName, logger.NewORGPrefix(a.orgID))
 					continue
 				}
 			}
@@ -67,6 +68,6 @@ func (a *Aliyun) getRegions() ([]model.Region, error) {
 		}
 	}
 
-	log.Debug("get regions complete")
+	log.Debug("get regions complete", logger.NewORGPrefix(a.orgID))
 	return retRegions, nil
 }

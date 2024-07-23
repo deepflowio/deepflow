@@ -34,14 +34,14 @@ import (
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
-	"github.com/op/go-logging"
 	"inet.af/netaddr"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("genesis.common")
+var log = logger.MustGetLogger("genesis.common")
 
 type TeamInfo struct {
 	OrgID  int

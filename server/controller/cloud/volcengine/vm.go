@@ -21,12 +21,13 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/ecs"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
 )
 
 func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterface, []model.IP, error) {
-	log.Debug("get vms starting")
+	log.Debug("get vms starting", logger.NewORGPrefix(v.orgID))
 	var vms []model.VM
 	var vinterfaces []model.VInterface
 	var ips []model.IP
@@ -38,7 +39,7 @@ func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterfa
 		input := &ecs.DescribeInstancesInput{MaxResults: &maxResults, NextToken: nextToken}
 		result, err := ecs.New(sess).DescribeInstances(input)
 		if err != nil {
-			log.Errorf("request volcengine (ecs.DescribeInstances) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (ecs.DescribeInstances) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.VM{}, []model.VInterface{}, []model.IP{}, err
 		}
 		retVMs = append(retVMs, result.Instances...)
@@ -64,7 +65,7 @@ func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterfa
 		createStr := v.getStringPointerValue(retVM.CreatedAt)
 		createAt, err := time.ParseInLocation(time.RFC3339, createStr, time.Local)
 		if err != nil {
-			log.Infof("parse vm (%s) create at (%s) failed", vmName, createStr)
+			log.Infof("parse vm (%s) create at (%s) failed", vmName, createStr, logger.NewORGPrefix(v.orgID))
 		}
 		tags := map[string]string{}
 		for _, tag := range retVM.Tags {
@@ -146,6 +147,6 @@ func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterfa
 			RegionLcuuid:     v.regionUUID,
 		})
 	}
-	log.Debug("get vms complete")
+	log.Debug("get vms complete", logger.NewORGPrefix(v.orgID))
 	return vms, vinterfaces, ips, nil
 }
