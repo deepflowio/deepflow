@@ -628,7 +628,10 @@ vtap_group_id: g-xxxxxx
   #default-tap-type: 3
 
   ## Mirror Traffic PCP
-  ## Note: Calculate TAP value from vlan tag only if vlan pcp matches this value.
+  ## Default: 0, Range: [0, 9]
+  ## Note: When mirror-traffic-pcp <= 7 calculate TAP value from vlan tag only if vlan pcp matches this value.
+  ##   when mirror-traffic-pcp is 8 calculate TAP value from outer vlan tag, when mirror-traffic-pcp is 9
+  ##   calculate TAP value from inner vlan tag.
   #mirror-traffic-pcp: 0
 
   ## NFVGW Traffic

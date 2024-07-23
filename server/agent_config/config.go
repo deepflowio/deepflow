@@ -172,7 +172,7 @@ type StaticConfig struct {
 	L7ProtocolPorts                    map[string]string            `yaml:"l7-protocol-ports,omitempty"`
 	L7LogBlacklist                     map[string][]*L7LogBlacklist `yaml:"l7-log-blacklist,omitempty"`
 	L7ProtocolAdvancedFeatures         *L7ProtocolAdvancedFeatures  `yaml:"l7-protocol-advanced-features,omitempty"`
-	ServerPorts                        []string                     `yaml:"server-ports,omitempty"`
+	ServerPorts                        []uint16                     `yaml:"server-ports,omitempty"`
 	Ebpf                               *EbpfConfig                  `yaml:"ebpf,omitempty"`
 	OsAppTagExecUser                   *string                      `yaml:"os-app-tag-exec-user,omitempty"`
 	OsAppTagExec                       []string                     `yaml:"os-app-tag-exec,omitempty"`

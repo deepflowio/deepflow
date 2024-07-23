@@ -891,6 +891,10 @@ impl YamlConfig {
             c.l7_protocol_advanced_features.obfuscate_enabled_protocols = vec!["Redis".to_string()];
         }
 
+        if c.mirror_traffic_pcp > 9 {
+            c.mirror_traffic_pcp = 0;
+        }
+
         Ok(c)
     }
 
