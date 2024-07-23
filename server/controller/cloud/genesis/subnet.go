@@ -21,17 +21,18 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getSubnets() ([]model.Subnet, error) {
-	log.Debug("get subnets starting")
+	log.Debug("get subnets starting", logger.NewORGPrefix(g.orgID))
 	subnets := []model.Subnet{}
 
 	g.cloudStatsd.RefreshAPIMoniter("subnets", len(g.subnets), time.Time{})
 
 	for _, s := range g.subnets {
 		if s.NetworkLcuuid == "" {
-			log.Debug("network lcuuid not found")
+			log.Debug("network lcuuid not found", logger.NewORGPrefix(g.orgID))
 			continue
 		}
 		vpcLcuuid := s.VPCLcuuid
@@ -52,6 +53,6 @@ func (g *Genesis) getSubnets() ([]model.Subnet, error) {
 		}
 		subnets = append(subnets, subnet)
 	}
-	log.Debug("get subnets complete")
+	log.Debug("get subnets complete", logger.NewORGPrefix(g.orgID))
 	return subnets, nil
 }

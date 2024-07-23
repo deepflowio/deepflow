@@ -19,10 +19,11 @@ package tencent
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Subnet, []model.VInterface, error) {
-	log.Debug("get networks starting")
+	log.Debug("get networks starting", logger.NewORGPrefix(t.orgID))
 	var networks []model.Network
 	var subnets []model.Subnet
 	var netVinterfaces []model.VInterface
@@ -30,7 +31,7 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 	attrs := []string{"SubnetId", "SubnetName", "VpcId", "CidrBlock"}
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeSubnets", region.name, "SubnetSet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("network request tencent api error: (%s)", err.Error())
+		log.Errorf("network request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.Network{}, []model.Subnet{}, []model.VInterface{}, err
 	}
 	for _, nData := range resp {
@@ -81,6 +82,6 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 			})
 		}
 	}
-	log.Debug("get networks complete")
+	log.Debug("get networks complete", logger.NewORGPrefix(t.orgID))
 	return networks, subnets, netVinterfaces, nil
 }

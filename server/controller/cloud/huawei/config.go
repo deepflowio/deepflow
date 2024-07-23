@@ -22,6 +22,7 @@ import (
 	"github.com/bitly/go-simplejson"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 var DEFAULT_DOMAIN = "myhuaweicloud.com"
@@ -42,30 +43,30 @@ type Config struct {
 	IncludeRegions []string
 }
 
-func (c *Config) LoadFromString(sConf string) (err error) {
+func (c *Config) LoadFromString(orgID int, sConf string) (err error) {
 	jConf, err := simplejson.NewJson([]byte(sConf))
 	if err != nil {
-		log.Error("convert config string: %s to json failed: %v", sConf, err)
+		log.Error("convert config string: %s to json failed: %v", sConf, err, logger.NewORGPrefix(orgID))
 		return
 	}
 	c.AccountName, err = jConf.Get("account_name").String()
 	if err != nil {
-		log.Error("account_name must be specified")
+		log.Error("account_name must be specified", logger.NewORGPrefix(orgID))
 		return
 	}
 	c.IAMName, err = jConf.Get("iam_name").String()
 	if err != nil {
-		log.Error("iam_name must be specified")
+		log.Error("iam_name must be specified", logger.NewORGPrefix(orgID))
 		return
 	}
 	pswd, err := jConf.Get("password").String()
 	if err != nil {
-		log.Error("password must be specified")
+		log.Error("password must be specified", logger.NewORGPrefix(orgID))
 		return
 	}
 	dpswd, err := common.DecryptSecretKey(pswd)
 	if err != nil {
-		log.Error("decrypt password failed")
+		log.Error("decrypt password failed", logger.NewORGPrefix(orgID))
 		return
 	}
 	c.Password = dpswd
@@ -77,12 +78,12 @@ func (c *Config) LoadFromString(sConf string) (err error) {
 	c.IAMHostPrefix = strings.Split(c.IAMHost, ".")[0]
 	c.ProjectID, err = jConf.Get("project_id").String()
 	if err != nil {
-		log.Error("project_id must be specified")
+		log.Error("project_id must be specified", logger.NewORGPrefix(orgID))
 		return
 	}
 	c.ProjectName, err = jConf.Get("region_name").String()
 	if err != nil {
-		log.Error("region_name must be specified")
+		log.Error("region_name must be specified", logger.NewORGPrefix(orgID))
 		return
 	}
 	c.Domain = jConf.Get("domain").MustString()
@@ -91,7 +92,7 @@ func (c *Config) LoadFromString(sConf string) (err error) {
 	}
 	c.RegionLcuuid, err = jConf.Get("region_uuid").String()
 	if err != nil {
-		log.Error("region_uuid must be specified")
+		log.Error("region_uuid must be specified", logger.NewORGPrefix(orgID))
 		return
 	}
 	eRegions := jConf.Get("exclude_regions").MustString()

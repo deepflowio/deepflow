@@ -23,47 +23,48 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []model.PodReplicaSet, podRSCs []model.PodGroup, err error) {
-	log.Debug("get replicasets,replicasetcontrollers starting")
+	log.Debug("get replicasets,replicasetcontrollers starting", logger.NewORGPrefix(k.orgID))
 	for _, r := range k.k8sInfo["*v1.ReplicaSet"] {
 		rData, rErr := simplejson.NewJson([]byte(r))
 		if rErr != nil {
 			err = rErr
-			log.Errorf("replicaset,replicasetcontroller initialization simplejson error: (%s)", rErr.Error())
+			log.Errorf("replicaset,replicasetcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 		metaData, ok := rData.CheckGet("metadata")
 		if !ok {
-			log.Info("replicaset,replicasetcontroller metadata not found")
+			log.Info("replicaset,replicasetcontroller metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uID := metaData.Get("uid").MustString()
 		if uID == "" {
-			log.Info("replicaset,replicasetcontroller uid not found")
+			log.Info("replicaset,replicasetcontroller uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		name := metaData.Get("name").MustString()
 		if name == "" {
-			log.Infof("replicaset,replicasetcontroller (%s) name not found", uID)
+			log.Infof("replicaset,replicasetcontroller (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		replicas := rData.Get("spec").Get("replicas").MustInt()
 		if replicas == 0 {
-			log.Debugf("replicaset,replicasetcontroller (%s) is inactive", name)
+			log.Debugf("replicaset,replicasetcontroller (%s) is inactive", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		namespace := metaData.Get("namespace").MustString()
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
-			log.Infof("replicaset,replicasetcontroller (%s) namespace not found", name)
+			log.Infof("replicaset,replicasetcontroller (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		podGroups := metaData.Get("ownerReferences")
 		podGroupLcuuid := podGroups.GetIndex(0).Get("uid").MustString()
 		if len(podGroups.MustArray()) == 0 || podGroupLcuuid == "" {
-			log.Infof("replicaset,replicasetcontroller (%s) pod group not found", name)
+			log.Infof("replicaset,replicasetcontroller (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		podGroupLcuuid = common.IDGenerateUUID(k.orgID, podGroupLcuuid)
@@ -129,6 +130,6 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 		podRSs = append(podRSs, podRS)
 		k.rsLcuuidToPodGroupLcuuid[uLcuuid] = podGroupLcuuid
 	}
-	log.Debug("get replicasets,replicasetcontrollers complete")
+	log.Debug("get replicasets,replicasetcontrollers complete", logger.NewORGPrefix(k.orgID))
 	return
 }

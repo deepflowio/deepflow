@@ -23,6 +23,7 @@ import (
 	slb "github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[string]string) (
@@ -38,11 +39,11 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 		return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs, nil
 	}
 
-	log.Debug("get lbs starting")
+	log.Debug("get lbs starting", logger.NewORGPrefix(a.orgID))
 	request := slb.CreateDescribeLoadBalancersRequest()
 	response, err := a.getLBResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs, err
 	}
 
@@ -56,7 +57,7 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 				[]string{"LoadBalancerId", "LoadBalancerName", "Address", "AddressType"},
 			)
 			if err != nil {
-				log.Info(err)
+				log.Info(err, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 
@@ -85,7 +86,7 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 			// lb API本身没有返回vpc信息且后端主机无法补充时，跳过该lb
 			if vpcLcuuid == "" {
 				if tmpVPCLcuuid == "" {
-					log.Infof("get lb (%s) vpc info failed", lbId)
+					log.Infof("get lb (%s) vpc info failed", lbId, logger.NewORGPrefix(a.orgID))
 					continue
 				}
 				vpcLcuuid = tmpVPCLcuuid
@@ -141,7 +142,7 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 			retIPs = append(retIPs, retIP)
 		}
 	}
-	log.Debug("get lbs complete")
+	log.Debug("get lbs complete", logger.NewORGPrefix(a.orgID))
 	return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs, nil
 }
 
@@ -152,7 +153,7 @@ func (a *Aliyun) getLBListeners(region model.Region, lbId, lbIP string) ([]model
 	request.LoadBalancerId = lbId
 	response, err := a.getLBListenerResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return []model.LBListener{}, err
 	}
 
@@ -164,12 +165,12 @@ func (a *Aliyun) getLBListeners(region model.Region, lbId, lbIP string) ([]model
 
 			protocol := attr.Get("ListenerProtocal").MustString()
 			if protocol == "" {
-				log.Debug("no ListenerProtocal in %v", attr)
+				log.Debug("no ListenerProtocal in %v", attr, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			listenerPort := attr.Get("ListenerPort").MustInt()
 			if listenerPort == 0 {
-				log.Debug("no ListenerPort in %v", attr)
+				log.Debug("no ListenerPort in %v", attr, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			key := protocol + ":" + strconv.Itoa(listenerPort)
@@ -198,7 +199,7 @@ func (a *Aliyun) getLBTargetServers(region model.Region, lbId string, vmLcuuidTo
 	request.LoadBalancerId = lbId
 	response, err := a.getLBTargetServerResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return []model.LBTargetServer{}, "", err
 	}
 
@@ -213,7 +214,7 @@ func (a *Aliyun) getLBTargetServers(region model.Region, lbId string, vmLcuuidTo
 				[]string{"ServerId", "Port", "Protocol", "ListenerPort", "ServerIp"},
 			)
 			if err != nil {
-				log.Info(err)
+				log.Info(err, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 

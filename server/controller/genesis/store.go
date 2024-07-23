@@ -33,6 +33,7 @@ import (
 	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -278,9 +279,9 @@ func (s *SyncStorage) refreshDatabase() {
 			if len(invalidStorages) > 0 {
 				err := db.Delete(&invalidStorages).Error
 				if err != nil {
-					log.Errorf("node (%s) clean org (%d) genesis storage invalid data failed: %s", nodeIP, orgID, err)
+					log.Errorf("node (%s) clean genesis storage invalid data failed: %s", nodeIP, err, logger.NewORGPrefix(orgID))
 				} else {
-					log.Infof("node (%s) clean org (%d) genesis storage invalid data success", nodeIP, orgID)
+					log.Infof("node (%s) clean genesis storage invalid data success", nodeIP, logger.NewORGPrefix(orgID))
 				}
 			}
 		}
@@ -385,7 +386,7 @@ func (k *KubernetesStorage) Add(orgID int, newInfo KubernetesInfo) {
 	if !unTriggerFlag {
 		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
 		if err != nil {
-			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()))
+			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()), logger.NewORGPrefix(orgID))
 		}
 	}
 }
@@ -453,7 +454,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 		"version":           strconv.Itoa(int(version)),
 	}
 
-	log.Debugf("trigger cloud (%s) org (%d) kubernetes (%s) refresh version (%d)", requestUrl, orgID, clusterID, version)
+	log.Debugf("trigger cloud (%s) kubernetes (%s) refresh version (%d)", requestUrl, clusterID, version, logger.NewORGPrefix(orgID))
 
 	return gcommon.RequestGet(requestUrl, 30, queryStrings)
 }

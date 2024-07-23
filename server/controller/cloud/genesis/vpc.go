@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getVPCs() ([]model.VPC, error) {
-	log.Debug("get vpcs starting")
+	log.Debug("get vpcs starting", logger.NewORGPrefix(g.orgID))
 	vpcs := []model.VPC{}
 	vpcsData := g.genesisData.VPCs
 
@@ -42,6 +43,6 @@ func (g *Genesis) getVPCs() ([]model.VPC, error) {
 		}
 		vpcs = append(vpcs, vpc)
 	}
-	log.Debug("get vpcs complete")
+	log.Debug("get vpcs complete", logger.NewORGPrefix(g.orgID))
 	return vpcs, nil
 }

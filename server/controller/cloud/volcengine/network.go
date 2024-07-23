@@ -19,12 +19,13 @@ package volcengine
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/vpc"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
 )
 
 func (v *VolcEngine) getNetworks(sess *session.Session) ([]model.Network, []model.Subnet, error) {
-	log.Debug("get networks starting")
+	log.Debug("get networks starting", logger.NewORGPrefix(v.orgID))
 	var networks []model.Network
 	var subnets []model.Subnet
 
@@ -35,7 +36,7 @@ func (v *VolcEngine) getNetworks(sess *session.Session) ([]model.Network, []mode
 		input := &vpc.DescribeSubnetsInput{MaxResults: &maxResults, NextToken: nextToken}
 		result, err := vpc.New(sess).DescribeSubnets(input)
 		if err != nil {
-			log.Errorf("request volcengine (vpc.DescribeSubnets) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (vpc.DescribeSubnets) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.Network{}, []model.Subnet{}, err
 		}
 		retSubnets = append(retSubnets, result.Subnets...)
@@ -78,6 +79,6 @@ func (v *VolcEngine) getNetworks(sess *session.Session) ([]model.Network, []mode
 			NetworkLcuuid: networkLcuuid,
 		})
 	}
-	log.Debug("get networks complete")
+	log.Debug("get networks complete", logger.NewORGPrefix(v.orgID))
 	return networks, subnets, nil
 }

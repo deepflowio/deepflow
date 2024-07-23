@@ -23,6 +23,7 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/vpc"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]string) (
@@ -32,7 +33,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get nat_gateways starting")
+	log.Debug("get nat_gateways starting", logger.NewORGPrefix(b.orgID))
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -44,7 +45,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 		startTime := time.Now()
 		result, err := vpcClient.ListNatGateway(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListNatGateway", len(result.Nats), startTime)
@@ -60,7 +61,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 		for _, nat := range r.Nats {
 			vpcLcuuid, ok := vpcIdToLcuuid[nat.VpcId]
 			if !ok {
-				log.Debugf("nat_gateway (%s) vpc (%s) not found", nat.Id, nat.VpcId)
+				log.Debugf("nat_gateway (%s) vpc (%s) not found", nat.Id, nat.VpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			natGatewayLcuuid := common.GenerateUUIDByOrgID(b.orgID, nat.Id)
@@ -101,6 +102,6 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 			}
 		}
 	}
-	log.Debug("get nat_gateways complete")
+	log.Debug("get nat_gateways complete", logger.NewORGPrefix(b.orgID))
 	return retNATGateways, retVInterfaces, retIPs, nil
 }

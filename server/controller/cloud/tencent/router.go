@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []model.RoutingTable, error) {
-	log.Debug("get routers and tables starting")
+	log.Debug("get routers and tables starting", logger.NewORGPrefix(t.orgID))
 	var routers []model.VRouter
 	var routerTables []model.RoutingTable
 	gwTypeToDesc := map[string]string{
@@ -43,7 +44,7 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 	rtAttrs := []string{"RouteId", "DestinationCidrBlock", "GatewayType", "GatewayId"}
 	rResp, err := t.getResponse("vpc", "2017-03-12", "DescribeRouteTables", region.name, "RouteTableSet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("router request tencent api error: (%s)", err.Error())
+		log.Errorf("router request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.VRouter{}, []model.RoutingTable{}, err
 	}
 	for _, rData := range rResp {
@@ -96,6 +97,6 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 			})
 		}
 	}
-	log.Debug("get routers and tables complete")
+	log.Debug("get routers and tables complete", logger.NewORGPrefix(t.orgID))
 	return routers, routerTables, nil
 }

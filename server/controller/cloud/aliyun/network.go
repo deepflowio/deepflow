@@ -20,17 +20,18 @@ import (
 	vpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getNetworks(region model.Region) ([]model.Network, []model.Subnet, error) {
 	var retNetworks []model.Network
 	var retSubnets []model.Subnet
 
-	log.Debug("get networks starting")
+	log.Debug("get networks starting", logger.NewORGPrefix(a.orgID))
 	request := vpc.CreateDescribeVSwitchesRequest()
 	response, err := a.getNetworkResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retNetworks, retSubnets, err
 	}
 	for _, r := range response {
@@ -81,6 +82,6 @@ func (a *Aliyun) getNetworks(region model.Region) ([]model.Network, []model.Subn
 			retSubnets = append(retSubnets, retSubnet)
 		}
 	}
-	log.Debug("get networks complete")
+	log.Debug("get networks complete", logger.NewORGPrefix(a.orgID))
 	return retNetworks, retSubnets, nil
 }

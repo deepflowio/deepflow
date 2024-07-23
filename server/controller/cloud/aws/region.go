@@ -23,16 +23,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getRegions() ([]awsRegion, error) {
-	log.Debug("get regions starting")
+	log.Debug("get regions starting", logger.NewORGPrefix(a.orgID))
 	var regions []awsRegion
 
 	awsClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(a.apiDefaultRegion), config.WithHTTPClient(a.httpClient))
 	result, err := ec2.NewFromConfig(awsClientConfig).DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{})
 	if err != nil {
-		log.Errorf("region request aws api error: (%s)", err.Error())
+		log.Errorf("region request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 		return []awsRegion{}, err
 	}
 	for _, rData := range result.Regions {
@@ -42,7 +43,7 @@ func (a *Aws) getRegions() ([]awsRegion, error) {
 		if len(a.includeRegions) > 0 {
 			regionIndex := sort.SearchStrings(a.includeRegions, name)
 			if regionIndex == len(a.includeRegions) || a.includeRegions[regionIndex] != name {
-				log.Infof("region (%s) not in include_regions", name)
+				log.Infof("region (%s) not in include_regions", name, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 		}
@@ -50,7 +51,7 @@ func (a *Aws) getRegions() ([]awsRegion, error) {
 		if len(a.excludeRegions) > 0 {
 			regionIndex := sort.SearchStrings(a.excludeRegions, name)
 			if regionIndex < len(a.excludeRegions) && a.excludeRegions[regionIndex] == name {
-				log.Infof("region (%s) in exclude_regions", name)
+				log.Infof("region (%s) in exclude_regions", name, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 		}
@@ -60,6 +61,6 @@ func (a *Aws) getRegions() ([]awsRegion, error) {
 			lcuuid: lcuuid,
 		})
 	}
-	log.Debug("get regions complete")
+	log.Debug("get regions complete", logger.NewORGPrefix(a.orgID))
 	return regions, nil
 }

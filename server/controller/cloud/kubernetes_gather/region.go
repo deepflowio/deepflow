@@ -19,10 +19,11 @@ package kubernetes_gather
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getRegion() (model.Region, error) {
-	log.Debug("get region starting")
+	log.Debug("get region starting", logger.NewORGPrefix(k.orgID))
 	var region model.Region
 	if k.RegionUUID == "" {
 		k.RegionUUID = common.DEFAULT_REGION
@@ -31,6 +32,6 @@ func (k *KubernetesGather) getRegion() (model.Region, error) {
 			Name:   common.DEFAULT_REGION_NAME,
 		}
 	}
-	log.Debug("get region complete")
+	log.Debug("get region complete", logger.NewORGPrefix(k.orgID))
 	return region, nil
 }

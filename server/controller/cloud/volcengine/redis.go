@@ -19,12 +19,13 @@ package volcengine
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/redis"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
 )
 
 func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) ([]model.RedisInstance, []model.VInterface, []model.IP, error) {
-	log.Debug("get redis instances starting")
+	log.Debug("get redis instances starting", logger.NewORGPrefix(v.orgID))
 	var rediss []model.RedisInstance
 	var vinterfaces []model.VInterface
 	var ips []model.IP
@@ -34,7 +35,7 @@ func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) (
 	for {
 		result, err := redis.New(sess).DescribeDBInstances(&redis.DescribeDBInstancesInput{RegionId: &regionID, PageNumber: &pageNumber, PageSize: &pageSize})
 		if err != nil {
-			log.Errorf("request volcengine (redis.DescribeDBInstances) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (redis.DescribeDBInstances) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RedisInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 		retRediss = append(retRediss, result.Instances...)
@@ -51,7 +52,7 @@ func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) (
 
 		redisDetail, err := redis.New(sess).DescribeDBInstanceDetail(&redis.DescribeDBInstanceDetailInput{InstanceId: r.InstanceId})
 		if err != nil {
-			log.Errorf("request volcengine (redis.DescribeDBInstanceDetail) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (redis.DescribeDBInstanceDetail) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RedisInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 
@@ -96,7 +97,7 @@ func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) (
 				netType = common.VIF_TYPE_WAN
 				retRedis.PublicHost = conIP
 			default:
-				log.Infof("invalid network type (%s)", networkType)
+				log.Infof("invalid network type (%s)", networkType, logger.NewORGPrefix(v.orgID))
 				continue
 			}
 			netID := v.getStringPointerValue(con.EipId)
@@ -125,6 +126,6 @@ func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) (
 		}
 		rediss = append(rediss, retRedis)
 	}
-	log.Debug("get redis instances complete")
+	log.Debug("get redis instances complete", logger.NewORGPrefix(v.orgID))
 	return rediss, vinterfaces, ips, nil
 }

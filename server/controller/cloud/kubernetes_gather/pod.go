@@ -26,10 +26,11 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
-	log.Debug("get pods starting")
+	log.Debug("get pods starting", logger.NewORGPrefix(k.orgID))
 	podTypesMap := map[string]bool{
 		"CloneSet":              false,
 		"DaemonSet":             false,
@@ -43,7 +44,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		pData, pErr := simplejson.NewJson([]byte(p))
 		if pErr != nil {
 			err = pErr
-			log.Errorf("pod initialization simplejson error: (%s)", pErr.Error())
+			log.Errorf("pod initialization simplejson error: (%s)", pErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 
@@ -51,23 +52,23 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 
 		metaData, ok := pData.CheckGet("metadata")
 		if !ok {
-			log.Info("pod metadata not found")
+			log.Info("pod metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uID := metaData.Get("uid").MustString()
 		if uID == "" {
-			log.Info("pod uid not found")
+			log.Info("pod uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		name := metaData.Get("name").MustString()
 		if name == "" {
-			log.Infof("pod (%s) name not found", uID)
+			log.Infof("pod (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		namespace := metaData.Get("namespace").MustString()
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
-			log.Infof("pod (%s) namespace not found", name)
+			log.Infof("pod (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 
@@ -75,7 +76,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		if len(podGroups.MustArray()) == 0 {
 			providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
 			if providerType != "serverless" && providerType != "proprietary" {
-				log.Debugf("pod (%s) type (%s) ownerReferences not found or sci cluster type not support", name, providerType)
+				log.Debugf("pod (%s) type (%s) ownerReferences not found or sci cluster type not support", name, providerType, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
@@ -88,7 +89,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			}
 			resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
 			if resourceName == "" {
-				log.Debugf("sci pod (%s) not found provider resource name", name)
+				log.Debugf("sci pod (%s) not found provider resource name", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			abstractPGName := resourceName
@@ -102,12 +103,12 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		}
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
 		if ID == "" {
-			log.Infof("pod (%s) pod group not found", name)
+			log.Infof("pod (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		kind := podGroups.GetIndex(0).Get("kind").MustString()
 		if _, ok := podTypesMap[kind]; !ok {
-			log.Infof("pod group (%s) type (%s) not support", name, kind)
+			log.Infof("pod group (%s) type (%s) not support", name, kind, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		hostIP := pData.Get("status").Get("hostIP").MustString()
@@ -121,7 +122,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			podGroupLcuuid = gLcuuid
 		} else {
 			if !k.podGroupLcuuids.Contains(ID) {
-				log.Debugf("pod (%s) pod group not found", name)
+				log.Debugf("pod (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			podGroupLcuuid = ID
@@ -226,6 +227,6 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			}
 		}
 	}
-	log.Debug("get pods complete")
+	log.Debug("get pods complete", logger.NewORGPrefix(k.orgID))
 	return
 }

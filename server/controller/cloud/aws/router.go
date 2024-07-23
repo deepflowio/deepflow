@@ -24,10 +24,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.RoutingTable, error) {
-	log.Debug("get routers and tables starting")
+	log.Debug("get routers and tables starting", logger.NewORGPrefix(a.orgID))
 	a.vpcOrSubnetToRouter = map[string]string{}
 	var routers []model.VRouter
 	var routerTables []model.RoutingTable
@@ -53,7 +54,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 		}
 		result, err := a.ec2Client.DescribeRouteTables(context.TODO(), input)
 		if err != nil {
-			log.Errorf("routetable request aws api error: (%s)", err.Error())
+			log.Errorf("routetable request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VRouter{}, []model.RoutingTable{}, err
 		}
 		retRouteTables = append(retRouteTables, result.RouteTables...)
@@ -102,7 +103,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 			case route.InstanceId != nil:
 				gatewayID = *route.InstanceId
 			default:
-				log.Infof("routetable rule (%s) gateway id not found", route)
+				log.Infof("routetable rule (%s) gateway id not found", route, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			prefix := gatewayID[:strings.Index(gatewayID, "-")+1]
@@ -122,6 +123,6 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 			})
 		}
 	}
-	log.Debug("get routers and tables complete")
+	log.Debug("get routers and tables complete", logger.NewORGPrefix(a.orgID))
 	return routers, routerTables, nil
 }

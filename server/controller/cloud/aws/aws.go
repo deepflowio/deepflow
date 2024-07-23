@@ -28,14 +28,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/bitly/go-simplejson"
+
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/op/go-logging"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("cloud.aws")
+var log = logger.MustGetLogger("cloud.aws")
 
 const (
 	REGION_NAME                  = "cn-north-1"
@@ -78,25 +79,25 @@ type awsGressRule struct {
 func NewAws(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretID, err := config.Get("secret_id").String()
 	if err != nil {
-		log.Error("secret_id must be specified")
+		log.Error("secret_id must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretKey, err := config.Get("secret_key").String()
 	if err != nil {
-		log.Error("secret_key must be specified")
+		log.Error("secret_key must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	decryptSecretKey, err := common.DecryptSecretKey(secretKey)
 	if err != nil {
-		log.Error("decrypt secret_key failed (%s)", err.Error())
+		log.Error("decrypt secret_key failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
@@ -143,7 +144,7 @@ func NewAws(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Aws, 
 func (a *Aws) CheckAuth() error {
 	awsClientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(a.apiDefaultRegion), awsconfig.WithHTTPClient(a.httpClient))
 	if err != nil {
-		log.Error("client config failed (%s)", err.Error())
+		log.Error("client config failed (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 		return err
 	}
 	_, err = ec2.NewFromConfig(awsClientConfig).DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{})
@@ -206,11 +207,11 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 	}
 
 	for _, region := range regionList {
-		log.Infof("region (%s) collect starting", region.name)
+		log.Infof("region (%s) collect starting", region.name, logger.NewORGPrefix(a.orgID))
 
 		clientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(region.name), awsconfig.WithHTTPClient(a.httpClient))
 		if err != nil {
-			log.Error("client config failed (%s)", err.Error())
+			log.Error("client config failed (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return model.Resource{}, err
 		}
 		a.ec2Client = ec2.NewFromConfig(clientConfig)
@@ -335,7 +336,7 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 			resource.AZs = append(resource.AZs, azs...)
 		}
 
-		log.Infof("region (%s) collect complete", region.name)
+		log.Infof("region (%s) collect complete", region.name, logger.NewORGPrefix(a.orgID))
 	}
 
 	return resource, nil

@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	logging "github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/cloud/aliyun"
 	"github.com/deepflowio/deepflow/server/controller/cloud/aws"
 	"github.com/deepflowio/deepflow/server/controller/cloud/baidubce"
@@ -36,9 +34,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/volcengine"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("cloud.platform")
+var log = logger.MustGetLogger("cloud.platform")
 
 type Platform interface {
 	CheckAuth() error

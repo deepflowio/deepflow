@@ -33,7 +33,6 @@ import (
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/mikioh/ipaddr"
-	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm"
 	"inet.af/netaddr"
@@ -44,10 +43,11 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	controllermodel "github.com/deepflowio/deepflow/server/controller/model"
 )
 
-var log = logging.MustGetLogger("cloud.common")
+var log = logger.MustGetLogger("cloud.common")
 
 func StringStringMapKeys(m map[string]string) (keys []string) {
 	for k := range m {
@@ -255,12 +255,12 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 	for _, host := range hosts {
 		vtapCtrlIP, ok := vtapLaunchServerToCtrlIP[host.IP]
 		if !ok {
-			log.Debugf("no vtap with launch_server (%s)", host.IP)
+			log.Debugf("no vtap with launch_server (%s)", host.IP, logger.NewORGPrefix(orgID))
 			continue
 		}
 		vinterfaces, ok := hostIPToVInterfaces[vtapCtrlIP]
 		if !ok {
-			log.Debugf("no host (%s) vinterfaces in response", host.IP)
+			log.Debugf("no host (%s) vinterfaces in response", host.IP, logger.NewORGPrefix(orgID))
 			continue
 		}
 		vpcLcuuid := common.GenerateUUIDByOrgID(orgID, uuidGenerate+host.RegionLcuuid)
@@ -275,12 +275,12 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 		includeHostIP := false
 		for _, vinterface := range vinterfaces {
 			if reg == nil || !reg.MatchString(vinterface.Name) {
-				log.Debugf("vinterface name (%s) reg (%s) not match", vinterface.Name, portNameRegex)
+				log.Debugf("vinterface name (%s) reg (%s) not match", vinterface.Name, portNameRegex, logger.NewORGPrefix(orgID))
 				continue
 			}
 
 			if vinterface.IPs == "" {
-				log.Debugf("vinterface name (%s) not found ips", vinterface.Name)
+				log.Debugf("vinterface name (%s) not found ips", vinterface.Name, logger.NewORGPrefix(orgID))
 				continue
 			}
 
@@ -300,7 +300,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 				if len(ipMasks) > 1 {
 					ipAddr, err = netaddr.ParseIP(ipMasks[0])
 					if err != nil {
-						log.Debugf("parse ip (%s) failed", ipMasks[0])
+						log.Debugf("parse ip (%s) failed", ipMasks[0], logger.NewORGPrefix(orgID))
 						continue
 					}
 					ipMask = ipMasks[1]
@@ -321,7 +321,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 				for _, subnet := range subnets {
 					subnetCidr, err := netaddr.ParseIPPrefix(subnet.CIDR)
 					if err != nil {
-						log.Debugf("parse ip prefix (%s) failed", subnet.CIDR)
+						log.Debugf("parse ip prefix (%s) failed", subnet.CIDR, logger.NewORGPrefix(orgID))
 						continue
 					}
 					if subnetCidr.Contains(ipAddr) {
@@ -332,7 +332,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 				if subnetLcuuid == "" {
 					cidrParse, err := ipaddr.Parse(ip)
 					if err != nil {
-						log.Debugf("parse ip (%s) failed", ip)
+						log.Debugf("parse ip (%s) failed", ip, logger.NewORGPrefix(orgID))
 						continue
 					}
 					subnetCidr := cidrParse.First().IP.String() + "/" + ipMask
@@ -381,14 +381,14 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 		// 判断IP是否已经在当前网段中；如果不在，则生成新的网段信息
 		ipAddr, err := netaddr.ParseIP(host.IP)
 		if err != nil {
-			log.Debugf("parse ip (%s) failed", host.IP)
+			log.Debugf("parse ip (%s) failed", host.IP, logger.NewORGPrefix(orgID))
 			continue
 		}
 		subnetLcuuid := ""
 		for _, subnet := range subnets {
 			subnetCidr, err := netaddr.ParseIPPrefix(subnet.CIDR)
 			if err != nil {
-				log.Debugf("parse ip prefix (%s) failed", subnet.CIDR)
+				log.Debugf("parse ip prefix (%s) failed", subnet.CIDR, logger.NewORGPrefix(orgID))
 				continue
 			}
 			if subnetCidr.Contains(ipAddr) {
@@ -403,7 +403,7 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 			}
 			cidrParse, err := ipaddr.Parse(host.IP + "/" + ipMask)
 			if err != nil {
-				log.Debugf("parse ip (%s) failed", host.IP+"/"+ipMask)
+				log.Debugf("parse ip (%s) failed", host.IP+"/"+ipMask, logger.NewORGPrefix(orgID))
 				continue
 			}
 			subnetCidr := cidrParse.First().IP.String() + "/" + ipMask

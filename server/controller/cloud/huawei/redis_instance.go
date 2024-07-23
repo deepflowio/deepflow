@@ -23,6 +23,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface, []model.IP, error) {
@@ -51,7 +52,7 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 			name := jRedis.Get("name").MustString()
 			state, ok := stateStrToInt[jRedis.Get("status").MustString()]
 			if !ok {
-				log.Infof("exclude redis_instance: %s, state: %s", id, jRedis.Get("status").MustString())
+				log.Infof("exclude redis_instance: %s, state: %s", id, jRedis.Get("status").MustString(), logger.NewORGPrefix(h.orgID))
 				continue
 			}
 
@@ -60,14 +61,14 @@ func (h *HuaWei) getRedisInstances() ([]model.RedisInstance, []model.VInterface,
 			if len(azNames) == 1 && azNames[0] != "" {
 				azLcuuid, ok = h.toolDataSet.azNameToAZLcuuid[azNames[0]]
 				if !ok {
-					log.Infof("exclude redis_instance: %s, az: %s not found", id, azNames[0])
+					log.Infof("exclude redis_instance: %s, az: %s not found", id, azNames[0], logger.NewORGPrefix(h.orgID))
 					continue
 				}
 			}
 
 			networkLcuuid := common.IDGenerateUUID(h.orgID, jRedis.Get("subnet_id").MustString())
 			if networkLcuuid == "" {
-				log.Infof("exclude rds_instance: %s, no subnet_id", id)
+				log.Infof("exclude rds_instance: %s, no subnet_id", id, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 
