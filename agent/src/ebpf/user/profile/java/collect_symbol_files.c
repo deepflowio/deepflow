@@ -25,73 +25,78 @@
 #include "../../tracer.h"
 #include "../../socket.h"
 #include "../../proc.h"
-#include "gen_syms_file.h"
+#include "collect_symbol_files.h"
 #include "config.h"
-#include "df_jattach.h"
-
-extern int g_java_syms_write_bytes_max;
+#include "jvm_symbol_collect.h"
+#include "../perf_profiler.h"
+#include "../../elf.h"
+#include "../../load.h"
+#include "../../perf_reader.h"
+#include "../../bihash_8_8.h"
+#include "../stringifier.h"
+#include "../profile_common.h"
 
 static pthread_mutex_t list_lock;
 
 /* For Java symbols update task. */
 static struct list_head java_syms_update_tasks_head;
 
-/** Generate Java symbol file.
+/** Collect Java symbols.
  *
  * @pid Process ID
  * @ret_val
  *   Return address, used by the caller to determine subsequent processing.
  * @error_occurred
- *   'true' indicates that an error has occurred at some point,
+ *   'true' indicates that an error has occurred at some point, 
+ *          no symbol collection for this process.
  *   'false' indicates that no error has occurred.
  */
-void gen_java_symbols_file(int pid, int *ret_val, bool error_occurred)
+void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 {
 	/*
 	 * If an error has occurred at some point, no further retries will
 	 * be attempted.
 	 */
 	if (error_occurred) {
-		goto error;
-	}
-
-	*ret_val = JAVA_SYMS_OK;
-	int target_ns_pid = get_nspid(pid);
-	if (target_ns_pid < 0) {
+		*ret_val = JAVA_SYMS_COLLECT_ERR;
 		return;
 	}
 
-	char args[PERF_PATH_SZ * 2];
-	snprintf(args, sizeof(args),
-		 "%d %d," DF_AGENT_LOCAL_PATH_FMT ".map,"
-		 DF_AGENT_LOCAL_PATH_FMT ".log", pid,
-		 g_java_syms_write_bytes_max, pid, pid);
-
-	char ret_buf[1024];
-	memset(ret_buf, 0, sizeof(ret_buf));
+	*ret_val = JAVA_SYMS_COLLECT_OK;
+	bool is_new_collector;
 	u64 start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-	exec_command(DF_JAVA_ATTACH_CMD, args, ret_buf, sizeof(ret_buf));
+	if (update_java_symbol_file(pid, &is_new_collector))
+		goto error;
 	u64 end_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 
-	if (target_symbol_file_access(pid, target_ns_pid, true) != 0) {
+	if (target_symbol_file_access(pid) != 0) {
 		goto error;
 	}
 
-	i64 new_file_sz = get_local_symbol_file_sz(pid, target_ns_pid);
+	i64 new_file_sz = get_local_symbol_file_sz(pid);
 	if (new_file_sz == 0) {
 		goto error;
 	}
 
-	ebpf_info("Refreshing JAVA symbol file: " DF_AGENT_LOCAL_PATH_FMT
-		  ".map, PID %d, size %ld, cost %lu us",
-		  pid, pid, new_file_sz, (end_time - start_time) / 1000ULL);
+	if (is_new_collector) {
+		ebpf_info("Refreshing JAVA symbol file: "
+			  DF_AGENT_LOCAL_PATH_FMT
+			  ".map, PID %d, size %ld, cost %lu us", pid, pid,
+			  new_file_sz, (end_time - start_time) / 1000ULL);
+		*ret_val = JAVA_SYMS_NEW_COLLECTOR;
+	} else {
+		*ret_val = JAVA_SYMS_NEED_UPDATE;
+	}
 
-	*ret_val = JAVA_SYMS_NEED_UPDATE;
 	return;
+
 error:
-	*ret_val = JAVA_SYMS_ERR;
-	ebpf_warning("Generate Java symbol files failed. PID %d\n%s\n", pid,
-		     ret_buf);
+	if (is_new_collector)
+		*ret_val = JAVA_CREATE_COLLECTOR_ERR;
+	else
+		*ret_val = JAVA_SYMS_COLLECT_ERR;
+
+	ebpf_warning("Generate Java symbol files failed. PID %d\n", pid);
 }
 
 void clean_local_java_symbols_files(int pid)
@@ -119,6 +124,10 @@ void add_java_syms_update_task(struct symbolizer_proc_info *p_info)
 
 void java_syms_update_main(void *arg)
 {
+	// Ensure the profiler is initialized and currently running
+	while (!profiler_is_running())
+		CLIB_PAUSE();
+
 	pthread_mutex_init(&list_lock, NULL);
 	init_list_head(&java_syms_update_tasks_head);
 	struct java_syms_update_task *task;
@@ -141,17 +150,31 @@ void java_syms_update_main(void *arg)
 			/* JAVA process has not exited. */
 			if (AO_GET(&p->use) > 1) {
 				int ret;
-				gen_java_symbols_file(p->pid, &ret,
-						      p->gen_java_syms_file_err);
-				if (ret != JAVA_SYMS_ERR) {
-					if (ret == JAVA_SYMS_NEED_UPDATE)
+				collect_java_symbols(p->pid, &ret,
+						     p->gen_java_syms_file_err);
+				if (ret != JAVA_SYMS_COLLECT_ERR
+				    && ret != JAVA_CREATE_COLLECTOR_ERR) {
+					if (ret == JAVA_SYMS_NEED_UPDATE
+					    || ret == JAVA_SYMS_NEW_COLLECTOR)
 						p->cache_need_update = true;
 					else
 						p->cache_need_update = false;
 
+					if (ret != JAVA_SYMS_NEW_COLLECTOR) {
+						p->need_new_symbol_collector =
+						    false;
+					}
+
 					p->gen_java_syms_file_err = false;
 				} else {
-					p->gen_java_syms_file_err = true;
+					/*
+					 * Mark an error occurred when creating collector,
+					 * no further symbol collection for this process.
+					 */
+					if (ret == JAVA_CREATE_COLLECTOR_ERR)
+						p->gen_java_syms_file_err =
+						    true;
+
 					p->cache_need_update = false;
 				}
 

@@ -59,6 +59,7 @@ static pthread_t proc_events_pthread;	// Process exec/exit thread
  */
 static volatile uint64_t probes_act;
 
+extern __thread uword thread_index;     // for symbol pid caches hash
 extern int sys_cpus_count;
 extern bool *cpu_online;
 extern uint32_t attach_failed_count;
@@ -1213,6 +1214,7 @@ static void check_datadump_timeout(void)
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
+	thread_index = THREAD_PROC_EVENTS_HANDLE_IDX;
 	struct bpf_tracer *t = arg;
 	for (;;) {
 		/*
@@ -1795,7 +1797,6 @@ static_always_inline uint64_t clib_cpu_time_now(void)
 }
 #endif
 
-extern __thread uword thread_index;	// for symbol pid caches hash
 static void perf_buffer_read(void *arg)
 {
 	/*
@@ -1803,7 +1804,7 @@ static void perf_buffer_read(void *arg)
 	 * to monitor the perf buffer belonging to its jurisdiction.
 	 */
 	uint64_t epoll_id = (uint64_t) arg;
-	thread_index = THREAD_PROC_ACT_IDX_BASE + epoll_id;	// for bihash
+	thread_index = THREAD_SOCK_READER_IDX_BASE + epoll_id;	// for bihash
 	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL) {
 		ebpf_warning("find_bpf_tracer() error\n");

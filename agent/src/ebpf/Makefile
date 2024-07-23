@@ -93,15 +93,15 @@ OBJS := user/elf.o \
 	$(patsubst %.c,%.o,$(wildcard user/profile/extended/*.c)) \
 	user/profile/perf_profiler.o \
 	user/profile/stringifier.o \
-	user/profile/java/df_jattach.o \
-	user/profile/java/gen_syms_file.o
+	user/profile/java/jvm_symbol_collect.o \
+	user/profile/java/collect_symbol_files.o
 
 JAVA_TOOL := deepflow-jattach
-JAVA_AGENT_VERSION := 1
+JAVA_AGENT_VERSION := 2
 JAVA_AGENT_GNU_SO := df_java_agent_v$(JAVA_AGENT_VERSION).so
 JAVA_AGENT_MUSL_SO := df_java_agent_musl_v$(JAVA_AGENT_VERSION).so
 JAVA_AGENT_SO := $(JAVA_AGENT_GNU_SO) $(JAVA_AGENT_MUSL_SO)
-JAVA_AGENT_SRC := user/profile/java/agent.c
+JAVA_AGENT_SRC := user/profile/java/symbol_collect_agent.c
 JAVA_AGENT_MACROS := -DAGENT_LIB_NAME="\"$(JAVA_AGENT_GNU_SO)\"" -DAGENT_MUSL_LIB_NAME="\"$(JAVA_AGENT_MUSL_SO)\""
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
@@ -134,8 +134,7 @@ endif
 
 all: build
 
-SOCKET_TRACE_ELFS := \
-	user/socket_trace_bpf_common.c \
+SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 	user/socket_trace_bpf_3_10_0.c \
 	user/socket_trace_bpf_5_2_plus.c \
 	user/socket_trace_bpf_kylin.c
@@ -214,9 +213,9 @@ tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
-$(JAVA_TOOL): $(JAVA_AGENT_SO) user/profile/java/df_jattach.c user/log.c user/common.c libs/jattach/build/libjattach.a
+$(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/common.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)
-	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/profile/java/df_jattach.c user/log.c user/common.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
+	@$(GNU_CC) $(CFLAGS) -DJAVA_AGENT_ATTACH_TOOL user/log.c user/common.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a -o $@ -ldl -lpthread
 	@rm -rf user/profile/deepflow_jattach_bin.c
 	@./tools/bintobuffer ./$@ user/profile/deepflow_jattach_bin.c deepflow_jattach_bin
 

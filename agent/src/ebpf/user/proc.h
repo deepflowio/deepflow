@@ -73,6 +73,8 @@ struct symbolizer_proc_info {
 	/* Unknown symbols was found, and it is currently mainly used to
 	 * obtain the match of the Java process.*/
 	bool unknown_syms_found;
+	/* Is it necessary to create a new Java symbol collector? */
+	bool need_new_symbol_collector;
 	/* Expiration time (in seconds) for updating the Java symbol table */
 	u64 update_syms_table_time;
 	/* process name */

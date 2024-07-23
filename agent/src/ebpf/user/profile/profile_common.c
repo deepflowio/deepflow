@@ -34,7 +34,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
-#include "java/gen_syms_file.h"
+#include "java/collect_symbol_files.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -45,7 +45,7 @@
 #include "../table.h"
 #include <regex.h>
 #include "java/config.h"
-#include "java/df_jattach.h"
+#include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
 #include "../proc.h"
 
@@ -381,8 +381,9 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 	}
 }
 
-static void print_profiler_status(struct profiler_context *ctx,
-				  struct bpf_tracer *t, u64 iter_count)
+static void __attribute__ ((__unused__))
+print_profiler_status(struct profiler_context *ctx,
+		      struct bpf_tracer *t, u64 iter_count)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
@@ -861,14 +862,13 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			if (ctx->use_delta_time) {
 				if (ctx->sample_period > 0) {
-					((stack_trace_msg_t *) kv.
-					 msg_ptr)->count +=
-		   				(ctx->sample_period / 1000);
+					((stack_trace_msg_t *) kv.msg_ptr)->
+					    count +=
+					    (ctx->sample_period / 1000);
 				} else {
 					// Using microseconds for storage.
-					((stack_trace_msg_t *) kv.
-					 msg_ptr)->count +=
-		 				(v->duration_ns / 1000);
+					((stack_trace_msg_t *) kv.msg_ptr)->
+					    count += (v->duration_ns / 1000);
 				}
 
 			} else {
@@ -1077,7 +1077,7 @@ release_iter:
 	bpf_table_set_value(t, ctx->state_map_name,
 			    sample_count_idx, &sample_cnt_val);
 
-	print_profiler_status(ctx, t, count);
+	//print_profiler_status(ctx, t, count);
 
 	/* free all elems */
 	clean_stack_strs(&ctx->stack_str_hash);
@@ -1109,6 +1109,19 @@ bool check_profiler_regex(struct profiler_context *ctx, const char *name)
 				return true;
 			}
 		}
+	}
+
+	return false;
+}
+
+bool profiler_is_running(void)
+{
+	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
+		if (g_ctx_array[i] == NULL)
+			continue;
+		if (g_ctx_array[i]->enable_bpf_profile == 1)
+			return true;
+
 	}
 
 	return false;

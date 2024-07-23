@@ -22,6 +22,8 @@
 #include "../../kernel/include/perf_profiler.h"
 
 #define PROFILER_CTX_NUM 2
+// For storing information about continuously running profiling processes.
+#define DEEPFLOW_RUNNING_PID_PATH "/tmp/.deepflow-agent-running-pid"
 
 /*
  * stack_trace_msg_hash, used to store stack trace messages and
@@ -158,8 +160,7 @@ struct stack_ids_bitmap {
 } __attribute__((packed));
 
 int stop_continuous_profiler(void);
-int start_continuous_profiler(int freq, int java_syms_space_limit,
-			      int java_syms_update_delay,
+int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      tracer_callback_t callback);
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val);
 void release_flame_graph_hash(void);
@@ -168,4 +169,5 @@ int set_profiler_cpu_aggregation(int flag);
 struct bpf_tracer *get_profiler_tracer(void);
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
 void cpdbg_process(stack_trace_msg_t * msg);
+int check_profiler_running_pid(void);
 #endif /* DF_USER_PERF_PROFILER_H */

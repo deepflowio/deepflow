@@ -49,8 +49,8 @@
 #endif
 #include "libGoReSym.h"
 #include "profile/perf_profiler.h"
-#include "profile/java/df_jattach.h"
-#include "profile/java/gen_syms_file.h"
+#include "profile/java/jvm_symbol_collect.h"
+#include "profile/java/collect_symbol_files.h"
 #include "bihash_8_8.h"
 #include "profile/stringifier.h"
 #include "profile/profile_common.h"
@@ -535,6 +535,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->new_java_syms_file = false;
 	p->cache_need_update = false;
 	p->gen_java_syms_file_err = false;
+	p->need_new_symbol_collector = true;
 	p->lock = 0;
 	pthread_mutex_init(&p->mutex, NULL);
 	p->syms_cache = 0;
@@ -673,7 +674,9 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 		goto exit;
 	}
 
-	ebpf_info("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
+	if (p->need_new_symbol_collector)
+		ebpf_info("cache update PID %d NAME %s\n", kv->k.pid, p->comm);
+
 	add_symcache_count++;
 
 exit:

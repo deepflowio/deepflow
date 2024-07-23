@@ -23,6 +23,7 @@
 #ifndef AARCH64_MUSL
 #include <sys/stat.h>
 #include <math.h>
+#include <signal.h>		/* kill() */
 #include <bcc/perf_reader.h>
 #include "../config.h"
 #include "../utils.h"
@@ -33,7 +34,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
-#include "java/gen_syms_file.h"
+#include "java/collect_symbol_files.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -44,7 +45,7 @@
 #include "../table.h"
 #include <regex.h>
 #include "java/config.h"
-#include "java/df_jattach.h"
+#include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
 #include "../proc.h"
 
@@ -55,13 +56,11 @@
 #define CP_PERF_PG_NUM	16
 #define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
+#define DEEPFLOW_AGENT_NAME "deepflow-agent"
 
 extern int sys_cpus_count;
 struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 static struct profiler_context oncpu_ctx;
-
-/* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
-int g_java_syms_write_bytes_max;
 
 static bool g_enable_oncpu = true;
 
@@ -568,11 +567,24 @@ static struct tracer_sockopts cpdbg_sockopts = {
 	.get = cpdbg_sockopt_get,
 };
 
+// Function to check if the recorded PID and its start time are correct
+int check_profiler_running_pid(void)
+{
+	int pid = find_pid_by_name(DEEPFLOW_AGENT_NAME, getpid());
+	if (pid > 0) {
+		ebpf_warning("The deepflow-agent with process ID %d is already "
+			     "running. You can disable the continuous profiling "
+			     "feature of the deepflow-agent to skip this check.\n",
+			     pid);
+		return ETR_EXIST;
+	}
+
+	return ETR_NOTEXIST;
+}
+
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @java_syms_space_limit The maximum space occupied by the Java symbol files
- *                        in the target POD. 
  * @java_syms_update_delay To allow Java to run for an extended period and gather
  *                    more symbol information, we delay symbol retrieval when
  *                    encountering unknown symbols. The default value is
@@ -582,16 +594,23 @@ static struct tracer_sockopts cpdbg_sockopts = {
  * @returns 0 on success, < 0 on error
  */
 
-int start_continuous_profiler(int freq, int java_syms_space_limit,
-			      int java_syms_update_delay,
+int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
 	uword buffer_sz;
 
+	/*
+	 * To determine if the profiler is already running, at any given time, only
+	 * one profiler can be active due to the persistence required for Java symbol
+	 * generation, which is incompatible with multiple agents.
+	 */
+	if (check_profiler_running_pid() == ETR_EXIST)
+		exit(EXIT_FAILURE);
+
 	if (!run_conditions_check())
-		return (-1);
+		exit(EXIT_FAILURE);
 
 	memset(g_ctx_array, 0, sizeof(g_ctx_array));
 	profiler_context_init(&oncpu_ctx, ONCPU_PROFILER_NAME, LOG_CP_TAG,
@@ -600,15 +619,6 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 			      MAP_STACK_B_NAME, false, true,
 			      NANOSEC_PER_SEC / freq);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
-
-	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
-	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
-	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
-		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
-	g_java_syms_write_bytes_max =
-	    java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
-	ebpf_info("set java_syms_write_bytes_max : %d\n",
-		  g_java_syms_write_bytes_max);
 
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
 	    (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
@@ -829,7 +839,6 @@ int disable_oncpu_profiler(void)
 #include "perf_profiler.h"
 
 int start_continuous_profiler(int freq,
-			      int java_syms_space_limit,
 			      int java_syms_update_delay,
 			      tracer_callback_t callback)
 {

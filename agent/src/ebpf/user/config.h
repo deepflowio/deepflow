@@ -69,7 +69,8 @@ enum {
 //thread index for bihash
 enum {
 	THREAD_PROFILER_READER_IDX = 0,
-	THREAD_PROC_ACT_IDX_BASE = 2,
+	THREAD_PROC_EVENTS_HANDLE_IDX = 3,
+	THREAD_SOCK_READER_IDX_BASE = 4,
 };
 
 /*
