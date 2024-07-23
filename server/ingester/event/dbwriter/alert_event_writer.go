@@ -17,11 +17,13 @@
 package dbwriter
 
 import (
+	"strconv"
 	"sync/atomic"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/config"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/pool"
@@ -52,6 +54,7 @@ type AlertEventStore struct {
 	AlertPlicy   string
 	MetricValue  float64
 	EventLevel   uint8
+	TargetTags   string
 	TagStrKeys   []string
 	TagStrValues []string
 	TagIntKeys   []string
@@ -78,6 +81,7 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("alert_policy", ckdb.LowCardinalityString),
 		ckdb.NewColumn("metric_value", ckdb.Float64),
 		ckdb.NewColumn("event_level", ckdb.UInt8),
+		ckdb.NewColumn("target_tags", ckdb.String),
 
 		ckdb.NewColumn("tag_string_names", ckdb.ArrayLowCardinalityString),
 		ckdb.NewColumn("tag_string_values", ckdb.ArrayString),
@@ -98,6 +102,7 @@ func (e *AlertEventStore) WriteBlock(block *ckdb.Block) {
 		e.AlertPlicy,
 		e.MetricValue,
 		e.EventLevel,
+		e.TargetTags,
 
 		e.TagStrKeys,
 		e.TagStrValues,
@@ -115,6 +120,69 @@ func (e *AlertEventStore) Release() {
 
 func (e *AlertEventStore) OrgID() uint16 {
 	return e.OrgId
+}
+
+func (e *AlertEventStore) Table() string {
+	return common.ALERT_EVENT.TableName()
+}
+
+func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
+	// reset temporary buffers
+	flowTagInfo := &cache.FlowTagInfoBuffer
+	*flowTagInfo = flow_tag.FlowTagInfo{
+		Table:  e.Table(),
+		OrgId:  e.OrgId,
+		TeamID: e.TeamID,
+	}
+	cache.Fields = cache.Fields[:0]
+	cache.FieldValues = cache.FieldValues[:0]
+
+	// tags
+	flowTagInfo.FieldType = flow_tag.FieldTag
+
+	tagStrLen := len(e.TagStrKeys)
+	tagIntLen := len(e.TagIntKeys)
+	var name, value string
+	for i := 0; i < tagStrLen+tagIntLen; i++ {
+		if i < tagStrLen {
+			name = e.TagStrKeys[i]
+			value = e.TagStrValues[i]
+		} else {
+			name = e.TagIntKeys[i-tagStrLen]
+			value = strconv.FormatInt(e.TagIntValues[i-tagStrLen], 10)
+		}
+
+		flowTagInfo.FieldName = name
+		// tag + value
+		flowTagInfo.FieldValue = value
+		if old, ok := cache.FieldValueCache.AddOrGet(*flowTagInfo, e.Time); ok {
+			if old+cache.CacheFlushTimeout >= e.Time {
+				// If there is no new fieldValue, of course there will be no new field.
+				// So we can just skip the rest of the process in the loop.
+				continue
+			} else {
+				cache.FieldValueCache.Add(*flowTagInfo, e.Time)
+			}
+		}
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
+		tagFieldValue.Timestamp = e.Time
+		tagFieldValue.FlowTagInfo = *flowTagInfo
+		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
+
+		// only tag
+		flowTagInfo.FieldValue = ""
+		if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, e.Time); ok {
+			if old+cache.CacheFlushTimeout >= e.Time {
+				continue
+			} else {
+				cache.FieldCache.Add(*flowTagInfo, e.Time)
+			}
+		}
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
+		tagField.Timestamp = e.Time
+		tagField.FlowTagInfo = *flowTagInfo
+		cache.Fields = append(cache.Fields, tagField)
+	}
 }
 
 func GenAlertEventCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
@@ -153,6 +221,12 @@ func NewAlertEventWriter(config *config.Config) (*EventWriter, error) {
 		writerConfig:      config.CKWriterConfig,
 	}
 
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(0, common.ALERT_EVENT.String(), EVENT_DB, w.ttl, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	w.flowTagWriter = flowTagWriter
 	ckTable := GenAlertEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, common.ALERT_EVENT.TableName()))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
