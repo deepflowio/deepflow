@@ -7,6 +7,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
+* fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
 * fix: update agent commands permission [#7481](https://github.com/deepflowio/deepflow/pull/7481) by [roryye](https://github.com/roryye)
 * fix: process resource api does not response sub_domain field [#7448](https://github.com/deepflowio/deepflow/pull/7448) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -55,6 +57,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
+* feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
 * feat: prevents dirty data from increasing MySQL IO [#7499](https://github.com/deepflowio/deepflow/pull/7499) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Server exporters support tag-filter-condition config (#7492) [#7493](https://github.com/deepflowio/deepflow/pull/7493) by [ZhuoZhuoCrayon](https://github.com/ZhuoZhuoCrayon)
 * feat: agent - eBPF Remove tracing for HEAD type requests in NGINX [#7489](https://github.com/deepflowio/deepflow/pull/7489) by [yinjiping](https://github.com/yinjiping)
