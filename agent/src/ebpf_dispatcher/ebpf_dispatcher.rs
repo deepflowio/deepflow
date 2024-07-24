@@ -597,6 +597,23 @@ impl EbpfCollector {
                 info!("ebpf golang symbol proc regexp is empty, skip set")
             }
 
+            // ONLY java memory profile is supported at the moment
+            // configuration structure revision is required to support more languages (maybe one regex for each language)
+            #[cfg(feature = "extended_profile")]
+            if !config.ebpf.memory_profile.disabled {
+                info!(
+                    "ebpf set java symbol uprobe proc regexp: {}",
+                    config.ebpf.memory_profile.regex.as_str()
+                );
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_UPROBE_JAVA,
+                    CString::new(config.ebpf.memory_profile.regex.as_str().as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
+            }
+
             for i in get_all_protocol().into_iter() {
                 if l7_protocol_enabled_bitmap.is_enabled(i.protocol()) {
                     info!("l7 protocol {:?} parse enabled", i.protocol());
