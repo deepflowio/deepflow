@@ -94,7 +94,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"Prometheus 数据", // prometheus.*
 	"事件-资源变更事件",     // event.event
 	"事件-IO 事件",      // event.perf_event
-	"事件-告警事件",       // event.alarm_event
+	"事件-告警事件",       // event.alert_event
 	"应用-性能剖析",       // profile.in_process
 	"网络-网络策略",       // flow_metrics.traffic_policy
 	"日志-日志数据",       // application_log.log
@@ -639,7 +639,7 @@ func getName(interval int, collection string) (string, error) {
 		// return value: flow_log.l4_flow_log, flow_log.l7_flow_log,
 		// flow_log.l4_packet, flow_log.l7_packet,
 		// deepflow_tenant, deepflow_admin, ext_metrics, prometheus,
-		// event.event, event.perf_event, event.alarm_event
+		// event.event, event.perf_event, event.alert_event
 		return strings.TrimSuffix(collection, ".*"), nil
 	case 1: // one second
 		return "1s", nil
