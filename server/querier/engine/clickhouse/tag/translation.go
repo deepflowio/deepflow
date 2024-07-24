@@ -213,6 +213,38 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
+	// pod_service
+	for _, suffix := range []string{"", "_0", "_1"} {
+		podServiceIDSuffix := "pod_service_id" + suffix
+		podServiceNameSuffix := "pod_service" + suffix
+		tagResourceMap[podServiceIDSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"service_id"+suffix,
+				"service_id"+suffix+"!=0",
+				"service_id"+suffix+" %s %s",
+				"",
+			)}
+		tagResourceMap[podServiceNameSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64("+"service_id"+suffix+")))",
+				"service_id"+suffix+"!=0",
+				"toUInt64("+"service_id"+suffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
+				"toUInt64("+"service_id"+suffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
+			),
+			"node_type": NewTag(
+				"'pod_service'",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(11),toUInt64("+"service_id"+suffix+")))",
+				"",
+				"",
+				"",
+			),
+		}
+	}
 
 	// 服务
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
@@ -480,7 +512,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// 关联资源
-	for _, relatedResourceStr := range []string{"pod_service", "pod_ingress", "natgw", "lb", "lb_listener"} {
+	for _, relatedResourceStr := range []string{"pod_ingress", "natgw", "lb", "lb_listener"} {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
 			relatedResourceID := relatedResourceStr + "_id"
@@ -494,7 +526,6 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			nameTagTranslator := ""
 			notNullFilter := ""
 			deviceIDSuffix := "l3_device_id" + suffix
-			serviceIDSuffix := "service_id" + suffix
 			deviceTypeSuffix := "l3_device_type" + suffix
 			deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
 			if common.IsValueInSliceString(relatedResourceStr, []string{"natgw", "lb"}) {
@@ -526,37 +557,6 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						idTagTranslator,
 						notNullFilter,
 						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
-						"",
-					),
-				}
-			} else if relatedResourceStr == "pod_service" {
-				nameTagTranslator = "dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + serviceIDSuffix + ")))"
-				notNullFilter = serviceIDSuffix + "!=0"
-				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
-					"node_type": NewTag(
-						"'"+relatedResourceStr+"'",
-						"",
-						"",
-						"",
-					),
-					"icon_id": NewTag(
-						"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+serviceIDSuffix+")))",
-						"",
-						"",
-						"",
-					),
-					"default": NewTag(
-						nameTagTranslator,
-						notNullFilter,
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
-					),
-				}
-				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
-					"default": NewTag(
-						serviceIDSuffix,
-						notNullFilter,
-						"service_id"+suffix+" %s %s",
 						"",
 					),
 				}
