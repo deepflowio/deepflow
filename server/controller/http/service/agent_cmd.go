@@ -30,8 +30,6 @@ import (
 )
 
 var (
-	agentCommandTimeout = time.Second * 10
-
 	agentCMDMutex   sync.RWMutex
 	agentCMDManager = make(AgentCMDManager)
 )
@@ -250,7 +248,7 @@ func GetNamespaces(key string, requestID uint64) []*trident.LinuxNamespace {
 	return nil
 }
 
-func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
+func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, error) {
 	log.Infof("current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
@@ -277,12 +275,13 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 	}
 	manager.ExecCH <- cmdReq
 
-	timeout := time.After(agentCommandTimeout)
+	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
 	resp := &model.RemoteExecResp{}
 	for {
 		select {
-		case <-timeout:
-			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", agentCommandTimeout.Seconds())
+		case <-cmdTimeout:
+			// RemoveAllFromCMDManager(key)
+			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", timeout)
 		case _, ok := <-cmdResp.RemoteCMDDoneCH:
 			if !ok {
 				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
@@ -317,7 +316,7 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 	}
 }
 
-func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string) (string, error) {
+func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CMD string) (string, error) {
 	serverLog := fmt.Sprintf("The deepflow-server is unable to execute the `%s` command."+
 		" Detailed error information is as follows:\n\n", CMD)
 	dbInfo, err := mysql.GetDB(orgID)
@@ -341,12 +340,12 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string)
 	req.RequestId = &requestID
 	manager.ExecCH <- req
 
-	timeout := time.After(agentCommandTimeout)
+	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
 	content := ""
 	for {
 		select {
-		case <-timeout:
-			err = fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, agentCommandTimeout.Seconds())
+		case <-cmdTimeout:
+			err = fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, timeout)
 			log.Error(err)
 			return "", err
 		case _, ok := <-cmdResp.ExecDoneCH:
