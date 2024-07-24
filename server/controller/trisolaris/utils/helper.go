@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/vishvananda/netlink"
 )
 
@@ -170,12 +171,12 @@ func Grow[S ~[]E, E any](s S, n int) S {
 
 type ORGID int
 
-func (o ORGID) Logf(format string, args ...interface{}) string {
-	return fmt.Sprintf("ORGID-%d: %s", o, fmt.Sprintf(format, args...))
+func (o ORGID) Logf(format string, args ...interface{}) (string, logger.Prefix) {
+	return fmt.Sprintf(format, args...), logger.NewORGPrefix(int(o))
 }
 
-func (o ORGID) Log(logStr string) string {
-	return fmt.Sprintf("ORGID-%d: %s", o, logStr)
+func (o ORGID) Log(logStr string) (string, logger.Prefix) {
+	return logStr, logger.NewORGPrefix(int(o))
 }
 
 func (o ORGID) GetORGID() int {
