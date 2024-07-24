@@ -871,9 +871,13 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	var subDomain mysql.SubDomain
 	var dbUpdateMap = make(map[string]interface{})
 	var resourceUp = make(map[string]interface{})
-	if userID, ok := subDomainUpdate["USER_ID"]; ok {
-		dbUpdateMap["user_id"] = userID
-		resourceUp["owner_user_id"] = userID
+	// if userID, ok := subDomainUpdate["USER_ID"]; ok {
+	// 	dbUpdateMap["user_id"] = userID
+	// 	resourceUp["owner_user_id"] = userID
+	// }
+	if teamID, ok := subDomainUpdate["TEAM_ID"]; ok {
+		dbUpdateMap["team_id"] = teamID
+		resourceUp["team_id"] = teamID
 	}
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {

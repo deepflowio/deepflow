@@ -374,6 +374,7 @@ type SubDomainCreate struct {
 }
 
 type SubDomainUpdate struct {
+	TeamID int                    `json:"TEAM_ID"`
 	UserID int                    `json:"USER_ID"`
 	Config map[string]interface{} `json:"CONFIG"`
 }
