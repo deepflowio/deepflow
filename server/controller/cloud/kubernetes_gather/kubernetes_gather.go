@@ -39,7 +39,7 @@ var log = logging.MustGetLogger("cloud.kubernetes_gather")
 
 type KubernetesGather struct {
 	orgID                        int
-	teamID                       int
+	TeamID                       int
 	Name                         string
 	Lcuuid                       string
 	UuidGenerate                 string
@@ -179,7 +179,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 		Lcuuid:                lcuuid,
 		UuidGenerate:          displayName,
 		ClusterID:             clusterID,
-		teamID:                teamID,
+		TeamID:                teamID,
 		orgID:                 db.ORGID,
 		db:                    db.DB,
 		RegionUUID:            configJson.Get("region_uuid").MustString(),
@@ -235,7 +235,7 @@ func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
 
 	return statsd.StatsdStatter{
 		OrgID:      k.orgID,
-		TeamID:     k.teamID,
+		TeamID:     k.TeamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(k.cloudStatsd),
 	}
