@@ -287,7 +287,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 			}
 		}
 
-		log.Infof("ORG(id=%d database=%s) update vtap_group (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtapGroup.Name, vtapGroupUpdate)
+		log.Infof("update vtap_group (%s) config %v", vtapGroup.Name, vtapGroupUpdate, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 
 		var dbUpdateMap = make(map[string]interface{})
 		// 修改名称
@@ -374,8 +374,8 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 
 			for _, lcuuid := range delVtapLcuuids.ToSlice() {
 				vtap := lcuuidToOldVtap[lcuuid.(string)]
-				log.Infof("ORG(id=%d database=%s) update vtap group lcuuid(%s -> %s)",
-					dbInfo.ORGID, dbInfo.Name, vtap.VtapGroupLcuuid, defaultVtapGroup.Lcuuid)
+				log.Infof("update vtap group lcuuid(%s -> %s)",
+					vtap.VtapGroupLcuuid, defaultVtapGroup.Lcuuid, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 				if err = tx.Model(vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": defaultVtapGroup.Lcuuid}).Error; err != nil {
 					return err
 				}
@@ -387,8 +387,8 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 					return fmt.Errorf(
 						"agent(%s) team(%d) must equal to agent group team(%d)", vtap.Name, vtap.TeamID, vtapGroupTeamID)
 				}
-				log.Infof("ORG(id=%d database=%s) update vtap group lcuuid(%s - > %s)",
-					dbInfo.ORGID, dbInfo.Name, vtap.VtapGroupLcuuid, vtapGroup.Lcuuid)
+				log.Infof("update vtap group lcuuid(%s - > %s)",
+					vtap.VtapGroupLcuuid, vtapGroup.Lcuuid, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 				if err = tx.Model(vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": vtapGroup.Lcuuid}).Error; err != nil {
 					return err
 				}
@@ -428,7 +428,7 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 	}
 
-	log.Infof("ORG(id=%d database=%s) delete vtap_group (%s)", dbInfo.ORGID, dbInfo.Name, vtapGroup.Name)
+	log.Infof("delete vtap_group (%s)", vtapGroup.Name, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err = tx.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Updates(map[string]interface{}{
 			"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": defaultVtapGroup.TeamID}).Error; err != nil {

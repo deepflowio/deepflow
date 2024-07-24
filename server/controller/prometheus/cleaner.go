@@ -296,11 +296,11 @@ func DeleteBatch[MT any](resourceType string, db *mysql.DB, items []MT) error {
 		}
 		toDel := items[start:end]
 		if err := db.Delete(&toDel).Error; err != nil {
-			log.Errorf("mysql delete %s failed: %v", resourceType, err, db.LogPrefixORG)
+			log.Errorf("mysql delete %s failed: %v", resourceType, err, db.LogPrefixORGID)
 			return err
 		}
-		log.Infof("clear %s data count: %d", resourceType, len(toDel), db.LogPrefixORG)
-		log.Debugf("clear %s data: %#v", resourceType, toDel, db.LogPrefixORG)
+		log.Infof("clear %s data count: %d", resourceType, len(toDel), db.LogPrefixORGID)
+		log.Debugf("clear %s data: %#v", resourceType, toDel, db.LogPrefixORGID)
 	}
 
 	return nil

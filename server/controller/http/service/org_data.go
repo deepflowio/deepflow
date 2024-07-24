@@ -30,13 +30,14 @@ import (
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"gorm.io/gorm"
 )
 
 // CreateORGData create database and backs up the controller and analyzer tables.
 // Returns the database name and error.
 func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig) (string, error) {
-	log.Infof("create org (id: %d) data", dataCreate.ORGID)
+	log.Infof("create org data", logger.NewORGPrefix(dataCreate.ORGID))
 	mysql.CheckORGNumberAndLog()
 
 	defaultDatabase := mysqlCfg.Database
@@ -72,7 +73,7 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig
 }
 
 func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
-	log.Infof("delete org (id: %d) data", orgID)
+	log.Infof("delete org data", logger.NewORGPrefix(orgID))
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
 	if err = migrator.DropDatabase(cfg); err != nil {
 		return err

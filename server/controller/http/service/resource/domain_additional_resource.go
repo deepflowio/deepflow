@@ -33,6 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -73,7 +74,7 @@ func newAddtionalResourceToolDataSet(regionUUID string) *addtionalResourceToolDa
 }
 
 func ApplyDomainAddtionalResource(reqData model.AdditionalResource, orgDB *mysql.DB) error {
-	log.Infof("apply domain additional resource: %#v", reqData)
+	log.Infof("apply domain additional resource: %#v", reqData, orgDB.LogPrefixORGID)
 	domainUUIDToToolDataSet, err := generateToolDataSet(reqData, orgDB)
 	if err != nil {
 		return err
@@ -106,7 +107,7 @@ func fullUpdateDB(orgDB *mysql.DB, dbItems []mysql.DomainAdditionalResource) err
 		)
 	}
 
-	log.Debugf("apply domain additional resources success: %#v", dbItems)
+	log.Debugf("apply domain additional resources success: %#v", dbItems, orgDB.LogPrefixORGID)
 	return nil
 }
 
@@ -864,7 +865,7 @@ func generateCloudModelData(orgID int, domainUUIDToToolDataSet map[string]*addti
 		}
 
 		domainUUIDToCloudModelData[domainUUID] = cloudMD
-		log.Debugf("domain (uuid: %s) cloud data: %#v", cloudMD)
+		log.Debugf("domain (uuid: %s) cloud data: %#v", cloudMD, logger.NewORGPrefix(orgID))
 	}
 	return domainUUIDToCloudModelData, nil
 }
