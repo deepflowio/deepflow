@@ -1705,12 +1705,24 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+
+	// string_tags
 	tagResourceMap["string_tags"] = map[string]*Tag{
 		"default": NewTag(
 			"tag_int_values[indexOf(tag_string_names,'%s')]",
 			"",
 			"tag_string_values[indexOf(tag_string_names,'%s')] %s %s",
 			"%s (tag_string_values[indexOf(tag_string_names,'%s')], %s)",
+		),
+	}
+
+	// enum(event_level)
+	tagResourceMap["event_level"] = map[string]*Tag{
+		"enum": NewTag(
+			"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(event_level)), event_level)",
+			"",
+			"toUInt64(event_level) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(event_level) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		),
 	}
 
