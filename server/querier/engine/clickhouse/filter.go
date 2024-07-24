@@ -789,6 +789,60 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		}
 		return &view.Expr{Value: filter}, nil
+	} else if table == "alert_event" {
+		tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
+		tagName := strings.Trim(t.Tag, "`")
+		if !ok {
+			preAsTag, ok := asTagMap[t.Tag]
+			if ok {
+				// whereTag = preAsTag
+				tagName = preAsTag
+				tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
+			}
+		}
+		if ok {
+			switch t.Tag {
+			case "service", "chost", "router", "dhcpgw", "redis", "rds", "lb_listener",
+				"natgw", "lb", "host", "pod_node", "user", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess",
+				"pod_ingress", "pod_service", "alert_policy":
+				filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
+			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+				} else {
+					filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+				}
+			default:
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
+				} else {
+					filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+				}
+			}
+		} else {
+			switch t.Tag {
+			case "policy_type", "metric_value", "event_level", "team_id", "user_id":
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
+				} else {
+					filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+				}
+			default:
+				_, err := strconv.Atoi(t.Value)
+				if err != nil {
+					tagItem, ok = tag.GetTag("string_tags", db, table, "default")
+				} else {
+					tagItem, ok = tag.GetTag("int_tags", db, table, "default")
+				}
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, tagName, t.Value)
+				} else {
+					filter = fmt.Sprintf(tagItem.WhereTranslator, tagName, op, t.Value)
+				}
+			}
+		}
+
+		return &view.Expr{Value: filter}, nil
 	} else {
 		if t.Tag == "tap_port" {
 			t.Tag = "capture_nic"
