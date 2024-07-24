@@ -21,17 +21,17 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	logging "github.com/op/go-logging"
 	context "golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 )
 
-var log = logging.MustGetLogger("trisolaris/synchronize")
+var log = logger.MustGetLogger("trisolaris/synchronize")
 
 type TSDBEvent struct{}
 
@@ -56,7 +56,7 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 	}
 	orgTrisolaris := trisolaris.GetTrisolaris(orgID)
 	if orgTrisolaris == nil {
-		log.Errorf("ORGID-%d: not found trisolaris data", in.GetOrgId())
+		log.Errorf("not found trisolaris data", logger.NewORGPrefix(orgID))
 		return &api.SyncResponse{
 			Status: &STATUS_FAILED,
 		}, nil
@@ -74,24 +74,24 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 	versionPolicy := nodeInfo.GetPolicyVersion()
 	if versionPlatformData != in.GetVersionPlatformData() ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
-		log.Infof("ORGID-%d: ctrl_ip is %s, (platform data version %d -> %d), "+
+		log.Infof("ctrl_ip is %s, (platform data version %d -> %d), "+
 			"(acl version %d -> %d), (groups version %d -> %d), NAME:%s",
-			orgID, tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
+			tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
 			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
-			processName)
+			processName, logger.NewORGPrefix(orgID))
 	}
 
 	vTapInfo := orgTrisolaris.GetVTapInfo()
 	// 只有ingester进入数据节点注册流程，其他节点直接返回数据
 	if processName == TSDB_PROCESS_NAME {
 		log.Infof(
-			"ORGID-%d: ctrl_ip:%s, cpu_num:%d, memory_size:%d, arch:%s, os:%s, "+
+			"ctrl_ip:%s, cpu_num:%d, memory_size:%d, arch:%s, os:%s, "+
 				"kernel_version:%s, pcap_data_mount_path:%s",
 			orgID, tsdbIP, in.GetCpuNum(), in.GetMemorySize(),
 			in.GetArch(), in.GetOs(),
 			in.GetKernelVersion(),
-			in.GetTsdbReportInfo())
+			in.GetTsdbReportInfo(), logger.NewORGPrefix(orgID))
 		tsdbCache := nodeInfo.GetTSDBCache(tsdbIP)
 		// 数据节点注册
 		if tsdbCache == nil {
@@ -159,7 +159,7 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	}
 	orgTrisolaris := trisolaris.GetTrisolaris(orgID)
 	if orgTrisolaris == nil {
-		log.Errorf("ORGID-%d: not found trisolaris data", orgID)
+		log.Errorf("not found trisolaris data", logger.NewORGPrefix(orgID))
 		return &api.SyncResponse{
 			Status: &STATUS_FAILED,
 		}, nil
@@ -185,12 +185,12 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	versionPolicy := nodeInfo.GetPolicyVersion()
 	if versionPlatformData != in.GetVersionPlatformData() ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
-		log.Infof("ORGID-%d: push ctrl_ip is %s, (platform data version %d -> %d), "+
+		log.Infof("push ctrl_ip is %s, (platform data version %d -> %d), "+
 			"(acl version %d -> %d), (groups version %d -> %d), NAME:%s",
 			orgID, tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
 			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
-			processName)
+			processName, logger.NewORGPrefix(orgID))
 	}
 	configure := e.generateConfig(tsdbIP, orgID)
 	platformData := []byte{}
@@ -243,7 +243,7 @@ func (e *TSDBEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 		}
 		pushmanager.IngesterWait(orgID)
 	}
-	log.Info("exit ingester push", r.GetCtrlIp(), r.GetCtrlMac(), orgID)
+	log.Info("exit ingester push", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
 	return err
 }
 
@@ -254,7 +254,7 @@ func (e *TSDBEvent) GetUniversalTagNameMaps(ctx context.Context, in *api.Univers
 	}
 	orgTrisolaris := trisolaris.GetTrisolaris(orgID)
 	if orgTrisolaris == nil {
-		log.Errorf("ORGID-%d: not found trisolaris data", in.GetOrgId())
+		log.Errorf("not found trisolaris data", logger.NewORGPrefix(orgID))
 		return &api.UniversalTagNameMapsResponse{}, nil
 	}
 	nodeInfo := orgTrisolaris.GetNodeInfo()
@@ -263,7 +263,7 @@ func (e *TSDBEvent) GetUniversalTagNameMaps(ctx context.Context, in *api.Univers
 	}
 
 	resp := nodeInfo.GetUniversalTagNames()
-	log.Infof("ORGID-%d, UniversalTagNameVersion %d", orgID, resp.GetVersion())
+	log.Infof("UniversalTagNameVersion %d", resp.GetVersion(), logger.NewORGPrefix(orgID))
 	return resp, nil
 }
 

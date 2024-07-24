@@ -20,10 +20,11 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("common")
+var log = logger.MustGetLogger("common")
 
 type LcResponse struct {
 	OptStatus    string      `json:"OPT_STATUS"`
