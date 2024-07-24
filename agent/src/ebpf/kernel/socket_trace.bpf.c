@@ -1153,6 +1153,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (tracer_ctx == NULL)
 		return SUBMIT_INVALID;
 
+	if (tracer_ctx->disable_tracing)
+		conn_info->no_trace = true;
+
 	/*
 	 * It is possible that these values were modified during ebpf running,
 	 * so they are saved here.

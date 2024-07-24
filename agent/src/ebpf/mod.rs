@@ -680,9 +680,9 @@ extern "C" {
     ) -> c_int;
 
     pub fn enable_oncpu_profiler() -> c_int;
-
     pub fn disable_oncpu_profiler() -> c_int;
     pub fn show_collect_pool();
+    pub fn disable_syscall_trace_id() -> c_int;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "off_cpu")] {
