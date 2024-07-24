@@ -46,6 +46,12 @@
 
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
+/*
+ * Control whether to disable the tracing feature.
+ * 'true' disables the tracing feature, and 'false' enables it.
+ * The default is 'false'.
+ */
+static bool g_disable_syscall_tracing = true; // For test, disable tracing
 
 /*
  * tracer_hooks_detach() and tracer_hooks_attach() will become terrible
@@ -186,7 +192,17 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
 
 	// exit tracepoints
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
+	/*
+	 * `tracepoint/syscalls/sys_exit_socket` This is currently added only to
+	 * implement the NGINX tracing feature. If the tracing feature is disabled,
+	 * the syscall socket() interface will not be hooked.
+	 */
+	if (!g_disable_syscall_tracing)
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
+	else
+		ebpf_info("Due to the tracing feature being disabled, the"
+			  " syscall socket() will not be attached.\n");
+
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_read");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_write");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendto");
@@ -2123,10 +2139,12 @@ int running_socket_tracer(tracer_callback_t handle,
 		t_conf[cpu].coroutine_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].thread_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].data_limit_max = socket_data_limit_max;
-		t_conf[cpu].go_tracing_timeout = go_tracing_timeout;
 		t_conf[cpu].io_event_collect_mode = io_event_collect_mode;
 		t_conf[cpu].io_event_minimal_duration =
 		    io_event_minimal_duration;
+		t_conf[cpu].disable_tracing = g_disable_syscall_tracing;
+		if (!g_disable_syscall_tracing)
+			t_conf[cpu].go_tracing_timeout = go_tracing_timeout;
 	}
 
 	if (!bpf_table_set_value
@@ -2961,3 +2979,11 @@ failed:
 	     proto_type, ports, err);
 	return -1;
 }
+
+int disable_syscall_trace_id(void)
+{
+	g_disable_syscall_tracing = true;
+	ebpf_info("Disable tracing feature.\n");
+	return 0;
+}
+
