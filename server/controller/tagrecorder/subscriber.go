@@ -146,6 +146,7 @@ type Subscriber interface {
 	pubsub.ResourceBatchDeletedSubscriber
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
+	OnSubDomainTeamIDUpdated(md *message.Metadata)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
@@ -264,6 +265,18 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *mess
 		log.Errorf("get org dbinfo fail : %d", md.ORGID)
 	}
 	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
+		log.Error(err)
+	}
+}
+
+// Update team_id of resource by sub domain
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
+	var chModel CT
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+	}
+	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.SubDomainID).Update("team_id", md.TeamID).Error; err != nil {
 		log.Error(err)
 	}
 }
