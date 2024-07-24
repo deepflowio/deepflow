@@ -28,7 +28,9 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/unmarshaller"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -78,7 +80,12 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 		if err != nil {
 			return nil, err
 		}
-		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriter, exporters)
+		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, ckdb.METRICS_DB, cfg.FlowMetricsTTL.VtapApp1M, ckdb.TimeFuncTwelveHour, cfg.Base)
+		if err != nil {
+			return nil, err
+		}
+
+		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriter, exporters, appServiceTagWriter)
 	}
 
 	return &flowMetrics, nil

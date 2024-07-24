@@ -46,8 +46,9 @@ type Parser struct {
 	podID         uint32
 
 	// profileWriter.Write
-	callBack                   func([]interface{})
-	offCpuSplittingGranularity int
+	profileWriterCallback       func([]interface{})
+	appServiceTagWriterCallback func(*dbwriter.InProcessProfile)
+	offCpuSplittingGranularity  int
 
 	platformData    *grpc.PlatformInfoTable
 	inTimestamp     time.Time
@@ -72,7 +73,9 @@ func (p *Parser) Put(ctx context.Context, i *storage.PutInput) error {
 			stack[i], stack[j] = stack[j], stack[i]
 		}
 		inProcesses := p.stackToInProcess(i, stack, self)
-		p.callBack(inProcesses)
+		p.profileWriterCallback(inProcesses)
+		// in the same batch, app_service is the same and only needs to be written once.
+		p.appServiceTagWriterCallback(inProcesses[0].(*dbwriter.InProcessProfile))
 	})
 	return nil
 }
