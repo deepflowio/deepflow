@@ -74,8 +74,8 @@ static void openssl_parse_and_register(int pid, struct tracer_probes_conf *conf)
 	ebpf_info("openssl uprobe, pid:%d, path:%s\n", pid, path);
 	add_probe_sym_to_tracer_probes(pid, path, conf, symbols, NELEMS(symbols));
 
-out:
 	free(path);
+out:
 	return;
 }
 
