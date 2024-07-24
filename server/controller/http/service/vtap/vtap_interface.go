@@ -88,11 +88,11 @@ func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterfac
 	var vtapVIFs []model.VTapInterface
 	vtapVIFs = append(vtapVIFs, v.formatVTapVInterfaces(masterRegionVVIFs, filter, toolDS)...)
 	for slaveRegion, regionControllerIPs := range slaveRegionLcuuidToHealthyControllerIPs {
-		log.Info(v.db.Logf("get region (lcuuid: %s) vtap interfaces", slaveRegion))
+		log.Infof("get region (lcuuid: %s) vtap interfaces", slaveRegion, v.db.LogPrefixORGID)
 		for _, ip := range regionControllerIPs {
 			err := common.IsTCPActive(ip, common.GConfig.HTTPNodePort)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error(err.Error(), v.db.LogPrefixORGID)
 			} else {
 				vtapVIFs = append(vtapVIFs, v.formatVTapVInterfaces(v.getRawVTapVinterfacesByRegion(ip, common.GConfig.HTTPNodePort, syncAPIQuery), filter, toolDS)...)
 				break
@@ -117,7 +117,7 @@ func (v *VTapInterface) formatSyncAPIQuery(filter map[string]interface{}) (query
 	if _, ok := filter["team_id"]; ok {
 		teamID, _ := filter["team_id"].(int)
 		if _, ok := unauthorizedTeamIDs[teamID]; ok {
-			log.Info(v.db.Logf("no permission, drop all data"))
+			log.Infof("no permission, drop all data", v.db.LogPrefixORGID)
 			return "", true, nil
 		}
 		return fmt.Sprintf("team_id_filter=whitelist&team_id=%s", teamID), false, nil
@@ -139,7 +139,7 @@ func (v *VTapInterface) getRawVTapVinterfacesByRegion(host string, port int, que
 	if queryStr != "" {
 		url += "?" + queryStr
 	}
-	log.Info(v.db.Logf("get vtap interfaces: %s", url))
+	log.Infof("get vtap interfaces: %s", url, v.db.LogPrefixORGID)
 	resp, err := common.CURLPerform(
 		"GET",
 		url,
@@ -149,11 +149,11 @@ func (v *VTapInterface) getRawVTapVinterfacesByRegion(host string, port int, que
 		common.WithHeader(common.HEADER_KEY_X_ORG_ID, fmt.Sprintf("%d", v.userInfo.ORGID)),
 	)
 	if err != nil {
-		log.Error(v.db.Logf("get genesis vinterface failed: %s, %s", err.Error(), url))
+		log.Errorf("get genesis vinterface failed: %s, %s", err.Error(), url, v.db.LogPrefixORGID)
 		return simplejson.New()
 	}
 	if len(resp.Get("DATA").MustArray()) == 0 {
-		log.Warning(v.db.Logf("no data in curl response"))
+		log.Warningf("no data in curl response", v.db.LogPrefixORGID)
 		return simplejson.New()
 	}
 	return resp.Get("DATA")
@@ -172,7 +172,7 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 		vtapID := jVIF.Get("VTAP_ID").MustInt()
 		lastSeen, err := time.Parse(time.RFC3339, jVIF.Get("LAST_SEEN").MustString())
 		if err != nil {
-			log.Error(v.db.Logf("parse time (%s) failed: %s", jVIF.Get("LAST_SEEN").MustString(), err.Error()))
+			log.Errorf("parse time (%s) failed: %s", jVIF.Get("LAST_SEEN").MustString(), err.Error(), v.db.LogPrefixORGID)
 		}
 		vtapVIF := model.VTapInterface{
 			ID:       jVIF.Get("ID").MustInt(),
@@ -224,7 +224,7 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 						}
 					}
 					if macVIF == nil {
-						log.Warning(v.db.Logf("vif with mac: %s not found", vtapVIF.MAC))
+						log.Warningf("vif with mac: %s not found", vtapVIF.MAC, v.db.LogPrefixORGID)
 						continue
 					}
 				}
@@ -269,7 +269,7 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 				}
 			}
 		} else if vtapID != 0 {
-			log.Error(v.db.Logf("vtap (%d) not found", vtapID))
+			log.Errorf("vtap (%d) not found", vtapID, v.db.LogPrefixORGID)
 		}
 		vtapVIFs = append(vtapVIFs, vtapVIF)
 	}
@@ -320,7 +320,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 	}
 	var vtaps []*mysql.VTap
 	if err = db.Unscoped().Find(&vtaps).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("vtap", err)))
+		log.Error(dbQueryResourceFailed("vtap", err), db.LogPrefixORGID)
 		return
 	}
 	for _, vtap := range vtaps {
@@ -329,7 +329,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var vifs []*mysql.VInterface
 	if err = db.Select("mac", "deviceid", "devicetype").Unscoped().Find(&vifs).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("vinterface", err)))
+		log.Error(dbQueryResourceFailed("vinterface", err), db.LogPrefixORGID)
 		return
 	}
 	for _, vif := range vifs {
@@ -338,7 +338,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var hosts []*mysql.Host
 	if err = db.Select("id", "name").Unscoped().Find(&hosts).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("host_device", err)))
+		log.Error(dbQueryResourceFailed("host_device", err), db.LogPrefixORGID)
 		return
 	}
 	for _, host := range hosts {
@@ -347,7 +347,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var vms []*mysql.VM
 	if err = db.Select("id", "name", "launch_server").Unscoped().Find(&vms).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("vm", err)))
+		log.Error(dbQueryResourceFailed("vm", err), db.LogPrefixORGID)
 		return
 	}
 	for _, vm := range vms {
@@ -357,7 +357,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var podNodes []*mysql.PodNode
 	if err = db.Select("id", "name").Unscoped().Find(&podNodes).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("pod_node", err)))
+		log.Error(dbQueryResourceFailed("pod_node", err), db.LogPrefixORGID)
 		return
 	}
 	for _, podNode := range podNodes {
@@ -366,7 +366,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var vmPodNodeConns []*mysql.VMPodNodeConnection
 	if err = db.Unscoped().Find(&vmPodNodeConns).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("vm_pod_node_connection", err)))
+		log.Error(dbQueryResourceFailed("vm_pod_node_connection", err), db.LogPrefixORGID)
 		return
 	}
 	for _, conn := range vmPodNodeConns {
@@ -376,7 +376,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var vrouters []*mysql.VRouter
 	if err = db.Select("id", "name").Unscoped().Find(&vrouters).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("vrouter", err)))
+		log.Error(dbQueryResourceFailed("vrouter", err), db.LogPrefixORGID)
 		return
 	}
 	for _, v := range vrouters {
@@ -385,7 +385,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var dhcpPorts []*mysql.DHCPPort
 	if err = db.Select("id", "name").Unscoped().Find(&dhcpPorts).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("dhcp_port", err)))
+		log.Error(dbQueryResourceFailed("dhcp_port", err), db.LogPrefixORGID)
 		return
 	}
 	for _, d := range dhcpPorts {
@@ -394,7 +394,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var ngws []*mysql.NATGateway
 	if err = db.Select("id", "name").Unscoped().Find(&ngws).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("nat_gateway", err)))
+		log.Error(dbQueryResourceFailed("nat_gateway", err), db.LogPrefixORGID)
 		return
 	}
 	for _, n := range ngws {
@@ -403,7 +403,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var lbs []*mysql.LB
 	if err = db.Select("id", "name").Unscoped().Find(&lbs).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("lb", err)))
+		log.Error(dbQueryResourceFailed("lb", err), db.LogPrefixORGID)
 		return
 	}
 	for _, lb := range lbs {
@@ -412,7 +412,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var rdsInstances []*mysql.RDSInstance
 	if err = db.Select("id", "name").Unscoped().Find(&rdsInstances).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("rds_instance", err)))
+		log.Error(dbQueryResourceFailed("rds_instance", err), db.LogPrefixORGID)
 		return
 	}
 	for _, r := range rdsInstances {
@@ -421,7 +421,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var redisInstances []*mysql.RedisInstance
 	if err = db.Select("id", "name").Unscoped().Find(&redisInstances).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("redis_instance", err)))
+		log.Error(dbQueryResourceFailed("redis_instance", err), db.LogPrefixORGID)
 		return
 	}
 	for _, r := range redisInstances {
@@ -430,7 +430,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var podServices []*mysql.PodService
 	if err = db.Select("id", "name").Unscoped().Find(&podServices).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("pod_service", err)))
+		log.Error(dbQueryResourceFailed("pod_service", err), db.LogPrefixORGID)
 		return
 	}
 	for _, p := range podServices {
@@ -439,7 +439,7 @@ func newToolDataSet(db *mysql.DB) (toolDS *vpToolDataSet, err error) {
 
 	var pods []*mysql.Pod
 	if err = db.Select("id", "name", "pod_node_id").Unscoped().Find(&pods).Error; err != nil {
-		log.Error(db.Log(dbQueryResourceFailed("pod", err)))
+		log.Error(dbQueryResourceFailed("pod", err), db.LogPrefixORGID)
 		return
 	}
 	for _, p := range pods {

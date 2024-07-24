@@ -726,7 +726,7 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 	if ret.Error != nil {
 		ret = db.Where("vtap_group_lcuuid = ?", lcuuid).First(realConfig)
 		if ret.Error != nil {
-			log.Errorf("vtap group configuration(%s) not found", lcuuid)
+			log.Errorf("vtap group configuration(%s) not found", lcuuid, dbInfo.LogPrefixORGID)
 			realConfig = &agent_config.AgentGroupConfigModel{}
 		}
 	}

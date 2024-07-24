@@ -41,7 +41,7 @@ func addBatch[T constraint.OperateBatchModel](db *mysql.DB, toAdd []*T, resource
 		if err != nil {
 			return err
 		}
-		log.Infof("add %d %s success", len(oneP), resourceType, db.LogPrefixORG)
+		log.Infof("add %d %s success", len(oneP), resourceType, db.LogPrefixORGID)
 	}
 	return nil
 }

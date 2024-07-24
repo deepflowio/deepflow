@@ -54,10 +54,10 @@ func InitDefaultDB(cfg config.MySqlConfig) error {
 
 type DB struct {
 	*gorm.DB
-	ORGID         int
-	Name          string
-	LogPrefixORG  logger.Prefix
-	LogPrefixName logger.Prefix
+	ORGID          int
+	Name           string
+	LogPrefixORGID logger.Prefix
+	LogPrefixName  logger.Prefix
 }
 
 func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {

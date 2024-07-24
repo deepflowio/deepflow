@@ -291,7 +291,7 @@ func getResourceFromDB(orgDB *mysql.DB) (map[string]*cloudmodel.AdditionalResour
 		}
 		additionalResource := &cloudmodel.AdditionalResource{}
 		if err := json.Unmarshal(content, &additionalResource); err != nil {
-			log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", item.Domain, err.Error())
+			log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", item.Domain, err.Error(), orgDB.LogPrefixORGID)
 			continue
 		}
 		domainToResource[item.Domain] = additionalResource
