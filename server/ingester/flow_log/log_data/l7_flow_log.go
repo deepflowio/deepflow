@@ -283,7 +283,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),
 		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetComment("app service"),
-		ckdb.NewColumn("app_instance", ckdb.String).SetComment("app instance"),
+		ckdb.NewColumn("app_instance", ckdb.LowCardinalityString).SetComment("app instance"),
 
 		ckdb.NewColumn("response_duration", ckdb.UInt64),
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),

@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	exportcommon "github.com/deepflowio/deepflow/server/ingester/exporters/common"
 	exportconfig "github.com/deepflowio/deepflow/server/ingester/exporters/config"
+	flowlogcommon "github.com/deepflowio/deepflow/server/ingester/flow_log/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
@@ -76,18 +77,19 @@ type Counter struct {
 }
 
 type Decoder struct {
-	index         int
-	msgType       datatype.MessageType
-	dataSourceID  uint32
-	platformData  *grpc.PlatformInfoTable
-	inQueue       queue.QueueReader
-	throttler     *throttler.ThrottlingQueue
-	flowTagWriter *flow_tag.FlowTagWriter
-	spanWriter    *dbwriter.SpanWriter
-	spanBuf       []interface{}
-	exporters     *exporters.Exporters
-	cfg           *config.Config
-	debugEnabled  bool
+	index               int
+	msgType             datatype.MessageType
+	dataSourceID        uint32
+	platformData        *grpc.PlatformInfoTable
+	inQueue             queue.QueueReader
+	throttler           *throttler.ThrottlingQueue
+	flowTagWriter       *flow_tag.FlowTagWriter
+	appServiceTagWriter *flow_tag.AppServiceTagWriter
+	spanWriter          *dbwriter.SpanWriter
+	spanBuf             []interface{}
+	exporters           *exporters.Exporters
+	cfg                 *config.Config
+	debugEnabled        bool
 
 	agentId, orgId, teamId uint16
 
@@ -104,26 +106,28 @@ func NewDecoder(
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
 	flowTagWriter *flow_tag.FlowTagWriter,
+	appServiceTagWriter *flow_tag.AppServiceTagWriter,
 	spanWriter *dbwriter.SpanWriter,
 	exporters *exporters.Exporters,
 	cfg *config.Config,
 ) *Decoder {
 	return &Decoder{
-		index:          index,
-		msgType:        msgType,
-		dataSourceID:   exportconfig.FlowLogMessageToDataSourceID(msgType),
-		platformData:   platformData,
-		inQueue:        inQueue,
-		throttler:      throttler,
-		flowTagWriter:  flowTagWriter,
-		spanWriter:     spanWriter,
-		spanBuf:        make([]interface{}, 0, BUFFER_SIZE),
-		exporters:      exporters,
-		cfg:            cfg,
-		debugEnabled:   log.IsEnabledFor(logging.DEBUG),
-		fieldsBuf:      make([]interface{}, 0, 64),
-		fieldValuesBuf: make([]interface{}, 0, 64),
-		counter:        &Counter{},
+		index:               index,
+		msgType:             msgType,
+		dataSourceID:        exportconfig.FlowLogMessageToDataSourceID(msgType),
+		platformData:        platformData,
+		inQueue:             inQueue,
+		throttler:           throttler,
+		flowTagWriter:       flowTagWriter,
+		appServiceTagWriter: appServiceTagWriter,
+		spanWriter:          spanWriter,
+		spanBuf:             make([]interface{}, 0, BUFFER_SIZE),
+		exporters:           exporters,
+		cfg:                 cfg,
+		debugEnabled:        log.IsEnabledFor(logging.DEBUG),
+		fieldsBuf:           make([]interface{}, 0, 64),
+		fieldValuesBuf:      make([]interface{}, 0, 64),
+		counter:             &Counter{},
 	}
 }
 
@@ -268,6 +272,7 @@ func (d *Decoder) sendOpenMetetry(tracesData *v1.TracesData) {
 			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
 			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+			d.appServiceTagWrite(l)
 			d.spanWrite(l)
 		}
 		l.Release()
@@ -346,6 +351,16 @@ func (d *Decoder) spanWrite(l *log_data.L7FlowLog) {
 	}
 }
 
+func (d *Decoder) appServiceTagWrite(l *log_data.L7FlowLog) {
+	if d.appServiceTagWriter == nil {
+		return
+	}
+	if l.AppService == "" && l.AppInstance == "" {
+		return
+	}
+	d.appServiceTagWriter.Write(l.Time, flowlogcommon.L7_FLOW_ID.String(), l.AppService, l.AppInstance, l.OrgId, l.TeamID)
+}
+
 func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
@@ -360,6 +375,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
 			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 		}
+		d.appServiceTagWrite(l)
 		d.export(l)
 		d.spanWrite(l)
 	}
