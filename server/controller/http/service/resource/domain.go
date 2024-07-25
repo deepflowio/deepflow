@@ -934,12 +934,6 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 		return nil, err
 	}
 
-	// 更新domain DB
-	err = db.Model(&subDomain).Updates(dbUpdateMap).Error
-	if err != nil {
-		return nil, err
-	}
-
 	// pub to tagrecorder
 	teamIDInt := int(teamID.(float64))
 	if teamIDInt != subDomain.TeamID {
@@ -947,6 +941,12 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 		for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
 			s.OnSubDomainTeamIDUpdated(metadata)
 		}
+	}
+
+	// 更新domain DB
+	err = db.Model(&subDomain).Updates(dbUpdateMap).Error
+	if err != nil {
+		return nil, err
 	}
 
 	response, _ := GetSubDomains(db, []int{}, map[string]interface{}{"lcuuid": lcuuid})
