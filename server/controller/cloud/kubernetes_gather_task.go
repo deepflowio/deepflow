@@ -56,6 +56,7 @@ func NewKubernetesGatherTask(
 	return &KubernetesGatherTask{
 		basicInfo: kmodel.KubernetesGatherBasicInfo{
 			Name:                  kubernetesGather.Name,
+			TeamID:                kubernetesGather.TeamID,
 			Lcuuid:                kubernetesGather.Lcuuid,
 			ClusterID:             kubernetesGather.ClusterID,
 			PortNameRegex:         kubernetesGather.PortNameRegex,

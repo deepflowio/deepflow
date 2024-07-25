@@ -888,9 +888,14 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	var subDomain mysql.SubDomain
 	var dbUpdateMap = make(map[string]interface{})
 	var resourceUp = make(map[string]interface{})
-	if userID, ok := subDomainUpdate["USER_ID"]; ok {
-		dbUpdateMap["user_id"] = userID
-		resourceUp["owner_user_id"] = userID
+	// if userID, ok := subDomainUpdate["USER_ID"]; ok {
+	// 	dbUpdateMap["user_id"] = userID
+	// 	resourceUp["owner_user_id"] = userID
+	// }
+	teamID, ok := subDomainUpdate["TEAM_ID"]
+	if ok {
+		dbUpdateMap["team_id"] = teamID
+		resourceUp["team_id"] = teamID
 	}
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
@@ -933,6 +938,15 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 	err = db.Model(&subDomain).Updates(dbUpdateMap).Error
 	if err != nil {
 		return nil, err
+	}
+
+	// pub to tagrecorder
+	teamIDInt := int(teamID.(float64))
+	if teamIDInt != subDomain.TeamID {
+		metadata := message.NewMetadata(db.ORGID, message.MetadataSubDomainID(subDomain.ID), message.MetadataTeamID(teamIDInt))
+		for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
+			s.OnSubDomainTeamIDUpdated(metadata)
+		}
 	}
 
 	response, _ := GetSubDomains(db, []int{}, map[string]interface{}{"lcuuid": lcuuid})

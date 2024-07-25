@@ -61,6 +61,8 @@ controller:
   #all-agent-connect-to-nat-ip: false
   ## If no-ip-overlapping is set to true, All IP and cidr issued by the controller to agent are wan
   #no-ip-overlapping: false
+  ## exec agent command timeout
+  # agent-cmd-timeout: 30
 
   # ingester plaform data, default: 0
   # 0 (All K8s Cluster)
