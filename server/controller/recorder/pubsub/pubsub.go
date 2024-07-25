@@ -61,14 +61,28 @@ func (p *PubSubComponent) Unsubscribe(topic int, subscriber interface{}) {
 	}
 }
 
-// PubSub interface for the whole cloud platform
-type DomainPubSub interface {
+// AnyChangePubSub interface for a whole platform such as domain, subdomain
+type AnyChangePubSub interface {
 	PubSub
-	PublishChange(*message.Metadata) // publish any change of the cloud platform, only notify the fact that the cloud platform has been changed, without specific changed data.
+	PublishChange(*message.Metadata) // publish any change of a platform, only notify the fact that the cloud platform has been changed, without specific changed data.
+}
+
+type AnyChangePubSubComponent struct {
+	PubSubComponent
+}
+
+func (p *AnyChangePubSubComponent) PublishChange(md *message.Metadata) {
+	for topic, subs := range p.subscribers {
+		if topic == TopicPlatformResourceChanged {
+			for _, sub := range subs {
+				sub.(AnyChangedSubscriber).OnAnyChanged(md)
+			}
+		}
+	}
 }
 
 const (
-	TopicResourceChanged              = iota // subscribe to this topic to get notification of resource changed
+	TopicPlatformResourceChanged      = iota // subscribe to this topic to get notification of resource changed
 	TopicResourceBatchAddedMySQL             // subscribe to this topic to get MySQL model data of resource batch added
 	TopicResourceUpdatedFields               // subscribe to this topic to get message update model data of resource updated
 	TopicResourceUpdatedMessageUpdate        // subscribe to this topic to get message update model data of resource updated
@@ -76,7 +90,7 @@ const (
 	TopicResourceBatchDeletedMySQL           // subscribe to this topic to get MySQL model data of resource batch deleted
 )
 
-// Pubsub interface for a specific resource
+// ResourcePubSub interface for a specific resource
 type ResourcePubSub[
 	MAPT constraint.AddPtr[MAT],
 	MAT constraint.Add,
@@ -88,7 +102,7 @@ type ResourcePubSub[
 	MDT constraint.Delete,
 ] interface {
 	PubSub
-	PublishChange(*message.Metadata)             // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
+	// PublishChange(*message.Metadata)             // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
 	PublishBatchAdded(*message.Metadata, MAPT)   // publish resource batch added notification, including specific data
 	PublishUpdated(*message.Metadata, MUPT)      // publish resource updated notification, including specific data
 	PublishBatchDeleted(*message.Metadata, MDPT) // publish resource batch deleted notification, including specific data
@@ -106,16 +120,6 @@ type ResourcePubSubComponent[
 ] struct {
 	resourceType string
 	PubSubComponent
-}
-
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishChange(md *message.Metadata) {
-	for topic, subs := range p.subscribers {
-		if topic == TopicResourceChanged {
-			for _, sub := range subs {
-				sub.(ResourceChangedSubscriber).OnResourceChanged(md, nil)
-			}
-		}
-	}
 }
 
 func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchAdded(md *message.Metadata, msg MAPT) {

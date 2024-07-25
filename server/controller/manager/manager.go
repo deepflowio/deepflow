@@ -34,23 +34,20 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	recordercfg "github.com/deepflowio/deepflow/server/controller/recorder/config"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 var log = logger.MustGetLogger("manager")
 
 type Manager struct {
-	cfg                config.ManagerConfig
-	taskMap            map[string]*Task
-	mutex              sync.RWMutex
-	resourceEventQueue *queue.OverwriteQueue
+	cfg     config.ManagerConfig
+	taskMap map[string]*Task
+	mutex   sync.RWMutex
 }
 
-func NewManager(cfg config.ManagerConfig, resourceEventQueue *queue.OverwriteQueue) *Manager {
+func NewManager(cfg config.ManagerConfig) *Manager {
 	return &Manager{
-		cfg:                cfg,
-		taskMap:            make(map[string]*Task),
-		resourceEventQueue: resourceEventQueue,
+		cfg:     cfg,
+		taskMap: make(map[string]*Task),
 	}
 }
 
@@ -229,7 +226,7 @@ func (m *Manager) run(ctx context.Context) {
 		for _, lcuuid := range addDomainLcuuids.ToSlice() {
 			addedLcuuid := lcuuid.(string)
 			domain := lcuuidToDomain[addedLcuuid]
-			task := NewTask(orgID, domain, m.cfg.TaskCfg, ctx, m.resourceEventQueue)
+			task := NewTask(orgID, domain, m.cfg.TaskCfg, ctx)
 			if task == nil || task.Cloud == nil {
 				log.Errorf("domain (%s) init failed", domain.Name, logger.NewORGPrefix(orgID))
 				continue
@@ -252,7 +249,7 @@ func (m *Manager) run(ctx context.Context) {
 				log.Infof("domain (%s) oldDomainConfig: %s", newDomain.Name, oldDomainConfig, logger.NewORGPrefix(orgID))
 				log.Infof("domain (%s) newDomainConfig: %s", newDomain.Name, newDomain.Config, logger.NewORGPrefix(orgID))
 				m.taskMap[domainLcuuid].Stop()
-				task := NewTask(orgID, newDomain, m.cfg.TaskCfg, ctx, m.resourceEventQueue)
+				task := NewTask(orgID, newDomain, m.cfg.TaskCfg, ctx)
 				if task == nil || task.Cloud == nil {
 					log.Errorf("domain (%s) init failed", newDomain.Name, logger.NewORGPrefix(orgID))
 					continue
@@ -268,7 +265,7 @@ func (m *Manager) run(ctx context.Context) {
 				if oldDomainName != newDomain.Name {
 					if m.taskMap[domainLcuuid].Cloud.GetBasicInfo().Type == common.KUBERNETES {
 						m.taskMap[domainLcuuid].Stop()
-						task := NewTask(orgID, newDomain, m.cfg.TaskCfg, ctx, m.resourceEventQueue)
+						task := NewTask(orgID, newDomain, m.cfg.TaskCfg, ctx)
 						if task == nil || task.Cloud == nil {
 							log.Errorf("domain (%s) init failed", newDomain.Name, logger.NewORGPrefix(orgID))
 							continue

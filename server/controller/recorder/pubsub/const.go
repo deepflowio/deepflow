@@ -22,6 +22,8 @@ import (
 
 const (
 	PubSubTypeAllDomains            = "all_domains"
+	PubSubTypeWholeDomain           = "whole_domain"
+	PubSubTypeWholeSubDomain        = "whole_sub_domain"
 	PubSubTypeDomain                = "domain"
 	PubSubTypeRegion                = common.RESOURCE_TYPE_REGION_EN
 	PubSubTypeAZ                    = common.RESOURCE_TYPE_AZ_EN

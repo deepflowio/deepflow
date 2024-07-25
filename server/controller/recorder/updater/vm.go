@@ -185,5 +185,9 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		structInfo.CloudTags.Set(diffBase.CloudTags, cloudItem.CloudTags)
 	}
 
+	if len(mapInfo) > 0 {
+		structInfo.Name.SetNew(cloudItem.Name) // TODO better
+	}
+
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

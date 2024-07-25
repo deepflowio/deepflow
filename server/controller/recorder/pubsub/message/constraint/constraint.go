@@ -49,6 +49,8 @@ type UpdatePtr[T Update] interface {
 	GetDiffBase() interface{} // return *constraint.DiffBase
 	SetCloudItem(interface{})
 	GetCloudItem() interface{} // return *constraint.CloudModel
+	SetNewMySQLItem(interface{})
+	GetNewMySQLItem() interface{} // return *constraint.MySQLModel
 }
 
 // Update是所有资源更新消息的泛型约束

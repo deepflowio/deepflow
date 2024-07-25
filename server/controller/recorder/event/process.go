@@ -23,36 +23,35 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/slices"
 
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type Process struct {
-	EventManagerBase
+	ManagerComponent
+	CUDSubscriberComponent
 	deviceType int
 	tool       *IPTool
 }
 
-func NewProcess(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Process {
+func NewProcess(q *queue.OverwriteQueue) *Process {
 	mng := &Process{
-		newEventManagerBase("process",
-			toolDS,
-			eq,
-		),
+		newManagerComponent(common.RESOURCE_TYPE_PROCESS_EN, q),
+		newCUDSubscriberComponent(common.RESOURCE_TYPE_PROCESS_EN),
 		common.PROCESS_INSTANCE_TYPE,
-		newTool(toolDS),
+		newTool(),
 	}
+	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (p *Process) ProduceByAdd(items []*mysql.Process) {
-	processData, err := p.GetProcessData(items)
+func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	items := msg.([]*mysql.Process)
+	processData, err := p.GetProcessData(md, items)
 	if err != nil {
 		log.Error(err)
 	}
@@ -64,13 +63,13 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 		switch t := processData[item.ID].ResourceType; t {
 		case common.VIF_DEVICE_TYPE_POD:
 			podID := processData[item.ID].ResourceID
-			info, err := p.ToolDataSet.GetPodInfoByID(podID)
+			info, err := md.GetToolDataSet().GetPodInfoByID(podID)
 			if err != nil {
 				log.Error(err)
 			} else {
-				podGroupType, ok := p.ToolDataSet.GetPodGroupTypeByID(info.PodGroupID)
+				podGroupType, ok := md.GetToolDataSet().GetPodGroupTypeByID(info.PodGroupID)
 				if !ok {
-					log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID, p.metadata.LogPrefixes)
+					log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID, md.LogPrefixORGID)
 				}
 
 				opts = append(opts, []eventapi.TagFieldOption{
@@ -84,14 +83,14 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 					eventapi.TagPodNodeID(info.PodNodeID),
 					eventapi.TagPodNSID(info.PodNamespaceID),
 				}...)
-				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(info.PodNodeID); ok {
+				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, info.PodNodeID); ok {
 					opts = append(opts, l3DeviceOpts...)
 				}
 			}
 
 		case common.VIF_DEVICE_TYPE_POD_NODE:
 			podNodeID := processData[item.ID].ResourceID
-			info, err := p.ToolDataSet.GetPodNodeInfoByID(podNodeID)
+			info, err := md.GetToolDataSet().GetPodNodeInfoByID(podNodeID)
 			if err != nil {
 				log.Error(err)
 			} else {
@@ -102,14 +101,14 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 					eventapi.TagVPCID(info.VPCID),
 					eventapi.TagPodClusterID(info.PodClusterID),
 				}...)
-				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(podNodeID); ok {
+				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, podNodeID); ok {
 					opts = append(opts, l3DeviceOpts...)
 				}
 			}
 
 		case common.VIF_DEVICE_TYPE_VM:
 			vmID := processData[item.ID].ResourceID
-			info, err := p.ToolDataSet.GetVMInfoByID(vmID)
+			info, err := md.GetToolDataSet().GetVMInfoByID(vmID)
 			if err != nil {
 				log.Error(err)
 			} else {
@@ -125,8 +124,13 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 		default:
 			log.Error("cannot support type: %s", t)
 		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagGProcessID(uint32(item.ID)),
+			eventapi.TagGProcessName(item.Name), // TODO @weiqiang why use name
+		}...)
 
-		p.createProcessAndEnqueue(
+		p.createAndEnqueue(
+			md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -137,28 +141,13 @@ func (p *Process) ProduceByAdd(items []*mysql.Process) {
 	}
 }
 
-func (p *Process) ProduceByUpdate(cloudItem *cloudmodel.Process, diffBase *diffbase.Process) {
-}
-
-func (p *Process) ProduceByDelete(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		var id int
-		var name string
-		processInfo, exists := p.ToolDataSet.GetProcessInfoByLcuuid(lcuuid)
-		if !exists {
-			log.Errorf("process info not fount, lcuuid: %s", lcuuid, p.metadata.LogPrefixes)
-		} else {
-			id = processInfo.ID
-			name = processInfo.Name
+func (p *Process) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*mysql.Process) {
+		opts := []eventapi.TagFieldOption{
+			eventapi.TagGProcessID(uint32(item.ID)),
+			eventapi.TagGProcessName(item.Name),
 		}
-
-		p.createProcessAndEnqueue(
-			lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_DELETE,
-			name,
-			p.deviceType,
-			id,
-		)
+		p.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID, opts...)
 	}
 }
 
@@ -169,14 +158,14 @@ type ProcessData struct {
 	VTapName     string
 }
 
-func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
+func (p *Process) GetProcessData(md *message.Metadata, processes []*mysql.Process) (map[int]ProcessData, error) {
 	// store vtap info
 	vtapIDs := mapset.NewSet[uint32]()
 	for _, item := range processes {
 		vtapIDs.Add(item.VTapID)
 	}
 	var vtaps []mysql.VTap
-	if err := p.metadata.DB.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
+	if err := md.GetDB().Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
 		return nil, err
 	}
 	type vtapInfo struct {
@@ -202,7 +191,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 
 	// store vm info
 	var vms []mysql.VM
-	if err := p.metadata.DB.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
+	if err := md.GetDB().Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	vmIDToName := make(map[int]string, len(vms))
@@ -212,7 +201,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 
 	// store pod node info
 	var podNodes []mysql.PodNode
-	if err := p.metadata.DB.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
+	if err := md.GetDB().Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
 		return nil, err
 	}
 	podNodeIDToName := make(map[int]string, len(podNodes))
@@ -222,7 +211,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 
 	// store pod info
 	var pods []mysql.Pod
-	if err := p.metadata.DB.Find(&pods).Error; err != nil {
+	if err := md.GetDB().Find(&pods).Error; err != nil {
 		return nil, err
 	}
 	podIDToName := make(map[int]string, len(pods))

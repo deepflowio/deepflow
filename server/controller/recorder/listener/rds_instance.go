@@ -21,25 +21,20 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type RDSInstance struct {
-	cache         *cache.Cache
-	eventProducer *event.RDSInstance
+	cache *cache.Cache
 }
 
-func NewRDSInstance(c *cache.Cache, eq *queue.OverwriteQueue) *RDSInstance {
+func NewRDSInstance(c *cache.Cache) *RDSInstance {
 	listener := &RDSInstance{
-		cache:         c,
-		eventProducer: event.NewRDSInstance(c.ToolDataSet, eq),
+		cache: c,
 	}
 	return listener
 }
 
 func (r *RDSInstance) OnUpdaterAdded(addedDBItems []*mysql.RDSInstance) {
-	r.eventProducer.ProduceByAdd(addedDBItems)
 	r.cache.AddRDSInstances(addedDBItems)
 }
 
@@ -49,6 +44,5 @@ func (r *RDSInstance) OnUpdaterUpdated(cloudItem *cloudmodel.RDSInstance, diffBa
 }
 
 func (r *RDSInstance) OnUpdaterDeleted(lcuuids []string) {
-	r.eventProducer.ProduceByDelete(lcuuids)
 	r.cache.DeleteRDSInstances(lcuuids)
 }

@@ -21,6 +21,18 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
+type WholeSubDomain struct {
+	AnyChangePubSubComponent
+}
+
+func NewWholeSubDomain() *WholeSubDomain {
+	return &WholeSubDomain{
+		AnyChangePubSubComponent{
+			PubSubComponent: newPubSubComponent(PubSubTypeWholeSubDomain),
+		},
+	}
+}
+
 type SubDomain struct {
 	ResourcePubSubComponent[
 		*message.SubDomainAdd,

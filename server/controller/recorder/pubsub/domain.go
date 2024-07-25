@@ -16,12 +16,14 @@
 
 package pubsub
 
-type Domain struct {
-	PubSubComponent
+type WholeDomain struct {
+	AnyChangePubSubComponent
 }
 
-func NewDomain() *Domain {
-	return &Domain{
-		PubSubComponent: newPubSubComponent(PubSubTypeDomain),
+func NewWholeDomain() *WholeDomain {
+	return &WholeDomain{
+		AnyChangePubSubComponent{
+			PubSubComponent: newPubSubComponent(PubSubTypeWholeDomain),
+		},
 	}
 }

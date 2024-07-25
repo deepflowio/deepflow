@@ -112,7 +112,7 @@ func TestEventManagerBase_convertToEventBeEnqueued(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &EventManagerBase{}
+			e := &ManagerComponent{}
 			if got := e.convertToEventBeEnqueued(tt.args.ev); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("EventManagerBase.convertToEventBeEnqueued() = %v, want %v", got, tt.want)
 			}

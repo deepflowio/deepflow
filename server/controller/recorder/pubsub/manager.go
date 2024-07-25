@@ -42,8 +42,9 @@ func GetManager() *Manager {
 	pubSubManagerOnce.Do(func() {
 		pubSubManager = &Manager{
 			TypeToPubSub: map[string]PubSub{
-				// DomainPubSub
-				PubSubTypeDomain: NewDomain(),
+				// AnyChangePubSub
+				PubSubTypeWholeDomain:    NewWholeDomain(),
+				PubSubTypeWholeSubDomain: NewWholeSubDomain(),
 
 				// ResourcePubSub
 				PubSubTypeAZ:                    NewAZ(),
