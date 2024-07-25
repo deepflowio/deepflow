@@ -19,7 +19,7 @@ services:
     networks:
       - deepflow
   clickhouse:
-    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/clickhouse-server:22.8.6.71
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/clickhouse-server:23.8.7.24
     container_name: deepflow-clickhouse
     restart: always
     environment:
@@ -38,7 +38,7 @@ services:
     networks:
       - deepflow
   deepflow-server:
-    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-server:latest
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-server:v6.5
     container_name: deepflow-server
     restart: always
     environment:
@@ -66,7 +66,7 @@ services:
       - 30035:20035  # controller module, control plane, grpc port
       - 30033:20033  # ingester module, data plane, port
   deepflow-app:
-    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-app:latest
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-app:v6.5
     container_name: deepflow-app
     restart: always
     environment:

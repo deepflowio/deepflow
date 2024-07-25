@@ -1726,6 +1726,26 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 
+	//enum(policy_type)
+	tagResourceMap["policy_type"] = map[string]*Tag{
+		"enum": NewTag(
+			"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(policy_type)), policy_type)",
+			"",
+			"toUInt64(policy_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(policy_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+		),
+	}
+
+	// Time-event
+	tagResourceMap["time_str"] = map[string]*Tag{
+		"default": NewTag(
+			"toString(time)",
+			"",
+			"",
+			"",
+		),
+	}
+
 	return tagResourceMap
 }
 func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
