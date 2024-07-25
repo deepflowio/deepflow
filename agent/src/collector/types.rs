@@ -160,6 +160,8 @@ pub struct AppMeterWithFlow {
 
     pub app_meter: AppMeter,
     pub time_in_second: Timestamp,
+    // request-reponse time span
+    pub time_span: u32,
 }
 
 #[derive(Clone)]

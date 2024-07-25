@@ -23,6 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
+use ahash::AHashMap;
 use flate2::{read::GzDecoder, write::ZlibEncoder, Compression};
 use http::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use http::HeaderMap;
@@ -513,7 +514,7 @@ fn fill_l7_stats(
     };
     let flow_perf_stats = FlowPerfStats {
         tcp: Default::default(),
-        l7: stats.clone(),
+        l7: AHashMap::new(),
         l4_protocol,
         l7_protocol,
         ..Default::default()
@@ -551,6 +552,7 @@ fn fill_l7_stats(
         signal_source: SignalSource::OTel,
         time_in_second: flow_stat_time.into(),
         biz_type: 0,
+        time_span: 0,
     }
 }
 
