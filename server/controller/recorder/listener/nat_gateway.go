@@ -21,35 +21,28 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type NATGateway struct {
-	cache         *cache.Cache
-	eventProducer *event.NATGateway
+	cache *cache.Cache
 }
 
-func NewNATGateway(c *cache.Cache, eq *queue.OverwriteQueue) *NATGateway {
+func NewNATGateway(c *cache.Cache) *NATGateway {
 	listener := &NATGateway{
-		cache:         c,
-		eventProducer: event.NewNATGateway(c.ToolDataSet, eq),
+		cache: c,
 	}
 	return listener
 }
 
 func (g *NATGateway) OnUpdaterAdded(addedDBItems []*metadbmodel.NATGateway) {
-	g.eventProducer.ProduceByAdd(addedDBItems)
 	g.cache.AddNATGateways(addedDBItems)
 }
 
 func (g *NATGateway) OnUpdaterUpdated(cloudItem *cloudmodel.NATGateway, diffBase *diffbase.NATGateway) {
-	g.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	g.cache.UpdateNATGateway(cloudItem)
 }
 
 func (g *NATGateway) OnUpdaterDeleted(lcuuids []string) {
-	g.eventProducer.ProduceByDelete(lcuuids)
 	g.cache.DeleteNATGateways(lcuuids)
 }

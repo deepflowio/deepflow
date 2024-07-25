@@ -27,7 +27,7 @@ type DataSet struct {
 
 	LogController
 
-	Regions                map[string]*Region
+	Regions                map[string]*Region // TODO change to private
 	AZs                    map[string]*AZ
 	SubDomains             map[string]*SubDomain
 	Hosts                  map[string]*Host

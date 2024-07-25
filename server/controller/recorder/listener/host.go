@@ -21,35 +21,28 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type Host struct {
-	cache         *cache.Cache
-	eventProducer *event.Host
+	cache *cache.Cache
 }
 
-func NewHost(c *cache.Cache, eq *queue.OverwriteQueue) *Host {
+func NewHost(c *cache.Cache) *Host {
 	listener := &Host{
-		cache:         c,
-		eventProducer: event.NewHost(c.ToolDataSet, eq),
+		cache: c,
 	}
 	return listener
 }
 
 func (h *Host) OnUpdaterAdded(addedDBItems []*metadbmodel.Host) {
-	h.eventProducer.ProduceByAdd(addedDBItems)
 	h.cache.AddHosts(addedDBItems)
 }
 
 func (h *Host) OnUpdaterUpdated(cloudItem *cloudmodel.Host, diffBase *diffbase.Host) {
-	h.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 	h.cache.UpdateHost(cloudItem)
 }
 
 func (h *Host) OnUpdaterDeleted(lcuuids []string) {
-	h.eventProducer.ProduceByDelete(lcuuids)
 	h.cache.DeleteHosts(lcuuids)
 }

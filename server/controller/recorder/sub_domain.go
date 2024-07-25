@@ -30,28 +30,25 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 	"github.com/deepflowio/deepflow/server/controller/recorder/updater"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type subDomains struct {
 	metadata *rcommon.Metadata
 
 	cacheMng   *cache.CacheManager
-	eventQueue *queue.OverwriteQueue
-
 	refreshers map[string]*subDomain
 }
 
-func newSubDomains(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, md *rcommon.Metadata, cacheMng *cache.CacheManager) *subDomains {
+func newSubDomains(ctx context.Context, cfg config.RecorderConfig, md *rcommon.Metadata, cacheMng *cache.CacheManager) *subDomains {
 	return &subDomains{
 		metadata: md,
 
 		cacheMng:   cacheMng,
-		eventQueue: eventQueue,
-
 		refreshers: make(map[string]*subDomain),
 	}
 }
@@ -111,7 +108,7 @@ func (s *subDomains) newRefresher(lcuuid string) (*subDomain, error) {
 	}
 	md := s.metadata.Copy()
 	md.SetSubDomain(sd)
-	return newSubDomain(s.eventQueue, md, s.cacheMng.DomainCache.ToolDataSet, s.cacheMng.CreateSubDomainCacheIfNotExists(md)), nil
+	return newSubDomain(md, s.cacheMng.DomainCache.ToolDataSet, s.cacheMng.CreateSubDomainCacheIfNotExists(md)), nil
 }
 
 type subDomain struct {
@@ -120,17 +117,26 @@ type subDomain struct {
 
 	domainToolDataSet *tool.DataSet
 	cache             *cache.Cache
-	eventQueue        *queue.OverwriteQueue
+
+	pubsub      pubsub.AnyChangePubSub
+	msgMetadata *message.Metadata
 }
 
-func newSubDomain(eventQueue *queue.OverwriteQueue, md *rcommon.Metadata, domainToolDataSet *tool.DataSet, cache *cache.Cache) *subDomain {
+func newSubDomain(md *rcommon.Metadata, domainToolDataSet *tool.DataSet, cache *cache.Cache) *subDomain {
 	return &subDomain{
 		metadata: md,
 		statsd:   statsd.NewSubDomainStatsd(md),
 
 		domainToolDataSet: domainToolDataSet,
 		cache:             cache,
-		eventQueue:        eventQueue,
+		pubsub:            pubsub.GetPubSub(pubsub.PubSubTypeWholeSubDomain).(pubsub.AnyChangePubSub),
+		msgMetadata: message.NewMetadata(
+			md.GetORGID(),
+			message.MetadataDomainLcuuid(md.GetDomainInfo().Lcuuid),
+			message.MetadataSubDomainLcuuid(md.GetSubDomainInfo().Lcuuid),
+			message.MetadataToolDataSet(cache.ToolDataSet),
+			message.MetadataDB(md.GetDB()),
+		),
 	}
 }
 
@@ -160,11 +166,10 @@ func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
 	// for process
 	s.cache.RefreshVTaps()
 
-	listener := listener.NewWholeSubDomain(s.metadata.Domain.Lcuuid, s.metadata.SubDomain.Lcuuid, s.cache, s.eventQueue)
 	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudData)
 	s.executeUpdaters(subDomainUpdatersInUpdateOrder)
 	s.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
-	listener.OnUpdatersCompleted()
+	s.pubsub.PublishChange(s.msgMetadata)
 
 	s.updateSyncedAt(s.metadata.SubDomain.Lcuuid, cloudData.SyncAt)
 
@@ -193,14 +198,14 @@ func (s *subDomain) shouldRefresh(lcuuid string, cloudData cloudmodel.SubDomainR
 
 func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) []updater.ResourceUpdater {
 	ip := updater.NewIP(s.cache, cloudData.IPs, s.domainToolDataSet)
-	ip.GetLANIP().RegisterListener(listener.NewLANIP(s.cache, s.eventQueue))
-	ip.GetWANIP().RegisterListener(listener.NewWANIP(s.cache, s.eventQueue))
+	ip.GetLANIP().RegisterListener(listener.NewLANIP(s.cache))
+	ip.GetWANIP().RegisterListener(listener.NewWANIP(s.cache))
 
 	return []updater.ResourceUpdater{
 		updater.NewPodCluster(s.cache, cloudData.PodClusters).RegisterListener(
 			listener.NewPodCluster(s.cache)),
 		updater.NewPodNode(s.cache, cloudData.PodNodes).RegisterListener(
-			listener.NewPodNode(s.cache, s.eventQueue)),
+			listener.NewPodNode(s.cache)),
 		updater.NewPodNamespace(s.cache, cloudData.PodNamespaces).RegisterListener(
 			listener.NewPodNamespace(s.cache)),
 		updater.NewPodIngress(s.cache, cloudData.PodIngresses).RegisterListener(
@@ -208,7 +213,7 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 		updater.NewPodIngressRule(s.cache, cloudData.PodIngressRules).RegisterListener(
 			listener.NewPodIngressRule(s.cache)),
 		updater.NewPodService(s.cache, cloudData.PodServices).RegisterListener(
-			listener.NewPodService(s.cache, s.eventQueue)),
+			listener.NewPodService(s.cache)),
 		updater.NewPodIngressRuleBackend(s.cache, cloudData.PodIngressRuleBackends).RegisterListener(
 			listener.NewPodIngressRuleBackend(s.cache)),
 		updater.NewPodServicePort(s.cache, cloudData.PodServicePorts).RegisterListener(
@@ -220,7 +225,7 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 		updater.NewPodReplicaSet(s.cache, cloudData.PodReplicaSets).RegisterListener(
 			listener.NewPodReplicaSet(s.cache)),
 		updater.NewPod(s.cache, cloudData.Pods).RegisterListener(
-			listener.NewPod(s.cache, s.eventQueue)).BuildStatsd(s.statsd),
+			listener.NewPod(s.cache)).BuildStatsd(s.statsd),
 		updater.NewNetwork(s.cache, cloudData.Networks).RegisterListener(
 			listener.NewNetwork(s.cache)),
 		updater.NewSubnet(s.cache, cloudData.Subnets).RegisterListener(
@@ -231,7 +236,7 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 		updater.NewVMPodNodeConnection(s.cache, cloudData.VMPodNodeConnections).RegisterListener( // VMPodNodeConnection需放在最后
 			listener.NewVMPodNodeConnection(s.cache)),
 		updater.NewProcess(s.cache, cloudData.Processes).RegisterListener(
-			listener.NewProcess(s.cache, s.eventQueue)),
+			listener.NewProcess(s.cache)),
 	}
 }
 

@@ -24,7 +24,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 var log = logger.MustGetLogger("recorder")
@@ -36,7 +35,7 @@ type Recorder struct {
 	domainRefresher *domain
 }
 
-func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *queue.OverwriteQueue, orgID int, domainLcuuid string) *Recorder {
+func NewRecorder(ctx context.Context, cfg config.RecorderConfig, orgID int, domainLcuuid string) *Recorder {
 	log.Infof("domain lcuuid: %s, new recorder", domainLcuuid, logger.NewORGPrefix(orgID))
 	md, err := common.NewMetadata(cfg, orgID)
 	if err != nil {
@@ -54,7 +53,7 @@ func NewRecorder(ctx context.Context, cfg config.RecorderConfig, eventQueue *que
 		cfg: cfg,
 		ctx: ctx,
 
-		domainRefresher: newDomain(ctx, cfg, eventQueue, md),
+		domainRefresher: newDomain(ctx, cfg, md),
 	}
 }
 
