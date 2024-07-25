@@ -21,34 +21,27 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type WANIP struct {
-	cache         *cache.Cache
-	eventProducer *event.WANIP
+	cache *cache.Cache
 }
 
-func NewWANIP(c *cache.Cache, eq *queue.OverwriteQueue) *WANIP {
+func NewWANIP(c *cache.Cache) *WANIP {
 	listener := &WANIP{
-		cache:         c,
-		eventProducer: event.NewWANIP(c.ToolDataSet, eq),
+		cache: c,
 	}
 	return listener
 }
 
 func (i *WANIP) OnUpdaterAdded(addedDBItems []*metadbmodel.WANIP) {
-	i.eventProducer.ProduceByAdd(addedDBItems)
 	i.cache.AddWANIPs(addedDBItems)
 }
 
 func (i *WANIP) OnUpdaterUpdated(cloudItem *cloudmodel.IP, diffBase *diffbase.WANIP) {
-	i.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem)
 }
 
 func (i *WANIP) OnUpdaterDeleted(lcuuids []string) {
-	i.eventProducer.ProduceByDelete(lcuuids)
 	i.cache.DeleteWANIPs(lcuuids)
 }

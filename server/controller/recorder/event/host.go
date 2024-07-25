@@ -17,36 +17,33 @@
 package event
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type Host struct {
-	EventManagerBase
+	ManagerComponent
+	CUDSubscriberComponent
 	deviceType int
 }
 
-func NewHost(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Host {
+func NewHost(q *queue.OverwriteQueue) *Host {
 	mng := &Host{
-		newEventManagerBase(
-			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
-			toolDS,
-			eq,
-		),
+		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_HOST_EN, q),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_HOST_EN),
 		ctrlrcommon.VIF_DEVICE_TYPE_HOST,
 	}
+	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (h *Host) ProduceByAdd(items []*metadbmodel.Host) {
-	for _, item := range items {
+func (h *Host) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.Host) {
 		var opts []eventapi.TagFieldOption
-		info, err := h.ToolDataSet.GetHostInfoByID(item.ID)
+		info, err := md.GetToolDataSet().GetHostInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -61,7 +58,7 @@ func (h *Host) ProduceByAdd(items []*metadbmodel.Host) {
 			eventapi.TagL3DeviceType(h.deviceType),
 		}...)
 
-		h.createAndEnqueue(
+		h.createAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -72,23 +69,8 @@ func (h *Host) ProduceByAdd(items []*metadbmodel.Host) {
 	}
 }
 
-func (h *Host) ProduceByUpdate(cloudItem *cloudmodel.Host, diffBase *diffbase.Host) {
-}
-
-func (h *Host) ProduceByDelete(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		var name string
-		id, ok := h.ToolDataSet.GetHostIDByLcuuid(lcuuid)
-		if !ok {
-			log.Error(nameByIDNotFound(h.resourceType, id))
-		} else {
-			var err error
-			name, err = h.ToolDataSet.GetHostNameByID(id)
-			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(h.resourceType, lcuuid), err, h.metadata.LogPrefixes)
-			}
-		}
-
-		h.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, h.deviceType, id)
+func (h *Host) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.Host) {
+		h.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, h.deviceType, item.ID)
 	}
 }

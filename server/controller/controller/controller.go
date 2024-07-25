@@ -43,6 +43,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/native_field"
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
+	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/controller/report"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
@@ -140,7 +141,13 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	router.SetInitStageForHealthChecker("Manager init")
 	// 启动resource manager
 	// 每个云平台启动一个cloud和recorder
-	m := manager.NewManager(cfg.ManagerCfg, shared.ResourceEventQueue)
+	err := event.GetSubscriberManager().Start(shared.ResourceEventQueue)
+	if err != nil {
+		log.Errorf("resource event subscriber manager start failed: %s", err.Error())
+		time.Sleep(time.Second)
+		os.Exit(0)
+	}
+	m := manager.NewManager(cfg.ManagerCfg)
 	m.Start()
 
 	router.SetInitStageForHealthChecker("Trisolaris init")

@@ -17,36 +17,33 @@
 package event
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type RedisInstance struct {
-	EventManagerBase
+	ManagerComponent
+	CUDSubscriberComponent
 	deviceType int
 }
 
-func NewRedisInstance(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *RedisInstance {
+func NewRedisInstance(q *queue.OverwriteQueue) *RedisInstance {
 	mng := &RedisInstance{
-		newEventManagerBase(
-			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
-			toolDS,
-			eq,
-		),
+		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, q),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN),
 		ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 	}
+	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (r *RedisInstance) ProduceByAdd(items []*metadbmodel.RedisInstance) {
-	for _, item := range items {
+func (r *RedisInstance) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.RedisInstance) {
 		var opts []eventapi.TagFieldOption
-		info, err := r.ToolDataSet.GetRedisInstanceInfoByID(item.ID)
+		info, err := md.GetToolDataSet().GetRedisInstanceInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -61,7 +58,7 @@ func (r *RedisInstance) ProduceByAdd(items []*metadbmodel.RedisInstance) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		r.createAndEnqueue(
+		r.createAndEnqueue(md,
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -72,24 +69,8 @@ func (r *RedisInstance) ProduceByAdd(items []*metadbmodel.RedisInstance) {
 	}
 }
 
-func (r *RedisInstance) ProduceByUpdate(cloudItem *cloudmodel.RedisInstance, diffBase *diffbase.RedisInstance) {
-}
-
-func (r *RedisInstance) ProduceByDelete(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		var id int
-		var name string
-		id, ok := r.ToolDataSet.GetRedisInstanceIDByLcuuid(lcuuid)
-		if ok {
-			var err error
-			name, err = r.ToolDataSet.GetRedisInstanceNameByID(id)
-			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err, r.metadata.LogPrefixes)
-			}
-		} else {
-			log.Error(nameByIDNotFound(r.resourceType, id))
-		}
-
-		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+func (r *RedisInstance) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.RedisInstance) {
+		r.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, r.deviceType, item.ID)
 	}
 }

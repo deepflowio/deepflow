@@ -21,8 +21,6 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 // SubDomain is used to listen to the changes of the SubDomain resource itself
@@ -46,21 +44,4 @@ func (sd *SubDomain) OnUpdaterUpdated(cloudItem *cloudmodel.SubDomain, diffBase 
 
 func (sd *SubDomain) OnUpdaterDeleted(lcuuids []string) {
 	sd.cache.DeleteSubDomains(lcuuids)
-}
-
-// WholeSubDomain is used to listen to the changes of the whole SubDomain related resources
-type WholeSubDomain struct {
-	cache         *cache.Cache
-	eventProducer *event.SubDomain
-}
-
-func NewWholeSubDomain(domainLcuuid, subDomainLcuuid string, c *cache.Cache, eq *queue.OverwriteQueue) *WholeSubDomain {
-	return &WholeSubDomain{
-		cache:         c,
-		eventProducer: event.NewSubDomain(domainLcuuid, subDomainLcuuid, c.ToolDataSet, eq),
-	}
-}
-
-func (wsd *WholeSubDomain) OnUpdatersCompleted() {
-	wsd.eventProducer.ProduceFromMySQL()
 }
