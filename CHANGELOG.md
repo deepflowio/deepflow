@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: data under all organizations should be cleared when disk is full [#7565](https://github.com/deepflowio/deepflow/pull/7565) by [lzf575](https://github.com/lzf575)
+* fix: do not pub to tagrecorder [#7563](https://github.com/deepflowio/deepflow/pull/7563) by [askyrie](https://github.com/askyrie)
+* fix: add agent cmd timeout to config [#7536](https://github.com/deepflowio/deepflow/pull/7536) by [roryye](https://github.com/roryye)
 * fix: Java uprobe regex not configured [#7532](https://github.com/deepflowio/deepflow/pull/7532) by [rvql](https://github.com/rvql)
 * fix: agent fix check_params failed when param is empty [#7509](https://github.com/deepflowio/deepflow/pull/7509) by [TomatoMr](https://github.com/TomatoMr)
 * fix: Do not verify dynamic tags [#7504](https://github.com/deepflowio/deepflow/pull/7504) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -78,6 +81,14 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Table alert_event add tag [#7564](https://github.com/deepflowio/deepflow/pull/7564) by [Ericsssss](https://github.com/Ericsssss)
+* feat: alert event add fields [#7558](https://github.com/deepflowio/deepflow/pull/7558) by [lzf575](https://github.com/lzf575)
+* feat: change auto name  [#7557](https://github.com/deepflowio/deepflow/pull/7557) by [duandaa](https://github.com/duandaa)
+* feat: modify alert_event user_filter condition [#7556](https://github.com/deepflowio/deepflow/pull/7556) by [Ericsssss](https://github.com/Ericsssss)
+* feat: alert event add new filed [#7555](https://github.com/deepflowio/deepflow/pull/7555) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: alert event add _target_uid [#7549](https://github.com/deepflowio/deepflow/pull/7549) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: update data source collection event.alarm_event to event.alert_e… [#7539](https://github.com/deepflowio/deepflow/pull/7539) by [roryye](https://github.com/roryye)
+* feat: change service translation [#7538](https://github.com/deepflowio/deepflow/pull/7538) by [duandaa](https://github.com/duandaa)
 * feat: Tagrecorder support update team_id [#7543](https://github.com/deepflowio/deepflow/pull/7543) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Modify alert_event event_level tag translation [#7542](https://github.com/deepflowio/deepflow/pull/7542) by [Ericsssss](https://github.com/Ericsssss)
 * feat: sub domain support update team [#7535](https://github.com/deepflowio/deepflow/pull/7535) by [askyrie](https://github.com/askyrie)
