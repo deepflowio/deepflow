@@ -15,9 +15,10 @@ message AlertEvent {
     repeated  string tag_str_values = 9;
     repeated  string tag_int_keys = 10;
     repeated  int64 tag_int_values = 11;
-    optional string _target_uid = 12;
+    optional uint32 org_id = 12;
+    optional uint32 user_id = 13;
+    optional uint32 team_id = 14;
 
-    optional uint32 org_id = 13;
-    optional uint32 user_id = 14;
-    optional uint32 team_id = 15;
+    optional string _target_uid = 21;
+    optional string _data_region = 22;
 }
