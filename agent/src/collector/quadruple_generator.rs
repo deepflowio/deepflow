@@ -35,6 +35,7 @@ use super::{
     MetricsType, QgStats,
 };
 
+use crate::common::flow::L7PerfStats;
 use crate::common::{
     endpoint::EPC_INTERNET,
     enums::{EthernetType, IpProtocol, TapType},
@@ -1043,20 +1044,24 @@ impl QuadrupleGenerator {
             Some(s) => s,
             None => return flow_meter,
         };
+        let mut l7_perf_stats = L7PerfStats::default();
+        for (_, l7_stats) in stats.l7.iter() {
+            l7_perf_stats.sequential_merge(l7_stats);
+        }
         match (stats.l7_protocol, tagged_flow.flow.signal_source) {
             (
                 L7Protocol::Unknown,
                 SignalSource::Packet | SignalSource::EBPF | SignalSource::XFlow,
             ) => {}
             (_, _) => {
-                flow_meter.traffic.l7_request = stats.l7.request_count;
-                flow_meter.traffic.l7_response = stats.l7.response_count;
-                flow_meter.latency.rrt_max = stats.l7.rrt_max;
-                flow_meter.latency.rrt_sum = stats.l7.rrt_sum;
-                flow_meter.latency.rrt_count = stats.l7.rrt_count;
-                flow_meter.anomaly.l7_client_error = stats.l7.err_client_count;
-                flow_meter.anomaly.l7_server_error = stats.l7.err_server_count;
-                flow_meter.anomaly.l7_timeout = stats.l7.err_timeout;
+                flow_meter.traffic.l7_request = l7_perf_stats.request_count;
+                flow_meter.traffic.l7_response = l7_perf_stats.response_count;
+                flow_meter.latency.rrt_max = l7_perf_stats.rrt_max;
+                flow_meter.latency.rrt_sum = l7_perf_stats.rrt_sum;
+                flow_meter.latency.rrt_count = l7_perf_stats.rrt_count;
+                flow_meter.anomaly.l7_client_error = l7_perf_stats.err_client_count;
+                flow_meter.anomaly.l7_server_error = l7_perf_stats.err_server_count;
+                flow_meter.anomaly.l7_timeout = l7_perf_stats.err_timeout;
             }
         }
 

@@ -301,6 +301,8 @@ pub struct Tagger {
     pub biz_type: u8,
     pub signal_source: SignalSource,
     pub pod_id: u32,
+    // request-reponse time span
+    pub time_span: u32,
 }
 
 impl Default for Tagger {
@@ -335,6 +337,7 @@ impl Default for Tagger {
             signal_source: SignalSource::default(),
             pod_id: 0,
             biz_type: 0,
+            time_span: 0,
         }
     }
 }
@@ -391,6 +394,7 @@ impl From<Tagger> for metric::MiniTag {
                 endpoint: t.endpoint.unwrap_or_default(),
                 pod_id: t.pod_id,
                 biz_type: t.biz_type as u32,
+                time_span: t.time_span,
             }),
         }
     }
