@@ -942,9 +942,12 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 
 	// pub to tagrecorder
 	teamIDInt := int(teamID.(float64))
+	log.Infof("bbbbb %d", teamIDInt)
+	log.Infof("bbbbb %#v", subDomain)
 	if teamIDInt != subDomain.TeamID {
 		metadata := message.NewMetadata(db.ORGID, message.MetadataSubDomainID(subDomain.ID), message.MetadataTeamID(teamIDInt))
 		for _, s := range tagrecorder.GetSubscriberManager().GetSubscribers("sub_domain") {
+			log.Infof("bbbbb %#v", metadata)
 			s.OnSubDomainTeamIDUpdated(metadata)
 		}
 	}
