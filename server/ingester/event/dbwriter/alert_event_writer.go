@@ -60,6 +60,9 @@ type AlertEventStore struct {
 	TagIntKeys   []string
 	TagIntValues []int64
 
+	XTargetUid   string
+	XQueryRegion string
+
 	UserId uint32
 	OrgId  uint16
 	TeamID uint16
@@ -88,6 +91,9 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("tag_int_names", ckdb.ArrayLowCardinalityString),
 		ckdb.NewColumn("tag_int_values", ckdb.ArrayInt64),
 
+		ckdb.NewColumn("_target_uid", ckdb.String),
+		ckdb.NewColumn("_query_region", ckdb.LowCardinalityString),
+
 		ckdb.NewColumn("team_id", ckdb.UInt16),
 		ckdb.NewColumn("user_id", ckdb.UInt32),
 	}
@@ -108,6 +114,8 @@ func (e *AlertEventStore) WriteBlock(block *ckdb.Block) {
 		e.TagStrValues,
 		e.TagIntKeys,
 		e.TagIntValues,
+		e.XTargetUid,
+		e.XQueryRegion,
 
 		e.TeamID,
 		e.UserId,
