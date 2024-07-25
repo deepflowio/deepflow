@@ -50,9 +50,11 @@ chost_hostname            , chost_hostname_0          , chost_hostname_1        
 pod_node_ip               , pod_node_ip_0             , pod_node_ip_1              , resource       ,                       , Universal Tag     , 111          , 0             , 
 pod_node_hostname         , pod_node_hostname_0       , pod_node_hostname_1        , resource       ,                       , Universal Tag     , 111          , 0             , 
 
-user                       , user                      , user                      , resource       ,                       , Universal Tag   , 111          , 0
-alert_policy               , alert_policy              , alert_policy              , resource       ,                       , Universal Tag   , 110          , 0
-policy_type                , policy_type               , policy_type               , int_enum       , policy_app_type       , Alarm Info      , 111          , 0
-event_level                , event_level               , event_level               , int_enum       , event_level           , Alarm Info      , 111          , 0
-target_tags                , target_tags               , target_tags               , string         ,                       , Event Info      , 111          , 0
-metric_value               , metric_value              , metric_value              , float          ,                       , Event Info      , 111          , 0
+user                       , user                      , user                      , resource       ,                       , Universal Tag   , 111          , 0               , 
+alert_policy               , alert_policy              , alert_policy              , resource       ,                       , Universal Tag   , 110          , 0               , 
+policy_type                , policy_type               , policy_type               , int_enum       , policy_app_type       , Alarm Info      , 111          , 0               , 
+event_level                , event_level               , event_level               , int_enum       , event_level           , Alarm Info      , 111          , 0               , 
+target_tags                , target_tags               , target_tags               , string         ,                       , Event Info      , 111          , 0               , 
+metric_value               , metric_value              , metric_value              , float          ,                       , Event Info      , 111          , 0               , 
+_target_uid                , _target_uid               , _target_uid               , string         ,                       , Event Info      , 111          , 0               , 111
+_query_region              , _query_region             , _query_region             , string         ,                       , Event Info      , 111          , 0               , 
