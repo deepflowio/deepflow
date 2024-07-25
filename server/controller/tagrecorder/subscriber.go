@@ -271,6 +271,8 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *mess
 
 // Update team_id of resource by sub domain
 func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
+	log.Infof("aaaaa  %d", md.SubDomainID)
+	log.Infof("aaaaa  %d", md.TeamID)
 	var chModel CT
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
@@ -279,4 +281,5 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md
 	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.SubDomainID).Update("team_id", md.TeamID).Error; err != nil {
 		log.Error(err)
 	}
+	log.Info("aaaaa end")
 }
