@@ -181,9 +181,6 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 			} else {
 				// Location to id
 				nodeProfileLocationStrRef := utils.String(profileLocationStrByte[curSemicolonIndex+1 : preSemicolonIndex])
-				log.Info(nodeProfileLocationStrRef)
-				log.Info("改动前")
-				log.Info(string(profileLocationStrByte[curSemicolonIndex+1 : preSemicolonIndex]))
 				locationID, ok := locationToID[nodeProfileLocationStrRef]
 				if !ok {
 					locationID = len(locations)
@@ -197,8 +194,9 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 				nodeUUIDToID[nodeUUID] = nodeID
 				nodes = append(nodes, newProfileTreeNode(locationID, nodeProfileValue, profileValue))
 				if runeIndex == 0 {
-					nodes[0].TotalValue += profileValue
+					nodes[0].TotalValue += profileValue // update root
 				}
+
 				if preNodeID >= 0 {
 					nodes[preNodeID].ParentNodeID = nodeID
 				} else {
