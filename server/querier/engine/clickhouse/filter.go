@@ -821,7 +821,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		} else {
 			switch t.Tag {
-			case "policy_type", "metric_value", "event_level", "team_id", "user_id":
+			case "policy_type", "metric_value", "event_level", "team_id", "user_id", "1":
 				if strings.Contains(op, "match") {
 					filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 				} else {
