@@ -58,7 +58,7 @@ func TestHost_ProduceByAdd(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.h.ProduceByAdd(tt.args.items)
 
-			e := tt.h.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.h.ManagerComponent.Queue.Get().(*eventapi.ResourceEvent)
 			assert.Equal(t, tt.wantID, e.InstanceID)
 			assert.Equal(t, tt.wantName, e.InstanceName)
 		})
@@ -110,7 +110,7 @@ func TestHost_ProduceByDelete(t *testing.T) {
 			tt.h = NewHost(tt.cache.ToolDataSet, NewEventQueue())
 			tt.h.ProduceByDelete(tt.args.lcuuids)
 
-			e := tt.h.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.h.ManagerComponent.Queue.Get().(*eventapi.ResourceEvent)
 			assert.Equal(t, tt.wantID, e.InstanceID)
 			assert.Equal(t, tt.wantName, e.InstanceName)
 		})

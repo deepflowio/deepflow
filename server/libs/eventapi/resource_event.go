@@ -172,6 +172,18 @@ func TagIP(ip string) TagFieldOption {
 	}
 }
 
+func TagGProcessID(id uint32) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.GProcessID = id
+	}
+}
+
+func TagGProcessName(name string) TagFieldOption {
+	return func(r *ResourceEvent) {
+		r.GProcessName = name
+	}
+}
+
 func (r *ResourceEvent) Release() {
 	ReleaseResourceEvent(r)
 }

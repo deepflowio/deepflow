@@ -17,39 +17,36 @@
 package event
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type PodNode struct {
-	EventManagerBase
+	ManagerComponent
+	CUDSubscriberComponent
 	deviceType int
 	tool       *IPTool
 }
 
-func NewPodNode(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *PodNode {
+func NewPodNode(q *queue.OverwriteQueue) *PodNode {
 	mng := &PodNode{
-		newEventManagerBase(
-			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
-			toolDS,
-			eq,
-		),
+		newManagerComponent(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, q),
+		newCUDSubscriberComponent(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN),
 		ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE,
-		newTool(toolDS),
+		newTool(),
 	}
+	mng.SetSubscriberSelf(mng)
 	return mng
 }
 
-func (p *PodNode) ProduceByAdd(items []*metadbmodel.PodNode) {
-	for _, item := range items {
+func (p *PodNode) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.PodNode) {
 		var opts []eventapi.TagFieldOption
 		var domainLcuuid string
-		info, err := p.ToolDataSet.GetPodNodeInfoByID(item.ID)
+		info, err := md.GetToolDataSet().GetPodNodeInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -65,10 +62,10 @@ func (p *PodNode) ProduceByAdd(items []*metadbmodel.PodNode) {
 			eventapi.TagPodClusterID(item.PodClusterID),
 		}...)
 
-		l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(item.ID)
+		l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, item.ID)
 		if ok {
 			opts = append(opts, l3DeviceOpts...)
-			p.createAndEnqueue(
+			p.createAndEnqueue(md,
 				item.Lcuuid,
 				eventapi.RESOURCE_EVENT_TYPE_CREATE,
 				item.Name,
@@ -78,6 +75,7 @@ func (p *PodNode) ProduceByAdd(items []*metadbmodel.PodNode) {
 			)
 		} else {
 			p.enqueueIfInsertIntoMySQLFailed(
+				md,
 				item.Lcuuid,
 				domainLcuuid,
 				eventapi.RESOURCE_EVENT_TYPE_CREATE,
@@ -90,21 +88,8 @@ func (p *PodNode) ProduceByAdd(items []*metadbmodel.PodNode) {
 	}
 }
 
-func (p *PodNode) ProduceByUpdate(cloudItem *cloudmodel.PodNode, diffBase *diffbase.PodNode) {
-}
-
-func (p *PodNode) ProduceByDelete(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		var name string
-		id := p.ToolDataSet.GetPodNodeIDByLcuuid(lcuuid)
-		if id != 0 {
-			var err error
-			name, err = p.ToolDataSet.GetPodNodeNameByID(id)
-			if err != nil {
-				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err, p.metadata.LogPrefixes)
-			}
-		}
-
-		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+func (p *PodNode) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
+	for _, item := range msg.([]*metadbmodel.PodNode) {
+		p.createAndEnqueue(md, item.Lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, item.Name, p.deviceType, item.ID)
 	}
 }

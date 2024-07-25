@@ -21,34 +21,27 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
-	"github.com/deepflowio/deepflow/server/controller/recorder/event"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type Process struct {
-	cache         *cache.Cache
-	eventProducer *event.Process
+	cache *cache.Cache
 }
 
-func NewProcess(c *cache.Cache, eq *queue.OverwriteQueue) *Process {
+func NewProcess(c *cache.Cache) *Process {
 	listener := &Process{
-		cache:         c,
-		eventProducer: event.NewProcess(c.ToolDataSet, eq),
+		cache: c,
 	}
 	return listener
 }
 
 func (p *Process) OnUpdaterAdded(addedDBItems []*metadbmodel.Process) {
-	p.eventProducer.ProduceByAdd(addedDBItems)
 	p.cache.AddProcesses(addedDBItems)
 }
 
 func (p *Process) OnUpdaterUpdated(cloudItem *cloudmodel.Process, diffBase *diffbase.Process) {
-	p.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 	diffBase.Update(cloudItem, p.cache.ToolDataSet)
 }
 
 func (p *Process) OnUpdaterDeleted(lcuuids []string) {
-	p.eventProducer.ProduceByDelete(lcuuids)
 	p.cache.DeleteProcesses(lcuuids)
 }
