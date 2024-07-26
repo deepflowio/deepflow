@@ -40,7 +40,7 @@ func (t *ChTapType) generateNewData() (map[TapTypeKey]mysql.ChTapType, bool) {
 	var tapTypes []mysql.TapType
 	err := mysql.Db.Unscoped().Find(&tapTypes).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(t.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(t.resourceTypeName, err), t.db.LogPrefixORGID)
 		return nil, false
 	}
 

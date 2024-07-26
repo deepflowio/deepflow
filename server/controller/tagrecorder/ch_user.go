@@ -35,12 +35,12 @@ func NewChUser() *ChUser {
 }
 
 func (c *ChUser) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChUser, bool) {
-	log.Infof("generate data for %s", c.resourceTypeName)
+	log.Infof("generate data for %s", c.resourceTypeName, db.LogPrefixORGID)
 	var users []mysql.User
 
 	err := mysql.DefaultDB.Unscoped().Find(&users).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 

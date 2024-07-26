@@ -42,7 +42,7 @@ func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysql.ChPod
 
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -50,7 +50,7 @@ func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysql.ChPod
 	for _, pod := range pods {
 		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
 		if err != nil {
-			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod)
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod, k.db.LogPrefixORGID)
 		}
 
 		annotations := strings.Split(pod.Annotation, ", ")

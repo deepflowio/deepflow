@@ -42,12 +42,12 @@ func (l *ChLbListener) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChLBListen
 	var lbTargetServers []mysql.LBTargetServer
 	err := db.Unscoped().Find(&lbListeners).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	err = db.Unscoped().Find(&lbTargetServers).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 

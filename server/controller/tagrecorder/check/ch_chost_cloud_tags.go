@@ -41,7 +41,7 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 	var vms []mysql.VM
 	err := c.db.Unscoped().Find(&vms).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err), c.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -54,7 +54,7 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 		if len(cloudTagsMap) > 0 {
 			cloudTagsStr, err := json.Marshal(cloudTagsMap)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, c.db.LogPrefixORGID)
 				return nil, false
 			}
 			key := CloudTagsKey{

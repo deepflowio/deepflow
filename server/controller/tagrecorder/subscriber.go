@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -216,7 +217,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *me
 	items := msg.([]*MT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	keys, chItems := s.generateKeyTargets(md, items)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
@@ -227,7 +228,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *messa
 	updateFields := msg.(MUPT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 }
@@ -237,7 +238,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *
 	items := msg.([]*MT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	keys, chItems := s.generateKeyTargets(md, items)
 	if md.SoftDelete {
@@ -254,10 +255,10 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message
 	var chModel CT
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
 	s.ResourceUpdateAtInfoUpdated(md, db)
 }
@@ -267,10 +268,10 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *mess
 	var chModel CT
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
 	s.ResourceUpdateAtInfoUpdated(md, db)
 }
@@ -280,10 +281,10 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md
 	var chModel CT
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.SubDomainID).Update("team_id", md.TeamID).Error; err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 	}
 }
 

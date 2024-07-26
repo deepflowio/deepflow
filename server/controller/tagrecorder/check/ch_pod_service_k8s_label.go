@@ -43,17 +43,17 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 	var podClusters []mysql.PodCluster
 	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 	err = k.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 	err = k.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -65,7 +65,7 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 	for _, podService := range podServices {
 		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
 		if err != nil {
-			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), podService)
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), podService, k.db.LogPrefixORGID)
 		}
 
 		splitLabel := strings.Split(podService.Label, ", ")

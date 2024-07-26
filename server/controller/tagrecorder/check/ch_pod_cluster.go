@@ -41,7 +41,7 @@ func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 	var podClusters []mysql.PodCluster
 	err := p.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -49,7 +49,7 @@ func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 	for _, podCluster := range podClusters {
 		teamID, err := tagrecorder.GetTeamID(podCluster.Domain, podCluster.SubDomain)
 		if err != nil {
-			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podCluster)
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podCluster, p.db.LogPrefixORGID)
 		}
 		if podCluster.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{

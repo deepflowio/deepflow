@@ -34,17 +34,17 @@ func GetTeamInfo(db *mysql.DB) {
 	var vTaps []mysql.VTap
 	err := db.Unscoped().Find(&domains).Error
 	if err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 		return
 	}
 	err = db.Unscoped().Find(&subDomains).Error
 	if err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 		return
 	}
 	err = db.Unscoped().Find(&vTaps).Error
 	if err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 		return
 	}
 	domainToTeamID := map[string]int{}

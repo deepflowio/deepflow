@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
@@ -44,7 +45,7 @@ func (c *ChChostCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 	if fieldsUpdate.CloudTags.IsDifferent() {
 		bytes, err := json.Marshal(fieldsUpdate.CloudTags.GetNew())
 		if err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			return
 		}
 		updateInfo["cloud_tags"] = string(bytes)
@@ -71,7 +72,7 @@ func (c *ChChostCloudTags) sourceToTarget(md *message.Metadata, item *mysql.VM) 
 	}
 	bytes, err := json.Marshal(item.CloudTags)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(md.ORGID))
 		return
 	}
 	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChChostCloudTags{{ID: item.ID, CloudTags: string(bytes), TeamID: md.TeamID, DomainID: md.DomainID}}

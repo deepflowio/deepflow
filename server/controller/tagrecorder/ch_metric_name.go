@@ -39,7 +39,7 @@ func (l *ChPrometheusMetricName) generateNewData(db *mysql.DB) (map[IDKey]mysql.
 	var prometheusMetricName []mysql.PrometheusMetricName
 	err := db.Unscoped().Find(&prometheusMetricName).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
