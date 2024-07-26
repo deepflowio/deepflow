@@ -227,22 +227,17 @@ struct EbpfDispatcher {
 }
 
 impl EbpfDispatcher {
-    const MERGE_COUNT_MAX: usize = 2;
-
     fn segmentation_reassembly<'a>(
         packets: &'a mut Vec<Box<MetaPacket<'a>>>,
     ) -> Vec<Box<MetaPacket<'a>>> {
         let mut merge_packets: Vec<Box<MetaPacket<'a>>> = vec![];
-        let mut count = 0;
         for mut p in packets.drain(..) {
             if p.segment_flags != SegmentFlags::Seg {
-                count = 1;
                 merge_packets.push(p);
                 continue;
             }
 
             let Some(last) = merge_packets.last_mut() else {
-                count = 1;
                 merge_packets.push(p);
                 continue;
             };
@@ -250,12 +245,9 @@ impl EbpfDispatcher {
             if last.generate_ebpf_flow_id() == p.generate_ebpf_flow_id()
                 && last.segment_flags == SegmentFlags::Start
                 && last.cap_end_seq + 1 == p.cap_start_seq
-                && count < Self::MERGE_COUNT_MAX
             {
                 last.merge(&mut p);
-                count += 1;
             } else {
-                count = 1;
                 merge_packets.push(p);
             }
         }

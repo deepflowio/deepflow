@@ -1566,6 +1566,7 @@ impl FlowMap {
     fn collect_l7_stats(
         &mut self,
         node: &mut FlowNode,
+        meta_flow_log: &mut Box<FlowLog>,
         new_endpoint: Option<String>,
         new_biz_type: u8,
     ) {
@@ -1582,11 +1583,8 @@ impl FlowMap {
                     .perf_cache
                     .borrow_mut()
                     .pop_timeout_count(flow_id, false); // TODO: flow_end is most likely false, but may also be true
-                let (l7_perf_stats, l7_protocol) = node
-                    .meta_flow_log
-                    .as_mut()
-                    .unwrap()
-                    .copy_and_reset_l7_perf_data(l7_timeout_count as u32);
+                let (l7_perf_stats, l7_protocol) =
+                    meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
 
                 // FIXME: Because the endpoint changes, the index of the first packet of the current endpoint
                 // will also be counted into the index of the previous endpoint, so there will be a slight error
@@ -1636,7 +1634,7 @@ impl FlowMap {
         let flow_config = &config.flow;
         let log_parser_config = &config.log_parser;
 
-        if let Some(log) = node.meta_flow_log.as_mut() {
+        if let Some(mut log) = node.meta_flow_log.take() {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             let local_epc_id = match config.ebpf.as_ref() {
                 Some(c) => c.epc_id as i32,
@@ -1649,45 +1647,59 @@ impl FlowMap {
             } else {
                 (0, local_epc_id)
             };
-            match log.parse(
-                flow_config,
-                log_parser_config,
-                meta_packet,
-                is_first_packet_direction,
-                Self::l7_metrics_enabled(flow_config),
-                Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key),
-                &mut self.app_table,
-                local_epc,
-                remote_epc,
-                &self.l7_protocol_checker,
-            ) {
-                Ok(info) => {
-                    if node.tagged_flow.flow.direction_score != ServiceTable::MAX_SCORE {
-                        // After perf.parse() success, meta_packet's direction is determined.
-                        // Here we determine whether to reverse flow.
-                        self.rectify_flow_direction(node, meta_packet, is_first_packet);
-                    }
-                    match info {
-                        crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
-                            self.collect_l7_stats(node, s.get_endpoint(), s.get_biz_type());
-                            self.write_to_app_proto_log(flow_config, node, &meta_packet, s);
+
+            for packet in meta_packet {
+                match log.parse(
+                    flow_config,
+                    log_parser_config,
+                    packet,
+                    is_first_packet_direction,
+                    Self::l7_metrics_enabled(flow_config),
+                    Self::l7_log_parse_enabled(flow_config, &packet.lookup_key),
+                    &mut self.app_table,
+                    local_epc,
+                    remote_epc,
+                    &self.l7_protocol_checker,
+                ) {
+                    Ok(info) => {
+                        if node.tagged_flow.flow.direction_score != ServiceTable::MAX_SCORE {
+                            // After perf.parse() success, meta_packet's direction is determined.
+                            // Here we determine whether to reverse flow.
+                            self.rectify_flow_direction(node, packet, is_first_packet);
                         }
-                        crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
-                            for i in m.into_iter() {
-                                self.collect_l7_stats(node, i.get_endpoint(), i.get_biz_type());
-                                self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                        match info {
+                            crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
+                                self.collect_l7_stats(
+                                    node,
+                                    &mut log,
+                                    s.get_endpoint(),
+                                    s.get_biz_type(),
+                                );
+                                self.write_to_app_proto_log(flow_config, node, &packet, s);
                             }
+                            crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
+                                for i in m.into_iter() {
+                                    self.collect_l7_stats(
+                                        node,
+                                        &mut log,
+                                        i.get_endpoint(),
+                                        i.get_biz_type(),
+                                    );
+                                    self.write_to_app_proto_log(flow_config, node, &packet, i);
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
+                    Err(Error::L7ProtocolUnknown) => {
+                        self.flow_perf_counter
+                            .unknown_l7_protocol
+                            .fetch_add(1, Ordering::Relaxed);
+                    }
+                    Err(e) => log::trace!("unhandled log parse error: {}", e),
                 }
-                Err(Error::L7ProtocolUnknown) => {
-                    self.flow_perf_counter
-                        .unknown_l7_protocol
-                        .fetch_add(1, Ordering::Relaxed);
-                }
-                Err(e) => log::trace!("unhandled log parse error: {}", e),
             }
+            node.meta_flow_log = Some(log);
         }
     }
 
