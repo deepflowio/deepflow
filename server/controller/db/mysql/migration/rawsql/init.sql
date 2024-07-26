@@ -76,24 +76,6 @@ CREATE TABLE IF NOT EXISTS process (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
 
-CREATE TABLE IF NOT EXISTS prometheus_target (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    lcuuid              CHAR(64) DEFAULT '',
-    instance            VARCHAR(255) DEFAULT '',
-    job                 VARCHAR(255) DEFAULT '',
-    scrape_url          VARCHAR(2083) DEFAULT '',
-    other_labels        TEXT COMMENT 'separated by ,',
-    epc_id              INTEGER NOT NULL DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    pod_cluster_id      INTEGER,
-    create_method       TINYINT(1) DEFAULT 1 COMMENT '1.recorder learning 2.prometheus learning',
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
-) ENGINE = innodb DEFAULT CHARSET = utf8mb4 AUTO_INCREMENT = 1;
-TRUNCATE TABLE prometheus_target;
-
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     type                INTEGER COMMENT '1.Server 3.Gateway 4.DFI',

@@ -87,7 +87,6 @@ func GetManager() *Manager {
 				PubSubTypePodReplicaSet:         NewPodReplicaSet(),
 				PubSubTypePod:                   NewPod(),
 				PubSubTypeProcess:               NewProcess(),
-				PubSubTypePrometheusTarget:      NewPrometheusTarget(),
 			},
 		}
 	})

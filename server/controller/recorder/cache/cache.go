@@ -255,7 +255,6 @@ func (c *Cache) Refresh() {
 	c.refreshWANIPs()
 	c.refreshLANIPs()
 	c.refreshProcesses()
-	// c.refreshPrometheusTarget()
 }
 
 func (c *Cache) AddRegion(item *mysql.Region) {
@@ -1482,29 +1481,6 @@ func (c *Cache) refreshProcesses() {
 	}
 
 	c.AddProcesses(processes)
-}
-
-func (c *Cache) AddPrometheusTargets(items []*mysql.PrometheusTarget) {
-	for _, item := range items {
-		c.DiffBaseDataSet.AddPrometheusTarget(item, c.Sequence, c.ToolDataSet)
-	}
-}
-
-func (c *Cache) DeletePrometheusTargets(lcuuids []string) {
-	for _, lcuuid := range lcuuids {
-		c.DiffBaseDataSet.DeletePrometheusTarget(lcuuid)
-	}
-}
-
-func (c *Cache) refreshPrometheusTarget() {
-	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN), c.metadata.LogPrefixes)
-	var prometheusTargets []*mysql.PrometheusTarget
-	if err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid, ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER).Find(&prometheusTargets).Error; err != nil {
-		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, err), c.metadata.LogPrefixes)
-		return
-	}
-
-	c.AddPrometheusTargets(prometheusTargets)
 }
 
 func (c *Cache) AddVIPs(items []*mysql.VIP) {

@@ -290,14 +290,6 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	}
 	k.k8sInfo = k8sInfo
 
-	prometheusTargets, err := k.getPrometheusTargets()
-	if err != nil {
-		return model.KubernetesGatherResource{
-			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
-			ErrorMessage: err.Error(),
-		}, err
-	}
-
 	podCluster, err := k.getPodCluster()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
@@ -385,10 +377,8 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		PodReplicaSets:         replicaSets,
 		PodGroups:              podGroups,
 		Pods:                   pods,
-		PrometheusTargets:      prometheusTargets,
 	}
 
-	k.cloudStatsd.RefreshAPIMoniter("PrometheusTarget", len(prometheusTargets), time.Time{})
 	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(k)
 	return resource, nil
