@@ -467,18 +467,6 @@ type Process struct {
 	SubDomainLcuuid string    `json:"sub_domain_lcuuid"`
 }
 
-type PrometheusTarget struct {
-	Lcuuid            string `json:"lcuuid,omitempty" binding:"required"`
-	ScrapeURL         string `json:"scrape_url" binding:"required"`
-	Instance          string `json:"instance" binding:"required"`
-	Job               string `json:"job" binding:"required"`
-	OtherLabels       string `json:"other_labels" binding:"required"`
-	SubDomainLcuuid   string `json:"sub_domain_lcuuid,omitempty"`
-	PodClusterLcuuid  string `json:"pod_cluster_lcuuid" binding:"required"`
-	VPCLcuuid         string `json:"vpc_lcuuid,omitempty"`
-	HonorLabelsConfig bool   `json:"honor_labels_config" binding:"required"`
-}
-
 type SubDomainResource struct {
 	Verified               bool `json:"verified"`
 	ErrorState             int
@@ -502,7 +490,6 @@ type SubDomainResource struct {
 	PodReplicaSets         []PodReplicaSet
 	Pods                   []Pod
 	Processes              []Process
-	PrometheusTargets      []PrometheusTarget
 }
 
 type Resource struct {
@@ -551,7 +538,6 @@ type Resource struct {
 	PodIngressRules        []PodIngressRule
 	PodIngressRuleBackends []PodIngressRuleBackend
 	Processes              []Process
-	PrometheusTargets      []PrometheusTarget
 	SubDomainResources     map[string]SubDomainResource
 }
 

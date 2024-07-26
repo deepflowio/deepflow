@@ -258,7 +258,6 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	deleteAndPublish[mysql.PodReplicaSet](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
 	deleteAndPublish[mysql.Pod](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 	deleteAndPublish[mysql.Process](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, c.toolData)
-	// deleteAndPublish[mysql.PrometheusTarget](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, c.toolData)
 	log.Info("clean soft deleted resources completed", c.org.LogPrefix)
 }
 

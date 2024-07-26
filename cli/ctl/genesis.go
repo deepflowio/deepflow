@@ -62,19 +62,10 @@ func RegisterGenesisCommand() *cobra.Command {
 	}
 	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type: '*version.Info | *v1.Pod | *v1.ConfigMap | *v1.Namespace | \n*v1.Service | *v1.Deployment | *v1.DaemonSet | *v1.ReplicaSet | *v1beta1.Ingress | \n*v1.CloneSet | *v1.StatefulSet'")
 
-	prometheusInfo := &cobra.Command{
-		Use:     "prometheus",
-		Short:   "genesis prometheus info",
-		Example: "deepflow-ctl genesis prometheus cluster_id",
-		Run: func(cmd *cobra.Command, args []string) {
-			prometheusInfo(cmd, args)
-		},
-	}
-
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
-		Example: "deepflow-ctl genesis agent -i node_ip [host_ip or agent_id]",
+		Example: "deepflow-ctl genesis agent -i node_ip [agent_id]",
 		Run: func(cmd *cobra.Command, args []string) {
 			agentInfo(cmd, args)
 		},
@@ -92,7 +83,6 @@ func RegisterGenesisCommand() *cobra.Command {
 	genesis.AddCommand(syncInfo)
 	genesis.AddCommand(k8sInfo)
 	genesis.AddCommand(agentInfo)
-	genesis.AddCommand(prometheusInfo)
 	genesis.AddCommand(storageInfo)
 	return genesis
 }
