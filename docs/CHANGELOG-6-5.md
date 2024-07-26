@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Modify the whitelist restructuring format [#7580](https://github.com/deepflowio/deepflow/pull/7580) by [yinjiping](https://github.com/yinjiping)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
@@ -99,3 +100,7 @@
 
 #### Testing
 * chore: use the latest go version to build server/cli [#7235](https://github.com/deepflowio/deepflow/pull/7235) by [zhangzujian](https://github.com/zhangzujian)
+
+
+#### Refactoring
+* refactor: agent remove prometheus api sync [#7577](https://github.com/deepflowio/deepflow/pull/7577) by [TomatoMr](https://github.com/TomatoMr)
