@@ -67,7 +67,7 @@ func (b *UpdaterBase[MT, KT]) generateOldData() ([]MT, bool) {
 		err = b.db.Unscoped().Find(&items).Error
 	}
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), b.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -78,7 +78,7 @@ func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
 	var items []MT
 	err := mysql.Db.Unscoped().First(&items).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), b.db.LogPrefixORGID)
 		return nil, false
 	}
 	idToItem := make(map[KT]MT)

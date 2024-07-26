@@ -47,7 +47,7 @@ func getVMIdToUidMap(db *mysql.DB) map[int]string {
 	var vms []mysql.VM
 	err := db.Unscoped().Find(&vms).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VM, err))
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VM, err), db.LogPrefixORGID)
 		return idToUidMap
 	}
 	for _, vm := range vms {
@@ -61,7 +61,7 @@ func getRDSIdToUidMap(db *mysql.DB) map[int]string {
 	var rdsInstances []mysql.RDSInstance
 	err := db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_RDS, err))
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_RDS, err), db.LogPrefixORGID)
 		return idToUidMap
 	}
 	for _, rdsInstance := range rdsInstances {
@@ -75,7 +75,7 @@ func getRedisIdToUidMap(db *mysql.DB) map[int]string {
 	var redisInstances []mysql.RedisInstance
 	err := db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_REDIS, err))
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_REDIS, err), db.LogPrefixORGID)
 		return idToUidMap
 	}
 	for _, redisInstance := range redisInstances {
@@ -89,7 +89,7 @@ func getLBIdToUidMap(db *mysql.DB) map[int]string {
 	var lbs []mysql.LB
 	err := db.Unscoped().Find(&lbs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_LB, err))
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_LB, err), db.LogPrefixORGID)
 		return idToUidMap
 	}
 	for _, lb := range lbs {
@@ -103,7 +103,7 @@ func getNatgwIdToUidMap(db *mysql.DB) map[int]string {
 	var natGateways []mysql.NATGateway
 	err := db.Unscoped().Find(&natGateways).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err))
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err), db.LogPrefixORGID)
 		return idToUidMap
 	}
 	for _, natGateway := range natGateways {
@@ -117,7 +117,7 @@ func getVPCIdToUidMap(db *mysql.DB) map[int]string {
 	var vpcs []mysql.VPC
 	err := db.Unscoped().Find(&vpcs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VPC, err))
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VPC, err), db.LogPrefixORGID)
 		return idToUidMap
 	}
 	for _, vpc := range vpcs {
@@ -139,7 +139,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 	}
 	res, err := redis.GetClient().DimensionResource.HGetAll(i.ctx, "deepflow_dimension_resource_ip").Result()
 	if err != nil {
-		log.Error(err)
+		log.Error(err, i.db.LogPrefixORGID)
 		return nil, false
 	}
 	for subnetIDIP, MultiResource := range res {
@@ -150,7 +150,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 		subnetIDStr := subnetIDIPList[0]
 		subnetID, err := strconv.Atoi(subnetIDStr)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, i.db.LogPrefixORGID)
 			return nil, false
 		}
 		if subnetID == 0 {
@@ -162,7 +162,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 		MultiResourceMap := make(map[string]interface{})
 		err = json.Unmarshal([]byte(MultiResource), &MultiResourceMap)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, i.db.LogPrefixORGID)
 			return nil, false
 		}
 		for _, tag := range CH_IP_RESOURCE_TAGS {
@@ -208,13 +208,13 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 		}
 		itemStr, err := json.Marshal(itemMap)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, i.db.LogPrefixORGID)
 			return nil, false
 		}
 		itemStruct := mysql.ChIPResource{}
 		err = json.Unmarshal(itemStr, &itemStruct)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, i.db.LogPrefixORGID)
 			return nil, false
 		}
 		keyToItem[IPResourceKey{IP: ip, SubnetID: subnetID}] = itemStruct

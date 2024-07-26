@@ -41,7 +41,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 	processes, err := query.FindInBatches[mysql.Process](p.db.Unscoped())
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -49,7 +49,7 @@ func (p *ChGProcess) generateNewData() (map[IDKey]mysql.ChGProcess, bool) {
 	for _, process := range processes {
 		teamID, err := tagrecorder.GetTeamID(process.Domain, process.SubDomain)
 		if err != nil {
-			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), process)
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), process, p.db.LogPrefixORGID)
 		}
 
 		if process.DeletedAt.Valid {

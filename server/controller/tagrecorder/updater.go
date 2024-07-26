@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 type UpdaterManager struct {
@@ -167,7 +168,7 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 	for _, orgID := range orgIDs {
 		db, err := mysql.GetDB(orgID)
 		if err != nil {
-			log.Errorf("get org dbinfo fail : %d", orgID)
+			log.Error("get org dbinfo fail", logger.NewORGPrefix(orgID))
 			continue
 		}
 		GetTeamInfo(db)
@@ -236,7 +237,7 @@ func (b *UpdaterComponent[MT, KT]) generateOldData(db *mysql.DB) (map[KT]MT, boo
 		err = db.Unscoped().Find(&items).Error
 	}
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	idToItem := make(map[KT]MT)
@@ -250,7 +251,7 @@ func (b *UpdaterComponent[MT, KT]) generateOneData(db *mysql.DB) (map[KT]MT, boo
 	var items []MT
 	err := db.Unscoped().First(&items).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	idToItem := make(map[KT]MT)

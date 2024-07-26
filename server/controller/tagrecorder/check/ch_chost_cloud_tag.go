@@ -39,7 +39,7 @@ func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysql.ChChostCloudT
 	var vms []mysql.VM
 	err := c.db.Unscoped().Find(&vms).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err), c.db.LogPrefixORGID)
 		return nil, false
 	}
 

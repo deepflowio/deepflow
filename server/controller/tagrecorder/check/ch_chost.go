@@ -42,12 +42,12 @@ func (p *ChChost) generateNewData() (map[IDKey]mysql.ChChost, bool) {
 	)
 	err := p.db.Unscoped().Find(&chosts).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 	err = p.db.Unscoped().Select("id", "ip").Find(&hosts).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 

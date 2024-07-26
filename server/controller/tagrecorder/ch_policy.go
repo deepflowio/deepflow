@@ -41,12 +41,12 @@ func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, 
 	)
 	err := db.Unscoped().Select("id", "name", "policy_acl_group_id", "team_id").Find(&pcapPolicys).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	err = db.Unscoped().Select("id", "name", "policy_acl_group_id", "npb_tunnel_id", "team_id").Find(&npbPolicys).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
