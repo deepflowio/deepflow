@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - eBPF Modify the whitelist restructuring format (#7580) [#7581](https://github.com/deepflowio/deepflow/pull/7581) by [yinjiping](https://github.com/yinjiping)
+* fix: appp_service should be app_service [#7569](https://github.com/deepflowio/deepflow/pull/7569) by [lzf575](https://github.com/lzf575)
 * fix: data under all organizations should be cleared when disk is full [#7565](https://github.com/deepflowio/deepflow/pull/7565) by [lzf575](https://github.com/lzf575)
 * fix: do not pub to tagrecorder [#7563](https://github.com/deepflowio/deepflow/pull/7563) by [askyrie](https://github.com/askyrie)
 * fix: add agent cmd timeout to config [#7536](https://github.com/deepflowio/deepflow/pull/7536) by [roryye](https://github.com/roryye)
@@ -81,6 +83,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: unifies http service log [#7578](https://github.com/deepflowio/deepflow/pull/7578) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: Table alarm_event modify tag support oprerator [#7573](https://github.com/deepflowio/deepflow/pull/7573) by [Ericsssss](https://github.com/Ericsssss)
+* feat: support write flow_tag service [#7550](https://github.com/deepflowio/deepflow/pull/7550) by [lzf575](https://github.com/lzf575)
+* feat: unifies controller prometheus log [#7528](https://github.com/deepflowio/deepflow/pull/7528) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Table alert_event add tag [#7564](https://github.com/deepflowio/deepflow/pull/7564) by [Ericsssss](https://github.com/Ericsssss)
 * feat: alert event add fields [#7558](https://github.com/deepflowio/deepflow/pull/7558) by [lzf575](https://github.com/lzf575)
 * feat: change auto name  [#7557](https://github.com/deepflowio/deepflow/pull/7557) by [duandaa](https://github.com/duandaa)
@@ -174,6 +180,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: agent remove prometheus api sync [#7576](https://github.com/deepflowio/deepflow/pull/7576) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: cli update and deepflow-server update message [#7500](https://github.com/deepflowio/deepflow/pull/7500) by [lzf575](https://github.com/lzf575)
 * refactor: server message update [#7498](https://github.com/deepflowio/deepflow/pull/7498) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: trace_tree add topic field [#7418](https://github.com/deepflowio/deepflow/pull/7418) by [lzf575](https://github.com/lzf575)
