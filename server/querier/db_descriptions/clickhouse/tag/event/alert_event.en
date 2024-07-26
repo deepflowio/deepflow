@@ -52,7 +52,7 @@ pod_node_hostname         , K8s Node                      , The hostname of K8s 
 
 user                       , Creator                    ,
 alert_policy               , AlarmPolicy                ,
-policy_type                , MonitoredObject            ,
+policy_type                , PolicyType                 ,
 event_level                , EventLevel                 ,
 target_tags                , TargetTags                 , 
 metric_value               , MetricValue	            ,
