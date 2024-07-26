@@ -73,7 +73,7 @@ func NewAppServiceTagWriter(
 		counter:           &AppServiceCounter{},
 	}
 	var err error
-	tableName := fmt.Sprintf("%s_appp_service", db)
+	tableName := fmt.Sprintf("%s_app_service", db)
 	w.ckwriter, err = ckwriter.NewCKWriter(
 		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		fmt.Sprintf("tag-%s-%d", tableName, decoderIndex),
