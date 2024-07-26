@@ -1568,9 +1568,6 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	if (conn_info->protocol == PROTO_CUSTOM) {
 		if (conn_info->enable_reasm) {
-			if (conn_info->socket_info_ptr) {
-				conn_info->socket_info_ptr->finish_reasm = true;
-			}
 			conn_info->is_reasm_seg = true;
 		}
 	}
