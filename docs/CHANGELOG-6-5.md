@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - windows compile error [#7589](https://github.com/deepflowio/deepflow/pull/7589) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - missing cbpf l7 log [#7586](https://github.com/deepflowio/deepflow/pull/7586) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - eBPF Modify the whitelist restructuring format [#7580](https://github.com/deepflowio/deepflow/pull/7580) by [yinjiping](https://github.com/yinjiping)
 * fix: data under all organizations should be cleared when disk is full [#7566](https://github.com/deepflowio/deepflow/pull/7566) by [lzf575](https://github.com/lzf575)
 * fix: do not pub to tagrecorder [#7562](https://github.com/deepflowio/deepflow/pull/7562) by [askyrie](https://github.com/askyrie)
@@ -78,6 +80,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - support parallel protocols [#7585](https://github.com/deepflowio/deepflow/pull/7585) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: add agent cmd timeout to config [#7548](https://github.com/deepflowio/deepflow/pull/7548) by [roryye](https://github.com/roryye)
 * feat: Tagrecorder support update team_id [#7544](https://github.com/deepflowio/deepflow/pull/7544) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: sub domain support update team [#7537](https://github.com/deepflowio/deepflow/pull/7537) by [askyrie](https://github.com/askyrie)

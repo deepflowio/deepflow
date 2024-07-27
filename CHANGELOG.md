@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: CVE-2024-35195 vuln [#7590](https://github.com/deepflowio/deepflow/pull/7590) by [fengshunli](https://github.com/fengshunli)
+* fix: agent - windows compile error [#7588](https://github.com/deepflowio/deepflow/pull/7588) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - missing cbpf l7 log [#7587](https://github.com/deepflowio/deepflow/pull/7587) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - eBPF Modify the whitelist restructuring format (#7580) [#7581](https://github.com/deepflowio/deepflow/pull/7581) by [yinjiping](https://github.com/yinjiping)
 * fix: appp_service should be app_service [#7569](https://github.com/deepflowio/deepflow/pull/7569) by [lzf575](https://github.com/lzf575)
 * fix: data under all organizations should be cleared when disk is full [#7565](https://github.com/deepflowio/deepflow/pull/7565) by [lzf575](https://github.com/lzf575)
@@ -83,6 +86,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - support parallel protocols [#7582](https://github.com/deepflowio/deepflow/pull/7582) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: unifies http service log [#7578](https://github.com/deepflowio/deepflow/pull/7578) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Table alarm_event modify tag support oprerator [#7573](https://github.com/deepflowio/deepflow/pull/7573) by [Ericsssss](https://github.com/Ericsssss)
 * feat: support write flow_tag service [#7550](https://github.com/deepflowio/deepflow/pull/7550) by [lzf575](https://github.com/lzf575)
