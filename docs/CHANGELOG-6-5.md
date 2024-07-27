@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Modify the whitelist restructuring format [#7580](https://github.com/deepflowio/deepflow/pull/7580) by [yinjiping](https://github.com/yinjiping)
 * fix: data under all organizations should be cleared when disk is full [#7566](https://github.com/deepflowio/deepflow/pull/7566) by [lzf575](https://github.com/lzf575)
 * fix: do not pub to tagrecorder [#7562](https://github.com/deepflowio/deepflow/pull/7562) by [askyrie](https://github.com/askyrie)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
@@ -112,8 +113,8 @@
 * feat: add change log [#7095](https://github.com/deepflowio/deepflow/pull/7095) by [Nick-0314](https://github.com/Nick-0314)
 
 #### Refactoring
+* refactor: agent remove prometheus api sync [#7577](https://github.com/deepflowio/deepflow/pull/7577) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: Change crate name [#7158](https://github.com/deepflowio/deepflow/pull/7158) by [rvql](https://github.com/rvql)
-
 
 #### Documentation
 * docs: rename opentemetry to opentelemetry [#7246](https://github.com/deepflowio/deepflow/pull/7246) by [lzf575](https://github.com/lzf575)
