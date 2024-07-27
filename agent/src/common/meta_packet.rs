@@ -203,7 +203,6 @@ pub struct MetaPacket<'a> {
     pub raw_from_ebpf: Vec<u8>,
     pub raw_from_ebpf_offset: usize,
     pub sub_packet_index: usize,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub sub_packets: Vec<SubPacket>,
 
     pub socket_id: u64,
@@ -535,7 +534,7 @@ impl<'a> MetaPacket<'a> {
         self.packet_len = packet.len() as u32;
         self.ebpf_type = EbpfType::None;
         let mut size_checker = packet.len() as isize;
-
+        self.sub_packets.push(SubPacket::default());
         // eth
         size_checker -= HeaderType::Eth.min_header_size() as isize;
         if size_checker < 0 {
@@ -1150,12 +1149,7 @@ impl<'a> Iterator for MetaPacket<'a> {
     type Item = &'a mut MetaPacket<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
         if self.sub_packet_index >= self.sub_packets.len() {
-            return None;
-        }
-        #[cfg(target_os = "windows")]
-        if self.sub_packet_index != 0 {
             return None;
         }
 
