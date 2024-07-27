@@ -139,7 +139,6 @@ impl From<u8> for SegmentFlags {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Clone, Debug, Default)]
 pub struct SubPacket {
     timestamp: Timestamp,
