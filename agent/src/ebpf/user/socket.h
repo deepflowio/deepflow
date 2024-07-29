@@ -22,6 +22,8 @@
 #define CACHE_LINE_SIZE 64
 #endif
 
+#define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
+
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
 #define OFFSET_INFER_SERVER_PORT 54583
