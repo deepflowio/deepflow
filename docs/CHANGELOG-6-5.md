@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: Remove useless output from CL [#7593](https://github.com/deepflowio/deepflow/pull/7593) by [roryye](https://github.com/roryye)
 * fix: agent - windows compile error [#7589](https://github.com/deepflowio/deepflow/pull/7589) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - missing cbpf l7 log [#7586](https://github.com/deepflowio/deepflow/pull/7586) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - eBPF Modify the whitelist restructuring format [#7580](https://github.com/deepflowio/deepflow/pull/7580) by [yinjiping](https://github.com/yinjiping)
@@ -80,6 +81,10 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: update trace_tree struct [#7604](https://github.com/deepflowio/deepflow/pull/7604) by [taloric](https://github.com/taloric)
+* feat: agent - eBPF Add delay threshold check for push period [#7598](https://github.com/deepflowio/deepflow/pull/7598) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Add kernel dependency check [#7596](https://github.com/deepflowio/deepflow/pull/7596) by [yinjiping](https://github.com/yinjiping)
+*  feat: add cloud common for h3c [#7551](https://github.com/deepflowio/deepflow/pull/7551) by [askyrie](https://github.com/askyrie)
 * feat: agent - support parallel protocols [#7585](https://github.com/deepflowio/deepflow/pull/7585) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: add agent cmd timeout to config [#7548](https://github.com/deepflowio/deepflow/pull/7548) by [roryye](https://github.com/roryye)
 * feat: Tagrecorder support update team_id [#7544](https://github.com/deepflowio/deepflow/pull/7544) by [xiaochaoren1](https://github.com/xiaochaoren1)
