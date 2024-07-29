@@ -24,7 +24,6 @@ import (
 
 	messagecommon "github.com/deepflowio/deepflow/message/common"
 	"github.com/deepflowio/deepflow/message/trident"
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -48,14 +47,6 @@ type K8SRPCMessage struct {
 	message *trident.KubernetesAPISyncRequest
 }
 
-type PrometheusMessage struct {
-	orgID   int
-	msgType int
-	vtapID  uint32
-	peer    string
-	message *trident.PrometheusAPISyncRequest
-}
-
 type KubernetesInfo struct {
 	ORGID     int
 	ClusterID string
@@ -63,14 +54,6 @@ type KubernetesInfo struct {
 	Version   uint64
 	Epoch     time.Time
 	Entries   []*messagecommon.KubernetesAPIInfo
-}
-
-type PrometheusInfo struct {
-	ORGID     int
-	ClusterID string
-	ErrorMSG  string
-	Epoch     time.Time
-	Entries   []cloudmodel.PrometheusTarget
 }
 
 type GenesisSyncData struct {

@@ -18,20 +18,16 @@ package genesis
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"inet.af/netaddr"
 
-	"github.com/bitly/go-simplejson"
 	tridentcommon "github.com/deepflowio/deepflow/message/common"
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
@@ -968,160 +964,5 @@ func (k *KubernetesRpcUpdater) Start() {
 func (k *KubernetesRpcUpdater) Stop() {
 	if k.kCancel != nil {
 		k.kCancel()
-	}
-}
-
-type PrometheusRpcUpdater struct {
-	kCtx        context.Context
-	kCancel     context.CancelFunc
-	storage     *PrometheusStorage
-	outputQueue queue.QueueReader
-}
-
-func NewPrometheuspInfoRpcUpdater(storage *PrometheusStorage, queue queue.QueueReader, ctx context.Context) *PrometheusRpcUpdater {
-	pCtx, pCancel := context.WithCancel(ctx)
-	return &PrometheusRpcUpdater{
-		kCtx:        pCtx,
-		kCancel:     pCancel,
-		storage:     storage,
-		outputQueue: queue,
-	}
-}
-
-func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([]cloudmodel.PrometheusTarget, error) {
-	result := []cloudmodel.PrometheusTarget{}
-	entries := info.message.GetEntries()
-	for index, e := range entries {
-		pJobNameToHonorLabelsConfig := map[string]bool{}
-		configOut, err := genesiscommon.ParseCompressedInfo(e.GetConfigCompressedInfo())
-		if err != nil {
-			log.Warningf("index (%d): config decompress error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		cEntryJson, err := simplejson.NewJson(configOut.Bytes())
-		if err != nil {
-			log.Warningf("index (%d): config marshal json error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		cStatus := cEntryJson.Get("status").MustString()
-		if cStatus != "success" {
-			errMSG := fmt.Sprintf("index (%d): config api status (%s)", index+1, cStatus)
-			log.Warning(errMSG)
-			return []cloudmodel.PrometheusTarget{}, errors.New(errMSG)
-		}
-		prometheusConfig, err := genesiscommon.ParseYMAL(cEntryJson.GetPath("data", "yaml").MustString())
-		if err != nil {
-			log.Warningf("index (%d): config parse yaml error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		for _, scrapeConfig := range prometheusConfig.ScrapeConfigs {
-			pJobNameToHonorLabelsConfig[scrapeConfig.JobName] = scrapeConfig.HonorLabels
-		}
-
-		targetOut, err := genesiscommon.ParseCompressedInfo(e.GetTargetCompressedInfo())
-		if err != nil {
-			log.Warningf("index (%d): target decompress error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		tEntryJson, err := simplejson.NewJson(targetOut.Bytes())
-		if err != nil {
-			log.Warningf("index (%d): target marshal json error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		tStatus := tEntryJson.Get("status").MustString()
-		if tStatus != "success" {
-			errMSG := fmt.Sprintf("index (%d): target api status (%s)", index+1, tStatus)
-			log.Warning(errMSG)
-			return []cloudmodel.PrometheusTarget{}, errors.New(errMSG)
-		}
-		targets := tEntryJson.GetPath("data", "activeTargets")
-		for t := range targets.MustArray() {
-			target := targets.GetIndex(t)
-			scrapeUrl := target.Get("scrapeUrl").MustString()
-			labels := target.Get("labels")
-			job := labels.Get("job").MustString()
-			instance := labels.Get("instance").MustString()
-
-			labelsSlice := []string{}
-			honorLabelsConfig, ok := pJobNameToHonorLabelsConfig[job]
-			if !ok {
-				honorLabelsConfig = true
-			}
-			labelsMap := labels.MustMap()
-			delete(labelsMap, "job")
-			delete(labelsMap, "instance")
-			keys := []string{}
-			for key := range labelsMap {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				v := labelsMap[k]
-				vString, ok := v.(string)
-				if !ok {
-					vString = ""
-				}
-				newString := k + ":" + vString
-				labelsSlice = append(labelsSlice, newString)
-			}
-
-			otherLabelsString := strings.Join(labelsSlice, ", ")
-
-			result = append(result, cloudmodel.PrometheusTarget{
-				ScrapeURL:         scrapeUrl,
-				Job:               job,
-				Instance:          instance,
-				OtherLabels:       otherLabelsString,
-				HonorLabelsConfig: honorLabelsConfig,
-			})
-		}
-	}
-
-	return result, nil
-}
-
-func (p *PrometheusRpcUpdater) run() {
-	currentVersion := map[string]uint64{}
-	for {
-		info := p.outputQueue.Get().(PrometheusMessage)
-		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("prometheus from (%s) vtap_id (%v) type (%v) exit", info.peer, info.vtapID, info.msgType)
-			break
-		}
-		// 更新和保存内存数据
-		var err error
-		var entries []cloudmodel.PrometheusTarget
-		clusterID := info.message.GetClusterId()
-		version := info.message.GetVersion()
-		errMSG := info.message.GetErrorMsg()
-		cVersion := currentVersion[clusterID]
-		parseFlag := version != cVersion
-		if errMSG == "" && parseFlag {
-			entries, err = p.ParsePrometheusEntries(info)
-			if err != nil {
-				errMSG = err.Error()
-			}
-			currentVersion[clusterID] = version
-		}
-
-		log.Debugf("prometheus from %s vtap_id %v received cluster_id %s version %v,  error message (%s)", info.peer, info.vtapID, clusterID, version, errMSG)
-
-		p.storage.Add(info.orgID, parseFlag, PrometheusInfo{
-			ORGID:     info.orgID,
-			ClusterID: clusterID,
-			Entries:   entries,
-			Epoch:     time.Now(),
-			ErrorMSG:  errMSG,
-		})
-	}
-}
-
-func (p *PrometheusRpcUpdater) Start() {
-	go p.run()
-}
-
-func (p *PrometheusRpcUpdater) Stop() {
-	if p.kCancel != nil {
-		p.kCancel()
 	}
 }

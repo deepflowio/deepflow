@@ -182,8 +182,6 @@ func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.Res
 			listener.NewPodReplicaSet(d.cache)),
 		updater.NewPod(d.cache, cloudData.Pods).RegisterListener(
 			listener.NewPod(d.cache, d.eventQueue)),
-		// updater.NewPrometheusTarget(d.cache, cloudData.PrometheusTargets).RegisterListener(
-		// 	listener.NewPrometheusTarget(d.cache)),
 		updater.NewNetwork(d.cache, cloudData.Networks).RegisterListener(
 			listener.NewNetwork(d.cache)),
 		updater.NewSubnet(d.cache, cloudData.Subnets).RegisterListener(
