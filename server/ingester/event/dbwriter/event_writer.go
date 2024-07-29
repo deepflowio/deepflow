@@ -68,6 +68,8 @@ func (w *EventWriter) Write(e *EventStore) {
 }
 
 func (w *EventWriter) WriteAlertEvent(e *AlertEventStore) {
+	e.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 	w.ckWriter.Put(e)
 }
 

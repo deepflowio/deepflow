@@ -44,7 +44,7 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_ADMIN:  []string{"deepflow_server"},
 	DB_NAME_DEEPFLOW_TENANT: []string{"deepflow_collector"},
-	DB_NAME_EVENT:           []string{"event", "perf_event", "alarm_event"},
+	DB_NAME_EVENT:           []string{"event", "perf_event", "alert_event"},
 	DB_NAME_PROFILE:         []string{"in_process"},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
 	DB_NAME_APPLICATION_LOG: []string{"log"},

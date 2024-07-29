@@ -17,7 +17,7 @@
 package encoder
 
 import (
-	"errors"
+	"fmt"
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -57,11 +57,13 @@ func newIDAllocator(org *common.ORG, resourceType string, min, max int) idAlloca
 
 func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	if len(ia.usableIDs) == 0 {
-		return nil, errors.New(ia.org.Logf("%s has no more usable ids, usable ids count: 0", ia.resourceType))
+		log.Errorf("%s has no more usable ids, usable ids count: 0", ia.resourceType, ia.org.LogPrefix)
+		return nil, fmt.Errorf("%s has no more usable ids, usable ids count: 0", ia.resourceType)
 	}
 
 	if len(ia.usableIDs) < count {
-		return nil, errors.New(ia.org.Logf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count))
+		log.Errorf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count, ia.org.LogPrefix)
+		return nil, fmt.Errorf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count)
 	}
 
 	ids = make([]int, count)
@@ -72,22 +74,23 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 		return
 	}
 	if len(inUseIDs) != 0 {
-		return nil, errors.New(ia.org.Logf("%s ids: %v are in use", ia.resourceType, inUseIDs))
+		log.Errorf("%s ids: %v are in use", ia.resourceType, inUseIDs, ia.org.LogPrefix)
+		return nil, fmt.Errorf("%s ids: %v are in use", ia.resourceType, inUseIDs)
 	}
 
-	log.Info(ia.org.Logf("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids)))
+	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids), ia.org.LogPrefix)
 	ia.usableIDs = ia.usableIDs[count:]
 	return
 }
 
 func (ia *idAllocator) refresh() error {
-	log.Debug(ia.org.Logf("refresh %s id pools started", ia.resourceType))
+	log.Debugf("refresh %s id pools started", ia.resourceType, ia.org.LogPrefix)
 	inUseIDSet, err := ia.rawDataProvider.load()
 	if err != nil {
 		return err
 	}
 	ia.usableIDs = ia.getSortedUsableIDs(ia.getAllIDSet(), inUseIDSet)
-	log.Debug(ia.org.Logf("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs)))
+	log.Debugf("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs), ia.org.LogPrefix)
 	return nil
 }
 

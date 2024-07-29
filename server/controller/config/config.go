@@ -79,6 +79,7 @@ type ControllerConfig struct {
 	NoTeamIDRefused                bool   `default:"false" yaml:"no-teamid-refused"`
 	AllAgentConnectToNatIP         bool   `default:"false" yaml:"all-agent-connect-to-nat-ip"`
 	NoIPOverlapping                bool   `default:"false" yaml:"no-ip-overlapping"`
+	AgentCommandTimeout            int    `default:"30" yaml:"agent-cmd-timeout"`
 
 	DFWebService DFWebService   `yaml:"df-web-service"`
 	FPermit      common.FPermit `yaml:"fpermit"`

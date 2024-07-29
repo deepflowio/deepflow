@@ -43,6 +43,12 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 	}
 	labelType := ""
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+	if table == "alert_event" {
+		if ok {
+			tagTranslator := tagItem.TagTranslator
+			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
+		}
+	}
 	if !ok {
 		name := strings.Trim(name, "`")
 		if strings.HasPrefix(name, "k8s.label.") {

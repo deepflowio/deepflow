@@ -191,7 +191,7 @@ func UpdateAnalyzer(
 		return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
 	}
 
-	log.Infof("update analyzer (%s) config %v", analyzer.Name, analyzerUpdate)
+	log.Infof("update analyzer (%s) config %v", analyzer.Name, analyzerUpdate, dbInfo.LogPrefixORGID)
 
 	tx := db.Begin()
 	defer func() {
@@ -441,7 +441,7 @@ func DeleteAnalyzer(orgID int, lcuuid string, m *monitor.AnalyzerCheck) (resp ma
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("analyzer (%s) not found", lcuuid))
 	}
 
-	log.Infof("delete analyzer (%s)", analyzer.Name)
+	log.Infof("delete analyzer (%s)", analyzer.Name, dbInfo.LogPrefixORGID)
 
 	db.Where("analyzer_ip = ?", analyzer.IP).Count(&vtapCount)
 	if vtapCount > 0 {

@@ -19,15 +19,15 @@ package encoder
 import (
 	"sync"
 
-	"github.com/op/go-logging"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/message/controller"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
-var log = logging.MustGetLogger("prometheus.synchronizer.encoder")
+var log = logger.MustGetLogger("prometheus.synchronizer.encoder")
 
 type Encoder struct {
 	org *common.ORG
@@ -41,10 +41,10 @@ type Encoder struct {
 }
 
 func newEncoder(cfg prometheuscfg.Config, orgID int) (*Encoder, error) {
-	log.Infof("[OID-%d] new prometheus encoder", orgID)
+	log.Infof("new prometheus encoder", logger.NewORGPrefix(orgID))
 	org, err := common.NewORG(orgID)
 	if err != nil {
-		log.Errorf("[OID-%d] failed to create org object: %s", orgID, err.Error())
+		log.Errorf("failed to create org object", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 	e := &Encoder{org: org}
@@ -60,7 +60,7 @@ func (e *Encoder) Refresh() error {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 
-	log.Info(e.org.Log("prometheus encoder refresh started"))
+	log.Infof("prometheus encoder refresh started", e.org.LogPrefix)
 	e.label.refresh()
 	eg := &errgroup.Group{}
 	common.AppendErrGroup(eg, e.metricName.refresh)
@@ -68,7 +68,7 @@ func (e *Encoder) Refresh() error {
 	common.AppendErrGroup(eg, e.labelValue.refresh)
 	common.AppendErrGroup(eg, e.LabelLayout.refresh)
 	err := eg.Wait()
-	log.Info(e.org.Log("prometheus encoder refresh completed"))
+	log.Infof("prometheus encoder refresh completed", e.org.LogPrefix)
 	return err
 }
 

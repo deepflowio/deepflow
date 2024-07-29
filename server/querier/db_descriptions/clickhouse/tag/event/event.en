@@ -24,7 +24,7 @@ pod_service           , K8s Service                  ,
 pod_group_type        , K8s Workload Type            ,
 pod_group             , K8s Workload                 ,
 pod                   , K8s POD                      ,
-service               , Service                      ,
+service               , Service                      , Deprecated，please use pod_service
 auto_instance_type    , Auto Instance Type           , The type of 'auto_instance'.
 auto_instance         , Auto Instance Tag            , The instance of IP, when the instance is an IP, auto_instance_id displayed as a subnet ID.
 auto_service_type     , Auto Service Type         , The type of 'auto_service'.

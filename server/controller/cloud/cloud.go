@@ -457,7 +457,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 			lcuuid := subDomain.(string)
 			oldSubDomain := c.kubernetesGatherTaskMap[lcuuid]
 			newSubDomain := lcuuidToSubDomain[lcuuid]
-			if oldSubDomain.SubDomainConfig != newSubDomain.Config || oldSubDomain.kubernetesGather.Name != newSubDomain.Name {
+			if oldSubDomain.SubDomainConfig != newSubDomain.Config || oldSubDomain.kubernetesGather.Name != newSubDomain.Name || oldSubDomain.kubernetesGather.TeamID != newSubDomain.TeamID {
 				log.Infof("oldSubDomainConfig: %s", oldSubDomain.SubDomainConfig)
 				log.Infof("newSubDomainConfig: %s", newSubDomain.Config)
 				c.kubernetesGatherTaskMap[lcuuid].Stop()

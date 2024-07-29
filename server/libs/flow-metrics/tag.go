@@ -981,7 +981,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	if code&L7Protocol != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_service", ckdb.LowCardinalityString))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.String))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.LowCardinalityString))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("endpoint", ckdb.String))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("biz_type", ckdb.UInt8).SetComment("Business Type"))
 	}

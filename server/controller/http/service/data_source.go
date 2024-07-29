@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
@@ -94,7 +95,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"Prometheus 数据", // prometheus.*
 	"事件-资源变更事件",     // event.event
 	"事件-IO 事件",      // event.perf_event
-	"事件-告警事件",       // event.alarm_event
+	"事件-告警事件",       // event.alert_event
 	"应用-性能剖析",       // profile.in_process
 	"网络-网络策略",       // flow_metrics.traffic_policy
 	"日志-日志数据",       // application_log.log
@@ -314,7 +315,7 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 		}
 		log.Infof(
 			"config analyzer (%s) add data_source (%s) complete",
-			analyzer.IP, dataSource.DisplayName,
+			analyzer.IP, dataSource.DisplayName, dbInfo.LogPrefixORGID,
 		)
 	}
 	if len(errStrs) > 0 {
@@ -410,7 +411,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 			continue
 		}
 		log.Infof("config analyzer (%s) mod data_source (%s) complete, retention time change: %ds -> %ds",
-			analyzer.IP, dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
+			analyzer.IP, dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime, dbInfo.LogPrefixORGID)
 	}
 
 	if len(errs) == 0 {
@@ -423,7 +424,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 			return model.DataSource{}, err
 		}
 		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
-			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime)
+			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime, dbInfo.LogPrefixORGID)
 	}
 	var errStrs []string
 	for _, e := range errs {
@@ -493,7 +494,7 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 		)
 	}
 
-	log.Infof("delete data_source (%s)", dataSource.DisplayName)
+	log.Infof("delete data_source (%s)", dataSource.DisplayName, dbInfo.LogPrefixORGID)
 
 	// 调用ingester API配置clickhouse
 	var analyzers []mysql.Analyzer
@@ -513,7 +514,7 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 		}
 		log.Infof(
 			"config analyzer (%s) del data_source (%s) complete",
-			analyzer.IP, dataSource.DisplayName,
+			analyzer.IP, dataSource.DisplayName, dbInfo.LogPrefixORGID,
 		)
 	}
 
@@ -556,7 +557,7 @@ func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, base
 		"retention-time":            dataSource.RetentionTime,
 	}
 	if len(d.ipToController) == 0 {
-		log.Warningf("ORGID-%d get ip to controller nil", orgID)
+		log.Warningf("get ip to controller nil", logger.NewORGPrefix(orgID))
 	}
 	port := d.cfg.IngesterApi.NodePort
 	if controller, ok := d.ipToController[ip]; ok {
@@ -566,7 +567,7 @@ func (d *DataSource) CallIngesterAPIAddRP(orgID int, ip string, dataSource, base
 		}
 	}
 	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), port)
-	log.Infof("call add data_source, url: %s, body: %v", url, body)
+	log.Infof("call add data_source, url: %s, body: %v", url, body, logger.NewORGPrefix(orgID))
 	_, err = common.CURLPerform("POST", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
 		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
@@ -586,7 +587,7 @@ func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysql
 		"retention-time":            dataSource.RetentionTime,
 	}
 	if len(d.ipToController) == 0 {
-		log.Warningf("ORGID-%d get ip to controller nil", orgID)
+		log.Warningf("get ip to controller nil", logger.NewORGPrefix(orgID))
 	}
 	port := d.cfg.IngesterApi.NodePort
 	if controller, ok := d.ipToController[ip]; ok {
@@ -596,7 +597,7 @@ func (d *DataSource) CallIngesterAPIModRP(orgID int, ip string, dataSource mysql
 		}
 	}
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), port)
-	log.Infof("call mod data_source, url: %s, body: %v", url, body)
+	log.Infof("call mod data_source, url: %s, body: %v", url, body, logger.NewORGPrefix(orgID))
 	_, err = common.CURLPerform("PATCH", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
 		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
@@ -615,7 +616,7 @@ func (d *DataSource) CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql
 		"db":                        getTableName(dataSource.DataTableCollection),
 	}
 	if len(d.ipToController) == 0 {
-		log.Warningf("ORGID-%d get ip to controller nil", orgID)
+		log.Warningf("get ip to controller nil", logger.NewORGPrefix(orgID))
 	}
 	port := d.cfg.IngesterApi.NodePort
 	if controller, ok := d.ipToController[ip]; ok {
@@ -625,7 +626,7 @@ func (d *DataSource) CallIngesterAPIDelRP(orgID int, ip string, dataSource mysql
 		}
 	}
 	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), port)
-	log.Infof("call del data_source, url: %s, body: %v", url, body)
+	log.Infof("call del data_source, url: %s, body: %v", url, body, logger.NewORGPrefix(orgID))
 	_, err = common.CURLPerform("DELETE", url, body, common.WithORGHeader(strconv.Itoa(orgID)))
 	if err != nil && !(errors.Is(err, httpcommon.ErrorPending) || errors.Is(err, httpcommon.ErrorFail)) {
 		err = fmt.Errorf("%w, %s", httpcommon.ErrorFail, err.Error())
@@ -639,7 +640,7 @@ func getName(interval int, collection string) (string, error) {
 		// return value: flow_log.l4_flow_log, flow_log.l7_flow_log,
 		// flow_log.l4_packet, flow_log.l7_packet,
 		// deepflow_tenant, deepflow_admin, ext_metrics, prometheus,
-		// event.event, event.perf_event, event.alarm_event
+		// event.event, event.perf_event, event.alert_event
 		return strings.TrimSuffix(collection, ".*"), nil
 	case 1: // one second
 		return "1s", nil
@@ -728,7 +729,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 			}
 		}
 		log.Infof(
-			"config analyzer (%s) mod data_source (%s) complete", ip, dataSource.DisplayName,
+			"config analyzer (%s) mod data_source (%s) complete", ip, dataSource.DisplayName, logger.NewORGPrefix(orgID),
 		)
 	}
 
