@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: Remove useless output from CL [#7593](https://github.com/deepflowio/deepflow/pull/7593) by [roryye](https://github.com/roryye)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
@@ -57,6 +58,10 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: update trace_tree struct [#7604](https://github.com/deepflowio/deepflow/pull/7604) by [taloric](https://github.com/taloric)
+* feat: agent - eBPF Add delay threshold check for push period [#7598](https://github.com/deepflowio/deepflow/pull/7598) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Add kernel dependency check [#7596](https://github.com/deepflowio/deepflow/pull/7596) by [yinjiping](https://github.com/yinjiping)
+*  feat: add cloud common for h3c [#7551](https://github.com/deepflowio/deepflow/pull/7551) by [askyrie](https://github.com/askyrie)
 * feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
 * feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
