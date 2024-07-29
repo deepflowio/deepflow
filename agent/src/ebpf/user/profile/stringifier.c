@@ -194,42 +194,90 @@ static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
-void rewrite_java_symbol(char *sym) {
+// Demangle with
+// https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3
+char *rewrite_java_symbol(char *sym) {
 	int len = strlen(sym);
 	if (len == 0) {
-		return;
+		return NULL;
 	}
 
-	int i, cls_start = 1;
-	bool is_array = false;
+	int i = 0, j = 0;
+	for (i = 0; i < len && sym[i] == '['; i++) {}
+	int array_dims = i;
 
-	switch (sym[0]) {
-	case '[':
-		if (len <= 1 || sym[1] != 'L') {
-			break;
-		}
-		is_array = true;
-		cls_start++;
-		// fallthrough to handle "[LClassname;::methodName"
+	// make room for array ']'s and base type name expension
+	int new_len = len + array_dims + 16;
+	char *dst = clib_mem_alloc_aligned("symbol_str", new_len, 0, NULL);
+	if (dst == NULL) {
+		return dst;
+	}
+	memset(dst, 0, new_len);
+	int offset = 0;
+
+	switch (sym[i]) {
+	case 'B':
+		offset += snprintf(dst + offset, new_len - offset, "byte");
+		i++;
+		break;
+	case 'C':
+		offset += snprintf(dst + offset, new_len - offset, "char");
+		i++;
+		break;
+	case 'D':
+		offset += snprintf(dst + offset, new_len - offset, "double");
+		i++;
+		break;
+	case 'F':
+		offset += snprintf(dst + offset, new_len - offset, "float");
+		i++;
+		break;
+	case 'I':
+		offset += snprintf(dst + offset, new_len - offset, "int");
+		i++;
+		break;
+	case 'J':
+		offset += snprintf(dst + offset, new_len - offset, "long");
+		i++;
+		break;
+	case 'S':
+		offset += snprintf(dst + offset, new_len - offset, "short");
+		i++;
+		break;
+	case 'Z':
+		offset += snprintf(dst + offset, new_len - offset, "boolean");
+		i++;
+		break;
 	case 'L':
 		// LClassName;::methodName
-		for (i = cls_start; i < len; i++) {
-			if (sym[i] == ';') {
+		for (j = i + 1; j < len; j++) {
+			if (sym[j] == ';') {
 				break;
 			}
 		}
-		if (i != len) {
-			memcpy(sym, sym + cls_start, i - cls_start);
-			memcpy(sym + i - cls_start, sym + i + 1, len - i - 1);
-			memset(sym + len - cls_start - 1, '\0', cls_start + 1);
-			if (is_array) {
-				memcpy(sym + len - cls_start - 1, "[]", 2);
-			}
+		if (j == len) {
+			goto failed;
 		}
+		memcpy(dst + offset, sym + i + 1, j - (i + 1));
+		offset += j - i;
+		i = j + 1;
 		break;
 	default:
-		break;
+		goto failed;
 	}
+
+	for (int j = 0; j < array_dims; j++) {
+		offset += snprintf(dst + offset, new_len - offset, "[]");
+	}
+
+	// rest
+	snprintf(dst + offset, new_len - offset, sym + i);
+
+	return dst;
+
+failed:
+	clib_mem_free(dst);
+	return NULL;
 }
 
 static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
@@ -255,7 +303,11 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 				*sym_ptr = proc_symbol_name_fetch(pid, sym);
 				if (p->is_java) {
 					// handle java encoded symbols
-					rewrite_java_symbol(*sym_ptr);
+					char *new_sym = rewrite_java_symbol(*sym_ptr);
+					if (new_sym != NULL) {
+						clib_mem_free(*sym_ptr);
+						*sym_ptr = new_sym;
+					}
 				}
 				pthread_mutex_unlock(&p->mutex);
 				return ret;

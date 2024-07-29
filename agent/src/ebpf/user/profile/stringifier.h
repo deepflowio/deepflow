@@ -47,7 +47,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      stack_str_hash_t *h,
 				      bool new_cache,
 				      char *process_name, void *info_p, bool ignore_libs);
-void rewrite_java_symbol(char *sym);
+char *rewrite_java_symbol(char *sym);
 
 #endif /* AARCH64_MUSL */
 #endif /* DF_USER_STRINGIFIER_H */
