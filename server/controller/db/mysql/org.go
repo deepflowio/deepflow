@@ -155,7 +155,7 @@ func SyncDefaultOrgData[T any](data []T, excludeFields []string) error {
 			return nil
 		})
 		if err != nil {
-			log.Errorf("org(id:%d, name:%s) error: %s", dbInfo.ORGID, dbInfo.Name, err.Error())
+			log.Errorf("%s", err.Error(), dbInfo.LogPrefixORGID)
 		}
 	}
 	return nil

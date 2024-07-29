@@ -259,7 +259,7 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 		return nil, err
 	}
 	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) get remote commands and linux namespaces",
-		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name)
+		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, dbInfo.LogPrefixORGID)
 
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
@@ -301,12 +301,12 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 			if len(GetCommands(key, requestID)) != 0 {
 				return &model.RemoteExecResp{RemoteCommand: GetCommands(key, requestID)}, nil
 			}
-			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key, requestID))
+			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key, requestID), dbInfo.LogPrefixORGID)
 			return nil, errors.New(key)
 		default:
 			if len(GetCommands(key, requestID)) != 0 && len(GetNamespaces(key, requestID)) != 0 {
 				log.Infof("len(commands)=%d, len(namespaces)=%d",
-					len(GetCommands(key, requestID)), len(GetNamespaces(key, requestID)))
+					len(GetCommands(key, requestID)), len(GetNamespaces(key, requestID)), dbInfo.LogPrefixORGID)
 				return &model.RemoteExecResp{
 					RemoteCommand:  GetCommands(key, requestID),
 					LinuxNamespace: GetNamespaces(key, requestID),
@@ -329,7 +329,7 @@ func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CM
 	}
 	b, _ := json.Marshal(req)
 	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) run remote command, request: %s",
-		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b))
+		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b), dbInfo.LogPrefixORGID)
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
 	requestID, cmdResp := NewAgentCMDResp(key)
@@ -346,7 +346,7 @@ func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CM
 		select {
 		case <-cmdTimeout:
 			err = fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, timeout)
-			log.Error(err)
+			log.Error(err, dbInfo.LogPrefixORGID)
 			return "", err
 		case _, ok := <-cmdResp.ExecDoneCH:
 			if !ok {
@@ -357,7 +357,7 @@ func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CM
 					" Detailed error information is as follows:\n\n%s", CMD, msg)
 			}
 			content = GetContent(key, requestID)
-			log.Infof("command run content len: %d", len(content))
+			log.Infof("command run content len: %d", len(content), dbInfo.LogPrefixORGID)
 			return content, nil
 		}
 	}

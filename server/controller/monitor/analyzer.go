@@ -219,7 +219,7 @@ func (c *AnalyzerCheck) healthCheck(orgDB *mysql.DB) {
 	for ip, dfhostCheck := range checkExceptionAnalyzers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
 			if err := orgDB.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", ip).Error; err != nil {
-				log.Errorf("delete az_analyzer_connection(ip: %s) error: %s", ip, err.Error())
+				log.Errorf("delete az_analyzer_connection(ip: %s) error: %s", ip, err.Error(), orgDB.LogPrefixORGID)
 			}
 			err := mysql.DefaultDB.Delete(mysql.Analyzer{}, "ip = ?", ip).Error
 			if err != nil {
@@ -241,24 +241,24 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *mysql.DB) {
 	var vtaps []mysql.VTap
 	var noAnalyzerVtapCount int64
 
-	log.Info("vtap analyzer check start")
+	log.Info("vtap analyzer check start", orgDB.LogPrefixORGID)
 
 	ipMap, err := getIPMap(common.HOST_TYPE_ANALYZER)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 	}
 
 	if err := orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 		return
 	}
 	for _, vtap := range vtaps {
 		// check vtap.analyzer_ip is not in controller.ip, set to empty if not exist
 		if _, ok := ipMap[vtap.AnalyzerIP]; !ok {
-			log.Infof("analyzer ip(%s) in vtap(%s) is invalid", vtap.AnalyzerIP, vtap.Name)
+			log.Infof("analyzer ip(%s) in vtap(%s) is invalid", vtap.AnalyzerIP, vtap.Name, orgDB.LogPrefixORGID)
 			vtap.AnalyzerIP = ""
 			if err := orgDB.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("analyzer_ip", "").Error; err != nil {
-				log.Errorf("update vtap(lcuuid: %s, name: %s) analyzer ip to empty error: %v", vtap.Lcuuid, vtap.Name, err)
+				log.Errorf("update vtap(lcuuid: %s, name: %s) analyzer ip to empty error: %v", vtap.Lcuuid, vtap.Name, err, orgDB.LogPrefixORGID)
 			}
 		}
 
@@ -274,7 +274,7 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck(orgDB *mysql.DB) {
 	if noAnalyzerVtapCount > 0 {
 		c.TriggerReallocAnalyzer(orgDB, "")
 	}
-	log.Info("vtap analyzer check end")
+	log.Info("vtap analyzer check end", orgDB.LogPrefixORGID)
 }
 
 func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
@@ -283,14 +283,14 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
 	var azs []mysql.AZ
 	var azAnalyzerConns []mysql.AZAnalyzerConnection
 
-	log.Info("vtap analyzer alloc start")
+	log.Info("vtap analyzer alloc start", orgDB.LogPrefixORGID)
 
 	if err := orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 		return
 	}
 	if err := orgDB.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers).Error; err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 		return
 	}
 
@@ -318,7 +318,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
 
 	// 根据可用区查询region信息
 	if err := orgDB.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs).Error; err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 		return
 	}
 	regionToAZLcuuids := make(map[string][]string)
@@ -361,10 +361,10 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
 		for _, vtap := range noAnalyzerVtaps {
 			// 分配数据节点失败，更新异常错误码
 			if len(analyzerAvailableVTapNum) == 0 {
-				log.Warningf("no available analyzer for vtap (%s)", vtap.Name)
+				log.Warningf("no available analyzer for vtap (%s)", vtap.Name, orgDB.LogPrefixORGID)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
 				if err := orgDB.Model(&vtap).Update("exceptions", exceptions).Error; err != nil {
-					log.Errorf("update vtap(name: %s) exceptions(%d) error: %v", vtap.Name, exceptions, err)
+					log.Errorf("update vtap(name: %s) exceptions(%d) error: %v", vtap.Name, exceptions, err, orgDB.LogPrefixORGID)
 				}
 				continue
 			}
@@ -382,9 +382,9 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(orgDB *mysql.DB, excludeIP string) {
 			analyzerIPToAvailableVTapNum[analyzerAvailableVTapNum[0].Key] -= 1
 
 			// 分配数据节点成功，更新数据节点IP + 清空数据节点分配失败的错误码
-			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[0].Key, vtap.Name)
+			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[0].Key, vtap.Name, orgDB.LogPrefixORGID)
 			if err := orgDB.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key).Error; err != nil {
-				log.Error(err)
+				log.Error(err, orgDB.LogPrefixORGID)
 			}
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
@@ -401,10 +401,10 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 	var analyzers []mysql.Analyzer
 	var regions []mysql.Region
 
-	log.Info("az connection check start")
+	log.Info("az connection check start", orgDB.LogPrefixORGID)
 
 	if err := orgDB.Find(&azs).Error; err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 		return
 	}
 	azLcuuidToName := make(map[string]string)
@@ -414,7 +414,7 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 
 	analyzerIPToConn := make(map[string]mysql.AZAnalyzerConnection)
 	if err := orgDB.Find(&azAnalyzerConns).Error; err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 	}
 	for _, conn := range azAnalyzerConns {
 		analyzerIPToConn[conn.AnalyzerIP] = conn
@@ -424,19 +424,19 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
 			if err := orgDB.Delete(&conn).Error; err != nil {
 				log.Infof("delete analyzer (ip: %s) az (name: %s, lcuuid: %s, region: %s) connection",
-					conn.AnalyzerIP, name, conn.AZ, conn.Region)
+					conn.AnalyzerIP, name, conn.AZ, conn.Region, orgDB.LogPrefixORGID)
 			}
-			log.Infof("delete analyzer (%s) az (%s) connection", conn.AnalyzerIP, name)
+			log.Infof("delete analyzer (%s) az (%s) connection", conn.AnalyzerIP, name, orgDB.LogPrefixORGID)
 		}
 	}
 
 	if err := orgDB.Find(&regions).Error; err != nil {
-		log.Error(err)
+		log.Error(err, orgDB.LogPrefixORGID)
 	}
 	if len(regions) == 1 {
 		var deleteAnalyzers []mysql.Analyzer
 		if err := orgDB.Find(&analyzers).Error; err != nil {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 		for _, analyzer := range analyzers {
 			if _, ok := analyzerIPToConn[analyzer.IP]; ok == false {
@@ -445,13 +445,13 @@ func (c *AnalyzerCheck) azConnectionCheck(orgDB *mysql.DB) {
 		}
 		for _, deleteAnalyzer := range deleteAnalyzers {
 			if err := orgDB.Delete(&deleteAnalyzer).Error; err != nil {
-				log.Infof("delete analyzer (ip: %s, name: %s) error: %s", deleteAnalyzer.IP, deleteAnalyzer.Name, err)
+				log.Infof("delete analyzer (ip: %s, name: %s) error: %s", deleteAnalyzer.IP, deleteAnalyzer.Name, err, orgDB.LogPrefixORGID)
 			}
-			log.Infof("delete analyzer (%s) because no az_analyzer_conn", deleteAnalyzer.IP)
+			log.Infof("delete analyzer (%s) because no az_analyzer_conn", deleteAnalyzer.IP, orgDB.LogPrefixORGID)
 		}
 	}
 
-	log.Info("az connection check end")
+	log.Info("az connection check end", orgDB.LogPrefixORGID)
 }
 
 var SyncAnalyzerExcludeField = []string{"nat_ip", "agg", "state"}

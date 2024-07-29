@@ -20,15 +20,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("db.mysql")
+var log = logger.MustGetLogger("db.mysql")
 var Db *gorm.DB
 
 func InitMySQL(cfg config.MySqlConfig) error {
