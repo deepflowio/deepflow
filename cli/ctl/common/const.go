@@ -195,6 +195,16 @@ const (
 	// attention: following line comments are used by `stringer`
 	PLUGIN_TYPE_WASM PluginType = 1 + iota
 	PLUGIN_TYPE_SO
+	PLUGIN_TYPE_LUA
+)
+
+type PluginUser int
+
+//go:generate stringer -type=PluginUser -trimprefix=PLUGIN_USER_ -linecomment
+const (
+	// attention: following line comments are used by `stringer`
+	PLUGIN_USER_AGENT PluginUser = 1 + iota
+	PLUGIN_USER_SERVER
 )
 
 var (
