@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Modify alert_policy show tag values error #25978 [#7599](https://github.com/deepflowio/deepflow/pull/7599) by [Ericsssss](https://github.com/Ericsssss)
+* fix: modify resource delete error #25844 [#7552](https://github.com/deepflowio/deepflow/pull/7552) by [Ericsssss](https://github.com/Ericsssss)
 * fix: CVE-2024-35195 vuln [#7590](https://github.com/deepflowio/deepflow/pull/7590) by [fengshunli](https://github.com/fengshunli)
 * fix: agent - windows compile error [#7588](https://github.com/deepflowio/deepflow/pull/7588) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - missing cbpf l7 log [#7587](https://github.com/deepflowio/deepflow/pull/7587) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -86,6 +88,16 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Allow longer java symbol name [#7603](https://github.com/deepflowio/deepflow/pull/7603) by [rvql](https://github.com/rvql)
+* feat: Modify alert_policy node type [#7601](https://github.com/deepflowio/deepflow/pull/7601) by [Ericsssss](https://github.com/Ericsssss)
+* feat: agent - eBPF Add kernel dependency check [#7594](https://github.com/deepflowio/deepflow/pull/7594) by [yinjiping](https://github.com/yinjiping)
+* feat: delete invalid code for promethus target [#7574](https://github.com/deepflowio/deepflow/pull/7574) by [askyrie](https://github.com/askyrie)
+* feat: agent - support consistent timestamp in l7metrics [#7561](https://github.com/deepflowio/deepflow/pull/7561) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: Profile support grafana [#7559](https://github.com/deepflowio/deepflow/pull/7559) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: Use the new logging module [#7530](https://github.com/deepflowio/deepflow/pull/7530) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: update trace_tree struct [#7523](https://github.com/deepflowio/deepflow/pull/7523) by [lzf575](https://github.com/lzf575)
+* feat: update log format [#7519](https://github.com/deepflowio/deepflow/pull/7519) by [askyrie](https://github.com/askyrie)
+* feat: add cloud common for h3c [#7320](https://github.com/deepflowio/deepflow/pull/7320) by [askyrie](https://github.com/askyrie)
 * feat: agent - support parallel protocols [#7582](https://github.com/deepflowio/deepflow/pull/7582) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: unifies http service log [#7578](https://github.com/deepflowio/deepflow/pull/7578) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Table alarm_event modify tag support oprerator [#7573](https://github.com/deepflowio/deepflow/pull/7573) by [Ericsssss](https://github.com/Ericsssss)
