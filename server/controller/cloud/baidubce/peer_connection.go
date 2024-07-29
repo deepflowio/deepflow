@@ -23,12 +23,13 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[string]string) ([]model.PeerConnection, error) {
 	var retPeerConnections []model.PeerConnection
 
-	log.Debug("get peer_connections starting")
+	log.Debug("get peer_connections starting", logger.NewORGPrefix(b.orgID))
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -40,7 +41,7 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 		startTime := time.Now()
 		result, err := vpcClient.ListPeerConn(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListPeerConn", len(result.PeerConns), startTime)
@@ -59,12 +60,12 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 			}
 			localVPCLcuuid, ok := vpcIdToLcuuid[conn.LocalVpcId]
 			if !ok {
-				log.Debugf("peer_connection (%s) local_vpc_id (%s) not found", conn.PeerConnId, conn.LocalVpcId)
+				log.Debugf("peer_connection (%s) local_vpc_id (%s) not found", conn.PeerConnId, conn.LocalVpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			remoteVPCLcuuid, ok := vpcIdToLcuuid[conn.PeerVpcId]
 			if !ok {
-				log.Debugf("peer_connection (%s) remote_vpc_id (%s) not found", conn.PeerConnId, conn.PeerVpcId)
+				log.Debugf("peer_connection (%s) remote_vpc_id (%s) not found", conn.PeerConnId, conn.PeerVpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			retPeerConnections = append(retPeerConnections, model.PeerConnection{
@@ -79,6 +80,6 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 		}
 	}
 
-	log.Debug("get peer_connections complete")
+	log.Debug("get peer_connections complete", logger.NewORGPrefix(b.orgID))
 	return retPeerConnections, nil
 }

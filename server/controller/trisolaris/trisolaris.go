@@ -20,13 +20,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/election"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/kubernetes"
@@ -37,7 +37,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 )
 
-var log = logging.MustGetLogger("trisolaris")
+var log = logger.MustGetLogger("trisolaris")
 
 type Trisolaris struct {
 	config         *config.Config

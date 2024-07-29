@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {
@@ -32,12 +33,12 @@ func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {
 	var regionIdToLcuuid map[string]string
 	var zoneNames []string
 
-	log.Info("get region and azs starting")
+	log.Info("get region and azs starting", logger.NewORGPrefix(q.orgID))
 
 	kwargs := []*Param{{"status.1", "active"}}
 	response, err := q.GetResponse("DescribeZones", "zone_set", kwargs)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(q.orgID))
 		return nil, nil, err
 	}
 
@@ -89,6 +90,6 @@ func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {
 		})
 	}
 
-	log.Info("get region and azs complete")
+	log.Info("get region and azs complete", logger.NewORGPrefix(q.orgID))
 	return retRegions, retAZs, nil
 }

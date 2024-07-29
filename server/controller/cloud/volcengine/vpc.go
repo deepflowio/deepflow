@@ -19,12 +19,13 @@ package volcengine
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/vpc"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
 )
 
 func (v *VolcEngine) getVPCs(sess *session.Session) ([]model.VPC, error) {
-	log.Debug("get vpcs starting")
+	log.Debug("get vpcs starting", logger.NewORGPrefix(v.orgID))
 	var vpcs []model.VPC
 
 	var retVPCs []*vpc.VpcForDescribeVpcsOutput
@@ -34,7 +35,7 @@ func (v *VolcEngine) getVPCs(sess *session.Session) ([]model.VPC, error) {
 		input := &vpc.DescribeVpcsInput{MaxResults: &maxResults, NextToken: nextToken}
 		result, err := vpc.New(sess).DescribeVpcs(input)
 		if err != nil {
-			log.Errorf("request volcengine (vpc.DescribeVpcs) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (vpc.DescribeVpcs) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.VPC{}, err
 		}
 		retVPCs = append(retVPCs, result.Vpcs...)
@@ -58,6 +59,6 @@ func (v *VolcEngine) getVPCs(sess *session.Session) ([]model.VPC, error) {
 			RegionLcuuid: v.regionUUID,
 		})
 	}
-	log.Debug("get vpcs complete")
+	log.Debug("get vpcs complete", logger.NewORGPrefix(v.orgID))
 	return vpcs, nil
 }

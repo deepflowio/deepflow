@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (f *FileReader) getRouters(fileInfo *FileInfo) ([]model.VRouter, []model.VInterface, []model.IP, error) {
@@ -37,7 +38,7 @@ func (f *FileReader) getRouters(fileInfo *FileInfo) ([]model.VRouter, []model.VI
 		vpcLcuuid, ok := f.vpcNameToLcuuid[router.VPC]
 		if !ok {
 			err := errors.New(fmt.Sprintf("vpc (%s) not in file", router.VPC))
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(f.orgID))
 			return nil, nil, nil, err
 		}
 
@@ -55,13 +56,13 @@ func (f *FileReader) getRouters(fileInfo *FileInfo) ([]model.VRouter, []model.VI
 			networkLcuuid, ok := f.subnetNameToNetworkLcuuid[port.Subnet]
 			if !ok {
 				err := errors.New(fmt.Sprintf("subnet (%s) not in file", port.Subnet))
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(f.orgID))
 				return nil, nil, nil, err
 			}
 			netType, ok := f.networkLcuuidToNetType[networkLcuuid]
 			if !ok {
 				err := errors.New(fmt.Sprintf("subnet (%s) network not in file", port.Subnet))
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(f.orgID))
 				return nil, nil, nil, err
 			}
 
@@ -80,7 +81,7 @@ func (f *FileReader) getRouters(fileInfo *FileInfo) ([]model.VRouter, []model.VI
 			subnetLcuuid, ok := f.subnetNameToLcuuid[port.Subnet]
 			if !ok {
 				err := errors.New(fmt.Sprintf("subnet (%s) not in file", port.Subnet))
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(f.orgID))
 				return nil, nil, nil, err
 			}
 			retIPs = append(retIPs, model.IP{

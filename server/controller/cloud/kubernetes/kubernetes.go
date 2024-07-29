@@ -20,14 +20,14 @@ import (
 	"regexp"
 
 	simplejson "github.com/bitly/go-simplejson"
-	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("cloud.kubernetes")
+var log = logger.MustGetLogger("cloud.kubernetes")
 
 type Kubernetes struct {
 	name                  string
@@ -44,7 +44,7 @@ type Kubernetes struct {
 func NewKubernetes(orgID int, domain mysql.Domain) (*Kubernetes, error) {
 	configJson, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
@@ -55,7 +55,7 @@ func NewKubernetes(orgID int, domain mysql.Domain) (*Kubernetes, error) {
 
 	_, regxErr := regexp.Compile(portNameRegex)
 	if regxErr != nil {
-		log.Errorf("newkubernetes portnameregex (%s) compile error : (%s)", portNameRegex, regxErr.Error())
+		log.Errorf("newkubernetes portnameregex (%s) compile error : (%s)", portNameRegex, regxErr.Error(), logger.NewORGPrefix(orgID))
 		return nil, regxErr
 	}
 

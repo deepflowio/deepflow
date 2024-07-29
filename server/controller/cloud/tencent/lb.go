@@ -22,10 +22,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBListener, []model.LBTargetServer, []model.VInterface, []model.IP, error) {
-	log.Debug("get load balances starting")
+	log.Debug("get load balances starting", logger.NewORGPrefix(t.orgID))
 	var lbs []model.LB
 	var lbListeners []model.LBListener
 	var lbTargetServers []model.LBTargetServer
@@ -40,7 +41,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 
 	lbResp, err := t.getResponse("clb", "2018-03-17", "DescribeLoadBalancers", region.name, "LoadBalancerSet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("load balance request tencent api error: (%s)", err.Error())
+		log.Errorf("load balance request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 	}
 	for _, lbData := range lbResp {
@@ -51,7 +52,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 		vpcLcuuid := common.GetUUIDByOrgID(t.orgID, vpcID)
 		lbName := lbData.Get("LoadBalancerName").MustString()
 		if vpcID == "" {
-			log.Warningf("load balance (%s) vpc not found", lbName)
+			log.Warningf("load balance (%s) vpc not found", lbName, logger.NewORGPrefix(t.orgID))
 			continue
 		}
 		lbType := lbData.Get("LoadBalancerType").MustString()
@@ -82,7 +83,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			// Application load balance
 			lbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeListeners", region.name, "Listeners", false, params)
 			if err != nil {
-				log.Errorf("application load balance listener request tencent api error: (%s)", err.Error())
+				log.Errorf("application load balance listener request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 			}
 
@@ -110,7 +111,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 
 			lbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeTargets", region.name, "Listeners", false, params)
 			if err != nil {
-				log.Errorf("application load balance target request tencent api error: (%s)", err.Error())
+				log.Errorf("application load balance target request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 			}
 			for _, lbTargetServerData := range lbTargetServerResp {
@@ -144,7 +145,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 				instanceID := s.server.Get("InstanceId").MustString()
 				aPrivateIPs, ok := s.server.CheckGet("PrivateIpAddresses")
 				if !ok || len(aPrivateIPs.MustArray()) == 0 {
-					log.Infof("application lb target server (%s) ip not found", instanceID)
+					log.Infof("application lb target server (%s) ip not found", instanceID, logger.NewORGPrefix(t.orgID))
 					continue
 				}
 				aPIPSlice := []string{}
@@ -171,7 +172,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			// Classic load balance
 			clbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBListeners", region.name, "Listeners", false, params)
 			if err != nil {
-				log.Errorf("classic load balance listener request tencent api error: (%s)", err.Error())
+				log.Errorf("classic load balance listener request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 			}
 			for _, clbListenerData := range clbListenerResp {
@@ -193,7 +194,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 
 				clbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBTargets", region.name, "Targets", false, params)
 				if err != nil {
-					log.Errorf("classic load balance classic target request tencent api error: (%s)", err.Error())
+					log.Errorf("classic load balance classic target request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 					return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 				}
 				for _, clbTargetServerData := range clbTargetServerResp {
@@ -203,7 +204,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 					clbTargetServerInstanceID := clbTargetServerData.Get("InstanceId").MustString()
 					cPrivateIPs, ok := clbTargetServerData.CheckGet("PrivateIpAddresses")
 					if !ok || len(cPrivateIPs.MustArray()) == 0 {
-						log.Infof("classic lb target server (%s) ip not found", clbTargetServerInstanceID)
+						log.Infof("classic lb target server (%s) ip not found", clbTargetServerInstanceID, logger.NewORGPrefix(t.orgID))
 						continue
 					}
 					cPIPSlice := []string{}
@@ -255,6 +256,6 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			})
 		}
 	}
-	log.Debug("get load balances complete")
+	log.Debug("get load balances complete", logger.NewORGPrefix(t.orgID))
 	return lbs, lbListeners, lbTargetServers, lbVinterfaces, lbIPs, nil
 }

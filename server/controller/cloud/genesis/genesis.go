@@ -21,7 +21,6 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
-	"github.com/op/go-logging"
 	"inet.af/netaddr"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
@@ -30,11 +29,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
-var log = logging.MustGetLogger("cloud.genesis")
+var log = logger.MustGetLogger("cloud.genesis")
 
 type Genesis struct {
 	orgID           int
@@ -57,7 +57,7 @@ type Genesis struct {
 func NewGenesis(orgID int, domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 	ipV4MaxMask := config.Get("ipv4_cidr_max_mask").MustInt()
@@ -167,7 +167,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 			var cidr netaddr.IPPrefix
 			ipNet, err := netaddr.ParseIP(ip.IP)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error(err.Error(), logger.NewORGPrefix(g.orgID))
 				continue
 			}
 			if ipNet.Is4() {
@@ -203,7 +203,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 		for _, ip := range ipsWithoutMasklen {
 			ipNet, err := netaddr.ParseIP(ip.IP)
 			if err != nil {
-				log.Warning(err.Error())
+				log.Warning(err.Error(), logger.NewORGPrefix(g.orgID))
 				continue
 			}
 			if ipNet.Is4() {
@@ -211,7 +211,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 			} else if ipNet.Is6() {
 				prefixV6 = append(prefixV6, netaddr.IPPrefixFrom(ipNet, 128))
 			} else {
-				log.Warningf("parse ip error: ip is (%s)", ipNet.String())
+				log.Warningf("parse ip error: ip is (%s)", ipNet.String(), logger.NewORGPrefix(g.orgID))
 				continue
 			}
 		}
@@ -222,7 +222,7 @@ func (g *Genesis) generateIPsAndSubnets() {
 		for _, ip := range ipsWithoutMasklen {
 			ipNet, err := netaddr.ParseIP(ip.IP)
 			if err != nil {
-				log.Warning(err.Error())
+				log.Warning(err.Error(), logger.NewORGPrefix(g.orgID))
 				continue
 			}
 			for _, cidr := range knownCIDRs.ToSlice() {

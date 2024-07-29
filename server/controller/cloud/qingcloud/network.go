@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
@@ -33,7 +34,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 	var vxnetIdToVPCLcuuid map[string]string
 	var regionIdToVxnetIds map[string][]string
 
-	log.Info("get networks starting")
+	log.Info("get networks starting", logger.NewORGPrefix(q.orgID))
 
 	vxnetIdToVPCLcuuid = make(map[string]string)
 	vxnetIdToSubnetLcuuid = make(map[string]string)
@@ -42,7 +43,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 		kwargs := []*Param{{"zone", regionId}}
 		response, err := q.GetResponse("DescribeVxnets", "vxnet_set", kwargs)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(q.orgID))
 			return nil, nil, err
 		}
 
@@ -150,7 +151,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 	q.regionIdToVxnetIds = regionIdToVxnetIds
 	q.VxnetIdToVPCLcuuid = vxnetIdToVPCLcuuid
 	q.VxnetIdToSubnetLcuuid = vxnetIdToSubnetLcuuid
-	log.Info("get networks complete")
+	log.Info("get networks complete", logger.NewORGPrefix(q.orgID))
 	return retNetworks, retSubnets, nil
 }
 
@@ -167,7 +168,7 @@ func (q *QingCloud) getSelfMgmtNetworkInfo(regionId, vxnetId string) (string, st
 		"DescribeVxnetInstances", "instance_set", kwargs,
 	)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(q.orgID))
 		return routerId, subnetCidr, err
 	}
 

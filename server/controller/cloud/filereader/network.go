@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (f *FileReader) getNetworks(fileInfo *FileInfo) ([]model.Network, error) {
@@ -35,13 +36,13 @@ func (f *FileReader) getNetworks(fileInfo *FileInfo) ([]model.Network, error) {
 		azLcuuid, ok := f.azNameToLcuuid[network.AZ]
 		if !ok {
 			err := errors.New(fmt.Sprintf("az (%s) not in file", network.AZ))
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(f.orgID))
 			return nil, err
 		}
 		vpcLcuuid, ok := f.vpcNameToLcuuid[network.VPC]
 		if !ok {
 			err := errors.New(fmt.Sprintf("vpc (%s) not in file", network.VPC))
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(f.orgID))
 			return nil, err
 		}
 

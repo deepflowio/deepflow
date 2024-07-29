@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 // 合并附属容器集群的资源到云平台资源中
@@ -43,7 +44,7 @@ func (c *Cloud) getSubDomainDataByLcuuid(lcuuid string, cResource model.Resource
 	kubernetesGatherTask, ok := c.kubernetesGatherTaskMap[lcuuid]
 	if !ok {
 		msg := fmt.Sprintf("domain (%s) not found sub_domain lcuuid (%s)", c.basicInfo.Name, lcuuid)
-		log.Warning(msg)
+		log.Warning(msg, logger.NewORGPrefix(c.orgID))
 		return map[string]model.SubDomainResource{
 			lcuuid: model.SubDomainResource{
 				ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
@@ -71,7 +72,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	// 如果当前KubernetesGather数据中没有与主云平台相关的容器节点，则跳过该集群
 	if len(podNodes) == 0 {
 		msg := "gather node is not associated with cloud vm"
-		log.Warning(msg)
+		log.Warning(msg, logger.NewORGPrefix(c.orgID))
 		return model.SubDomainResource{
 			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
 			ErrorMessage: msg,
@@ -176,7 +177,7 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 	var vpcs []mysql.VPC
 	err := c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vpcs).Error
 	if err != nil {
-		log.Errorf("get own domain resource vpc failed: (%s)", err.Error())
+		log.Errorf("get own domain resource vpc failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 	vpcIDToLcuuid := map[int]string{}
@@ -187,42 +188,42 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 	var vms []mysql.VM
 	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vms).Error
 	if err != nil {
-		log.Errorf("get own domain resource vm failed: (%s)", err.Error())
+		log.Errorf("get own domain resource vm failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var vinterfaces []mysql.VInterface
 	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
 	if err != nil {
-		log.Errorf("get own domain resource vinterface failed: (%s)", err.Error())
+		log.Errorf("get own domain resource vinterface failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var wanIPs []mysql.WANIP
 	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&wanIPs).Error
 	if err != nil {
-		log.Errorf("get own domain resource wan ip failed: (%s)", err.Error())
+		log.Errorf("get own domain resource wan ip failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var lanIPs []mysql.LANIP
 	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&lanIPs).Error
 	if err != nil {
-		log.Errorf("get own domain resource lan ip failed: (%s)", err.Error())
+		log.Errorf("get own domain resource lan ip failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var networks []mysql.Network
 	err = c.db.DB.Where("domain = ? AND sub_domain = ''", c.basicInfo.Lcuuid).Find(&networks).Error
 	if err != nil {
-		log.Errorf("get own domain resource network failed: (%s)", err.Error())
+		log.Errorf("get own domain resource network failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var subnets []mysql.Subnet
 	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subnets).Error
 	if err != nil {
-		log.Errorf("get own domain resource subnet failed: (%s)", err.Error())
+		log.Errorf("get own domain resource subnet failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
@@ -322,13 +323,13 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 		}
 		ip, err := netaddr.ParseIP(s.Prefix)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error(err.Error(), logger.NewORGPrefix(c.orgID))
 			continue
 		}
 		mask := net.IPMask(net.ParseIP(s.Netmask).To4())
 		maskSize, _ := mask.Size()
 		if maskSize == 0 {
-			log.Errorf("parse netmask (%s) failed", s.Netmask)
+			log.Errorf("parse netmask (%s) failed", s.Netmask, logger.NewORGPrefix(c.orgID))
 			continue
 		}
 		cidr := netaddr.IPPrefixFrom(ip, uint8(maskSize))
@@ -425,7 +426,7 @@ func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, cResource model.Res
 				ip := net.ParseIP(podNode.IP)
 				_, ipNet, err := net.ParseCIDR(cidr)
 				if err != nil {
-					log.Error(err)
+					log.Error(err, logger.NewORGPrefix(c.orgID))
 					continue
 				}
 				if ipNet.Contains(ip) {
@@ -703,7 +704,7 @@ func (c *Cloud) getSubDomainIPs(subDomainLcuuid string, cResource model.Resource
 	for _, ip := range kResource.PodNodeIPs {
 		// 过滤掉主云平台已经存在的node ip
 		if _, ok := existNodeIPs[ip.IP]; ok {
-			log.Debugf("subdomain node ip (%s) already exists on the vm ip", ip.IP)
+			log.Debugf("subdomain node ip (%s) already exists on the vm ip", ip.IP, logger.NewORGPrefix(c.orgID))
 			continue
 		}
 		ipAddr, _ := netaddr.ParseIP(ip.IP)
@@ -765,7 +766,7 @@ func (c *Cloud) getSubDomainVInterfaces(
 	for _, vinterface := range resource.PodNodeVInterfaces {
 		// 过滤掉主云平台已经存在的node mac
 		if _, ok := existNodeMacs[vinterface.Mac]; ok {
-			log.Debugf("subdomain node mac (%s) already exists on the vm mac", vinterface.Mac)
+			log.Debugf("subdomain node mac (%s) already exists on the vm mac", vinterface.Mac, logger.NewORGPrefix(c.orgID))
 			continue
 		}
 		networkLcuuid := vinterface.NetworkLcuuid

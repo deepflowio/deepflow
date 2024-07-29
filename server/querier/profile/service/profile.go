@@ -46,8 +46,7 @@ const (
 	initNodeCapacity     = 8192
 )
 
-func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model.ProfileTree, debug interface{}, err error) {
-	debugs := model.ProfileDebug{}
+func Profile(args model.Profile, cfg *config.QuerierConfig) (result model.ProfileTree, debug interface{}, err error) {
 	whereSlice := []string{}
 	whereSlice = append(whereSlice, fmt.Sprintf(" time>=%d", args.TimeStart))
 	whereSlice = append(whereSlice, fmt.Sprintf(" time<=%d", args.TimeEnd))
@@ -58,16 +57,21 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 		whereSlice = append(whereSlice, " ("+args.TagFilter+")")
 	}
 	whereSql := strings.Join(whereSlice, " AND")
+	return GenerateProfile(args, cfg, whereSql)
+}
+
+func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string) (result model.ProfileTree, debug interface{}, err error) {
+	debugs := model.ProfileDebug{}
 	limitSql := cfg.Profile.FlameQueryLimit
 	sql := fmt.Sprintf(
 		"SELECT %s, %s FROM %s WHERE %s LIMIT %d",
-		common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, limitSql,
+		common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.TABLE_PROFILE, where, limitSql,
 	)
 
 	if slices.Contains[[]string, string](InstanceProfileEventType, args.ProfileEventType) {
 		sql = fmt.Sprintf(
 			"SELECT %s, Last(%s) AS %s FROM %s WHERE %s GROUP BY %s ,%s, %s LIMIT %d",
-			common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.PROFILE_VALUE, common.TABLE_PROFILE, whereSql, common.PROFILE_LOCATION_STR, common.TAG_AGENT_ID, common.TAG_PROCESS_ID, limitSql,
+			common.PROFILE_LOCATION_STR, common.PROFILE_VALUE, common.PROFILE_VALUE, common.TABLE_PROFILE, where, common.PROFILE_LOCATION_STR, common.TAG_AGENT_ID, common.TAG_PROCESS_ID, limitSql,
 		)
 	}
 	ckEngine := &clickhouse.CHEngine{DB: common.DATABASE_PROFILE}
@@ -81,13 +85,13 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 	}
 	// XXX: change to streaming read, reduce memory
 	querierResult, querierDebug, err := ckEngine.ExecuteQuery(&querierArgs)
-	if err != nil {
-		log.Errorf("ExecuteQuery failed: %v", querierDebug, err)
-		return
-	}
-
 	profileDebug := NewProfileDebug(sql, querierDebug)
 	debugs.QuerierDebug = append(debugs.QuerierDebug, profileDebug)
+	if err != nil {
+		log.Errorf("ExecuteQuery failed: %v", querierDebug, err)
+		debug = debugs
+		return
+	}
 
 	formatStartTime := time.Now()
 	profileLocationStrIndex := -1
@@ -109,6 +113,7 @@ func Tracing(args model.ProfileTracing, cfg *config.QuerierConfig) (result model
 	if indexOK {
 		log.Error("Not all fields found")
 		err = errors.New("Not all fields found")
+		debug = debugs
 		return
 	}
 

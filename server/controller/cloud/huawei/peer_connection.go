@@ -22,6 +22,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
@@ -43,12 +44,12 @@ func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
 			name := jpn.Get("name").MustString()
 			localTenant := jpn.Get("request_vpc_info").Get("tenant_id").MustString()
 			if localTenant == "" {
-				log.Infof("exclude peer_connection: %s, missing local region", name)
+				log.Infof("exclude peer_connection: %s, missing local region", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			remoteTenant := jpn.Get("accept_vpc_info").Get("tenant_id").MustString()
 			if localTenant == "" {
-				log.Infof("exclude peer_connection: %s, missing remote region", name)
+				log.Infof("exclude peer_connection: %s, missing remote region", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			pns = append(

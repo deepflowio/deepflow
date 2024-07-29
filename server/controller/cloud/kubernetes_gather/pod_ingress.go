@@ -22,10 +22,11 @@ import (
 	"github.com/bitly/go-simplejson"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingressRules []model.PodIngressRule, ingressRuleBackends []model.PodIngressRuleBackend, err error) {
-	log.Debug("get ingresses starting")
+	log.Debug("get ingresses starting", logger.NewORGPrefix(k.orgID))
 	var ingressInfo []string
 	switch {
 	case len(k.k8sInfo["*v1.Ingress"]) != 0:
@@ -39,28 +40,28 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 		iData, iErr := simplejson.NewJson([]byte(i))
 		if iErr != nil {
 			err = iErr
-			log.Errorf("ingress initialization simplejson error: (%s)", iErr.Error())
+			log.Errorf("ingress initialization simplejson error: (%s)", iErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 		metaData, ok := iData.CheckGet("metadata")
 		if !ok {
-			log.Info("ingress metadata not found")
+			log.Info("ingress metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uID := metaData.Get("uid").MustString()
 		if uID == "" {
-			log.Info("ingress uid not found")
+			log.Info("ingress uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		name := metaData.Get("name").MustString()
 		if name == "" {
-			log.Infof("ingress (%s) name not found", uID)
+			log.Infof("ingress (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		namespace := metaData.Get("namespace").MustString()
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
-			log.Infof("ingress (%s) namespace not found", name)
+			log.Infof("ingress (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
@@ -96,7 +97,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				}
 				service, ok := k.nsServiceNameToService[namespace+serviceName]
 				if !ok {
-					log.Infof("ingress backend service (%s) not found", serviceName)
+					log.Infof("ingress backend service (%s) not found", serviceName, logger.NewORGPrefix(k.orgID))
 					continue
 				}
 				serviceLcuuid, ports := "", map[string]int{}
@@ -106,7 +107,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 					break
 				}
 				if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uLcuuid {
-					log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID)
+					log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID, logger.NewORGPrefix(k.orgID))
 				} else {
 					k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uLcuuid
 				}
@@ -122,7 +123,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 					}
 				}
 				if port == 0 {
-					log.Infof("ingress (%s) backend service (%s) no servicePort", uID, serviceName)
+					log.Infof("ingress (%s) backend service (%s) no servicePort", uID, serviceName, logger.NewORGPrefix(k.orgID))
 					continue
 				}
 				key := serviceName + "_" + strconv.Itoa(port)
@@ -155,7 +156,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			}
 			service, ok := k.nsServiceNameToService[namespace+serviceName]
 			if !ok {
-				log.Infof("ingress backend service (%s) not found", serviceName)
+				log.Infof("ingress backend service (%s) not found", serviceName, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			serviceLcuuid, ports := "", map[string]int{}
@@ -165,7 +166,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				break
 			}
 			if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uLcuuid {
-				log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID)
+				log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID, logger.NewORGPrefix(k.orgID))
 
 			} else {
 				k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uLcuuid
@@ -182,7 +183,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				}
 			}
 			if port == 0 {
-				log.Infof("ingress (%s) backend service (%s) no servicePort", uID, serviceName)
+				log.Infof("ingress (%s) backend service (%s) no servicePort", uID, serviceName, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			key := serviceName + "_" + strconv.Itoa(port)
@@ -209,7 +210,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			serviceName := spec.Get("to").Get("name").MustString()
 			service, ok := k.nsServiceNameToService[namespace+serviceName]
 			if !ok {
-				log.Infof("ingress service (%s) not found", serviceName)
+				log.Infof("ingress service (%s) not found", serviceName, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			serviceLcuuid, ports := "", map[string]int{}
@@ -219,13 +220,13 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				break
 			}
 			if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[serviceLcuuid]; ok && ingressLcuuid != uLcuuid {
-				log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID)
+				log.Infof("ingress (%s) is already associated with the service (%s), and ingress (%s) cannot be associated", ingressLcuuid, serviceLcuuid, uID, logger.NewORGPrefix(k.orgID))
 
 			} else {
 				k.serviceLcuuidToIngressLcuuid[serviceLcuuid] = uLcuuid
 			}
 			if _, ok := spec.CheckGet("port"); !ok {
-				log.Infof("ingress (%s) port not found", uID)
+				log.Infof("ingress (%s) port not found", uID, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			port, ok := ports[spec.Get("port").MustString()]
@@ -233,7 +234,7 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 				port = spec.Get("targetPort").MustInt()
 			}
 			if port == 0 {
-				log.Infof("ingress (%s) backend service (%s) no servicePort", uID, serviceName)
+				log.Infof("ingress (%s) backend service (%s) no servicePort", uID, serviceName, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			key := serviceName + "_" + strconv.Itoa(port)
@@ -247,6 +248,6 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 			ingressRuleBackends = append(ingressRuleBackends, ingressRuleBackend)
 		}
 	}
-	log.Debug("get ingresses complete")
+	log.Debug("get ingresses complete", logger.NewORGPrefix(k.orgID))
 	return
 }

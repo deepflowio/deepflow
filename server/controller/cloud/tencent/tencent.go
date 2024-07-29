@@ -25,19 +25,20 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	tcommon "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
+	thttp "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/http"
+	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
+
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
-	"github.com/op/go-logging"
-	tcommon "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
-	thttp "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/http"
-	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
 )
 
-var log = logging.MustGetLogger("cloud.tencent")
+var log = logger.MustGetLogger("cloud.tencent")
 
 const (
 	FINANCE_REGION_PROFILE = "金融"
@@ -98,25 +99,25 @@ type tencentProtocolPort struct {
 func NewTencent(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*Tencent, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretID, err := config.Get("secret_id").String()
 	if err != nil {
-		log.Error("secret_id must be specified")
+		log.Error("secret_id must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretKey, err := config.Get("secret_key").String()
 	if err != nil {
-		log.Error("secret_key must be specified")
+		log.Error("secret_key must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	decryptSecretKey, err := common.DecryptSecretKey(secretKey)
 	if err != nil {
-		log.Error("decrypt secret_key failed (%s)", err.Error())
+		log.Error("decrypt secret_key failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
@@ -265,7 +266,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 		}
 	}
 
-	log.Debugf("request tencent action (%s): total count is (%v)", action, totalCount)
+	log.Debugf("request tencent action (%s): total count is (%v)", action, totalCount, logger.NewORGPrefix(t.orgID))
 
 	if !strings.Contains(common.CloudMonitorExceptionAPI[common.TENCENT_EN], action) {
 		t.cloudStatsd.RefreshAPIMoniter(action, totalCount, startTime)
@@ -277,7 +278,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 func (t *Tencent) checkRequiredAttributes(json *simplejson.Json, attributes []string) bool {
 	for _, attribute := range attributes {
 		if _, ok := json.CheckGet(attribute); !ok {
-			log.Warningf("get attribute (%s) failed", attribute)
+			log.Warningf("get attribute (%s) failed", attribute, logger.NewORGPrefix(t.orgID))
 			return false
 		}
 	}
@@ -319,7 +320,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 		return model.Resource{}, err
 	}
 	for _, region := range regionList {
-		log.Infof("region (%s) collect starting", region.regionName)
+		log.Infof("region (%s) collect starting", region.regionName, logger.NewORGPrefix(t.orgID))
 
 		regionFlag := false
 		t.azLcuuidMap = map[string]int{}
@@ -432,7 +433,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 			resource.AZs = append(resource.AZs, azs...)
 		}
 
-		log.Infof("region (%s) collect complete", region.regionName)
+		log.Infof("region (%s) collect complete", region.regionName, logger.NewORGPrefix(t.orgID))
 	}
 
 	// TODO: 因为腾讯云服务器 API 3.0 版本暂未支持对等连接的获取，这里等待后续支持

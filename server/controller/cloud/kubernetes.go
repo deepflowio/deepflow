@@ -23,13 +23,14 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 // Kubernetes平台直接使用对应kubernetesgather的resource作为cloud的resource
 func (c *Cloud) getKubernetesData() model.Resource {
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
 	if !ok {
-		log.Warningf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name)
+		log.Warningf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 		return model.Resource{
 			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
 		}
@@ -38,7 +39,7 @@ func (c *Cloud) getKubernetesData() model.Resource {
 
 	// 避免合并时产生默认的空值，对kubernetes_gather resource的az做判断
 	if kubernetesGatherResource.AZ.Lcuuid == "" {
-		log.Infof("domain (%s) kubernetes_gather_task resource is null", c.basicInfo.Name)
+		log.Infof("domain (%s) kubernetes_gather_task resource is null", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 		// return k8s gather error info
 		return model.Resource{
 			ErrorState:   kubernetesGatherResource.ErrorState,

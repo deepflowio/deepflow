@@ -22,12 +22,13 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/csn"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 	var cens []model.CEN
 
-	log.Debug("get cens starting")
+	log.Debug("get cens starting", logger.NewORGPrefix(b.orgID))
 
 	csnClient, _ := csn.NewClient(b.secretID, b.secretKey, "https://csn.baidubce.com")
 	csnClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -39,7 +40,7 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 		startTime := time.Now()
 		result, err := csnClient.ListCsn(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return []model.CEN{}, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListCsn", 1, startTime)
@@ -65,7 +66,7 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 			args.Marker = marker
 			result, err := csnClient.ListInstance(c.CsnId, args)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(b.orgID))
 				return []model.CEN{}, err
 			}
 			retCsnInstances = append(retCsnInstances, result.Instances...)
@@ -79,7 +80,7 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 		vpcLcuuids := []string{}
 		for _, i := range retCsnInstances {
 			if i.InstanceType != "vpc" {
-				log.Debugf("csn (%s) instance type (%s) not is vpc", c.CsnId, i.InstanceType)
+				log.Debugf("csn (%s) instance type (%s) not is vpc", c.CsnId, i.InstanceType, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			if i.InstanceId != "" {
@@ -97,6 +98,6 @@ func (b *BaiduBce) getCENs() ([]model.CEN, error) {
 		b.debugger.WriteJson("CsnInstance", " ", structToJson(retCsnInstances))
 	}
 
-	log.Debug("Get cens complete")
+	log.Debug("Get cens complete", logger.NewORGPrefix(b.orgID))
 	return cens, nil
 }

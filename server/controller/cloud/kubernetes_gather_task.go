@@ -26,12 +26,14 @@ import (
 	kmodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type KubernetesGatherTask struct {
 	kCtx                context.Context
 	kCancel             context.CancelFunc
+	orgID               int
 	gatherCost          float64
 	SubDomainConfig     string // 附属容器集群配置字段config
 	resource            kmodel.KubernetesGatherResource
@@ -44,7 +46,7 @@ func NewKubernetesGatherTask(
 	ctx context.Context, db *mysql.DB, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGatherTask {
 	kubernetesGather := kubernetes_gather.NewKubernetesGather(db, domain, subDomain, cfg, isSubDomain)
 	if kubernetesGather == nil {
-		log.Errorf("kubernetes_gather task (%s) init faild", domain.Name)
+		log.Errorf("kubernetes_gather task (%s) init faild", domain.Name, db.LogPrefixORGID)
 		return nil
 	}
 	subDomainConfig := ""
@@ -54,6 +56,7 @@ func NewKubernetesGatherTask(
 
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesGatherTask{
+		orgID: db.ORGID,
 		basicInfo: kmodel.KubernetesGatherBasicInfo{
 			Name:                  kubernetesGather.Name,
 			TeamID:                kubernetesGather.TeamID,
@@ -91,7 +94,7 @@ func (k *KubernetesGatherTask) GetGatherCost() float64 {
 }
 
 func (k *KubernetesGatherTask) PutRefreshSignal(version int) error {
-	log.Infof("kubernetes gather (%s) get a refresh version (%d)", k.kubernetesGather.Name, version)
+	log.Infof("kubernetes gather (%s) get a refresh version (%d)", k.kubernetesGather.Name, version, logger.NewORGPrefix(k.orgID))
 	k.gatherRefreshSignal.Put(struct{}{})
 	return nil
 }
@@ -114,7 +117,7 @@ func (k *KubernetesGatherTask) Start(rSignal *queue.OverwriteQueue) {
 
 func (k *KubernetesGatherTask) run(rSignal *queue.OverwriteQueue) {
 	startTime := time.Now()
-	log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name)
+	log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name, logger.NewORGPrefix(k.orgID))
 	kResource, err := k.kubernetesGather.GetKubernetesGatherData()
 	// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 	if err != nil {
@@ -126,10 +129,10 @@ func (k *KubernetesGatherTask) run(rSignal *queue.OverwriteQueue) {
 		kResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 	}
 	k.resource = kResource
-	log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name)
+	log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name, logger.NewORGPrefix(k.orgID))
 	k.gatherCost = time.Now().Sub(startTime).Seconds()
 	if rSignal == nil {
-		log.Errorf("kubernetes gather (%s) refresh signal is nil")
+		log.Errorf("kubernetes gather (%s) refresh signal is nil", logger.NewORGPrefix(k.orgID))
 		return
 	}
 	rSignal.Put(struct{}{})

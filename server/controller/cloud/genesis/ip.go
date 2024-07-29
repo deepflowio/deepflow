@@ -21,17 +21,18 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getIPs() ([]model.IP, error) {
-	log.Debug("get ips starting")
+	log.Debug("get ips starting", logger.NewORGPrefix(g.orgID))
 	ips := []model.IP{}
 
 	g.cloudStatsd.RefreshAPIMoniter("ips", len(g.ips), time.Time{})
 
 	for _, i := range g.ips {
 		if i.VInterfaceLcuuid == "" || i.SubnetLcuuid == "" {
-			log.Debug("vinterface lcuuid or subnet lcuuid not found")
+			log.Debug("vinterface lcuuid or subnet lcuuid not found", logger.NewORGPrefix(g.orgID))
 			continue
 		}
 		lcuuid := i.Lcuuid
@@ -47,6 +48,6 @@ func (g *Genesis) getIPs() ([]model.IP, error) {
 		}
 		ips = append(ips, ip)
 	}
-	log.Debug("get ips complete")
+	log.Debug("get ips complete", logger.NewORGPrefix(g.orgID))
 	return ips, nil
 }

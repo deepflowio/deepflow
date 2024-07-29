@@ -1204,7 +1204,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if tag == "policy" || tag == "npb_tunnel" {
 		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
-	} else if tag == "alarm_policy" {
+	} else if tag == "alert_policy" {
 		sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM alarm_policy_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if tag == "user" {
 		sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM user_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
