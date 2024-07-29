@@ -24,6 +24,7 @@
 
 #define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
+#define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
 
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
