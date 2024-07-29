@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"sync"
+	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -147,6 +148,7 @@ type Subscriber interface {
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
 	OnSubDomainTeamIDUpdated(md *message.Metadata)
+	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
@@ -242,7 +244,9 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *
 		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
+		s.ResourceUpdateAtInfoUpdated(md, db)
 	}
+
 }
 
 // Delete resource by domain
@@ -255,6 +259,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message
 	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err)
 	}
+	s.ResourceUpdateAtInfoUpdated(md, db)
 }
 
 // Delete resource by sub domain
@@ -267,6 +272,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *mess
 	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
 		log.Error(err)
 	}
+	s.ResourceUpdateAtInfoUpdated(md, db)
 }
 
 // Update team_id of resource by sub domain
@@ -278,5 +284,24 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md
 	}
 	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.SubDomainID).Update("team_id", md.TeamID).Error; err != nil {
 		log.Error(err)
+	}
+}
+
+// Update updated_at when resource is deleted
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB) {
+	var updateItems []MT
+	err := db.Unscoped().First(&updateItems).Error
+	if err == nil {
+		var testItems []*MT
+		for _, item := range updateItems {
+			testItems = append(testItems, &item)
+		}
+		updateKeys, updateDBItem := s.generateKeyTargets(md, testItems)
+		if len(updateDBItem) > 0 && len(updateKeys) > 0 {
+			updateTimeInfo := make(map[string]interface{})
+			now := time.Now()
+			updateTimeInfo["updated_at"] = now.Format("2006-01-02 15:04:05")
+			s.dbOperator.update(updateDBItem[0], updateTimeInfo, updateKeys[0], db)
+		}
 	}
 }
