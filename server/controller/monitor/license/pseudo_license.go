@@ -88,7 +88,7 @@ func (v *VTapLicenseAllocation) Stop() {
 }
 
 func (v *VTapLicenseAllocation) allocLicense(orgDB *mysql.DB) {
-	log.Info("ORG(id=%d database=%s) alloc license starting", orgDB.ORGID, orgDB.Name)
+	log.Info("alloc license starting", orgDB.LogPrefixORGID)
 
 	whereSQL := "license_type IS NULL OR license_functions != ?"
 	licenseFunctions := strings.Join(VTAP_LICENSE_FUNCTIONS, ",")
@@ -98,7 +98,7 @@ func (v *VTapLicenseAllocation) allocLicense(orgDB *mysql.DB) {
 			"license_functions": licenseFunctions,
 		},
 	)
-	log.Info("ORG(id=%d database=%s) alloc license complete", orgDB.ORGID, orgDB.Name)
+	log.Info("alloc license complete", orgDB.LogPrefixORGID)
 }
 
 func GetSupportedLicenseType(vtapType int) []int {

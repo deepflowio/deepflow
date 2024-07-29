@@ -157,7 +157,7 @@ func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, sp
 
 		name, err := getName(dataSource.Interval, dataSource.DataTableCollection)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, dbInfo.LogPrefixORGID)
 			return nil, err
 		}
 
@@ -315,13 +315,13 @@ func (d *DataSource) CreateDataSource(orgID int, dataSourceCreate *model.DataSou
 		}
 		log.Infof(
 			"config analyzer (%s) add data_source (%s) complete",
-			analyzer.IP, dataSource.DisplayName, dbInfo.LogPrefixORGID,
+			analyzer.IP, dataSource.DisplayName, dbInfo.LogPrefixORGID, dbInfo.LogPrefixORGID,
 		)
 	}
 	if len(errStrs) > 0 {
 		errMsg := strings.Join(errStrs, ".") + "."
 		err = NewError(httpcommon.STATUES_PARTIAL_CONTENT, errMsg)
-		log.Error(errMsg)
+		log.Error(errMsg, dbInfo.LogPrefixORGID)
 	}
 
 	if err != nil {
@@ -447,7 +447,7 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	for _, e := range errs {
 		if errors.Is(e, httpcommon.ErrorPending) {
 			warnMsg := fmt.Sprintf("pending %s", e.Error())
-			log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg))
+			log.Warning(NewError(httpcommon.CONFIG_PENDING, warnMsg), dbInfo.LogPrefixORGID)
 			err = NewError(httpcommon.CONFIG_PENDING, warnMsg)
 			break
 		}
@@ -528,7 +528,7 @@ func (d *DataSource) DeleteDataSource(orgID int, lcuuid string) (map[string]stri
 	if len(errStrs) > 0 {
 		errMsg := strings.Join(errStrs, ".") + "."
 		err = NewError(httpcommon.SERVER_ERROR, errMsg)
-		log.Error(errMsg)
+		log.Error(errMsg, dbInfo.LogPrefixORGID)
 	}
 	if e := db.Delete(&dataSource).Error; e != nil {
 		return nil, e
@@ -707,7 +707,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) mod data_source (%s) failed", ip, dataSource.DisplayName,
 				)
-				log.Error(errMsg)
+				log.Error(errMsg, dbInfo.LogPrefixORGID)
 				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
@@ -715,7 +715,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 			baseDataSource, ok := idToDataSource[dataSource.BaseDataSourceID]
 			if !ok {
 				errMsg := fmt.Sprintf("base data_source (%d) not exist", dataSource.BaseDataSourceID)
-				log.Error(errMsg)
+				log.Error(errMsg, dbInfo.LogPrefixORGID)
 				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}
@@ -723,7 +723,7 @@ func (d *DataSource) ConfigAnalyzerDataSource(orgID int, ip string) error {
 				errMsg := fmt.Sprintf(
 					"config analyzer (%s) add data_source (%s) failed", ip, dataSource.DisplayName,
 				)
-				log.Error(errMsg)
+				log.Error(errMsg, dbInfo.LogPrefixORGID)
 				err = NewError(httpcommon.SERVER_ERROR, errMsg)
 				continue
 			}

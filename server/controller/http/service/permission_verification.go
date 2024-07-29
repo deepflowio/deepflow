@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 type AccessType string
@@ -267,14 +268,14 @@ func PermitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
 	)
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) error: %s", url, userInfo.Type, userInfo.ID, err.Error())
-		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error())
+		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error(), logger.NewORGPrefix(userInfo.ORGID))
 	}
 
 	havePermission := response.Get("DATA").MustBool()
 	if !havePermission {
 		desc := response.Get("DESCRIPTION").MustString()
 		log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d) description(%s)",
-			url, userInfo.Type, userInfo.ID, teamID, desc)
+			url, userInfo.Type, userInfo.ID, teamID, desc, logger.NewORGPrefix(userInfo.ORGID))
 		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, desc)
 	}
 	return nil
@@ -291,7 +292,7 @@ func ugcPermission(url string, userInfo *httpcommon.UserInfo, body map[string]in
 	)
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) body(%#v) error: %s",
-			url, userInfo.Type, userInfo.ID, body, err.Error())
+			url, userInfo.Type, userInfo.ID, body, err.Error(), logger.NewORGPrefix(userInfo.ORGID))
 		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error())
 	}
 
@@ -299,7 +300,7 @@ func ugcPermission(url string, userInfo *httpcommon.UserInfo, body map[string]in
 	if !havePermission {
 		desc := response.Get("DESCRIPTION").MustString()
 		log.Errorf("url(%s) user_type(%d) user_id(%d) body(%#v) description(%s)",
-			url, userInfo.Type, userInfo.ID, body, desc)
+			url, userInfo.Type, userInfo.ID, body, desc, logger.NewORGPrefix(userInfo.ORGID))
 		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, desc)
 	}
 	return nil
@@ -317,7 +318,7 @@ func resourceVerify(url, httpMethod string, userInfo *httpcommon.UserInfo, teamI
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d) body(%#v) error: %s",
 			url, userInfo.Type, userInfo.ID, teamID, body, err.Error())
-		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, err.Error())
+		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, err.Error(), logger.NewORGPrefix(userInfo.ORGID))
 	}
 	return nil
 }
