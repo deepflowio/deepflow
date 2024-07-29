@@ -330,6 +330,9 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, db, dstTable, a
 	}
 
 	engine := ckdb.AggregatingMergeTree.String()
+	if t.DBType == ckdb.CKDBTypeByconity {
+		engine = ckdb.CnchAggregatingMergeTree.String()
+	}
 	if m.replicaEnabled {
 		engine = fmt.Sprintf(ckdb.ReplicatedAggregatingMergeTree.String(), db, dstTable+"_"+AGG.String())
 	}
@@ -437,7 +440,16 @@ func MakeGlobalTableCreateSQL(t *ckdb.Table, db, dstTable string) string {
 }
 
 func (m *DatasourceManager) getMetricsTable(id flow_metrics.MetricsTableID) *ckdb.Table {
-	return flow_metrics.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1, m.ckdbColdStorages)[id]
+	return flow_metrics.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, m.ckdbType, 7, 1, 7, 1, m.ckdbColdStorages)[id]
+}
+
+func deleteFirstLocalSuffix(s string) string {
+	suffix := "_local"
+	idx := strings.Index(s, suffix)
+	if idx > 0 {
+		return s[:idx] + s[idx+len(suffix):]
+	}
+	return s
 }
 
 func (m *DatasourceManager) createTableMV(cks basecommon.DBs, db string, tableId flow_metrics.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
@@ -453,11 +465,17 @@ func (m *DatasourceManager) createTableMV(cks basecommon.DBs, db string, tableId
 		partitionTime = ckdb.TimeFuncYYYYMM
 	}
 
+	globalCreateTable := MakeGlobalTableCreateSQL(table, db, dstTable)
+	localCreateTable := MakeCreateTableLocal(table, db, dstTable, aggrSummable, aggrUnsummable)
+	if m.ckdbType == ckdb.CKDBTypeByconity {
+		globalCreateTable = deleteFirstLocalSuffix(localCreateTable)
+	}
+
 	commands := []string{
 		m.makeAggTableCreateSQL(table, db, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
 		MakeMVTableCreateSQL(table, db, dstTable, aggrSummable, aggrUnsummable, aggTime),
-		MakeCreateTableLocal(table, db, dstTable, aggrSummable, aggrUnsummable),
-		MakeGlobalTableCreateSQL(table, db, dstTable),
+		localCreateTable,
+		globalCreateTable,
 	}
 	for _, cmd := range commands {
 		log.Info(cmd)

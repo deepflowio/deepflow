@@ -112,6 +112,11 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 		return err
 	}
 
+	// ByConity not support modify timezone
+	if t.DBType == ckdb.CKDBTypeByconity {
+		return nil
+	}
+
 	for _, c := range t.Columns {
 		for _, table := range []string{t.GlobalName, t.LocalName} {
 			modTimeZoneSql := c.MakeModifyTimeZoneSQL(t.OrgDatabase(orgID), table, timeZone)

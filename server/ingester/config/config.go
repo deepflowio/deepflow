@@ -47,6 +47,7 @@ const (
 	EnvK8sNodeName                  = "K8S_NODE_NAME_FOR_DEEPFLOW"
 	EnvK8sNamespace                 = "K8S_NAMESPACE_FOR_DEEPFLOW"
 	DefaultCKDBService              = "deepflow-clickhouse"
+	DefaultByconityService          = "byconity-server"
 	DefaultCKDBServicePort          = 9000
 	DefaultListenPort               = 20033
 	DefaultGrpcBufferSize           = 41943040
@@ -61,6 +62,7 @@ const (
 	FormatDecimal                   = "decimal"
 	EnvRunningMode                  = "DEEPFLOW_SERVER_RUNNING_MODE"
 	RunningModeStandalone           = "STANDALONE"
+	DefaultByconityStoragePolicy    = "cnch_default_s3"
 )
 
 type DatabaseTable struct {
@@ -118,6 +120,7 @@ type CKWriterConfig struct {
 
 type CKDB struct {
 	External            bool   `yaml:"external"`
+	Type                string `yaml:"type"`
 	Host                string `yaml:"host"`
 	ActualAddrs         []string
 	Watcher             *Watcher
@@ -300,8 +303,21 @@ func (c *Config) Validate() error {
 		return nil
 	}
 
+	if c.CKDB.Type == "" {
+		c.CKDB.Type = ckdb.CKDBTypeClickhouse
+	}
+
+	if c.CKDB.Type != ckdb.CKDBTypeByconity && c.CKDB.Type != ckdb.CKDBTypeClickhouse {
+		log.Errorf("the setting of 'ckdb.type' (%s) is invalid, should be '%s' or '%s'", c.CKDB.Type, ckdb.CKDBTypeClickhouse, ckdb.CKDBTypeByconity)
+		sleepAndExit()
+	}
+
 	if c.CKDB.Host == "" {
-		c.CKDB.Host = DefaultCKDBService
+		if c.CKDB.Type == ckdb.CKDBTypeClickhouse {
+			c.CKDB.Host = DefaultCKDBService
+		} else {
+			c.CKDB.Host = DefaultByconityService
+		}
 	}
 	if c.CKDB.Port == 0 {
 		c.CKDB.Port = DefaultCKDBServicePort
@@ -321,6 +337,9 @@ func (c *Config) Validate() error {
 			c.CKDB.StoragePolicy = "default"
 		} else {
 			c.CKDB.StoragePolicy = ckdb.DF_STORAGE_POLICY
+		}
+		if c.CKDB.Type == ckdb.CKDBTypeByconity {
+			c.CKDB.StoragePolicy = DefaultByconityStoragePolicy
 		}
 	}
 	if c.CKDB.TimeZone == "" {
@@ -369,9 +388,11 @@ func (c *Config) Validate() error {
 			continue
 		}
 
-		if err := CheckCluster(conns, c.CKDB.ClusterName); err != nil {
-			log.Errorf("get clickhouse cluster (%s) info from table 'system.clusters' failed: %s", c.CKDB.ClusterName, err)
-			continue
+		if c.CKDB.Type != ckdb.CKDBTypeByconity {
+			if err := CheckCluster(conns, c.CKDB.ClusterName); err != nil {
+				log.Errorf("get clickhouse cluster (%s) info from table 'system.clusters' failed: %s", c.CKDB.ClusterName, err)
+				continue
+			}
 		}
 
 		if err := CheckStoragePolicy(conns, c.CKDB.StoragePolicy); err != nil {
