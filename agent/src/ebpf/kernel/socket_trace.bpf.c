@@ -2372,7 +2372,14 @@ skip_copy:
 	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
 
-	if (v_buff->events_num >= EVENT_BURST_NUM ||
+	/*
+	 * If the delay of the periodic push event exceeds the threshold, it
+	 * will be pushed immediately.
+	 */
+	__u64 curr_time = bpf_ktime_get_ns();
+	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
+	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
+	    v_buff->events_num >= EVENT_BURST_NUM ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		__u32 buf_size =
 		    (v_buff->len +
@@ -2399,6 +2406,17 @@ skip_copy:
 
 		v_buff->events_num = 0;
 		v_buff->len = 0;
+		if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS) {
+			struct trace_stats *stats;
+			tracer_ctx->last_period_timestamp =
+				tracer_ctx->period_timestamp;
+			tracer_ctx->period_timestamp = curr_time;
+			stats = trace_stats_map__lookup(&k0);
+			if (stats == NULL)
+				goto clear_args_map_1;
+			if (diff > stats->period_event_max_delay)
+				stats->period_event_max_delay = diff;
+		}
 	}
 
 clear_args_map_1:
