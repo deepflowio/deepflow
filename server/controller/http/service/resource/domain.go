@@ -54,6 +54,7 @@ var DOMAIN_PASSWORD_KEYS = map[string]bool{
 	"boss_secret_key":     false,
 	"manage_one_password": false,
 	"token":               false,
+	"app_secret":          false,
 }
 
 func getGrpcServerAndPort(db *mysql.DB, controllerIP string, cfg *config.ControllerConfig) (string, string) {
