@@ -144,9 +144,6 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	// networks
 	networks := c.getSubDomainNetworks(lcuuid, &kubernetesGatherResource, azLcuuid)
 
-	// prometheusTargets
-	prometheusTargets := c.getSubDomainPrometheusTargets(lcuuid, &kubernetesGatherResource)
-
 	// 生成SubDomainResource
 	return model.SubDomainResource{
 		Verified:               true,
@@ -170,7 +167,6 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 		Subnets:                subnets,
 		VInterfaces:            vinterfaces,
 		IPs:                    ips,
-		PrometheusTargets:      prometheusTargets,
 	}
 }
 
@@ -877,24 +873,4 @@ func (c *Cloud) getSubDomainNetworks(
 	}
 
 	return retNetworks
-}
-
-func (c *Cloud) getSubDomainPrometheusTargets(
-	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource) []model.PrometheusTarget {
-	var retPrometheusTargets []model.PrometheusTarget
-
-	// 遍历PrometheusTargets，更新subDomain信息
-	for _, p := range resource.PrometheusTargets {
-		retPrometheusTargets = append(retPrometheusTargets, model.PrometheusTarget{
-			Lcuuid:          p.Lcuuid,
-			ScrapeURL:       p.ScrapeURL,
-			Instance:        p.Instance,
-			Job:             p.Job,
-			OtherLabels:     p.OtherLabels,
-			VPCLcuuid:       p.VPCLcuuid,
-			SubDomainLcuuid: subDomainLcuuid,
-		})
-	}
-
-	return retPrometheusTargets
 }

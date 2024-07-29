@@ -51,7 +51,6 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/genesis-storage/:vtapID/", getGenesisStorage(d.g))
 	e.GET("/v1/kubernetes-refresh/", triggerKubernetesRefresh(d.m)) // TODO: Move to a better path
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
-	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(d.g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(d.m))
 	e.GET("/v1/sub-domain-info/:lcuuid/", getSubDomainResource(d.m))
 	e.GET("/v1/kubernetes-gather-info/:lcuuid/", getKubernetesGatherResource(d.m))
@@ -303,18 +302,6 @@ func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 			return
 		}
 		data, err := service.GetGenesisKubernetesData(g, orgID, c.Param("clusterID"))
-		JsonResponse(c, data, err)
-	})
-}
-
-func getGenesisPrometheusData(g *genesis.Genesis) gin.HandlerFunc {
-	return gin.HandlerFunc(func(c *gin.Context) {
-		orgID, err := GetContextOrgID(c)
-		if err != nil {
-			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
-			return
-		}
-		data, err := service.GetGenesisPrometheusData(g, orgID, c.Param("clusterID"))
 		JsonResponse(c, data, err)
 	})
 }

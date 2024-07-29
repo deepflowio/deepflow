@@ -67,7 +67,6 @@ type DataSet struct {
 	PodReplicaSets         map[string]*PodReplicaSet
 	Pods                   map[string]*Pod
 	Process                map[string]*Process
-	PrometheusTarget       map[string]*PrometheusTarget
 	VIP                    map[string]*VIP
 }
 
@@ -115,7 +114,6 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		PodReplicaSets:         make(map[string]*PodReplicaSet),
 		Pods:                   make(map[string]*Pod),
 		Process:                make(map[string]*Process),
-		PrometheusTarget:       make(map[string]*PrometheusTarget),
 		VIP:                    make(map[string]*VIP),
 	}
 }

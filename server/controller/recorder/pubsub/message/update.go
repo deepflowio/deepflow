@@ -752,19 +752,3 @@ type ProcessUpdate struct {
 	DiffBase[*diffbase.Process]
 	MySQLData[mysql.Process]
 }
-
-type PrometheusTargetFieldsUpdate struct {
-	Key
-	Name        fieldDetail[string]
-	Job         fieldDetail[string]
-	ScrapeURL   fieldDetail[string]
-	OtherLabels fieldDetail[string]
-	VPCID       fieldDetail[int]
-	VPCLcuuid   fieldDetail[string]
-}
-type PrometheusTargetUpdate struct {
-	Fields[PrometheusTargetFieldsUpdate]
-	CloudItem[cloudmodel.PrometheusTarget]
-	DiffBase[*diffbase.PrometheusTarget]
-	MySQLData[mysql.PrometheusTarget]
-}

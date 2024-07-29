@@ -189,41 +189,6 @@ func NewCloudFloatingIP(regionLcuuid, vpcLcuuid, networkLcuuid, vmLcuuid string)
 	}
 }
 
-func NewCloudSecurityGroup(regionLcuuid, vpcLcuuid string) cloudmodel.SecurityGroup {
-	return cloudmodel.SecurityGroup{
-		Lcuuid:       uuid.NewString(),
-		Name:         faker.Name(),
-		Label:        faker.Name(),
-		VPCLcuuid:    FormatLcuuid(vpcLcuuid),
-		RegionLcuuid: FormatLcuuid(regionLcuuid),
-	}
-}
-
-func NewCloudSecurityGroupRule(securityGroupLcuuid string) cloudmodel.SecurityGroupRule {
-	return cloudmodel.SecurityGroupRule{
-		Lcuuid:              uuid.NewString(),
-		Protocol:            "TCP",
-		Action:              1,
-		Priority:            RandID(),
-		Direction:           1,
-		EtherType:           2,
-		LocalPortRange:      "0-65535",
-		RemotePortRange:     "0-65535",
-		Local:               "0.0.0.0/0",
-		Remote:              "0.0.0.0/0",
-		SecurityGroupLcuuid: FormatLcuuid(securityGroupLcuuid),
-	}
-}
-
-func NewCloudVMSecurityGroup(vmLcuuid, securityGroupLcuuid string) cloudmodel.VMSecurityGroup {
-	return cloudmodel.VMSecurityGroup{
-		Lcuuid:              uuid.NewString(),
-		VMLcuuid:            FormatLcuuid(vmLcuuid),
-		SecurityGroupLcuuid: FormatLcuuid(securityGroupLcuuid),
-		Priority:            RandID(),
-	}
-}
-
 func NewCloudNATGateway(regionLcuuid, vpcLcuuid string) cloudmodel.NATGateway {
 	return cloudmodel.NATGateway{
 		Lcuuid:       uuid.NewString(),
@@ -645,16 +610,6 @@ func NewCloudResource(baseCount int) cloudmodel.Resource {
 				// security_group、vm_security_group、routing_table、nat_rule、lb_listener、lb_target_server
 				for l := 0; l < 5; l++ {
 					resource.RoutingTables = append(resource.RoutingTables, NewCloudRoutingTable(vrouter.Lcuuid))
-					securityGroup := NewCloudSecurityGroup(region.Lcuuid, vpc.Lcuuid)
-					resource.SecurityGroups = append(resource.SecurityGroups, securityGroup)
-					resource.VMSecurityGroups = append(
-						resource.VMSecurityGroups, NewCloudVMSecurityGroup(resource.VMs[len(resource.VMs)-1].Lcuuid, securityGroup.Lcuuid),
-					)
-					// baseCount * 5 * 5 * 5 * 5
-					// security_group_rule
-					for m := 0; m < 5; m++ {
-						resource.SecurityGroupRules = append(resource.SecurityGroupRules, NewCloudSecurityGroupRule(securityGroup.Lcuuid))
-					}
 					resource.NATRules = append(resource.NATRules, NewCloudNATRule(natGateway.Lcuuid))
 					lbListener := NewCloudLBListener(lb.Lcuuid)
 					resource.LBListeners = append(resource.LBListeners, lbListener)

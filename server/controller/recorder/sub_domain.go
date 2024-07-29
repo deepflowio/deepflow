@@ -212,8 +212,6 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 			listener.NewNetwork(s.cache)),
 		updater.NewSubnet(s.cache, cloudData.Subnets).RegisterListener(
 			listener.NewSubnet(s.cache)),
-		// updater.NewPrometheusTarget(s.cache, cloudData.PrometheusTargets).RegisterListener(
-		// 	listener.NewPrometheusTarget(s.cache)),
 		updater.NewVInterface(s.cache, cloudData.VInterfaces, s.domainToolDataSet).RegisterListener(
 			listener.NewVInterface(s.cache)),
 		ip,
