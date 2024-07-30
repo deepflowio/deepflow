@@ -314,6 +314,10 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	if input.Key.Labels() != nil {
 		p.SpanName = input.Key.Labels()[LabelSpanName]
 	}
+	// app_instance should upload by user with label, if empty use app_service
+	if p.AppInstance == "" {
+		p.AppInstance = p.AppService
+	}
 	p.ProcessID = pid
 	p.ProcessStartTime = stime
 	p.GPID = platformData.QueryProcessInfo(orgId, vtapID, pid)
