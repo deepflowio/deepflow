@@ -68,8 +68,14 @@ impl Document {
 
 impl From<Document> for metric::Document {
     fn from(d: Document) -> Self {
+        let timestamp = if d.flags.contains(DocumentFlag::PER_SECOND_METRICS) {
+            d.timestamp - d.tagger.time_span
+        } else {
+            d.timestamp - d.tagger.time_span * 60
+        };
+
         metric::Document {
-            timestamp: d.timestamp,
+            timestamp,
             tag: Some(d.tagger.into()),
             meter: Some(d.meter.into()),
             flags: d.flags.bits(),
@@ -394,7 +400,6 @@ impl From<Tagger> for metric::MiniTag {
                 endpoint: t.endpoint.unwrap_or_default(),
                 pod_id: t.pod_id,
                 biz_type: t.biz_type as u32,
-                time_span: t.time_span,
             }),
         }
     }
