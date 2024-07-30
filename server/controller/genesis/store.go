@@ -148,7 +148,7 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, info VIFRPCMessage) 
 
 		db, err := mysql.GetDB(info.orgID)
 		if err != nil {
-			log.Errorf("get org id (%d) mysql session failed", info.orgID)
+			log.Error("get mysql session failed", logger.NewORGPrefix(info.orgID))
 			return
 		}
 		nodeIP := os.Getenv(common.NODE_IP_KEY)
@@ -259,7 +259,7 @@ func (s *SyncStorage) refreshDatabase() {
 		for _, orgID := range orgIDs {
 			db, err := mysql.GetDB(orgID)
 			if err != nil {
-				log.Errorf("get org id (%d) mysql session failed", orgID)
+				log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 				continue
 			}
 			vTaps := []mysql.VTap{}
@@ -404,7 +404,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get org id (%d) mysql session failed", orgID)
+		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return err
 	}
 

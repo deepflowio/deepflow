@@ -139,7 +139,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get org id (%d) mysql session failed", orgID)
+		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return retGenesisSyncData, err
 	}
 
@@ -444,7 +444,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get org id (%d) mysql session failed", orgID)
+		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 
