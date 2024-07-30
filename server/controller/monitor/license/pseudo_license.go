@@ -22,14 +22,13 @@ import (
 	"strings"
 	"time"
 
-	logging "github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 )
 
-var log = logging.MustGetLogger("monitor.license")
+var log = logger.MustGetLogger("monitor.license")
 
 var VTAP_LICENSE_TYPE_DEFAULT = common.VTAP_LICENSE_TYPE_A
 var VTAP_LICENSE_FUNCTIONS = []string{

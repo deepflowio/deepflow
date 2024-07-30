@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	logging "github.com/op/go-logging"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -37,7 +36,7 @@ import (
 )
 
 var (
-	log = logging.MustGetLogger("tagrecorder/check")
+	log = logger.MustGetLogger("tagrecorder/check")
 
 	tagRecorderOnce sync.Once
 	tagRecorder     *TagRecorder

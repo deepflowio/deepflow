@@ -19,12 +19,11 @@ package statsd
 import (
 	"sync/atomic"
 
-	logging "github.com/op/go-logging"
-
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 )
 
-var log = logging.MustGetLogger("trisolaris/statsd")
+var log = logger.MustGetLogger("trisolaris/statsd")
 
 type Counter struct {
 	ReqCount uint64 `statsd:"req_count"`
