@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bitly/go-simplejson"
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm/clause"
 
@@ -313,6 +314,26 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 	} else {
 		regionLcuuid = confRegion.(string)
 	}
+
+	// 同一区域只允许存在一个(采集器同步)类型
+	// only one type (agent_sync) can exist in the same region
+	if domainCreate.Type == common.AGENT_SYNC {
+		var agentSyncDomains []mysql.Domain
+		err := db.Where("type = ?", domainCreate.Type).Find(&agentSyncDomains).Error
+		if err != nil {
+			return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, err.Error())
+		}
+		for _, asDomain := range agentSyncDomains {
+			configJson, err := simplejson.NewJson([]byte(asDomain.Config))
+			if err != nil {
+				return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, err.Error())
+			}
+			if regionLcuuid == configJson.Get("region_uuid").MustString() {
+				return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("only one agent_sync can exist in the region (%s)", regionLcuuid))
+			}
+		}
+	}
+
 	// TODO: controller_ip拿到config外面，直接作为domain的一级参数
 	var controllerIP string
 	confControllerIP, ok := domainCreate.Config["controller_ip"]
