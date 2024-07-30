@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: modify resource delete error #25844 [#7608](https://github.com/deepflowio/deepflow/pull/7608) by [Ericsssss](https://github.com/Ericsssss)
 * fix: Remove useless output from CL [#7593](https://github.com/deepflowio/deepflow/pull/7593) by [roryye](https://github.com/roryye)
 * fix: agent - windows compile error [#7589](https://github.com/deepflowio/deepflow/pull/7589) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - missing cbpf l7 log [#7586](https://github.com/deepflowio/deepflow/pull/7586) by [yuanchaoa](https://github.com/yuanchaoa)

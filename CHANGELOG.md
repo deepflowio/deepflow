@@ -8,6 +8,11 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: fix agent traffic log [#7620](https://github.com/deepflowio/deepflow/pull/7620) by [roryye](https://github.com/roryye)
+* fix: Memory counter error [#7619](https://github.com/deepflowio/deepflow/pull/7619) by [rvql](https://github.com/rvql)
+* fix: Fix off-by-one error in java symbol rewrite [#7613](https://github.com/deepflowio/deepflow/pull/7613) by [rvql](https://github.com/rvql)
+* fix: Set 0 for e_stack_id [#7612](https://github.com/deepflowio/deepflow/pull/7612) by [rvql](https://github.com/rvql)
+* fix: Fix duplicate key for different java classes [#7611](https://github.com/deepflowio/deepflow/pull/7611) by [rvql](https://github.com/rvql)
 * fix: Modify alert_policy show tag values error #25978 [#7599](https://github.com/deepflowio/deepflow/pull/7599) by [Ericsssss](https://github.com/Ericsssss)
 * fix: modify resource delete error #25844 [#7552](https://github.com/deepflowio/deepflow/pull/7552) by [Ericsssss](https://github.com/Ericsssss)
 * fix: CVE-2024-35195 vuln [#7590](https://github.com/deepflowio/deepflow/pull/7590) by [fengshunli](https://github.com/fengshunli)
@@ -88,6 +93,13 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: support default team in domain create api [#7622](https://github.com/deepflowio/deepflow/pull/7622) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: Modify app_service and app_instance tag type and filter condition [#7621](https://github.com/deepflowio/deepflow/pull/7621) by [Ericsssss](https://github.com/Ericsssss)
+* feat: unifies legacy log organization info [#7618](https://github.com/deepflowio/deepflow/pull/7618) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: log format add org [#7616](https://github.com/deepflowio/deepflow/pull/7616) by [askyrie](https://github.com/askyrie)
+* feat: fill profile app_instance [#7609](https://github.com/deepflowio/deepflow/pull/7609) by [taloric](https://github.com/taloric)
+* feat: agent - eBPF Add delay threshold check for push period [#7607](https://github.com/deepflowio/deepflow/pull/7607) by [yinjiping](https://github.com/yinjiping)
+* feat: Tagrecorder log add org info [#7579](https://github.com/deepflowio/deepflow/pull/7579) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Allow longer java symbol name [#7603](https://github.com/deepflowio/deepflow/pull/7603) by [rvql](https://github.com/rvql)
 * feat: Modify alert_policy node type [#7601](https://github.com/deepflowio/deepflow/pull/7601) by [Ericsssss](https://github.com/Ericsssss)
 * feat: agent - eBPF Add kernel dependency check [#7594](https://github.com/deepflowio/deepflow/pull/7594) by [yinjiping](https://github.com/yinjiping)
@@ -196,6 +208,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: update monitor, server log with org info [#7597](https://github.com/deepflowio/deepflow/pull/7597) by [roryye](https://github.com/roryye)
 * refactor: agent remove prometheus api sync [#7576](https://github.com/deepflowio/deepflow/pull/7576) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: cli update and deepflow-server update message [#7500](https://github.com/deepflowio/deepflow/pull/7500) by [lzf575](https://github.com/lzf575)
 * refactor: server message update [#7498](https://github.com/deepflowio/deepflow/pull/7498) by [TomatoMr](https://github.com/TomatoMr)
