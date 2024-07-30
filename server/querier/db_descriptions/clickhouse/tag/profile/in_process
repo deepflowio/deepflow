@@ -39,8 +39,8 @@ cloud.tag                  , cloud.tag                 , cloud.tag              
 ip                         , ip                        , ip                        , ip            ,                       , Network Layer   , 111            , 0
 is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum      , ip_type               , Network Layer   , 111            , 0
 
-app_service                , app_service               , app_service               , string        ,                       , Service Info    , 111            , 0
-app_instance               , app_instance              , app_instance              , string        ,                       , Service Info    , 111            , 0
+app_service                , app_service               , app_service               , string_enum   ,                       , Service Info    , 111            , 0
+app_instance               , app_instance              , app_instance              , string_enum   ,                       , Service Info    , 111            , 0
 
 trace_id                   , trace_id                  , trace_id                  , string        ,                       , Tracing Info    , 111            , 0
 span_name                  , span_name                 , span_name                 , string        ,                       , Tracing Info    , 111            , 0

@@ -63,8 +63,8 @@ tunnel_type                , tunnel_type               , tunnel_type            
 server_port                , server_port               , server_port               , int_enum      , server_port            , Transport Layer , 111           , 0
 
 l7_protocol                , l7_protocol               , l7_protocol               , int_enum      , l7_protocol            , Application Layer , 111           , 0
-app_service                , app_service               , app_service               , string        ,                        , Application Layer , 111           , 0
-app_instance               , app_instance              , app_instance              , string        ,                        , Application Layer , 111           , 0
+app_service                , app_service               , app_service               , string_enum   ,                        , Application Layer , 111           , 0
+app_instance               , app_instance              , app_instance              , string_enum   ,                        , Application Layer , 111           , 0
 endpoint                   , endpoint                  , endpoint                  , string        ,                        , Application Layer , 111           , 0
 
 tap                        , tap                       , tap                       , resource      ,                        , Capture Info    , 110           , 1
