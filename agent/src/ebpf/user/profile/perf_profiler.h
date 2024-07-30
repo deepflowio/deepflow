@@ -18,7 +18,7 @@
 #define DF_USER_PERF_PROFILER_H
 #define CP_PROFILE_SET_PROBES(T)
 #include "../extended/extended.h"
-#include "../bihash_24_8.h"
+#include "../bihash_32_8.h"
 #include "../../kernel/include/perf_profiler.h"
 
 #define PROFILER_CTX_NUM 3
@@ -31,15 +31,15 @@
  * for processing.
  */
 
-#define stack_trace_msg_hash_t		clib_bihash_24_8_t
-#define stack_trace_msg_hash_init	clib_bihash_init_24_8
-#define stack_trace_msg_hash_kv		clib_bihash_kv_24_8_t
-#define print_hash_stack_trace_msg	print_bihash_24_8
-#define stack_trace_msg_hash_search	clib_bihash_search_24_8
-#define stack_trace_msg_hash_add_del	clib_bihash_add_del_24_8
-#define stack_trace_msg_hash_free	clib_bihash_free_24_8
-#define stack_trace_msg_hash_key_value_pair_cb		clib_bihash_foreach_key_value_pair_cb_24_8
-#define stack_trace_msg_hash_foreach_key_value_pair	clib_bihash_foreach_key_value_pair_24_8
+#define stack_trace_msg_hash_t		clib_bihash_32_8_t
+#define stack_trace_msg_hash_init	clib_bihash_init_32_8
+#define stack_trace_msg_hash_kv		clib_bihash_kv_32_8_t
+#define print_hash_stack_trace_msg	print_bihash_32_8
+#define stack_trace_msg_hash_search	clib_bihash_search_32_8
+#define stack_trace_msg_hash_add_del	clib_bihash_add_del_32_8
+#define stack_trace_msg_hash_free	clib_bihash_free_32_8
+#define stack_trace_msg_hash_key_value_pair_cb		clib_bihash_foreach_key_value_pair_cb_32_8
+#define stack_trace_msg_hash_foreach_key_value_pair	clib_bihash_foreach_key_value_pair_32_8
 
 #define JAVA_ATTACH_TOOL_PATH DF_JAVA_ATTACH_CMD
 
@@ -72,6 +72,7 @@ typedef struct {
 			u64 stime;
 			u32 u_stack_id;
 			u32 k_stack_id;
+			u64 e_stack_id; // extra stack id as key (object class or interpreter stack)
 		} k;
 
 		/* Matching and combining for process/thread name. */
