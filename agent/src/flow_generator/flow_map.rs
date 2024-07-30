@@ -1905,6 +1905,7 @@ impl FlowMap {
                     l7_stats.signal_source = flow.signal_source;
                     l7_stats.time_in_second = flow.flow_stat_time.into();
                     l7_stats.l7_protocol = l7_protocol;
+                    l7_stats.time_span = l7_perf_stats_key.time_span;
                     if index + 1 == count {
                         l7_stats.flow = Some(tagged_flow.clone());
                     } else {
