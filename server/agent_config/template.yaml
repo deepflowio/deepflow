@@ -9,7 +9,7 @@ global:
   #   en: Limits
   #   ch: 资源限制
   # description:
-  #   en:
+  #   en: Resource limitations
   #   ch: 控制 deepflow-agent 资源用量
   limits:
     # type: int
@@ -85,7 +85,6 @@ global:
     #   ch: |-
     #     用于 deepflow-agent 控制自身运行日志在本地的存储量。
     # upgrade_from: log_file_size
-    # TODO: 还有用吗？是否还会写本地文件，和 standalone.log_fize 是什么关系？
     max_local_log_file_size: 1000
     # type: duration
     # name:
@@ -103,7 +102,6 @@ global:
     #     用于 deepflow-agent 控制自身运行日志在本地的留存时长。
     # upgrade_from: log_retention
     # TODO: 以前的单位是天，改为 duration
-    # TODO: 还有用吗？是否还会写本地文件，和 standalone.log_fize 是什么关系？
     local_log_retention: 300d
   # type: section
   # name:
@@ -170,7 +168,6 @@ global:
     #     - https://unix.stackexchange.com/questions/495854/processes-hanging-when-trying-to-access-a-file
     # upgrade_from: static_config.check-core-file-disabled
     # deprecated: true
-    # TODO: 【待确认】可以废弃了？
     check_core_file_disabled: false
   # type: section
   # name:
@@ -211,7 +208,6 @@ global:
       #   ch: |-
       #     当系统空闲内存低于此阈值的 90% 时，deepflow-agent 将自动重启。
       # upgrade_from: sys_free_memory_limit
-      # TODO: 为何不是低于这个比例直接重启，需要 90% 的控制吗？
       trigger_threshold: 0
     # type: section
     # name:
@@ -357,11 +353,21 @@ global:
     # description:
     #   en: |-
     #     CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-    #     without being migrated to other processors. Example: `cpu-affinity: [1, 3, 5, 7, 9]`.
+    #     without being migrated to other processors. Example:
+    #     ```yaml
+    #     global:
+    #       tunning:
+    #         cpu_affinity: [1, 3, 5, 7, 9]
+    #     ```
     #   ch: |-
-    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。举例：`cpu-affinity: [1, 3, 5, 7, 9]`
+    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。举例：
+    #     ```yaml
+    #     global:
+    #       tunning:
+    #         cpu_affinity: [1, 3, 5, 7, 9]
+    #     ```
     # upgrade_from: static_config.cpu-affinity
-    # TODO：（1）CPU 亲和性是操作系统的行为还是deepflow-agent的行为？（2）如果配置的ID不存在会有什么影响？
+    # TODO: （1）CPU 亲和性是操作系统的行为还是deepflow-agent的行为？（2）如果配置的ID不存在会有什么影响？
     cpu_affinity: []
     # type: int
     # name:
@@ -396,7 +402,6 @@ global:
     #   ch: |-
     #     开启闲置内存修剪特性，将降低 agent 内存使用量，但可能会损失 agent 处理性能。
     # upgrade_from: static_config.memory-trim-disabled
-    # TODO: 【待确认】可以废弃了？
     # TODO: 注意换成了正向的开关，字面值变了但默认行为没变
     idle_memory_trimming: false
     # type: duration
@@ -485,7 +490,7 @@ global:
     #     当 deepflow-agent 与 deepflow-server 之间的时间偏移大于‘min_drift’设置值时，对 agent 的
     #     时间戳进行纠正。
     # upgrade_from: static_config.ntp-min-interval
-    # TODO：默认值 10s 代表 10s 内的时间偏差不做纠正吗？
+    # TODO: 默认值 10s 代表 10s 内的时间偏差不做纠正吗？
     min_drift: 10s
   # type: section
   # name:
@@ -681,6 +686,22 @@ global:
       #     deepflow-agent 运行日志输出等级。
       # upgrade_from: log_level
       log_level: INFO
+      # type: string
+      # name:
+      #   en: Log File
+      #   ch: 日志文件
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Note that this configuration is only used in standalone mode.
+      #   ch: |-
+      #     deepflow-agent 运行日志的写入位置。
+      # upgrade_from: static_config.log-file
+      log_file: /var/log/deepflow_agent/deepflow_agent.log
       # type: bool
       # name:
       #   en: Log Backhaul Enabled
@@ -720,7 +741,7 @@ global:
       #     该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
       #     开启后，支持对 Trident 持续剖析。
       # upgrade_from: static_config.profiler
-      # TODO: 【待确认】only for trident
+      # deprecated: true
       enabled: false
     # type: section
     # name:
@@ -747,7 +768,6 @@ global:
       #     该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。用于配置
       #     trident 用于诊断的 UDP 监听端口，默认值为 0 ，表示使用随机的端口。
       # upgrade_from: static_config.debug-listen-port
-      # TODO: 【待确认】only for trident，【待确认】可使用 unix socket，从而避免 listen port
       # TODO: trident主动监听？英文中描述是“client port number”，感觉不太对。
       local_udp_port: 0
       # type: bool
@@ -765,7 +785,7 @@ global:
       #   ch: |-
       #     该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
       # upgrade_from: static_config.enable-debug-stats
-      # TODO: 【待确认】only for trident
+      # deprecated: true
       debug_metrics_enabled: false
   # type: section
   # name:
@@ -817,23 +837,7 @@ global:
     #     数据文件的写入位置。
     # upgrade_from: static_config.standalone-data-file-dir
     data_file_dir: /var/log/deepflow_agent/
-    # type: string
-    # name:
-    #   en: Log File
-    #   ch: 日志文件
-    # unit:
-    # range: []
-    # enum_options: []
-    # modification: agent_restart
-    # ee_feature: false
-    # description:
-    #   en: |-
-    #     Note that this configuration is only used in standalone mode.
-    #   ch: |-
-    #     deepflow-agent 运行日志的写入位置。
-    # upgrade_from: static_config.log-file
-    # TODO: 日志文件的写入位置，是不是应该放到“log”部分，而不是放在“standalone_mode”部分。
-    log_file: /var/log/deepflow_agent/deepflow_agent.log
+
 # type: section
 # name:
 #   en: Inputs
@@ -934,7 +938,7 @@ inputs:
       #   en: |-
       #     Execute the command every time when scan the process, expect get the process tag
       #     from stdout in yaml format, the example yaml format as follow:
-      #     ```
+      #     ```yaml
       #     - pid: 1
       #       tags:
       #       - key: xxx
@@ -944,11 +948,17 @@ inputs:
       #       - key: xxx
       #         value: xxx
       #     ```
-      #     Example configuration: `os_app_tag_exec: ["cat", "/tmp/tag.yaml"]`
+      #     Example configuration:
+      #     ```yaml
+      #     inputs:
+      #       proc:
+      #         tag_extraction:
+      #           script_command: ["cat", "/tmp/tag.yaml"]
+      #     ```
       #   ch: |-
       #     deepflow-agent 每次采集进程信息时，会执行配置的脚本命令，并从标准输出的 yaml 格式
       #     中尝试获取进程的标签字段。yaml 格式的样例如下：
-      #     ```
+      #     ```yaml
       #     - pid: 1
       #       tags:
       #       - key: xxx
@@ -958,7 +968,13 @@ inputs:
       #       - key: xxx
       #         value: xxx
       #     ```
-      #     配置样例: `os_app_tag_exec: ["cat", "/tmp/tag.yaml"]`
+      #     配置样例:
+      #     ```yaml
+      #     inputs:
+      #       proc:
+      #         tag_extraction:
+      #           script_command: ["cat", "/tmp/tag.yaml"]
+      #     ```
       # upgrade_from: static_config.os-app-tag-exec
       # TODO: 样例配置是否需要更新字段名？
       script_command: []
@@ -1005,29 +1021,31 @@ inputs:
     #       Default value `""` means no replacement.
     #
     #     Example:
-    #     ```
-    #     os_proc_regex:
-    #       - match_regex: python3 (.*)\.py
-    #         match_type: cmdline
-    #         match_languages: []
-    #         match_usernames: []
-    #         only_in_container: true
-    #         only_with_tag: false
-    #         ignore: false
-    #         rewrite_name: $1-py-script
-    #         enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
-    #       - match_regex: (?P<PROC_NAME>nginx)
-    #         match_type: process_name
-    #         rewrite_name: ${PROC_NAME}-%HOSTNAME%
-    #       - match_regex: "nginx"
-    #         match_type: parent_process_name
-    #         ignore: true
-    #       - match_regex: .*sleep.*
-    #         match_type: process_name
-    #         ignore: true
-    #       - match_regex: .+ # match after concatenating a tag key and value pair using colon,
-    #                         # i.e., an regex `app:.+` can match all processes has a `app` tag
-    #         match_type: tag
+    #     ```yaml
+    #     inputs:
+    #       proc:
+    #         process_matcher:
+    #         - match_regex: python3 (.*)\.py
+    #           match_type: cmdline
+    #           match_languages: []
+    #           match_usernames: []
+    #           only_in_container: true
+    #           only_with_tag: false
+    #           ignore: false
+    #           rewrite_name: $1-py-script
+    #           enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
+    #         - match_regex: (?P<PROC_NAME>nginx)
+    #           match_type: process_name
+    #           rewrite_name: ${PROC_NAME}-%HOSTNAME%
+    #         - match_regex: "nginx"
+    #           match_type: parent_process_name
+    #           ignore: true
+    #         - match_regex: .*sleep.*
+    #           match_type: process_name
+    #           ignore: true
+    #         - match_regex: .+ # match after concatenating a tag key and value pair using colon,
+    #                           # i.e., an regex `app:.+` can match all processes has a `app` tag
+    #           match_type: tag
     #     ```
     # upgrade_from: static_config.os-proc-regex
     # TODO: 注意 dict 的升级
@@ -1171,17 +1189,17 @@ inputs:
     # enum_options:
     #   - proc.socket_list
     #   - proc.symbol_table
-    #   - proc.proc_event // XXX
+    #   - proc.proc_event # XXX
     #   - ebpf.socket.uprobe.golang
     #   - ebpf.socket.uprobe.tls
-    #   - ebpf.socket.uprobe.rdma // XXX
+    #   - ebpf.socket.uprobe.rdma # XXX
     #   - ebpf.file.io_event
-    #   - ebpf.file.management_event // XXX
+    #   - ebpf.file.management_event # XXX
     #   - ebpf.profile.on_cpu
     #   - ebpf.profile.off_cpu
     #   - ebpf.profile.memory
-    #   - ebpf.profile.cuda // XXX
-    #   - ebpf.profile.hbm // XXX
+    #   - ebpf.profile.cuda # XXX
+    #   - ebpf.profile.hbm # XXX
     # modification: agent_restart
     # ee_feature: false
     # description:
@@ -1318,7 +1336,7 @@ inputs:
         #
         #     TODO
         # upgrade_from: static_config.ebpf.java-symbol-file-refresh-defer-interval
-        # TODO: 待确认——该 duration 是否用于控制复核表再生成的延迟时间？
+        # TODO: 待确认——该 duration 是否用于控制符号表再生成的延迟时间？
         refresh_defer_duration: 60s
         # type: int
         # name:
@@ -1423,7 +1441,6 @@ inputs:
       #   ch: |-
       #     需要采集流量的网络接口的正则表达式。
       # upgrade_from: tap_interface_regex
-      # TODO: 字符串长度为 0 时的行为确认下
       interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
       # type: dict
       # name:
@@ -1441,9 +1458,12 @@ inputs:
       #
       #     Example:
       #     ```yaml
-      #     bond_interfaces:
-      #       - slave_interfaces: [eth0, eth1]
-      #       - slave_interfaces: [eth2, eth3]
+      #     inputs:
+      #       cbpf:
+      #         af_packet:
+      #           bond_interfaces:
+      #           - slave_interfaces: [eth0, eth1]
+      #           - slave_interfaces: [eth2, eth3]
       #     ```
       # upgrade_from: static_config.tap-interface-bond-groups
       # TODO: dict 中的配置注意升级问题
@@ -1510,7 +1530,6 @@ inputs:
       # name: TAP Interfaces
       # upgrade_from: static_config.src-interfaces
       # deprecated: true
-      # TODO: 【待确定】deprecated
       src_interfaces: []
       # type: int
       # name:
@@ -1644,7 +1663,7 @@ inputs:
         #
         #     注意：参数仅在`capture_mode`为 0，且`extra_netns_regex`为空时有效。
         # upgrade_from: static_config.local-dispatcher-count
-        # TODO: 【待确定】适用于哪些 recv engine。另外以前没有最大值，现在加上了 64 的限制
+        # TODO: 【待确定】另外以前没有最大值，现在加上了 64 的限制
         # TODO: 提升什么的性能和弹性？application or agent ？
         packet_fanout_count: 1
         # type: int
@@ -1675,7 +1694,6 @@ inputs:
         #     - https://github.com/torvalds/linux/blob/afcd48134c58d6af45fb3fdb648f1260b20f2326/include/uapi/linux/if_packet.h#L71
         #     - https://www.stackpath.com/blog/bpf-hook-points-part-1/
         # upgrade_from: static_config.packet-fanout-mode
-        # TODO: 【待确定】适用于哪些 recv engine
         packet_fanout_mode: 0
     # type: section
     # name:
@@ -1804,11 +1822,12 @@ inputs:
       # description:
       #   en: |-
       #     The configuration takes effect when capture_mode is 0 or 2,
-      #     dispatcher-queue is always true when capture_mode is 2
+      #     dispatcher-queue is always true when capture_mode is 2.
+      #
+      #     Available for all recv_engines.
       #   ch: |-
       #     TODO
       # upgrade_from: static_config.dispatcher-queue
-      # TODO: 【待确定】适用于哪些 recv engine
       # TODO: 是不是 capture_mode 1 也支持了？@苑超
       # TODO: 待确认英文内容后补充中文内容。
       dispatcher_queue_enabled: false
@@ -1827,7 +1846,6 @@ inputs:
       #   ch: |-
       #     该参数配置对 DPDK 环境无效。
       # upgrade_from: capture_packet_size
-      # TODO: 待确认适用于哪些 recv engine
       max_capture_packet_size: 65535
       # type: int
       # name:
@@ -1866,7 +1884,6 @@ inputs:
       #   ch: |-
       #     TODO
       # upgrade_from: static_config.analyzer-queue-size
-      # TODO: 确认一下，仅用于 raw packet 吧？
       # TODO: 待明确中文释义。
       raw_packet_queue_size: 131072
       # type: int
@@ -1881,10 +1898,12 @@ inputs:
       # description:
       #   en: |-
       #     Maximum packet rate allowed for collection.
+      #
+      #     Available for all recv_engines.
       #   ch: |-
       #     deepflow-agent 采集数据包的速率上限。
       # upgrade_from: max_collect_pps
-      # TODO: 确认一下适用于哪些 recv engine。另外默认值偏小了，默认设置为 0 表示不限速？
+      # TODO: 默认值偏小了，默认设置为 0 表示不限速？
       max_capture_pps: 200
     # type: section
     # name:
@@ -1927,8 +1946,7 @@ inputs:
       #   ch: |-
       #     流量镜像模式下，deepflow-agent 需要剥离的隧道头协议类型。
       # upgrade_from: static_config.trim-tunnel-types
-      # TODO: 用于哪些 capture_mode?
-      # TODO: “虚拟网络镜像”、“物理网络镜像”是否均适用？
+      # TODO: “虚拟网络镜像”、“物理网络镜像”是否均适用？【是的】
       tunnel_trim_protocols: []
     # type: section
     # name:
@@ -2121,12 +2139,13 @@ inputs:
           # description:
           #   en: |-
           #     TCP&UDP Port Blacklist, Priority higher than kprobe-whitelist.
-          #     Example: 80,1000-2000
+          #
+          #     Example: `ports: 80,1000-2000`
           #   ch: |-
           #     TCP 和 UDP 的端口黑名单列表。端口号列入黑名单的 socket 将被 Kprobe 采集忽略。黑名单
           #     生效优先级高于 kprobe 白名单。
           #
-          #     配置样例: ports: 80,1000-2000
+          #     配置样例: `ports: 80,1000-2000`
           # upgrade_from: static_config.ebpf.kprobe-blacklist.port-list
           ports: ""
         # type: section
@@ -2147,10 +2166,12 @@ inputs:
           # description:
           #   en: |-
           #     TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
-          #     Example: 80,1000-2000
+          #
+          #     Example: `ports: 80,1000-2000`
           #   ch: |-
           #     TCP 和 UDP 的端口白名单列表，白名单生效优先级低于 kprobe 黑名单。
-          #     配置样例: ports: 80,1000-2000
+          #
+          #     配置样例: `ports: 80,1000-2000`
           # upgrade_from: static_config.ebpf.kprobe-whitelist.port-list
           # TODO: 未列入黑名单、白名单的端口是否用 kprobe 做采集？
           port: ""
@@ -2293,8 +2314,7 @@ inputs:
         #   ch: |-
         #     eBPF Off-CPU profile 数据的采集开关。
         # upgrade_from: static_config.ebpf.off-cpu-profile.disabled
-        # TODO: 默认值应该是 true 吧？
-        disabled: false
+        disabled: true
         # type: bool
         # name:
         #   en: Aggregate by CPU
@@ -2385,7 +2405,7 @@ inputs:
       #   ch: |-
       #     eBPF 数据的最大采集速率，设置为 `0` 表示不对 deepflow-agent 的 eBPF 数据采集速率做限制。
       # upgrade_from: static_config.ebpf.global-ebpf-pps-threshold
-      # TODO: 包括哪些 ebpf 数据？socket 相关的（requset_log, io_event）
+      # TODO: 包括哪些 ebpf 数据？socket 相关的（仅 requset_log）
       max_capture_rate: 0
       # type: int
       # name:
@@ -2657,7 +2677,7 @@ inputs:
       # upgrade_from: platform_enabled
       # TODO: 原来是 int，需要改为 bool
       # TODO: 到底包含采集哪些信息？决定起什么名字
-      # TODO: 是否仅对 Trident 有效？
+      # TODO: 是否仅对 Trident 有效？【是的】
       hypervisor_resource_enabled: false
       # type: int
       # name:
@@ -2692,7 +2712,6 @@ inputs:
       #     - 1: 从 tap 接口的名字中提取 MAC 地址
       #     - 2: 从 VM XML 文件中提取 MAC 地址
       # upgrade_from: if_mac_source
-      # TODO: 待 check 中文释义
       vm_mac_source: 0
       # type: string
       # name:
@@ -2772,41 +2791,41 @@ inputs:
       #   en: |-
       #     Specify kubernetes resources to watch.
       #
-      #     The schematics of entries in list is:
-      #     ```
-      #     name: string
-      #     group: string
-      #     version: string
-      #     disabled: bool (default false)
-      #     field-selector: string
-      #     ```
-      #
       #     To disable a resource, add an entry to the list with `disabled: true`:
-      #     ```
-      #     kubernetes-resources:
-      #     - name: services
-      #       disabled: true
+      #     ```yaml
+      #     inputs:
+      #       resources:
+      #         kubernetes:
+      #           api_resources:
+      #           - name: services
+      #             disabled: true
       #     ```
       #
       #     To enable a resource, add an entry of this resource to the list. Be advised that
       #     this setting overrides the default of the same resource. For example, to enable
       #     `statefulsets` in both group `apps` (the default) and `apps.kruise.io` will require
       #     two entries:
-      #     ```
-      #     kubernetes-resources:
-      #     - name: statefulsets
-      #       group: apps
-      #     - name: statefulsets
-      #       group: apps.kruise.io
-      #       version: v1beta1
+      #     ```yaml
+      #     inputs:
+      #       resources:
+      #         kubernetes:
+      #           api_resources:
+      #           - name: statefulsets
+      #             group: apps
+      #           - name: statefulsets
+      #             group: apps.kruise.io
+      #             version: v1beta1
       #     ```
       #
       #     To watching `routes` in openshift you can use the following settings:
-      #     ```
-      #     kubernetes-resources:
-      #     - name: ingresses
-      #       disabled: true
-      #     - name: routes
+      #     ```yaml
+      #     inputs:
+      #       resources:
+      #         kubernetes:
+      #           api_resources:
+      #           - name: ingresses
+      #             disabled: true
+      #           - name: routes
       #     ```
       # upgrade_from: static_config.kubernetes-resources
       # TODO: dict 类型的字段升级时要注意
@@ -2946,7 +2965,6 @@ inputs:
       # name: Ingress Flavour
       # upgrade_from: static_config.ingress-flavour
       # deprecated: true
-      # TODO: 这个字段废弃了，应该可以直接删除了？
       ingress_flavour: kubernetes
       # type: string
       # name:
@@ -3002,7 +3020,6 @@ inputs:
       #     以减少下发的数据量。当业务系统中不存在跨云平台的服务访问时，可以配置仅向 deepflow-agent
       #     下发本云平台的数据。参数的默认值为`0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
       #     仅获取部分云平台的数据。
-      #   TODO
       # upgrade_from: domains
       # TODO: 特殊字段，候选项需要通过自己的 API 获取。这个字段是 int 还是 string？默认值为空数组更合理？
       # TODO: local domain 如何配置？是否需要以云平台为单位，对 agent 配置 lcuuid？
@@ -3266,7 +3283,6 @@ processors:
       #   ch: |-
       #     设置为`true`时，deepflow-agent 不启用 fast path。
       # upgrade_from: static_config.fast-path-disabled
-      # TODO: 还在用吗：
       fast_path_disabled: false
       # type: int
       # name:
@@ -3392,7 +3408,7 @@ processors:
       #     ```
       #     flag 设置为`0`表示全部关闭，设置为`255`表示全部
       # upgrade_from: static_config.packet-sequence-flag
-      # TODO：英文中的的 bit 位是不是错位了？
+      # TODO: 英文中的的 bit 位是不是错位了？
       header_fields_flag: 0b0000_0000
     # type: section
     # name:
@@ -3692,7 +3708,7 @@ processors:
       # ee_feature: false
       # description:
       #   en: |-
-      #     Port-list example: 80,1000-2000
+      #     Port-list example: `80,1000-2000`
       #
       #     HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
       #     All data obtained through uprobe is not subject to port restrictions.
@@ -3703,9 +3719,11 @@ processors:
       #
       #     Attention: use `HTTP2` for `gRPC` Protocol.
       #   ch: |-
-      #     配置样例: 80,1000-2000
-      #     注意：（1）该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe有效，对 Uprobe 无效；（2）如需
-      #     控制`gRPC`协议，请使用`HTTP2`配置。
+      #     配置样例: `80,1000-2000`
+      #
+      #     注意：
+      #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe有效，对 Uprobe 无效；
+      #     2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
       # upgrade_from: static_config.l7-protocol-ports
       # TODO: 格式改成和 l7-log-blacklist 一样，不用 dict 了，这样 key 更明确，且默认值的行为更明确。
       # TODO: 确认一下 SofaRPC 的拼写
@@ -3744,12 +3762,17 @@ processors:
       # description:
       #   en: |-
       #     Tag filter example:
-      #     ```
-      #     tag_filters:
-      #       HTTP:
-      #         - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
-      #           operator: equal               # equal, prefix
-      #           value: somevalue
+      #     ```yaml
+      #     processors:
+      #       request_log:
+      #         filters:
+      #           tag_filters:
+      #             HTTP:
+      #               - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+      #                 operator: equal               # equal, prefix
+      #                 value: somevalue
+      #             HTTP2: []
+      #             # other protocols
       #     ```
       #     A l7_flow_log blacklist can be configured for each protocol, preventing request logs matching
       #     the blacklist from being collected by the agent or included in application performance metrics.
@@ -3777,14 +3800,15 @@ processors:
         # description:
         #   en: |-
         #     HTTP Tag filter example:
-        #     ```
-        #     tag_filters:
-        #       HTTP:
-        #         - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
-        #           operator: equal               # equal, prefix
-        #           value: somevalue
-        #       HTTP2: []
-        #       # other protocols ...
+        #     ```yaml
+        #     processors:
+        #       request_log:
+        #         filters:
+        #           tag_filters:
+        #             HTTP:
+        #               - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+        #                 operator: equal               # equal, prefix
+        #                 value: somevalue
         #     ```
         #     A l7_flow_log tag_filter can be configured for each protocol, preventing request logs matching
         #     the blacklist from being collected by the agent or included in application performance metrics.
@@ -4083,13 +4107,13 @@ processors:
         #       / is regarded as one paragraph) as endpoint
         #
         #     By default, two segments are extracted from the URL. For example, the
-        #     URL is /a/b/c?query=xxx", whose segment is 3, extracts "/a/b" as the
+        #     URL is `/a/b/c?query=xxx`, whose segment is 3, extracts `/a/b` as the
         #     endpoint.
         #   ch: |-
         #     HTTP 协议的 endpoint 提取遵循如下规则：
         #     - 最长匹配原则：优先匹配最长的前缀；
         #     - 提取 URL 最前的数段（段数由参数确定，默认值为 2）作为 endpoint。
-        #     比如，URL 为"/a/b/c?query=xxx"，deepflow-agent 默认提取"/a/b"作为 endpoint。
+        #     比如，URL 为 `/a/b/c?query=xxx`，deepflow-agent 默认提取 `/a/b` 作为 endpoint。
         # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.match-rules
         # TODO: 注意 dict 字段的升级。
         # ---
@@ -4148,10 +4172,13 @@ processors:
       #
       #     Example:
       #     ```yaml
-      #     custom_fields:
-      #       HTTP:
-      #         - field-name: "user-agent"
-      #         - field-name: "cookie"
+      #     processors:
+      #       request_log:
+      #         tag_extraction:
+      #           custom_fields:
+      #             HTTP:
+      #             - field-name: "user-agent"
+      #             - field-name: "cookie"
       #     ```
       #
       #     Attention: use `HTTP2` for `gRPC` Protocol.
@@ -4175,11 +4202,13 @@ processors:
         #
         #     Example:
         #     ```yaml
-        #     custom_fields:
-        #       HTTP:
-        #         - field-name: "user-agent"
-        #         - field-name: "cookie"
-        #       HTTP2: []
+        #     processors:
+        #       request_log:
+        #         tag_extraction:
+        #           custom_fields:
+        #             HTTP:
+        #             - field-name: "user-agent"
+        #             - field-name: "cookie"
         #     ```
         #
         #     Attention: use `HTTP2` for `gRPC` Protocol.
@@ -4542,8 +4571,8 @@ processors:
       # description:
       #   en: |-
       #     Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
-      #     the RRT cache, Example: rrt-cache-capacity = flow-count-limit. When rrt-cache-capacity is
-      #     not enough, it will be unable to calculate the rrt of l7.
+      #     the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
+      #     is not enough, it will be unable to calculate the rrt of l7.
       #   ch: |-
       #     TODO
       # upgrade_from: static_config.flow.flow-count-limit
@@ -4935,7 +4964,7 @@ outputs:
       #   ch: |-
       #     deepflow-agent 每秒发送的 l4_flow_log 数量上限，实际发送数量超出参数值后，将开启采样。
       # upgrade_from: l4_log_collect_nps_threshold
-      # TODO：超出数量后是开启采样吗？是否是丢弃？如果是采样是否意味着发送数量能够超过此值？
+      # TODO: 超出数量后是开启采样吗？是否是丢弃？如果是采样是否意味着发送数量能够超过此值？
       l4_throttle: 10000
       # type: int
       # name:
@@ -5333,6 +5362,7 @@ outputs:
     #     设置 deepflow-agent 做 NPB 分发的最大吞吐率。
     # upgrade_from: max_npb_bps
     max_tx_throughput: 1000
+
 # type: section
 # name:
 #   en: Plugins
@@ -5375,6 +5405,7 @@ plugins:
   # upgrade_from: so_plugins
   # TODO: 候选项需要特殊处理
   so_plugins: []
+
 # type: section
 # name:
 #   en: Dev
