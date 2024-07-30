@@ -201,11 +201,15 @@ global:
       # ee_feature: false
       # description:
       #   en: |-
-      #     The limit of the percentage of system free memory.
-      #     When the free percentage is lower than 90% of this value,
-      #     the agent will automatically restart.
+      #     Setting sys_free_memory_limit to 0 indicates that the system free memory ratio is not checked.
+      #     1. When the current system free memory ratio is below sys_free_memory_limit * 70%,
+      #        the agent will automatically restart.
+      #     2. When the current system free memory ratio is below sys_free_memory_limit but above 70%,
+      #        the agent enters the disabled state.
+      #     3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
+      #        the agent recovers from the disabled state.
       #   ch: |-
-      #     当系统空闲内存低于此阈值的 90% 时， deepflow-agent 将自动重启。
+      #     当系统空闲内存低于此阈值的 90% 时，deepflow-agent 将自动重启。
       # upgrade_from: sys_free_memory_limit
       # TODO: 为何不是低于这个比例直接重启，需要 90% 的控制吗？
       trigger_threshold: 0
@@ -1175,7 +1179,7 @@ inputs:
     #   - ebpf.file.management_event // XXX
     #   - ebpf.profile.on_cpu
     #   - ebpf.profile.off_cpu
-    #   - ebpf.profile.mem // XXX
+    #   - ebpf.profile.memory
     #   - ebpf.profile.cuda // XXX
     #   - ebpf.profile.hbm // XXX
     # modification: agent_restart
@@ -1302,12 +1306,20 @@ inputs:
         #     stack of a Java process, it will trigger the regeneration of the symbol file of the
         #     process. Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain
         #     more symbols for Java processes, the regeneration will be deferred for a period of time.
+        #
+        #     At the startup of a Java program, the JVM and JIT compiler are in a "warm-up" phase. During this
+        #     period, symbol changes are typically frequent due to the dynamic compilation and optimization
+        #     processes. Therefore, deepflow-agent delay symbol collection for one minute after the Java program
+        #     starts, allowing the JVM and JIT to "warm up" and for symbol churn to be minimized before proceeding
+        #     with the collection.
         #   ch: |-
         #     当 deepflow-agent 在 Java 进程的函数调用栈中发现未能解析的函数名时，将触发进程函数符号表的再生成
         #     过程，而由于 Java 使用了 JIT 编译机制，符号表的再生成过程将延迟一定的时间。
+        #
+        #     TODO
         # upgrade_from: static_config.ebpf.java-symbol-file-refresh-defer-interval
         # TODO: 待确认——该 duration 是否用于控制复核表再生成的延迟时间？
-        refresh_defer_duration: 600s
+        refresh_defer_duration: 60s
         # type: int
         # name:
         #   en: Maximum Symbol File Size
@@ -1511,7 +1523,9 @@ inputs:
       # ee_feature: true
       # description:
       #   en: |-
-      #     Calculate `capture_network_type` from vlan tag only if vlan pcp matches this value.
+      #     When mirror-traffic-pcp <= 7 calculate TAP value from vlan tag only if vlan pcp matches this value.
+      #     when mirror-traffic-pcp is 8 calculate TAP value from outer vlan tag, when mirror-traffic-pcp is 9
+      #     calculate TAP value from inner vlan tag.
       #   ch: |-
       #     TODO
       # upgrade_from: static_config.mirror-traffic-pcp
@@ -1690,35 +1704,6 @@ inputs:
         # upgrade_from: static_config.dpdk-enabled
         # TODO: 待整理。
         enabled: false
-        # type: string
-        # name:
-        #   en: CPU Core List
-        #   ch: CPU 核心列表
-        # unit:
-        # range: []
-        # enum_options: []
-        # modification: agent_restart
-        # ee_feature: true
-        # description:
-        #   en: |-
-        #     Map lcore set to physical cpu set.
-        #     Format: `<lcores[@cpus]>[<,lcores[@cpus]>...]`
-        #
-        #     Examples:
-        #     - 1,2,3,4
-        #     - 1-4
-        #     - (1,2)(3-10)
-        #     - 1@3,2@4
-        #
-        #     lcores and cpus list are grouped by `(` and `)`. Within the group, `-` is used
-        #     for range separator, `,` is used for single number separator. `()` can be
-        #     omitted for single element group, `@` can be omitted if cpus and lcores have
-        #     the same value.
-        #   ch: |-
-        #     TODO
-        # upgrade_from: static_config.dpdk_core_list
-        # TODO: 待整理。
-        cpu_core_list: ""
       # type: section
       # name: Libpcap
       # description:
@@ -2361,6 +2346,24 @@ inputs:
         #     不采集阻塞超过 1 小时的事件。
         # upgrade_from: static_config.ebpf.off-cpu-profile.minblock
         min_blocking_time: 50us
+      # type: section
+      # name: Memory
+      # description:
+      memory:
+        # type: bool
+        # name: Disabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     eBPF memory profile switch.
+        #   ch: |-
+        #     eBPF memory profile 数据的采集开关。
+        # upgrade_from: static_config.ebpf.memory-profile.disabled
+        disabled: true
     # type: section
     # name:
     #   en: Tunning
@@ -4358,6 +4361,23 @@ processors:
       #   ch: Flow 生成逻辑
       # description:
       flow_generation:
+        # type: int
+        # name:
+        #   en: Server Ports
+        #   ch: 服务端口号
+        # unit:
+        # range: [1, 65535]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Service port list, priority lower than TCP SYN flags.
+        #   ch: |-
+        #     deepflow-agent 有可能会错误的判断长流的方向，如果某个端口一定是服务端端口，
+        #     可配置在此处避免误判断。
+        # upgrade_from: static_config.server-ports
+        server_ports: []
         # type: bool
         # name:
         #   en: Cloud Traffic Ignore MAC
