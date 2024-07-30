@@ -41,7 +41,7 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 	var podGroups []mysql.PodGroup
 	err := p.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -49,7 +49,7 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 	for _, podGroup := range podGroups {
 		teamID, err := tagrecorder.GetTeamID(podGroup.Domain, podGroup.SubDomain)
 		if err != nil {
-			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podGroup)
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podGroup, p.db.LogPrefixORGID)
 		}
 
 		if podGroup.DeletedAt.Valid {

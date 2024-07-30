@@ -259,14 +259,14 @@ char *rewrite_java_symbol(char *sym) {
 			goto failed;
 		}
 		memcpy(dst + offset, sym + i + 1, j - (i + 1));
-		offset += j - i;
+		offset += j - (i + 1);
 		i = j + 1;
 		break;
 	default:
 		goto failed;
 	}
 
-	for (int j = 0; j < array_dims; j++) {
+	for (j = 0; j < array_dims; j++) {
 		offset += snprintf(dst + offset, new_len - offset, "[]");
 	}
 

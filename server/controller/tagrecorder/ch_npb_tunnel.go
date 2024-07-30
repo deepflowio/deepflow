@@ -38,7 +38,7 @@ func (p *ChNpbTunnel) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChNpbTunnel
 	var npbTunnels []mysql.NpbTunnel
 	err := db.Unscoped().Select("id", "name", "team_id").Find(&npbTunnels).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 

@@ -42,7 +42,7 @@ func (l *ChAPPLabel) generateNewData(db *mysql.DB) (map[PrometheusAPPLabelKey]my
 	err := db.Unscoped().Find(&prometheusLabels).Error
 
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -92,7 +92,7 @@ func (l *ChAPPLabel) generateAPPLabelData(db *mysql.DB) ([]string, bool) {
 	err := db.Unscoped().Select("app_label_name").Group("app_label_name").Find(&prometheusAPPMetricAPPLabelLayouts).Error
 
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return appLabelSlice, false
 	}
 
@@ -111,14 +111,14 @@ func (l *ChAPPLabel) generateNameIDData(db *mysql.DB) (map[string]int, map[strin
 	err := db.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, nil, false
 	}
 
 	err = db.Unscoped().Find(&prometheusLabelValues).Error
 
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, nil, false
 	}
 

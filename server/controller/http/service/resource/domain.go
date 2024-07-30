@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm/clause"
 
@@ -39,13 +38,14 @@ import (
 	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	svc "github.com/deepflowio/deepflow/server/controller/http/service"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
-var log = logging.MustGetLogger("service.resource")
+var log = logger.MustGetLogger("service.resource")
 
 var DOMAIN_PASSWORD_KEYS = map[string]bool{
 	"admin_password":      false,
@@ -1066,7 +1066,7 @@ func (c *DomainChecker) CheckRegularly(sCtx context.Context) {
 }
 
 func (c *DomainChecker) checkAndAllocateController(db *mysql.DB) {
-	log.Infof("check domain controller health started", db.LogPrefixORGID)
+	log.Info("check domain controller health started", db.LogPrefixORGID)
 	controllerIPToRegionLcuuid := make(map[string]string)
 	var azCConns []*mysql.AZControllerConnection
 	db.Find(&azCConns)
@@ -1107,5 +1107,5 @@ func (c *DomainChecker) checkAndAllocateController(db *mysql.DB) {
 			}
 		}
 	}
-	log.Infof("check domain controller health ended", db.LogPrefixORGID)
+	log.Info("check domain controller health ended", db.LogPrefixORGID)
 }

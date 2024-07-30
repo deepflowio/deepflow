@@ -21,14 +21,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("router")
+var log = logger.MustGetLogger("router")
 
 const OK = "ok"
 

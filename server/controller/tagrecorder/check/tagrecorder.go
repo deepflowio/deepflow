@@ -26,17 +26,17 @@ import (
 	"sync"
 	"time"
 
-	logging "github.com/op/go-logging"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 var (
-	log = logging.MustGetLogger("tagrecorder/check")
+	log = logger.MustGetLogger("tagrecorder/check")
 
 	tagRecorderOnce sync.Once
 	tagRecorder     *TagRecorder
@@ -66,12 +66,12 @@ func (c *TagRecorder) Check() {
 	go func() {
 		if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
 			t := time.Now()
-			log.Infof("ORG(id=%d database=%s) tagrecorder health check data run", db.ORGID, db.Name)
+			log.Infof("database=%s tagrecorder health check data run", db.Name, db.LogPrefixORGID)
 			tagrecorder.GetTeamInfo(db)
 			if err := c.check(db); err != nil {
-				log.Infof("ORG(id=%d database=%s) tagrecorder health check failed: %v", db.ORGID, db.Name, err.Error())
+				log.Infof("database=%s tagrecorder health check failed: %v", db.Name, err.Error(), db.LogPrefixORGID)
 			}
-			log.Infof("ORG(id=%d database=%s) tagrecorder health check data end, time since: %v", db.ORGID, db.Name, time.Since(t))
+			log.Infof("database=%s tagrecorder health check data end, time since: %v", db.Name, time.Since(t), db.LogPrefixORGID)
 			return nil
 		}); err != nil {
 			log.Error(err)
@@ -189,8 +189,8 @@ func compareAndCheck[CT MySQLChModel](db *mysql.DB, oldItems, newItems []CT) err
 	}
 	var t CT
 	tableName := reflect.TypeOf(t).String()
-	log.Infof("ORG(id=%d database=%s) check tagrecorder table(%v), old len(%v) hash(%v), new len(%v) hash(%v)",
-		db.ORGID, db.Name, tableName, len(oldItems), oldHash, len(newItems), newHash)
+	log.Infof("database=%s check tagrecorder table(%v), old len(%v) hash(%v), new len(%v) hash(%v)",
+		db.Name, tableName, len(oldItems), oldHash, len(newItems), newHash, db.LogPrefixORGID)
 	if oldHash == newHash {
 		return nil
 	}
@@ -212,7 +212,7 @@ func compareAndCheck[CT MySQLChModel](db *mysql.DB, oldItems, newItems []CT) err
 		}
 		return nil
 	})
-	log.Infof("ORG(id=%d database=%s) truncate table(%v)", db.ORGID, db.Name, tableName)
+	log.Infof("database=%s truncate table(%v)", db.Name, tableName, db.LogPrefixORGID)
 	return err
 }
 
@@ -234,7 +234,7 @@ func addBatch[CT MySQLChModel](tx *gorm.DB, toAdd []CT, orgID int, database, res
 		if err != nil {
 			return err
 		}
-		log.Infof("ORG(id=%d database=%s) add %d %s[%d, %d] success", orgID, database, len(oneP), resourceType, start, end)
+		log.Infof("database=%s add %d %s[%d, %d] success", database, len(oneP), resourceType, start, end, logger.NewORGPrefix(orgID))
 	}
 	return nil
 }

@@ -40,23 +40,23 @@ func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[I
 }
 
 func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChRegion, bool) {
-	log.Infof("generate data for %s", r.resourceTypeName)
+	log.Infof("generate data for %s", r.resourceTypeName, db.LogPrefixORGID)
 	var regions []mysql.Region
 	var azs []mysql.AZ
 	var vpcs []mysql.VPC
 	err := db.Unscoped().Find(&regions).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	err = db.Unscoped().Find(&azs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	err = db.Unscoped().Find(&vpcs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 

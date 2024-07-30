@@ -42,7 +42,7 @@ func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.Ch
 
 	err := mysql.Db.Unscoped().Find(&prometheusMetricNames).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -107,7 +107,7 @@ func (l *ChTargetLabel) generateMetricTargetData() (map[string][]int, bool) {
 	err := mysql.Db.Unscoped().Find(&prometheusMetricTargets).Error
 
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -124,7 +124,7 @@ func (l *ChTargetLabel) generateTargetData() (map[int]string, bool) {
 	err := mysql.Db.Unscoped().Find(&prometheusTargets).Error
 
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -142,7 +142,7 @@ func (l *ChTargetLabel) generateLabelNameIDData() (map[string]int, bool) {
 	err := mysql.Db.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
 	}
 

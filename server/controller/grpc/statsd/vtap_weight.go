@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/stats/pb"
 )
@@ -54,7 +55,7 @@ func (c *VTapCounter) GetVtapNameCounter(orgID int) VTapNameCounter {
 
 	if c.ORGIDToVTapNameCounter[orgID] == nil {
 		c.ORGIDToVTapNameCounter[orgID] = make(VTapNameCounter)
-		log.Infof("ORGID-%d init vtap name counter", orgID)
+		log.Infof("init vtap name counter", logger.NewORGPrefix(orgID))
 	}
 	return c.ORGIDToVTapNameCounter[orgID]
 }
@@ -78,14 +79,14 @@ func (c *VTapCounter) SetCounter(db *mysql.DB, teamID int, vtapName string, weig
 
 	vtapNameCounter, ok := c.ORGIDToVTapNameCounter[db.ORGID]
 	if !ok {
-		log.Warningf("ORGID-%d failed to find agent counter to set counter", db.ORGID)
+		log.Warningf("failed to find agent counter to set counter", db.LogPrefixORGID)
 		c.ORGIDToVTapNameCounter[db.ORGID] = make(VTapNameCounter)
 	}
 
 	if counter, ok := vtapNameCounter[vtapName]; ok {
 		if counter.Weight != weight || counter.IsAnalyzerChanged != isChanged {
-			log.Infof("ORGID-%d DATABASE-%s agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
-				db.ORGID, db.Name, vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged)
+			log.Infof("agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
+				vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged, db.LogPrefixORGID)
 		}
 		c.ORGIDToVTapNameCounter[db.ORGID][vtapName].Weight = weight
 		c.ORGIDToVTapNameCounter[db.ORGID][vtapName].IsAnalyzerChanged = isChanged
@@ -132,8 +133,7 @@ func (v *VTapWeightCounter) SendStats(vtapName string) {
 		MetricsFloatNames:  []string{"is_analyzer_changed", "weight"},
 		MetricsFloatValues: []float64{float64(v.IsAnalyzerChanged), v.Weight},
 	}
-	log.Debugf("ORGID-%d send agent(name: %s) traffic counter: %s",
-		v.ORGID, vtapName, data.String())
+	log.Debugf("send agent(name: %s) traffic counter: %s", vtapName, data.String(), logger.NewORGPrefix(int(v.ORGID)))
 	if err := statsd.MetaStatsd.Send(data); err != nil {
 		log.Error(err)
 	}

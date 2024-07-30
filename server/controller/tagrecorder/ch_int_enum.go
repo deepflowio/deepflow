@@ -46,7 +46,7 @@ func (e *ChIntEnum) generateNewData(dbClient *mysql.DB) (map[IntEnumTagKey]mysql
 	keyToItem := make(map[IntEnumTagKey]mysql.ChIntEnum)
 	respMap, err := tag.GetEnumTagValues(db, table, sql)
 	if err != nil {
-		log.Errorf("read failed: %v", err)
+		log.Errorf("read failed: %v", err, dbClient.LogPrefixORGID)
 	}
 
 	for name, tagValues := range respMap {

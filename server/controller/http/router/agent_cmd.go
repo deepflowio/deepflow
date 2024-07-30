@@ -92,21 +92,21 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 		db, err := mysql.GetDB(orgID.(int))
 		if err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 			c.Abort()
 			return
 		}
 		agentID, err := getAgentID(c, db)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			c.Abort()
 			return
 		}
 		var agent *mysql.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 			c.Abort()
 			return
@@ -118,19 +118,19 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		if len(timesStr) > 0 {
 			v, err := strconv.Atoi(timesStr)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, db.LogPrefixORGID)
 				BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 				return
 			}
 			forwardTimes = v
 		} else {
-			log.Infof("node ip(%s) init %s to 0", common.NodeIP, ForwardControllerTimes)
+			log.Infof("node ip(%s) init %s to 0", common.NodeIP, ForwardControllerTimes, db.LogPrefixORGID)
 			c.Request.Header.Set(ForwardControllerTimes, "0")
 		}
-		log.Infof("node ip(%s) forward times: %d", common.NodeIP, forwardTimes)
+		log.Infof("node ip(%s) forward times: %d", common.NodeIP, forwardTimes, db.LogPrefixORGID)
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 			c.Abort()
 			return
@@ -161,11 +161,11 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 
 		reverseProxy := fmt.Sprintf("http://%s:%d", newHost, common.GConfig.HTTPNodePort)
 		log.Infof("node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
-			common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP)
+			common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP, db.LogPrefixORGID)
 
 		proxyURL, err := url.Parse(reverseProxy)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 			c.Abort()
 			return

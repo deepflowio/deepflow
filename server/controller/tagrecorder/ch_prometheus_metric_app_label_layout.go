@@ -40,7 +40,7 @@ func (l *ChPrometheusMetricAPPLabelLayout) generateNewData(db *mysql.DB) (map[ID
 
 	err := db.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 

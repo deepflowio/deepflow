@@ -25,6 +25,7 @@ import (
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 )
 
@@ -84,10 +85,11 @@ type VTapRepoDelete struct {
 func deleteVtapRepo(c *gin.Context) {
 	vtapRepo := VTapRepoDelete{}
 	err := c.BindJSON(&vtapRepo)
+	orgID := httpcommon.GetUserInfo(c).ORGID
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
 		return
 	}
-	JsonResponse(c, nil, service.DeleteVtapRepo(httpcommon.GetUserInfo(c).ORGID, vtapRepo.ImageName))
+	JsonResponse(c, nil, service.DeleteVtapRepo(orgID, vtapRepo.ImageName))
 }
