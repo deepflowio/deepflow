@@ -548,7 +548,8 @@ static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
-static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
+static void set_msg_kvp(struct profiler_context *ctx,
+			stack_trace_msg_kv_t * kvp,
 			struct stack_trace_key_t *v, u64 stime, void *msg_value)
 {
 	kvp->k.tgid = v->tgid;
@@ -557,6 +558,9 @@ static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
 	kvp->k.cpu = v->cpu;
 	kvp->k.u_stack_id = (u32) v->userstack;
 	kvp->k.k_stack_id = (u32) v->kernstack;
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		kvp->k.e_stack_id = v->ext_data.memory.class_id;
+	}
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
@@ -853,7 +857,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 
 			if (matched)
-				set_msg_kvp(&kv, v, stime, (void *)0);
+				set_msg_kvp(ctx, &kv, v, stime, (void *)0);
 			else {
 				if (ctx->only_matched_data) {
 					if (__info_p)
