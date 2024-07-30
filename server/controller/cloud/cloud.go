@@ -74,7 +74,7 @@ func NewCloud(orgID int, domain mysql.Domain, cfg config.CloudConfig, ctx contex
 		return nil
 	}
 
-	log.Infof("org (%d) cloud task (%s) init success", orgID, domain.Name, logger.NewORGPrefix(orgID))
+	log.Infof("cloud task (%s) init success", domain.Name, logger.NewORGPrefix(orgID))
 
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
@@ -337,14 +337,14 @@ func (c *Cloud) sendStatsd(cloudCost float64) {
 }
 
 func (c *Cloud) run() {
-	log.Infof("org (%d) cloud (%s) started", c.orgID, c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+	log.Infof("cloud (%s) started", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 
 	if err := c.platform.CheckAuth(); err != nil {
-		log.Errorf("org (%d) cloud (%+v) check auth failed", c.orgID, c.basicInfo, logger.NewORGPrefix(c.orgID))
+		log.Errorf("cloud (%+v) check auth failed", c.basicInfo, logger.NewORGPrefix(c.orgID))
 	}
-	log.Infof("org (%d) cloud (%s) assemble data starting", c.orgID, c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+	log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 	c.getCloudData()
-	log.Infof("org (%d) cloud (%s) assemble data complete", c.orgID, c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+	log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 
 	cloudGatherInterval := c.getCloudGatherInterval()
 	c.basicInfo.Interval = cloudGatherInterval
@@ -354,18 +354,18 @@ func (c *Cloud) run() {
 	for {
 		select {
 		case <-ticker.C:
-			log.Infof("org (%d) cloud (%s) assemble data starting", c.orgID, c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+			log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 			c.getCloudData()
-			log.Infof("org (%d) cloud (%s) assemble data complete", c.orgID, c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+			log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 		case <-c.cCtx.Done():
-			log.Infof("org (%d) cloud (%s) stopped", c.orgID, c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+			log.Infof("cloud (%s) stopped", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 			return
 		}
 	}
 }
 
 func (c *Cloud) startKubernetesGatherTask() {
-	log.Infof("org (%d) cloud (%s) kubernetes gather task started", c.orgID, c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+	log.Infof("cloud (%s) kubernetes gather task started", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 	c.runKubernetesGatherTask()
 	go func() {
 		for range time.Tick(time.Duration(c.cfg.KubernetesGatherInterval) * time.Second) {

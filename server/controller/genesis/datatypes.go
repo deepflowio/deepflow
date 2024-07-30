@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -196,7 +197,7 @@ func (g *GenesisSyncTypeOperation[T]) Load(timestamp time.Time, timeout time.Dur
 	for _, orgID := range orgIDs {
 		db, err := mysql.GetDB(orgID)
 		if err != nil {
-			log.Errorf("get org id (%d) mysql session failed", orgID)
+			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 			continue
 		}
 		db.Where("node_ip = ?", nodeIP).Find(&items)
@@ -232,7 +233,7 @@ func (g *GenesisSyncTypeOperation[T]) Save() {
 	for orgID := range g.dataDict {
 		db, err := mysql.GetDB(orgID)
 		if err != nil {
-			log.Errorf("get org id (%d) mysql session failed", orgID)
+			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 			continue
 		}
 
