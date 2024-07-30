@@ -2,6 +2,8 @@
 
 ## Limits {#global.limits}
 
+Resource limitations
+
 ### CPU Limit {#global.limits.max_millicpus}
 
 **Tags**:
@@ -305,9 +307,13 @@ global:
 
 **Description**:
 
-The limit of the percentage of system free memory.
-When the free percentage is lower than 90% of this value,
-the agent will automatically restart.
+Setting sys_free_memory_limit to 0 indicates that the system free memory ratio is not checked.
+1. When the current system free memory ratio is below sys_free_memory_limit * 70%,
+   the agent will automatically restart.
+2. When the current system free memory ratio is below sys_free_memory_limit but above 70%,
+   the agent enters the disabled state.
+3. When the current system free memory ratio remains above sys_free_memory_limit * 110%,
+   the agent recovers from the disabled state.
 
 ### Relative System Load {#global.circuit_breakers.relative_sys_load}
 
@@ -520,7 +526,12 @@ global:
 **Description**:
 
 CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-without being migrated to other processors. Example: `cpu-affinity: [1, 3, 5, 7, 9]`.
+without being migrated to other processors. Example:
+```yaml
+global:
+  tunning:
+    cpu_affinity: [1, 3, 5, 7, 9]
+```
 
 ### Process Scheduling Priority {#global.tunning.process_scheduling_priority}
 
@@ -997,6 +1008,35 @@ global:
 
 Log level of deepflow-agent.
 
+#### Log File {#global.self_monitoring.log.log_file}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`global.self_monitoring.log.log_file`
+
+Upgrade from old version: `static_config.log-file`
+
+**Default value**:
+```yaml
+global:
+  self_monitoring:
+    log:
+      log_file: /var/log/deepflow_agent/deepflow_agent.log
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Note that this configuration is only used in standalone mode.
+
 #### Log Backhaul Enabled {#global.self_monitoring.log.log_backhaul_enabled}
 
 **Tags**:
@@ -1033,6 +1073,7 @@ When enabled, deepflow-agent will send its own logs to deepflow-server.
 **Tags**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -1059,7 +1100,7 @@ Only available for Trident (Golang version of Agent).
 
 ### Debug {#global.self_monitoring.debug}
 
-#### Listen UDP Port {#global.self_monitoring.debug.listen_udp_port}
+#### Local UDP Port {#global.self_monitoring.debug.local_udp_port}
 
 **Tags**:
 
@@ -1067,7 +1108,7 @@ Only available for Trident (Golang version of Agent).
 
 **FQCN**:
 
-`global.self_monitoring.debug.listen_udp_port`
+`global.self_monitoring.debug.local_udp_port`
 
 Upgrade from old version: `static_config.debug-listen-port`
 
@@ -1076,7 +1117,7 @@ Upgrade from old version: `static_config.debug-listen-port`
 global:
   self_monitoring:
     debug:
-      listen_udp_port: 0
+      local_udp_port: 0
 ```
 
 **Schema**:
@@ -1095,6 +1136,7 @@ Only available for Trident (Golang version of Agent).
 **Tags**:
 
 <mark>agent_restart</mark>
+<mark>deprecated</mark>
 
 **FQCN**:
 
@@ -1183,34 +1225,6 @@ global:
 **Description**:
 
 Directory where data files are written to.
-
-### Log File {#global.standalone_mode.log_file}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-
-**FQCN**:
-
-`global.standalone_mode.log_file`
-
-Upgrade from old version: `static_config.log-file`
-
-**Default value**:
-```yaml
-global:
-  standalone_mode:
-    log_file: /var/log/deepflow_agent/deepflow_agent.log
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-Note that this configuration is only used in standalone mode.
 
 # Inputs {#inputs}
 
@@ -1361,7 +1375,7 @@ inputs:
 
 Execute the command every time when scan the process, expect get the process tag
 from stdout in yaml format, the example yaml format as follow:
-```
+```yaml
 - pid: 1
   tags:
   - key: xxx
@@ -1371,7 +1385,13 @@ from stdout in yaml format, the example yaml format as follow:
   - key: xxx
     value: xxx
 ```
-Example configuration: `os_app_tag_exec: ["cat", "/tmp/tag.yaml"]`
+Example configuration:
+```yaml
+inputs:
+  proc:
+    tag_extraction:
+      script_command: ["cat", "/tmp/tag.yaml"]
+```
 
 #### Execution Username {#inputs.proc.tag_extraction.exec_username}
 
@@ -1449,29 +1469,31 @@ Configuration Item:
   Default value `""` means no replacement.
 
 Example:
-```
-os_proc_regex:
-  - match_regex: python3 (.*)\.py
-    match_type: cmdline
-    match_languages: []
-    match_usernames: []
-    only_in_container: true
-    only_with_tag: false
-    ignore: false
-    rewrite_name: $1-py-script
-    enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
-  - match_regex: (?P<PROC_NAME>nginx)
-    match_type: process_name
-    rewrite_name: ${PROC_NAME}-%HOSTNAME%
-  - match_regex: "nginx"
-    match_type: parent_process_name
-    ignore: true
-  - match_regex: .*sleep.*
-    match_type: process_name
-    ignore: true
-  - match_regex: .+ # match after concatenating a tag key and value pair using colon,
-                    # i.e., an regex `app:.+` can match all processes has a `app` tag
-    match_type: tag
+```yaml
+inputs:
+  proc:
+    process_matcher:
+    - match_regex: python3 (.*)\.py
+      match_type: cmdline
+      match_languages: []
+      match_usernames: []
+      only_in_container: true
+      only_with_tag: false
+      ignore: false
+      rewrite_name: $1-py-script
+      enabled_features: [ebpf.socket.uprobe.golang, ebpf.profile.on_cpu]
+    - match_regex: (?P<PROC_NAME>nginx)
+      match_type: process_name
+      rewrite_name: ${PROC_NAME}-%HOSTNAME%
+    - match_regex: "nginx"
+      match_type: parent_process_name
+      ignore: true
+    - match_regex: .*sleep.*
+      match_type: process_name
+      ignore: true
+    - match_regex: .+ # match after concatenating a tag key and value pair using colon,
+                      # i.e., an regex `app:.+` can match all processes has a `app` tag
+      match_type: tag
 ```
 
 #### Match Regex {#inputs.proc.process_matcher.match_regex}
@@ -1742,17 +1764,17 @@ inputs:
 | ----- | ---------------------------- |
 | proc.socket_list | |
 | proc.symbol_table | |
-| proc.proc_event // XXX | |
+| proc.proc_event | |
 | ebpf.socket.uprobe.golang | |
 | ebpf.socket.uprobe.tls | |
-| ebpf.socket.uprobe.rdma // XXX | |
+| ebpf.socket.uprobe.rdma | |
 | ebpf.file.io_event | |
-| ebpf.file.management_event // XXX | |
+| ebpf.file.management_event | |
 | ebpf.profile.on_cpu | |
 | ebpf.profile.off_cpu | |
-| ebpf.profile.mem // XXX | |
-| ebpf.profile.cuda // XXX | |
-| ebpf.profile.hbm // XXX | |
+| ebpf.profile.memory | |
+| ebpf.profile.cuda | |
+| ebpf.profile.hbm | |
 
 **Schema**:
 | Key  | Value                        |
@@ -1855,7 +1877,7 @@ inputs:
   proc:
     symbol_table:
       java:
-        refresh_defer_duration: 600s
+        refresh_defer_duration: 60s
 ```
 
 **Schema**:
@@ -1870,6 +1892,12 @@ When deepflow-agent finds that an unresolved function name appears in the functi
 stack of a Java process, it will trigger the regeneration of the symbol file of the
 process. Because Java utilizes the Just-In-Time (JIT) compilation mechanism, to obtain
 more symbols for Java processes, the regeneration will be deferred for a period of time.
+
+At the startup of a Java program, the JVM and JIT compiler are in a "warm-up" phase. During this
+period, symbol changes are typically frequent due to the dynamic compilation and optimization
+processes. Therefore, deepflow-agent delay symbol collection for one minute after the Java program
+starts, allowing the JVM and JIT to "warm up" and for symbol churn to be minimized before proceeding
+with the collection.
 
 ##### Maximum Symbol File Size {#inputs.proc.symbol_table.java.max_symbol_file_size}
 
@@ -1949,6 +1977,7 @@ the source. For example:
 - in the Hyper-V environment, capture the VM traffic through the Hypervisor NIC
 - in the ESXi environment, capture traffic through VDS/VSS local SPAN
 - in the DPDK environment, capture traffic through DPDK ring buffer
+
 Use Physical Mirror mode when deepflow-agent captures traffic through physical
 switch mirroring.
 
@@ -2029,9 +2058,12 @@ Only effective when capture_mode is 0.
 
 Example:
 ```yaml
-bond_interfaces:
-  - slave_interfaces: [eth0, eth1]
-  - slave_interfaces: [eth2, eth3]
+inputs:
+  cbpf:
+    af_packet:
+      bond_interfaces:
+      - slave_interfaces: [eth0, eth1]
+      - slave_interfaces: [eth2, eth3]
 ```
 
 ##### Slave Interfaces {#inputs.cbpf.af_packet.bond_interfaces.slave_interfaces}
@@ -2155,7 +2187,7 @@ inputs:
 | ---- | ---------------------------- |
 | Type | string |
 
-#### VLAN PCP in Physical Mirror Traffic {#inputs.cbpf.af_packet.vlan_pap_in_physical_mirror_traffic}
+#### VLAN PCP in Physical Mirror Traffic {#inputs.cbpf.af_packet.vlan_pcp_in_physical_mirror_traffic}
 
 **Tags**:
 
@@ -2164,7 +2196,7 @@ inputs:
 
 **FQCN**:
 
-`inputs.cbpf.af_packet.vlan_pap_in_physical_mirror_traffic`
+`inputs.cbpf.af_packet.vlan_pcp_in_physical_mirror_traffic`
 
 Upgrade from old version: `static_config.mirror-traffic-pcp`
 
@@ -2173,7 +2205,7 @@ Upgrade from old version: `static_config.mirror-traffic-pcp`
 inputs:
   cbpf:
     af_packet:
-      vlan_pap_in_physical_mirror_traffic: 0
+      vlan_pcp_in_physical_mirror_traffic: 0
 ```
 
 **Schema**:
@@ -2184,7 +2216,9 @@ inputs:
 
 **Description**:
 
-Calculate `capture_network_type` from vlan tag only if vlan pcp matches this value.
+When mirror-traffic-pcp <= 7 calculate TAP value from vlan tag only if vlan pcp matches this value.
+when mirror-traffic-pcp is 8 calculate TAP value from outer vlan tag, when mirror-traffic-pcp is 9
+calculate TAP value from inner vlan tag.
 
 #### BPF Filter Disabled {#inputs.cbpf.af_packet.bpf_filter_disabled}
 
@@ -2442,49 +2476,6 @@ The DPDK RecvEngine is only started when this configuration item is turned on.
 Note that you also need to set capture_mode to 1. Please refer to
 https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
 
-##### CPU Core List {#inputs.cbpf.special_network.dpdk.cpu_core_list}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.cbpf.special_network.dpdk.cpu_core_list`
-
-Upgrade from old version: `static_config.dpdk_core_list`
-
-**Default value**:
-```yaml
-inputs:
-  cbpf:
-    special_network:
-      dpdk:
-        cpu_core_list: ''
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-Map lcore set to physical cpu set.
-Format: `<lcores[@cpus]>[<,lcores[@cpus]>...]`
-
-Examples:
-- 1,2,3,4
-- 1-4
-- (1,2)(3-10)
-- 1@3,2@4
-
-lcores and cpus list are grouped by `(` and `)`. Within the group, `-` is used
-for range separator, `,` is used for single number separator. `()` can be
-omitted for single element group, `@` can be omitted if cpus and lcores have
-the same value.
-
 #### Libpcap {#inputs.cbpf.special_network.libpcap}
 
 ##### Enabled {#inputs.cbpf.special_network.libpcap.enabled}
@@ -2652,7 +2643,9 @@ inputs:
 **Description**:
 
 The configuration takes effect when capture_mode is 0 or 2,
-dispatcher-queue is always true when capture_mode is 2
+dispatcher-queue is always true when capture_mode is 2.
+
+Available for all recv_engines.
 
 #### Maximum Capture Packet Size {#inputs.cbpf.tunning.max_capture_packet_size}
 
@@ -2781,6 +2774,8 @@ inputs:
 **Description**:
 
 Maximum packet rate allowed for collection.
+
+Available for all recv_engines.
 
 ### Preprocess {#inputs.cbpf.preprocess}
 
@@ -3144,7 +3139,7 @@ inputs:
 
 TCP&UDP Port Blacklist, Priority higher than kprobe-whitelist.
 
-Example: 80,1000-2000
+Example: `ports: 80,1000-2000`
 
 ##### Whitelist {#inputs.ebpf.socket.kprobe.whitelist}
 
@@ -3179,7 +3174,7 @@ inputs:
 
 TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
 
-Example: 80,1000-2000
+Example: `ports: 80,1000-2000`
 
 ### File {#inputs.ebpf.file}
 
@@ -3377,7 +3372,7 @@ inputs:
   ebpf:
     profile:
       off_cpu:
-        disabled: false
+        disabled: true
 ```
 
 **Schema**:
@@ -3464,6 +3459,39 @@ If the off-CPU time is less than the value configured in this item, the data wil
 discarded. If your goal is to trace longer blocking events, increasing this parameter
 can filter out shorter blocking events, further reducing overhead. Additionally, we
 will not collect events with a blocking time exceeding 1 hour.
+
+#### Memory {#inputs.ebpf.profile.memory}
+
+##### Disabled {#inputs.ebpf.profile.memory.disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.memory.disabled`
+
+Upgrade from old version: `static_config.ebpf.memory-profile.disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      memory:
+        disabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+eBPF memory profile switch.
 
 ### Tunning {#inputs.ebpf.tunning}
 
@@ -4051,7 +4079,7 @@ inputs:
 
 **Description**:
 
-Used when deepflow-agent has only one k8s namespace query permission.
+TODO
 
 #### K8s API Resources {#inputs.resources.kubernetes.api_resources}
 
@@ -4092,41 +4120,41 @@ inputs:
 
 Specify kubernetes resources to watch.
 
-The schematics of entries in list is:
-```
-name: string
-group: string
-version: string
-disabled: bool (default false)
-field-selector: string
-```
-
 To disable a resource, add an entry to the list with `disabled: true`:
-```
-kubernetes-resources:
-- name: services
-  disabled: true
+```yaml
+inputs:
+  resources:
+    kubernetes:
+      api_resources:
+      - name: services
+        disabled: true
 ```
 
 To enable a resource, add an entry of this resource to the list. Be advised that
 this setting overrides the default of the same resource. For example, to enable
 `statefulsets` in both group `apps` (the default) and `apps.kruise.io` will require
 two entries:
-```
-kubernetes-resources:
-- name: statefulsets
-  group: apps
-- name: statefulsets
-  group: apps.kruise.io
-  version: v1beta1
+```yaml
+inputs:
+  resources:
+    kubernetes:
+      api_resources:
+      - name: statefulsets
+        group: apps
+      - name: statefulsets
+        group: apps.kruise.io
+        version: v1beta1
 ```
 
 To watching `routes` in openshift you can use the following settings:
-```
-kubernetes-resources:
-- name: ingresses
-  disabled: true
-- name: routes
+```yaml
+inputs:
+  resources:
+    kubernetes:
+      api_resources:
+      - name: ingresses
+        disabled: true
+      - name: routes
 ```
 
 ##### Name {#inputs.resources.kubernetes.api_resources.name}
@@ -4463,7 +4491,7 @@ IP addresses delivered by deepflow-server to deepflow-agent. When there is no
 cross-domain service request, deepflow-server can be configured to only deliver
 the information in the local domain to deepflow-agent.
 
-#### K8s Internal Pod IP Filter {#inputs.resources.pull_resource_from_controller.kubernetes_internal_pod_ip_filter}
+#### Only K8s Pod IP in Local Cluster {#inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster}
 
 **Tags**:
 
@@ -4471,7 +4499,7 @@ the information in the local domain to deepflow-agent.
 
 **FQCN**:
 
-`inputs.resources.pull_resource_from_controller.kubernetes_internal_pod_ip_filter`
+`inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster`
 
 Upgrade from old version: `pod_cluster_internal_ip`
 
@@ -4480,19 +4508,13 @@ Upgrade from old version: `pod_cluster_internal_ip`
 inputs:
   resources:
     pull_resource_from_controller:
-      kubernetes_internal_pod_ip_filter: 0
+      only_kubernetes_pod_ip_in_local_cluster: false
 ```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| 0 | All K8s Cluster |
-| 1 | Local K8s Cluster |
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | int |
+| Type | bool |
 
 **Description**:
 
@@ -4820,7 +4842,7 @@ inputs:
 | ---- | ---------------------------- |
 | Type | bool |
 
-# Precessors {#processors}
+# Processors {#processors}
 
 ## Packet {#processors.packet}
 
@@ -5077,7 +5099,7 @@ value is 0, which means the feature is disabled, and 255, which means all fields
 need to be reported all fields corresponding to each bit:
 ```
 | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
-8      7     6     5              4             3         2        1          0
+    7     6     5              4             3         2        1          0
 ```
 
 ### PCAP Stream {#processors.packet.pcap_stream}
@@ -5238,7 +5260,7 @@ processors:
 
 **Description**:
 
-FIXME
+TODO
 
 #### Cache Size {#processors.packet.toa.cache_size}
 
@@ -5554,7 +5576,7 @@ processors:
 
 **Description**:
 
-Port-list example: 80,1000-2000
+Port-list example: `80,1000-2000`
 
 HTTP2 and TLS are only used for kprobe, not applicable to uprobe.
 All data obtained through uprobe is not subject to port restrictions.
@@ -5619,12 +5641,17 @@ processors:
 **Description**:
 
 Tag filter example:
-```
-tag_filters:
-  HTTP:
-    - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
-      operator: equal               # equal, prefix
-      value: somevalue
+```yaml
+processors:
+  request_log:
+    filters:
+      tag_filters:
+        HTTP:
+          - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+            operator: equal               # equal, prefix
+            value: somevalue
+        HTTP2: []
+        # other protocols
 ```
 A l7_flow_log blacklist can be configured for each protocol, preventing request logs matching
 the blacklist from being collected by the agent or included in application performance metrics.
@@ -5664,14 +5691,15 @@ processors:
 **Description**:
 
 HTTP Tag filter example:
-```
-tag_filters:
-  HTTP:
-    - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
-      operator: equal               # equal, prefix
-      value: somevalue
-  HTTP2: []
-  # other protocols ...
+```yaml
+processors:
+  request_log:
+    filters:
+      tag_filters:
+        HTTP:
+          - field-name: request_resource  # endpoint, request_type, request_domain, request_resource
+            operator: equal               # equal, prefix
+            value: somevalue
 ```
 A l7_flow_log tag_filter can be configured for each protocol, preventing request logs matching
 the blacklist from being collected by the agent or included in application performance metrics.
@@ -6125,7 +6153,7 @@ Extract endpoint according to the following rules:
   / is regarded as one paragraph) as endpoint
 
 By default, two segments are extracted from the URL. For example, the
-URL is /a/b/c?query=xxx", whose segment is 3, extracts "/a/b" as the
+URL is `/a/b/c?query=xxx`, whose segment is 3, extracts `/a/b` as the
 endpoint.
 
 ###### URL Prefix {#processors.request_log.tag_extraction.http_endpoint.match_rules.url_prefix}
@@ -6229,10 +6257,13 @@ Configuration to extract the customized header fields of HTTP, HTTP2, gRPC proto
 
 Example:
 ```yaml
-custom_fields:
-  HTTP:
-    - field-name: "user-agent"
-    - field-name: "cookie"
+processors:
+  request_log:
+    tag_extraction:
+      custom_fields:
+        HTTP:
+        - field-name: "user-agent"
+        - field-name: "cookie"
 ```
 
 Attention: use `HTTP2` for `gRPC` Protocol.
@@ -6269,11 +6300,13 @@ Configuration to extract the customized header fields of HTTP, HTTP2, gRPC proto
 
 Example:
 ```yaml
-custom_fields:
-  HTTP:
-    - field-name: "user-agent"
-    - field-name: "cookie"
-  HTTP2: []
+processors:
+  request_log:
+    tag_extraction:
+      custom_fields:
+        HTTP:
+        - field-name: "user-agent"
+        - field-name: "cookie"
 ```
 
 Attention: use `HTTP2` for `gRPC` Protocol.
@@ -6434,11 +6467,11 @@ The following metrics can be used as reference data for adjusting this configura
   Used to record the number of times eviction is triggered due to reaching the
   LRU capacity limit.
 
-## Flow Metrics {#processors.flow_metrics}
+## Flow Log {#processors.flow_log}
 
-### Time Window {#processors.flow_metrics.time_window}
+### Time Window {#processors.flow_log.time_window}
 
-#### Maximum Tolerable Packet Delay {#processors.flow_metrics.time_window.max_tolerable_packet_delay}
+#### Maximum Tolerable Packet Delay {#processors.flow_log.time_window.max_tolerable_packet_delay}
 
 **Tags**:
 
@@ -6446,14 +6479,14 @@ The following metrics can be used as reference data for adjusting this configura
 
 **FQCN**:
 
-`processors.flow_metrics.time_window.max_tolerable_packet_delay`
+`processors.flow_log.time_window.max_tolerable_packet_delay`
 
 Upgrade from old version: `static_config.packet-delay`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     time_window:
       max_tolerable_packet_delay: 1s
 ```
@@ -6468,7 +6501,7 @@ processors:
 
 Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
 
-#### Extra Tolerable Flow Delay {#processors.flow_metrics.time_window.extra_tolerable_flow_delay}
+#### Extra Tolerable Flow Delay {#processors.flow_log.time_window.extra_tolerable_flow_delay}
 
 **Tags**:
 
@@ -6476,14 +6509,14 @@ Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
 
 **FQCN**:
 
-`processors.flow_metrics.time_window.extra_tolerable_flow_delay`
+`processors.flow_log.time_window.extra_tolerable_flow_delay`
 
 Upgrade from old version: `static_config.second-flow-extra-delay-second`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     time_window:
       extra_tolerable_flow_delay: 0s
 ```
@@ -6498,9 +6531,9 @@ processors:
 
 Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
 
-### Conntrack (a.k.a. Flow Map) {#processors.flow_metrics.conntrack}
+### Conntrack (a.k.a. Flow Map) {#processors.flow_log.conntrack}
 
-#### Flow Flush Interval {#processors.flow_metrics.conntrack.flow_flush_interval}
+#### Flow Flush Interval {#processors.flow_log.conntrack.flow_flush_interval}
 
 **Tags**:
 
@@ -6508,14 +6541,14 @@ Extra tolerance for QuadrupleGenerator receiving 1s-FlowLog.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.flow_flush_interval`
+`processors.flow_log.conntrack.flow_flush_interval`
 
 Upgrade from old version: `static_config.flow.flush-interval`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       flow_flush_interval: 1s
 ```
@@ -6530,9 +6563,9 @@ processors:
 
 Flush interval of the queue connected to the collector.
 
-#### Flow Generation {#processors.flow_metrics.conntrack.flow_generation}
+#### Flow Generation {#processors.flow_log.conntrack.flow_generation}
 
-##### Cloud Traffic Ignore MAC {#processors.flow_metrics.conntrack.flow_generation.cloud_traffic_ignore_mac}
+##### Server Ports {#processors.flow_log.conntrack.flow_generation.server_ports}
 
 **Tags**:
 
@@ -6540,14 +6573,45 @@ Flush interval of the queue connected to the collector.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.flow_generation.cloud_traffic_ignore_mac`
+`processors.flow_log.conntrack.flow_generation.server_ports`
+
+Upgrade from old version: `static_config.server-ports`
+
+**Default value**:
+```yaml
+processors:
+  flow_log:
+    conntrack:
+      flow_generation:
+        server_ports: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 65535] |
+
+**Description**:
+
+Service port list, priority lower than TCP SYN flags.
+
+##### Cloud Traffic Ignore MAC {#processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac`
 
 Upgrade from old version: `static_config.flow.ignore-tor-mac`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       flow_generation:
         cloud_traffic_ignore_mac: false
@@ -6564,7 +6628,7 @@ When the MAC addresses of the two-way traffic collected at the same
 location are asymmetrical, the traffic cannot be aggregated into a Flow.
 You can set this value at this time. Only valid for Cloud (not IDC) traffic.
 
-##### Ignore L2End {#processors.flow_metrics.conntrack.flow_generation.ignore_l2_end}
+##### Ignore L2End {#processors.flow_log.conntrack.flow_generation.ignore_l2_end}
 
 **Tags**:
 
@@ -6572,14 +6636,14 @@ You can set this value at this time. Only valid for Cloud (not IDC) traffic.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.flow_generation.ignore_l2_end`
+`processors.flow_log.conntrack.flow_generation.ignore_l2_end`
 
 Upgrade from old version: `static_config.flow.ignore-l2-end`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       flow_generation:
         ignore_l2_end: false
@@ -6597,7 +6661,7 @@ L2End = true is matched when generating the flow. Set this value to true to
 force a double-sided MAC address match and only aggregate traffic with
 exactly equal MAC addresses.
 
-##### IDC Traffic Ignore VLAN {#processors.flow_metrics.conntrack.flow_generation.idc_traffic_ignore_vlan}
+##### IDC Traffic Ignore VLAN {#processors.flow_log.conntrack.flow_generation.idc_traffic_ignore_vlan}
 
 **Tags**:
 
@@ -6606,14 +6670,14 @@ exactly equal MAC addresses.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.flow_generation.idc_traffic_ignore_vlan`
+`processors.flow_log.conntrack.flow_generation.idc_traffic_ignore_vlan`
 
 Upgrade from old version: `static_config.flow.ignore-idc-vlan`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       flow_generation:
         idc_traffic_ignore_vlan: false
@@ -6630,9 +6694,9 @@ When the VLAN of the two-way traffic collected at the same location
 are asymmetrical, the traffic cannot be aggregated into a Flow. You can
 set this value at this time. Only valid for IDC (not Cloud) traffic.
 
-#### Timeouts {#processors.flow_metrics.conntrack.timeouts}
+#### Timeouts {#processors.flow_log.conntrack.timeouts}
 
-##### Established {#processors.flow_metrics.conntrack.timeouts.established}
+##### Established {#processors.flow_log.conntrack.timeouts.established}
 
 **Tags**:
 
@@ -6640,14 +6704,14 @@ set this value at this time. Only valid for IDC (not Cloud) traffic.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.timeouts.established`
+`processors.flow_log.conntrack.timeouts.established`
 
 Upgrade from old version: `static_config.flow.established-timeout`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       timeouts:
         established: 300s
@@ -6663,7 +6727,7 @@ processors:
 
 Timeouts for TCP State Machine - Established.
 
-##### Closing RST {#processors.flow_metrics.conntrack.timeouts.closing_rst}
+##### Closing RST {#processors.flow_log.conntrack.timeouts.closing_rst}
 
 **Tags**:
 
@@ -6671,14 +6735,14 @@ Timeouts for TCP State Machine - Established.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.timeouts.closing_rst`
+`processors.flow_log.conntrack.timeouts.closing_rst`
 
 Upgrade from old version: `static_config.flow.closing-rst-timeout`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       timeouts:
         closing_rst: 35s
@@ -6694,7 +6758,7 @@ processors:
 
 Timeouts for TCP State Machine - Closing Reset.
 
-##### Opening RST {#processors.flow_metrics.conntrack.timeouts.opening_rst}
+##### Opening RST {#processors.flow_log.conntrack.timeouts.opening_rst}
 
 **Tags**:
 
@@ -6702,14 +6766,14 @@ Timeouts for TCP State Machine - Closing Reset.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.timeouts.opening_rst`
+`processors.flow_log.conntrack.timeouts.opening_rst`
 
 Upgrade from old version: `static_config.flow.opening-rst-timeout`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       timeouts:
         opening_rst: 1s
@@ -6725,7 +6789,7 @@ processors:
 
 Timeouts for TCP State Machine - Opening Reset.
 
-##### Others {#processors.flow_metrics.conntrack.timeouts.others}
+##### Others {#processors.flow_log.conntrack.timeouts.others}
 
 **Tags**:
 
@@ -6733,14 +6797,14 @@ Timeouts for TCP State Machine - Opening Reset.
 
 **FQCN**:
 
-`processors.flow_metrics.conntrack.timeouts.others`
+`processors.flow_log.conntrack.timeouts.others`
 
 Upgrade from old version: `static_config.flow.others-timeout`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     conntrack:
       timeouts:
         others: 5s
@@ -6756,9 +6820,9 @@ processors:
 
 Timeouts for TCP State Machine - Others.
 
-### Tunning {#processors.flow_metrics.tunning}
+### Tunning {#processors.flow_log.tunning}
 
-#### FlowMap Hash Slots {#processors.flow_metrics.tunning.flow_map_hash_slots}
+#### FlowMap Hash Slots {#processors.flow_log.tunning.flow_map_hash_slots}
 
 **Tags**:
 
@@ -6766,14 +6830,14 @@ Timeouts for TCP State Machine - Others.
 
 **FQCN**:
 
-`processors.flow_metrics.tunning.flow_map_hash_slots`
+`processors.flow_log.tunning.flow_map_hash_slots`
 
 Upgrade from old version: `static_config.flow.flow-slots-size`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     tunning:
       flow_map_hash_slots: 131072
 ```
@@ -6790,7 +6854,7 @@ Since FlowAggregator is the first step in all processing, this value
 is also widely used in other hash tables such as QuadrupleGenerator,
 Collector, etc.
 
-#### Concurrent Flow Limit {#processors.flow_metrics.tunning.concurrent_flow_limit}
+#### Concurrent Flow Limit {#processors.flow_log.tunning.concurrent_flow_limit}
 
 **Tags**:
 
@@ -6798,14 +6862,14 @@ Collector, etc.
 
 **FQCN**:
 
-`processors.flow_metrics.tunning.concurrent_flow_limit`
+`processors.flow_log.tunning.concurrent_flow_limit`
 
 Upgrade from old version: `static_config.flow.flow-count-limit`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     tunning:
       concurrent_flow_limit: 65535
 ```
@@ -6819,10 +6883,10 @@ processors:
 **Description**:
 
 Maximum number of flows that can be stored in FlowMap, It will also affect the capacity of
-the RRT cache, Example: rrt-cache-capacity = flow-count-limit. When rrt-cache-capacity is
-not enough, it will be unable to calculate the rrt of l7.
+the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
+is not enough, it will be unable to calculate the rrt of l7.
 
-#### Memory Pool Size {#processors.flow_metrics.tunning.memory_pool_size}
+#### Memory Pool Size {#processors.flow_log.tunning.memory_pool_size}
 
 **Tags**:
 
@@ -6830,14 +6894,14 @@ not enough, it will be unable to calculate the rrt of l7.
 
 **FQCN**:
 
-`processors.flow_metrics.tunning.memory_pool_size`
+`processors.flow_log.tunning.memory_pool_size`
 
 Upgrade from old version: `static_config.flow.memory-pool-size`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     tunning:
       memory_pool_size: 65536
 ```
@@ -6854,7 +6918,7 @@ This value is used to set max length of memory pool in FlowMap
 Memory pools are used for frequently create and destroy objects like
 FlowNode, FlowLog, etc.
 
-#### Maximum Size of Batched Buffer {#processors.flow_metrics.tunning.max_batched_buffer_size}
+#### Maximum Size of Batched Buffer {#processors.flow_log.tunning.max_batched_buffer_size}
 
 **Tags**:
 
@@ -6862,14 +6926,14 @@ FlowNode, FlowLog, etc.
 
 **FQCN**:
 
-`processors.flow_metrics.tunning.max_batched_buffer_size`
+`processors.flow_log.tunning.max_batched_buffer_size`
 
 Upgrade from old version: `static_config.batched-buffer-size-limit`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     tunning:
       max_batched_buffer_size: 131072
 ```
@@ -6889,7 +6953,7 @@ A number larger than 128K is not recommended because the default
 MMAP_THRESHOLD is 128K, allocating chunks larger than 128K will
 result in calling mmap and more page faults.
 
-#### FlowAggregator Queue Size {#processors.flow_metrics.tunning.flow_aggregator_queue_size}
+#### FlowAggregator Queue Size {#processors.flow_log.tunning.flow_aggregator_queue_size}
 
 **Tags**:
 
@@ -6897,14 +6961,14 @@ result in calling mmap and more page faults.
 
 **FQCN**:
 
-`processors.flow_metrics.tunning.flow_aggregator_queue_size`
+`processors.flow_log.tunning.flow_aggregator_queue_size`
 
 Upgrade from old version: `static_config.flow.flow-aggr-queue-size`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     tunning:
       flow_aggregator_queue_size: 65535
 ```
@@ -6920,7 +6984,7 @@ processors:
 The length of the following queues:
 - 2-second-flow-to-minute-aggrer
 
-#### FlowGenerator Queue Size {#processors.flow_metrics.tunning.flow_generator_queue_size}
+#### FlowGenerator Queue Size {#processors.flow_log.tunning.flow_generator_queue_size}
 
 **Tags**:
 
@@ -6928,14 +6992,14 @@ The length of the following queues:
 
 **FQCN**:
 
-`processors.flow_metrics.tunning.flow_generator_queue_size`
+`processors.flow_log.tunning.flow_generator_queue_size`
 
 Upgrade from old version: `static_config.flow-queue-size`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     tunning:
       flow_generator_queue_size: 65536
 ```
@@ -6953,7 +7017,7 @@ The length of the following queues:
 - 1-tagged-flow-to-app-protocol-logs
 - 0-{flow_type}-{port}-packet-to-tagged-flow (flow_type: sflow, netflow)
 
-#### QuadrupleGenerator Queue Size {#processors.flow_metrics.tunning.quadruple_generator_queue_size}
+#### QuadrupleGenerator Queue Size {#processors.flow_log.tunning.quadruple_generator_queue_size}
 
 **Tags**:
 
@@ -6961,14 +7025,14 @@ The length of the following queues:
 
 **FQCN**:
 
-`processors.flow_metrics.tunning.quadruple_generator_queue_size`
+`processors.flow_log.tunning.quadruple_generator_queue_size`
 
 Upgrade from old version: `static_config.quadruple-queue-size`
 
 **Default value**:
 ```yaml
 processors:
-  flow_metrics:
+  flow_log:
     tunning:
       quadruple_generator_queue_size: 262144
 ```
@@ -7048,6 +7112,42 @@ outputs:
 | Value | Note                         |
 | ----- | ---------------------------- |
 | TCP | |
+| UDP | |
+| RAW_UDP | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+RAW_UDP uses RawSocket to send UDP packets, which has the highest
+performance, but there may be compatibility issues in some environments.
+
+### NPB Socket Type {#outputs.socket.npb_socket_type}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`outputs.socket.npb_socket_type`
+
+Upgrade from old version: `npb_socket_type`
+
+**Default value**:
+```yaml
+outputs:
+  socket:
+    npb_socket_type: RAW_UDP
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
 | UDP | |
 | RAW_UDP | |
 
@@ -7714,42 +7814,6 @@ outputs:
 
 When using RAW_UDP Socket to transmit UDP data, this value can be used to
 set the VLAN tag. Default value `0` means no VLAN tag.
-
-### Socket Type {#outputs.npb.socket_type}
-
-**Tags**:
-
-`hot_update`
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`outputs.npb.socket_type`
-
-Upgrade from old version: `npb_socket_type`
-
-**Default value**:
-```yaml
-outputs:
-  npb:
-    socket_type: RAW_UDP
-```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| UDP | |
-| RAW_UDP | |
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-RAW_UDP uses RawSocket to send UDP packets, which has the highest
-performance, but there may be compatibility issues in some environments.
 
 ### Extra VLAN Header {#outputs.npb.extra_vlan_header}
 
