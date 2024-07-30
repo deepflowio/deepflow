@@ -134,13 +134,13 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 		// set weight to 0 if vtap losed
 		if !ok {
 			vtapCounter.SetNull(db.ORGID, name)
-			log.Infof("ORGID-%d agent(name: %s) set null when agent losed", counter.ORGID, name)
+			log.Infof("agent(name: %s) set null when agent losed", counter.ORGID, name, db.LogPrefixORGID)
 			continue
 		}
 		// set weight to 0 if vtap not normal
 		if vtap, ok := allVTapIDToVTap[vtapID]; ok && vtap.State != common.VTAP_STATE_NORMAL {
 			vtapCounter.SetNull(db.ORGID, name)
-			log.Infof("ORGID-%d agent(name: %s) set null when agent not normal", counter.ORGID, name)
+			log.Infof("agent(name: %s) set null when agent not normal", counter.ORGID, name, db.LogPrefixORGID)
 			continue
 		}
 	}
