@@ -153,7 +153,7 @@ func (v *VTapInterface) getRawVTapVinterfacesByRegion(host string, port int, que
 		return simplejson.New()
 	}
 	if len(resp.Get("DATA").MustArray()) == 0 {
-		log.Warningf("no data in curl response", v.db.LogPrefixORGID)
+		log.Warning("no data in curl response", v.db.LogPrefixORGID)
 		return simplejson.New()
 	}
 	return resp.Get("DATA")
