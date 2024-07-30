@@ -894,11 +894,10 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-			if (ctx->use_delta_time) {
-				if (ctx->type == PROFILER_TYPE_MEMORY) {
-					((stack_trace_msg_t *) kv.
-					 msg_ptr)->count += v->ext_data.memory.size;
-				} else if (ctx->sample_period > 0) {
+			if (ctx->type == PROFILER_TYPE_MEMORY) {
+				((stack_trace_msg_t *) kv.msg_ptr)->count += v->ext_data.memory.size;
+			} else if (ctx->use_delta_time) {
+				if (ctx->sample_period > 0) {
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
 		   				(ctx->sample_period / 1000);
