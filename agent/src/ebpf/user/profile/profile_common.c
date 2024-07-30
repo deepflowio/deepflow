@@ -560,6 +560,8 @@ static void set_msg_kvp(struct profiler_context *ctx,
 	kvp->k.k_stack_id = (u32) v->kernstack;
 	if (ctx->type == PROFILER_TYPE_MEMORY) {
 		kvp->k.e_stack_id = v->ext_data.memory.class_id;
+	} else {
+		kvp->k.e_stack_id = 0;
 	}
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
