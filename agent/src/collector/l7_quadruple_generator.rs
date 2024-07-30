@@ -265,7 +265,10 @@ impl SubQuadGen {
         }
         let slot = (((time_in_second - self.window_start).as_secs() / self.slot_interval) as usize)
             .min(self.stashs.len() - 1);
-        let time_span = l7_stats.time_span / self.slot_interval as u32;
+        let current_span = time_in_second.as_secs() / self.slot_interval;
+        let request_span =
+            (time_in_second.as_secs() - l7_stats.time_span as u64) / self.slot_interval;
+        let time_span = (current_span - request_span) as u32;
         let stash = &mut self.stashs[slot];
         let value = stash.l7_stats.get_mut(&l7_stats.flow_id);
 

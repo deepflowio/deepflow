@@ -46,7 +46,6 @@ message MiniField {
     // Deprecated in v6.4.1: uint32 netns_id = 26;
     uint32 pod_id = 27;
     uint32 biz_type = 28;
-    uint32 time_span = 29;
 }
 
 message MiniTag {
