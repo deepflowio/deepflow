@@ -30,6 +30,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
+	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/resource"
@@ -159,6 +160,9 @@ func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 		if err != nil {
 			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
 			return
+		}
+		if domainCreate.TeamID == 0 {
+			domainCreate.TeamID = mysqlcommon.DEFAULT_TEAM_ID
 		}
 
 		db, err := common.GetContextOrgDB(c)

@@ -1376,6 +1376,14 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not match"
 				}
 			}
+			if tagName == "app_service" || tagName == "app_instance" {
+				if strings.Contains(opName, "match") {
+					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, tagName, f.Value)
+				} else {
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, tagName, opName, f.Value)
+				}
+				return &view.Expr{Value: "(" + whereFilter + ")"}, nil
+			}
 			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {
 			case "=":

@@ -1206,6 +1206,20 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM %s_map %s GROUP BY value, display_name ORDER BY %s ASC %s", tag, whereSql, orderBy, limitSql)
 	} else if tag == "alert_policy" {
 		sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM alarm_policy_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+	} else if tag == "app_service" {
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND `table`='%s' AND app_service!=''", table)
+		} else {
+			whereSql = fmt.Sprintf(" WHERE `table`='%s' AND app_service!=''", table)
+		}
+		sql = fmt.Sprintf("SELECT app_service AS value, app_service AS display_name FROM %s_app_service %s GROUP BY value, display_name ORDER BY %s ASC %s", db, whereSql, orderBy, limitSql)
+	} else if tag == "app_instance" {
+		if whereSql != "" {
+			whereSql += fmt.Sprintf(" AND `table`='%s' AND app_instance!=''", table)
+		} else {
+			whereSql = fmt.Sprintf(" WHERE `table`='%s' AND app_instance!=''", table)
+		}
+		sql = fmt.Sprintf("SELECT app_instance AS value, app_instance AS display_name FROM %s_app_service %s GROUP BY value, display_name ORDER BY %s ASC %s", db, whereSql, orderBy, limitSql)
 	} else if tag == "user" {
 		sql = fmt.Sprintf("SELECT id AS value, name AS display_name FROM user_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if tag == common.TAP_PORT_HOST || tag == common.TAP_PORT_CHOST || tag == common.TAP_PORT_POD_NODE || tag == common.CAPTURE_NIC_HOST || tag == common.CAPTURE_NIC_CHOST || tag == common.CAPTURE_NIC_POD_NODE {

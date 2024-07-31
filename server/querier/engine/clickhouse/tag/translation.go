@@ -1063,6 +1063,26 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"%s(capture_nic_type,%s)",
 		),
 	}
+
+	//Enum(app_service) & Enum(app_instance)
+	tagResourceMap["app_service"] = map[string]*Tag{
+		"enum": NewTag(
+			"%s",
+			"",
+			"%s %s %s ",
+			"%s(%s,%s)",
+		),
+	}
+
+	tagResourceMap["app_instance"] = map[string]*Tag{
+		"enum": NewTag(
+			"%s",
+			"",
+			"%s %s %s ",
+			"%s(%s,%s)",
+		),
+	}
+
 	// Pcap
 	tagResourceMap["has_pcap"] = map[string]*Tag{
 		"default": NewTag(
