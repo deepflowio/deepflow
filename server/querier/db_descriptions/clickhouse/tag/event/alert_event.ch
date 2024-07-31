@@ -52,9 +52,9 @@ pod_node_hostname         , K8s 容器节点             , 容器节点的 Hostn
 
 user                       , 创建人                      ,
 alert_policy               , 告警策略                    ,
+ip                         , IP 地址                     ,
 policy_type                , 策略类型                    ,
 event_level                , 事件等级                    ,
 target_tags                , 监控对象标签                 , 
-metric_value               , 监控数值	                  ,
 _target_uid                ,                             , 
 _query_region              , 查询区域                     , 
