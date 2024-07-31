@@ -277,8 +277,8 @@ var (
 		input:  "SELECT chost_id_0 from l4_flow_log WHERE NOT exist(chost_0) LIMIT 1",
 		output: []string{"SELECT if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_id_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (l3_device_type_0=1) LIMIT 1"},
 	}, {
-		input:  "SELECT `cloud.tag.xx` from l4_flow_log WHERE NOT exist(`cloud.tag.xx`) LIMIT 1",
-		output: []string{"SELECT if(if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), '')!='',if(l3_device_type=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id),'xx')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(pod_ns_id),'xx')) ) AS `cloud.tag.xx` FROM flow_log.`l4_flow_log` PREWHERE NOT (((toUInt64(l3_device_id) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='xx') AND l3_device_type=1) OR (toUInt64(pod_ns_id) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='xx')))) LIMIT 1"},
+		input:  "SELECT `cloud.tag.xx_0` from l4_flow_log WHERE NOT exist(`cloud.tag.xx_0`) LIMIT 1",
+		output: []string{"SELECT if(if(l3_device_type_0=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id_0),'xx')), '')!='',if(l3_device_type_0=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id_0),'xx')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(pod_ns_id_0),'xx')) ) AS `cloud.tag.xx_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (((toUInt64(l3_device_id_0) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='xx') AND l3_device_type_0=1) OR (toUInt64(pod_ns_id_0) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='xx')))) LIMIT 1"},
 	}, {
 		input:  "select `k8s.annotation.statefulset.kubernetes.io/pod-name_0` from l4_flow_log where `k8s.annotation.statefulset.kubernetes.io/pod-name_0`='opensource-loki-0' group by `k8s.annotation.statefulset.kubernetes.io/pod-name_0`",
 		output: []string{"SELECT if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) ) AS `k8s.annotation.statefulset.kubernetes.io/pod-name_0` FROM flow_log.`l4_flow_log` PREWHERE ((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name'))) AND (((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='statefulset.kubernetes.io/pod-name')))) GROUP BY `k8s.annotation.statefulset.kubernetes.io/pod-name_0` LIMIT 10000"},
@@ -441,8 +441,8 @@ var (
 		output: []string{"SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_log.`l4_flow_log` PREWHERE (pod_id_0!=0) AND (host_id_1!=0) AND (l3_epc_id_0!=-2) AND (auto_instance_type_1 not in (101,102)) AND (auto_service_type_0 not in (10)) LIMIT 1"},
 	}, {
 		name:   "exist_trans_support_tag_1",
-		input:  "SELECT pod from vtap_app_port WHERE exist(resource_gl0_0) AND exist(resource_gl1_1) LIMIT 1",
-		output: []string{"SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`application` WHERE (auto_instance_type_0 not in (101,102)) AND (auto_service_type_1 not in (10)) LIMIT 1"},
+		input:  "SELECT pod from vtap_app_port WHERE exist(resource_gl0) AND exist(resource_gl1) LIMIT 1",
+		output: []string{"SELECT dictGet(flow_tag.pod_map, 'name', (toUInt64(pod_id))) AS `pod` FROM flow_metrics.`application` WHERE (auto_instance_type not in (101,102)) AND (auto_service_type not in (10)) LIMIT 1"},
 		db:     "flow_metrics",
 	}, {
 		name:   "l2_vpc_filter_trans",
