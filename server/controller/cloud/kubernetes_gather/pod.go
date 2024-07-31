@@ -17,7 +17,6 @@
 package kubernetes_gather
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -72,65 +71,43 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			continue
 		}
 
-		podGroups := metaData.Get("ownerReferences")
-		if len(podGroups.MustArray()) == 0 {
-			providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
-			if providerType != "serverless" && providerType != "proprietary" {
-				log.Debugf("pod (%s) type (%s) ownerReferences not found or sci cluster type not support", name, providerType, logger.NewORGPrefix(k.orgID))
+		var podGroupUID, kind string
+		if pgInfo, ok := k.podLcuuidToPGInfo[uID]; ok {
+			podGroupUID = pgInfo[0]
+			kind = pgInfo[1]
+		} else {
+			podGroups := metaData.Get("ownerReferences")
+			podGroupUID = podGroups.GetIndex(0).Get("uid").MustString()
+			if podGroupUID == "" {
+				log.Infof("pod (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
-			if abstractPGType == "" {
-				if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
-					abstractPGType = "StatefulSet"
-				} else {
-					abstractPGType = "Deployment"
-				}
-			}
-			resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
-			if resourceName == "" {
-				log.Debugf("sci pod (%s) not found provider resource name", name, logger.NewORGPrefix(k.orgID))
+			kind = podGroups.GetIndex(0).Get("kind").MustString()
+			if _, ok := podTypesMap[kind]; !ok {
+				log.Infof("pod group (%s) type (%s) not support", name, kind, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			abstractPGName := resourceName
-			targetIndex := strings.LastIndex(resourceName, "-")
-			if targetIndex != -1 {
-				abstractPGName = resourceName[:targetIndex]
-			}
-			uid := common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
-			// 适配 serverless pod
-			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s"}]`, uid, abstractPGType)))
-		}
-		ID := podGroups.GetIndex(0).Get("uid").MustString()
-		if ID == "" {
-			log.Infof("pod (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
-			continue
-		}
-		kind := podGroups.GetIndex(0).Get("kind").MustString()
-		if _, ok := podTypesMap[kind]; !ok {
-			log.Infof("pod group (%s) type (%s) not support", name, kind, logger.NewORGPrefix(k.orgID))
-			continue
 		}
 		hostIP := pData.Get("status").Get("hostIP").MustString()
 
 		podRSLcuuid := ""
 		podGroupLcuuid := ""
 		podLcuuid := ""
-		ID = common.IDGenerateUUID(k.orgID, ID)
-		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[ID]; ok {
-			podRSLcuuid = ID
+		pgLcuuid := common.IDGenerateUUID(k.orgID, podGroupUID)
+		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[podGroupUID]; ok {
+			podRSLcuuid = pgLcuuid
 			podGroupLcuuid = gLcuuid
 		} else {
-			if !k.podGroupLcuuids.Contains(ID) {
+			if !k.podGroupLcuuids.Contains(pgLcuuid) {
 				log.Debugf("pod (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			podGroupLcuuid = ID
+			podGroupLcuuid = pgLcuuid
 		}
 		if kind == "StatefulSet" {
 			generate_name := metaData.Get("generate_name").MustString()
 			serialNumber := strings.TrimLeft(name, generate_name)
-			podLcuuid = common.GetUUIDByOrgID(k.orgID, ID+serialNumber)
+			podLcuuid = common.GetUUIDByOrgID(k.orgID, pgLcuuid+serialNumber)
 		} else {
 			podLcuuid = common.IDGenerateUUID(k.orgID, uID)
 		}

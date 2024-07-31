@@ -21,6 +21,7 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/plugin"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/logger"
@@ -103,36 +104,34 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					serviceType = common.POD_GROUP_DEPLOYMENT
 					label = "inplaceset:" + namespace + ":" + name
 				} else {
-					providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
-					if providerType != "serverless" && providerType != "proprietary" {
-						log.Debugf("sci pod (%s) type (%s) not support", name, providerType, logger.NewORGPrefix(k.orgID))
+					// when certain Pods do not have a corresponding workload or the corresponding workload is not supported,
+					// the lua plugin can be used to abstract the name and type of the workload according to the pod information
+					// 当某些 pod 因为缺少对应的工作负载或对应的工作负载不被支持的时候，
+					// 可以通过 lua 插件根据 pod 的信息来抽象出符合规则的工作负载名称和类型
+					abstractPGType, abstractPGName, err := plugin.GeneratePodGroup(k.orgID, k.db, metaData)
+					if err != nil {
+						log.Warningf("pod (%s) abstract pod group failed: (%s)", name, err.Error, logger.NewORGPrefix(k.orgID))
 						continue
 					}
-					abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
-					if abstractPGType == "" {
-						if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
-							abstractPGType = "StatefulSet"
-						} else {
-							abstractPGType = "Deployment"
-						}
-					}
-					resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
-					if resourceName == "" {
-						log.Debugf("sci pod (%s) abstract pod group not found provider resource name", name, logger.NewORGPrefix(k.orgID))
+					if abstractPGType == "" || abstractPGName == "" {
+						log.Debugf("pod (%s) abstract not found pod group type (%s) or name (%s)", name, abstractPGType, abstractPGName, logger.NewORGPrefix(k.orgID))
 						continue
 					}
-					abstractPGName := resourceName
-					targetIndex := strings.LastIndex(resourceName, "-")
-					if targetIndex != -1 {
-						abstractPGName = resourceName[:targetIndex]
-					}
-					uLcuuid = common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
-					if k.podGroupLcuuids.Contains(uLcuuid) {
-						log.Debugf("sci pod (%s) abstract workload already existed", name, logger.NewORGPrefix(k.orgID))
-						continue
-					}
+
 					typeName := strings.ToLower(abstractPGType)
-					serviceType = pgNameToTypeID[typeName]
+					serviceType, ok = pgNameToTypeID[typeName]
+					if !ok {
+						log.Infof("pod (%s) abstract workload type (%s) not support", name, abstractPGType, logger.NewORGPrefix(k.orgID))
+						continue
+					}
+
+					abstractUID := common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
+					k.podLcuuidToPGInfo[uID] = [2]string{abstractUID, abstractPGType}
+					uLcuuid = common.IDGenerateUUID(k.orgID, abstractUID)
+					if k.podGroupLcuuids.Contains(uLcuuid) {
+						log.Debugf("pod (%s) abstract workload already existed", name, logger.NewORGPrefix(k.orgID))
+						continue
+					}
 					label = typeName + ":" + namespace + ":" + abstractPGName
 					name = abstractPGName
 				}
