@@ -140,6 +140,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		newHost := common.NodeIP
 		if common.NodeIP == agent.CurControllerIP {
 			if manager := service.GetAgentCMDManager(key); manager != nil {
+				log.Infof("agent(key: %s) command context next, node ip(%s)", key)
 				c.Next()
 				return
 			} else {
@@ -148,6 +149,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			}
 		} else if common.NodeIP == agent.ControllerIP {
 			if manager := service.GetAgentCMDManager(key); manager != nil {
+				log.Infof("agent(key: %s) command context next, node ip(%s)", key)
 				c.Next()
 				return
 			} else {
