@@ -95,7 +95,9 @@ func (t *SpanWithTraceID) Encode() {
 	// topic: currently only taken from Kafka's RequestDomain
 	if t.L7Protocol == uint8(datatype.L7_PROTOCOL_KAFKA) {
 		encoder.WriteString255(t.RequestDomain)
+		encoder.WriteString255(t.RequestType)
 	} else {
+		encoder.WriteString255("")
 		encoder.WriteString255("")
 	}
 	encoder.WriteVarintU64(t.SyscallTraceIDRequest)
