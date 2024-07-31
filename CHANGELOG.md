@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Modify alert_event metric_value and add ip tag  #26017/26020 [#7637](https://github.com/deepflowio/deepflow/pull/7637) by [Ericsssss](https://github.com/Ericsssss)
+* fix: agent cmd panic [#7631](https://github.com/deepflowio/deepflow/pull/7631) by [roryye](https://github.com/roryye)
+* fix: Modify custom tag show tags error #25979 [#7628](https://github.com/deepflowio/deepflow/pull/7628) by [Ericsssss](https://github.com/Ericsssss)
+* fix: Translate fields by table [#7627](https://github.com/deepflowio/deepflow/pull/7627) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: fix agent traffic log [#7620](https://github.com/deepflowio/deepflow/pull/7620) by [roryye](https://github.com/roryye)
 * fix: Memory counter error [#7619](https://github.com/deepflowio/deepflow/pull/7619) by [rvql](https://github.com/rvql)
 * fix: Fix off-by-one error in java symbol rewrite [#7613](https://github.com/deepflowio/deepflow/pull/7613) by [rvql](https://github.com/rvql)
@@ -93,6 +97,12 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add request type from Kafka trace map [#7639](https://github.com/deepflowio/deepflow/pull/7639) by [lzf575](https://github.com/lzf575)
+* feat: server - Add configuration items to server [#7629](https://github.com/deepflowio/deepflow/pull/7629) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: adds blocker module to logger [#7625](https://github.com/deepflowio/deepflow/pull/7625) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: limit number of agent_sync [#7614](https://github.com/deepflowio/deepflow/pull/7614) by [askyrie](https://github.com/askyrie)
+* feat: agent - do not send time_span to server [#7610](https://github.com/deepflowio/deepflow/pull/7610) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: supports lua plugin [#7602](https://github.com/deepflowio/deepflow/pull/7602) by [duandaa](https://github.com/duandaa)
 * feat: support default team in domain create api [#7622](https://github.com/deepflowio/deepflow/pull/7622) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: Modify app_service and app_instance tag type and filter condition [#7621](https://github.com/deepflowio/deepflow/pull/7621) by [Ericsssss](https://github.com/Ericsssss)
 * feat: unifies legacy log organization info [#7618](https://github.com/deepflowio/deepflow/pull/7618) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -208,6 +218,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: polish agent config [#7342](https://github.com/deepflowio/deepflow/pull/7342) by [sharang](https://github.com/sharang)
 * refactor: update monitor, server log with org info [#7597](https://github.com/deepflowio/deepflow/pull/7597) by [roryye](https://github.com/roryye)
 * refactor: agent remove prometheus api sync [#7576](https://github.com/deepflowio/deepflow/pull/7576) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: cli update and deepflow-server update message [#7500](https://github.com/deepflowio/deepflow/pull/7500) by [lzf575](https://github.com/lzf575)

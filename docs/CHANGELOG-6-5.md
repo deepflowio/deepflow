@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent cmd panic [#7638](https://github.com/deepflowio/deepflow/pull/7638) by [roryye](https://github.com/roryye)
+* fix: Translate fields by table [#7635](https://github.com/deepflowio/deepflow/pull/7635) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: Modify custom tag show tags error #25979 [#7632](https://github.com/deepflowio/deepflow/pull/7632) by [Ericsssss](https://github.com/Ericsssss)
 * fix: modify resource delete error #25844 [#7608](https://github.com/deepflowio/deepflow/pull/7608) by [Ericsssss](https://github.com/Ericsssss)
 * fix: Remove useless output from CL [#7593](https://github.com/deepflowio/deepflow/pull/7593) by [roryye](https://github.com/roryye)
 * fix: agent - windows compile error [#7589](https://github.com/deepflowio/deepflow/pull/7589) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -82,6 +85,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: server - Add configuration items to server [#7630](https://github.com/deepflowio/deepflow/pull/7630) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: update trace_tree struct [#7604](https://github.com/deepflowio/deepflow/pull/7604) by [taloric](https://github.com/taloric)
 * feat: agent - eBPF Add delay threshold check for push period [#7598](https://github.com/deepflowio/deepflow/pull/7598) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Add kernel dependency check [#7596](https://github.com/deepflowio/deepflow/pull/7596) by [yinjiping](https://github.com/yinjiping)
@@ -134,6 +138,7 @@
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* support consistent timestamp in l7metrics [#7626](https://github.com/deepflowio/deepflow/pull/7626) by [yuanchaoa](https://github.com/yuanchaoa)
 * V65 trace map [#7445](https://github.com/deepflowio/deepflow/pull/7445) by [taloric](https://github.com/taloric)
 * bump golang.org/x/net to v0.26.0 [#7234](https://github.com/deepflowio/deepflow/pull/7234) by [zhangzujian](https://github.com/zhangzujian)
 
