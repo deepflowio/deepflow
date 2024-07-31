@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
-const SPAN_TRACE_VERSION = 0x11
+const SPAN_TRACE_VERSION = 0x12
 
 type SpanTrace struct {
 	Time uint32 // not store, easy to use when calculating
@@ -53,7 +53,8 @@ type SpanTrace struct {
 	SpanId                 string
 	ParentSpanId           string
 	AppService             string
-	Topic                  string
+	Topic                  string // only valid when is Kafka protocol, from l7FlowLog RequestDomain
+	RequestType            string // only valid when is Kafka protocol
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
 
@@ -93,6 +94,7 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 	t.ParentSpanId = decoder.ReadString255()
 	t.AppService = decoder.ReadString255()
 	t.Topic = decoder.ReadString255()
+	t.RequestType = decoder.ReadString255()
 
 	t.SyscallTraceIDRequest = decoder.ReadVarintU64()
 	t.SyscallTraceIDResponse = decoder.ReadVarintU64()
