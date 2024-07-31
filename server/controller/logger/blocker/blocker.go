@@ -14,9 +14,24 @@
  * limitations under the License.
  */
 
-package migration
+package blocker
+
+import "slices"
 
 const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.6.1.5"
+	defaultORGID  = 1
+	defaultTeamID = 1
 )
+
+var (
+	ORGIDsToBlock  = []int{defaultORGID}
+	TeamIDsToBlock = []int{defaultTeamID}
+)
+
+func IfBlockORGID(id int) bool {
+	return slices.Contains(ORGIDsToBlock, id)
+}
+
+func IfBlockTeamID(id int) bool {
+	return slices.Contains(TeamIDsToBlock, id)
+}

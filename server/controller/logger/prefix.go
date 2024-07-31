@@ -18,6 +18,8 @@ package logger
 
 import (
 	"fmt"
+
+	"github.com/deepflowio/deepflow/server/controller/logger/blocker"
 )
 
 // Prefix is an interface that can be implemented by types that want to provide a prefix to a log message.
@@ -38,7 +40,7 @@ func NewORGPrefix(id int) Prefix {
 }
 
 func (o *ORGPrefix) Prefix() string {
-	if o.ID == 0 || o.ID == defaultORGID {
+	if blocker.IfBlockORGID(o.ID) {
 		return ""
 	}
 	return fmt.Sprintf("[ORGID-%d]", o.ID)
@@ -53,7 +55,7 @@ func NewTeamPrefix(id int) Prefix {
 }
 
 func (t *TeamPrefix) Prefix() string {
-	if t.ID == 0 {
+	if blocker.IfBlockTeamID(t.ID) {
 		return ""
 	}
 	return fmt.Sprintf("[TeamID-%d]", t.ID)
