@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"sync"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	api "github.com/deepflowio/deepflow/message/trident"
@@ -31,7 +32,10 @@ import (
 
 func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) error {
 	key := ""
+	var wg sync.WaitGroup
+	wg.Add(1)
 	defer func() {
+		wg.Wait()
 		service.RemoveAllFromCMDManager(key)
 	}()
 
@@ -43,6 +47,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 
 	go func() {
 		defer func() {
+			wg.Done()
 			if r := recover(); r != nil {
 				buf := make([]byte, 2048)
 				n := runtime.Stack(buf, false)
