@@ -155,7 +155,7 @@ func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]
 		if err != nil {
 			return err
 		}
-		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
 			if serverName == clientName {
 				clientNameMetric := NewMetrics(
 					0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],

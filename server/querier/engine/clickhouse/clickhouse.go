@@ -258,7 +258,7 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 				continue
 			}
 		}
-		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
 			if serverName == clientName {
 				clientNameMetric := []interface{}{
 					clientName, true, displayName, "", metrics.METRICS_TYPE_NAME_MAP["tag"],
@@ -1700,7 +1700,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 				args = append(args, arg)
 			}
 		}
-		whereFilter := TransWhereTagFunction(e.DB, sqlparser.String(node.Name), args)
+		whereFilter := TransWhereTagFunction(e.DB, e.Table, sqlparser.String(node.Name), args)
 		if whereFilter == "" {
 			return nil, nil
 		}
