@@ -568,6 +568,20 @@ static struct tracepoint *find_tracepoint_from_name(struct bpf_tracer *tracer,
 	return NULL;
 }
 
+static struct kfunc *find_kfunc_from_name(struct bpf_tracer *tracer,
+					  const char *name)
+{
+	struct kfunc *p;
+	int i;
+	for (i = 0; i < PROBES_NUM_MAX; i++) {
+		p = &tracer->kfuncs[i];
+		if (!strcmp(p->name, name))
+			return p;
+	}
+
+	return NULL;
+}
+
 static struct tracepoint *get_tracepoint_from_tracer(struct bpf_tracer *tracer,
 						     const char *tp_name)
 {
@@ -592,6 +606,32 @@ static struct tracepoint *get_tracepoint_from_tracer(struct bpf_tracer *tracer,
 	snprintf(tp->name, sizeof(tp->name), "%s", tp_name);
 
 	return tp;
+}
+
+static struct kfunc *get_kfunc_from_tracer(struct bpf_tracer *tracer,
+					   const char *name)
+{
+	struct kfunc *p = find_kfunc_from_name(tracer, name);
+	if (p && p->prog)
+		return p;
+
+	struct ebpf_prog *prog;
+	int fd = bpf_get_program_fd(tracer->obj, name, (void **)&prog);
+	if (fd < 0) {
+		ebpf_info
+		    ("fun: %s, bpf_get_program_fd failed, tracepoint_name:%s.\n",
+		     __func__, name);
+		return NULL;
+	}
+
+	int idx = tracer->kfuncs_count++;
+	p = &tracer->kfuncs[idx];
+	p->prog_fd = fd;
+	p->prog = prog;
+
+	snprintf(p->name, sizeof(p->name), "%s", name);
+
+	return p;
 }
 
 void add_probe_to_tracer(struct probe *pb)
@@ -738,7 +778,8 @@ static struct ebpf_link *exec_attach_kprobe(struct ebpf_prog *prog, char *name,
 	else
 		fn_name = name + strlen("kprobe/");
 
-	snprintf(ev_name, sizeof(ev_name), "%s_deepflow_%s", isret ? "r" : "p", fn_name);
+	snprintf(ev_name, sizeof(ev_name), "%s_deepflow_%s", isret ? "r" : "p",
+		 fn_name);
 	ret =
 	    program__attach_kprobe(prog, isret, pid, fn_name, ev_name,
 				   (void **)&link);
@@ -883,17 +924,54 @@ static int tracepoint_detach(struct tracepoint *tp)
 	return ETR_OK;
 }
 
+static int kfunc_attach(struct kfunc *p)
+{
+	if (p->link) {
+		return ETR_EXIST;
+	}
+
+	struct ebpf_link *bl = program__attach_kfunc(p->prog);
+	p->link = bl;
+
+	if (bl == NULL) {
+		ebpf_warning("program__attach_tracepoint() failed, name:%s.\n",
+			     p->name);
+		__sync_fetch_and_add(&attach_failed_count, 1);
+		return ETR_INVAL;
+	}
+
+	return ETR_OK;
+}
+
+static int kfunc_detach(struct kfunc *p)
+{
+	if (p->link == NULL) {
+		return ETR_NOTEXIST;
+	}
+
+	if (p->link->detach) {
+		p->link->detach(p->link);
+	}
+
+	p->link = NULL;
+	free(p->link);
+	return ETR_OK;
+}
+
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_fun) (struct probe * p) = NULL;
-	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
+	int (*probe_handle)(struct probe * p) = NULL;
+	int (*tracepoint_handle)(struct tracepoint * p) = NULL;
+	int (*kfunc_handle)(struct kfunc * p) = NULL;
 	if (type == HOOK_ATTACH) {
-		probe_fun = probe_attach;
-		tracepoint_fun = tracepoint_attach;
+		probe_handle = probe_attach;
+		tracepoint_handle = tracepoint_attach;
+		kfunc_handle = kfunc_attach;
 	} else if (type == HOOK_DETACH) {
-		probe_fun = probe_detach;
-		tracepoint_fun = tracepoint_detach;
+		probe_handle = probe_detach;
+		tracepoint_handle = tracepoint_detach;
+		kfunc_handle = kfunc_detach;
 	} else
 		return ETR_INVAL;
 
@@ -918,7 +996,7 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			break;
 		}
 
-		error = probe_fun(p);
+		error = probe_handle(p);
 		if (type == HOOK_ATTACH && error == ETR_EXIST)
 			continue;
 
@@ -955,7 +1033,7 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 		if (!tp)
 			return ETR_INVAL;
 
-		error = tracepoint_fun(tp);
+		error = tracepoint_handle(tp);
 		if (type == HOOK_ATTACH && error == ETR_EXIST)
 			continue;
 
@@ -971,6 +1049,30 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			ebpf_info("%s tracepoint: '%s', succeed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  tp->name);
+	}
+
+	struct kfunc *kf;
+	for (i = 0; i < tps->kfuncs_nr; i++) {
+		kf = get_kfunc_from_tracer(tracer, tps->kfuncs[i].name);
+		if (!kf)
+			return ETR_INVAL;
+
+		error = kfunc_handle(kf);
+		if (type == HOOK_ATTACH && error == ETR_EXIST)
+			continue;
+
+		if (type == HOOK_DETACH && error == ETR_NOTEXIST)
+			continue;
+
+		if (error) {
+			ebpf_info("%s kfunc: '%s', failed!",
+				  type == HOOK_ATTACH ? "attach" : "detach",
+				  kf->name);
+			return ETR_INVAL;
+		} else
+			ebpf_info("%s kfunc: '%s', succeed!",
+				  type == HOOK_ATTACH ? "attach" : "detach",
+				  kf->name);
 	}
 
 perf_event:
@@ -989,18 +1091,21 @@ perf_event:
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
 				errno = 0;
 				int ret =
-				    program__attach_perf_event(obj->
-							       progs[i].prog_fd,
+				    program__attach_perf_event(obj->progs[i].
+							       prog_fd,
 							       PERF_TYPE_SOFTWARE,
 							       PERF_COUNT_SW_CPU_CLOCK,
 							       0,	/* sample_period */
-							       tracer->sample_freq,
+							       tracer->
+							       sample_freq,
 							       -1,	/* pid, current process */
 							       -1,	/* cpu, no binding */
 							       -1,	/* new event group is created */
-							       tracer->per_cpu_fds,
+							       tracer->
+							       per_cpu_fds,
 							       ARRAY_SIZE
-							       (tracer->per_cpu_fds));
+							       (tracer->
+								per_cpu_fds));
 				if (!ret) {
 					ebpf_info
 					    ("tracer \"%s\" attach perf event prog successful.\n",
@@ -1441,7 +1546,7 @@ static int tracer_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			      void **out, size_t * outsize)
+			      void **out, size_t *outsize)
 {
 	*outsize = sizeof(struct bpf_tracer_param_array) +
 	    sizeof(struct bpf_tracer_param) * tracers_count;

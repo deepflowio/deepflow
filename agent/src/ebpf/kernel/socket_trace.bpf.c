@@ -605,12 +605,14 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.rcv_saddr, 16,
 					      sk +
-					      offset->struct_sock_ip6saddr_offset);
+					      offset->
+					      struct_sock_ip6saddr_offset);
 		}
 		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.daddr, 16,
 					      sk +
-					      offset->struct_sock_ip6daddr_offset);
+					      offset->
+					      struct_sock_ip6daddr_offset);
 		}
 		v->tuple.addr_len = 16;
 		break;
@@ -1208,8 +1210,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 */
 		if (socket_info_ptr &&
 		    conn_info->direction == T_EGRESS &&
-		    !conn_info->no_trace &&
-		    socket_info_ptr->peer_fd > 0) {
+		    !conn_info->no_trace && socket_info_ptr->peer_fd > 0) {
 			sk_info.peer_fd = socket_info_ptr->peer_fd;
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
@@ -1316,8 +1317,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
-							      socket_info_ptr->
-							      peer_fd);
+							      socket_info_ptr->peer_fd);
 			/*
 			 * Query the socket information of the NGINX frontend and modify the
 			 * traceID of the data returned by the frontend.
@@ -1367,17 +1367,15 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->tuple.dport = conn_info->tuple.dport;
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
-	if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
-	    args->port > 0) {
+	if (conn_info->tuple.l4_protocol == IPPROTO_UDP && args->port > 0) {
 		if (conn_info->skc_family == PF_INET) {
-			bpf_probe_read_kernel(v->tuple.daddr, 4,
-					      args->addr);
+			bpf_probe_read_kernel(v->tuple.daddr, 4, args->addr);
 			v->tuple.addr_len = 4;
 		} else if (conn_info->skc_family == PF_INET6) {
-			if (*(__u64 *)&args->addr[0] == 0 &&
-			    *(__u32 *)&args->addr[8] == 0xffff0000) {
-				*(__u32 *)v->tuple.daddr = 
-					*(__u32 *)&args->addr[12];
+			if (*(__u64 *) & args->addr[0] == 0 &&
+			    *(__u32 *) & args->addr[8] == 0xffff0000) {
+				*(__u32 *) v->tuple.daddr =
+				    *(__u32 *) & args->addr[12];
 				v->tuple.addr_len = 4;
 			} else {
 				bpf_probe_read_kernel(v->tuple.daddr, 16,
@@ -1466,7 +1464,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->push_reassembly_bytes = send_reasm_bytes;
-	context->vecs = (bool) vecs;
+	context->vecs = (bool)vecs;
 	context->is_close = false;
 	context->dir = conn_info->direction;
 
@@ -1521,10 +1519,12 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		if (conn_info->tuple.dport == 0 &&
 		    is_socket_info_valid(conn_info->socket_info_ptr) &&
 		    conn_info->socket_info_ptr->udp_pre_set_addr) {
-			conn_info->tuple.dport = conn_info->socket_info_ptr->port;
+			conn_info->tuple.dport =
+			    conn_info->socket_info_ptr->port;
 			args->port = conn_info->tuple.dport;
 			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
-					      conn_info->socket_info_ptr->ipaddr);
+					      conn_info->socket_info_ptr->
+					      ipaddr);
 		}
 	}
 
@@ -1574,7 +1574,6 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 			conn_info->is_reasm_seg = true;
 		}
 	}
-
 	// When at least one of protocol or message_type is valid, 
 	// data_submit can be performed, otherwise MySQL data may be lost
 	if (conn_info->protocol != PROTO_UNKNOWN ||
@@ -1743,21 +1742,20 @@ TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
 	if (write_args.tcp_seq == 0) {
 		struct syscall_sendto_enter_ctx *sendto_ctx =
-			(struct syscall_sendto_enter_ctx *)ctx;
+		    (struct syscall_sendto_enter_ctx *)ctx;
 		struct sockaddr_in addr = { 0 };
 		bpf_probe_read_user(&addr, sizeof(addr), sendto_ctx->addr);
 		write_args.port = __bpf_ntohs(addr.sin_port);
 		if (write_args.port > 0 && addr.sin_family == AF_INET) {
-			*(__u32 *)write_args.addr =
-				__bpf_ntohl(addr.sin_addr.s_addr);
-		} else if (write_args.port > 0 &&
-			   addr.sin_family == AF_INET6) {
+			*(__u32 *) write_args.addr =
+			    __bpf_ntohl(addr.sin_addr.s_addr);
+		} else if (write_args.port > 0 && addr.sin_family == AF_INET6) {
 			struct sockaddr_in6 addr = { 0 };
 			bpf_probe_read_user(&addr, sizeof(addr),
 					    sendto_ctx->addr);
 			bpf_probe_read_kernel(&write_args.addr[0], 16,
 					      &addr.sin6_addr.s6_addr[0]);
-                }
+		}
 	}
 
 	active_write_args_map__update(&id, &write_args);
@@ -2099,7 +2097,7 @@ TP_SYSCALL_PROG(exit_readv) (struct syscall_comm_exit_ctx * ctx) {
 
 static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 					struct member_fields_offset *offset,
-				        struct syscall_comm_enter_ctx *ctx)
+					struct syscall_comm_enter_ctx *ctx)
 {
 	__u32 k0 = 0;
 	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
@@ -2156,7 +2154,7 @@ TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
 	struct socket_info_s *socket_info_ptr =
-		socket_info_map__lookup(&conn_key);
+	    socket_info_map__lookup(&conn_key);
 	if (socket_info_ptr == NULL) {
 		socket_role_map__delete(&conn_key);
 		return 0;
@@ -2241,9 +2239,41 @@ TP_SYSCALL_PROG(enter_connect) (struct syscall_comm_enter_ctx * ctx) {
 	return 0;
 }
 
+struct filename {
+    const char *name;
+    const char *uptr;
+    int refcnt;
+    void *aname;
+    const char iname[];
+};
+
+///////////////////////// fentry/fexit //////////////////////////////
+//long do_unlinkat(int dfd, struct filename *name)
+KFUNC_PROG(do_unlinkat, int dfd, struct filename *name)
+{
+	__u32 k0 = 0;
+	adapt_kern_uid_map__lookup(&k0);
+	pid_t pid;
+
+	pid = bpf_get_current_pid_tgid() >> 32;
+	bpf_debug("fentry: pid = %d, filename = %s\n", pid, name->name);
+	return 0;
+}
+//#if 0
+KRETFUNC_PROG(do_unlinkat, int dfd, struct filename *name, long ret)
+{
+	__u32 k0 = 0;
+	adapt_kern_uid_map__lookup(&k0);
+	pid_t pid;
+
+	pid = bpf_get_current_pid_tgid() >> 32;
+	bpf_debug("fexit: pid = %d, filename = %s, ret = %ld\n", pid,
+		  name->name, ret);
+	return 0;
+}
+//#endif
 // Store IO event information
 MAP_PERARRAY(io_event_buffer, __u32, struct __io_event_buffer, 1)
-
 /*
  * This eBPF program is specially used to transmit data to the agent. The purpose
  * of this is to solve the problem that the number of instructions exceeds the limit.
@@ -2412,7 +2442,7 @@ skip_copy:
 		if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS) {
 			struct trace_stats *stats;
 			tracer_ctx->last_period_timestamp =
-				tracer_ctx->period_timestamp;
+			    tracer_ctx->period_timestamp;
 			tracer_ctx->period_timestamp = curr_time;
 			stats = trace_stats_map__lookup(&k0);
 			if (stats == NULL)

@@ -144,7 +144,7 @@ extern bool allow_seg_reasm_protos[PROTO_NUM];
 do {                                                        			\
 	char *func = (char*)calloc(PROBE_NAME_SZ, 1);             		\
 	if (func != NULL) {                                       		\
-		curr_idx = index++;                  		            	\
+		int curr_idx = t->kprobes_nr++;                  		\
 		t->ksymbols[curr_idx].isret = false;                 	    	\
 		snprintf(func, PROBE_NAME_SZ, "kprobe/%s", fn);           	\
 		t->ksymbols[curr_idx].func = func;                        	\
@@ -157,7 +157,7 @@ do {                                                        			\
 do {                                                        			\
 	char *func = (char*)calloc(PROBE_NAME_SZ, 1);             		\
 	if (func != NULL) {                                       		\
-		curr_idx = index++;                  		            	\
+		int curr_idx = t->kprobes_nr++;                  		\
 		t->ksymbols[curr_idx].isret = true;                 	    	\
 		snprintf(func, PROBE_NAME_SZ, "kretprobe/%s", fn);           	\
 		t->ksymbols[curr_idx].func = func;                        	\
@@ -170,7 +170,7 @@ do {                                                        			\
 do {                            						\
 	char *func = (char*)calloc(PROBE_NAME_SZ, 1);      			\
 	if (func != NULL) {							\
-		curr_idx = index++;						\
+		int curr_idx = t->kprobes_nr++;					\
 		t->ksymbols[curr_idx].isret = false;				\
 		snprintf(func, PROBE_NAME_SZ, "kprobe/%s", fn);			\
 		t->ksymbols[curr_idx].func = func;				\
@@ -179,7 +179,7 @@ do {                            						\
 	}									\
 	func = (char*)calloc(PROBE_NAME_SZ, 1);					\
 	if (func != NULL) {							\
-		curr_idx = index++;						\
+		int curr_idx = t->kprobes_nr++;					\
 		snprintf(func, PROBE_NAME_SZ, "kretprobe/%s", fn);		\
 		t->ksymbols[curr_idx].isret = true;				\
 		t->ksymbols[curr_idx].func = func;				\
@@ -192,11 +192,25 @@ do {                            						\
 do {										\
 	char *name = (char*)calloc(PROBE_NAME_SZ, 1);				\
 	if (name != NULL) {							\
-		curr_idx = index++;						\
 		snprintf(name, PROBE_NAME_SZ, "%s", tp);			\
-		t->tps[curr_idx].name = name;					\
+		t->tps[t->tps_nr++].name = name;				\
 	} else {								\
 		ebpf_error("no memory, probe (tp %s) set failed", tp);		\
+	}									\
+} while(0)
+
+#define kfunc_set_symbol(t, fn, ret)						\
+do {										\
+	char *name = (char*)calloc(PROBE_NAME_SZ, 1);				\
+	if (name != NULL) {							\
+		if ((ret)) {							\
+			snprintf(name, PROBE_NAME_SZ, "fexit/%s", fn);		\
+		} else {							\
+			snprintf(name, PROBE_NAME_SZ, "fentry/%s", fn);		\
+		}								\
+		t->kfuncs[t->kfuncs_nr++].name = name;				\
+	} else {								\
+		ebpf_error("no memory, kfunc('%s') set failed", fn);		\
 	}									\
 } while(0)
 /* *INDENT-ON* */
@@ -247,6 +261,8 @@ struct tracer_probes_conf {
 	int kprobes_nr;
 	struct symbol_tracepoint tps[PROBES_NUM_MAX];
 	int tps_nr;
+	struct symbol_kfunc kfuncs[PROBES_NUM_MAX];
+	int kfuncs_nr;
 	struct list_head uprobe_syms_head;	// uprobe symbol 信息存放链表。
 	int uprobe_count;
 };
@@ -265,6 +281,13 @@ struct probe {
 };
 
 struct tracepoint {
+	char name[PROBE_NAME_SZ];
+	struct ebpf_link *link;
+	struct ebpf_prog *prog;
+	int prog_fd;
+};
+
+struct kfunc {
 	char name[PROBE_NAME_SZ];
 	struct ebpf_link *link;
 	struct ebpf_prog *prog;
@@ -350,6 +373,8 @@ struct bpf_tracer {
 	int probes_count;		// probe count.
 	struct tracepoint tracepoints[PROBES_NUM_MAX];
 	int tracepoints_count;
+	struct kfunc kfuncs[PROBES_NUM_MAX];
+	int kfuncs_count;
 	pthread_mutex_t mutex_probes_lock; // Protect the probes operation in multiple threads
 
 	/*
