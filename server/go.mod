@@ -10,6 +10,7 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table => ./controller/db/mysql/migrator/table
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
+	github.com/deepflowio/deepflow/server/controller/logger/blocker => ./controller/logger/blocker
 	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
 	github.com/deepflowio/deepflow/server/ingester/config/configdefaults => ./ingester/config/configdefaults
 	github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap => ./querier/app/distributed_tracing/service/tracemap
@@ -100,6 +101,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
 	github.com/bytedance/sonic v1.11.8
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/logger/blocker v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
