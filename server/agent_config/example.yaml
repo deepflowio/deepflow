@@ -824,6 +824,14 @@ static_config:
   #     LRU capacity limit
   l7-log-session-slot-capacity: 1024
 
+  # Consistent Timestamp in L7 Metrics
+  # NOTE: When this configuration is enabled, for the same session, response-related metrics (such as
+  #   response count, latency, exceptions) are recorded in the time slot corresponding to when the request
+  #   occurred, rather than the time slot of the response itself. This means that when calculating metrics
+  #   for requests and responses within a session, a consistent timestamp based on the time of the request
+  #   occurrence is used.
+  consistent-timestamp-in-l7-metrics: false
+
   ##########
   ## PCAP ##
   ##########
