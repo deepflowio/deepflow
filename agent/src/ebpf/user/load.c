@@ -433,6 +433,9 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 		prog_type = BPF_PROG_TYPE_TRACEPOINT;
 	} else if (!memcmp(desc->name, "perf_event", 10)) {
 		prog_type = BPF_PROG_TYPE_PERF_EVENT;
+	} else if (!memcmp(desc->name, "fentry/", 7) ||
+		   !memcmp(desc->name, "fexit/", 6)) {
+		prog_type = BPF_PROG_TYPE_TRACING;
 	} else {
 		prog_type = BPF_PROG_TYPE_UNSPEC;
 	}

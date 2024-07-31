@@ -135,8 +135,6 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 				 int total_time, int event_count);
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
-	int index = 0, curr_idx;
-
 	probes_set_enter_symbol(tps, "__sys_sendmsg");
 	probes_set_enter_symbol(tps, "__sys_sendmmsg");
 	probes_set_enter_symbol(tps, "__sys_recvmsg");
@@ -169,10 +167,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 			probes_set_exit_symbol(tps, "sys_clone");
 	}
 
-	tps->kprobes_nr = index;
-
 	/* tracepoints */
-	index = 0;
 
 	/*
 	 * 由于在Linux 4.17+ sys_write, sys_read, sys_sendto, sys_recvfrom
@@ -210,7 +205,9 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	// clear trace connection & fetch close info
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
 
-	tps->tps_nr = index;
+	/* kfuncs */
+	kfunc_set_symbol(tps, "do_unlinkat", false);
+	kfunc_set_symbol(tps, "do_unlinkat", true);
 
 	// 收集go可执行文件uprobe符号信息
 	collect_go_uprobe_syms_from_procfs(tps);
@@ -415,7 +412,7 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 }
 
 static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				 void **out, size_t * outsize)
+				 void **out, size_t *outsize)
 {
 	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
@@ -547,7 +544,7 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-				void **out, size_t * outsize)
+				void **out, size_t *outsize)
 {
 	return 0;
 }
@@ -660,7 +657,7 @@ static int register_events_handle(struct reader_forward_info *fwd_info,
 	}
 
 	struct extra_event *e;
-	void (*fn) (void *) = NULL;
+	void (*fn)(void *) = NULL;
 	list_for_each_entry(e, &events_list, list) {
 		if (e->type & meta->event_type) {
 			fn = e->h;
@@ -2495,9 +2492,9 @@ struct socket_trace_stats socket_tracer_stats(void)
  *
  * @return 0 is success, if not 0 is failed
  */
-int register_event_handle(uint32_t type, void (*fn) (void *))
+int register_event_handle(uint32_t type, void (*fn)(void *))
 {
-	if (type < EVENT_TYPE_MIN || fn == NULL) {
+	if(type < EVENT_TYPE_MIN || fn == NULL) {
 		ebpf_warning("Parameter is invalid, type %d fn %p\n", type, fn);
 		return -1;
 	}
@@ -2534,7 +2531,7 @@ int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 		__u32 stream_id;
 		__u32 header_len;
 		__u32 value_len;
-	} __attribute__ ((packed)) header;
+	} __attribute__((packed)) header;
 
 	int bytes = 0;
 	char key[1024] = { 0 };
@@ -2578,7 +2575,7 @@ int print_io_event_info(const char *data, int len, char *buf, int buf_len)
 		__u32 operation;
 		__u64 latency;
 		char filename[64];
-	} __attribute__ ((packed)) event;
+	} __attribute__((packed)) event;
 
 	int bytes = 0;
 
@@ -2610,7 +2607,7 @@ int print_uprobe_grpc_dataframe(const char *data, int len, char *buf,
 		__u32 stream_id;
 		__u32 data_len;
 		char data[1024];
-	} __attribute__ ((packed)) dataframe;
+	} __attribute__((packed)) dataframe;
 
 	int bytes = 0;
 	memcpy(&dataframe, data, len);
@@ -2925,7 +2922,7 @@ static void datadump_process(void *data, int64_t boot_time)
 }
 
 static inline int __set_protocol_ports_bitmap(int proto_type,
-					      bool * allow_ports,
+					      bool *allow_ports,
 					      const char *ports)
 {
 	int i;
