@@ -1649,7 +1649,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 				args = append(args, arg)
 			}
 		}
-		whereFilter := TransWhereTagFunction(e.DB, sqlparser.String(node.Name), args)
+		whereFilter := TransWhereTagFunction(e.DB, e.Table, sqlparser.String(node.Name), args)
 		if whereFilter == "" {
 			return nil, nil
 		}
