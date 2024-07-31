@@ -4316,6 +4316,26 @@ processors:
       # upgrade_from: static_config.l7-log-session-slot-capacity
       # TODO: 增加了最大值
       session_aggregate_slot_capacity: 1024
+
+      # type: bool
+      # name:
+      #   en: Consistent Timestamp in L7 Metrics
+      #   ch: 应用指标时间一致性开关
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When this configuration is enabled, for the same session, response-related metrics (such as response
+      #     count, latency, exceptions) are recorded in the time slot corresponding to when the request occurred,
+      #     rather than the time slot of the response itself. This means that when calculating metrics for
+      #     requests and responses within a session, a consistent timestamp based on the time of the request
+      #     occurrence is used.
+      #   ch: |-
+      #     当开关打开时对于同一个会话的请求和响应, 它们对应的指标数据会全部统计在请求所在的时间戳里
+      consistent_timestamp_in_l7_metrics: false
   # type: section
   # name:
   #   en: Flow Log
