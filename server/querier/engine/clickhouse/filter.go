@@ -536,7 +536,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		filter := ""
 		switch t.Tag {
-		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id", "team_id":
+		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id", "team_id", "app_service", "app_instance":
 			if table == "user_map" && t.Tag == "user_id" {
 				tagItem, ok := tag.GetTag("value", db, table, "default")
 				if ok {
@@ -1304,6 +1304,11 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 	}
 	function := strings.Trim(f.Function.ToString(), "`")
 	if strings.HasPrefix(function, "Enum(") {
+		tagName := strings.TrimPrefix(function, "Enum(")
+		tagName = strings.TrimSuffix(tagName, ")")
+		tagName = strings.Trim(tagName, "`")
+		tagEnum := strings.TrimSuffix(tagName, "_0")
+		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		if db == "flow_tag" {
 			if strings.ToLower(opName) == "like" || strings.ToLower(opName) == "not like" {
 				f.Value = strings.ReplaceAll(f.Value, "*", "%")
@@ -1327,6 +1332,17 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				}
 			}
 			filter := ""
+			if tagName == "app_service" || tagName == "app_instance" {
+				tagItem, ok := tag.GetTag("other_id", db, table, "default")
+				if ok {
+					if strings.Contains(opName, "match") {
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, tagName, f.Value)
+					} else {
+						filter = fmt.Sprintf(tagItem.WhereTranslator, tagName, opName, f.Value)
+					}
+				}
+				return &view.Expr{Value: "(" + filter + ")"}, nil
+			}
 			tagItem, ok := tag.GetTag("enum_tag_name", db, table, "default")
 			if ok {
 				switch strings.ToLower(opName) {
@@ -1348,11 +1364,6 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 
 		}
 		var isIntEnum = true
-		tagName := strings.TrimPrefix(function, "Enum(")
-		tagName = strings.TrimSuffix(tagName, ")")
-		tagName = strings.Trim(tagName, "`")
-		tagEnum := strings.TrimSuffix(tagName, "_0")
-		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		tagDescription, ok := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
 			DB: db, Table: table, TagName: tagEnum,
 		}]
