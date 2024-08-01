@@ -378,4 +378,5 @@ int socket_tracer_stop(void);
 int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
+int disable_syscall_trace_id(void);
 #endif /* DF_USER_SOCKET_H */

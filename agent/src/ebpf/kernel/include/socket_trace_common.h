@@ -100,6 +100,7 @@ struct tracer_ctx_s {
 	int push_buffer_refcnt; /**< Reference count of the data push buffer */
 	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
 	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
+	bool disable_tracing;  /**< Disable tracing feature. */
 };
 
 /**
