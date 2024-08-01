@@ -50,9 +50,28 @@ chost_hostname            , Cloud Host                    , The hostname of Clou
 pod_node_ip               , K8s Node                      , The primary IP address of K8s Node.
 pod_node_hostname         , K8s Node                      , The hostname of K8s Node.
 
+ip                        , IP Address                    ,
+is_internet           , Internet IP Flag                  , Whether the IP address is an external Internet address.
+province              , Province                          , The province to which the Internet IP address belongs.
+
+tcp_flags_bit         , TCP Flag Set                      , The set of TCP flags in all packets in the current natural minute.
+
+l2_end                , Boundary of L2 Network            , Indicates whether the traffic is collected on the client NIC or the server NIC.
+l3_end                , Boundary of L3 Network            , Indicates whether the traffic is collected in the Layer 2 network where the client or server is located.
+nat_real_ip           , NAT IP Address                    , The real IP address before (after) NAT, the value is extracted from TOA (TCP Option Address), or calculated according to the mapping information between VIP and RIP in the cloud platform.
+nat_real_port         , NAT Port                          , The real port number before NAT works, the value is extracted from TOA (TCP Option Address).
+
+process_id                , Process ID                    ,
+process_kname             , Kernel Thread Name            ,
+
+k8s.label             , K8s Label                         ,
+k8s.annotation        , K8s Annotation                    ,
+k8s.env               , K8s Env                           ,
+cloud.tag             , Cloud Tag                         ,
+os.app                , OS APP                            ,
+
 user                       , Creator                    ,
 alert_policy               , AlarmPolicy                ,
-ip                         , IP Address                 ,
 policy_type                , PolicyType                 ,
 event_level                , EventLevel                 ,
 target_tags                , TargetTags                 , 
