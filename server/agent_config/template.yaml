@@ -1438,6 +1438,8 @@ inputs:
       #     Cilium         lxc.*
       #     Kube-OVN       [0-9a-f]+_h$
       #     ```
+      #     When the `tap_interface_regex` is not configured, it indicates 
+      #     that network card traffic is not being collected
       #   ch: |-
       #     需要采集流量的网络接口的正则表达式。
       # upgrade_from: tap_interface_regex
@@ -2175,6 +2177,29 @@ inputs:
           # upgrade_from: static_config.ebpf.kprobe-whitelist.port-list
           # TODO: 未列入黑名单、白名单的端口是否用 kprobe 做采集？
           port: ""
+      # type: section
+      # name: Socket
+      # description:
+      sokcet:
+        # type: bool
+        # name:
+        #   en: Syscall_trace_id Disabled
+        #   ch: 禁用 syscall_trace_id 相关的计算
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the trace_id is injected into all requests, the computation logic for all
+        #     syscall_trace_id can be turned off. This will significantly reduce the impact of the
+        #     eBPF hook on the CPU consumption of the application process.
+        #   ch: |-
+        #     当 trace_id 注入所有请求时，所有请求的 syscall_trace_id 计算逻辑可以关闭。这将大大减少
+        #     eBPF hook 进程的 CPU 消耗。
+        # upgrade_from: static_config.ebpf.syscall-trace-id-disabled
+        syscall_trace_id_disabled: false
     # type: section
     # name:
     #   en: File
