@@ -509,10 +509,15 @@ impl ExtraLogFields {
     }
 }
 
+fn default_obfuscate_enabled_protocols() -> Vec<String> {
+    vec!["Redis".to_string()]
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
+    #[serde(default = "default_obfuscate_enabled_protocols")]
     pub obfuscate_enabled_protocols: Vec<String>,
     pub extra_log_fields: ExtraLogFields,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
@@ -896,13 +901,6 @@ impl YamlConfig {
 
         if c.packet_fanout_mode > Self::PACKET_FANOUT_MODE_MAX {
             c.packet_fanout_mode = 0;
-        }
-
-        if c.l7_protocol_advanced_features
-            .obfuscate_enabled_protocols
-            .is_empty()
-        {
-            c.l7_protocol_advanced_features.obfuscate_enabled_protocols = vec!["Redis".to_string()];
         }
 
         if c.mirror_traffic_pcp > 9 {
