@@ -41,10 +41,11 @@ use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
         endpoint::FeatureFlags,
-        enums::{EthernetType, TapType},
+        enums::{CaptureNetworkType, EthernetType},
         flow::L7Stats,
-        MetaPacket, TaggedFlow, TapTyper, DEFAULT_CONTROLLER_PORT, DEFAULT_INGESTER_PORT,
-        ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE, VLAN_ID_MASK,
+        CaptureNetworkTyper, MetaPacket, TaggedFlow, DEFAULT_CONTROLLER_PORT,
+        DEFAULT_INGESTER_PORT, ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE,
+        VLAN_ID_MASK,
     },
     config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
@@ -59,7 +60,7 @@ use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
     packet::Packet,
-    proto::trident::{Exception, IfMacSource, TapMode},
+    proto::agent::{Exception, IfMacSource, PacketCaptureType},
     queue::DebugSender,
     utils::net::{self, get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -88,7 +89,7 @@ pub(super) struct BaseDispatcher {
     pub(super) tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub(super) tunnel_info: TunnelInfo,
 
-    pub(super) tap_type_handler: TapTypeHandler,
+    pub(super) tap_type_handler: CaptureNetworkTypeHandler,
 
     pub(super) need_update_bpf: Arc<AtomicBool>,
     // 该表中的tap接口采集包长不截断
@@ -131,7 +132,7 @@ pub(super) struct BaseDispatcher {
 impl BaseDispatcher {
     pub(super) fn prepare_flow(
         meta_packet: &mut MetaPacket,
-        tap_type: TapType,
+        tap_type: CaptureNetworkType,
         reset_ttl: bool,
         queue_hash: u8,
         npb_dedup_enabled: bool,
@@ -205,7 +206,8 @@ impl BaseDispatcher {
             Ok(links) => links,
         };
         let options = self.options.lock().unwrap();
-        self.engine = if options.tap_mode == TapMode::Local && options.libpcap_enabled {
+        self.engine = if options.capture_mode == PacketCaptureType::Local && options.libpcap_enabled
+        {
             if pcap_interfaces.is_empty() {
                 return Err(Error::Libpcap(
                     "libpcap capture must give interface to capture packet".into(),
@@ -314,10 +316,10 @@ impl BaseDispatcher {
 
     pub(super) fn decapsulate(
         packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
+    ) -> Result<(usize, CaptureNetworkType)> {
         if packet.len() < ETH_HEADER_SIZE {
             return Err(Error::PacketInvalid(
                 "packet.len() < ETH_HEADER_SIZE".to_string(),
@@ -340,13 +342,13 @@ impl BaseDispatcher {
 
     pub(super) fn decap_tunnel_with_erspan(
         packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
         trim_bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
+    ) -> Result<(usize, CaptureNetworkType)> {
         let mut decap_len = 0;
-        let mut tap_type = TapType::Any;
+        let mut tap_type = CaptureNetworkType::Any;
         // 仅解析两层隧道
         for i in 0..2 {
             let (offset, t) = Self::decapsulate(
@@ -378,11 +380,11 @@ impl BaseDispatcher {
 
     pub(super) fn decap_tunnel(
         packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
         trim_bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
+    ) -> Result<(usize, CaptureNetworkType)> {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
@@ -439,10 +441,10 @@ impl BaseDispatcher {
 
     pub(super) fn decapsulate(
         packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
+    ) -> Result<(usize, CaptureNetworkType)> {
         if packet.len() < ETH_HEADER_SIZE {
             return Err(Error::PacketInvalid(
                 "packet.len() < ETH_HEADER_SIZE".to_string(),
@@ -465,13 +467,13 @@ impl BaseDispatcher {
 
     pub(super) fn decap_tunnel_with_erspan(
         packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
         trim_bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
+    ) -> Result<(usize, CaptureNetworkType)> {
         let mut decap_len = 0;
-        let mut tap_type = TapType::Any;
+        let mut tap_type = CaptureNetworkType::Any;
         // 仅解析两层隧道
         for i in 0..2 {
             let (offset, t) = Self::decapsulate(
@@ -500,11 +502,11 @@ impl BaseDispatcher {
 
     pub(super) fn decap_tunnel(
         packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
         trim_bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
+    ) -> Result<(usize, CaptureNetworkType)> {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
@@ -538,19 +540,22 @@ impl BaseDispatcher {
 }
 
 #[derive(Clone, Default)]
-pub(super) struct TapTypeHandler {
-    pub(super) tap_typer: Arc<TapTyper>,
-    pub(super) default_tap_type: TapType,
+pub(super) struct CaptureNetworkTypeHandler {
+    pub(super) tap_typer: Arc<CaptureNetworkTyper>,
+    pub(super) default_tap_type: CaptureNetworkType,
     pub(super) mirror_traffic_pcp: u16,
-    pub(super) tap_mode: TapMode,
+    pub(super) capture_mode: PacketCaptureType,
 }
 
-impl TapTypeHandler {
+impl CaptureNetworkTypeHandler {
     const OUTER_VLAN: u16 = 8;
     const INNER_VLAN: u16 = 9;
 
     // returns tap_type, ethernet_type and l2_len
-    pub(super) fn get_l2_info(&self, packet: &[u8]) -> Result<(TapType, EthernetType, usize)> {
+    pub(super) fn get_l2_info(
+        &self,
+        packet: &[u8],
+    ) -> Result<(CaptureNetworkType, EthernetType, usize)> {
         let mut eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE..]);
         let mut tap_type = self.default_tap_type;
         let mut l2_opt_size = 0;
@@ -576,10 +581,10 @@ impl TapTypeHandler {
             (0, 0)
         };
 
-        if self.tap_mode == TapMode::Analyzer {
+        if self.capture_mode == PacketCaptureType::Analyzer {
             if l2_opt_size == 0 {
                 if let Some(t) = self.tap_typer.get_tap_type_by_vlan(0) {
-                    if t != TapType::Unknown {
+                    if t != CaptureNetworkType::Unknown {
                         tap_type = t;
                     }
                 }
@@ -590,7 +595,7 @@ impl TapTypeHandler {
                             .tap_typer
                             .get_tap_type_by_vlan(outer_vlan_tag & VLAN_ID_MASK)
                         {
-                            if t != TapType::Unknown {
+                            if t != CaptureNetworkType::Unknown {
                                 tap_type = t;
                             }
                         }
@@ -600,7 +605,7 @@ impl TapTypeHandler {
                             .tap_typer
                             .get_tap_type_by_vlan(inner_vlan_tag & VLAN_ID_MASK)
                         {
-                            if t != TapType::Unknown {
+                            if t != CaptureNetworkType::Unknown {
                                 tap_type = t;
                             }
                         }
@@ -611,7 +616,7 @@ impl TapTypeHandler {
                                 .tap_typer
                                 .get_tap_type_by_vlan(outer_vlan_tag & VLAN_ID_MASK)
                             {
-                                if t != TapType::Unknown {
+                                if t != CaptureNetworkType::Unknown {
                                     tap_type = t;
                                 }
                             }

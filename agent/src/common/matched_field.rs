@@ -29,7 +29,7 @@ pub enum MatchedFlag {
     SrcPort,
     DstPort,
     Proto,
-    TapType,
+    CaptureNetworkType,
 }
 
 #[derive(Clone, Debug)]
@@ -132,7 +132,7 @@ impl fmt::Display for MatchedField {
             self.get(MatchedFlag::SrcEpc),
             self.get(MatchedFlag::DstEpc),
             self.get(MatchedFlag::Proto),
-            self.get(MatchedFlag::TapType)
+            self.get(MatchedFlag::CaptureNetworkType)
         )
     }
 }
@@ -177,7 +177,7 @@ impl<const N: usize> MatchedFieldN<N> {
             MatchedFlag::SrcPort => 4,
             MatchedFlag::DstPort => 6,
             MatchedFlag::Proto => 8,
-            MatchedFlag::TapType => 9,
+            MatchedFlag::CaptureNetworkType => 9,
             MatchedFlag::SrcIp | MatchedFlag::DstIp => 0,
         }
     }
@@ -191,7 +191,7 @@ impl<const N: usize> MatchedFieldN<N> {
             | MatchedFlag::DstPort => {
                 u16::from_le_bytes(*<&[u8; 2]>::try_from(&self.others[offset..offset + 2]).unwrap())
             }
-            MatchedFlag::Proto | MatchedFlag::TapType => self.others[offset] as u16,
+            MatchedFlag::Proto | MatchedFlag::CaptureNetworkType => self.others[offset] as u16,
             _ => unimplemented!(),
         }
     }
@@ -205,7 +205,9 @@ impl<const N: usize> MatchedFieldN<N> {
             | MatchedFlag::DstPort => {
                 self.others[offset..offset + 2].copy_from_slice(value.to_le_bytes().as_slice())
             }
-            MatchedFlag::Proto | MatchedFlag::TapType => self.others[offset] = value as u8,
+            MatchedFlag::Proto | MatchedFlag::CaptureNetworkType => {
+                self.others[offset] = value as u8
+            }
             _ => unimplemented!(),
         }
     }
@@ -403,7 +405,7 @@ mod tests {
             IpAddr::V4(_) => MatchedField::V4(MatchedFieldv4::default()),
             IpAddr::V6(_) => MatchedField::V6(MatchedFieldv6::default()),
         };
-        matched.set(MatchedFlag::TapType, tap_type);
+        matched.set(MatchedFlag::CaptureNetworkType, tap_type);
         matched.set(MatchedFlag::Proto, proto as u16);
         matched.set_ip(MatchedFlag::SrcIp, src_ip);
         matched.set_ip(MatchedFlag::DstIp, dst_ip);
@@ -423,7 +425,7 @@ mod tests {
             60,
         );
         assert_eq!(
-            matched.get(MatchedFlag::TapType),
+            matched.get(MatchedFlag::CaptureNetworkType),
             66,
             "MATCHED_TAP_TYPE error. {}",
             matched
@@ -468,7 +470,7 @@ mod tests {
             60,
         );
         assert_eq!(
-            matched.get(MatchedFlag::TapType),
+            matched.get(MatchedFlag::CaptureNetworkType),
             0xFF,
             "MATCHED_TAP_TYPE error. {}",
             matched
@@ -492,7 +494,7 @@ mod tests {
             60,
         );
         assert_eq!(
-            matched.get(MatchedFlag::TapType),
+            matched.get(MatchedFlag::CaptureNetworkType),
             231,
             "MATCHED_TAP_TYPE error. {}",
             matched

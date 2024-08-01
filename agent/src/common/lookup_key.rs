@@ -21,7 +21,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use super::TapPort;
 use super::{
     endpoint::FeatureFlags,
-    enums::{EthernetType, IpProtocol, TapType},
+    enums::{CaptureNetworkType, EthernetType, IpProtocol},
     flow::PacketDirection,
     matched_field::{MatchedField, MatchedFieldv4, MatchedFieldv6, MatchedFlag},
     Timestamp,
@@ -49,7 +49,7 @@ pub struct LookupKey {
     pub l3_epc_id_0: u16,
     pub l3_epc_id_1: u16,
     pub proto: IpProtocol,
-    pub tap_type: TapType,
+    pub tap_type: CaptureNetworkType,
     pub feature_flag: FeatureFlags,
     pub forward_matched: Option<MatchedField>,
     pub backward_matched: Option<MatchedField>,
@@ -75,7 +75,7 @@ impl DedupOperator for LookupKey {
     }
 
     fn is_tor(&self) -> bool {
-        self.tap_type == TapType::Cloud
+        self.tap_type == CaptureNetworkType::Cloud
     }
 }
 
@@ -123,7 +123,7 @@ impl LookupKey {
 
     fn set_matched_field(
         f: &mut MatchedField,
-        tap_type: TapType,
+        tap_type: CaptureNetworkType,
         proto: IpProtocol,
         src_ip: IpAddr,
         dst_ip: IpAddr,
@@ -132,7 +132,7 @@ impl LookupKey {
         src_port: u16,
         dst_port: u16,
     ) {
-        f.set(MatchedFlag::TapType, u16::from(tap_type));
+        f.set(MatchedFlag::CaptureNetworkType, u16::from(tap_type));
         f.set(MatchedFlag::Proto, u8::from(proto) as u16);
         f.set_ip(MatchedFlag::SrcIp, src_ip);
         f.set_ip(MatchedFlag::DstIp, dst_ip);

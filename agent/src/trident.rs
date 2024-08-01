@@ -54,17 +54,17 @@ use crate::{
         L7CollectorThread,
     },
     common::{
-        enums::TapType,
+        enums::CaptureNetworkType,
         flow::L7Stats,
         proc_event::BoxedProcEvents,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
-        tap_types::TapTyper,
+        tap_types::CaptureNetworkTyper,
         FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_TRIDENT_CONF_FILE, FREE_SPACE_REQUIREMENT,
     },
-    config::PcapConfig,
+    config::PcapStream,
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig},
-        Config, ConfigError, RuntimeConfig, YamlConfig,
+        Config, ConfigError, RuntimeConfig,
     },
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
@@ -119,7 +119,7 @@ use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
     packet::MiniPacket,
-    proto::trident::{self, Exception, SocketType, TapMode},
+    proto::agent::{self, Exception, PacketCaptureType, SocketType},
     queue::{self, DebugSender},
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -135,7 +135,7 @@ pub struct ChangedConfig {
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
     pub gateway_vmac_addrs: Vec<MacAddr>,
-    pub tap_types: Vec<trident::TapType>,
+    pub tap_types: Vec<agent::CaptureNetworkType>,
 }
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
@@ -219,7 +219,7 @@ impl fmt::Display for AgentId {
     }
 }
 
-impl From<&AgentId> for trident::AgentId {
+impl From<&AgentId> for agent::AgentId {
     fn from(id: &AgentId) -> Self {
         Self {
             ip: Some(id.ip.to_string()),
@@ -266,7 +266,7 @@ impl Trident {
                 let rc = RuntimeConfig::load_from_file(config_path.as_ref())?;
                 let mut conf = Config::default();
                 conf.controller_ips = vec!["127.0.0.1".into()];
-                conf.log_file = rc.yaml_config.log_file;
+                conf.log_file = rc.global.self_monitoring.log.log_file;
                 conf.agent_mode = agent_mode;
                 conf
             }
@@ -603,14 +603,21 @@ impl Trident {
         let guard = match Guard::new(
             config_handler.environment(),
             log_dir.to_string(),
-            config_handler.candidate_config.yaml_config.guard_interval,
+            config_handler
+                .candidate_config
+                .config
+                .global
+                .tunning
+                .resource_monitoring_interval,
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
             config_handler
                 .candidate_config
-                .yaml_config
-                .memory_trim_disabled,
+                .config
+                .global
+                .tunning
+                .idle_memory_trimming,
         ) {
             Ok(g) => g,
             Err(e) => {
@@ -682,7 +689,7 @@ impl Trident {
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
         let mut components: Option<Components> = None;
-        let mut yaml_conf: Option<YamlConfig> = None;
+        let mut current_runtime_config: Option<RuntimeConfig> = None;
 
         loop {
             match &mut *state_guard {
@@ -781,20 +788,20 @@ impl Trident {
                 tap_types,
             } = new_state.unwrap_config();
 
-            if let Some(old_yaml) = yaml_conf {
-                if old_yaml != runtime_config.yaml_config {
+            if let Some(old_yaml) = current_runtime_config {
+                if old_yaml != runtime_config {
                     if let Some(mut c) = components.take() {
                         c.stop();
                     }
                     // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
                     // Work around this problem by exiting and restart trident
-                    let info = "yaml_config updated, deepflow-agent restart...";
+                    let info = "runtime_config updated, deepflow-agent restart...";
                     warn!("{}", info);
                     thread::sleep(Duration::from_secs(1));
                     return Err(anyhow!(info));
                 }
             }
-            yaml_conf = Some(runtime_config.yaml_config.clone());
+            current_runtime_config = Some(runtime_config.clone());
             let agent_id = synchronizer.agent_id.read().clone();
             match components.as_mut() {
                 None => {
@@ -843,7 +850,8 @@ impl Trident {
                     comp.start();
 
                     if let Components::Agent(components) = &mut comp {
-                        if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer
+                        if config_handler.candidate_config.dispatcher.capture_mode
+                            == PacketCaptureType::Analyzer
                         {
                             parse_tap_type(components, tap_types);
                         }
@@ -994,13 +1002,13 @@ fn component_on_config_change(
     blacklist: Vec<u64>,
     vm_mac_addrs: Vec<MacAddr>,
     gateway_vmac_addrs: Vec<MacAddr>,
-    tap_types: Vec<trident::TapType>,
+    tap_types: Vec<agent::CaptureNetworkType>,
     synchronizer: &Arc<Synchronizer>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
 ) {
     let conf = &config_handler.candidate_config.dispatcher;
-    match conf.tap_mode {
-        TapMode::Local => {
+    match conf.capture_mode {
+        PacketCaptureType::Local => {
             let if_mac_source = conf.if_mac_source;
             components.dispatcher_components.retain_mut(|d| {
                 let links = get_listener_links(
@@ -1016,7 +1024,7 @@ fn component_on_config_change(
                 d.dispatcher_listener.on_tap_interface_change(
                     &links,
                     if_mac_source,
-                    conf.trident_type,
+                    conf.agent_type,
                     &blacklist,
                 );
                 d.dispatcher_listener
@@ -1075,26 +1083,30 @@ fn component_on_config_change(
                 }
             }
         }
-        TapMode::Mirror | TapMode::Analyzer => {
+        PacketCaptureType::Mirror | PacketCaptureType::Analyzer => {
             for d in components.dispatcher_components.iter() {
                 d.dispatcher_listener.on_tap_interface_change(
                     &vec![],
                     conf.if_mac_source,
-                    conf.trident_type,
+                    conf.agent_type,
                     &blacklist,
                 );
                 d.dispatcher_listener
                     .on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
             }
-            if conf.tap_mode == TapMode::Analyzer {
+            if conf.capture_mode == PacketCaptureType::Analyzer {
                 parse_tap_type(components, tap_types);
             }
 
             #[cfg(target_os = "linux")]
-            if conf.tap_mode == TapMode::Mirror
+            if conf.capture_mode == PacketCaptureType::Mirror
                 && (!config_handler
                     .candidate_config
-                    .yaml_config
+                    .config
+                    .inputs
+                    .cbpf
+                    .special_network
+                    .vhost_user
                     .vhost_socket_path
                     .is_empty()
                     || conf.dpdk_enabled)
@@ -1185,7 +1197,7 @@ fn component_on_config_change(
     }
 }
 
-fn parse_tap_type(components: &mut AgentComponents, tap_types: Vec<trident::TapType>) {
+fn parse_tap_type(components: &mut AgentComponents, tap_types: Vec<agent::CaptureNetworkType>) {
     let mut updated = false;
     if components.cur_tap_types.len() != tap_types.len() {
         updated = true;
@@ -1368,7 +1380,7 @@ pub enum Components {
 #[cfg(target_os = "linux")]
 pub struct WatcherComponents {
     pub running: AtomicBool,
-    tap_mode: TapMode,
+    capture_mode: PacketCaptureType,
     agent_mode: RunningMode,
     runtime: Arc<Runtime>,
 }
@@ -1384,7 +1396,7 @@ impl WatcherComponents {
         info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
         Ok(WatcherComponents {
             running: AtomicBool::new(false),
-            tap_mode: candidate_config.tap_mode,
+            capture_mode: candidate_config.capture_mode,
             agent_mode,
             runtime,
         })
@@ -1493,8 +1505,8 @@ impl DispatcherComponent {
 pub struct AgentComponents {
     pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
-    pub tap_typer: Arc<TapTyper>,
-    pub cur_tap_types: Vec<trident::TapType>,
+    pub tap_typer: Arc<CaptureNetworkTyper>,
+    pub cur_tap_types: Vec<agent::CaptureNetworkType>,
     pub dispatcher_components: Vec<DispatcherComponent>,
     pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
@@ -1537,14 +1549,14 @@ pub struct AgentComponents {
     pub last_dispatcher_component_id: usize,
 
     max_memory: u64,
-    tap_mode: TapMode,
+    capture_mode: PacketCaptureType,
     agent_mode: RunningMode,
 
     runtime: Arc<Runtime>,
 }
 
 impl AgentComponents {
-    fn get_flowgen_tolerable_delay(yaml_config: &YamlConfig) -> u64 {
+    fn get_flowgen_tolerable_delay(config: &RuntimeConfig) -> u64 {
         // FIXME: The flow_generator and dispatcher should be decoupled, and a delay function should be provided for this purpose.
         // The components of quadruple_generator's Delay are as follows:
         //   - Inherent delay in flow statistics data in flow_map: second_flow_extra_delay + packet_delay
@@ -1552,12 +1564,32 @@ impl AgentComponents {
         //   - Delay in flushing the output queue in flow_map: flow.flush_interval
         //   - Potential delay from other processing steps in flow_map: COMMON_DELAY 5 seconds
         //   - The delay caused by the time window being pushed ahead in flow_map: flow.flush_interval
-        yaml_config.packet_delay.as_secs()
+        config
+            .processors
+            .flow_log
+            .time_window
+            .max_tolerable_packet_delay
+            .as_secs()
             + TIME_UNIT.as_secs()
-            + yaml_config.flow.flush_interval.as_secs()
+            + config
+                .processors
+                .flow_log
+                .conntrack
+                .flow_flush_interval
+                .as_secs()
             + COMMON_DELAY
-            + yaml_config.second_flow_extra_delay.as_secs()
-            + yaml_config.flow.flush_interval.as_secs() // The flow_map may send data to qg ahead of time due to the output_buffer exceeding its limit. This can result in the time_window of qg being advanced prematurely, with the maximum advancement time being the flush_interval.
+            + config
+                .processors
+                .flow_log
+                .time_window
+                .extra_tolerable_flow_delay
+                .as_secs()
+            + config
+                .processors
+                .flow_log
+                .conntrack
+                .flow_flush_interval
+                .as_secs() // The flow_map may send data to qg ahead of time due to the output_buffer exceeding its limit. This can result in the time_window of qg being advanced prematurely, with the maximum advancement time being the flush_interval.
     }
     fn new_collector(
         id: usize,
@@ -1572,9 +1604,9 @@ impl AgentComponents {
         synchronizer: &Arc<Synchronizer>,
         agent_mode: RunningMode,
     ) -> CollectorThread {
-        let yaml_config = &config_handler.candidate_config.yaml_config;
+        let config = &config_handler.candidate_config.config;
 
-        let flowgen_tolerable_delay = Self::get_flowgen_tolerable_delay(yaml_config);
+        let flowgen_tolerable_delay = Self::get_flowgen_tolerable_delay(config);
         // minute QG window is also pushed forward by flow stat time,
         // therefore its delay should be 60 + second delay (including extra flow delay)
         let minute_quadruple_tolerable_delay = 60 + flowgen_tolerable_delay;
@@ -1583,7 +1615,11 @@ impl AgentComponents {
         let mut l4_log_sender_outer = None;
         if l4_flow_aggr_sender.is_some() {
             let (l4_log_sender, l4_log_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow.aggr_queue_size as usize,
+                config
+                    .processors
+                    .flow_log
+                    .tunning
+                    .flow_aggregator_queue_size,
                 "2-second-flow-to-minute-aggrer",
                 queue_debugger,
             );
@@ -1611,7 +1647,11 @@ impl AgentComponents {
         }
 
         let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.quadruple_queue_size,
+            config
+                .processors
+                .flow_log
+                .tunning
+                .quadruple_generator_queue_size,
             "2-flow-with-meter-to-second-collector",
             queue_debugger,
         );
@@ -1623,7 +1663,11 @@ impl AgentComponents {
             Countable::Owned(Box::new(counter)),
         );
         let (minute_sender, minute_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.quadruple_queue_size,
+            config
+                .processors
+                .flow_log
+                .tunning
+                .quadruple_generator_queue_size,
             "2-flow-with-meter-to-minute-collector",
             queue_debugger,
         );
@@ -1642,7 +1686,7 @@ impl AgentComponents {
             minute_sender,
             toa_info_sender,
             l4_log_sender_outer,
-            (yaml_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
+            (config.processors.flow_log.tunning.flow_map_hash_slots as usize) << 3, // connection_lru_capacity
             metrics_type,
             flowgen_tolerable_delay,
             minute_quadruple_tolerable_delay,
@@ -1699,10 +1743,14 @@ impl AgentComponents {
         synchronizer: &Arc<Synchronizer>,
         agent_mode: RunningMode,
     ) -> L7CollectorThread {
-        let yaml_config = &config_handler.candidate_config.yaml_config;
+        let runtime_config = &config_handler.candidate_config.config;
 
         let (l7_second_sender, l7_second_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.quadruple_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .quadruple_generator_queue_size,
             "2-flow-with-meter-to-l7-second-collector",
             queue_debugger,
         );
@@ -1714,7 +1762,11 @@ impl AgentComponents {
             Countable::Owned(Box::new(counter)),
         );
         let (l7_minute_sender, l7_minute_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.quadruple_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .quadruple_generator_queue_size,
             "2-flow-with-meter-to-l7-minute-collector",
             queue_debugger,
         );
@@ -1726,7 +1778,7 @@ impl AgentComponents {
             Countable::Owned(Box::new(counter)),
         );
 
-        let second_quadruple_tolerable_delay = Self::get_flowgen_tolerable_delay(yaml_config);
+        let second_quadruple_tolerable_delay = Self::get_flowgen_tolerable_delay(runtime_config);
         // minute QG window is also pushed forward by flow stat time,
         // therefore its delay should be 60 + second delay (including extra flow delay)
         let minute_quadruple_tolerable_delay = 60 + second_quadruple_tolerable_delay;
@@ -1794,23 +1846,29 @@ impl AgentComponents {
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
-        let yaml_config = &candidate_config.yaml_config;
+        let runtime_config = &candidate_config.config;
         let ctrl_ip = config_handler.ctrl_ip;
         let max_memory = config_handler.candidate_config.environment.max_memory;
         let process_threshold = config_handler
             .candidate_config
             .environment
             .process_threshold;
-        let feature_flags = FeatureFlags::from(&yaml_config.feature_flags);
+        let feature_flags = FeatureFlags::from(&runtime_config.dev.feature_flags);
 
-        if !yaml_config.src_interfaces.is_empty() {
+        if !runtime_config
+            .inputs
+            .cbpf
+            .af_packet
+            .src_interfaces
+            .is_empty()
+        {
             warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
         }
 
         info!("Start check process...");
         trident_process_check(process_threshold);
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if !yaml_config.check_core_file_disabled {
+        if !runtime_config.global.alerts.check_core_file_disabled {
             info!("Start check core file...");
             core_file_check();
         }
@@ -1830,7 +1888,7 @@ impl AgentComponents {
 
         #[cfg(target_os = "linux")]
         if candidate_config.dispatcher.extra_netns_regex != "" {
-            if candidate_config.tap_mode == TapMode::Local {
+            if candidate_config.capture_mode == PacketCaptureType::Local {
                 let re = regex::Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
                 let mut nss = netns::find_ns_files_by_regex(&re);
                 nss.sort_unstable();
@@ -1841,15 +1899,20 @@ impl AgentComponents {
                     }
                 }
             } else {
-                log::error!("When the TapMode is not Local, it does not support extra_netns_regex, other modes only support interfaces under the root network namespace");
+                log::error!("When the PacketCaptureType is not Local, it does not support extra_netns_regex, other modes only support interfaces under the root network namespace");
             }
         }
 
         #[cfg(target_os = "linux")]
-        let local_dispatcher_count = if candidate_config.tap_mode == TapMode::Local
+        let local_dispatcher_count = if candidate_config.capture_mode == PacketCaptureType::Local
             && candidate_config.dispatcher.extra_netns_regex == ""
         {
-            yaml_config.local_dispatcher_count
+            runtime_config
+                .inputs
+                .cbpf
+                .af_packet
+                .tunning
+                .packet_fanout_count
         } else {
             1
         };
@@ -1862,7 +1925,7 @@ impl AgentComponents {
             &netns::NsFile::Root,
         );
         if interfaces_and_ns.is_empty() && !links.is_empty() {
-            if candidate_config.tap_mode != TapMode::Local {
+            if candidate_config.capture_mode != PacketCaptureType::Local {
                 for l in links {
                     #[cfg(target_os = "linux")]
                     interfaces_and_ns.push((vec![l], netns::NsFile::Root));
@@ -1879,15 +1942,21 @@ impl AgentComponents {
             }
         }
         #[cfg(target_os = "linux")]
-        if candidate_config.tap_mode == TapMode::Mirror
-            && (!yaml_config.vhost_socket_path.is_empty()
+        if candidate_config.capture_mode == PacketCaptureType::Mirror
+            && (!runtime_config
+                .inputs
+                .cbpf
+                .special_network
+                .vhost_user
+                .vhost_socket_path
+                .is_empty()
                 || candidate_config.dispatcher.dpdk_enabled)
         {
             interfaces_and_ns = vec![(vec![], netns::NsFile::Root)];
         }
 
-        match candidate_config.tap_mode {
-            TapMode::Analyzer => {
+        match candidate_config.capture_mode {
+            PacketCaptureType::Analyzer => {
                 info!("Start check kernel...");
                 kernel_check();
                 info!("Start check tap interface...");
@@ -1907,7 +1976,7 @@ impl AgentComponents {
             _ => {
                 // NPF服务检查
                 // TODO: npf (only on windows)
-                if candidate_config.tap_mode == TapMode::Mirror {
+                if candidate_config.capture_mode == PacketCaptureType::Mirror {
                     info!("Start check kernel...");
                     kernel_check();
                 }
@@ -1920,15 +1989,21 @@ impl AgentComponents {
         // =================================================================================
         // 目前仅支持local-mode + ebpf-collector，ebpf-collector不适用fastpath, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
-            1.max(if candidate_config.tap_mode != TapMode::Local {
-                interfaces_and_ns.len()
-            } else {
-                1
-            }),
-            yaml_config.first_path_level as usize,
-            yaml_config.fast_path_map_size,
-            yaml_config.forward_capacity,
-            yaml_config.fast_path_disabled,
+            1.max(
+                if candidate_config.capture_mode != PacketCaptureType::Local {
+                    interfaces_and_ns.len()
+                } else {
+                    1
+                },
+            ),
+            runtime_config.processors.packet.policy.max_first_path_level,
+            runtime_config.processors.packet.policy.fast_path_map_size,
+            runtime_config
+                .processors
+                .packet
+                .policy
+                .forward_table_capacity,
+            runtime_config.processors.packet.policy.fast_path_disabled,
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);
@@ -1967,15 +2042,15 @@ impl AgentComponents {
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        //#[cfg(any(target_os = "linux", target_os = "android"))]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
-            yaml_config.toa_sender_queue_size,
+            runtime_config.processors.packet.toa.sender_queue_size,
             "1-socket-sync-toa-info-queue",
             &queue_debugger,
         );
         #[cfg(target_os = "windows")]
         let (toa_sender, _, _) = queue::bounded_with_debug(
-            yaml_config.toa_sender_queue_size,
+            runtime_config.processors.packet.toa.sender_queue_size,
             "1-socket-sync-toa-info-queue",
             &queue_debugger,
         );
@@ -1989,13 +2064,13 @@ impl AgentComponents {
             session.clone(),
             toa_recv,
             Arc::new(Mutex::new(Lru::with_capacity(
-                yaml_config.toa_lru_cache_size >> 5,
-                yaml_config.toa_lru_cache_size,
+                runtime_config.processors.packet.toa.cache_size >> 5,
+                runtime_config.processors.packet.toa.cache_size,
             ))),
         );
 
-        let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.tap_mode {
-            TapMode::Analyzer => None,
+        let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.capture_mode {
+            PacketCaptureType::Analyzer => None,
             _ => Some(
                 config_handler
                     .candidate_config
@@ -2004,7 +2079,7 @@ impl AgentComponents {
             ),
         }));
 
-        let tap_typer = Arc::new(TapTyper::new());
+        let tap_typer = Arc::new(CaptureNetworkTyper::new());
 
         // TODO: collector enabled
         let mut dispatcher_components = vec![];
@@ -2012,11 +2087,15 @@ impl AgentComponents {
         // Sender/Collector
         info!(
             "static analyzer ip: '{}' actual analyzer ip '{}'",
-            yaml_config.analyzer_ip, candidate_config.sender.dest_ip
+            runtime_config.global.communication.ingester_ip, candidate_config.sender.dest_ip
         );
         let l4_flow_aggr_queue_name = "3-flowlog-to-collector-sender";
         let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.flow_sender_queue_size as usize,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_generator_queue_size,
             l4_flow_aggr_queue_name,
             &queue_debugger,
         );
@@ -2038,7 +2117,11 @@ impl AgentComponents {
 
         let metrics_queue_name = "3-doc-to-collector-sender";
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.collector_sender_queue_size,
+            runtime_config
+                .outputs
+                .flow_metrics
+                .tunning
+                .sender_queue_size,
             metrics_queue_name,
             &queue_debugger,
         );
@@ -2060,7 +2143,7 @@ impl AgentComponents {
 
         let proto_log_queue_name = "2-protolog-to-collector-sender";
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.flow_sender_queue_size,
+            runtime_config.outputs.flow_log.tunning.collector_queue_size,
             proto_log_queue_name,
             &queue_debugger,
         );
@@ -2120,7 +2203,11 @@ impl AgentComponents {
         let pcap_batch_queue = "2-pcap-batch-to-sender";
         let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
             queue::bounded_with_debug(
-                yaml_config.pcap.queue_size as usize,
+                runtime_config
+                    .processors
+                    .packet
+                    .pcap_stream
+                    .receiver_queue_size,
                 pcap_batch_queue,
                 &queue_debugger,
             );
@@ -2146,7 +2233,11 @@ impl AgentComponents {
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
             queue::bounded_with_debug(
-                yaml_config.packet_sequence_queue_size,
+                runtime_config
+                    .processors
+                    .packet
+                    .tcp_header
+                    .sender_queue_size,
                 packet_sequence_queue_name,
                 &queue_debugger,
             );
@@ -2170,8 +2261,8 @@ impl AgentComponents {
 
         let bpf_builder = bpf::Builder {
             is_ipv6: ctrl_ip.is_ipv6(),
-            vxlan_flags: yaml_config.vxlan_flags,
-            npb_port: yaml_config.npb_port,
+            vxlan_flags: runtime_config.outputs.npb.custom_vxlan_flags,
+            npb_port: runtime_config.outputs.npb.target_port,
             controller_port: static_config.controller_port,
             controller_tls_port: static_config.controller_tls_port,
             proxy_controller_port: candidate_config.dispatcher.proxy_controller_port,
@@ -2234,7 +2325,7 @@ impl AgentComponents {
         let proc_event_queue_name = "1-proc-event-to-sender";
         #[allow(unused)]
         let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.ebpf_collector_queue_size,
+            runtime_config.inputs.ebpf.tunning.collector_queue_size,
             proc_event_queue_name,
             &queue_debugger,
         );
@@ -2256,7 +2347,7 @@ impl AgentComponents {
 
         let profile_queue_name = "1-profile-to-sender";
         let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.ebpf_collector_queue_size,
+            runtime_config.inputs.ebpf.tunning.collector_queue_size,
             profile_queue_name,
             &queue_debugger,
         );
@@ -2277,7 +2368,11 @@ impl AgentComponents {
         );
         let application_log_queue_name = "1-application-log-to-sender";
         let (application_log_sender, application_log_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_aggregator_queue_size,
             application_log_queue_name,
             &queue_debugger,
         );
@@ -2302,10 +2397,14 @@ impl AgentComponents {
         let mut ebpf_dispatcher_component = None;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled
-            && candidate_config.tap_mode != TapMode::Analyzer
+            && candidate_config.capture_mode != PacketCaptureType::Analyzer
         {
             let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
+                runtime_config
+                    .processors
+                    .flow_log
+                    .tunning
+                    .flow_generator_queue_size,
                 "1-l7-stats-to-quadruple-generator",
                 &queue_debugger,
             );
@@ -2317,7 +2416,11 @@ impl AgentComponents {
                 Countable::Owned(Box::new(counter)),
             );
             let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
+                runtime_config
+                    .processors
+                    .flow_log
+                    .tunning
+                    .flow_generator_queue_size,
                 "1-tagged-flow-to-app-protocol-logs",
                 &queue_debugger,
             );
@@ -2387,7 +2490,11 @@ impl AgentComponents {
 
         let otel_queue_name = "1-otel-to-sender";
         let (otel_sender, otel_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_aggregator_queue_size,
             otel_queue_name,
             &queue_debugger,
         );
@@ -2410,7 +2517,11 @@ impl AgentComponents {
         let otel_dispatcher_id = ebpf_dispatcher_id + 1;
 
         let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.flow_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_generator_queue_size,
             "1-l7-stats-to-quadruple-generator",
             &queue_debugger,
         );
@@ -2435,7 +2546,11 @@ impl AgentComponents {
 
         let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_aggregator_queue_size,
             prometheus_queue_name,
             &queue_debugger,
         );
@@ -2459,7 +2574,11 @@ impl AgentComponents {
 
         let telegraf_queue_name = "1-telegraf-to-sender";
         let (telegraf_sender, telegraf_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_aggregator_queue_size,
             telegraf_queue_name,
             &queue_debugger,
         );
@@ -2481,7 +2600,11 @@ impl AgentComponents {
 
         let compressed_otel_queue_name = "1-compressed-otel-to-sender";
         let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.external_metrics_sender_queue_size,
+            runtime_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_aggregator_queue_size,
             compressed_otel_queue_name,
             &queue_debugger,
         );
@@ -2516,20 +2639,32 @@ impl AgentComponents {
             candidate_config.platform.epc_id,
             policy_getter,
             synchronizer.ntp_diff(),
-            candidate_config.yaml_config.prometheus_extra_config.clone(),
+            runtime_config
+                .inputs
+                .integration
+                .prometheus_extra_labels
+                .clone(),
             candidate_config.log_parser.clone(),
-            candidate_config
-                .yaml_config
-                .external_profile_integration_disabled,
-            candidate_config
-                .yaml_config
-                .external_trace_integration_disabled,
-            candidate_config
-                .yaml_config
-                .external_metric_integration_disabled,
-            candidate_config
-                .yaml_config
-                .external_log_integration_disabled,
+            runtime_config
+                .inputs
+                .integration
+                .feature_control
+                .profile_integration_disabled,
+            runtime_config
+                .inputs
+                .integration
+                .feature_control
+                .trace_integration_disabled,
+            runtime_config
+                .inputs
+                .integration
+                .feature_control
+                .metric_integration_disabled,
+            runtime_config
+                .inputs
+                .integration
+                .feature_control
+                .log_integration_disabled,
         );
 
         stats_collector.register_countable(
@@ -2581,7 +2716,7 @@ impl AgentComponents {
             profile_uniform_sender,
             proc_event_uniform_sender,
             application_log_uniform_sender,
-            tap_mode: candidate_config.tap_mode,
+            capture_mode: candidate_config.capture_mode,
             packet_sequence_uniform_output, // Enterprise Edition Feature: packet-sequence
             packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
             npb_bps_limit,
@@ -2622,7 +2757,7 @@ impl AgentComponents {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         self.socket_synchronizer.start();
         #[cfg(target_os = "linux")]
-        if crate::utils::environment::is_tt_pod(self.config.trident_type) {
+        if crate::utils::environment::is_tt_pod(self.config.agent_type) {
             self.kubernetes_poller.start();
         }
         self.debugger.start();
@@ -2633,9 +2768,9 @@ impl AgentComponents {
         // Enterprise Edition Feature: packet-sequence
         self.packet_sequence_uniform_sender.start();
 
-        // When tap_mode is Analyzer mode and agent is not running in container and agent
+        // When capture_mode is Analyzer mode and agent is not running in container and agent
         // in the environment where cgroup is not supported, we need to check free memory
-        if self.tap_mode != TapMode::Analyzer
+        if self.capture_mode != PacketCaptureType::Analyzer
             && !running_in_container()
             && !is_kernel_available_for_cgroups()
         {
@@ -2832,7 +2967,7 @@ impl Components {
 
 fn build_pcap_assembler(
     enabled: bool,
-    config: &PcapConfig,
+    config: &PcapStream,
     stats_collector: &stats::Collector,
     pcap_batch_sender: DebugSender<BoxedPcapBatch>,
     queue_debugger: &QueueDebugger,
@@ -2841,15 +2976,15 @@ fn build_pcap_assembler(
 ) -> (PcapAssembler, DebugSender<MiniPacket>) {
     let mini_packet_queue = "1-mini-meta-packet-to-pcap-handler";
     let (mini_packet_sender, mini_packet_receiver, mini_packet_counter) = queue::bounded_with_debug(
-        config.queue_size as usize,
+        config.receiver_queue_size,
         mini_packet_queue,
         &queue_debugger,
     );
     let pcap_assembler = PcapAssembler::new(
         id as u32,
         enabled,
-        config.buffer_size,
-        config.flow_buffer_size,
+        config.total_buffer_size,
+        config.buffer_size_per_flow,
         config.flush_interval,
         pcap_batch_sender,
         mini_packet_receiver,
@@ -2886,7 +3021,7 @@ fn build_dispatchers(
     packet_sequence_uniform_output: DebugSender<BoxedPacketSequenceBlock>,
     proto_log_sender: DebugSender<BoxAppProtoLogsData>,
     pcap_batch_sender: DebugSender<BoxedPcapBatch>,
-    tap_typer: Arc<TapTyper>,
+    tap_typer: Arc<CaptureNetworkTyper>,
     vm_mac_addrs: Vec<MacAddr>,
     gateway_vmac_addrs: Vec<MacAddr>,
     toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
@@ -2897,7 +3032,7 @@ fn build_dispatchers(
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
 ) -> Result<DispatcherComponent> {
     let candidate_config = &config_handler.candidate_config;
-    let yaml_config = &candidate_config.yaml_config;
+    let runtime_config = &candidate_config.config;
     let dispatcher_config = &candidate_config.dispatcher;
     let static_config = &config_handler.static_config;
     let agent_mode = static_config.agent_mode;
@@ -2906,7 +3041,11 @@ fn build_dispatchers(
     let src_link = links.get(0).map(|l| l.to_owned()).unwrap_or_default();
 
     let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
-        yaml_config.flow_queue_size,
+        runtime_config
+            .processors
+            .flow_log
+            .tunning
+            .flow_generator_queue_size,
         "1-tagged-flow-to-quadruple-generator",
         &queue_debugger,
     );
@@ -2919,7 +3058,11 @@ fn build_dispatchers(
     );
 
     let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
-        yaml_config.flow_queue_size,
+        runtime_config
+            .processors
+            .flow_log
+            .tunning
+            .flow_generator_queue_size,
         "1-l7-stats-to-quadruple-generator",
         &queue_debugger,
     );
@@ -2933,7 +3076,11 @@ fn build_dispatchers(
 
     // create and start app proto logs
     let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
-        yaml_config.flow_queue_size,
+        runtime_config
+            .processors
+            .flow_log
+            .tunning
+            .flow_generator_queue_size,
         "1-tagged-flow-to-app-protocol-logs",
         &queue_debugger,
     );
@@ -2960,7 +3107,11 @@ fn build_dispatchers(
     // Enterprise Edition Feature: packet-sequence
     // create and start packet sequence
     let (packet_sequence_sender, packet_sequence_receiver, counter) = queue::bounded_with_debug(
-        yaml_config.packet_sequence_queue_size,
+        runtime_config
+            .processors
+            .packet
+            .tcp_header
+            .sender_queue_size,
         "1-packet-sequence-block-to-parser",
         &queue_debugger,
     );
@@ -2979,7 +3130,7 @@ fn build_dispatchers(
     );
     let (pcap_assembler, mini_packet_sender) = build_pcap_assembler(
         is_ce_version,
-        &yaml_config.pcap,
+        &runtime_config.processors.packet.pcap_stream,
         &stats_collector,
         pcap_batch_sender.clone(),
         &queue_debugger,
@@ -2999,12 +3150,19 @@ fn build_dispatchers(
         )),
     ]));
 
-    let pcap_interfaces =
-        if candidate_config.tap_mode == TapMode::Mirror && yaml_config.dpdk_enabled {
-            vec![]
-        } else {
-            links.clone()
-        };
+    let pcap_interfaces = if candidate_config.capture_mode == PacketCaptureType::Mirror
+        && candidate_config
+            .config
+            .inputs
+            .cbpf
+            .special_network
+            .dpdk
+            .enabled
+    {
+        vec![]
+    } else {
+        links.clone()
+    };
 
     let dispatcher_builder = DispatcherBuilder::new()
         .id(id)
@@ -3016,32 +3174,58 @@ fn build_dispatchers(
             #[cfg(any(target_os = "linux", target_os = "android"))]
             af_packet_version: dispatcher_config.af_packet_version,
             packet_blocks: dispatcher_config.af_packet_blocks,
-            tap_mode: candidate_config.tap_mode,
-            tap_mac_script: yaml_config.tap_mac_script.clone(),
+            capture_mode: candidate_config.capture_mode,
+            tap_mac_script: runtime_config
+                .inputs
+                .resources
+                .private_cloud
+                .vm_mac_mapping_script
+                .clone(),
             is_ipv6: ctrl_ip.is_ipv6(),
-            npb_port: yaml_config.npb_port,
-            vxlan_flags: yaml_config.vxlan_flags,
+            npb_port: runtime_config.outputs.npb.target_port,
+            vxlan_flags: runtime_config.outputs.npb.custom_vxlan_flags,
             controller_port: static_config.controller_port,
             controller_tls_port: static_config.controller_tls_port,
-            libpcap_enabled: yaml_config.libpcap_enabled,
+            libpcap_enabled: runtime_config.inputs.cbpf.special_network.libpcap.enabled,
             snap_len: dispatcher_config.capture_packet_size as usize,
             dpdk_enabled: dispatcher_config.dpdk_enabled,
             dispatcher_queue: dispatcher_config.dispatcher_queue,
-            packet_fanout_mode: yaml_config.packet_fanout_mode,
-            vhost_socket_path: yaml_config.vhost_socket_path.clone(),
+            packet_fanout_mode: runtime_config
+                .inputs
+                .cbpf
+                .af_packet
+                .tunning
+                .packet_fanout_mode,
+            vhost_socket_path: runtime_config
+                .inputs
+                .cbpf
+                .special_network
+                .vhost_user
+                .vhost_socket_path
+                .clone(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             cpu_set: dispatcher_config.cpu_set,
             ..Default::default()
         })))
         .bpf_options(bpf_options)
         .default_tap_type(
-            (yaml_config.default_tap_type as u16)
+            (runtime_config
+                .inputs
+                .cbpf
+                .physical_mirror
+                .default_capture_network_type)
                 .try_into()
-                .unwrap_or(TapType::Cloud),
+                .unwrap_or(CaptureNetworkType::Cloud),
         )
-        .mirror_traffic_pcp(yaml_config.mirror_traffic_pcp)
+        .mirror_traffic_pcp(
+            runtime_config
+                .inputs
+                .cbpf
+                .af_packet
+                .vlan_pcp_in_physical_mirror_traffic,
+        )
         .tap_typer(tap_typer.clone())
-        .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
+        .analyzer_dedup_disabled(runtime_config.inputs.cbpf.tunning.dispatcher_queue_enabled)
         .flow_output_queue(flow_sender.clone())
         .l7_stats_output_queue(l7_stats_sender.clone())
         .log_output_queue(log_sender.clone())
@@ -3053,18 +3237,26 @@ fn build_dispatchers(
         .policy_getter(policy_getter)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())
-        .src_interface(if candidate_config.tap_mode != TapMode::Local {
-            src_link.name.clone()
-        } else {
-            "".into()
-        })
-        .trident_type(dispatcher_config.trident_type)
+        .src_interface(
+            if candidate_config.capture_mode != PacketCaptureType::Local {
+                src_link.name.clone()
+            } else {
+                "".into()
+            },
+        )
+        .agent_type(dispatcher_config.agent_type)
         .queue_debugger(queue_debugger.clone())
-        .analyzer_queue_size(yaml_config.analyzer_queue_size as usize)
+        .analyzer_queue_size(runtime_config.inputs.cbpf.tunning.raw_packet_queue_size)
         .pcap_interfaces(pcap_interfaces.clone())
         .tunnel_type_trim_bitmap(dispatcher_config.tunnel_type_trim_bitmap)
         .bond_group(dispatcher_config.bond_group.clone())
-        .analyzer_raw_packet_block_size(yaml_config.analyzer_raw_packet_block_size as usize);
+        .analyzer_raw_packet_block_size(
+            runtime_config
+                .inputs
+                .cbpf
+                .tunning
+                .raw_packet_buffer_block_size,
+        );
     #[cfg(target_os = "linux")]
     let dispatcher_builder = dispatcher_builder
         .netns(netns)
@@ -3086,7 +3278,7 @@ fn build_dispatchers(
     dispatcher_listener.on_tap_interface_change(
         &links,
         dispatcher_config.if_mac_source,
-        dispatcher_config.trident_type,
+        dispatcher_config.agent_type,
         &vec![],
     );
     dispatcher_listener.on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);

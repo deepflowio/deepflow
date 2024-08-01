@@ -40,7 +40,7 @@ use crate::exception::ExceptionHandler;
 use crate::utils::stats::{
     self, Collector, Countable, Counter, CounterType, CounterValue, RefCountable,
 };
-use public::proto::trident::{Exception, SocketType};
+use public::proto::agent::{Exception, SocketType};
 use public::queue::{Error, Receiver};
 
 const PRE_FILE_SUFFIX: &str = ".pre";
@@ -179,18 +179,18 @@ impl<T: Sendable> Encoder<T> {
 
     pub fn update_header(&mut self, name: &str, id: usize, config: &SenderAccess) {
         let config = config.load();
-        if self.header.agent_id != config.vtap_id
+        if self.header.agent_id != config.agent_id
             || self.header.team_id != config.team_id
             || self.header.organization_id != config.organize_id as u16
         {
             info!(
                 "{} id {} update agent id from {:?} to {:?}, team id from {:?} to {:?}, organization id from {:?} to {:?}.",
                 name, id,
-                self.header.agent_id, config.vtap_id,
+                self.header.agent_id, config.agent_id,
                 self.header.team_id, config.team_id,
                 self.header.organization_id, config.organize_id,
             );
-            self.header.agent_id = config.vtap_id;
+            self.header.agent_id = config.agent_id;
             self.header.team_id = config.team_id;
             self.header.organization_id = config.organize_id as u16;
         }
@@ -388,7 +388,7 @@ impl<T: Sendable> UniformSender<T> {
             name,
             input,
             counter: Arc::new(SenderCounter::default()),
-            encoder: Encoder::new(0, SendMessageType::TaggedFlow, cfg.vtap_id),
+            encoder: Encoder::new(0, SendMessageType::TaggedFlow, cfg.agent_id),
             config,
             private_conn: Mutex::new(Connection::new()),
             private_shared_conn,

@@ -47,7 +47,7 @@ use special_recv_engine::Libpcap;
 use special_recv_engine::{Dpdk, VhostUser};
 
 use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
-use base_dispatcher::{BaseDispatcher, TapTypeHandler};
+use base_dispatcher::{BaseDispatcher, CaptureNetworkTypeHandler};
 use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use local_plus_mode_dispatcher::{LocalPlusModeDispatcher, LocalPlusModeDispatcherListener};
@@ -68,7 +68,8 @@ use crate::common::decapsulate::TunnelTypeBitmap;
 use crate::platform::LibvirtXmlExtractor;
 use crate::{
     common::{
-        enums::TapType, flow::L7Stats, FlowAclListener, FlowAclListenerId, TaggedFlow, TapTyper,
+        enums::CaptureNetworkType, flow::L7Stats, CaptureNetworkTyper, FlowAclListener,
+        FlowAclListenerId, TaggedFlow,
     },
     config::{
         handler::{CollectorAccess, FlowAccess, LogParserAccess},
@@ -88,10 +89,7 @@ use crate::{
 use public::netns::NsFile;
 use public::{
     buffer::{BatchedBox, BatchedBuffer},
-    proto::{
-        common::TridentType,
-        trident::{IfMacSource, TapMode},
-    },
+    proto::agent::{AgentType, IfMacSource, PacketCaptureType},
     queue::DebugSender,
     utils::net::{Link, MacAddr},
     LeakyBucket,
@@ -229,7 +227,7 @@ pub enum DispatcherListener {
 impl FlowAclListener for DispatcherListener {
     fn flow_acl_change(
         &mut self,
-        _: TridentType,
+        _: AgentType,
         _: i32,
         _: &Vec<Arc<crate::_IpGroupData>>,
         _: &Vec<Arc<crate::_PlatformData>>,
@@ -311,25 +309,25 @@ impl DispatcherListener {
         &self,
         interfaces: &[Link],
         if_mac_source: IfMacSource,
-        trident_type: TridentType,
+        agent_type: AgentType,
         blacklist: &Vec<u64>,
     ) {
         match self {
             Self::LocalPlus(l) => {
-                l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
+                l.on_tap_interface_change(interfaces, if_mac_source, agent_type, blacklist)
             }
             Self::Local(l) => {
-                l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
+                l.on_tap_interface_change(interfaces, if_mac_source, agent_type, blacklist)
             }
             // Enterprise Edition Feature: analyzer_mode
             Self::Analyzer(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source);
             }
             Self::Mirror(l) => {
-                l.on_tap_interface_change(interfaces, if_mac_source, trident_type);
+                l.on_tap_interface_change(interfaces, if_mac_source, agent_type);
             }
             Self::MirrorPlus(l) => {
-                l.on_tap_interface_change(interfaces, if_mac_source, trident_type);
+                l.on_tap_interface_change(interfaces, if_mac_source, agent_type);
             }
         }
     }
@@ -555,7 +553,7 @@ pub struct Options {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub af_packet_version: OptTpacketVersion,
     pub snap_len: usize,
-    pub tap_mode: TapMode,
+    pub capture_mode: PacketCaptureType,
     pub dpdk_enabled: bool,
     pub libpcap_enabled: bool,
     pub dispatcher_queue: bool,
@@ -684,9 +682,9 @@ pub struct DispatcherBuilder {
     options: Option<Arc<Mutex<Options>>>,
     handler_builders: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     bpf_options: Option<Arc<Mutex<BpfOptions>>>,
-    default_tap_type: Option<TapType>,
+    default_tap_type: Option<CaptureNetworkType>,
     mirror_traffic_pcp: Option<u16>,
-    tap_typer: Option<Arc<TapTyper>>,
+    tap_typer: Option<Arc<CaptureNetworkTyper>>,
     analyzer_dedup_disabled: Option<bool>,
     #[cfg(target_os = "linux")]
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
@@ -707,7 +705,7 @@ pub struct DispatcherBuilder {
     pcap_interfaces: Option<Vec<Link>>,
     #[cfg(target_os = "linux")]
     netns: Option<NsFile>,
-    trident_type: Option<TridentType>,
+    agent_type: Option<AgentType>,
     queue_debugger: Option<Arc<QueueDebugger>>,
     analyzer_queue_size: Option<usize>,
     analyzer_raw_packet_block_size: Option<usize>,
@@ -760,7 +758,7 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn default_tap_type(mut self, v: TapType) -> Self {
+    pub fn default_tap_type(mut self, v: CaptureNetworkType) -> Self {
         self.default_tap_type = Some(v);
         self
     }
@@ -770,7 +768,7 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn tap_typer(mut self, v: Arc<TapTyper>) -> Self {
+    pub fn tap_typer(mut self, v: Arc<CaptureNetworkTyper>) -> Self {
         self.tap_typer = Some(v);
         self
     }
@@ -856,8 +854,8 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn trident_type(mut self, v: TridentType) -> Self {
-        self.trident_type = Some(v);
+    pub fn agent_type(mut self, v: AgentType) -> Self {
+        self.agent_type = Some(v);
         self
     }
 
@@ -895,7 +893,7 @@ impl DispatcherBuilder {
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
-        let tap_mode = options.lock().unwrap().tap_mode;
+        let capture_mode = options.lock().unwrap().capture_mode;
         let snap_len = options.lock().unwrap().snap_len;
         let queue_debugger = self
             .queue_debugger
@@ -904,7 +902,7 @@ impl DispatcherBuilder {
         let engine = Self::get_engine(
             &self.pcap_interfaces,
             &mut self.src_interface,
-            tap_mode,
+            capture_mode,
             &options,
             &queue_debugger,
         )?;
@@ -916,7 +914,7 @@ impl DispatcherBuilder {
         let collector = self
             .stats_collector
             .ok_or(Error::StatsCollector("no stats collector"))?;
-        let src_interface = if tap_mode == TapMode::Local {
+        let src_interface = if capture_mode == PacketCaptureType::Local {
             "".to_string()
         } else {
             self.src_interface.unwrap_or("".to_string())
@@ -983,7 +981,7 @@ impl DispatcherBuilder {
             tunnel_type_bitmap: Default::default(),
             tunnel_info: Default::default(),
 
-            tap_type_handler: TapTypeHandler {
+            tap_type_handler: CaptureNetworkTypeHandler {
                 tap_typer: self
                     .tap_typer
                     .ok_or(Error::ConfigIncomplete("no tap_typer".into()))?,
@@ -993,7 +991,7 @@ impl DispatcherBuilder {
                 mirror_traffic_pcp: self
                     .mirror_traffic_pcp
                     .ok_or(Error::ConfigIncomplete("no mirror_traffic_pcp".into()))?,
-                tap_mode,
+                capture_mode,
             },
 
             need_update_bpf: Arc::new(AtomicBool::new(true)),
@@ -1065,8 +1063,8 @@ impl DispatcherBuilder {
             &stats::SingleTagModule("dispatcher", "id", base.id),
             stats::Countable::Ref(Arc::downgrade(&stat_counter) as Weak<dyn stats::RefCountable>),
         );
-        let mut dispatcher = match tap_mode {
-            TapMode::Local => {
+        let mut dispatcher = match capture_mode {
+            PacketCaptureType::Local => {
                 #[cfg(target_os = "linux")]
                 let extractor = self
                     .libvirt_xml_extractor
@@ -1097,7 +1095,7 @@ impl DispatcherBuilder {
                     })
                 }
             }
-            TapMode::Mirror => {
+            PacketCaptureType::Mirror => {
                 if dispatcher_queue {
                     DispatcherFlavor::MirrorPlus(MirrorPlusModeDispatcher {
                         base,
@@ -1107,9 +1105,9 @@ impl DispatcherBuilder {
                         #[cfg(target_os = "linux")]
                         poller: Some(platform_poller),
                         updated: Arc::new(AtomicBool::new(false)),
-                        trident_type: Arc::new(RwLock::new(
-                            self.trident_type
-                                .ok_or(Error::ConfigIncomplete("no trident_type".into()))?,
+                        agent_type: Arc::new(RwLock::new(
+                            self.agent_type
+                                .ok_or(Error::ConfigIncomplete("no agent_type".into()))?,
                         )),
                         mac: get_mac_by_name(src_interface),
                         flow_generator_thread_handler: None,
@@ -1134,16 +1132,16 @@ impl DispatcherBuilder {
                         #[cfg(target_os = "linux")]
                         poller: Some(platform_poller),
                         updated: Arc::new(AtomicBool::new(false)),
-                        trident_type: Arc::new(RwLock::new(
-                            self.trident_type
-                                .ok_or(Error::ConfigIncomplete("no trident_type".into()))?,
+                        agent_type: Arc::new(RwLock::new(
+                            self.agent_type
+                                .ok_or(Error::ConfigIncomplete("no agent_type".into()))?,
                         )),
                         mac: get_mac_by_name(src_interface),
                         last_timestamp_array: vec![],
                     })
                 }
             }
-            TapMode::Analyzer => {
+            PacketCaptureType::Analyzer => {
                 #[cfg(target_os = "linux")]
                 {
                     base.bpf_options
@@ -1193,8 +1191,8 @@ impl DispatcherBuilder {
             }
             _ => {
                 return Err(Error::ConfigInvalid(format!(
-                    "invalid tap mode {:?}",
-                    &base.options.lock().unwrap().tap_mode
+                    "invalid capture mode {:?}",
+                    &base.options.lock().unwrap().capture_mode
                 )))
             }
         };
@@ -1213,20 +1211,20 @@ impl DispatcherBuilder {
     fn get_engine(
         pcap_interfaces: &Option<Vec<Link>>,
         src_interface: &mut Option<String>,
-        tap_mode: TapMode,
+        capture_mode: PacketCaptureType,
         options: &Arc<Mutex<Options>>,
         queue_debugger: &Arc<QueueDebugger>,
     ) -> Result<RecvEngine> {
         let options = options.lock().unwrap();
-        match tap_mode {
+        match capture_mode {
             #[cfg(target_os = "linux")]
-            TapMode::Mirror if !options.vhost_socket_path.is_empty() => {
+            PacketCaptureType::Mirror if !options.vhost_socket_path.is_empty() => {
                 Ok(RecvEngine::VhostUser(VhostUser::new(
                     options.vhost_socket_path.clone(),
                     options.vhost_queue_size(),
                 )))
             }
-            TapMode::Mirror | TapMode::Local if options.libpcap_enabled => {
+            PacketCaptureType::Mirror | PacketCaptureType::Local if options.libpcap_enabled => {
                 #[cfg(target_os = "windows")]
                 let src_ifaces = pcap_interfaces
                     .as_ref()
@@ -1255,7 +1253,7 @@ impl DispatcherBuilder {
                 Ok(RecvEngine::Libpcap(Some(libpcap)))
             }
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            TapMode::Mirror if options.dpdk_enabled => {
+            PacketCaptureType::Mirror if options.dpdk_enabled => {
                 #[cfg(target_arch = "s390x")]
                 return Err(Error::ConfigInvalid(
                     "cpu arch s390x does not support DPDK!".into(),
@@ -1266,9 +1264,9 @@ impl DispatcherBuilder {
                 }
             }
             #[cfg(any(target_os = "linux", target_os = "android"))]
-            TapMode::Local | TapMode::Mirror | TapMode::Analyzer => {
+            PacketCaptureType::Local | PacketCaptureType::Mirror | PacketCaptureType::Analyzer => {
                 let afp = af_packet::Options {
-                    frame_size: if options.tap_mode == TapMode::Analyzer {
+                    frame_size: if options.capture_mode == PacketCaptureType::Analyzer {
                         FRAME_SIZE_MIN as u32
                     } else {
                         FRAME_SIZE_MAX as u32
@@ -1278,7 +1276,7 @@ impl DispatcherBuilder {
                     poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
                     version: options.af_packet_version,
                     iface: src_interface.as_ref().unwrap_or(&"".to_string()).clone(),
-                    packet_fanout_mode: if options.tap_mode == TapMode::Local {
+                    packet_fanout_mode: if options.capture_mode == PacketCaptureType::Local {
                         Some(options.packet_fanout_mode)
                     } else {
                         None

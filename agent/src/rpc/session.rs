@@ -33,10 +33,9 @@ use crate::{
     utils::stats::{self, AtomicTimeStats},
 };
 use grpc::dial as grpc_dial;
-use public::proto::trident::{self, Exception, Status};
 use public::{
     counter::{Countable, Counter, CounterType, CounterValue, RefCountable},
-    proto::trident::PluginType,
+    proto::agent::{self, Exception, PluginType, Status},
 };
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -157,7 +156,7 @@ macro_rules! sync_grpc_call {
                 return Err(tonic::Status::cancelled("grpc client not connected"));
             }
         };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+        let mut client = agent::synchronizer_client::SynchronizerClient::new(client);
 
         let request_len = $request.encoded_len();
         let now = Instant::now();
@@ -292,17 +291,16 @@ impl Session {
 
     pub async fn grpc_push_with_statsd(
         &self,
-        request: trident::SyncRequest,
-    ) -> Result<tonic::Response<tonic::codec::Streaming<trident::SyncResponse>>, tonic::Status>
-    {
+        request: agent::SyncRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<agent::SyncResponse>>, tonic::Status> {
         sync_grpc_call!(self, push, request, PUSH_ENDPOINT)
     }
 
     async fn grpc_sync_inner(
         &self,
-        request: trident::SyncRequest,
+        request: agent::SyncRequest,
         with_statsd: bool,
-    ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<agent::SyncResponse>, tonic::Status> {
         log::trace!("grpc sync prepare client");
         self.update_current_server().await;
         let client = match self.get_client() {
@@ -312,7 +310,7 @@ impl Session {
                 return Err(tonic::Status::cancelled("grpc client not connected"));
             }
         };
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+        let mut client = agent::synchronizer_client::SynchronizerClient::new(client);
 
         if !with_statsd {
             log::trace!("grpc sync send request");
@@ -334,45 +332,45 @@ impl Session {
     // Not recommended, only used by debugger
     pub async fn grpc_sync(
         &self,
-        request: trident::SyncRequest,
-    ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
+        request: agent::SyncRequest,
+    ) -> Result<tonic::Response<agent::SyncResponse>, tonic::Status> {
         self.grpc_sync_inner(request, false).await
     }
 
     pub async fn grpc_sync_with_statsd(
         &self,
-        request: trident::SyncRequest,
-    ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
+        request: agent::SyncRequest,
+    ) -> Result<tonic::Response<agent::SyncResponse>, tonic::Status> {
         self.grpc_sync_inner(request, true).await
     }
 
     pub async fn grpc_upgrade_with_statsd(
         &self,
-        request: trident::UpgradeRequest,
-    ) -> Result<tonic::Response<tonic::codec::Streaming<trident::UpgradeResponse>>, tonic::Status>
+        request: agent::UpgradeRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<agent::UpgradeResponse>>, tonic::Status>
     {
         sync_grpc_call!(self, upgrade, request, UPGRADE_ENDPOINT)
     }
 
     pub async fn grpc_ntp_with_statsd(
         &self,
-        request: trident::NtpRequest,
-    ) -> Result<tonic::Response<trident::NtpResponse>, tonic::Status> {
+        request: agent::NtpRequest,
+    ) -> Result<tonic::Response<agent::NtpResponse>, tonic::Status> {
         // Ntp rpc name is `query`
         sync_grpc_call!(self, query, request, NTP_ENDPOINT)
     }
 
     pub async fn grpc_genesis_sync_with_statsd(
         &self,
-        request: trident::GenesisSyncRequest,
-    ) -> Result<tonic::Response<trident::GenesisSyncResponse>, tonic::Status> {
+        request: agent::GenesisSyncRequest,
+    ) -> Result<tonic::Response<agent::GenesisSyncResponse>, tonic::Status> {
         sync_grpc_call!(self, genesis_sync, request, GENESIS_SYNC_ENDPOINT)
     }
 
     pub async fn grpc_kubernetes_api_sync_with_statsd(
         &self,
-        request: trident::KubernetesApiSyncRequest,
-    ) -> Result<tonic::Response<trident::KubernetesApiSyncResponse>, tonic::Status> {
+        request: agent::KubernetesApiSyncRequest,
+    ) -> Result<tonic::Response<agent::KubernetesApiSyncResponse>, tonic::Status> {
         sync_grpc_call!(
             self,
             kubernetes_api_sync,
@@ -383,8 +381,8 @@ impl Session {
 
     pub async fn grpc_get_kubernetes_cluster_id_with_statsd(
         &self,
-        request: trident::KubernetesClusterIdRequest,
-    ) -> Result<tonic::Response<trident::KubernetesClusterIdResponse>, tonic::Status> {
+        request: agent::KubernetesClusterIdRequest,
+    ) -> Result<tonic::Response<agent::KubernetesClusterIdResponse>, tonic::Status> {
         sync_grpc_call!(
             self,
             get_kubernetes_cluster_id,
@@ -395,15 +393,15 @@ impl Session {
 
     pub async fn gpid_sync(
         &self,
-        request: trident::GpidSyncRequest,
-    ) -> Result<tonic::Response<trident::GpidSyncResponse>, tonic::Status> {
+        request: agent::GpidSyncRequest,
+    ) -> Result<tonic::Response<agent::GpidSyncResponse>, tonic::Status> {
         sync_grpc_call!(self, gpid_sync, request, GPID_SYNC_ENDPOINT)
     }
 
     pub async fn plugin(
         &self,
-        request: trident::PluginRequest,
-    ) -> Result<tonic::Response<tonic::codec::Streaming<trident::PluginResponse>>, tonic::Status>
+        request: agent::PluginRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<agent::PluginResponse>>, tonic::Status>
     {
         sync_grpc_call!(self, plugin, request, PLUGIN_ENDPOINT)
     }
@@ -415,7 +413,7 @@ impl Session {
         agent_id: &AgentId,
     ) -> Result<Vec<u8>> {
         let s = self
-            .plugin(trident::PluginRequest {
+            .plugin(agent::PluginRequest {
                 ctrl_ip: Some(agent_id.ip.to_string()),
                 ctrl_mac: Some(agent_id.mac.to_string()),
                 plugin_type: Some(plugin_type as i32),

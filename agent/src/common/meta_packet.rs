@@ -33,7 +33,7 @@ use pnet::packet::{
 
 use super::ebpf::EbpfType;
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use super::enums::TapType;
+use super::enums::CaptureNetworkType;
 use super::{
     consts::*,
     decapsulate::TunnelInfo,
@@ -1017,7 +1017,7 @@ impl<'a> MetaPacket<'a> {
             l2_end_0: data.direction == SOCK_DIR_SND,
             l2_end_1: data.direction == SOCK_DIR_RCV,
             proto: IpProtocol::try_from(data.tuple.protocol)?,
-            tap_type: TapType::Cloud,
+            tap_type: CaptureNetworkType::Cloud,
             ..Default::default()
         };
 

@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn encode() {
         let mut tflow = TaggedFlow::default();
-        tflow.flow.flow_key.vtap_id = 5;
+        tflow.flow.flow_key.agent_id = 5;
         tflow.flow.flow_metrics_peers[1].byte_count = 6;
         tflow.flow.tunnel.tunnel_type = TunnelType::Vxlan;
         tflow.flow.flow_id = 8;

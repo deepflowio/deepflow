@@ -35,7 +35,7 @@ use crate::{
     utils::lru::Lru,
 };
 use public::{
-    proto::trident::{GpidSyncRequest, GpidSyncResponse},
+    proto::agent::{GpidSyncRequest, GpidSyncResponse},
     queue::Receiver,
 };
 
@@ -70,7 +70,7 @@ impl SocketSynchronizer {
         // toa info cache, Lru<LocalAddr, RealAddr>
         lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
     ) -> Self {
-        if process_info_enabled(config.load().trident_type) {
+        if process_info_enabled(config.load().agent_type) {
             let lru_toa_info_clone = lru_toa_info.clone();
             thread::Builder::new()
                 .name("socket-synchronizer-toa-recv".to_string())
@@ -95,7 +95,7 @@ impl SocketSynchronizer {
 
     pub fn start(&mut self) {
         let conf_guard = self.config.load();
-        if !process_info_enabled(conf_guard.trident_type) {
+        if !process_info_enabled(conf_guard.agent_type) {
             return;
         }
 
@@ -229,7 +229,7 @@ impl SocketSynchronizer {
                         ctrl_ip: Some(ctrl_ip),
                         ctrl_mac: Some(ctrl_mac),
                         team_id: Some(team_id),
-                        vtap_id: Some(conf_guard.vtap_id as u32),
+                        agent_id: Some(conf_guard.agent_id as u32),
                         entries: sock_entries
                             .into_iter()
                             .filter_map(|sock| {
@@ -273,7 +273,7 @@ impl SocketSynchronizer {
 
     pub fn stop(&mut self) {
         let conf_guard = self.config.load();
-        if !process_info_enabled(conf_guard.trident_type) {
+        if !process_info_enabled(conf_guard.agent_type) {
             return;
         }
 
@@ -305,10 +305,10 @@ impl SocketSynchronizer {
 }
 
 mod config {
-    use public::proto::common;
+    use public::proto::agent;
     pub struct StaticConfig;
     impl StaticConfig {
-        pub fn get_trident_type(&self) -> common::TridentType {
+        pub fn get_agent_type(&self) -> agent::AgentType {
             todo!()
         }
 

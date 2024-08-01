@@ -29,7 +29,7 @@ use log::{debug, error};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
-use public::proto::trident::{ProcessInfo, Tag};
+use public::proto::agent::{ProcessInfo, Tag};
 use public::pwd::PasswordInfo;
 use regex::Regex;
 use ring::digest;
@@ -40,7 +40,7 @@ use super::proc_scan_hook::proc_scan_hook;
 
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
-    OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
+    ProcessMatcher, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
     OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
@@ -241,10 +241,10 @@ impl PartialEq for ProcRegRewrite {
 
 impl Eq for ProcRegRewrite {}
 
-impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
+impl TryFrom<&ProcessMatcher> for ProcRegRewrite {
     type Error = regex::Error;
 
-    fn try_from(value: &OsProcRegexp) -> Result<Self, Self::Error> {
+    fn try_from(value: &ProcessMatcher) -> Result<Self, Self::Error> {
         let re = Regex::new(value.match_regex.as_str())?;
         let action = match value.action.as_str() {
             "" | OS_PROC_REGEXP_MATCH_ACTION_ACCEPT => RegExpAction::Accept,
