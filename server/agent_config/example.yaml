@@ -649,6 +649,11 @@ static_config:
   #   sent when this feature is enabled cannot be captured by tcpdump.
   enable-qos-bypass: false
 
+  # Multiple Sockets To Ingester
+  # Note: When set to true, deepflow-agent will send data with multiple sockets to Ingester,
+  #   which has higher performance, but will bring more impact to the firewall.
+  multiple-sockets-to-ingester: false
+
   #####################
   ## NPB/PCAP Policy ##
   #####################

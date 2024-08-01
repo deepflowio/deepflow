@@ -4858,6 +4858,22 @@ outputs:
     #     Linux Kernel >= 3.14；（2）特性开启后，发送的数据包无法被 tcpdump 捕获。
     # upgrade_from: static_config.enable-qos-bypass
     raw_udp_qos_bypass: false
+    # type: bool
+    # name: Multiple Sockets To Ingester
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     When set to true, deepflow-agent will send data with multiple sockets to Ingester,
+    #     which has higher performance, but will bring more impact to the firewall.
+    #   ch: |-
+    #     当设置为 true 时，deepflow-agent 将使用多个套接字将数据发送到 Ingester，
+    #     其发送性能更高，但会给防火墙带来更大的影响。
+    # upgrade_from: static_config.multiple-sockets-to-ingester
+    multiple_sockets_to_ingester: false
   # type: section
   # name:
   #   en: Flow Log and Request Log

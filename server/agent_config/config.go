@@ -113,6 +113,7 @@ type StaticConfig struct {
 	DefaultTapType                     *uint32                      `yaml:"default-tap-type,omitempty"`
 	DebugListenPort                    *uint16                      `yaml:"debug-listen-port,omitempty"`
 	EnableQosBypass                    *bool                        `yaml:"enable-qos-bypass,omitempty"`
+	MultipleSocketsToIngester          *bool                        `yaml:"multiple-sockets-to-ingester,omitempty"`
 	FastPathMapSize                    *int                         `yaml:"fast-path-map-size,omitempty"`
 	FirstPathLevel                     *int                         `yaml:"first-path-level,omitempty"`
 	LocalDispatcherCount               *int                         `yaml:"local-dispatcher-count,omitempty"`

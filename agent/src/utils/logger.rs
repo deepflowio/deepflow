@@ -19,7 +19,7 @@ use std::io;
 use std::process;
 use std::sync::{
     atomic::{AtomicI64, AtomicU32, AtomicU64, AtomicU8, Ordering},
-    Arc, Weak,
+    Arc, Mutex, Weak,
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -35,7 +35,7 @@ use super::stats::{self, QueueStats};
 use crate::{
     config::handler::{LogAccess, LogConfig, SenderAccess},
     exception::ExceptionHandler,
-    sender::uniform_sender::UniformSenderThread,
+    sender::uniform_sender::{Connection, UniformSenderThread},
 };
 
 macro_rules! write_message {
@@ -105,6 +105,7 @@ impl RemoteLogWriter {
         stats_collector: Arc<stats::Collector>,
         exception_handler: ExceptionHandler,
         ntp_diff: Arc<AtomicI64>,
+        shared_conn: Arc<Mutex<Connection>>,
     ) -> Self {
         let module = "remote_logger";
         let (sender, receiver, counter) = queue::bounded(Self::INNER_QUEUE_SIZE);
@@ -121,7 +122,7 @@ impl RemoteLogWriter {
             sender_config,
             stats_collector,
             exception_handler,
-            true,
+            Some(shared_conn),
         );
         uniform_sender.start();
         Self {
