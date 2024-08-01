@@ -237,8 +237,14 @@ impl<'a> MetaPacket<'a> {
     pub fn timestamp_adjust(&mut self, time_diff: i64) {
         if time_diff >= 0 {
             self.lookup_key.timestamp += Timestamp::from_nanos(time_diff as u64);
+            if self.ebpf_type != EbpfType::None {
+                self.sub_packets[0].timestamp += Timestamp::from_nanos(time_diff as u64);
+            }
         } else {
             self.lookup_key.timestamp -= Timestamp::from_nanos(-time_diff as u64);
+            if self.ebpf_type != EbpfType::None {
+                self.sub_packets[0].timestamp -= Timestamp::from_nanos(-time_diff as u64);
+            }
         }
     }
 
