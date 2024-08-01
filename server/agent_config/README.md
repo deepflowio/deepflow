@@ -7328,6 +7328,35 @@ When sender uses RAW_UDP to send data, this feature can be enabled to
 improve performance. Linux Kernel >= 3.14 is required. Note that the data
 sent when this feature is enabled cannot be captured by tcpdump.
 
+### Multiple Sockets To Ingester {#outputs.socket.multiple_sockets_to_ingester}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.socket.multiple_sockets_to_ingester`
+
+Upgrade from old version: `static_config.multiple-sockets-to-ingester`
+
+**Default value**:
+```yaml
+outputs:
+  socket:
+    multiple_sockets_to_ingester: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, deepflow-agent will send data with multiple sockets to Ingester,
+which has higher performance, but will bring more impact to the firewall.
+
 ## Flow Log and Request Log {#outputs.flow_log}
 
 ### Filters {#outputs.flow_log.filters}

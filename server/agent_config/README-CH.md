@@ -7053,6 +7053,35 @@ outputs:
 当使用 RAW_UDP 发送数据时，可以开启该特性以提升数据发送的性能。注意：（1）该特性需要
 Linux Kernel >= 3.14；（2）特性开启后，发送的数据包无法被 tcpdump 捕获。
 
+### Multiple Sockets To Ingester {#outputs.socket.multiple_sockets_to_ingester}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.socket.multiple_sockets_to_ingester`
+
+Upgrade from old version: `static_config.multiple-sockets-to-ingester`
+
+**默认值**:
+```yaml
+outputs:
+  socket:
+    multiple_sockets_to_ingester: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当设置为 true 时，deepflow-agent 将使用多个套接字将数据发送到 Ingester，
+其发送性能更高，但会给防火墙带来更大的影响。
+
 ## 流日志及调用日志 {#outputs.flow_log}
 
 ### 过滤器 {#outputs.flow_log.filters}

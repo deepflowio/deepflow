@@ -85,7 +85,10 @@ use crate::{
     platform::synchronizer::Synchronizer as PlatformSynchronizer,
     policy::{Policy, PolicyGetter, PolicySetter},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{npb_sender::NpbArpTable, uniform_sender::UniformSenderThread},
+    sender::{
+        npb_sender::NpbArpTable,
+        uniform_sender::{Connection, UniformSenderThread},
+    },
     utils::{
         cgroups::{is_kernel_available_for_cgroups, Cgroups},
         command::get_hostname,
@@ -97,7 +100,7 @@ use crate::{
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogWriter},
         npb_bandwidth_watcher::NpbBandwidthWatcher,
-        stats::{self, ArcBatch, Countable, QueueStats, RefCountable},
+        stats::{self, Countable, QueueStats, RefCountable},
     },
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -295,6 +298,17 @@ impl Trident {
         let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
         let exception_handler = ExceptionHandler::default();
 
+        let log_stats_shared_connection = Arc::new(Mutex::new(Connection::new()));
+        let mut stats_sender = UniformSenderThread::new(
+            "stats",
+            stats_collector.get_receiver(),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            Some(log_stats_shared_connection.clone()),
+        );
+        stats_sender.start();
+
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
@@ -327,6 +341,7 @@ impl Trident {
                 stats_collector.clone(),
                 exception_handler.clone(),
                 ntp_diff.clone(),
+                log_stats_shared_connection,
             );
             logger_writers.push(Box::new(remote_log_writer));
         }
@@ -1484,7 +1499,6 @@ pub struct AgentComponents {
     pub l4_flow_uniform_sender: UniformSenderThread<BoxedTaggedFlow>,
     pub metrics_uniform_sender: UniformSenderThread<BoxedDocument>,
     pub l7_flow_uniform_sender: UniformSenderThread<BoxAppProtoLogsData>,
-    pub stats_sender: UniformSenderThread<ArcBatch>,
     pub platform_synchronizer: Arc<PlatformSynchronizer>,
     #[cfg(target_os = "linux")]
     pub kubernetes_poller: Arc<GenericPoller>,
@@ -1793,16 +1807,6 @@ impl AgentComponents {
             warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
         }
 
-        let mut stats_sender = UniformSenderThread::new(
-            "stats",
-            stats_collector.get_receiver(),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            true,
-        );
-        stats_sender.start();
-
         info!("Start check process...");
         trident_process_check(process_threshold);
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2029,7 +2033,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
 
         let metrics_queue_name = "3-doc-to-collector-sender";
@@ -2051,7 +2055,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
 
         let proto_log_queue_name = "2-protolog-to-collector-sender";
@@ -2073,7 +2077,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
 
         let analyzer_ip = if candidate_config
@@ -2127,13 +2131,16 @@ impl AgentComponents {
             },
             Countable::Owned(Box::new(pcap_batch_counter)),
         );
+
+        let pcap_packet_shared_connection = Arc::new(Mutex::new(Connection::new()));
+
         let pcap_batch_uniform_sender = UniformSenderThread::new(
             pcap_batch_queue,
             Arc::new(pcap_batch_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            false,
+            Some(pcap_packet_shared_connection.clone()),
         );
         // Enterprise Edition Feature: packet-sequence
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
@@ -2158,7 +2165,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            Some(pcap_packet_shared_connection),
         );
 
         let bpf_builder = bpf::Builder {
@@ -2244,7 +2251,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
 
         let profile_queue_name = "1-profile-to-sender";
@@ -2266,7 +2273,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
         let application_log_queue_name = "1-application-log-to-sender";
         let (application_log_sender, application_log_receiver, counter) = queue::bounded_with_debug(
@@ -2287,7 +2294,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
 
         let ebpf_dispatcher_id = dispatcher_components.len();
@@ -2397,7 +2404,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
 
         let otel_dispatcher_id = ebpf_dispatcher_id + 1;
@@ -2439,13 +2446,15 @@ impl AgentComponents {
             },
             Countable::Owned(Box::new(counter)),
         );
+
+        let prometheus_telegraf_shared_connection = Arc::new(Mutex::new(Connection::new()));
         let prometheus_uniform_sender = UniformSenderThread::new(
             prometheus_queue_name,
             Arc::new(prometheus_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            Some(prometheus_telegraf_shared_connection.clone()),
         );
 
         let telegraf_queue_name = "1-telegraf-to-sender";
@@ -2467,7 +2476,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            Some(prometheus_telegraf_shared_connection),
         );
 
         let compressed_otel_queue_name = "1-compressed-otel-to-sender";
@@ -2489,7 +2498,7 @@ impl AgentComponents {
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
-            true,
+            None,
         );
 
         let (external_metrics_server, external_metrics_counter) = MetricServer::new(
@@ -2550,7 +2559,6 @@ impl AgentComponents {
             l4_flow_uniform_sender,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
-            stats_sender,
             platform_synchronizer,
             #[cfg(target_os = "linux")]
             kubernetes_poller,
