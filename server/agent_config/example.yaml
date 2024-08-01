@@ -1276,13 +1276,6 @@ vtap_group_id: g-xxxxxx
     ## Default: false
     #disabled: false
 
-    ## Syscall TraceID Disabled
-    ## Default: false
-    ## Note: When the trace_id is injected into all requests, the computation logic for all
-    ##   syscall_trace_id can be turned off. This will significantly reduce the impact of the
-    ##   eBPF hook on the CPU consumption of the application process.
-    #syscall_trace_id_disabled: false
-
     ## eBPF Packet Capture Rate Limit
     ## Default: 0. Range: [0, +oo]
     #global-ebpf-pps-threshold: 0

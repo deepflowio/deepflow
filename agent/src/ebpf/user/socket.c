@@ -51,7 +51,7 @@ static pthread_t proc_events_pthread;	// Process exec/exit thread
  * 'true' disables the tracing feature, and 'false' enables it.
  * The default is 'false'.
  */
-static bool g_disable_syscall_tracing = true; // For test, disable tracing
+static bool g_disable_syscall_tracing;
 
 /*
  * tracer_hooks_detach() and tracer_hooks_attach() will become terrible
