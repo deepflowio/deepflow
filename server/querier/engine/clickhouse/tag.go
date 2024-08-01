@@ -47,7 +47,10 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 		if ok {
 			tagTranslator := tagItem.TagTranslator
 			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
+		} else {
+			stmts = append(stmts, &SelectTag{Value: name, Alias: alias})
 		}
+		return stmts, labelType, nil
 	}
 	if !ok {
 		name := strings.Trim(name, "`")
