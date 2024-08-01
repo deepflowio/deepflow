@@ -173,6 +173,9 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 		bcc_free_symcache((void *)p->syms_cache, p->pid);
 		free_symcache_count++;
 	}
+
+	vec_free(p->thread_names);
+	p->thread_names = NULL;
 	p->syms_cache = 0;
 	clib_mem_free((void *)p);
 }
@@ -539,6 +542,8 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->lock = 0;
 	pthread_mutex_init(&p->mutex, NULL);
 	p->syms_cache = 0;
+	p->thread_names = NULL;
+	p->thread_names_lock = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
 	if (p->netns_id == 0)
 		return ETR_INVAL;

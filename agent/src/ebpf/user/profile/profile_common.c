@@ -49,6 +49,8 @@
 #include "profile_common.h"
 #include "../proc.h"
 
+#define UNKNOWN_JAVA_SYMBOL_STR "Unknown"
+
 /*
  * This section is for symbolization of Java addresses, and we need
  * to prepare two so librarys, one for GNU and the other for MUSL:
@@ -544,19 +546,53 @@ static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 	kvp->c_k.cpu = v->cpu;
 	kvp->c_k.pid = v->tgid;
 	kvp->c_k.reserved = 0;
+	kvp->c_k.padding = 0;
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
 static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
-			struct stack_trace_key_t *v, u64 stime, void *msg_value)
+			struct stack_trace_key_t *v, u64 stime, void *msg_value, struct symbolizer_proc_info *p)
 {
 	kvp->k.tgid = v->tgid;
-	kvp->k.pid = v->pid;
 	kvp->k.stime = stime;
 	kvp->k.cpu = v->cpu;
 	kvp->k.u_stack_id = (u32) v->userstack;
 	kvp->k.k_stack_id = (u32) v->kernstack;
 	kvp->msg_ptr = pointer_to_uword(msg_value);
+
+	/*
+	 * It is possible that multiple threads of a process (or the process itself)
+	 * use the same task name (kernel structure: 'task_struct.comm[]'). To improve
+	 * aggregation efficiency, we use a unique value to fill 'kvp->k.pid' for
+	 * threads with the same name.
+	 */
+	struct task_comm_info_s *name, matched_name;
+	if (v->tgid == v->pid)
+		snprintf(matched_name.comm, sizeof(matched_name.comm), "P%s",
+			 v->comm);
+	else
+		snprintf(matched_name.comm, sizeof(matched_name.comm), "T%s",
+			 v->comm);
+
+	thread_names_lock(p);
+	vec_foreach(name, p->thread_names) {
+		if (strcmp(name->comm, matched_name.comm) == 0) {
+			kvp->k.pid = name->idx;
+			thread_names_unlock(p);
+			return;
+		}
+	}
+
+	kvp->k.pid = vec_len(p->thread_names);
+	matched_name.idx = kvp->k.pid;
+	int ret = VEC_OK;
+	vec_add1(p->thread_names, matched_name, ret);
+	if (ret != VEC_OK) {
+		ebpf_warning("vec add failed\n");
+		kvp->k.pid = v->pid;
+	}
+
+	thread_names_unlock(p);
 }
 
 static void set_stack_trace_msg(struct profiler_context *ctx,
@@ -825,7 +861,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 
 			if (matched)
-				set_msg_kvp(&kv, v, stime, (void *)0);
+				set_msg_kvp(&kv, v, stime, (void *)0, __info_p);
 			else {
 				if (ctx->only_matched_data) {
 					if (__info_p)
