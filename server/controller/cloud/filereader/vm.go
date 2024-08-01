@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface, []model.IP, error) {
@@ -37,13 +38,13 @@ func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface,
 		azLcuuid, ok := f.azNameToLcuuid[vm.AZ]
 		if !ok {
 			err := errors.New(fmt.Sprintf("az (%s) not in file", vm.AZ))
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(f.orgID))
 			return nil, nil, nil, err
 		}
 		vpcLcuuid, ok := f.vpcNameToLcuuid[vm.VPC]
 		if !ok {
 			err := errors.New(fmt.Sprintf("vpc (%s) not in file", vm.VPC))
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(f.orgID))
 			return nil, nil, nil, err
 		}
 
@@ -64,13 +65,13 @@ func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface,
 			networkLcuuid, ok := f.subnetNameToNetworkLcuuid[port.Subnet]
 			if !ok {
 				err := errors.New(fmt.Sprintf("subnet (%s) not in file", port.Subnet))
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(f.orgID))
 				return nil, nil, nil, err
 			}
 			netType, ok := f.networkLcuuidToNetType[networkLcuuid]
 			if !ok {
 				err := errors.New(fmt.Sprintf("subnet (%s) network not in file", port.Subnet))
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(f.orgID))
 				return nil, nil, nil, err
 			}
 
@@ -89,7 +90,7 @@ func (f *FileReader) getVMs(fileInfo *FileInfo) ([]model.VM, []model.VInterface,
 			subnetLcuuid, ok := f.subnetNameToLcuuid[port.Subnet]
 			if !ok {
 				err := errors.New(fmt.Sprintf("subnet (%s) not in file", port.Subnet))
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(f.orgID))
 				return nil, nil, nil, err
 			}
 			retIPs = append(retIPs, model.IP{

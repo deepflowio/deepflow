@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-package db
+package blocker
 
-import (
-	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+import "slices"
+
+const (
+	defaultORGID  = 1
+	defaultTeamID = 1
 )
 
-type PrometheusTarget struct {
-	OperatorBase[*mysql.PrometheusTarget, mysql.PrometheusTarget]
+var (
+	ORGIDsToBlock  = []int{defaultORGID}
+	TeamIDsToBlock = []int{defaultTeamID}
+)
+
+func IfBlockORGID(id int) bool {
+	return slices.Contains(ORGIDsToBlock, id)
 }
 
-func NewPrometheusTarget() *PrometheusTarget {
-	operator := &PrometheusTarget{
-		newOperatorBase[*mysql.PrometheusTarget](
-			ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN,
-			true,
-			true,
-		),
-	}
-	return operator
+func IfBlockTeamID(id int) bool {
+	return slices.Contains(TeamIDsToBlock, id)
 }

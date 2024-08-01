@@ -68,8 +68,14 @@ impl Document {
 
 impl From<Document> for metric::Document {
     fn from(d: Document) -> Self {
+        let timestamp = if d.flags.contains(DocumentFlag::PER_SECOND_METRICS) {
+            d.timestamp - d.tagger.time_span
+        } else {
+            d.timestamp - d.tagger.time_span * 60
+        };
+
         metric::Document {
-            timestamp: d.timestamp,
+            timestamp,
             tag: Some(d.tagger.into()),
             meter: Some(d.meter.into()),
             flags: d.flags.bits(),
@@ -301,6 +307,8 @@ pub struct Tagger {
     pub biz_type: u8,
     pub signal_source: SignalSource,
     pub pod_id: u32,
+    // request-reponse time span
+    pub time_span: u32,
 }
 
 impl Default for Tagger {
@@ -335,6 +343,7 @@ impl Default for Tagger {
             signal_source: SignalSource::default(),
             pod_id: 0,
             biz_type: 0,
+            time_span: 0,
         }
     }
 }

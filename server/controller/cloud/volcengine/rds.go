@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/rdsmssql"
 	"github.com/volcengine/volcengine-go-sdk/service/rdsmysqlv2"
 	"github.com/volcengine/volcengine-go-sdk/service/rdspostgresql"
@@ -28,7 +29,7 @@ import (
 )
 
 func (v *VolcEngine) getRDSInstances(sess *session.Session) ([]model.RDSInstance, []model.VInterface, []model.IP, error) {
-	log.Debug("get rds instances starting")
+	log.Debug("get rds instances starting", logger.NewORGPrefix(v.orgID))
 	var rdss []model.RDSInstance
 	var vinterfaces []model.VInterface
 	var ips []model.IP
@@ -60,7 +61,7 @@ func (v *VolcEngine) getRDSInstances(sess *session.Session) ([]model.RDSInstance
 	vinterfaces = append(vinterfaces, sVInterfaces...)
 	ips = append(ips, sIPs...)
 
-	log.Debug("get rds instances complete")
+	log.Debug("get rds instances complete", logger.NewORGPrefix(v.orgID))
 	return rdss, vinterfaces, ips, nil
 }
 
@@ -74,7 +75,7 @@ func (v *VolcEngine) getRDSMySQL(sess *session.Session) ([]model.RDSInstance, []
 	for {
 		result, err := rdsmysqlv2.New(sess).DescribeDBInstances(&rdsmysqlv2.DescribeDBInstancesInput{PageNumber: &pageNumber, PageSize: &pageSize})
 		if err != nil {
-			log.Errorf("request volcengine (rdsmysqlv2.DescribeDBInstances) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (rdsmysqlv2.DescribeDBInstances) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 		retRDSs = append(retRDSs, result.Instances...)
@@ -91,7 +92,7 @@ func (v *VolcEngine) getRDSMySQL(sess *session.Session) ([]model.RDSInstance, []
 
 		rdsDetail, err := rdsmysqlv2.New(sess).DescribeDBInstanceDetail(&rdsmysqlv2.DescribeDBInstanceDetailInput{InstanceId: rds.InstanceId})
 		if err != nil {
-			log.Errorf("request volcengine (rdsmysqlv2.DescribeDBInstanceDetail) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (rdsmysqlv2.DescribeDBInstanceDetail) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 
@@ -136,7 +137,7 @@ func (v *VolcEngine) getRDSMySQL(sess *session.Session) ([]model.RDSInstance, []
 				case "Public":
 					netType = common.VIF_TYPE_WAN
 				default:
-					log.Infof("invalid network type (%s)", networkType)
+					log.Infof("invalid network type (%s)", networkType, logger.NewORGPrefix(v.orgID))
 					continue
 				}
 				netID := v.getStringPointerValue(address.EipId)
@@ -186,7 +187,7 @@ func (v *VolcEngine) getRDSPostgreSQL(sess *session.Session) ([]model.RDSInstanc
 	for {
 		result, err := rdspostgresql.New(sess).DescribeDBInstances(&rdspostgresql.DescribeDBInstancesInput{PageNumber: &pageNumber, PageSize: &pageSize})
 		if err != nil {
-			log.Errorf("request volcengine (rdspostgresql.DescribeDBInstances) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (rdspostgresql.DescribeDBInstances) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 		retRDSs = append(retRDSs, result.Instances...)
@@ -203,7 +204,7 @@ func (v *VolcEngine) getRDSPostgreSQL(sess *session.Session) ([]model.RDSInstanc
 
 		rdsDetail, err := rdspostgresql.New(sess).DescribeDBInstanceDetail(&rdspostgresql.DescribeDBInstanceDetailInput{InstanceId: rds.InstanceId})
 		if err != nil {
-			log.Errorf("request volcengine (rdspostgresql.DescribeDBInstanceDetail) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (rdspostgresql.DescribeDBInstanceDetail) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 
@@ -244,7 +245,7 @@ func (v *VolcEngine) getRDSPostgreSQL(sess *session.Session) ([]model.RDSInstanc
 				case "Public":
 					netType = common.VIF_TYPE_WAN
 				default:
-					log.Infof("invalid network type (%s)", networkType)
+					log.Infof("invalid network type (%s)", networkType, logger.NewORGPrefix(v.orgID))
 					continue
 				}
 				netID := v.getStringPointerValue(add.EipId)
@@ -294,7 +295,7 @@ func (v *VolcEngine) getRDSSQLServer(sess *session.Session) ([]model.RDSInstance
 	for {
 		result, err := rdsmssql.New(sess).DescribeDBInstances(&rdsmssql.DescribeDBInstancesInput{PageNumber: &pageNumber, PageSize: &pageSize})
 		if err != nil {
-			log.Errorf("request volcengine (rdsmssql.DescribeDBInstances) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (rdsmssql.DescribeDBInstances) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 		retRDSs = append(retRDSs, result.InstancesInfo...)
@@ -311,7 +312,7 @@ func (v *VolcEngine) getRDSSQLServer(sess *session.Session) ([]model.RDSInstance
 
 		rdsDetail, err := rdsmssql.New(sess).DescribeDBInstanceDetail(&rdsmssql.DescribeDBInstanceDetailInput{InstanceId: rds.InstanceId})
 		if err != nil {
-			log.Errorf("request volcengine (rdsmssql.DescribeDBInstanceDetail) api error: (%s)", err.Error())
+			log.Errorf("request volcengine (rdsmssql.DescribeDBInstanceDetail) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
 		}
 
@@ -350,7 +351,7 @@ func (v *VolcEngine) getRDSSQLServer(sess *session.Session) ([]model.RDSInstance
 				case "Public":
 					netType = common.VIF_TYPE_WAN
 				default:
-					log.Infof("invalid network type (%s)", networkType)
+					log.Infof("invalid network type (%s)", networkType, logger.NewORGPrefix(v.orgID))
 					continue
 				}
 				netID := v.getStringPointerValue(net.EipId)

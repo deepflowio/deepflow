@@ -124,7 +124,7 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 
 	var vms []*mysql.VM
 	if err := mysql.Db.Unscoped().Find(&vms).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
 	for _, vm := range vms {
@@ -142,7 +142,7 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 			common.VIF_DEVICE_TYPE_POD,
 		},
 	).Unscoped().Find(&vifs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VINTERFACE, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VINTERFACE, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -162,12 +162,12 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 
 	var wanIPs []*mysql.WANIP
 	if err := mysql.Db.Unscoped().Find(&wanIPs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_WANIP, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_WANIP, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
 	var lanIPs []*mysql.LANIP
 	if err := mysql.Db.Unscoped().Find(&lanIPs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LANIP, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LANIP, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -183,12 +183,12 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
 	var natGateways []*mysql.NATGateway
 	if err := mysql.Db.Unscoped().Find(&natGateways).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err), i.db.LogPrefixORGID)
 		return false
 	}
 	var natRules []*mysql.NATRule
 	if err := mysql.Db.Unscoped().Find(&natRules).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_RULE, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_RULE, err), i.db.LogPrefixORGID)
 		return false
 	}
 	natGatewayIDToNatRules := make(map[int][]*mysql.NATRule)
@@ -197,7 +197,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 	}
 	var natVMConns []*mysql.NATVMConnection
 	if err := mysql.Db.Unscoped().Find(&natVMConns).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_VM_CONNECTION, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_VM_CONNECTION, err), i.db.LogPrefixORGID)
 		return false
 	}
 	for _, natGateway := range natGateways {
@@ -247,12 +247,12 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
 	var lbs []*mysql.LB
 	if err := mysql.Db.Unscoped().Find(&lbs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB, err), i.db.LogPrefixORGID)
 		return false
 	}
 	var lbListeners []*mysql.LBListener
 	if err := mysql.Db.Unscoped().Find(&lbListeners).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_LISTENER, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_LISTENER, err), i.db.LogPrefixORGID)
 		return false
 	}
 	lbIDToLBListeners := make(map[int][]*mysql.LBListener)
@@ -261,7 +261,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 	}
 	var lbTargetServers []*mysql.LBTargetServer
 	if err := mysql.Db.Unscoped().Find(&lbTargetServers).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_TARGET_SERVER, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_TARGET_SERVER, err), i.db.LogPrefixORGID)
 		return false
 	}
 	lbIDToLBTargetServers := make(map[int][]*mysql.LBTargetServer)
@@ -272,7 +272,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 	}
 	var lbVMConns []*mysql.LBVMConnection
 	if err := mysql.Db.Unscoped().Find(&lbVMConns).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_VM_CONNECTION, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_VM_CONNECTION, err), i.db.LogPrefixORGID)
 		return false
 	}
 	for _, lb := range lbs {
@@ -347,7 +347,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
 	var pods []*mysql.Pod
 	if err := mysql.Db.Unscoped().Find(&pods).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD, err), i.db.LogPrefixORGID)
 		return false
 	}
 	podGroupIDToPodIDs := make(map[int][]int)
@@ -356,7 +356,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	}
 	var podGroupPorts []*mysql.PodGroupPort
 	if err := mysql.Db.Unscoped().Find(&podGroupPorts).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_PORT, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_PORT, err), i.db.LogPrefixORGID)
 		return false
 	}
 	podServiceIDToPodIDs := make(map[int][]int)
@@ -367,7 +367,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	}
 	var podIngresses []*mysql.PodIngress
 	if err := mysql.Db.Unscoped().Find(&podIngresses).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS, err), i.db.LogPrefixORGID)
 		return false
 	}
 	podIngressIDToName := make(map[int]string)
@@ -376,7 +376,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	}
 	var podServices []*mysql.PodService
 	if err := mysql.Db.Unscoped().Find(&podServices).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE, err), i.db.LogPrefixORGID)
 		return false
 	}
 	for _, podService := range podServices {

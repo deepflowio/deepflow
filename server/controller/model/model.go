@@ -375,6 +375,7 @@ type SubDomainCreate struct {
 }
 
 type SubDomainUpdate struct {
+	TeamID int                    `json:"TEAM_ID"`
 	UserID int                    `json:"USER_ID"`
 	Config map[string]interface{} `json:"CONFIG"`
 }
@@ -708,6 +709,7 @@ type CSVHeader struct {
 type Plugin struct {
 	Name      string `json:"NAME" binding:"required"`
 	Type      int    `json:"TYPE" binding:"required"`
+	User      int    `json:"USER" binding:"required"`
 	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
 	UpdatedAt string `json:"UPDATED_AT"`
 }

@@ -20,17 +20,18 @@ import (
 	vpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []model.RoutingTable, error) {
 	var retVRouters []model.VRouter
 	var retRoutingTables []model.RoutingTable
 
-	log.Debug("get routers starting")
+	log.Debug("get routers starting", logger.NewORGPrefix(a.orgID))
 	request := vpc.CreateDescribeRouteTableListRequest()
 	response, err := a.getRouterResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retVRouters, retRoutingTables, err
 	}
 
@@ -71,7 +72,7 @@ func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []mod
 		}
 	}
 
-	log.Debug("get routers complete")
+	log.Debug("get routers complete", logger.NewORGPrefix(a.orgID))
 	return retVRouters, retRoutingTables, nil
 }
 
@@ -82,7 +83,7 @@ func (a *Aliyun) getRouterTables(region model.Region, routerId string) ([]model.
 	request.RouteTableId = routerId
 	response, err := a.getRouterTableResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retRoutingTables, err
 	}
 
@@ -107,7 +108,7 @@ func (a *Aliyun) getRouterTables(region model.Region, routerId string) ([]model.
 			nexthops := rule.Get("NextHops").Get("NextHop")
 
 			if len(nexthops.MustArray()) == 0 {
-				log.Infof("route table (%s) gateway id not found", ruleId)
+				log.Infof("route table (%s) gateway id not found", ruleId, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			nexthop := common.ROUTING_TABLE_TYPE_LOCAL

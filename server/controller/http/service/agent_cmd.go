@@ -30,8 +30,6 @@ import (
 )
 
 var (
-	agentCommandTimeout = time.Second * 10
-
 	agentCMDMutex   sync.RWMutex
 	agentCMDManager = make(AgentCMDManager)
 )
@@ -250,7 +248,7 @@ func GetNamespaces(key string, requestID uint64) []*trident.LinuxNamespace {
 	return nil
 }
 
-func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
+func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, error) {
 	log.Infof("current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
@@ -261,7 +259,7 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 		return nil, err
 	}
 	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) get remote commands and linux namespaces",
-		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name)
+		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, dbInfo.LogPrefixORGID)
 
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
@@ -277,12 +275,13 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 	}
 	manager.ExecCH <- cmdReq
 
-	timeout := time.After(agentCommandTimeout)
+	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
 	resp := &model.RemoteExecResp{}
 	for {
 		select {
-		case <-timeout:
-			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", agentCommandTimeout.Seconds())
+		case <-cmdTimeout:
+			// RemoveAllFromCMDManager(key)
+			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", timeout)
 		case _, ok := <-cmdResp.RemoteCMDDoneCH:
 			if !ok {
 				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
@@ -302,12 +301,12 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 			if len(GetCommands(key, requestID)) != 0 {
 				return &model.RemoteExecResp{RemoteCommand: GetCommands(key, requestID)}, nil
 			}
-			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key, requestID))
+			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key, requestID), dbInfo.LogPrefixORGID)
 			return nil, errors.New(key)
 		default:
 			if len(GetCommands(key, requestID)) != 0 && len(GetNamespaces(key, requestID)) != 0 {
 				log.Infof("len(commands)=%d, len(namespaces)=%d",
-					len(GetCommands(key, requestID)), len(GetNamespaces(key, requestID)))
+					len(GetCommands(key, requestID)), len(GetNamespaces(key, requestID)), dbInfo.LogPrefixORGID)
 				return &model.RemoteExecResp{
 					RemoteCommand:  GetCommands(key, requestID),
 					LinuxNamespace: GetNamespaces(key, requestID),
@@ -317,7 +316,7 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 	}
 }
 
-func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string) (string, error) {
+func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CMD string) (string, error) {
 	serverLog := fmt.Sprintf("The deepflow-server is unable to execute the `%s` command."+
 		" Detailed error information is as follows:\n\n", CMD)
 	dbInfo, err := mysql.GetDB(orgID)
@@ -330,7 +329,7 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string)
 	}
 	b, _ := json.Marshal(req)
 	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) run remote command, request: %s",
-		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b))
+		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b), dbInfo.LogPrefixORGID)
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
 	requestID, cmdResp := NewAgentCMDResp(key)
@@ -341,13 +340,13 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string)
 	req.RequestId = &requestID
 	manager.ExecCH <- req
 
-	timeout := time.After(agentCommandTimeout)
+	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
 	content := ""
 	for {
 		select {
-		case <-timeout:
-			err = fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, agentCommandTimeout.Seconds())
-			log.Error(err)
+		case <-cmdTimeout:
+			err = fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, timeout)
+			log.Error(err, dbInfo.LogPrefixORGID)
 			return "", err
 		case _, ok := <-cmdResp.ExecDoneCH:
 			if !ok {
@@ -358,7 +357,7 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string)
 					" Detailed error information is as follows:\n\n%s", CMD, msg)
 			}
 			content = GetContent(key, requestID)
-			log.Infof("command run content len: %d", len(content))
+			log.Infof("command run content len: %d", len(content), dbInfo.LogPrefixORGID)
 			return content, nil
 		}
 	}

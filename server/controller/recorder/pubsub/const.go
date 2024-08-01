@@ -64,5 +64,4 @@ const (
 	PubSubTypePodReplicaSet         = common.RESOURCE_TYPE_POD_REPLICA_SET_EN
 	PubSubTypePod                   = common.RESOURCE_TYPE_POD_EN
 	PubSubTypeProcess               = common.RESOURCE_TYPE_PROCESS_EN
-	PubSubTypePrometheusTarget      = common.RESOURCE_TYPE_PROMETHEUS_TARGET_EN
 )

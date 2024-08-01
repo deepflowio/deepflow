@@ -18,6 +18,9 @@
 #define DF_BPF_TABLE_H
 #include "tracer.h"
 
+bool bpf_table_get(struct bpf_tracer *tracer,
+			 const char *tb_name, void *key, void *val);
+
 bool bpf_table_get_value(struct bpf_tracer *tracer,
 			 const char *tb_name,
 			 uint64_t key,

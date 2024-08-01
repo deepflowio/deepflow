@@ -462,7 +462,8 @@ func (VTapRepo) TableName() string {
 type Plugin struct {
 	ID        int             `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string          `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	Type      int             `gorm:"column:type;type:int" json:"TYPE"` // 1: wasm
+	Type      int             `gorm:"column:type;type:int" json:"TYPE"`           // 1: wasm 2: so 3: lua
+	User      int             `gorm:"column:user;type:int;default:1" json:"USER"` // 1: agent 2: server
 	Image     compressedBytes `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
 	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`

@@ -2801,9 +2801,6 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 			return MSG_RESPONSE;
 		}
 
-		conn_info->correlation_id =
-		    conn_info->socket_info_ptr->correlation_id;
-		conn_info->role = conn_info->socket_info_ptr->role;
 		is_first = false;
 	} else
 		conn_info->need_reconfirm = true;
@@ -2812,45 +2809,10 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	enum message_type msg_type =
 	    infer_kafka_request(msg_buf, is_first, conn_info);
 	if (msg_type == MSG_REQUEST) {
-		// 首次需要在socket_info_map新建socket
-		if (is_first) {
-			return MSG_RECONFIRM;
-		}
-
-		/*
-		 * socket_info_map已经存在并且需要确认（需要response的数据进一步），
-		 * 这里的request的数据直接丢弃。
-		 */
-		return MSG_UNKNOWN;
-	}
-	// 推断的第一个包必须是请求包，否则直接丢弃
-	if (is_first)
-		return MSG_UNKNOWN;
-
-	// is response ?
-	// Response Header v0 => correlation_id
-	//  correlation_id => INT32
-	const __s32 correlation_id = __bpf_ntohl(*(__s32 *) msg_buf);
-	if (correlation_id < 0)
-		return MSG_UNKNOWN;
-
-	if (correlation_id == conn_info->correlation_id) {
-		// 完成确认
-		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-			conn_info->socket_info_ptr->need_reconfirm = false;
-			// 角色确认
-			if (conn_info->direction == T_EGRESS)
-				conn_info->socket_info_ptr->role = ROLE_SERVER;
-			else
-				conn_info->socket_info_ptr->role = ROLE_CLIENT;
-		}
-	} else {
-		// 再次确认失败直接删除socket记录。
-		return MSG_CLEAR;
+		conn_info->need_reconfirm = false;
+		return MSG_REQUEST;
 	}
 
-	// kafka长连接的形式存在，数据开始捕获从类型推断完成开始进行。
-	// 此处数据（用于确认协议类型）丢弃不要，避免发给用户产生混乱。
 	return MSG_UNKNOWN;
 }
 

@@ -26,10 +26,11 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getPodServices() (services []model.PodService, servicePorts []model.PodServicePort, podGroupPorts []model.PodGroupPort, network model.Network, subnets []model.Subnet, vinterfaces []model.VInterface, ips []model.IP, err error) {
-	log.Debug("get services starting")
+	log.Debug("get services starting", logger.NewORGPrefix(k.orgID))
 	serviceLcuuidToClusterIP := map[string]string{}
 	serviceTypes := map[string]int{
 		"NodePort":  common.POD_SERVICE_TYPE_NODEPORT,
@@ -42,40 +43,40 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			sData, sErr := simplejson.NewJson([]byte(s))
 			if sErr != nil {
 				err = sErr
-				log.Errorf("service initialization simplejson error: (%s)", sErr.Error())
+				log.Errorf("service initialization simplejson error: (%s)", sErr.Error(), logger.NewORGPrefix(k.orgID))
 				return
 			}
 			metaData, ok := sData.CheckGet("metadata")
 			if !ok {
-				log.Info("service metadata not found")
+				log.Info("service metadata not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			uID := metaData.Get("uid").MustString()
 			if uID == "" {
-				log.Info("service uid not found")
+				log.Info("service uid not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			name := metaData.Get("name").MustString()
 			if name == "" {
-				log.Infof("service (%s) name not found", uID)
+				log.Infof("service (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			namespace := metaData.Get("namespace").MustString()
 			namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 			if !ok {
-				log.Infof("service (%s) namespace not found", name)
+				log.Infof("service (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			selector := sData.Get("spec").Get("selector").MustMap()
 			if len(selector) == 0 {
-				log.Infof("service (%s) selector not found", name)
+				log.Infof("service (%s) selector not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			selectorSlice := cloudcommon.GenerateCustomTag(selector, nil, 0, ":")
 			specTypeString := sData.Get("spec").Get("type").MustString()
 			specType, ok := serviceTypes[specTypeString]
 			if !ok {
-				log.Infof("service (%s) type (%s) not support", name, specTypeString)
+				log.Infof("service (%s) type (%s) not support", name, specTypeString, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			clusterIP := sData.Get("spec").Get("clusterIP").MustString()
@@ -117,7 +118,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				if fErr == nil && labels != "[]" && labels != "null" {
 					labelArray, lErr := simplejson.NewJson([]byte(labels))
 					if lErr != nil {
-						log.Infof("service annotation (%s) init json error: (%s)", labels, lErr.Error())
+						log.Infof("service annotation (%s) init json error: (%s)", labels, lErr.Error(), logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					for i := range labelArray.MustArray() {
@@ -161,7 +162,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				}
 				// 如果没有找到关联PodGroup，进入下一循环
 				if podGroupLcuuids.Cardinality() == 0 {
-					log.Infof("service (%s) pod group id not found", name)
+					log.Infof("service (%s) pod group id not found", name, logger.NewORGPrefix(k.orgID))
 					continue
 				}
 				hasPodGroup = true
@@ -170,7 +171,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				for _, pgLcuuid := range podGroupLcuuids.ToSlice() {
 					pgLcuuidString, ok := pgLcuuid.(string)
 					if !ok {
-						log.Warningf("sercice (%s) pod group lcuuid interface conversion failed", name)
+						log.Warningf("sercice (%s) pod group lcuuid interface conversion failed", name, logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					targetPorts, ok := k.pgLcuuidTopodTargetPorts[pgLcuuidString]
@@ -189,7 +190,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				if targetPort == 0 {
 					targetPort = ports.Get("targetPort").MustInt()
 					if targetPort == 0 {
-						log.Infof("service (%s) target_port not match", name)
+						log.Infof("service (%s) target_port not match", name, logger.NewORGPrefix(k.orgID))
 						continue
 					}
 				}
@@ -214,7 +215,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				for _, Lcuuid := range podGroupLcuuids.ToSlice() {
 					pgLcuuid, ok := Lcuuid.(string)
 					if !ok {
-						log.Warningf("pod group lcuuid (%v) assert failed", Lcuuid)
+						log.Warningf("pod group lcuuid (%v) assert failed", Lcuuid, logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					key := ports.Get("protocol").MustString() + strconv.Itoa(targetPort)
@@ -232,7 +233,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			}
 			if !hasPodGroup {
 				delete(k.nsServiceNameToService, namespace+name)
-				log.Infof("service (%s) pod group not found", name)
+				log.Infof("service (%s) pod group not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			services = append(services, service)
@@ -250,7 +251,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		v4Prefixs, v6Prefixs, tErr := cloudcommon.TidyIPString(clusterIPs)
 		if tErr != nil {
 			err = tErr
-			log.Error("service tidy cluster ip Error" + tErr.Error())
+			log.Error("service tidy cluster ip Error"+tErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 		if len(v4Prefixs) != 0 {
@@ -311,6 +312,6 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		}
 		ips = append(ips, ip)
 	}
-	log.Debug("get services complete")
+	log.Debug("get services complete", logger.NewORGPrefix(k.orgID))
 	return
 }

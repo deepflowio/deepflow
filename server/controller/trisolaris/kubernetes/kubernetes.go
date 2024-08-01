@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	"context"
@@ -35,13 +34,14 @@ import (
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	resourceservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logging.MustGetLogger("trisolaris.kubernetes")
+var log = logger.MustGetLogger("trisolaris.kubernetes")
 
 type KubernetesInfo struct {
 	mutex                sync.RWMutex

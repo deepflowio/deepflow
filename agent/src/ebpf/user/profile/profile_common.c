@@ -548,7 +548,8 @@ static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
-static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
+static void set_msg_kvp(struct profiler_context *ctx,
+			stack_trace_msg_kv_t * kvp,
 			struct stack_trace_key_t *v, u64 stime, void *msg_value)
 {
 	kvp->k.tgid = v->tgid;
@@ -557,6 +558,11 @@ static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
 	kvp->k.cpu = v->cpu;
 	kvp->k.u_stack_id = (u32) v->userstack;
 	kvp->k.k_stack_id = (u32) v->kernstack;
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		kvp->k.e_stack_id = v->ext_data.memory.class_id;
+	} else {
+		kvp->k.e_stack_id = 0;
+	}
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
@@ -714,6 +720,27 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 	}
 }
 
+#define UNKNOWN_JAVA_SYMBOL_STR "Unknown"
+
+static char *get_java_symbol(struct bpf_tracer *t, struct java_symbol_map_key *key) {
+	char value[JAVA_SYMBOL_MAX_LENGTH];
+	memset(value, 0, JAVA_SYMBOL_MAX_LENGTH * sizeof(char));
+	if (!bpf_table_get(t, MAP_MEMORY_JAVA_SYMBOL_MAP_NAME, key, value)) {
+		return NULL;
+	}
+	char *ret = rewrite_java_symbol(value);
+	if (!ret) {
+		int len = strlen(value);
+		ret = clib_mem_alloc_aligned("symbol_str", len + 1, 0, NULL);
+		if (ret == NULL) {
+			return NULL;
+		}
+		memcpy(ret, value, len);
+		ret[len] = '\0';
+	}
+	return ret;
+}
+
 static void aggregate_stack_traces(struct profiler_context *ctx,
 				   struct bpf_tracer *t,
 				   const char *stack_map_name,
@@ -832,7 +859,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 
 			if (matched)
-				set_msg_kvp(&kv, v, stime, (void *)0);
+				set_msg_kvp(ctx, &kv, v, stime, (void *)0);
 			else {
 				if (ctx->only_matched_data) {
 					if (__info_p)
@@ -867,11 +894,10 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-			if (ctx->use_delta_time) {
-				if (ctx->type == PROFILER_TYPE_MEMORY) {
-					((stack_trace_msg_t *) kv.
-					 msg_ptr)->count += v->ext_data.memory.size;
-				} else if (ctx->sample_period > 0) {
+			if (ctx->type == PROFILER_TYPE_MEMORY) {
+				((stack_trace_msg_t *) kv.msg_ptr)->count += v->ext_data.memory.size;
+			} else if (ctx->use_delta_time) {
+				if (ctx->sample_period > 0) {
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
 		   				(ctx->sample_period / 1000);
@@ -913,9 +939,18 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			if (matched)
 				str_len += strlen(v->comm) + sizeof(pre_tag);
 
-			if (ctx->type == PROFILER_TYPE_MEMORY) {
-				rewrite_java_symbol(v->ext_data.memory.class_name);
-				str_len += strlen(v->ext_data.memory.class_name) + 1;
+			char *class_name = NULL;
+
+			if (ctx->type == PROFILER_TYPE_MEMORY && v->ext_data.memory.class_id != 0) {
+				struct java_symbol_map_key key = { 0 };
+				key.tgid = v->tgid;
+				key.class_id = v->ext_data.memory.class_id;
+				class_name = get_java_symbol(t, &key);
+				if (class_name) {
+					str_len += strlen(class_name) + 1;
+				} else {
+					str_len += strlen(UNKNOWN_JAVA_SYMBOL_STR) + 1;
+				}
 			}
 
 			int len = sizeof(stack_trace_msg_t) + str_len;
@@ -924,6 +959,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				clib_mem_free(trace_str);
 				if (__info_p)
 					AO_DEC(&__info_p->use);
+				if (class_name) {
+					clib_mem_free(class_name);
+				}
 				continue;
 			}
 
@@ -943,7 +981,13 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 			offset += snprintf(msg_str + offset, str_len - offset, "%s", trace_str);
 			if (ctx->type == PROFILER_TYPE_MEMORY) {
-				offset += snprintf(msg_str + offset, str_len - offset, ";%s", v->ext_data.memory.class_name);
+				if (class_name) {
+					offset += snprintf(msg_str + offset, str_len - offset, ";%s", class_name);
+					clib_mem_free(class_name);
+					class_name = NULL;
+				} else {
+					offset += snprintf(msg_str + offset, str_len - offset, ";%s", UNKNOWN_JAVA_SYMBOL_STR);
+				}
 			}
 
 			msg->data_len = strlen((char *)msg->data);

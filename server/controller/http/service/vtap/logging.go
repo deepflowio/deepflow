@@ -19,10 +19,10 @@ package vtap
 import (
 	"fmt"
 
-	logging "github.com/op/go-logging"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("http.service.vtap")
+var log = logger.MustGetLogger("http.service.vtap")
 
 func dbQueryResourceFailed(resource string, err error) string {
 	return fmt.Sprintf("db query %s failed: %v", resource, err)

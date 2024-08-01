@@ -20,6 +20,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
@@ -27,7 +28,7 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 	var vpcIdToCidr map[string]string
 	var regionIdToDefaultVPCLcuuid map[string]string
 
-	log.Info("get vpcs starting")
+	log.Info("get vpcs starting", logger.NewORGPrefix(q.orgID))
 
 	vpcIds := mapset.NewSet()
 	regionLcuuidToDefaultVPCLcuuid := make(map[string]string)
@@ -41,7 +42,7 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 		}
 		response, err := q.GetResponse("DescribeRouters", "router_set", kwargs)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(q.orgID))
 			return nil, err
 		}
 
@@ -53,7 +54,7 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 					continue
 				}
 
-				log.Debugf("get vpc (%s)", vpc.Get("router_id").MustString())
+				log.Debugf("get vpc (%s)", vpc.Get("router_id").MustString(), logger.NewORGPrefix(q.orgID))
 				// 不同可用区会返回相同的vpc，需要做去重处理
 				vpcId := vpc.Get("router_id").MustString()
 				if vpcIds.Contains(vpcId) {
@@ -99,6 +100,6 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 	q.vpcIdToCidr = vpcIdToCidr
 	q.regionIdToDefaultVPCLcuuid = regionIdToDefaultVPCLcuuid
 
-	log.Info("get vpcs complete")
+	log.Info("get vpcs complete", logger.NewORGPrefix(q.orgID))
 	return retVPCs, nil
 }

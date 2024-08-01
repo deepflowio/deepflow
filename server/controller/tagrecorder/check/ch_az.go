@@ -40,11 +40,11 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
-	log.Infof("generate data for %s", a.resourceTypeName)
+	log.Infof("generate data for %s", a.resourceTypeName, a.db.LogPrefixORGID)
 	var azs []mysql.AZ
 	err := a.db.Unscoped().Find(&azs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(a.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(a.resourceTypeName, err), a.db.LogPrefixORGID)
 		return nil, false
 	}
 

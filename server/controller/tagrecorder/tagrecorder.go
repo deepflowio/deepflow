@@ -20,12 +20,11 @@ import (
 	"context"
 	"sync"
 
-	logging "github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("tagrecorder")
+var log = logger.MustGetLogger("tagrecorder")
 
 var (
 	tagRecorderOnce sync.Once

@@ -66,7 +66,7 @@ static bool g_disable_syscall_tracing;
  */
 static volatile uint64_t probes_act;
 
-extern __thread uword thread_index;     // for symbol pid caches hash
+extern __thread uword thread_index;	// for symbol pid caches hash
 extern int sys_cpus_count;
 extern bool *cpu_online;
 extern uint32_t attach_failed_count;
@@ -646,7 +646,7 @@ static void process_event(struct process_event_t *e)
 {
 	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC) {
 		if (e->maybe_thread && !is_user_process(e->pid))
-			return;	
+			return;
 		update_proc_info_cache(e->pid, PROC_EXEC);
 		go_process_exec(e->pid);
 		ssl_process_exec(e->pid);
@@ -1946,6 +1946,33 @@ static int dispatch_workers_setup(struct bpf_tracer *tracer,
 	return ETR_OK;
 }
 
+static int check_dependencies(void)
+{
+	if (check_kernel_version(4, 14) != 0) {
+		return -1;
+	}
+
+	if (access(FTRACE_SYSCALLS_PATH, F_OK) != 0) {
+		ebpf_warning("Directory %s does not exist. deepflow-agent "
+			     "relies on the kernel compilation option "
+			     "'CONFIG_FTRACE_SYSCALLS'. Please ensure that "
+			     "this kernel compilation option is enabled (when "
+			     "enabled, it will display CONFIG_FTRACE_SYSCALLS=y). "
+			     "Generally, you can check the Linux kernel compilation"
+			     " options through the file `/boot/config-<current running"
+			     " Linux kernel version>`. If the compilation option is "
+			     "enabled but the `%s`"
+			     " directory is still missing, it may be due to a missing "
+			     "mount. Please manually execute the command `mount -t tracefs"
+			     " nodev /sys/kernel/debug/tracing` on the node to attempt to "
+			     "resolve the issue.\n", FTRACE_SYSCALLS_PATH,
+			     FTRACE_SYSCALLS_PATH);
+		return -1;
+	}
+
+	return 0;
+}
+
 /**
  * Start socket tracer
  *
@@ -2000,7 +2027,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (thread_nr > sys_cpus_count)
 		thread_nr = sys_cpus_count;
 
-	if (check_kernel_version(4, 14) != 0) {
+	if (check_dependencies() != 0) {
 		return -EINVAL;
 	}
 

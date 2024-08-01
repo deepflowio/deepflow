@@ -20,17 +20,17 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 )
 
-var log = logging.MustGetLogger("trisolaris/upgrade")
+var log = logger.MustGetLogger("trisolaris/upgrade")
 
 func init() {
 	http.Register(NewUpgradeService())
@@ -100,7 +100,7 @@ func Upgrade(c *gin.Context) {
 		return
 	}
 	vTapCache.UpdateUpgradeInfo(expectedRevision, upgradeInfo.ImageName)
-	log.Infof("orgID=%d, vtap(%s, %s) upgrade:(%s, %s)", orgIDInt, vtap.Name, key, expectedRevision, upgradeInfo.ImageName)
+	log.Infof("vtap(%s, %s) upgrade:(%s, %s)", orgIDInt, vtap.Name, key, expectedRevision, upgradeInfo.ImageName, logger.NewORGPrefix(orgIDInt))
 	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
 }
 

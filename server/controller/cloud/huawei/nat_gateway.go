@@ -24,6 +24,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (h *HuaWei) getNATGateways() (
@@ -44,12 +45,12 @@ func (h *HuaWei) getNATGateways() (
 			id := common.IDGenerateUUID(h.orgID, jNG.Get("id").MustString())
 			name := jNG.Get("name").MustString()
 			if !cloudcommon.CheckJsonAttributes(jNG, requiredAttrs) {
-				log.Infof("exclude nat_gateway: %s, missing attr", name)
+				log.Infof("exclude nat_gateway: %s, missing attr", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			routerID := common.IDGenerateUUID(h.orgID, jNG.Get("router_id").MustString())
 			if routerID == "" {
-				log.Infof("exclude nat_gateway: %s, missing vpc info", name)
+				log.Infof("exclude nat_gateway: %s, missing vpc info", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			natGateway := model.NATGateway{
@@ -122,7 +123,7 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 		jRule := jRules[i]
 		id := common.IDGenerateUUID(h.orgID, jRule.Get("id").MustString())
 		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
-			log.Infof("exclude nat_gateway: %s, missing attr", id)
+			log.Infof("exclude nat_gateway: %s, missing attr", id, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 		natGatewayID := common.IDGenerateUUID(h.orgID, jRule.Get("nat_gateway_id").MustString())
@@ -188,18 +189,18 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 		jRule := jRules[i]
 		id := common.IDGenerateUUID(h.orgID, jRule.Get("id").MustString())
 		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
-			log.Infof("exclude nat_gateway: %s, missing attr", id)
+			log.Infof("exclude nat_gateway: %s, missing attr", id, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 		networkID, ok := jRule.CheckGet("network_id")
 		if !ok {
-			log.Infof("exclude nat_gateway: %s, missing network info", id)
+			log.Infof("exclude nat_gateway: %s, missing network info", id, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 
 		fixedIP, ok := h.toolDataSet.networkLcuuidToCIDR[common.IDGenerateUUID(h.orgID, networkID.MustString())]
 		if !ok {
-			log.Infof("exclude nat_gateway: %s, missing fixed ip", id)
+			log.Infof("exclude nat_gateway: %s, missing fixed ip", id, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 		natGatewayID := common.IDGenerateUUID(h.orgID, jRule.Get("nat_gateway_id").MustString())

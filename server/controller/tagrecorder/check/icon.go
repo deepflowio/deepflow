@@ -43,7 +43,7 @@ func (c *TagRecorder) UpdateIconInfo(db *mysql.DB) (map[string]int, map[IconKey]
 	body := make(map[string]interface{})
 	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", c.cfg.DFWebService.Host, c.cfg.DFWebService.Port), body)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 		return domainToIconID, resourceToIconID, err
 	}
 	if len(response.Get("DATA").MustArray()) == 0 {

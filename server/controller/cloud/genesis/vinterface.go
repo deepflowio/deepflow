@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
-	log.Debug("get vinterfaces starting")
+	log.Debug("get vinterfaces starting", logger.NewORGPrefix(g.orgID))
 	vinterfaces := []model.VInterface{}
 	vinterfacesData := g.genesisData.Ports
 
@@ -32,7 +33,7 @@ func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 
 	for _, v := range vinterfacesData {
 		if v.DeviceLcuuid == "" || v.NetworkLcuuid == "" {
-			log.Debug("device lcuuid or network lcuuid not found")
+			log.Debug("device lcuuid or network lcuuid not found", logger.NewORGPrefix(g.orgID))
 			continue
 		}
 		vpcLcuuid := v.VPCLcuuid
@@ -52,6 +53,6 @@ func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 		}
 		vinterfaces = append(vinterfaces, vinterface)
 	}
-	log.Debug("get vinterfaces complete")
+	log.Debug("get vinterfaces complete", logger.NewORGPrefix(g.orgID))
 	return vinterfaces, nil
 }

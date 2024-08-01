@@ -20,15 +20,15 @@ import (
 	// "sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/op/go-logging"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
-var log = logging.MustGetLogger("prometheus.synchronizer")
+var log = logger.MustGetLogger("prometheus.synchronizer")
 
 type counter struct {
 	SendMetricCount uint64
@@ -87,7 +87,7 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 		return true
 	})
 	if nonLabelNames.Cardinality() > 0 {
-		log.Warning(s.org.Logf("label name id not found, names: %v", nonLabelNames.ToSlice()))
+		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice(), s.org.LogPrefix)
 	}
 	return mLabels, err
 }
@@ -117,10 +117,10 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 		s.counter.SendLabelCount++
 	}
 	if nonLabelNames.Cardinality() > 0 {
-		log.Warning(s.org.Logf("label name id not found, names: %v", nonLabelNames.ToSlice()))
+		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice(), s.org.LogPrefix)
 	}
 	if nonLabelValues.Cardinality() > 0 {
-		log.Warning(s.org.Logf("label value id not found, values: %v", nonLabelValues.ToSlice()))
+		log.Warningf("label value id not found, values: %v", nonLabelValues.ToSlice(), s.org.LogPrefix)
 	}
 	return ls, nil
 }
@@ -178,10 +178,10 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 // 	})
 
 // 	if nonInstances.Cardinality() > 0 {
-// 		log.Warning(s.org.Logf("target instance id not found, instances: %v", nonInstances.ToSlice()))
+// 		log.Warningf("target instance id not found, instances: %v", nonInstances.ToSlice()))
 // 	}
 // 	if nonJobs.Cardinality() > 0 {
-// 		log.Warning(s.org.Logf("target job id not found, jobs: %v", nonJobs.ToSlice()))
+// 		log.Warningf("target job id not found, jobs: %v", nonJobs.ToSlice()))
 // 	}
 // 	return targets, err
 // }

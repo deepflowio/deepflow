@@ -142,7 +142,7 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("profile_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 span_id"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 trace_id"),
 		ckdb.NewColumn("span_name", ckdb.String).SetComment("含义等同 l7_flow_log 的 endpoint"),
-		ckdb.NewColumn("app_instance", ckdb.String).SetComment("应用实例名称, 用户上报"),
+		ckdb.NewColumn("app_instance", ckdb.LowCardinalityString).SetComment("应用实例名称, 用户上报"),
 		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("profile 上报的 tagnames"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("profile 上报的 tagvalues"),
 		ckdb.NewColumn("compression_algo", ckdb.LowCardinalityString).SetComment("压缩算法"),
@@ -313,6 +313,10 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.ProfileID, _ = input.Key.ProfileID()
 	if input.Key.Labels() != nil {
 		p.SpanName = input.Key.Labels()[LabelSpanName]
+	}
+	// app_instance should upload by user with label, if empty use app_service
+	if p.AppInstance == "" {
+		p.AppInstance = p.AppService
 	}
 	p.ProcessID = pid
 	p.ProcessStartTime = stime

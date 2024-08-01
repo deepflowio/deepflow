@@ -86,7 +86,7 @@ func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTargetRequest
 
 	err := addBatch(mt.org.DB, dbToAdd, mt.resourceType)
 	if err != nil {
-		log.Error(mt.org.Logf("add %s error: %s", mt.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", mt.resourceType, err.Error(), mt.org.LogPrefix)
 		return resp, err
 	}
 	for _, item := range dbToAdd {

@@ -22,14 +22,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/message/controller"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
-var log = logging.MustGetLogger("prometheus.synchronizer.cache")
+var log = logger.MustGetLogger("prometheus.synchronizer.cache")
 
 var (
 	cacheOnce sync.Once
@@ -51,12 +51,12 @@ type Cache struct {
 }
 
 func newCache(orgID int) (*Cache, error) {
-	log.Infof("[OID-%d] new prometheus cache", orgID)
 	org, err := common.NewORG(orgID)
 	if err != nil {
-		log.Errorf("[OID-%d] failed to create org object: %s", orgID, err.Error())
+		log.Errorf("failed to create org object: %s", orgID, err.Error())
 		return nil, err
 	}
+	log.Infof("new prometheus cache", org.LogPrefix)
 	mn := newMetricName(org)
 	c := &Cache{
 		org:                     org,
@@ -85,14 +85,14 @@ LOOP:
 			break LOOP
 		default:
 			time.Sleep(time.Second)
-			log.Info(c.org.Log("last refresh cache not completed now"))
+			log.Infof("last refresh cache not completed now", c.org.LogPrefix)
 		}
 	}
 	return
 }
 
 func (c *Cache) refresh() error {
-	log.Info(c.org.Log("refresh cache started"))
+	log.Infof("refresh cache started", c.org.LogPrefix)
 	egRunAhead := &errgroup.Group{}
 	common.AppendErrGroup(egRunAhead, c.MetricName.refresh)
 	common.AppendErrGroup(egRunAhead, c.Label.refresh)
@@ -102,7 +102,7 @@ func (c *Cache) refresh() error {
 	common.AppendErrGroup(eg, c.LabelValue.refresh)
 	common.AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
 	err := eg.Wait()
-	log.Info(c.org.Log("refresh cache completed"))
+	log.Infof("refresh cache completed", c.org.LogPrefix)
 	return err
 
 }

@@ -73,7 +73,7 @@ func GetWhere(name, value string) WhereStatement {
 	}
 }
 
-func TransWhereTagFunction(db string, name string, args []string) (filter string) {
+func TransWhereTagFunction(db, table string, name string, args []string) (filter string) {
 	funcName := strings.ToLower(name)
 	switch funcName {
 	case "exist":
@@ -89,13 +89,16 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 		}
 		resource := strings.ToLower(strings.Trim(args[0], "`"))
 		suffix := ""
-		if strings.HasSuffix(resource, "_0") {
-			suffix = "_0"
-		} else if strings.HasSuffix(resource, "_1") {
-			suffix = "_1"
+		resourceNoSuffix := resource
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+			if strings.HasSuffix(resource, "_0") {
+				suffix = "_0"
+				resourceNoSuffix = strings.TrimSuffix(resourceNoSuffix, "_0")
+			} else if strings.HasSuffix(resource, "_1") {
+				suffix = "_1"
+				resourceNoSuffix = strings.TrimSuffix(resourceNoSuffix, "_1")
+			}
 		}
-		resourceNoSuffix := strings.TrimSuffix(resource, "_0")
-		resourceNoSuffix = strings.TrimSuffix(resourceNoSuffix, "_1")
 		resourceNoID := strings.TrimSuffix(resourceNoSuffix, "_id")
 		deviceTypeValue, ok := tag.DEVICE_MAP[resourceNoID]
 		if ok {
@@ -356,72 +359,87 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 	default:
 		tagName := strings.Trim(whereTag, "`")
 		if strings.HasPrefix(tagName, "k8s.label.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+			nameNoSuffix := tagName
+			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+				if strings.HasSuffix(tagName, "_0") {
+					tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
+				} else if strings.HasSuffix(tagName, "_1") {
+					tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+				}
 			} else {
 				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
 			}
 			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
 				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "k8s.annotation.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
+			nameNoSuffix := tagName
+			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+				if strings.HasSuffix(tagName, "_0") {
+					tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
+				} else if strings.HasSuffix(tagName, "_1") {
+					tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+				}
 			} else {
 				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
 			}
 			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
 				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "k8s.env.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
+			nameNoSuffix := tagName
+			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+				if strings.HasSuffix(tagName, "_0") {
+					tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
+				} else if strings.HasSuffix(tagName, "_1") {
+					tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+				}
 			} else {
 				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
 			}
 			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
 				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "cloud.tag.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+			nameNoSuffix := tagName
+			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+				if strings.HasSuffix(tagName, "_0") {
+					tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
+				} else if strings.HasSuffix(tagName, "_1") {
+					tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+				}
 			} else {
 				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
 			}
 			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
 				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "os.app.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+			nameNoSuffix := tagName
+			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+				if strings.HasSuffix(tagName, "_0") {
+					tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
+				} else if strings.HasSuffix(tagName, "_1") {
+					tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
+					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+				}
 			} else {
 				tagItem, ok = tag.GetTag("os_app", db, table, "default")
 			}
 			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
 				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
 				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
@@ -518,7 +536,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		filter := ""
 		switch t.Tag {
-		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id", "team_id":
+		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id", "team_id", "app_service", "app_instance":
 			if table == "user_map" && t.Tag == "user_id" {
 				tagItem, ok := tag.GetTag("value", db, table, "default")
 				if ok {
@@ -821,7 +839,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		} else {
 			switch t.Tag {
-			case "policy_type", "metric_value", "event_level", "team_id", "user_id":
+			case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1":
 				if strings.Contains(op, "match") {
 					filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 				} else {
@@ -1060,9 +1078,9 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				}
 			case "service", "chost", "chost_hostname", "chost_ip", "router", "dhcpgw", "redis", "rds", "lb_listener",
 				"natgw", "lb", "host", "host_hostname", "host_ip", "pod_node", "pod_node_hostname", "pod_node_ip", "user",
-				"pod_group_type", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "pod_service_id":
+				"pod_group_type", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "pod_service_id", "pod_service":
 				whereFilter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
-			case "pod_ingress", "pod_service", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
+			case "pod_ingress", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
 				whereFilter = TransIngressFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 				if strings.Contains(op, "match") {
@@ -1286,6 +1304,11 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 	}
 	function := strings.Trim(f.Function.ToString(), "`")
 	if strings.HasPrefix(function, "Enum(") {
+		tagName := strings.TrimPrefix(function, "Enum(")
+		tagName = strings.TrimSuffix(tagName, ")")
+		tagName = strings.Trim(tagName, "`")
+		tagEnum := strings.TrimSuffix(tagName, "_0")
+		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		if db == "flow_tag" {
 			if strings.ToLower(opName) == "like" || strings.ToLower(opName) == "not like" {
 				f.Value = strings.ReplaceAll(f.Value, "*", "%")
@@ -1309,6 +1332,17 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				}
 			}
 			filter := ""
+			if tagName == "app_service" || tagName == "app_instance" {
+				tagItem, ok := tag.GetTag("other_id", db, table, "default")
+				if ok {
+					if strings.Contains(opName, "match") {
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, tagName, f.Value)
+					} else {
+						filter = fmt.Sprintf(tagItem.WhereTranslator, tagName, opName, f.Value)
+					}
+				}
+				return &view.Expr{Value: "(" + filter + ")"}, nil
+			}
 			tagItem, ok := tag.GetTag("enum_tag_name", db, table, "default")
 			if ok {
 				switch strings.ToLower(opName) {
@@ -1330,11 +1364,6 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 
 		}
 		var isIntEnum = true
-		tagName := strings.TrimPrefix(function, "Enum(")
-		tagName = strings.TrimSuffix(tagName, ")")
-		tagName = strings.Trim(tagName, "`")
-		tagEnum := strings.TrimSuffix(tagName, "_0")
-		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		tagDescription, ok := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
 			DB: db, Table: table, TagName: tagEnum,
 		}]
@@ -1375,6 +1404,14 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				} else {
 					opName = "not match"
 				}
+			}
+			if tagName == "app_service" || tagName == "app_instance" {
+				if strings.Contains(opName, "match") {
+					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, tagName, f.Value)
+				} else {
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, tagName, opName, f.Value)
+				}
+				return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 			}
 			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {

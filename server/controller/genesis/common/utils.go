@@ -34,15 +34,14 @@ import (
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
-	"github.com/op/go-logging"
-	"gopkg.in/yaml.v3"
 	"inet.af/netaddr"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("genesis.common")
+var log = logger.MustGetLogger("genesis.common")
 
 type TeamInfo struct {
 	OrgID  int
@@ -160,15 +159,6 @@ type XMLVM struct {
 	Label      string
 	VPC        XMLVPC
 	Interfaces []XMLInterface
-}
-
-type scrapeConfig struct {
-	JobName     string `yaml:"job_name"`
-	HonorLabels bool   `yaml:"honor_labels"`
-}
-
-type prometheusConfig struct {
-	ScrapeConfigs []scrapeConfig `yaml:"scrape_configs"`
 }
 
 var IfaceRegex = regexp.MustCompile("^(\\d+):\\s+([^@:]+)(@.*)?\\:")
@@ -449,15 +439,6 @@ func ParseVMXml(s, nameField string) ([]XMLVM, error) {
 		vms = append(vms, vm)
 	}
 	return vms, nil
-}
-
-func ParseYMAL(y string) (prometheusConfig, error) {
-	pConfig := prometheusConfig{}
-	err := yaml.Unmarshal([]byte(y), &pConfig)
-	if err != nil {
-		return prometheusConfig{}, err
-	}
-	return pConfig, nil
 }
 
 func ParseCompressedInfo(cInfo []byte) (bytes.Buffer, error) {

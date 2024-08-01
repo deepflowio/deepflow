@@ -40,7 +40,7 @@ func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusL
 
 	err := mysql.Db.Unscoped().Find(&prometheusLabelName).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
 	}
 

@@ -22,7 +22,7 @@ pod_service                , K8s 容器服务               ,
 pod_group_type             , K8s 工作负载类型           ,
 pod_group                  , K8s 工作负载               , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                        , K8s 容器 POD               ,
-service                    , 服务                       ,
+service                    , 服务                       , 已废弃，请使用 pod_service
 gprocess                   , 进程                       ,
 host_ip                    , 宿主机                     , 宿主机的管理 IP。
 host_hostname              , 宿主机                     , 宿主机的 Hostname。

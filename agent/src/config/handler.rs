@@ -470,6 +470,7 @@ pub struct FlowConfig {
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
     pub server_ports: Vec<u16>,
+    pub consistent_timestamp_in_l7_metrics: bool,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -572,6 +573,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                     .obfuscate_enabled_protocols,
             ),
             server_ports: conf.yaml_config.server_ports.clone(),
+            consistent_timestamp_in_l7_metrics: conf.yaml_config.consistent_timestamp_in_l7_metrics,
         }
     }
 }

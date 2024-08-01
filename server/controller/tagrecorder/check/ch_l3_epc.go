@@ -41,7 +41,7 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 	var vpcs []mysql.VPC
 	err := v.db.Unscoped().Find(&vpcs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
 

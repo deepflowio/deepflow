@@ -40,7 +40,7 @@ func NewChDevice(resourceTypeToIconID map[IconKey]int) *ChDevice {
 }
 
 func (d *ChDevice) generateNewData() (map[DeviceKey]mysql.ChDevice, bool) {
-	log.Infof("generate data for %s", d.resourceTypeName)
+	log.Infof("generate data for %s", d.resourceTypeName, d.db.LogPrefixORGID)
 	keyToItem := make(map[DeviceKey]mysql.ChDevice)
 	ok := d.generateHostData(keyToItem)
 	if !ok {
@@ -131,7 +131,7 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 	var hosts []mysql.Host
 	err := d.db.Unscoped().Find(&hosts).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -172,7 +172,7 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var vms []mysql.VM
 	err := d.db.Unscoped().Find(&vms).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -215,7 +215,7 @@ func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysql.ChDevice) b
 	var vrouters []mysql.VRouter
 	err := d.db.Unscoped().Find(&vrouters).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -244,7 +244,7 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) 
 	var dhcpPorts []mysql.DHCPPort
 	err := d.db.Unscoped().Find(&dhcpPorts).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -281,7 +281,7 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice
 	var natGateways []mysql.NATGateway
 	err := d.db.Unscoped().Find(&natGateways).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -320,7 +320,7 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var lbs []mysql.LB
 	err := d.db.Unscoped().Find(&lbs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -359,7 +359,7 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevic
 	var rdsInstances []mysql.RDSInstance
 	err := d.db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -398,7 +398,7 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDev
 	var redisInstances []mysql.RedisInstance
 	err := d.db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -437,14 +437,14 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 	var podServices []mysql.PodService
 	err := d.db.Unscoped().Find(&podServices).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
 	for _, podService := range podServices {
 		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
 		if err != nil {
-			log.Errorf("resource(%s) %s, resource: %#v", d.resourceTypeName, err.Error(), podService)
+			log.Errorf("resource(%s) %s, resource: %#v", d.resourceTypeName, err.Error(), podService, d.db.LogPrefixORGID)
 		}
 		if podService.DeletedAt.Valid {
 			podServiceKey := DeviceKey{
@@ -514,7 +514,7 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 	var pods []mysql.Pod
 	err := d.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -552,7 +552,7 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 	var podGroups []mysql.PodGroup
 	err := d.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -590,7 +590,7 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 	var podNodes []mysql.PodNode
 	err := d.db.Unscoped().Find(&podNodes).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -632,7 +632,7 @@ func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysql.ChDevice
 	var podClusters []mysql.PodCluster
 	err := d.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -694,7 +694,7 @@ func (d *ChDevice) generateInternetData(keyToItem map[DeviceKey]mysql.ChDevice) 
 func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	processes, err := query.FindInBatches[mysql.Process](d.db.Unscoped())
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 	for _, process := range processes {

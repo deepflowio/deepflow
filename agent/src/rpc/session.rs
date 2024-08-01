@@ -64,7 +64,6 @@ const KUBERNETES_API_SYNC_ENDPOINT: usize = 5;
 const GET_KUBERNETES_CLUSTER_ID_ENDPOINT: usize = 6;
 const GPID_SYNC_ENDPOINT: usize = 7;
 const PLUGIN_ENDPOINT: usize = 8;
-const PROMETHEUS_API_SYNC_ENDPOINT: usize = 9;
 
 struct Config {
     ips: Vec<String>,
@@ -461,18 +460,6 @@ impl Session {
             plugin_type, name, total_len, msg_md5
         );
         Ok(data)
-    }
-
-    pub async fn grpc_prometheus_api_sync(
-        &self,
-        request: trident::PrometheusApiSyncRequest,
-    ) -> Result<tonic::Response<trident::PrometheusApiSyncResponse>, tonic::Status> {
-        sync_grpc_call!(
-            self,
-            prometheus_api_sync,
-            request,
-            PROMETHEUS_API_SYNC_ENDPOINT
-        )
     }
 }
 

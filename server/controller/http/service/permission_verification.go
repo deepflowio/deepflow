@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 type AccessType string
@@ -177,32 +178,51 @@ func (ra *ResourceAccess) CanUpdateSubDomainResource(domainTeamID, subDomainTeam
 	if err := PermitVerify(url, ra.userInfo, subDomainTeamID); err != nil {
 		return err
 	}
+
 	if resourceUp == nil || len(resourceUp) == 0 {
 		return nil
 	}
 
-	if newOwnerID, ok := resourceUp["owner_user_id"]; ok {
-		body := map[string]interface{}{
-			"new_team_id":   subDomainTeamID,
-			"new_owner_id":  newOwnerID,
-			"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
-			"resource_id":   resourceUUID,
-		}
-		url = fmt.Sprintf(urlUGCPermission, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
-		if err := ugcPermission(url, ra.userInfo, body); err != nil {
+	var newTeamID int = subDomainTeamID
+	teamID, tOK := resourceUp["team_id"]
+	if tOK {
+		newTeamID = int(teamID.(float64))
+		url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessAdd)
+		url += fmt.Sprintf("&parent_team_id=%d&team_id=%d", domainTeamID, newTeamID)
+		if err := PermitVerify(url, ra.userInfo, newTeamID); err != nil {
 			return err
 		}
 	}
+	return nil
 
-	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
-	body := map[string]interface{}{
-		"resource_where": map[string]interface{}{
-			"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
-			"resource_id":   resourceUUID,
-		},
-		"resource_up": resourceUp,
-	}
-	return resourceVerify(url, http.MethodPatch, ra.userInfo, domainTeamID, body)
+	// TODO: support update
+	// var newOwnerID int = ra.userInfo.ID
+	// userID, uOK := resourceUp["owner_user_id"]
+	// if uOK {
+	// 	newOwnerID = int(userID.(float64))
+	// }
+	// if tOK || uOK {
+	// 	body := map[string]interface{}{
+	// 		"new_team_id":   newTeamID,
+	// 		"new_owner_id":  newOwnerID,
+	// 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
+	// 		"resource_id":   resourceUUID,
+	// 	}
+	// 	url = fmt.Sprintf(urlUGCPermission, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	// 	if err := ugcPermission(url, ra.userInfo, body); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	// body := map[string]interface{}{
+	// 	"resource_where": map[string]interface{}{
+	// 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
+	// 		"resource_id":   resourceUUID,
+	// 	},
+	// 	"resource_up": resourceUp,
+	// }
+	// return resourceVerify(url, http.MethodPatch, ra.userInfo, domainTeamID, body)
 }
 
 func (ra *ResourceAccess) CanDeleteSubDomainResource(domainTeamID, subDomainTeamID int, resourceUUID string) error {
@@ -248,14 +268,14 @@ func PermitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
 	)
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) error: %s", url, userInfo.Type, userInfo.ID, err.Error())
-		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error())
+		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error(), logger.NewORGPrefix(userInfo.ORGID))
 	}
 
 	havePermission := response.Get("DATA").MustBool()
 	if !havePermission {
 		desc := response.Get("DESCRIPTION").MustString()
 		log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d) description(%s)",
-			url, userInfo.Type, userInfo.ID, teamID, desc)
+			url, userInfo.Type, userInfo.ID, teamID, desc, logger.NewORGPrefix(userInfo.ORGID))
 		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, desc)
 	}
 	return nil
@@ -272,7 +292,7 @@ func ugcPermission(url string, userInfo *httpcommon.UserInfo, body map[string]in
 	)
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) body(%#v) error: %s",
-			url, userInfo.Type, userInfo.ID, body, err.Error())
+			url, userInfo.Type, userInfo.ID, body, err.Error(), logger.NewORGPrefix(userInfo.ORGID))
 		return fmt.Errorf("%w %s", httpcommon.ERR_FPERMIT_EXCEPTION, err.Error())
 	}
 
@@ -280,7 +300,7 @@ func ugcPermission(url string, userInfo *httpcommon.UserInfo, body map[string]in
 	if !havePermission {
 		desc := response.Get("DESCRIPTION").MustString()
 		log.Errorf("url(%s) user_type(%d) user_id(%d) body(%#v) description(%s)",
-			url, userInfo.Type, userInfo.ID, body, desc)
+			url, userInfo.Type, userInfo.ID, body, desc, logger.NewORGPrefix(userInfo.ORGID))
 		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, desc)
 	}
 	return nil
@@ -298,7 +318,7 @@ func resourceVerify(url, httpMethod string, userInfo *httpcommon.UserInfo, teamI
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d) body(%#v) error: %s",
 			url, userInfo.Type, userInfo.ID, teamID, body, err.Error())
-		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, err.Error())
+		return fmt.Errorf("%w %s", httpcommon.ERR_NO_PERMISSIONS, err.Error(), logger.NewORGPrefix(userInfo.ORGID))
 	}
 	return nil
 }

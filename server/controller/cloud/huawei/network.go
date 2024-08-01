@@ -22,6 +22,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterface, error) {
@@ -44,7 +45,7 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 			id := common.IDGenerateUUID(h.orgID, jn.Get("id").MustString())
 			name := jn.Get("name").MustString()
 			if !cloudcommon.CheckJsonAttributes(jn, requiredAttrs) {
-				log.Infof("exclude network: %s, missing attr", name)
+				log.Infof("exclude network: %s, missing attr", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			vpcID := common.IDGenerateUUID(h.orgID, jn.Get("vpc_id").MustString())

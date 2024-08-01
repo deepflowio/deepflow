@@ -19,17 +19,18 @@ package volcengine
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/ecs"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
 )
 
 func (v *VolcEngine) getAZs(sess *session.Session) ([]model.AZ, error) {
-	log.Debug("get azs starting")
+	log.Debug("get azs starting", logger.NewORGPrefix(v.orgID))
 	var azs []model.AZ
 
 	resp, err := ecs.New(sess).DescribeZones(&ecs.DescribeZonesInput{})
 	if err != nil {
-		log.Errorf("request volcengine (ecs.DescribeZones) api error: (%s)", err.Error())
+		log.Errorf("request volcengine (ecs.DescribeZones) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 		return []model.AZ{}, err
 	}
 	for _, zone := range resp.Zones {
@@ -39,7 +40,7 @@ func (v *VolcEngine) getAZs(sess *session.Session) ([]model.AZ, error) {
 		zoneID := v.getStringPointerValue(zone.ZoneId)
 		lcuuid := common.GetUUIDByOrgID(v.orgID, zoneID)
 		if _, ok := v.azLcuuids[lcuuid]; !ok {
-			log.Debugf("az (%s) has no resource", zoneID)
+			log.Debugf("az (%s) has no resource", zoneID, logger.NewORGPrefix(v.orgID))
 			continue
 		}
 		azs = append(azs, model.AZ{
@@ -49,6 +50,6 @@ func (v *VolcEngine) getAZs(sess *session.Session) ([]model.AZ, error) {
 			RegionLcuuid: v.regionUUID,
 		})
 	}
-	log.Debug("get azs complete")
+	log.Debug("get azs complete", logger.NewORGPrefix(v.orgID))
 	return azs, nil
 }

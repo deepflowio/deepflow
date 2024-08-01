@@ -181,7 +181,3 @@ type PodAdd struct {
 type ProcessAdd struct {
 	MySQLItems[mysql.Process]
 }
-
-type PrometheusTargetAdd struct {
-	MySQLItems[mysql.PrometheusTarget]
-}

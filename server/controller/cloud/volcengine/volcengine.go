@@ -23,17 +23,18 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/volcengine/volcengine-go-sdk/volcengine"
+	"github.com/volcengine/volcengine-go-sdk/volcengine/credentials"
+	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
+
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/op/go-logging"
-	"github.com/volcengine/volcengine-go-sdk/volcengine"
-	"github.com/volcengine/volcengine-go-sdk/volcengine/credentials"
-	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
 )
 
-var log = logging.MustGetLogger("cloud.volcengine")
+var log = logger.MustGetLogger("cloud.volcengine")
 
 var vmStates = map[string]int{
 	"RUNNING": common.VM_STATE_RUNNING,
@@ -78,25 +79,25 @@ type VolcEngine struct {
 func NewVolcEngine(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*VolcEngine, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretID, err := config.Get("secret_id").String()
 	if err != nil {
-		log.Error("secret_id must be specified")
+		log.Error("secret_id must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretKey, err := config.Get("secret_key").String()
 	if err != nil {
-		log.Error("secret_key must be specified")
+		log.Error("secret_key must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	decryptSecretKey, err := common.DecryptSecretKey(secretKey)
 	if err != nil {
-		log.Error("decrypt secret_key failed (%s)", err.Error())
+		log.Error("decrypt secret_key failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
@@ -159,7 +160,7 @@ func (v *VolcEngine) GetCloudData() (model.Resource, error) {
 	}
 
 	for _, regionID := range regionIDs {
-		log.Infof("region (%s) collect starting", regionID)
+		log.Infof("region (%s) collect starting", regionID, logger.NewORGPrefix(v.orgID))
 
 		v.azLcuuids = map[string]bool{}
 
@@ -170,7 +171,7 @@ func (v *VolcEngine) GetCloudData() (model.Resource, error) {
 
 		sess, err := session.NewSession(config)
 		if err != nil {
-			log.Errorf("get volcengine session error: (%s)", err.Error())
+			log.Errorf("get volcengine session error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 			return model.Resource{}, err
 		}
 
@@ -223,7 +224,7 @@ func (v *VolcEngine) GetCloudData() (model.Resource, error) {
 		}
 		resource.AZs = append(resource.AZs, azs...)
 
-		log.Infof("region (%s) collect complete", regionID)
+		log.Infof("region (%s) collect complete", regionID, logger.NewORGPrefix(v.orgID))
 	}
 	return resource, nil
 }

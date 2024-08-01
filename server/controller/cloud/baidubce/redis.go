@@ -22,6 +22,7 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/scs"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RedisInstance, []model.VInterface, []model.IP, error) {
@@ -29,7 +30,7 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 	var vinterfaces []model.VInterface
 	var ips []model.IP
 
-	log.Debug("get redis starting")
+	log.Debug("get redis starting", logger.NewORGPrefix(b.orgID))
 
 	scsClient, _ := scs.NewClient(b.secretID, b.secretKey, "redis."+b.endpoint)
 	scsClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -41,7 +42,7 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 		startTime := time.Now()
 		result, err := scsClient.ListInstances(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListRedisInstance", len(result.Instances), startTime)
@@ -57,26 +58,26 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 		for _, ret := range result.Instances {
 			redis, err := scsClient.GetInstanceDetail(ret.InstanceID)
 			if err != nil {
-				log.Errorf("get instance detail error (%s)", err.Error())
+				log.Errorf("get instance detail error (%s)", err.Error(), logger.NewORGPrefix(b.orgID))
 				continue
 			}
 
 			if redis.InstanceStatus != "Running" {
-				log.Infof("redis (%s) invalid status (%s)", redis.InstanceName, redis.InstanceStatus)
+				log.Infof("redis (%s) invalid status (%s)", redis.InstanceName, redis.InstanceStatus, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			vpcLcuuid, ok := vpcIdToLcuuid[redis.VpcID]
 			if !ok {
-				log.Infof("redis (%s) vpc (%s) not found", redis.InstanceName, redis.VpcID)
+				log.Infof("redis (%s) vpc (%s) not found", redis.InstanceName, redis.VpcID, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			if len(redis.ZoneNames) == 0 {
-				log.Infof("redis (%s) zone not found", redis.InstanceName)
+				log.Infof("redis (%s) zone not found", redis.InstanceName, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			azLcuuid, ok := zoneNameToAZLcuuid[redis.ZoneNames[0]]
 			if !ok {
-				log.Infof("redis (%s) zone (%s) not found", redis.InstanceID, redis.ZoneNames[0])
+				log.Infof("redis (%s) zone (%s) not found", redis.InstanceID, redis.ZoneNames[0], logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			redisLcuuid := common.GenerateUUIDByOrgID(b.orgID, redis.InstanceID)
@@ -96,12 +97,12 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 			b.regionLcuuidToResourceNum[region.Lcuuid]++
 
 			if len(redis.Subnets) == 0 {
-				log.Infof("redis (%s) without subnets", redis.InstanceName)
+				log.Infof("redis (%s) without subnets", redis.InstanceName, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			networkLcuuid, ok := networkIdToLcuuid[redis.Subnets[0].SubnetID]
 			if !ok {
-				log.Infof("redis (%s) network (%s) not found", redis.InstanceName, redis.Subnets[0].SubnetID)
+				log.Infof("redis (%s) network (%s) not found", redis.InstanceName, redis.Subnets[0].SubnetID, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 
@@ -139,6 +140,6 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 			}
 		}
 	}
-	log.Debug("get redis complete")
+	log.Debug("get redis complete", logger.NewORGPrefix(b.orgID))
 	return redisInstances, vinterfaces, ips, nil
 }

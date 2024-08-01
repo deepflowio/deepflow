@@ -17,8 +17,9 @@
 package model
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"time"
+
+	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 )
 
 type KubernetesGatherResource struct {
@@ -51,7 +52,6 @@ type KubernetesGatherResource struct {
 	PodSubnets             []model.Subnet
 	PodVInterfaces         []model.VInterface
 	PodIPs                 []model.IP
-	PrometheusTargets      []model.PrometheusTarget
 }
 
 type KubernetesGatherBasicInfo struct {
@@ -59,6 +59,7 @@ type KubernetesGatherBasicInfo struct {
 	Name                  string        `json:"name"`
 	ClusterID             string        `json:"cluster_id"`
 	PortNameRegex         string        `json:"port_name_regex"`
+	TeamID                int           `json:"team_id"`
 	PodNetIPv4CIDRMaxMask int           `json:"pod_net_ipv4_cidr_max_mask"`
 	PodNetIPv6CIDRMaxMask int           `json:"pod_net_ipv6_cidr_max_mask"`
 	Interval              time.Duration `json:"interval"`

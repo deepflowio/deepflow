@@ -861,10 +861,12 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
 			DB: f.DB, Table: f.Table, TagName: f.Args[0],
 		}]
-
 		if getTagOK {
 			if tagOK {
 				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+				if tagEnum == "app_service" || tagEnum == "app_instance" {
+					enumFileName = tagEnum
+				}
 				tagFilter = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
 			} else {
 				tagFilter = fmt.Sprintf(tagDes.TagTranslator, tagEnum)

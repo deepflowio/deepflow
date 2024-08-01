@@ -22,7 +22,7 @@ pod_service                , pod_service               , pod_service            
 pod_group_type             , pod_group_type            , pod_group_type            , int_enum      , pod_group_type        , Universal Tag   , 111            , 0
 pod_group                  , pod_group                 , pod_group                 , resource      ,                       , Universal Tag   , 111            , 0
 pod                        , pod                       , pod                       , resource      ,                       , Universal Tag   , 111            , 0
-service                    , service                   , service                   , resource      ,                       , Universal Tag   , 111            , 0
+service                    , service                   , service                   , resource      ,                       , Universal Tag   , 111            , 1
 gprocess                   , gprocess                  , gprocess                  , resource      ,                       , Universal Tag   , 111            , 0
 host_ip                    , host_ip                   , host_ip                   , resource      ,                       , Universal Tag   , 111            , 0
 host_hostname              , host_hostname             , host_hostname             , resource      ,                       , Universal Tag   , 111            , 0
@@ -39,8 +39,8 @@ cloud.tag                  , cloud.tag                 , cloud.tag              
 ip                         , ip                        , ip                        , ip            ,                       , Network Layer   , 111            , 0
 is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum      , ip_type               , Network Layer   , 111            , 0
 
-app_service                , app_service               , app_service               , string        ,                       , Service Info    , 111            , 0
-app_instance               , app_instance              , app_instance              , string        ,                       , Service Info    , 111            , 0
+app_service                , app_service               , app_service               , string_enum   ,                       , Service Info    , 111            , 0
+app_instance               , app_instance              , app_instance              , string_enum   ,                       , Service Info    , 111            , 0
 
 trace_id                   , trace_id                  , trace_id                  , string        ,                       , Tracing Info    , 111            , 0
 span_name                  , span_name                 , span_name                 , string        ,                       , Tracing Info    , 111            , 0

@@ -25,6 +25,7 @@ import (
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -68,7 +69,7 @@ func (d *DataSource) getDataSources() gin.HandlerFunc {
 		dataSourceService := service.NewDataSource(httpcommon.GetUserInfo(c), d.cfg)
 		data, err := dataSourceService.GetDataSources(orgID.(int), args, &d.cfg.Spec)
 		if err != nil {
-			log.Error("ORGID-%d get data source error: %s", orgID, err)
+			log.Error("get data source error: %s", err, logger.NewORGPrefix(orgID.(int)))
 		}
 		JsonResponse(c, data, err)
 	})

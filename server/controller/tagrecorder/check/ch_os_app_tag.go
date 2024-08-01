@@ -41,7 +41,7 @@ func NewChOSAppTag() *ChOSAppTag {
 func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) {
 	processes, err := query.FindInBatches[mysql.Process](o.db.Unscoped())
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err), o.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -49,7 +49,7 @@ func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) 
 	for _, process := range processes {
 		teamID, err := tagrecorder.GetTeamID(process.Domain, process.SubDomain)
 		if err != nil {
-			log.Errorf("resource(%s) %s, resource: %#v", o.resourceTypeName, err.Error(), process)
+			log.Errorf("resource(%s) %s, resource: %#v", o.resourceTypeName, err.Error(), process, o.db.LogPrefixORGID)
 		}
 
 		splitTags := strings.Split(process.OSAPPTags, ", ")

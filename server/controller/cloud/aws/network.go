@@ -23,10 +23,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []model.VInterface, error) {
-	log.Debug("get networks starting")
+	log.Debug("get networks starting", logger.NewORGPrefix(a.orgID))
 	var networks []model.Network
 	var subnets []model.Subnet
 	var netVinterfaces []model.VInterface
@@ -43,7 +44,7 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 		}
 		result, err := a.ec2Client.DescribeSubnets(context.TODO(), input)
 		if err != nil {
-			log.Errorf("network request aws api error: (%s)", err.Error())
+			log.Errorf("network request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.Network{}, []model.Subnet{}, []model.VInterface{}, err
 		}
 		retNetworks = append(retNetworks, result.Subnets...)
@@ -101,6 +102,6 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 			})
 		}
 	}
-	log.Debug("get networks complete")
+	log.Debug("get networks complete", logger.NewORGPrefix(a.orgID))
 	return networks, subnets, netVinterfaces, nil
 }

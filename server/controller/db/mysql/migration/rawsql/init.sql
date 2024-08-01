@@ -8,7 +8,8 @@ TRUNCATE TABLE db_version;
 CREATE TABLE IF NOT EXISTS plugin (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
-    type                INTEGER NOT NULL COMMENT '1: wasm',
+    type                INTEGER NOT NULL COMMENT '1: wasm 2: so 3: lua',
+    user                INTEGER NOT NULL DEFAULT 1 COMMENT '1: agent 2: server',
     image               LONGBLOB NOT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -75,24 +76,6 @@ CREATE TABLE IF NOT EXISTS process (
     deleted_at          DATETIME DEFAULT NULL
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
-
-CREATE TABLE IF NOT EXISTS prometheus_target (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    lcuuid              CHAR(64) DEFAULT '',
-    instance            VARCHAR(255) DEFAULT '',
-    job                 VARCHAR(255) DEFAULT '',
-    scrape_url          VARCHAR(2083) DEFAULT '',
-    other_labels        TEXT COMMENT 'separated by ,',
-    epc_id              INTEGER NOT NULL DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    pod_cluster_id      INTEGER,
-    create_method       TINYINT(1) DEFAULT 1 COMMENT '1.recorder learning 2.prometheus learning',
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
-) ENGINE = innodb DEFAULT CHARSET = utf8mb4 AUTO_INCREMENT = 1;
-TRUNCATE TABLE prometheus_target;
 
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
@@ -2321,7 +2304,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (16, '事件-IO 事件', 'event.perf_event', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (17, '事件-告警事件', 'event.alarm_event', 0, 30*24, @lcuuid);
+                 VALUES (17, '事件-告警事件', 'event.alert_event', 0, 30*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);

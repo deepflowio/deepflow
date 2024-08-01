@@ -61,6 +61,8 @@ controller:
   #all-agent-connect-to-nat-ip: false
   ## If no-ip-overlapping is set to true, All IP and cidr issued by the controller to agent are wan
   #no-ip-overlapping: false
+  ## exec agent command timeout
+  # agent-cmd-timeout: 30
 
   # ingester plaform data, default: 0
   # 0 (All K8s Cluster)
@@ -621,7 +623,7 @@ ingester:
   #    free-space: 300          #  uint: GB, disk minimum free threshold
   #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
   #  priority-drops:     # set which database and table data will be deleted first when disk is full
-  #  - database: flow_log
+  #  - database: flow_log   # databases under all organizations
   #    tables-contain:      # tables name containing the string will be priority-dropped. If it is empty, it means all the tables under the database
   #  - database: flow_metrics
   #    tables-contain: 1s_local

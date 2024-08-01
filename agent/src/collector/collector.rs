@@ -133,6 +133,8 @@ struct StashKey {
     src_gpid: u32,
     dst_gpid: u32,
     endpoint_hash: u32,
+    // request-reponse time span
+    time_span: u32,
     biz_type: u8,
 }
 
@@ -145,6 +147,7 @@ impl Default for StashKey {
             src_gpid: 0,
             dst_gpid: 0,
             endpoint_hash: 0,
+            time_span: 0,
             biz_type: 0,
         }
     }
@@ -318,6 +321,7 @@ impl StashKey {
             dst_gpid: tagger.gpid_1,
             endpoint_hash,
             biz_type: tagger.biz_type,
+            time_span: tagger.time_span,
         }
     }
 }
@@ -521,6 +525,7 @@ impl Stash {
                     config,
                     None,
                     0,
+                    0,
                     acc_flow.l7_protocol,
                     self.context.agent_mode,
                 );
@@ -534,6 +539,7 @@ impl Stash {
                 acc_flow.is_active_host1,
                 config,
                 None,
+                0,
                 0,
                 acc_flow.l7_protocol,
                 self.context.agent_mode,
@@ -559,6 +565,7 @@ impl Stash {
                 acc_flow.is_active_host1,
                 config,
                 None,
+                0,
                 0,
                 acc_flow.l7_protocol,
                 self.context.agent_mode,
@@ -707,6 +714,7 @@ impl Stash {
                     config,
                     meter.endpoint.clone(),
                     meter.biz_type,
+                    meter.time_span,
                     meter.l7_protocol,
                     self.context.agent_mode,
                 );
@@ -727,6 +735,7 @@ impl Stash {
                 config,
                 meter.endpoint.clone(),
                 meter.biz_type,
+                meter.time_span,
                 meter.l7_protocol,
                 self.context.agent_mode,
             );
@@ -758,6 +767,7 @@ impl Stash {
                 config,
                 meter.endpoint.clone(),
                 meter.biz_type,
+                meter.time_span,
                 meter.l7_protocol,
                 self.context.agent_mode,
             );
@@ -919,6 +929,7 @@ fn get_single_tagger(
     config: &CollectorConfig,
     endpoint: Option<String>,
     biz_type: u8,
+    time_span: u32,
     l7_protocol: L7Protocol,
     agent_mode: RunningMode,
 ) -> Tagger {
@@ -1006,6 +1017,7 @@ fn get_single_tagger(
         endpoint,
         biz_type,
         pod_id: flow.pod_id,
+        time_span,
         ..Default::default()
     }
 }
@@ -1019,6 +1031,7 @@ fn get_edge_tagger(
     config: &CollectorConfig,
     endpoint: Option<String>,
     biz_type: u8,
+    time_span: u32,
     l7_protocol: L7Protocol,
     agent_mode: RunningMode,
 ) -> Tagger {
@@ -1117,6 +1130,7 @@ fn get_edge_tagger(
         endpoint,
         pod_id: flow.pod_id,
         biz_type,
+        time_span,
         ..Default::default()
     }
 }

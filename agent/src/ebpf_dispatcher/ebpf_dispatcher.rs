@@ -227,22 +227,17 @@ struct EbpfDispatcher {
 }
 
 impl EbpfDispatcher {
-    const MERGE_COUNT_MAX: usize = 2;
-
     fn segmentation_reassembly<'a>(
         packets: &'a mut Vec<Box<MetaPacket<'a>>>,
     ) -> Vec<Box<MetaPacket<'a>>> {
         let mut merge_packets: Vec<Box<MetaPacket<'a>>> = vec![];
-        let mut count = 0;
         for mut p in packets.drain(..) {
             if p.segment_flags != SegmentFlags::Seg {
-                count = 1;
                 merge_packets.push(p);
                 continue;
             }
 
             let Some(last) = merge_packets.last_mut() else {
-                count = 1;
                 merge_packets.push(p);
                 continue;
             };
@@ -250,12 +245,9 @@ impl EbpfDispatcher {
             if last.generate_ebpf_flow_id() == p.generate_ebpf_flow_id()
                 && last.segment_flags == SegmentFlags::Start
                 && last.cap_end_seq + 1 == p.cap_start_seq
-                && count < Self::MERGE_COUNT_MAX
             {
                 last.merge(&mut p);
-                count += 1;
             } else {
-                count = 1;
                 merge_packets.push(p);
             }
         }
@@ -595,6 +587,23 @@ impl EbpfCollector {
                 );
             } else {
                 info!("ebpf golang symbol proc regexp is empty, skip set")
+            }
+
+            // ONLY java memory profile is supported at the moment
+            // configuration structure revision is required to support more languages (maybe one regex for each language)
+            #[cfg(feature = "extended_profile")]
+            if !config.ebpf.memory_profile.disabled {
+                info!(
+                    "ebpf set java symbol uprobe proc regexp: {}",
+                    config.ebpf.memory_profile.regex.as_str()
+                );
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_UPROBE_JAVA,
+                    CString::new(config.ebpf.memory_profile.regex.as_str().as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
             }
 
             for i in get_all_protocol().into_iter() {

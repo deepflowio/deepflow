@@ -60,9 +60,15 @@ func createPlugin(c *gin.Context) {
 		JsonResponse(c, nil, err)
 		return
 	}
+	u, err := strconv.Atoi(c.PostForm("USER"))
+	if err != nil {
+		JsonResponse(c, nil, err)
+		return
+	}
 	plugin := &mysql.Plugin{
 		Name: c.PostForm("NAME"),
 		Type: t,
+		User: u,
 	}
 
 	// get file

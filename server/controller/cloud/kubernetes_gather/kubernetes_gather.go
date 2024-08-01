@@ -23,7 +23,6 @@ import (
 
 	simplejson "github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
-	logging "github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
@@ -32,14 +31,15 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
-var log = logging.MustGetLogger("cloud.kubernetes_gather")
+var log = logger.MustGetLogger("cloud.kubernetes_gather")
 
 type KubernetesGather struct {
 	orgID                        int
-	teamID                       int
+	TeamID                       int
 	Name                         string
 	Lcuuid                       string
 	UuidGenerate                 string
@@ -99,7 +99,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 	// 如果是K8s云平台，转换domain表的config
 	if isSubDomain {
 		if subDomain == nil {
-			log.Error("subdomain model is nil")
+			log.Error("subdomain model is nil", db.LogPrefixORGID)
 			return nil
 		}
 		teamID = subDomain.TeamID
@@ -114,7 +114,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 		}
 	} else {
 		if domain == nil {
-			log.Error("domain model is nil")
+			log.Error("domain model is nil", db.LogPrefixORGID)
 			return nil
 		}
 		teamID = domain.TeamID
@@ -125,13 +125,13 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 		configJson = domainConfigJson
 	}
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(db.ORGID))
 		return nil
 	}
 
 	_, err = regexp.Compile(portNameRegex)
 	if err != nil {
-		log.Errorf("port name regex compile error: (%s)", err.Error())
+		log.Errorf("port name regex compile error: (%s)", err.Error(), db.LogPrefixORGID)
 		return nil
 	}
 
@@ -151,7 +151,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 	}
 	labelR, err := regexp.Compile(labelRegString)
 	if err != nil {
-		log.Errorf("label regex compile error: (%s)", err.Error())
+		log.Errorf("label regex compile error: (%s)", err.Error(), db.LogPrefixORGID)
 		return nil
 	}
 	envRegString := configJson.Get("env_regex").MustString()
@@ -160,7 +160,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 	}
 	envR, err := regexp.Compile(envRegString)
 	if err != nil {
-		log.Errorf("env regex compile error: (%s)", err.Error())
+		log.Errorf("env regex compile error: (%s)", err.Error(), db.LogPrefixORGID)
 		return nil
 	}
 	annotationRegString := configJson.Get("annotation_regex").MustString()
@@ -169,7 +169,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 	}
 	annotationR, err := regexp.Compile(annotationRegString)
 	if err != nil {
-		log.Errorf("annotation regex compile error: (%s)", err.Error())
+		log.Errorf("annotation regex compile error: (%s)", err.Error(), db.LogPrefixORGID)
 		return nil
 	}
 
@@ -179,7 +179,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 		Lcuuid:                lcuuid,
 		UuidGenerate:          displayName,
 		ClusterID:             clusterID,
-		teamID:                teamID,
+		TeamID:                teamID,
 		orgID:                 db.ORGID,
 		db:                    db.DB,
 		RegionUUID:            configJson.Get("region_uuid").MustString(),
@@ -235,7 +235,7 @@ func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
 
 	return statsd.StatsdStatter{
 		OrgID:      k.orgID,
-		TeamID:     k.teamID,
+		TeamID:     k.TeamID,
 		GlobalTags: globalTags,
 		Element:    statsd.GetCloudStatsd(k.cloudStatsd),
 	}
@@ -282,21 +282,13 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 
 	k8sInfo, err := k.getKubernetesInfo()
 	if err != nil {
-		log.Warning(err.Error())
+		log.Warning(err.Error(), logger.NewORGPrefix(k.orgID))
 		return model.KubernetesGatherResource{
 			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
 			ErrorMessage: err.Error(),
 		}, err
 	}
 	k.k8sInfo = k8sInfo
-
-	prometheusTargets, err := k.getPrometheusTargets()
-	if err != nil {
-		return model.KubernetesGatherResource{
-			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
-			ErrorMessage: err.Error(),
-		}, err
-	}
 
 	podCluster, err := k.getPodCluster()
 	if err != nil {
@@ -385,10 +377,8 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		PodReplicaSets:         replicaSets,
 		PodGroups:              podGroups,
 		Pods:                   pods,
-		PrometheusTargets:      prometheusTargets,
 	}
 
-	k.cloudStatsd.RefreshAPIMoniter("PrometheusTarget", len(prometheusTargets), time.Time{})
 	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(k)
 	return resource, nil

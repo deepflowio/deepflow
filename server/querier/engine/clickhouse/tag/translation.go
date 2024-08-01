@@ -213,6 +213,38 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
+	// pod_service
+	for _, suffix := range []string{"", "_0", "_1"} {
+		podServiceIDSuffix := "pod_service_id" + suffix
+		podServiceNameSuffix := "pod_service" + suffix
+		tagResourceMap[podServiceIDSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"service_id"+suffix,
+				"service_id"+suffix+"!=0",
+				"service_id"+suffix+" %s %s",
+				"",
+			)}
+		tagResourceMap[podServiceNameSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64("+"service_id"+suffix+")))",
+				"service_id"+suffix+"!=0",
+				"toUInt64("+"service_id"+suffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
+				"toUInt64("+"service_id"+suffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
+			),
+			"node_type": NewTag(
+				"'pod_service'",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(11),toUInt64("+"service_id"+suffix+")))",
+				"",
+				"",
+				"",
+			),
+		}
+	}
 
 	// 服务
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
@@ -480,7 +512,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// 关联资源
-	for _, relatedResourceStr := range []string{"pod_service", "pod_ingress", "natgw", "lb", "lb_listener"} {
+	for _, relatedResourceStr := range []string{"pod_ingress", "natgw", "lb", "lb_listener"} {
 		// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 		for _, suffix := range []string{"", "_0", "_1"} {
 			relatedResourceID := relatedResourceStr + "_id"
@@ -494,7 +526,6 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			nameTagTranslator := ""
 			notNullFilter := ""
 			deviceIDSuffix := "l3_device_id" + suffix
-			serviceIDSuffix := "service_id" + suffix
 			deviceTypeSuffix := "l3_device_type" + suffix
 			deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
 			if common.IsValueInSliceString(relatedResourceStr, []string{"natgw", "lb"}) {
@@ -526,37 +557,6 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						idTagTranslator,
 						notNullFilter,
 						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
-						"",
-					),
-				}
-			} else if relatedResourceStr == "pod_service" {
-				nameTagTranslator = "dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + serviceIDSuffix + ")))"
-				notNullFilter = serviceIDSuffix + "!=0"
-				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
-					"node_type": NewTag(
-						"'"+relatedResourceStr+"'",
-						"",
-						"",
-						"",
-					),
-					"icon_id": NewTag(
-						"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+serviceIDSuffix+")))",
-						"",
-						"",
-						"",
-					),
-					"default": NewTag(
-						nameTagTranslator,
-						notNullFilter,
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
-					),
-				}
-				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
-					"default": NewTag(
-						serviceIDSuffix,
-						notNullFilter,
-						"service_id"+suffix+" %s %s",
 						"",
 					),
 				}
@@ -1063,6 +1063,26 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"%s(capture_nic_type,%s)",
 		),
 	}
+
+	//Enum(app_service) & Enum(app_instance)
+	tagResourceMap["app_service"] = map[string]*Tag{
+		"enum": NewTag(
+			"%s",
+			"",
+			"%s %s %s ",
+			"%s(%s,%s)",
+		),
+	}
+
+	tagResourceMap["app_instance"] = map[string]*Tag{
+		"enum": NewTag(
+			"%s",
+			"",
+			"%s %s %s ",
+			"%s(%s,%s)",
+		),
+	}
+
 	// Pcap
 	tagResourceMap["has_pcap"] = map[string]*Tag{
 		"default": NewTag(
@@ -1272,36 +1292,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
-	// 告警策略
-	// alarm_policy
-	tagResourceMap["alarm_policy"] = map[string]*Tag{
-		"default": NewTag(
-			"policy_name",
-			"policy_name!=''",
-			"policy_name %s %s",
-			"%s(policy_name, %s)",
-		),
-		"icon_id": NewTag(
-			"0",
-			"",
-			"",
-			"",
-		),
-		"node_type": NewTag(
-			"'alarm_policy'",
-			"",
-			"",
-			"",
-		),
-	}
-	tagResourceMap["alarm_policy_id"] = map[string]*Tag{
-		"default": NewTag(
-			"policy_id",
-			"policy_id!=0",
-			"policy_id %s %s",
-			"",
-		),
-	}
+
 	//User
 	tagResourceMap["user"] = map[string]*Tag{
 		"default": NewTag(
@@ -1660,7 +1651,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 		"node_type": NewTag(
-			"'alarm_policy'",
+			"'alert_policy'",
 			"",
 			"",
 			"",
@@ -1705,12 +1696,44 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+
+	// string_tags
 	tagResourceMap["string_tags"] = map[string]*Tag{
 		"default": NewTag(
 			"tag_int_values[indexOf(tag_string_names,'%s')]",
 			"",
 			"tag_string_values[indexOf(tag_string_names,'%s')] %s %s",
 			"%s (tag_string_values[indexOf(tag_string_names,'%s')], %s)",
+		),
+	}
+
+	// enum(event_level)
+	tagResourceMap["event_level"] = map[string]*Tag{
+		"enum": NewTag(
+			"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(event_level)), event_level)",
+			"",
+			"toUInt64(event_level) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(event_level) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+		),
+	}
+
+	//enum(policy_type)
+	tagResourceMap["policy_type"] = map[string]*Tag{
+		"enum": NewTag(
+			"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(policy_type)), policy_type)",
+			"",
+			"toUInt64(policy_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(policy_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+		),
+	}
+
+	// Time-event
+	tagResourceMap["time_str"] = map[string]*Tag{
+		"default": NewTag(
+			"toString(time)",
+			"",
+			"",
+			"",
 		),
 	}
 
