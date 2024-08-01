@@ -78,6 +78,13 @@ typedef struct {
 		struct {
 			u8 comm[TASK_COMM_LEN];
 			u64 pid:26, reserved:26, cpu:12;
+			/*
+			 * Add padding fields to ensure that the hash key part reaches 32
+			 * bytes (using a hash with a 32-byte key and a 1-byte value for
+			 * stack tracing data), and set the 'padding' value to 0 in the
+			 * key configuration.
+			 */
+			u64 padding;
 		} c_k;
 	};
 
