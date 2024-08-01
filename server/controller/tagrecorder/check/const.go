@@ -77,12 +77,6 @@ const (
 	RESOURCE_TYPE_CH_IP_RELATION       = "ch_ip_relation"
 	RESOURCE_TYPE_CH_IP_RESOURCE       = "ch_ip_resource"
 
-	RESOURCE_TYPE_CH_POD_PORT       = "ch_pod_port"
-	RESOURCE_TYPE_CH_POD_NODE_PORT  = "ch_pod_node_port"
-	RESOURCE_TYPE_CH_POD_GROUP_PORT = "ch_pod_group_port"
-	RESOURCE_TYPE_CH_IP_PORT        = "ch_ip_port"
-	RESOURCE_TYPE_CH_DEVICE_PORT    = "ch_device_port"
-
 	RESOURCE_TYPE_CH_NETWORK        = "ch_network"
 	RESOURCE_TYPE_CH_POD            = "ch_pod"
 	RESOURCE_TYPE_CH_POD_GROUP      = "ch_pod_group"

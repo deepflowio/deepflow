@@ -26,8 +26,8 @@ type MySQLChModel interface {
 	mysqlmodel.ChPrometheusTargetLabelLayout | mysqlmodel.ChTargetLabel | mysqlmodel.ChAPPLabel | mysqlmodel.ChPrometheusMetricName | mysqlmodel.ChPrometheusLabelName |
 		mysqlmodel.ChPrometheusMetricAPPLabelLayout | mysqlmodel.ChPodServiceK8sLabels | mysqlmodel.ChPodServiceK8sLabel | mysqlmodel.ChOSAppTags |
 		mysqlmodel.ChOSAppTag | mysqlmodel.ChPodNSCloudTags | mysqlmodel.ChChostCloudTags | mysqlmodel.ChPodNSCloudTag | mysqlmodel.ChChostCloudTag | mysqlmodel.ChIntEnum |
-		mysqlmodel.ChStringEnum | mysqlmodel.ChPodIngress | mysqlmodel.ChPodGroupPort | mysqlmodel.ChPodPort | mysqlmodel.ChVTapPort | mysqlmodel.ChAZ | mysqlmodel.ChIPResource | mysqlmodel.ChPodK8sLabel |
-		mysqlmodel.ChLBListener | mysqlmodel.ChPodNodePort | mysqlmodel.ChIPPort | mysqlmodel.ChDevicePort | mysqlmodel.ChRegion | mysqlmodel.ChVPC |
+		mysqlmodel.ChStringEnum | mysqlmodel.ChPodIngress | mysqlmodel.ChVTapPort | mysqlmodel.ChAZ | mysqlmodel.ChIPResource | mysqlmodel.ChPodK8sLabel |
+		mysqlmodel.ChLBListener | mysqlmodel.ChRegion | mysqlmodel.ChVPC |
 		mysqlmodel.ChDevice | mysqlmodel.ChIPRelation | mysqlmodel.ChPodGroup | mysqlmodel.ChNetwork | mysqlmodel.ChPod | mysqlmodel.ChPodCluster |
 		mysqlmodel.ChPodNode | mysqlmodel.ChPodNamespace | mysqlmodel.ChTapType | mysqlmodel.ChVTap | mysqlmodel.ChPodK8sLabels | mysqlmodel.ChNodeType | mysqlmodel.ChGProcess | mysqlmodel.ChPodK8sAnnotation | mysqlmodel.ChPodK8sAnnotations |
 		mysqlmodel.ChPodServiceK8sAnnotation | mysqlmodel.ChPodServiceK8sAnnotations |
