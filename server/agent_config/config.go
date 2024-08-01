@@ -293,6 +293,7 @@ type EbpfConfig struct {
 	SyscallOutOfOrderReassembly        []string                           `yaml:"syscall-out-of-order-reassembly,omitempty"`
 	SyscallSegmentationReassembly      []string                           `yaml:"syscall-segmentation-reassembly,omitempty"`
 	SyscallOutOfOrderCacheSize         *int                               `yaml:"syscall-out-of-order-cache-size,omitempty"`
+	SyscallTraceIdDisabled             *bool                              `yaml:"syscall-trace-id-disabled,omitempty"`
 }
 
 type OsProcRegex struct {
