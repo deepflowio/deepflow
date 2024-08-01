@@ -195,49 +195,6 @@ CREATE TABLE IF NOT EXISTS routing_table (
 )engine=innodb AUTO_INCREMENT=1  DEFAULT CHARSET=utf8;
 TRUNCATE TABLE routing_table;
 
-CREATE TABLE IF NOT EXISTS security_group (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name                varchar(256) DEFAULT '',
-    label               varchar(64) DEFAULT '',
-    alias               CHAR(64) DEFAULT '',
-    epc_id              INTEGER DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    region              CHAR(64) DEFAULT '',
-    topped              INTEGER DEFAULT 0,
-    lcuuid              CHAR(64) DEFAULT '',
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
-) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
-TRUNCATE TABLE security_group;
-
-CREATE TABLE IF NOT EXISTS security_group_rule (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    sg_id               INTEGER NOT NULL,
-    direction           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0.Unknow 1.Ingress 2.Egress',
-    protocol            CHAR(64) DEFAULT '',
-    ethertype           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0.Unknow 1.IPv4 2.IPv6',
-    local_port_range    TEXT,
-    remote_port_range   TEXT,
-    local               TEXT,
-    remote              TEXT,
-    priority            INTEGER NOT NULL,
-    action              TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0.Unknow 1.Accept 2.Drop',
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
-) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
-TRUNCATE TABLE security_group_rule;
-
-CREATE TABLE IF NOT EXISTS vm_security_group (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    sg_id               INTEGER NOT NULL,
-    vm_id               INTEGER NOT NULL,
-    priority            INTEGER NOT NULL,
-    domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
-) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
-TRUNCATE TABLE vm_security_group;
-
 CREATE TABLE IF NOT EXISTS vl2 (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     state               INTEGER NOT NULL COMMENT '0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.Destroyed',
@@ -534,24 +491,6 @@ set @lcuuid = (select uuid());
 INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (3, 'system_data_retention', '7', 'unit: day', @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO sys_configuration (`id`,`param_name`, `value`, `comments`, `lcuuid`) VALUES (4, 'ntp_servers', '0.cn.pool.ntp.org', '', @lcuuid);
-
-CREATE TABLE IF NOT EXISTS postman_cache(
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    dest                TEXT COMMENT 'destination email address, seprate by ","',
-    event_type          INTEGER DEFAULT 0,
-    resource_type       INTEGER DEFAULT 0,
-    resource_id         INTEGER DEFAULT 0,
-    issue_timestamp     INTEGER DEFAULT 0
-)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
-TRUNCATE TABLE postman_cache;
-
-CREATE TABLE IF NOT EXISTS postman_queue(
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    dest                TEXT COMMENT 'destination email address, seprate by ","',
-    aggregate_id        INTEGER DEFAULT 0,
-    send_request        TEXT
-)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
-TRUNCATE TABLE postman_queue;
 
 CREATE TABLE IF NOT EXISTS epc (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -996,24 +935,6 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule_backend (
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_ingress_rule_backend;
 
-CREATE TABLE IF NOT EXISTS `contact` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(256) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',
-  `mobile` varchar(13) NOT NULL DEFAULT '',
-  `email` varchar(128) NOT NULL DEFAULT '',
-  `company` varchar(128) NOT NULL DEFAULT '',
-  `push_email` TEXT COMMENT 'custom emails, separated by ;',
-  `lcuuid` CHAR(64),
-  `domain` CHAR(64),
-  `deleted` TINYINT(1) DEFAULT 0,
-  `create_method` tinyint(1) unsigned NOT NULL DEFAULT '0' COMMENT '0.created by UI 1.learning',
-  `alarm_push` tinyint(1) unsigned NOT NULL DEFAULT '0' COMMENT '0.disabled 1.enabled',
-  `report_push` tinyint(1) unsigned NOT NULL DEFAULT '0' COMMENT '0.disabled 1.enabled',
-  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
-
 CREATE TABLE IF NOT EXISTS `report` (
   `id`                     INTEGER NOT NULL AUTO_INCREMENT,
   `title`                  varchar(200) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '' COMMENT 'Title of the report',
@@ -1086,14 +1007,6 @@ CREATE TABLE IF NOT EXISTS vtap_group (
     short_uuid              CHAR(32)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE vtap_group;
-
-CREATE TABLE IF NOT EXISTS topo_position (
-    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    type                    INTEGER DEFAULT 1 COMMENT '3-link topo',
-    user_id                 INTEGER NOT NULL,
-    data                    TEXT,
-    lcuuid                  CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1;
 
 CREATE TABLE IF NOT EXISTS acl (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -1197,13 +1110,6 @@ CREATE TABLE IF NOT EXISTS group_acl (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE group_acl;
 
-CREATE TABLE IF NOT EXISTS alarm_label (
-    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    alarm_id                INTEGER NOT NULL,
-    label_name              TEXT
-) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
-TRUNCATE TABLE alarm_label;
-
 CREATE TABLE IF NOT EXISTS alarm_policy (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id                 INTEGER DEFAULT 1,
@@ -1277,53 +1183,6 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     lcuuid                  CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_event;
-
-CREATE TABLE IF NOT EXISTS label (
-    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name                    CHAR(64) NOT NULL,
-    type                    INTEGER NOT NULL COMMENT '1-resource topo',
-    host_id                 INTEGER,
-    epc_ids                 TEXT COMMENT 'separated by ,',
-    subnet_ids              TEXT COMMENT 'separated by ,',
-    security_group_ids      TEXT COMMENT 'separated by ,',
-    vm_ids                  TEXT COMMENT 'separated by ,',
-    ips                     TEXT COMMENT 'separated by ,',
-    lcuuid                  CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1;
-TRUNCATE TABLE label;
-
-CREATE TABLE IF NOT EXISTS alarm_endpoint (
-    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id                 INTEGER DEFAULT 1,
-    name                    CHAR(64) NOT NULL,
-    push_type               INTEGER NOT NULL COMMENT '0-email, 1-url, 2-pcap',
-    description             TEXT,
-    endpoints               TEXT COMMENT 'separated by ,',
-    user_id                 INTEGER,
-    start_type              INTEGER NOT NULL,
-    end_type                INTEGER NOT NULL,
-    method                  CHAR(64),
-    header                  TEXT,
-    body                    TEXT,
-    push_cycle              INTEGER,
-    push_frequency          INTEGER,
-    push_level              TEXT,
-    push_level_disable      TEXT,
-    send_title              TEXT,
-    topic                   TEXT,
-    sasl                    TEXT,
-    lcuuid                  CHAR(64),
-    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at              TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1;
-TRUNCATE TABLE alarm_endpoint;
-
-CREATE TABLE IF NOT EXISTS alarm_policy_endpoint_connection (
-    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    alarm_id                INTEGER,
-    endpoint_id             INTEGER
-) ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1;
-TRUNCATE TABLE alarm_policy_endpoint_connection;
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
@@ -1863,32 +1722,6 @@ CREATE TABLE IF NOT EXISTS analyzer (
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE analyzer;
 
-CREATE TABLE IF NOT EXISTS link (
-    id                      INTEGER NOT NULL auto_increment PRIMARY KEY,
-    name                    CHAR(64),
-    src_net_ele_id          INTEGER COMMENT 'network element id',
-    dst_net_ele_id          INTEGER COMMENT 'network element id',
-    src_tap_type            INTEGER,
-    dst_tap_type            INTEGER,
-    created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    lcuuid                  CHAR(64)
-)engine=innodb AUTO_INCREMENT=1  DEFAULT CHARSET=utf8;
-TRUNCATE TABLE link;
-
-CREATE TABLE IF NOT EXISTS network_element (
-    id                    INTEGER NOT NULL auto_increment PRIMARY KEY,
-    name                  CHAR(64),
-    alias                 CHAR(64),
-    type                  INTEGER DEFAULT 1 COMMENT '1. Switch, 2. Firewall, 3. Router, 4. GateWay, 5. Internet, 6. Domain, 7.SpecialLine, 8.Other',
-    region                CHAR(64),
-    create_method         INTEGER NOT NULL DEFAULT '0' COMMENT '0.user define 1.learning',
-    created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    lcuuid                CHAR(64)
-)engine=innodb AUTO_INCREMENT=1  DEFAULT CHARSET=utf8;
-TRUNCATE TABLE network_element;
-
 CREATE TABLE IF NOT EXISTS ch_region (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
@@ -2081,90 +1914,6 @@ CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_labels;
 
-CREATE TABLE IF NOT EXISTS ch_pod_node_port (
-    id                      INTEGER NOT NULL,
-    protocol                INTEGER NOT NULL,
-    port                    INTEGER NOT NULL,
-    port_lb_id              INTEGER,
-    port_lb_name            VARCHAR(256),
-    port_lb_listener_id     INTEGER,
-    port_lb_listener_name   VARCHAR(256),
-    port_pod_service_id     INTEGER,
-    port_pod_service_name   VARCHAR(256),
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id, protocol, port)
-)ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_pod_node_port;
-
-CREATE TABLE IF NOT EXISTS ch_pod_group_port (
-    id                      INTEGER NOT NULL,
-    protocol                INTEGER NOT NULL,
-    port                    INTEGER NOT NULL,
-    port_lb_id              INTEGER,
-    port_lb_name            VARCHAR(256),
-    port_lb_listener_id     INTEGER,
-    port_lb_listener_name   VARCHAR(256),
-    port_pod_service_id     INTEGER,
-    port_pod_service_name   VARCHAR(256),
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id, protocol, port)
-)ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_pod_group_port;
-
-CREATE TABLE IF NOT EXISTS ch_pod_port (
-    id                      INTEGER NOT NULL,
-    protocol                INTEGER NOT NULL,
-    port                    INTEGER NOT NULL,
-    port_lb_id              INTEGER,
-    port_lb_name            VARCHAR(256),
-    port_lb_listener_id     INTEGER,
-    port_lb_listener_name   VARCHAR(256),
-    port_pod_service_id     INTEGER,
-    port_pod_service_name   VARCHAR(256),
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id, protocol, port)
-)ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_pod_port;
-
-CREATE TABLE IF NOT EXISTS ch_device_port (
-    devicetype              INTEGER NOT NULL,
-    deviceid                INTEGER NOT NULL,
-    protocol                INTEGER NOT NULL,
-    port                    INTEGER NOT NULL,
-    port_lb_id              INTEGER,
-    port_lb_name            VARCHAR(256),
-    port_lb_listener_id     INTEGER,
-    port_lb_listener_name   VARCHAR(256),
-    port_pod_service_id     INTEGER,
-    port_pod_service_name   VARCHAR(256),
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (devicetype, deviceid, protocol, port)
-)ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_device_port;
-
-CREATE TABLE IF NOT EXISTS ch_ip_port (
-    ip                      VARCHAR(64) NOT NULL,
-    subnet_id               INTEGER NOT NULL,
-    protocol                INTEGER NOT NULL,
-    port                    INTEGER NOT NULL,
-    port_lb_id              INTEGER,
-    port_lb_name            VARCHAR(256),
-    port_lb_listener_id     INTEGER,
-    port_lb_listener_name   VARCHAR(256),
-    port_pod_service_id     INTEGER,
-    port_pod_service_name   VARCHAR(256),
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (ip, subnet_id, protocol, port)
-)ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_ip_port;
-
-CREATE TABLE IF NOT EXISTS ch_server_port (
-    server_port             INTEGER NOT NULL PRIMARY KEY,
-    server_port_name        VARCHAR(256),
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-)ENGINE=innodb DEFAULT CHARSET=utf8;
-TRUNCATE TABLE ch_server_port;
-
 CREATE TABLE IF NOT EXISTS ch_ip_relation (
     l3_epc_id           INTEGER NOT NULL,
     ip                  CHAR(64) NOT NULL,
@@ -2333,28 +2082,6 @@ set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (20, '日志-日志数据', 'application_log.log', 1, 30*24, @lcuuid);
 
-
-CREATE TABLE IF NOT EXISTS license (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    status              INTEGER DEFAULT 0,
-    name                VARCHAR(256),
-    value               blob,
-    lcuuid              CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
-TRUNCATE TABLE license;
-
-CREATE TABLE IF NOT EXISTS sys_event_alarm (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    process_name        VARCHAR(256),
-    event_content       TEXT,
-    event_type          INTEGER COMMENT '1.policy 2.vtap',
-    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
-    state               INTEGER COMMENT '0.wait 1.alarmed',
-    extra_info          TEXT,
-    lcuuid              CHAR(64)
-) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
-TRUNCATE TABLE sys_event_alarm;
-
 CREATE TABLE IF NOT EXISTS voucher (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     status              INTEGER DEFAULT 0,
@@ -2363,26 +2090,6 @@ CREATE TABLE IF NOT EXISTS voucher (
     lcuuid              CHAR(64) DEFAULT NULL
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE voucher;
-
-CREATE TABLE IF NOT EXISTS consumer_bill (
-    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id                 INTEGER DEFAULT 1,
-    org_id                  INTEGER DEFAULT 1,
-    vtap_name               VARCHAR(256) DEFAULT NULL,
-    vtap_ctrl_ip            CHAR(64) DEFAULT NULL,
-    vtap_ctrl_mac           CHAR(64) DEFAULT NULL,
-    monitor_type            INTEGER DEFAULT NULL,
-    transaction_time        datetime(6) DEFAULT NULL,
-    consumption_price       float(10,2) DEFAULT NULL,
-    consumption_service     INTEGER DEFAULT NULL,
-    consumption_period      VARCHAR(256) DEFAULT NULL,
-    remaining_sum           double(10,2) DEFAULT NULL,
-    voucher_lcuuid          CHAR(64) DEFAULT NULL,
-    voucher_name            CHAR(64) DEFAULT NULL,
-    billing_mode            INTEGER DEFAULT NULL,
-    lcuuid                  CHAR(64) DEFAULT NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
-TRUNCATE TABLE consumer_bill;
 
 CREATE TABLE IF NOT EXISTS license_func_log (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
