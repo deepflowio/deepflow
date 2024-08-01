@@ -55,7 +55,7 @@ use public::{
     enums::{EthernetType, IpProtocol},
     error::Error,
     netns::{InterfaceInfo, NsFile},
-    proto::trident::TapMode,
+    proto::agent::PacketCaptureType,
     utils::net::{addr_list, MacAddr},
 };
 
@@ -212,12 +212,12 @@ impl PassivePoller {
         expire_timeout: Duration,
         version: Arc<AtomicU64>,
         entries: Arc<Mutex<Vec<PassiveEntry>>>,
-        tap_mode: TapMode,
+        capture_mode: PacketCaptureType,
     ) {
-        let mut engine = match tap_mode {
-            TapMode::Local | TapMode::Mirror | TapMode::Analyzer => {
+        let mut engine = match capture_mode {
+            PacketCaptureType::Local | PacketCaptureType::Mirror | PacketCaptureType::Analyzer => {
                 let afp = Options {
-                    frame_size: if tap_mode == TapMode::Analyzer {
+                    frame_size: if capture_mode == PacketCaptureType::Analyzer {
                         FRAME_SIZE_MIN as u32
                     } else {
                         FRAME_SIZE_MAX as u32
@@ -231,7 +231,9 @@ impl PassivePoller {
                 RecvEngine::AfPacket(Tpacket::new(afp).unwrap())
             }
             _ => {
-                error!("construct RecvEngine error: TapMode({tap_mode:?}) not support");
+                error!(
+                    "construct RecvEngine error: PacketCaptureType({capture_mode:?}) not support"
+                );
                 return;
             }
         };
@@ -442,10 +444,10 @@ impl Poller for PassivePoller {
         let running = self.running.clone();
         let version = self.version.clone();
         let entries = self.entries.clone();
-        let tap_mode = self.config.load().tap_mode;
+        let capture_mode = self.config.load().capture_mode;
         let handle = thread::Builder::new()
             .name("kubernetes-poller".to_owned())
-            .spawn(move || Self::process(running, expire_timeout, version, entries, tap_mode))
+            .spawn(move || Self::process(running, expire_timeout, version, entries, capture_mode))
             .unwrap();
         self.thread.lock().unwrap().replace(handle);
         info!("kubernetes passive poller started");

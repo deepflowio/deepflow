@@ -27,7 +27,7 @@ use crate::{
     trident::AgentId,
 };
 use public::debug::{Error, Result};
-use public::proto::trident::SyncResponse;
+use public::proto::agent::SyncResponse;
 
 pub struct RpcDebugger {
     session: Arc<Session>,
@@ -52,7 +52,7 @@ pub struct ConfigResp {
 pub enum RpcMessage {
     Config(Option<String>),
     PlatformData(Option<String>),
-    TapTypes(Option<String>),
+    CaptureNetworkTypes(Option<String>),
     Cidr(Option<String>),
     Groups(Option<String>),
     Acls(Option<String>),
@@ -128,16 +128,16 @@ impl RpcDebugger {
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
 
-        if resp.tap_types.is_empty() {
+        if resp.capture_network_types.is_empty() {
             return Err(Error::NotFound(String::from(
-                "sync response's tap_types is empty",
+                "sync response's capture_network_types is empty",
             )));
         }
 
         let mut res = resp
-            .tap_types
+            .capture_network_types
             .into_iter()
-            .map(|t| RpcMessage::TapTypes(Some(format!("{:?}", t))))
+            .map(|t| RpcMessage::CaptureNetworkTypes(Some(format!("{:?}", t))))
             .collect::<Vec<_>>();
 
         res.push(RpcMessage::Fin);

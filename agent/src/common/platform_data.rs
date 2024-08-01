@@ -18,7 +18,7 @@ use std::net::{IpAddr, Ipv4Addr};
 
 use super::{endpoint::EPC_DEEPFLOW, error::Error, IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN};
 
-use public::proto::trident;
+use public::proto::agent;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IpSubnet {
     pub raw_ip: IpAddr,
@@ -96,15 +96,15 @@ impl Default for PlatformData {
     }
 }
 
-impl TryFrom<&trident::Interface> for PlatformData {
+impl TryFrom<&agent::Interface> for PlatformData {
     type Error = Error;
 
-    fn try_from(p: &trident::Interface) -> Result<Self, Self::Error> {
+    fn try_from(p: &agent::Interface) -> Result<Self, Self::Error> {
         let mut ips = vec![];
         for ip_res in p.ip_resources.iter() {
             let ip = ip_res.ip().parse::<IpAddr>().map_err(|e| {
                 Error::ParsePlatformData(format!(
-                    "parse trident::Interface to platform data ip-resource failed: {:?} {}",
+                    "parse agent::Interface to platform data ip-resource failed: {:?} {}",
                     ip_res.ip(),
                     e
                 ))
@@ -132,7 +132,7 @@ impl TryFrom<&trident::Interface> for PlatformData {
         Ok(PlatformData {
             mac: p.mac().try_into().map_err(|e| {
                 Error::ParsePlatformData(format!(
-                    "parse trident::Interface to platform data mac address failed: {}",
+                    "parse agent::Interface to platform data mac address failed: {}",
                     e
                 ))
             })?,
@@ -144,7 +144,7 @@ impl TryFrom<&trident::Interface> for PlatformData {
             pod_node_id: p.pod_node_id(),
             if_type: IfType::try_from(p.if_type() as u8).map_err(|e| {
                 Error::ParsePlatformData(format!(
-                    "parse trident::Interface to platform data if_type failed: {}",
+                    "parse agent::Interface to platform data if_type failed: {}",
                     e
                 ))
             })?,

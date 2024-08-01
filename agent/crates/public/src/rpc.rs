@@ -6,7 +6,7 @@ pub mod remote_exec {
     use futures::future::BoxFuture;
     use thiserror::Error;
 
-    use crate::proto::trident as pb;
+    use crate::proto::agent as pb;
 
     pub const DEFAULT_PARAM_REGEX: &'static str = "^[A-Za-z0-9-_]+$";
 

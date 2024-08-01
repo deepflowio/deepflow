@@ -64,7 +64,7 @@ impl Default for Module {
 
 #[derive(PartialEq, Debug, Encode, Decode)]
 pub struct Beacon {
-    pub vtap_id: u16,
+    pub agent_id: u16,
     pub hostname: String,
 }
 

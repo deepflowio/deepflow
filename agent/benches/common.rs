@@ -18,11 +18,11 @@ use std::time::Instant;
 
 use criterion::*;
 
-use deepflow_agent::common::TapTyper;
+use deepflow_agent::common::CaptureNetworkTyper;
 
 fn bench_tap_typer(c: &mut Criterion) {
     c.bench_function("get_tap_type_by_vlan", |b| {
-        let tap_typer = TapTyper::new();
+        let tap_typer = CaptureNetworkTyper::new();
 
         b.iter_custom(|iters| {
             let start = Instant::now();

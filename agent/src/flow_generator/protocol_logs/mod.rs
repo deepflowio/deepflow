@@ -61,7 +61,7 @@ use serde::{Serialize, Serializer};
 use crate::{
     common::{
         ebpf::EbpfType,
-        enums::{IpProtocol, TapType},
+        enums::{CaptureNetworkType, IpProtocol},
         flow::{L7Protocol, PacketDirection, SignalSource},
         tap_port::TapPort,
         Timestamp,
@@ -160,8 +160,8 @@ pub struct AppProtoLogsBaseInfo {
     #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
     pub signal_source: SignalSource,
-    pub vtap_id: u16,
-    pub tap_type: TapType,
+    pub agent_id: u16,
+    pub tap_type: CaptureNetworkType,
     pub tap_side: TapSide,
     pub biz_type: u8,
     #[serde(flatten)]
@@ -278,7 +278,7 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             end_time: f.end_time.as_nanos() as u64,
             flow_id: f.flow_id,
             tap_port: f.tap_port.0,
-            vtap_id: f.vtap_id as u32,
+            vtap_id: f.agent_id as u32,
             tap_type: u16::from(f.tap_type) as u32,
             is_ipv6: f.ip_src.is_ipv6() as u32,
             tap_side: f.tap_side as u32,
@@ -420,12 +420,12 @@ impl fmt::Display for AppProtoLogsBaseInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Timestamp: {:?} Vtap_id: {} Flow_id: {} TapType: {} TapPort: {} TapSide: {:?}\n \
+            "Timestamp: {:?} Vtap_id: {} Flow_id: {} CaptureNetworkType: {} TapPort: {} TapSide: {:?}\n \
                 \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {} EPC: {} -> {}\n \
                 \tProcess: {}:{} -> {}:{} Trace-id: {} -> {} Thread: {} -> {} cap_seq: {} -> {}\n \
                 \tL7Protocol: {:?} MsgType: {:?} Rrt: {}",
             self.start_time,
-            self.vtap_id,
+            self.agent_id,
             self.flow_id,
             self.tap_type,
             self.tap_port,

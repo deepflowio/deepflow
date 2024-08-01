@@ -37,7 +37,7 @@ use crate::{
 };
 
 use public::{
-    proto::{common::TridentType, trident::Exception},
+    proto::agent::{AgentType, Exception},
     utils::net::{
         addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
         LinkFlags, MacAddr,
@@ -178,30 +178,30 @@ pub fn trident_process_check(process_threshold: u32) {
     }
 }
 
-pub fn is_tt_hyper_v_compute(trident_type: TridentType) -> bool {
-    trident_type == TridentType::TtHyperVCompute
+pub fn is_tt_hyper_v_compute(agent_type: AgentType) -> bool {
+    agent_type == AgentType::TtHyperVCompute
 }
 
-pub fn is_tt_hyper_v_network(trident_type: TridentType) -> bool {
-    trident_type == TridentType::TtHyperVNetwork
+pub fn is_tt_hyper_v_network(agent_type: AgentType) -> bool {
+    agent_type == AgentType::TtHyperVNetwork
 }
 
-pub fn is_tt_hyper_v(trident_type: TridentType) -> bool {
-    trident_type == TridentType::TtHyperVCompute || trident_type == TridentType::TtHyperVNetwork
+pub fn is_tt_hyper_v(agent_type: AgentType) -> bool {
+    agent_type == AgentType::TtHyperVCompute || agent_type == AgentType::TtHyperVNetwork
 }
 
-pub fn is_tt_pod(trident_type: TridentType) -> bool {
-    trident_type == TridentType::TtHostPod
-        || trident_type == TridentType::TtVmPod
-        || trident_type == TridentType::TtK8sSidecar
+pub fn is_tt_pod(agent_type: AgentType) -> bool {
+    agent_type == AgentType::TtHostPod
+        || agent_type == AgentType::TtVmPod
+        || agent_type == AgentType::TtK8sSidecar
 }
 
-pub fn is_tt_process(trident_type: TridentType) -> bool {
-    trident_type == TridentType::TtProcess
+pub fn is_tt_process(agent_type: AgentType) -> bool {
+    agent_type == AgentType::TtProcess
 }
 
-pub fn is_tt_workload(trident_type: TridentType) -> bool {
-    trident_type == TridentType::TtPublicCloud || trident_type == TridentType::TtPhysicalMachine
+pub fn is_tt_workload(agent_type: AgentType) -> bool {
+    agent_type == AgentType::TtPublicCloud || agent_type == AgentType::TtPhysicalMachine
 }
 
 pub fn get_k8s_local_node_ip() -> Option<IpAddr> {

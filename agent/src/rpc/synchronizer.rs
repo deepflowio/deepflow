@@ -77,10 +77,7 @@ use crate::utils::{
     stats,
 };
 use public::{
-    proto::{
-        common::TridentType,
-        trident::{self as tp, Exception, TapMode},
-    },
+    proto::agent::{self as tp, AgentType, Exception, PacketCaptureType},
     utils::net::{is_unicast_link_local, MacAddr},
 };
 
@@ -93,7 +90,7 @@ pub struct StaticConfig {
     pub version_info: &'static VersionInfo,
     pub boot_time: SystemTime,
 
-    pub tap_mode: tp::TapMode,
+    pub capture_mode: tp::PacketCaptureType,
     pub vtap_group_id_request: String,
     pub controller_ip: String,
 
@@ -121,7 +118,7 @@ impl Default for StaticConfig {
         Self {
             version_info: EMPTY_VERSION_INFO,
             boot_time: SystemTime::now(),
-            tap_mode: Default::default(),
+            capture_mode: Default::default(),
             vtap_group_id_request: Default::default(),
             controller_ip: Default::default(),
             env: Default::default(),
@@ -293,7 +290,7 @@ impl Status {
     }
 
     fn modify_platform(&mut self, macs: &Vec<MacAddr>, config: &RuntimeConfig) {
-        if config.tap_mode == TapMode::Analyzer {
+        if config.inputs.cbpf.common.capture_mode == PacketCaptureType::Analyzer {
             return;
         }
         let mut local_mac_map = HashSet::new();
@@ -301,12 +298,12 @@ impl Status {
             let _ = local_mac_map.insert(u64::from(*mac));
         }
 
-        let region_id = config.region_id;
-        let pod_cluster_id = config.pod_cluster_id;
+        let region_id = config.global.tag.region_id;
+        let pod_cluster_id = config.global.tag.pod_cluster_id;
         let mut vinterfaces = Vec::new();
         for i in &self.interfaces {
             let mut viface = (*(i.clone())).clone();
-            if !is_tt_pod(config.trident_type) {
+            if !is_tt_pod(config.global.tag.agent_type) {
                 viface.skip_mac = viface.region_id != region_id;
             } else {
                 let mut is_tap_interface = viface.pod_cluster_id == pod_cluster_id;
@@ -408,8 +405,8 @@ impl Status {
     }
 
     pub fn get_local_epc(&mut self, config: &RuntimeConfig) -> bool {
-        if config.epc_id as i32 != self.local_epc {
-            self.local_epc = config.epc_id as i32;
+        if config.global.tag.vpc_id as i32 != self.local_epc {
+            self.local_epc = config.global.tag.vpc_id as i32;
             return true;
         }
         return false;
@@ -417,11 +414,11 @@ impl Status {
 
     fn trigger_flow_acl(
         &self,
-        trident_type: TridentType,
+        agent_type: AgentType,
         listener: &mut Box<dyn FlowAclListener>,
     ) -> Result<(), String> {
         listener.flow_acl_change(
-            trident_type,
+            agent_type,
             self.local_epc,
             &self.ip_groups,
             &self.interfaces,
@@ -485,7 +482,7 @@ impl Synchronizer {
             static_config: Arc::new(StaticConfig {
                 version_info,
                 boot_time: SystemTime::now(),
-                tap_mode: tp::TapMode::Local,
+                capture_mode: tp::PacketCaptureType::Local,
                 vtap_group_id_request,
                 controller_ip,
                 env: RuntimeEnvironment::new(),
@@ -590,7 +587,6 @@ impl Synchronizer {
             ctrl_mac: Some(agent_id.mac.to_string()),
             ctrl_ip: Some(agent_id.ip.to_string()),
             team_id: Some(agent_id.team_id.clone()),
-            tap_mode: Some(static_config.tap_mode.into()),
             host: Some(status.hostname.clone()),
             host_ips: {
                 #[cfg(target_os = "linux")]
@@ -615,7 +611,7 @@ impl Synchronizer {
             arch: Some(static_config.env.arch.clone()),
             os: Some(static_config.env.os.clone()),
             kernel_version: Some(static_config.env.kernel_version.clone()),
-            vtap_group_id_request: Some(static_config.vtap_group_id_request.clone()),
+            agent_group_id_request: Some(static_config.vtap_group_id_request.clone()),
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
             kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
             kubernetes_force_watch: Some(running_in_only_watch_k8s_mode()),
@@ -666,17 +662,17 @@ impl Synchronizer {
     }
 
     fn parse_segment(
-        tap_mode: tp::TapMode,
+        capture_mode: tp::PacketCaptureType,
         resp: &tp::SyncResponse,
     ) -> (Vec<tp::Segment>, Vec<MacAddr>, Vec<MacAddr>) {
-        let segments = if tap_mode == tp::TapMode::Analyzer {
+        let segments = if capture_mode == tp::PacketCaptureType::Analyzer {
             resp.remote_segments.clone()
         } else {
             resp.local_segments.clone()
         };
 
-        if segments.len() == 0 && tap_mode != tp::TapMode::Local {
-            warn!("Segment is empty, in {:?} mode.", tap_mode);
+        if segments.len() == 0 && capture_mode != tp::PacketCaptureType::Local {
+            warn!("Segment is empty, in {:?} mode.", capture_mode);
         }
         let mut macs = Vec::new();
         let mut gateway_vmacs = Vec::new();
@@ -766,27 +762,43 @@ impl Synchronizer {
             runtime_config.platform_enabled = false;
         }
          */
-        let _ = escape_tx.send(Duration::from_secs(runtime_config.max_escape));
+        let _ = escape_tx.send(runtime_config.global.communication.max_escape_duration);
 
-        max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
+        max_memory.store(runtime_config.global.limits.max_memory, Ordering::Relaxed);
 
         let containers = Self::parse_containers(&resp);
         for listener in flow_acl_listener.lock().unwrap().iter_mut() {
             listener.containers_change(&containers);
         }
-        let (_, macs, gateway_vmac_addrs) = Self::parse_segment(runtime_config.tap_mode, &resp);
+        let (_, macs, gateway_vmac_addrs) =
+            Self::parse_segment(runtime_config.inputs.cbpf.common.capture_mode, &resp);
 
         let mut status_guard = status.write();
-        status_guard.proxy_ip = if runtime_config.proxy_controller_ip.len() > 0 {
-            Some(runtime_config.proxy_controller_ip.clone())
+        status_guard.proxy_ip = if runtime_config
+            .global
+            .communication
+            .proxy_controller_ip
+            .len()
+            > 0
+        {
+            Some(
+                runtime_config
+                    .global
+                    .communication
+                    .proxy_controller_ip
+                    .clone(),
+            )
         } else {
             Some(static_config.controller_ip.clone())
         };
-        status_guard.proxy_port = runtime_config.proxy_controller_port;
-        status_guard.sync_interval = Duration::from_secs(runtime_config.sync_interval);
-        status_guard.ntp_enabled = runtime_config.ntp_enabled;
-        status_guard.ntp_max_interval = runtime_config.yaml_config.ntp_max_interval;
-        status_guard.ntp_min_interval = runtime_config.yaml_config.ntp_min_interval;
+        status_guard.proxy_port = runtime_config.global.communication.proxy_controller_port;
+        status_guard.sync_interval = runtime_config
+            .global
+            .communication
+            .proactive_request_interval;
+        status_guard.ntp_enabled = runtime_config.global.ntp.enabled;
+        status_guard.ntp_max_interval = runtime_config.global.ntp.max_drift;
+        status_guard.ntp_min_interval = runtime_config.global.ntp.min_drift;
         let updated_platform = status_guard.get_platform_data(&resp);
         if updated_platform {
             status_guard.modify_platform(&macs, &runtime_config);
@@ -812,7 +824,8 @@ impl Synchronizer {
             status_guard.version_groups, status_guard.version_platform_data, status_guard.version_acls);
             let mut policy_error = false;
             for listener in flow_acl_listener.lock().unwrap().iter_mut() {
-                if let Err(e) = status_guard.trigger_flow_acl(runtime_config.trident_type, listener)
+                if let Err(e) =
+                    status_guard.trigger_flow_acl(runtime_config.global.tag.agent_type, listener)
                 {
                     warn!("OnPolicyChange: {}.", e);
                     policy_error = true;
@@ -841,7 +854,7 @@ impl Synchronizer {
         drop(status_guard);
 
         let (trident_state, cvar) = &**trident_state;
-        if !runtime_config.enabled
+        if !runtime_config.global.enabled
             || exception_handler.has(Exception::SystemLoadCircuitBreaker)
             || exception_handler.has(Exception::FreeMemExceeded)
         {
@@ -852,7 +865,7 @@ impl Synchronizer {
                 blacklist,
                 vm_mac_addrs: macs,
                 gateway_vmac_addrs,
-                tap_types: resp.tap_types,
+                tap_types: resp.capture_network_types,
             });
         }
         cvar.notify_one();
@@ -1375,8 +1388,8 @@ impl Synchronizer {
 
                 for listener in flow_acl_listener.lock().unwrap().iter_mut() {
                     let _ = listener.flow_acl_change(
-                        runtime_config.trident_type,
-                        runtime_config.epc_id as i32,
+                        runtime_config.global.tag.agent_type,
+                        runtime_config.global.tag.vpc_id as i32,
                         &vec![],
                         &vec![],
                         &vec![],
@@ -1385,10 +1398,10 @@ impl Synchronizer {
                     );
                 }
 
-                max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
-                let new_sync_interval = Duration::from_secs(runtime_config.sync_interval);
+                max_memory.store(runtime_config.global.limits.max_memory, Ordering::Relaxed);
+                let new_sync_interval = runtime_config.inputs.proc.sync_interval;
                 let (trident_state, cvar) = &*trident_state;
-                if !runtime_config.enabled {
+                if !runtime_config.global.enabled {
                     *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
                 } else {
                     *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
@@ -1444,8 +1457,8 @@ impl Synchronizer {
                     let agent_id = agent_id.read();
                     let status = status.read();
                     info!(
-                        "TapMode: {:?}, AgentId: {:?}, Hostname: {}",
-                        static_config.tap_mode,
+                        "PacketCaptureType: {:?}, AgentId: {:?}, Hostname: {}",
+                        static_config.capture_mode,
                         agent_id,
                         status.hostname,
                     )

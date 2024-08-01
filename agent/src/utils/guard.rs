@@ -45,7 +45,7 @@ use crate::exception::ExceptionHandler;
 use crate::rpc::get_timestamp;
 use crate::utils::{cgroups::is_kernel_available_for_cgroups, environment::running_in_container};
 
-use public::proto::trident::{Exception, SystemLoadMetric, TapMode};
+use public::proto::agent::{Exception, PacketCaptureType, SystemLoadMetric};
 
 struct SystemLoadGuard {
     system: Arc<Mutex<System>>,
@@ -345,7 +345,7 @@ impl Guard {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
             loop {
                 let config = config.load();
-                let tap_mode = config.tap_mode;
+                let capture_mode = config.capture_mode;
                 let cpu_limit = config.max_millicpus;
                 let mut system_guard = system.lock().unwrap();
                 if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
@@ -375,8 +375,8 @@ impl Guard {
                         warn!("{}", e);
                     }
                 }
-                // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroups
-                if !in_container && config.tap_mode != TapMode::Analyzer {
+                // If it is in a container or capture_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroups
+                if !in_container && config.capture_mode != PacketCaptureType::Analyzer {
                     if cgroups_available && !cgroups_disabled {
                         if check_cgroup_result {
                             check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
@@ -424,7 +424,7 @@ impl Guard {
                 // Therefore, using Cgroups to limit the memory usage may not be accurate in some scenarios.
                 // Periodically checking the memory usage can determine whether the memory exceeds the limit.
                 // Reference: https://unix.stackexchange.com/questions/686814/cgroup-and-process-memory-statistics-mismatch
-                if tap_mode != TapMode::Analyzer {
+                if capture_mode != PacketCaptureType::Analyzer {
                     let memory_limit = config.max_memory;
                     if memory_limit != 0 {
                         match get_memory_rss() {

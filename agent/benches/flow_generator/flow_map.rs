@@ -24,13 +24,13 @@ use deepflow_agent::{
     _reverse_meta_packet as reverse_meta_packet, common::meta_packet::ProtocolData,
 };
 
-use public::proto::common::TridentType;
+use public::proto::agent::AgentType;
 
 pub(super) fn bench(c: &mut Criterion) {
     c.bench_function("flow_map_syn_flood", |b| {
         b.iter_custom(|iters| {
             let (module_config, mut map, _) =
-                new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+                new_flow_map_and_receiver(AgentType::TtProcess, None, false);
             let config = Config {
                 flow: &module_config.flow,
                 log_parser: &module_config.log_parser,
@@ -58,7 +58,7 @@ pub(super) fn bench(c: &mut Criterion) {
     c.bench_function("flow_map_with_ten_packets_flow_flood", |b| {
         b.iter_custom(|iters| {
             let (module_config, mut map, _) =
-                new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+                new_flow_map_and_receiver(AgentType::TtProcess, None, false);
             let config = Config {
                 flow: &module_config.flow,
                 log_parser: &module_config.log_parser,

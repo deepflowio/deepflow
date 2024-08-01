@@ -36,7 +36,7 @@ use nix::{
 use super::mirror_mode_dispatcher::{
     get_key as mirror_get_key, handler as mirror_handler, swap_last_timestamp,
 };
-use super::{Packet, TapTypeHandler};
+use super::{CaptureNetworkTypeHandler, Packet};
 #[cfg(target_os = "linux")]
 use crate::platform::{GenericPoller, Poller};
 use crate::{
@@ -54,7 +54,7 @@ use crate::{
 use public::{
     buffer::Allocator,
     debug::QueueDebugger,
-    proto::{common::TridentType, trident::IfMacSource},
+    proto::agent::{AgentType, IfMacSource},
     queue::{self, bounded_with_debug, DebugSender, Receiver},
     utils::net::{Link, MacAddr},
 };
@@ -68,7 +68,7 @@ pub struct MirrorPlusModeDispatcherListener {
     updated: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
     poller: Option<Arc<GenericPoller>>,
-    trident_type: Arc<RwLock<TridentType>>,
+    agent_type: Arc<RwLock<AgentType>>,
     base: BaseDispatcherListener,
 }
 
@@ -78,9 +78,9 @@ impl MirrorPlusModeDispatcherListener {
         &self.base.netns
     }
 
-    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource, trident_type: TridentType) {
-        let mut old_trident_type = self.trident_type.write().unwrap();
-        *old_trident_type = trident_type;
+    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource, agent_type: AgentType) {
+        let mut old_agent_type = self.agent_type.write().unwrap();
+        *old_agent_type = agent_type;
         self.base
             .on_tap_interface_change(vec![], IfMacSource::IfMac);
     }
@@ -214,7 +214,7 @@ pub(super) struct MirrorPlusModeDispatcher {
     #[cfg(target_os = "linux")]
     pub(super) poller: Option<Arc<GenericPoller>>,
     pub(super) updated: Arc<AtomicBool>,
-    pub(super) trident_type: Arc<RwLock<TridentType>>,
+    pub(super) agent_type: Arc<RwLock<AgentType>>,
     pub(super) mac: u32,
     pub(super) flow_generator_thread_handler: Option<JoinHandle<()>>,
     pub(super) queue_debugger: Arc<QueueDebugger>,
@@ -237,7 +237,7 @@ impl MirrorPlusModeDispatcher {
             local_vm_mac_set: self.local_vm_mac_set.clone(),
             updated: self.updated.clone(),
             base: self.base.listener(),
-            trident_type: self.trident_type.clone(),
+            agent_type: self.agent_type.clone(),
             #[cfg(target_os = "linux")]
             poller: self.poller.clone(),
         }
@@ -287,7 +287,7 @@ impl MirrorPlusModeDispatcher {
         let handler_builder = self.base.handler_builder.clone();
         let npb_dedup_enabled = self.base.npb_dedup_enabled.clone();
         let mac = self.mac;
-        let trident_type = self.trident_type.clone();
+        let agent_type = self.agent_type.clone();
         let local_vm_mac_set = self.local_vm_mac_set.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
@@ -340,7 +340,7 @@ impl MirrorPlusModeDispatcher {
                             Err(queue::Error::BatchTooLarge(_)) => unreachable!(),
                         }
 
-                        let trident_type = trident_type.read().unwrap().clone();
+                        let agent_type = agent_type.read().unwrap().clone();
                         for mut packet in batch.drain(..) {
                             let mut timestamp = packet.timestamp;
                             match swap_last_timestamp(
@@ -400,7 +400,7 @@ impl MirrorPlusModeDispatcher {
                                     &config,
                                     &mut flow_map,
                                     &counter,
-                                    trident_type,
+                                    agent_type,
                                     mac,
                                     npb_dedup_enabled.load(Ordering::Relaxed),
                                 );
@@ -423,7 +423,7 @@ impl MirrorPlusModeDispatcher {
                                     &config,
                                     &mut flow_map,
                                     &counter,
-                                    trident_type,
+                                    agent_type,
                                     if cloud_gateway_traffic {
                                         sa_gateway_vmac
                                     } else {
@@ -448,7 +448,7 @@ impl MirrorPlusModeDispatcher {
                                     &config,
                                     &mut flow_map,
                                     &counter,
-                                    trident_type,
+                                    agent_type,
                                     if cloud_gateway_traffic {
                                         da_gateway_vmac
                                     } else {
@@ -547,7 +547,7 @@ impl MirrorPlusModeDispatcher {
 
     fn decap_tunnel(
         packet: &mut Packet,
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         tunnel_type_bitmap: &Arc<RwLock<TunnelTypeBitmap>>,
         tunnel_type_trim_bitmap: TunnelTypeBitmap,

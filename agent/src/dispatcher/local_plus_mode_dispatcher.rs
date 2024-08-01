@@ -43,7 +43,7 @@ use crate::platform::LibvirtXmlExtractor;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType},
-        enums::{EthernetType, TapType},
+        enums::{CaptureNetworkType, EthernetType},
         MetaPacket, TapPort, FIELD_OFFSET_ETH_TYPE, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
     },
     config::DispatcherConfig,
@@ -58,7 +58,7 @@ use crate::{
 use public::{
     buffer::Allocator,
     debug::QueueDebugger,
-    proto::{common::TridentType, trident::IfMacSource},
+    proto::agent::{AgentType, IfMacSource},
     queue::{self, bounded_with_debug, DebugSender, Receiver},
     utils::net::{Link, MacAddr},
 };
@@ -268,7 +268,7 @@ impl LocalPlusModeDispatcher {
                             );
                             BaseDispatcher::prepare_flow(
                                 &mut meta_packet,
-                                TapType::Cloud,
+                                CaptureNetworkType::Cloud,
                                 false,
                                 id as u8,
                                 npb_dedup_enabled.load(Ordering::Relaxed),
@@ -514,7 +514,7 @@ impl LocalPlusModeDispatcherListener {
         &self,
         interfaces: &[Link],
         if_mac_source: IfMacSource,
-        trident_type: TridentType,
+        agent_type: AgentType,
         blacklist: &Vec<u64>,
     ) {
         let mut interfaces = interfaces.to_vec();
@@ -527,7 +527,7 @@ impl LocalPlusModeDispatcherListener {
         let macs = self.get_mapped_macs(
             &interfaces,
             if_mac_source,
-            trident_type,
+            agent_type,
             #[cfg(target_os = "linux")]
             &self.base.options.lock().unwrap().tap_mac_script,
         );
@@ -540,7 +540,7 @@ impl LocalPlusModeDispatcherListener {
         &self,
         interfaces: &Vec<Link>,
         if_mac_source: IfMacSource,
-        trident_type: TridentType,
+        agent_type: AgentType,
         #[cfg(target_os = "linux")] tap_mac_script: &str,
     ) -> Vec<MacAddr> {
         let mut macs = vec![];
@@ -567,7 +567,7 @@ impl LocalPlusModeDispatcherListener {
             macs.push(match if_mac_source {
                 IfMacSource::IfMac => {
                     let mut mac = iface.mac_addr;
-                    if trident_type == TridentType::TtProcess {
+                    if agent_type == AgentType::TtProcess {
                         let mut octets = mac.octets().to_owned();
                         octets[0] = 0;
                         mac = octets.into();

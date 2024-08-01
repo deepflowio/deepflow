@@ -97,6 +97,14 @@ impl TunnelTypeBitmap {
         bitmap
     }
 
+    pub fn from_slice(tunnel_types: &Vec<usize>) -> Self {
+        let mut bitmap = TunnelTypeBitmap(0);
+        for tunnel_type in tunnel_types.iter() {
+            bitmap.0 |= 1 << *tunnel_type as u16;
+        }
+        bitmap
+    }
+
     pub fn from_strings(tunnel_types: &Vec<String>) -> Self {
         let mut bitmap = TunnelTypeBitmap(0);
         for s in tunnel_types {

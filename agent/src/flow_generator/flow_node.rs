@@ -22,14 +22,14 @@ use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_S
 use crate::common::{
     decapsulate::TunnelType,
     endpoint::EndpointDataPov,
-    enums::{EthernetType, TapType, TcpFlags},
+    enums::{CaptureNetworkType, EthernetType, TcpFlags},
     flow::{FlowMetricsPeer, PacketDirection, SignalSource, TcpPerfStats},
     lookup_key::LookupKey,
     meta_packet::MetaPacket,
     tagged_flow::TaggedFlow,
     TapPort, Timestamp,
 };
-use public::{proto::common::TridentType, utils::net::MacAddr};
+use public::{proto::agent::AgentType, utils::net::MacAddr};
 
 use npb_pcap_policy::PolicyData;
 use packet_segmentation_reassembly::PacketSegmentationReassembly;
@@ -193,7 +193,7 @@ impl FlowNode {
         ignore_l2_end: bool,
         ignore_tor_mac: bool,
         ignore_idc_vlan: bool,
-        trident_type: TridentType,
+        agent_type: AgentType,
     ) -> bool {
         if meta_packet.signal_source == SignalSource::EBPF {
             if self.tagged_flow.flow.flow_id != meta_packet.generate_ebpf_flow_id() {
@@ -226,7 +226,7 @@ impl FlowNode {
         }
 
         if flow.vlan != meta_packet.vlan
-            && meta_lookup_key.tap_type != TapType::Cloud
+            && meta_lookup_key.tap_type != CaptureNetworkType::Cloud
             && !ignore_idc_vlan
         {
             return false;
@@ -265,13 +265,13 @@ impl FlowNode {
             || (meta_packet.tunnel.is_none() && flow.tunnel.tunnel_type != TunnelType::None)
         {
             // 微软ACS存在非对称隧道流量，需要排除
-            if !Self::is_hyper_v(trident_type) {
+            if !Self::is_hyper_v(agent_type) {
                 return false;
             }
         }
 
         // Ipv4/Ipv6 solve
-        let mac_match = Self::mac_match(meta_packet, ignore_l2_end, ignore_tor_mac, trident_type);
+        let mac_match = Self::mac_match(meta_packet, ignore_l2_end, ignore_tor_mac, agent_type);
         if flow_key.ip_src == meta_lookup_key.src_ip
             && flow_key.ip_dst == meta_lookup_key.dst_ip
             && flow_key.port_src == meta_lookup_key.src_port
@@ -302,8 +302,8 @@ impl FlowNode {
             )
     }
 
-    fn is_hyper_v(trident_type: TridentType) -> bool {
-        trident_type == TridentType::TtHyperVCompute || trident_type == TridentType::TtHyperVNetwork
+    fn is_hyper_v(agent_type: AgentType) -> bool {
+        agent_type == AgentType::TtHyperVCompute || agent_type == AgentType::TtHyperVNetwork
     }
 
     // Microsoft ACS：
@@ -319,21 +319,21 @@ impl FlowNode {
         meta_packet: &MetaPacket,
         ignore_l2_end: bool,
         ignore_tor_mac: bool,
-        trident_type: TridentType,
+        agent_type: AgentType,
     ) -> MatchMac {
         let ignore_mac = meta_packet.tunnel.is_some()
-            && ((Self::is_hyper_v(trident_type) && meta_packet.tunnel.unwrap().tier < 2)
+            && ((Self::is_hyper_v(agent_type) && meta_packet.tunnel.unwrap().tier < 2)
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::TencentGre
                 || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::Ipip);
 
         // return value stands different match type, defined by MAC_MATCH_*
         // TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
-        let is_from_isp = meta_packet.lookup_key.tap_type != TapType::Cloud;
+        let is_from_isp = meta_packet.lookup_key.tap_type != CaptureNetworkType::Cloud;
         if is_from_isp || ignore_mac || ignore_tor_mac {
             return MatchMac::None;
         }
 
-        let is_from_trident = meta_packet.lookup_key.tap_type == TapType::Cloud
+        let is_from_trident = meta_packet.lookup_key.tap_type == CaptureNetworkType::Cloud
             && meta_packet.tap_port.split_fields().0 > 0;
 
         if !ignore_l2_end && is_from_trident {

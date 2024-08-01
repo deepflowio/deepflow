@@ -56,7 +56,7 @@ use crate::{exception::ExceptionHandler, trident::AgentId};
 
 use public::{
     netns::{reset_netns, set_netns},
-    proto::trident as pb,
+    proto::agent as pb,
 };
 
 pub use public::rpc::remote_exec::*;
