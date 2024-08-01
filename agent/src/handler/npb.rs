@@ -44,7 +44,7 @@ use public::{
     counter::Countable,
     debug::QueueDebugger,
     leaky_bucket::LeakyBucket,
-    proto::trident::VlanMode,
+    proto::agent::VlanMode,
     queue::{bounded_with_debug, DebugSender},
     utils::net::MacAddr,
 };

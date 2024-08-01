@@ -37,12 +37,12 @@ use super::Packet;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
-        enums::TapType,
+        enums::CaptureNetworkType,
         MetaPacket, TapPort, ETH_HEADER_SIZE, VLAN_HEADER_SIZE,
     },
     config::DispatcherConfig,
     dispatcher::{
-        base_dispatcher::{BaseDispatcherListener, TapTypeHandler},
+        base_dispatcher::{BaseDispatcherListener, CaptureNetworkTypeHandler},
         error::Result,
     },
     flow_generator::{flow_map::Config, FlowMap},
@@ -56,7 +56,7 @@ use crate::{
 use public::{
     buffer::Allocator,
     debug::QueueDebugger,
-    proto::trident::IfMacSource,
+    proto::agent::IfMacSource,
     queue::{self, bounded_with_debug, DebugSender, Receiver},
     utils::net::{Link, MacAddr},
 };
@@ -142,7 +142,7 @@ impl AnalyzerModeDispatcherListener {
 }
 
 pub(super) struct AnalyzerPipeline {
-    tap_type: TapType,
+    tap_type: CaptureNetworkType,
     handlers: Vec<PacketHandler>,
     timestamp: Duration,
 }
@@ -169,8 +169,8 @@ impl AnalyzerModeDispatcher {
     }
 
     fn timestamp(
-        timestamp_map: &mut HashMap<TapType, Duration>,
-        tap_type: TapType,
+        timestamp_map: &mut HashMap<CaptureNetworkType, Duration>,
+        tap_type: CaptureNetworkType,
         mut timestamp: Duration,
     ) -> (Duration, bool) {
         let last_timestamp = timestamp_map.entry(tap_type).or_insert(Duration::ZERO);
@@ -244,7 +244,7 @@ impl AnalyzerModeDispatcher {
     fn run_flow_generator(
         &mut self,
         receiver: Receiver<Packet>,
-        sender: DebugSender<(TapType, MiniPacket<'static>)>,
+        sender: DebugSender<(CaptureNetworkType, MiniPacket<'static>)>,
     ) {
         let base = &self.base;
 
@@ -277,7 +277,7 @@ impl AnalyzerModeDispatcher {
             thread::Builder::new()
                 .name("dispatcher-packet-to-flow-generator".to_owned())
                 .spawn(move || {
-                    let mut timestamp_map: HashMap<TapType, Duration> = HashMap::new();
+                    let mut timestamp_map: HashMap<CaptureNetworkType, Duration> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     let mut flow_map = FlowMap::new(
@@ -364,7 +364,7 @@ impl AnalyzerModeDispatcher {
                             let mut overlay_packet = packet.raw;
                             overlay_packet.truncate(decap_length..raw_length);
                             // Only cloud traffic goes to de-duplication
-                            if tap_type == TapType::Cloud
+                            if tap_type == CaptureNetworkType::Cloud
                                 && !analyzer_dedup_disabled
                                 && dedup.duplicate(overlay_packet.as_mut(), timestamp)
                             {
@@ -443,7 +443,7 @@ impl AnalyzerModeDispatcher {
     // 2. NPB/PCAP/...
     fn run_additional_packet_pipeline(
         &mut self,
-        receiver: Receiver<(TapType, MiniPacket<'static>)>,
+        receiver: Receiver<(CaptureNetworkType, MiniPacket<'static>)>,
     ) {
         let base = &self.base;
         let terminated = base.terminated.clone();
@@ -456,7 +456,8 @@ impl AnalyzerModeDispatcher {
             thread::Builder::new()
                 .name("dispatcher-additional-packet-pipeline".to_owned())
                 .spawn(move || {
-                    let mut tap_pipelines: HashMap<TapType, AnalyzerPipeline> = HashMap::new();
+                    let mut tap_pipelines: HashMap<CaptureNetworkType, AnalyzerPipeline> =
+                        HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     if cpu_set != CpuSet::new() {
@@ -476,7 +477,7 @@ impl AnalyzerModeDispatcher {
                         for (tap_type, mini_packet) in batch.drain(..) {
                             let pipeline = match tap_pipelines.get_mut(&tap_type) {
                                 None => {
-                                    // ff : ff : ff : ff : DispatcherID : TapType(1-255)
+                                    // ff : ff : ff : ff : DispatcherID : CaptureNetworkType(1-255)
                                     let mac = ((0xffffffff as u64) << 16)
                                         | ((id as u64) << 8)
                                         | (u16::from(tap_type) as u64);
@@ -615,11 +616,11 @@ impl AnalyzerModeDispatcher {
 
     pub(super) fn decap_tunnel<T: AsMut<[u8]>>(
         mut packet: T,
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
         trim_bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
+    ) -> Result<(usize, CaptureNetworkType)> {
         let packet = packet.as_mut();
         if packet[BILD_FLAGS_OFFSET] == BILD_FLAGS as u8 && packet.len() > ETH_HEADER_SIZE {
             // bild will mark ERSPAN traffic and reduce the Trident process
@@ -640,12 +641,12 @@ impl AnalyzerModeDispatcher {
 
     pub(super) fn prepare_flow(
         meta_packet: &mut MetaPacket,
-        tap_type: TapType,
+        tap_type: CaptureNetworkType,
         queue_hash: u8,
         npb_dedup: bool,
     ) {
         let mut reset_ttl = false;
-        if tap_type == TapType::Cloud {
+        if tap_type == CaptureNetworkType::Cloud {
             reset_ttl = true;
         }
         BaseDispatcher::prepare_flow(meta_packet, tap_type, reset_ttl, queue_hash, npb_dedup)

@@ -627,14 +627,14 @@ global:
     # upgrade_from: proxy_controller_ip
     # TODO: 字段名容易与 agent 的 yaml 文件中的 controller_ip 产生混淆。
     # TODO: 中文描述与英文差异较大，待审核。
-    controller_ip: ""
+    proxy_controller_ip: "127.0.0.1"
     # type: int
     # name:
     #   en: Controller Port
     #   ch: Controller 端口号
     # unit:
-    # range: [1, 65535]
     # enum_options: []
+    # range: [1, 65535]
     # modification: hot_update
     # ee_feature: false
     # description:
@@ -645,7 +645,7 @@ global:
     #   ch: |-
     #     用于设置 deepflow-server 向 deepflow-agent 下发的 server 端控制面通信端口。
     # upgrade_from: proxy_controller_port
-    controller_port: 30035
+    proxy_controller_port: 30035
     # type: ip
     # name:
     #   en: Ingester IP Address
@@ -879,6 +879,18 @@ global:
     #   ch: 覆盖 statsd 主机标签。
     # upgrade_from: host
     hostname: ""
+    # type: duration
+    # name: Interval
+    # unit:
+    # range: [1s, 3600s]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: statsd interval.
+    #   ch: statsd 时间间隔。
+    # upgrade_from: stats_interval
+    interval: 10s
   # type: section
   # name:
   #   en: Standalone Mode
@@ -1304,7 +1316,7 @@ inputs:
     process_matcher:
       - match_regex: deepflow-*
         only_in_container: false
-        enabled_features: [ebpf.profile.on_cpu, ebpf.profile.off_cpu]
+        enabled_features: [ebpf.profile.on_cpu, ebpf.profile.off_cpu, os.proc.scan]
     # type: section
     # name:
     #   en: Symbol Table
@@ -1984,7 +1996,7 @@ inputs:
       # name:
       #   en: Max Capture PPS
       #   ch: 最大采集 PPS
-      # unit: Kpps
+      # unit: pps
       # range: [1, 1000000]
       # enum_options: []
       # modification: hot_update
@@ -1998,7 +2010,7 @@ inputs:
       #     deepflow-agent 采集数据包的速率上限。
       # upgrade_from: max_collect_pps
       # TODO: 默认值偏小了，默认设置为 0 表示不限速？
-      max_capture_pps: 200
+      max_capture_pps: 200000
     # type: section
     # name:
     #   en: Preprocess
@@ -5700,6 +5712,23 @@ outputs:
 #   ch: 插件
 # description:
 plugins:
+  # type: duration
+  # name:
+  #   en: Plugins Update Time
+  #   ch: 插件更新时间
+  # unit:
+  # range: []
+  # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+  # modification: hot_update
+  # ee_feature: false
+  # description:
+  #   en: |-
+  #     Plugins Update Time.
+  #   ch: |-
+  #     插件更新时间。
+  # upgrade_from: update_time
+  # TODO: 候选项需要特殊处理
+  update_time:
   # type: string
   # name:
   #   en: Wasm Plugins

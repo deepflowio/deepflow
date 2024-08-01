@@ -38,7 +38,7 @@ use crate::{
 
 use public::{
     netns::{self, InterfaceInfo, NsFile},
-    proto::trident as pb,
+    proto::agent as pb,
 };
 
 pub struct Querier {
@@ -336,7 +336,7 @@ impl Querier {
     }
 
     fn update_process_data(&mut self, config: &PlatformConfig, hasher: &mut AHasher) {
-        if !(process_info_enabled(config.trident_type)
+        if !(process_info_enabled(config.agent_type)
             && config.os_proc_scan_conf.os_proc_sync_enabled)
         {
             return;

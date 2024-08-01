@@ -322,7 +322,7 @@ message NpbAction {
 // 字段含义查看README
 message FlowAcl {
     optional uint32 id = 1;
-    repeated uint32 capture_network_type = 2;
+    optional uint32 capture_network_type = 2;
     optional uint32 protocol = 3 [default = 256];
     optional string src_ports = 4;
     optional string dst_ports = 5;

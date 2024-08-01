@@ -170,7 +170,7 @@ impl PolicyDebugger {
         }
 
         let _ = send_to(&sock, conn, PolicyMessage::Context(format!(
-            "Id: {}\nTapType: {}\nIP Src: \n\t{}\nIP Dst: \n\t{}\nProtocol: {}\nPort Src: {:?}\nPort Dst: {:?}\nActions: {}\n", acl.id,acl.tap_type,src_groups.iter().map(|x| format!("EPC: {} IP: {:?}", x.epc_id, x.ips)).collect::<Vec<String>>().join("\t\n"),dst_groups.iter().map(|x| format!("EPC: {} IP: {:?}", x.epc_id, x.ips)).collect::<Vec<String>>().join("\t\n"),
+            "Id: {}\nCaptureNetworkType: {}\nIP Src: \n\t{}\nIP Dst: \n\t{}\nProtocol: {}\nPort Src: {:?}\nPort Dst: {:?}\nActions: {}\n", acl.id,acl.tap_type,src_groups.iter().map(|x| format!("EPC: {} IP: {:?}", x.epc_id, x.ips)).collect::<Vec<String>>().join("\t\n"),dst_groups.iter().map(|x| format!("EPC: {} IP: {:?}", x.epc_id, x.ips)).collect::<Vec<String>>().join("\t\n"),
             acl.proto,
             acl.src_port_ranges.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", "),
             acl.dst_port_ranges.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", "),

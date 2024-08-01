@@ -40,7 +40,7 @@ use crate::platform::{GenericPoller, LibvirtXmlExtractor, Poller};
 use crate::{
     common::{
         decapsulate::TunnelType,
-        enums::{EthernetType, TapType},
+        enums::{CaptureNetworkType, EthernetType},
         MetaPacket, TapPort, FIELD_OFFSET_ETH_TYPE, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
     },
     config::DispatcherConfig,
@@ -50,7 +50,7 @@ use crate::{
     utils::bytes::read_u16_be,
 };
 use public::{
-    proto::{common::TridentType, trident::IfMacSource},
+    proto::agent::{AgentType, IfMacSource},
     utils::net::{Link, MacAddr},
 };
 
@@ -255,7 +255,7 @@ impl LocalModeDispatcher {
             );
             BaseDispatcher::prepare_flow(
                 &mut meta_packet,
-                TapType::Cloud,
+                CaptureNetworkType::Cloud,
                 false,
                 base.id as u8,
                 base.npb_dedup_enabled.load(Ordering::Relaxed),
@@ -384,7 +384,7 @@ impl LocalModeDispatcherListener {
         &self,
         interfaces: &[Link],
         if_mac_source: IfMacSource,
-        trident_type: TridentType,
+        agent_type: AgentType,
         blacklist: &Vec<u64>,
     ) {
         let mut interfaces = interfaces.to_vec();
@@ -397,7 +397,7 @@ impl LocalModeDispatcherListener {
         let macs = self.get_mapped_macs(
             &interfaces,
             if_mac_source,
-            trident_type,
+            agent_type,
             #[cfg(target_os = "linux")]
             &self.base.options.lock().unwrap().tap_mac_script,
         );
@@ -410,7 +410,7 @@ impl LocalModeDispatcherListener {
         &self,
         interfaces: &Vec<Link>,
         if_mac_source: IfMacSource,
-        trident_type: TridentType,
+        agent_type: AgentType,
         #[cfg(target_os = "linux")] tap_mac_script: &str,
     ) -> Vec<MacAddr> {
         let mut macs = vec![];
@@ -435,7 +435,7 @@ impl LocalModeDispatcherListener {
             macs.push(match if_mac_source {
                 IfMacSource::IfMac => {
                     let mut mac = iface.mac_addr;
-                    if trident_type == TridentType::TtProcess {
+                    if agent_type == AgentType::TtProcess {
                         let mut octets = mac.octets().to_owned();
                         octets[0] = 0;
                         mac = octets.into();

@@ -954,7 +954,7 @@ mod tests {
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
         config::{
             handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
-            ExtraLogFields,
+            CustomFields,
         },
         flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
@@ -999,7 +999,7 @@ mod tests {
                 vec![],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
-                ExtraLogFields::default(),
+                CustomFields::default(),
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),

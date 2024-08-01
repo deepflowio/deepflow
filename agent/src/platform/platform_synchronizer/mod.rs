@@ -29,11 +29,11 @@ cfg_if::cfg_if! {
     }
 }
 
-use public::proto::common::TridentType;
+use public::proto::agent::AgentType;
 
 use crate::utils::environment::{is_tt_pod, is_tt_workload};
 
 // whether need to scan the process info
-pub fn process_info_enabled(t: TridentType) -> bool {
+pub fn process_info_enabled(t: AgentType) -> bool {
     is_tt_workload(t) || is_tt_pod(t)
 }

@@ -34,14 +34,14 @@ use nix::{
     unistd::Pid,
 };
 
-use super::TapTypeHandler;
+use super::CaptureNetworkTypeHandler;
 use crate::common::decapsulate::TunnelTypeBitmap;
 #[cfg(target_os = "linux")]
 use crate::platform::{GenericPoller, Poller};
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType},
-        enums::TapType,
+        enums::CaptureNetworkType,
         MetaPacket, TapPort,
     },
     config::DispatcherConfig,
@@ -59,7 +59,7 @@ use crate::{
 use packet_dedup::PacketDedupMap;
 use public::packet::Packet;
 use public::{
-    proto::{common::TridentType, trident::IfMacSource},
+    proto::agent::{AgentType, IfMacSource},
     utils::net::{Link, MacAddr},
 };
 
@@ -71,7 +71,7 @@ pub struct MirrorModeDispatcherListener {
     updated: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
     poller: Option<Arc<GenericPoller>>,
-    trident_type: Arc<RwLock<TridentType>>,
+    agent_type: Arc<RwLock<AgentType>>,
     base: BaseDispatcherListener,
 }
 
@@ -81,9 +81,9 @@ impl MirrorModeDispatcherListener {
         &self.base.netns
     }
 
-    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource, trident_type: TridentType) {
-        let mut old_trident_type = self.trident_type.write().unwrap();
-        *old_trident_type = trident_type;
+    pub fn on_tap_interface_change(&self, _: &[Link], _: IfMacSource, agent_type: AgentType) {
+        let mut old_agent_type = self.agent_type.write().unwrap();
+        *old_agent_type = agent_type;
         self.base
             .on_tap_interface_change(vec![], IfMacSource::IfMac);
     }
@@ -303,7 +303,7 @@ fn prepare_flow(
     tunnel_type: TunnelType,
     key: u32,
     queue_hash: u8,
-    trident_type: TridentType,
+    agent_type: AgentType,
     mac: u32,
     npb_dedup: bool,
     cloud_gateway_traffic: bool,
@@ -312,14 +312,20 @@ fn prepare_flow(
     if cloud_gateway_traffic {
         meta_packet.tap_port = TapPort::from_gateway_mac(tunnel_type, mac);
     } else {
-        if is_tt_hyper_v_compute(trident_type) {
+        if is_tt_hyper_v_compute(agent_type) {
             meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, mac);
         } else {
             meta_packet.tap_port = TapPort::from_local_mac(nat_source, tunnel_type, key);
         }
     }
 
-    BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash, npb_dedup)
+    BaseDispatcher::prepare_flow(
+        meta_packet,
+        CaptureNetworkType::Cloud,
+        false,
+        queue_hash,
+        npb_dedup,
+    )
 }
 
 pub fn handler(
@@ -337,7 +343,7 @@ pub fn handler(
     config: &Config,
     flow_map: &mut FlowMap,
     counter: &Arc<PacketCounter>,
-    trident_type: TridentType,
+    agent_type: AgentType,
     mac: u32,
     npb_dedup: bool,
 ) -> Result<()> {
@@ -358,7 +364,7 @@ pub fn handler(
         tunnel_info.tunnel_type,
         key,
         id as u8,
-        trident_type,
+        agent_type,
         mac,
         npb_dedup,
         config.flow.cloud_gateway_traffic,
@@ -420,7 +426,7 @@ pub(super) struct MirrorModeDispatcher {
     pub(super) poller: Option<Arc<GenericPoller>>,
     pub(super) pipelines: HashMap<u32, MirrorPipeline>,
     pub(super) updated: Arc<AtomicBool>,
-    pub(super) trident_type: Arc<RwLock<TridentType>>,
+    pub(super) agent_type: Arc<RwLock<AgentType>>,
     pub(super) mac: u32,
     pub(super) last_timestamp_array: Vec<LastTimestamps>,
 }
@@ -439,7 +445,7 @@ impl MirrorModeDispatcher {
             local_vm_mac_set: self.local_vm_mac_set.clone(),
             updated: self.updated.clone(),
             base: self.base.listener(),
-            trident_type: self.trident_type.clone(),
+            agent_type: self.agent_type.clone(),
             #[cfg(target_os = "linux")]
             poller: self.poller.clone(),
         }
@@ -648,7 +654,7 @@ impl MirrorModeDispatcher {
                 overlay_packet,
                 self.base.tunnel_info,
             );
-            let trident_type = self.trident_type.read().unwrap().clone();
+            let agent_type = self.agent_type.read().unwrap().clone();
             let cloud_gateway_traffic = config.flow.cloud_gateway_traffic;
             if sa_gateway_vmac == 0 && da_gateway_vmac == 0 {
                 let _ = handler(
@@ -666,7 +672,7 @@ impl MirrorModeDispatcher {
                     &config,
                     &mut flow_map,
                     &self.base.counter,
-                    trident_type,
+                    agent_type,
                     self.mac,
                     self.base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
@@ -689,7 +695,7 @@ impl MirrorModeDispatcher {
                     &config,
                     &mut flow_map,
                     &self.base.counter,
-                    trident_type,
+                    agent_type,
                     if cloud_gateway_traffic {
                         sa_gateway_vmac
                     } else {
@@ -714,7 +720,7 @@ impl MirrorModeDispatcher {
                     &config,
                     &mut flow_map,
                     &self.base.counter,
-                    trident_type,
+                    agent_type,
                     if cloud_gateway_traffic {
                         da_gateway_vmac
                     } else {
@@ -733,7 +739,7 @@ impl MirrorModeDispatcher {
 
     fn decap_tunnel(
         packet: &mut Packet,
-        tap_type_handler: &TapTypeHandler,
+        tap_type_handler: &CaptureNetworkTypeHandler,
         tunnel_info: &mut TunnelInfo,
         tunnel_type_bitmap: &Arc<RwLock<TunnelTypeBitmap>>,
         tunnel_type_trim_bitmap: TunnelTypeBitmap,

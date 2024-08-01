@@ -37,7 +37,7 @@ use procfs::{
 use crate::{config::handler::OsProcScanConfig, policy::PolicyGetter};
 use public::{
     bytes::read_u32_be,
-    proto::trident::{GpidSyncEntry, RoleType, ServiceProtocol},
+    proto::agent::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
 use super::linux_process::{get_all_pid_process_map, get_os_app_tag_by_exec, RegExpAction};

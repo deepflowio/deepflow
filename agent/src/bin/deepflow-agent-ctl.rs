@@ -264,7 +264,7 @@ struct RpcCmd {
 enum RpcData {
     Config,
     Platform,
-    TapTypes,
+    CaptureNetworkTypes,
     Cidr,
     Groups,
     Acls,
@@ -372,15 +372,15 @@ impl Controller {
 
                     let beacon: Beacon =
                         decode_from_std_read(&mut &buf[length..n], config::standard())?;
-                    if !vtap_map.contains(&beacon.vtap_id) {
+                    if !vtap_map.contains(&beacon.agent_id) {
                         println!(
                             "{:<14} {:<28} {:<45} {}",
-                            beacon.vtap_id,
+                            beacon.agent_id,
                             beacon.hostname,
                             a.ip(),
                             a.port()
                         );
-                        vtap_map.insert(beacon.vtap_id);
+                        vtap_map.insert(beacon.agent_id);
                     }
                 }
                 Err(e) => return Err(anyhow!("{}", e)),
@@ -398,7 +398,7 @@ impl Controller {
             RpcData::Acls => RpcMessage::Acls(None),
             RpcData::Config => RpcMessage::Config(None),
             RpcData::Platform => RpcMessage::PlatformData(None),
-            RpcData::TapTypes => RpcMessage::TapTypes(None),
+            RpcData::CaptureNetworkTypes => RpcMessage::CaptureNetworkTypes(None),
             RpcData::Cidr => RpcMessage::Cidr(None),
             RpcData::Groups => RpcMessage::Groups(None),
             RpcData::Segments => RpcMessage::Segments(None),
@@ -418,7 +418,7 @@ impl Controller {
             match resp {
                 RpcMessage::Acls(v)
                 | RpcMessage::PlatformData(v)
-                | RpcMessage::TapTypes(v)
+                | RpcMessage::CaptureNetworkTypes(v)
                 | RpcMessage::Cidr(v)
                 | RpcMessage::Groups(v)
                 | RpcMessage::Segments(v) => match v {

@@ -200,7 +200,7 @@ impl StashKey {
             // fast_id
             // 128          72        64    59       56        48           32          24         16        0
             // +-------------+---------+-----+--------+---------+------------+-----------+----------+---------+
-            // |             | L7Proto | MAC | CodeID | TapType | ServerPort | Direction | Protocol | L3EpcId |
+            // |             | L7Proto | MAC | CodeID | CaptureNetworkType | ServerPort | Direction | Protocol | L3EpcId |
             // +-------------+---------+-----+--------+---------+------------+-----------+----------+---------+
             Self::SINGLE_MAC_IP_PORT_APP => {
                 fast_id |= (tagger.l7_protocol as u128) << 64;
@@ -252,7 +252,7 @@ impl StashKey {
             // RESERVED
             // 20    19       16        8         0
             // ------------------------------------
-            // | MAC | CodeID | L7Proto | TapType |
+            // | MAC | CodeID | L7Proto | CaptureNetworkType |
             // ------------------------------------
             Self::EDGE_MAC_IP_PORT_APP => {
                 let tap_port_reserve = (tagger.l7_protocol as u32) << 8 | 3 << 16 | 1 << 19;
@@ -447,7 +447,7 @@ impl Stash {
                     acl_gid,
                     server_port: ip_id,
                     signal_source: flow.signal_source,
-                    vtap_id: config.vtap_id,
+                    agent_id: config.agent_id,
                     ..Default::default()
                 };
                 let meter = &acc_flow.flow_meter;
@@ -468,7 +468,7 @@ impl Stash {
                     acl_gid,
                     server_port: ip_id,
                     signal_source: flow.signal_source,
-                    vtap_id: config.vtap_id,
+                    agent_id: config.agent_id,
                     ..Default::default()
                 };
 
@@ -970,7 +970,7 @@ fn get_single_tagger(
 
     Tagger {
         global_thread_id,
-        vtap_id: config.vtap_id,
+        agent_id: config.agent_id,
         mac: if !has_mac {
             MacAddr::ZERO
         } else if ep == FLOW_METRICS_PEER_SRC {
@@ -1087,7 +1087,7 @@ fn get_edge_tagger(
 
     Tagger {
         global_thread_id,
-        vtap_id: config.vtap_id,
+        agent_id: config.agent_id,
         mac: src_mac,
         mac1: dst_mac,
         ip: src_ip,
@@ -1472,7 +1472,7 @@ mod tests {
 
     use std::collections::HashSet;
 
-    use crate::common::enums::TapType;
+    use crate::common::enums::CaptureNetworkType;
 
     use super::*;
 
@@ -1511,7 +1511,7 @@ mod tests {
         tagger.l3_epc_id = (tagger.l3_epc_id as u16 ^ 0x8000) as i16;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
-        tagger.tap_type = TapType::Idc(255);
+        tagger.tap_type = CaptureNetworkType::Idc(255);
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
         tagger.direction = Direction::ServerToClient;
@@ -1550,7 +1550,7 @@ mod tests {
         tagger.l3_epc_id1 = (tagger.l3_epc_id as u16 ^ 0x8000) as i16;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
-        tagger.tap_type = TapType::Idc(200);
+        tagger.tap_type = CaptureNetworkType::Idc(200);
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None, 0);
         assert_eq!(map.insert(key), true);
         tagger.direction = Direction::ClientToServer;

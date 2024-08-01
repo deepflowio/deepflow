@@ -41,7 +41,7 @@ use super::resource_watcher::{
     Watcher, WatcherConfig,
 };
 use crate::{
-    config::{handler::PlatformAccess, KubernetesResourceConfig},
+    config::{handler::PlatformAccess, ApiResources},
     error::{Error, Result},
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
@@ -53,8 +53,8 @@ use crate::{
     },
 };
 use public::proto::{
+    agent::{Exception, KubernetesApiSyncRequest},
     common::KubernetesApiInfo,
-    trident::{Exception, KubernetesApiSyncRequest},
 };
 
 /*
@@ -244,7 +244,7 @@ impl ApiWatcher {
 
     async fn discover_resources(
         client: &Client,
-        resource_config: &Vec<KubernetesResourceConfig>,
+        resource_config: &Vec<ApiResources>,
         err_msgs: &Arc<Mutex<Vec<String>>>,
     ) -> Result<Vec<Resource>> {
         let mut resources = default_resources();
@@ -498,7 +498,7 @@ impl ApiWatcher {
     }
 
     async fn set_up(
-        resource_config: &Vec<KubernetesResourceConfig>,
+        resource_config: &Vec<ApiResources>,
         runtime: &Runtime,
         apiserver_version: &Arc<Mutex<Info>>,
         err_msgs: &Arc<Mutex<Vec<String>>>,
@@ -653,7 +653,7 @@ impl ApiWatcher {
             KubernetesApiSyncRequest {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
-                vtap_id: Some(config_guard.vtap_id as u32),
+                agent_id: Some(config_guard.agent_id as u32),
                 source_ip: Some(id.ip.to_string()),
                 team_id: Some(id.team_id.clone()),
                 error_msg: Some(
@@ -790,7 +790,7 @@ impl ApiWatcher {
                         KubernetesApiSyncRequest {
                             cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                             version: Some(context.version.load(Ordering::SeqCst)),
-                            vtap_id: Some(config_guard.vtap_id as u32),
+                            agent_id: Some(config_guard.agent_id as u32),
                             source_ip: Some(id.ip.to_string()),
                             team_id: Some(id.team_id.clone()),
                             error_msg: Some(e.to_string()),

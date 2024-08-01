@@ -24,7 +24,7 @@ use serde::Serialize;
 use super::meter::Meter;
 
 use crate::common::{
-    enums::{IpProtocol, TapType},
+    enums::{CaptureNetworkType, IpProtocol},
     flow::{L7Protocol, SignalSource},
     tap_port::TapPort,
 };
@@ -305,9 +305,9 @@ pub struct Tagger {
     pub protocol: IpProtocol,
     pub acl_gid: u16,
     pub server_port: u16, // tunnel_ip_id also uses this field
-    pub vtap_id: u16,
+    pub agent_id: u16,
     pub tap_port: TapPort,
-    pub tap_type: TapType,
+    pub tap_type: CaptureNetworkType,
     pub l7_protocol: L7Protocol,
 
     pub gpid: u32,
@@ -341,9 +341,9 @@ impl Default for Tagger {
             protocol: IpProtocol::default(),
             acl_gid: 0,
             server_port: 0,
-            vtap_id: 0,
+            agent_id: 0,
             tap_port: TapPort::default(),
-            tap_type: TapType::default(),
+            tap_type: CaptureNetworkType::default(),
             l7_protocol: L7Protocol::default(),
 
             gpid: 0,
@@ -400,7 +400,7 @@ impl From<Tagger> for metric::MiniTag {
                 protocol: u8::from(t.protocol) as u32,
                 acl_gid: t.acl_gid as u32,
                 server_port: t.server_port as u32,
-                vtap_id: t.vtap_id as u32,
+                vtap_id: t.agent_id as u32,
                 tap_port: t.tap_port.0,
                 tap_type: u16::from(t.tap_type) as u32,
                 l7_protocol: t.l7_protocol as u32,

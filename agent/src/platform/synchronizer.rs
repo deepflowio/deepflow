@@ -35,7 +35,7 @@ use crate::{
     config::handler::PlatformAccess, exception::ExceptionHandler, rpc::Session, trident::AgentId,
 };
 
-use public::proto::trident::{self, Exception};
+use public::proto::agent::{self, Exception};
 
 use super::querier::Querier;
 
@@ -134,7 +134,7 @@ impl Synchronizer {
             let err = format!(
                 "PlatformSynchronizer has already stopped with agent-id:{} vtap-id:{}",
                 self.agent_id.read(),
-                config_guard.vtap_id
+                config_guard.agent_id
             );
             debug!("{}", err);
             return;
@@ -157,7 +157,7 @@ impl Synchronizer {
             let err = format!(
                 "PlatformSynchronizer has already running with agent-id:{} vtap-id:{}",
                 self.agent_id.read(),
-                config_guard.vtap_id
+                config_guard.agent_id
             );
             debug!("{}", err);
             return;
@@ -247,22 +247,22 @@ impl Synchronizer {
 
             loop {
                 let msg = if args.version == args.peer_version {
-                    trident::GenesisSyncRequest {
+                    agent::GenesisSyncRequest {
                         version: Some(args.version),
-                        trident_type: Some(config.trident_type as i32),
+                        agent_type: Some(config.agent_type as i32),
                         source_ip: Some(ctrl_ip.clone()),
-                        vtap_id: Some(config.vtap_id as u32),
+                        agent_id: Some(config.agent_id as u32),
                         kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
                         team_id: Some(team_id.clone()),
                         ..Default::default()
                     }
                 } else {
                     info!("local version is {}, will send whole message", args.version);
-                    trident::GenesisSyncRequest {
+                    agent::GenesisSyncRequest {
                         version: Some(args.version),
-                        trident_type: Some(config.trident_type as i32),
+                        agent_type: Some(config.agent_type as i32),
                         source_ip: Some(ctrl_ip.clone()),
-                        vtap_id: Some(config.vtap_id as u32),
+                        agent_id: Some(config.agent_id as u32),
                         kubernetes_cluster_id: Some(config.kubernetes_cluster_id.clone()),
                         team_id: Some(team_id.clone()),
                         ..querier.generate_message(&config)
