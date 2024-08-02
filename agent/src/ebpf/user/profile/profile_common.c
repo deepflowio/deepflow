@@ -575,7 +575,7 @@ static void set_msg_kvp(struct profiler_context *ctx,
 	 * aggregation efficiency, we use a unique value to fill 'kvp->k.pid' for
 	 * threads with the same name.
 	 */
-	struct task_comm_info_s *name, matched_name;
+	struct task_comm_info_s matched_name;
 	if (v->tgid == v->pid)
 		snprintf(matched_name.comm, sizeof(matched_name.comm), "P%s",
 			 v->comm);
@@ -583,6 +583,16 @@ static void set_msg_kvp(struct profiler_context *ctx,
 		snprintf(matched_name.comm, sizeof(matched_name.comm), "T%s",
 			 v->comm);
 
+#ifdef USE_DJB2_HASH
+	/*
+	 * For the DJB2 hash algorithm, with string lengths up to 16 bytes and a total
+	 * of 100 strings, the collision probability is approximately 0.0000575%. This
+	 * collision rate is very low, indicating that with such a small dataset,
+	 * collisions with a 32-bit DJB2 hash value are almost unlikely.
+	 */
+	kvp->k.pid = djb2_32bit(matched_name.comm);
+#else
+	struct task_comm_info_s *name;
 	thread_names_lock(p);
 	vec_foreach(name, p->thread_names) {
 		if (strcmp(name->comm, matched_name.comm) == 0) {
@@ -600,8 +610,8 @@ static void set_msg_kvp(struct profiler_context *ctx,
 		ebpf_warning("vec add failed\n");
 		kvp->k.pid = v->pid;
 	}
-
 	thread_names_unlock(p);
+#endif
 }
 
 static void set_stack_trace_msg(struct profiler_context *ctx,
