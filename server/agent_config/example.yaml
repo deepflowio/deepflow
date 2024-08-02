@@ -125,6 +125,8 @@ process_threshold: 10
 #   Cilium:      lxc.*
 #   Kube-OVN:    [0-9a-f]+_h$
 # Note: Regular expression of NIC name for collecting traffic
+#   When the `tap_interface_regex` is not configured, it indicates 
+#   that network card traffic is not being collected.
 tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
 
 # Extra Capture Network Namespace
@@ -1561,6 +1563,12 @@ static_config:
     #   - TLS
     #   - Custom ## custom protocol from plugin
     syscall-segmentation-reassembly: []
+
+    # Syscall TraceID Disabled
+    # Note: When the trace_id is injected into all requests, the computation logic for all
+    #   syscall_trace_id can be turned off. This will significantly reduce the impact of the
+    #   eBPF hook on the CPU consumption of the application process.
+    syscall-trace-id-disabled: false
 
   ######################################
   ## Agent Running in Standalone Mode ##

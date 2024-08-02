@@ -35,7 +35,7 @@ use crate::common::l7_protocol_log::{
 };
 use crate::common::meta_packet::{MetaPacket, SegmentFlags};
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
-use crate::common::{FlowAclListener, FlowAclListenerId, TaggedFlow};
+use crate::common::{FlowAclListener, FlowAclListenerId};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf;
@@ -221,8 +221,7 @@ struct EbpfDispatcher {
 
     config: EbpfAccess,
     output: DebugSender<Box<AppProto>>, // Send AppProtos to the AppProtoLogsParser
-    flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>, // Send TaggedFlows to the QuadrupleGenerator
-    l7_stats_output: DebugSender<BatchedBox<L7Stats>>,     // Send L7Stats to the QuadrupleGenerator
+    l7_stats_output: DebugSender<BatchedBox<L7Stats>>, // Send L7Stats to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
 }
 
@@ -315,7 +314,7 @@ impl EbpfDispatcher {
         );
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
-            self.flow_output.clone(),
+            None,
             self.l7_stats_output.clone(),
             self.policy_getter,
             self.output.clone(),
@@ -701,6 +700,10 @@ impl EbpfCollector {
                 }
             }
 
+            if config.ebpf.syscall_trace_id_disabled {
+                ebpf::disable_syscall_trace_id();
+            }
+
             if ebpf::running_socket_tracer(
                 Self::ebpf_l7_callback,                    /* 回调接口 rust -> C */
                 config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -870,7 +873,6 @@ impl EbpfCollector {
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<Box<AppProto>>,
-        flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
@@ -916,7 +918,6 @@ impl EbpfCollector {
                 config,
                 log_parser_config,
                 output,
-                flow_output,
                 l7_stats_output,
                 flow_map_config,
                 stats_collector,

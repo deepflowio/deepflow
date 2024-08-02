@@ -404,6 +404,7 @@ pub struct EbpfYamlConfig {
     pub syscall_out_of_order_cache_size: usize,
     pub syscall_out_of_order_reassembly: Vec<String>,
     pub syscall_segmentation_reassembly: Vec<String>,
+    pub syscall_trace_id_disabled: bool,
 }
 
 impl Default for EbpfYamlConfig {
@@ -431,6 +432,7 @@ impl Default for EbpfYamlConfig {
             syscall_out_of_order_reassembly: vec![],
             syscall_segmentation_reassembly: vec![],
             syscall_out_of_order_cache_size: 16,
+            syscall_trace_id_disabled: false,
         }
     }
 }
@@ -1414,8 +1416,7 @@ impl RuntimeConfig {
             global_pps_threshold: 2000000,
             #[cfg(target_os = "linux")]
             extra_netns_regex: Default::default(),
-            tap_interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
-                .into(),
+            tap_interface_regex: "".into(),
             host: Default::default(),
             rsyslog_enabled: false,
             output_vlan: 0,
@@ -1542,7 +1543,9 @@ impl RuntimeConfig {
             )));
         }
 
-        if regex::Regex::new(&self.tap_interface_regex).is_err() {
+        if !self.tap_interface_regex.is_empty()
+            && regex::Regex::new(&self.tap_interface_regex).is_err()
+        {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "malformed tap-interface-regex({})",
                 self.tap_interface_regex

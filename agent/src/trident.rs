@@ -32,7 +32,9 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
-use flexi_logger::{colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, Naming};
+use flexi_logger::{
+    colored_opt_format, writers::LogWriter, Age, Cleanup, Criterion, FileSpec, Logger, Naming,
+};
 use log::{debug, info, warn};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
@@ -299,15 +301,6 @@ impl Trident {
             .to_str()
             .unwrap()
             .to_owned();
-        let remote_log_writer = RemoteLogWriter::new(
-            base_name,
-            hostname.clone(),
-            config_handler.log(),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            ntp_diff.clone(),
-        );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
         let logger = Logger::try_with_env_or_str("info")
@@ -324,14 +317,24 @@ impl Trident {
         } else {
             fs::create_dir_all(base_path).is_ok()
         };
+        let mut logger_writers: Vec<Box<dyn LogWriter>> = vec![Box::new(log_level_writer)];
+        if matches!(config.agent_mode, RunningMode::Managed) {
+            let remote_log_writer = RemoteLogWriter::new(
+                base_name,
+                hostname.clone(),
+                config_handler.log(),
+                config_handler.sender(),
+                stats_collector.clone(),
+                exception_handler.clone(),
+                ntp_diff.clone(),
+            );
+            logger_writers.push(Box::new(remote_log_writer));
+        }
         let logger = if write_to_file {
             logger
                 .log_to_file_and_writer(
                     FileSpec::try_from(&config.log_file)?,
-                    Box::new(LogWriterAdapter::new(vec![
-                        Box::new(remote_log_writer),
-                        Box::new(log_level_writer),
-                    ])),
+                    Box::new(LogWriterAdapter::new(logger_writers)),
                 )
                 .rotate(
                     Criterion::Age(Age::Day),
@@ -345,10 +348,7 @@ impl Trident {
                 "Log file path '{}' access denied, logs will not be written to file",
                 &config.log_file
             );
-            logger.log_to_writer(Box::new(LogWriterAdapter::new(vec![
-                Box::new(remote_log_writer),
-                Box::new(log_level_writer),
-            ])))
+            logger.log_to_writer(Box::new(LogWriterAdapter::new(logger_writers)))
         };
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -534,15 +534,20 @@ impl Trident {
         );
         synchronizer.start();
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        let remote_executor = crate::rpc::Executor::new(
-            synchronizer.agent_id.clone(),
-            session.clone(),
-            runtime.clone(),
-            exception_handler.clone(),
-        );
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        remote_executor.start();
+        if matches!(
+            config_handler.static_config.agent_mode,
+            RunningMode::Managed
+        ) {
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            let remote_executor = crate::rpc::Executor::new(
+                synchronizer.agent_id.clone(),
+                session.clone(),
+                runtime.clone(),
+                exception_handler.clone(),
+            );
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            remote_executor.start();
+        }
 
         let mut domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),
@@ -927,6 +932,10 @@ fn get_listener_links(
     conf: &DispatcherConfig,
     #[cfg(target_os = "linux")] netns: &netns::NsFile,
 ) -> Vec<Link> {
+    if conf.tap_interface_regex.is_empty() {
+        info!("tap-interface-regex is empty, skip packet dispatcher");
+        return vec![];
+    }
     #[cfg(target_os = "linux")]
     match netns::links_by_name_regex_in_netns(&conf.tap_interface_regex, netns) {
         Err(e) => {
@@ -935,7 +944,7 @@ fn get_listener_links(
         }
         Ok(links) => {
             if links.is_empty() {
-                info!(
+                warn!(
                     "tap-interface-regex({}) do not match any interface in {:?}",
                     conf.tap_interface_regex, netns,
                 );
@@ -978,20 +987,77 @@ fn component_on_config_change(
     match conf.tap_mode {
         TapMode::Local => {
             let if_mac_source = conf.if_mac_source;
-            for d in components.dispatcher_components.iter() {
-                let interfaces = get_listener_links(
+            components.dispatcher_components.retain_mut(|d| {
+                let links = get_listener_links(
                     conf,
                     #[cfg(target_os = "linux")]
                     d.dispatcher_listener.netns(),
                 );
+                if links.is_empty() {
+                    info!("No interfaces found, stopping dispatcher {}", d.id);
+                    d.stop();
+                    return false;
+                }
                 d.dispatcher_listener.on_tap_interface_change(
-                    &interfaces,
+                    &links,
                     if_mac_source,
                     conf.trident_type,
                     &blacklist,
                 );
                 d.dispatcher_listener
                     .on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
+                true
+            });
+
+            if components.dispatcher_components.is_empty() {
+                let links = get_listener_links(
+                    conf,
+                    #[cfg(target_os = "linux")]
+                    &netns::NsFile::Root,
+                );
+                if links.is_empty() {
+                    return;
+                }
+                match build_dispatchers(
+                    components.last_dispatcher_component_id + 1,
+                    links,
+                    components.stats_collector.clone(),
+                    config_handler,
+                    components.debugger.clone_queue(),
+                    components.is_ce_version,
+                    synchronizer,
+                    components.npb_bps_limit.clone(),
+                    components.npb_arp_table.clone(),
+                    components.rx_leaky_bucket.clone(),
+                    components.policy_getter,
+                    components.exception_handler.clone(),
+                    components.bpf_options.clone(),
+                    components.packet_sequence_uniform_output.clone(),
+                    components.proto_log_sender.clone(),
+                    components.pcap_batch_sender.clone(),
+                    components.tap_typer.clone(),
+                    vm_mac_addrs.clone(),
+                    gateway_vmac_addrs.clone(),
+                    components.toa_info_sender.clone(),
+                    components.l4_flow_aggr_sender.clone(),
+                    components.metrics_sender.clone(),
+                    #[cfg(target_os = "linux")]
+                    netns::NsFile::Root,
+                    #[cfg(target_os = "linux")]
+                    components.kubernetes_poller.clone(),
+                    #[cfg(target_os = "linux")]
+                    libvirt_xml_extractor.clone(),
+                ) {
+                    Ok(mut d) => {
+                        d.start();
+                        components.dispatcher_components.push(d);
+                        components.last_dispatcher_component_id += 1;
+                    }
+                    Err(e) => {
+                        warn!("build dispatcher_component failed: {}", e);
+                        crate::utils::notify_exit(1);
+                    }
+                }
             }
         }
         TapMode::Mirror | TapMode::Analyzer => {
@@ -1328,7 +1394,6 @@ impl WatcherComponents {
 pub struct EbpfDispatcherComponent {
     pub ebpf_collector: Box<EbpfCollector>,
     pub session_aggregator: SessionAggregator,
-    pub collector: CollectorThread,
     pub l7_collector: L7CollectorThread,
 }
 
@@ -1336,14 +1401,12 @@ pub struct EbpfDispatcherComponent {
 impl EbpfDispatcherComponent {
     pub fn start(&mut self) {
         self.session_aggregator.start();
-        self.collector.start();
         self.l7_collector.start();
         self.ebpf_collector.start();
     }
 
     pub fn stop(&mut self) {
         self.session_aggregator.stop();
-        self.collector.stop();
         self.l7_collector.stop();
         self.ebpf_collector.notify_stop();
     }
@@ -1768,8 +1831,10 @@ impl AgentComponents {
                 let mut nss = netns::find_ns_files_by_regex(&re);
                 nss.sort_unstable();
                 for ns in nss.into_iter() {
-                    interfaces_and_ns
-                        .push((get_listener_links(&candidate_config.dispatcher, &ns), ns));
+                    let links = get_listener_links(&candidate_config.dispatcher, &ns);
+                    if !links.is_empty() {
+                        interfaces_and_ns.push((links, ns));
+                    }
                 }
             } else {
                 log::error!("When the TapMode is not Local, it does not support extra_netns_regex, other modes only support interfaces under the root network namespace");
@@ -1787,12 +1852,12 @@ impl AgentComponents {
         #[cfg(any(target_os = "windows", target_os = "android"))]
         let local_dispatcher_count = 1;
 
-        if interfaces_and_ns.is_empty() {
-            let links = get_listener_links(
-                &candidate_config.dispatcher,
-                #[cfg(target_os = "linux")]
-                &netns::NsFile::Root,
-            );
+        let links = get_listener_links(
+            &candidate_config.dispatcher,
+            #[cfg(target_os = "linux")]
+            &netns::NsFile::Root,
+        );
+        if interfaces_and_ns.is_empty() && !links.is_empty() {
             if candidate_config.tap_mode != TapMode::Local {
                 for l in links {
                     #[cfg(target_os = "linux")]
@@ -2232,19 +2297,6 @@ impl AgentComponents {
         if !config_handler.ebpf().load().ebpf.disabled
             && candidate_config.tap_mode != TapMode::Analyzer
         {
-            let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_queue_size,
-                "1-tagged-flow-to-quadruple-generator",
-                &queue_debugger,
-            );
-            stats_collector.register_countable(
-                &QueueStats {
-                    id: ebpf_dispatcher_id,
-                    module: "1-tagged-flow-to-quadruple-generator",
-                },
-                Countable::Owned(Box::new(counter)),
-            );
-
             let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
                 "1-l7-stats-to-quadruple-generator",
@@ -2256,19 +2308,6 @@ impl AgentComponents {
                     module: "1-l7-stats-to-quadruple-generator",
                 },
                 Countable::Owned(Box::new(counter)),
-            );
-            let collector = Self::new_collector(
-                ebpf_dispatcher_id,
-                stats_collector.clone(),
-                flow_receiver,
-                toa_sender.clone(),
-                None,
-                metrics_sender.clone(),
-                MetricsType::SECOND | MetricsType::MINUTE,
-                config_handler,
-                &queue_debugger,
-                &synchronizer,
-                agent_mode,
             );
             let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -2313,7 +2352,6 @@ impl AgentComponents {
                 config_handler.collector(),
                 policy_getter,
                 log_sender,
-                flow_sender,
                 l7_stats_sender,
                 proc_event_sender,
                 profile_sender.clone(),
@@ -2331,7 +2369,6 @@ impl AgentComponents {
                     ebpf_dispatcher_component = Some(EbpfDispatcherComponent {
                         ebpf_collector,
                         session_aggregator,
-                        collector,
                         l7_collector,
                     });
                 }
