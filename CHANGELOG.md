@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: need to drop deepflow_tenant/admin database when drop an organization [#7648](https://github.com/deepflowio/deepflow/pull/7648) by [lzf575](https://github.com/lzf575)
+* fix: Modify select metric_value error #26036 [#7646](https://github.com/deepflowio/deepflow/pull/7646) by [Ericsssss](https://github.com/Ericsssss)
+* fix: agent - eBPF Fix Kafka protocol inference (#7644) [#7645](https://github.com/deepflowio/deepflow/pull/7645) by [yinjiping](https://github.com/yinjiping)
 * fix: Modify alert_event metric_value and add ip tag  #26017/26020 [#7637](https://github.com/deepflowio/deepflow/pull/7637) by [Ericsssss](https://github.com/Ericsssss)
 * fix: agent cmd panic [#7631](https://github.com/deepflowio/deepflow/pull/7631) by [roryye](https://github.com/roryye)
 * fix: Modify custom tag show tags error #25979 [#7628](https://github.com/deepflowio/deepflow/pull/7628) by [Ericsssss](https://github.com/Ericsssss)
@@ -97,6 +100,9 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: domain info case sensitive [#7647](https://github.com/deepflowio/deepflow/pull/7647) by [askyrie](https://github.com/askyrie)
+* feat: unifies controller manager log [#7643](https://github.com/deepflowio/deepflow/pull/7643) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: agent - eBPF Configurable to disable tracing [#7534](https://github.com/deepflowio/deepflow/pull/7534) by [yinjiping](https://github.com/yinjiping)
 * feat: add request type from Kafka trace map [#7639](https://github.com/deepflowio/deepflow/pull/7639) by [lzf575](https://github.com/lzf575)
 * feat: server - Add configuration items to server [#7629](https://github.com/deepflowio/deepflow/pull/7629) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: adds blocker module to logger [#7625](https://github.com/deepflowio/deepflow/pull/7625) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -232,6 +238,7 @@
 * refactor: OTel HTTP l7_protocol_str change from http to HTTP [#7292](https://github.com/deepflowio/deepflow/pull/7292) by [lzf575](https://github.com/lzf575)
 * refactor: server recorder polishes id allocator [#7168](https://github.com/deepflowio/deepflow/pull/7168) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * refactor: Change crate name [#7155](https://github.com/deepflowio/deepflow/pull/7155) by [rvql](https://github.com/rvql)
+* refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
 * perf: optimize trace_tree slice assignment [#7414](https://github.com/deepflowio/deepflow/pull/7414) by [lzf575](https://github.com/lzf575)
@@ -245,7 +252,3 @@
 
 #### Chore
 * chore: update cli dependencies [#7249](https://github.com/deepflowio/deepflow/pull/7249) by [lzf575](https://github.com/lzf575)
-
-
-#### OTHER
-* refacter: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
