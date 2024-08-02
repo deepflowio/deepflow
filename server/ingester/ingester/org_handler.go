@@ -29,7 +29,7 @@ import (
 )
 
 var CleanDatabaseList = []string{
-	"application_log", "deepflow_system", "event", "ext_metrics",
+	"application_log", "deepflow_admin", "deepflow_tenant", "event", "ext_metrics",
 	"flow_log", "flow_metrics", "flow_tag",
 	"profile", "prometheus"}
 

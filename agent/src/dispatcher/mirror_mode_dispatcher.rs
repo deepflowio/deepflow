@@ -543,7 +543,7 @@ impl MirrorModeDispatcher {
 
         let mut flow_map = FlowMap::new(
             self.base.id as u32,
-            self.base.flow_output_queue.clone(),
+            Some(self.base.flow_output_queue.clone()),
             self.base.l7_stats_output_queue.clone(),
             self.base.policy_getter,
             self.base.log_output_queue.clone(),

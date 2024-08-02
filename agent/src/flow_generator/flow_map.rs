@@ -175,7 +175,7 @@ pub struct FlowMap {
 
     tagged_flow_allocator: Allocator<TaggedFlow>,
     l7_stats_allocator: Allocator<L7Stats>,
-    output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+    output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
     l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
     out_log_queue: DebugSender<Box<AppProto>>,
     output_buffer: Vec<Arc<BatchedBox<TaggedFlow>>>,
@@ -212,7 +212,7 @@ impl FlowMap {
     const MICROS_IN_SECONDS: u64 = 1_000_000;
     pub fn new(
         id: u32,
-        output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+        output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
         policy_getter: PolicyGetter,
         app_proto_log_queue: DebugSender<Box<AppProto>>,
@@ -1845,8 +1845,13 @@ impl FlowMap {
                     self.l7_stats_buffer.clear();
                 }
             }
-            if self.output_buffer.len() > 0 {
-                if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
+            if self.output_queue.is_some() && self.output_buffer.len() > 0 {
+                if let Err(e) = self
+                    .output_queue
+                    .as_ref()
+                    .unwrap()
+                    .send_all(&mut self.output_buffer)
+                {
                     warn!(
                         "flow-map push tagged flows to queue failed, because {:?}",
                         e
@@ -1874,14 +1879,16 @@ impl FlowMap {
             Ordering::Relaxed,
         );
 
-        self.output_buffer.push(tagged_flow);
-        if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
-                warn!(
-                    "flow-map push tagged flows to queue failed, because {:?}",
-                    e
-                );
-                self.output_buffer.clear();
+        if let Some(output_queue) = &mut self.output_queue {
+            self.output_buffer.push(tagged_flow);
+            if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
+                if let Err(e) = output_queue.send_all(&mut self.output_buffer) {
+                    warn!(
+                        "flow-map push tagged flows to queue failed, because {:?}",
+                        e
+                    );
+                    self.output_buffer.clear();
+                }
             }
         }
     }
@@ -2503,7 +2510,7 @@ pub fn _new_flow_map_and_receiver(
     config.flow.trident_type = trident_type;
     let flow_map = FlowMap::new(
         0,
-        output_queue_sender,
+        Some(output_queue_sender),
         l7_stats_output_queue_sender,
         policy_getter,
         app_proto_log_queue,

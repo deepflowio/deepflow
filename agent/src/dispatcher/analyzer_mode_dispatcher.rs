@@ -282,7 +282,7 @@ impl AnalyzerModeDispatcher {
                     let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     let mut flow_map = FlowMap::new(
                         id as u32,
-                        flow_output_queue,
+                        Some(flow_output_queue),
                         l7_stats_output_queue,
                         policy_getter,
                         log_output_queue,
