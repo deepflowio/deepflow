@@ -47,23 +47,23 @@
  * stack trace messages for push-hash kvp.
  */
 
-#define BIT_26_MAX_VAL	0x3ffffffU
-#define PID_MAX_VAL	BIT_26_MAX_VAL
-#define STACK_ID_MAX	BIT_26_MAX_VAL
-#define CPU_INVALID	0xFFF
+#define BIT_24_MAX_VAL	0xFFFFFFU
+#define PID_MAX_VAL	BIT_24_MAX_VAL
+#define STACK_ID_MAX	BIT_24_MAX_VAL
+#define CPU_INVALID	0xFF
 typedef struct {
 	union {
 		struct {
 			/*
-			 * tgid:(max 67,108,864)
+			 * tgid:
 			 *   The tgid (Thread Group ID) in kernel space
 			 *   is equivalent to the process ID in user space.
-			 * pid:(max 67,108,864)
+			 * pid:
 			 *   The process ID or thread ID in kernel space.
-			 * cpu: (max 4,096)
+			 * cpu:
 			 *   Which CPU core does the perf event occur on?
 			 */
-			u64 tgid:26, pid:26, cpu:12;
+			u64 tgid:24, pid:32, cpu:8;
 
 			/*
 			 * process start time(the number of millisecond
@@ -78,7 +78,14 @@ typedef struct {
 		/* Matching and combining for process/thread name. */
 		struct {
 			u8 comm[TASK_COMM_LEN];
-			u64 pid:26, reserved:26, cpu:12;
+			u64 pid:24, reserved:32, cpu:8;
+			/*
+			 * Add padding fields to ensure that the hash key part reaches 32
+			 * bytes (using a hash with a 32-byte key and a 1-byte value for
+			 * stack tracing data), and set the 'padding' value to 0 in the
+			 * key configuration.
+			 */
+			u64 padding;
 		} c_k;
 	};
 

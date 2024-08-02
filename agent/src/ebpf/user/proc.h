@@ -48,6 +48,17 @@ struct symbol_cache_pids {
 	volatile u32 *lock;
 };
 
+/*
+ * The information used to record the names of threads or processes obtained in
+ * the process currently mainly includes the name and its corresponding index
+ * value. It is used for statistical aggregation in tracking stack strings.
+ */
+struct task_comm_info_s {
+	int idx;
+	/* Add a prefix here: 'P' for processes and 'T' for threads. */
+	char comm[TASK_COMM_LEN + 1];
+};
+
 struct symbolizer_proc_info {
 	int pid;
 	/* The process creation time since
@@ -79,6 +90,9 @@ struct symbolizer_proc_info {
 	u64 update_syms_table_time;
 	/* process name */
 	char comm[TASK_COMM_LEN];
+	/* Thread names vector */
+	struct task_comm_info_s *thread_names;
+	u32 thread_names_lock;
 	/* container id */
 	char container_id[CONTAINER_ID_SIZE];
 	/* reference counting */
@@ -92,6 +106,17 @@ struct symbolizer_proc_info {
 	/* Recording symbol resolution cache. */
 	volatile uword syms_cache;
 };
+
+static inline void thread_names_lock(struct symbolizer_proc_info *p)
+{
+	while (__atomic_test_and_set(&p->thread_names_lock, __ATOMIC_ACQUIRE))
+		CLIB_PAUSE();
+}
+
+static inline void thread_names_unlock(struct symbolizer_proc_info *p)
+{
+	__atomic_clear(&p->thread_names_lock, __ATOMIC_RELEASE);
+}
 
 static inline void symbolizer_proc_lock(struct symbolizer_proc_info *p)
 {
@@ -187,13 +212,14 @@ typedef struct {
 	pthread_mutex_t m;
 } proc_event_list_t;
 
-void add_event_to_proc_list(proc_event_list_t *list, struct bpf_tracer *tracer, int pid);
-void remove_event(proc_event_list_t *list, struct process_create_event *event);
-struct process_create_event *get_first_event(proc_event_list_t *list);
+void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
+			    int pid);
+void remove_event(proc_event_list_t * list, struct process_create_event *event);
+struct process_create_event *get_first_event(proc_event_list_t * list);
 
 char *get_so_path_by_pid_and_name(int pid, const char *so_name);
 int add_probe_sym_to_tracer_probes(int pid, const char *path,
-					  struct tracer_probes_conf *conf,
-					  struct symbol symbols[], size_t n_symbols);
+				   struct tracer_probes_conf *conf,
+				   struct symbol symbols[], size_t n_symbols);
 
 #endif /* _USER_PROC_H_ */

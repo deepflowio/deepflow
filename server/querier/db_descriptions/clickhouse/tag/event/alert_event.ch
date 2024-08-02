@@ -50,11 +50,30 @@ chost_hostname            , 云服务器                 , 云服务器的 Hostn
 pod_node_ip               , K8s 容器节点             , 容器节点的主 IP。
 pod_node_hostname         , K8s 容器节点             , 容器节点的 Hostname。
 
-user                       , 创建人                      ,
-alert_policy               , 告警策略                    ,
-ip                         , IP 地址                     ,
-policy_type                , 策略类型                    ,
-event_level                , 事件等级                    ,
-target_tags                , 监控对象标签                 , 
-_target_uid                ,                             , 
-_query_region              , 查询区域                     , 
+ip                        , IP 地址                  ,
+is_internet               , Internet IP 标志         , IP 地址是否为外部 Internet 地址。
+province                  , 省份                     , Internet IP 地址所属的省份。
+
+tcp_flags_bit             , TCP 标志位集合           , 当前自然分钟内所有包中 TCP 标志位的集合。
+
+l2_end                    , 二层边界                 , 表示是否是在客户端网卡或服务端网卡处采集的流量。
+l3_end                    , 三层边界                 , 表示是否是在客户端或服务端所在二层网络内采集的流量。
+nat_real_ip               , NAT IP 地址              , NAT 作用前（后）的真实 IP 地址，该值从 TOA（TCP Option Address）中提取，或者根据云平台中 VIP 与 RIP 的映射信息计算。
+nat_real_port             , NAT Port                 , NAT 作用前的真实端口号，该值从 TOA（TCP Option Address）中提取。
+
+process_id                , 进程 ID                  ,
+process_kname             , 内核线程名               ,
+
+k8s.label                 , K8s Label                , K8s 自定义 Label。
+k8s.annotation            , K8s Annotation           ,
+k8s.env                   , K8s Env                  ,
+cloud.tag                 , Cloud Tag                ,
+os.app                    , OS APP                   ,
+
+user                       , 创建人                   ,
+alert_policy               , 告警策略                 ,
+policy_type                , 策略类型                 ,
+event_level                , 事件等级                 ,
+target_tags                , 监控对象标签              , 
+_target_uid                ,                          , 
+_query_region              , 查询区域                 ,

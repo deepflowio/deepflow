@@ -50,6 +50,8 @@
 #include "../proc.h"
 #include "stringifier.h"
 
+#define UNKNOWN_JAVA_SYMBOL_STR "Unknown"
+
 /*
  * This section is for symbolization of Java addresses, and we need
  * to prepare two so librarys, one for GNU and the other for MUSL:
@@ -545,15 +547,16 @@ static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 	kvp->c_k.cpu = v->cpu;
 	kvp->c_k.pid = v->tgid;
 	kvp->c_k.reserved = 0;
+	kvp->c_k.padding = 0;
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
 static void set_msg_kvp(struct profiler_context *ctx,
 			stack_trace_msg_kv_t * kvp,
-			struct stack_trace_key_t *v, u64 stime, void *msg_value)
+			struct stack_trace_key_t *v, u64 stime, void *msg_value,
+			struct symbolizer_proc_info *p)
 {
 	kvp->k.tgid = v->tgid;
-	kvp->k.pid = v->pid;
 	kvp->k.stime = stime;
 	kvp->k.cpu = v->cpu;
 	kvp->k.u_stack_id = (u32) v->userstack;
@@ -563,7 +566,52 @@ static void set_msg_kvp(struct profiler_context *ctx,
 	} else {
 		kvp->k.e_stack_id = 0;
 	}
+
 	kvp->msg_ptr = pointer_to_uword(msg_value);
+
+	/*
+	 * It is possible that multiple threads of a process (or the process itself)
+	 * use the same task name (kernel structure: 'task_struct.comm[]'). To improve
+	 * aggregation efficiency, we use a unique value to fill 'kvp->k.pid' for
+	 * threads with the same name.
+	 */
+	struct task_comm_info_s matched_name;
+	if (v->tgid == v->pid)
+		snprintf(matched_name.comm, sizeof(matched_name.comm), "P%s",
+			 v->comm);
+	else
+		snprintf(matched_name.comm, sizeof(matched_name.comm), "T%s",
+			 v->comm);
+
+#ifdef USE_DJB2_HASH
+	/*
+	 * For the DJB2 hash algorithm, with string lengths up to 16 bytes and a total
+	 * of 100 strings, the collision probability is approximately 0.0000575%. This
+	 * collision rate is very low, indicating that with such a small dataset,
+	 * collisions with a 32-bit DJB2 hash value are almost unlikely.
+	 */
+	kvp->k.pid = djb2_32bit(matched_name.comm);
+#else
+	struct task_comm_info_s *name;
+	thread_names_lock(p);
+	vec_foreach(name, p->thread_names) {
+		if (strcmp(name->comm, matched_name.comm) == 0) {
+			kvp->k.pid = name->idx;
+			thread_names_unlock(p);
+			return;
+		}
+	}
+
+	kvp->k.pid = vec_len(p->thread_names);
+	matched_name.idx = kvp->k.pid;
+	int ret = VEC_OK;
+	vec_add1(p->thread_names, matched_name, ret);
+	if (ret != VEC_OK) {
+		ebpf_warning("vec add failed\n");
+		kvp->k.pid = v->pid;
+	}
+	thread_names_unlock(p);
+#endif
 }
 
 static void set_stack_trace_msg(struct profiler_context *ctx,
@@ -720,9 +768,9 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 	}
 }
 
-#define UNKNOWN_JAVA_SYMBOL_STR "Unknown"
-
-static char *get_java_symbol(struct bpf_tracer *t, struct java_symbol_map_key *key) {
+static char *get_java_symbol(struct bpf_tracer *t,
+			     struct java_symbol_map_key *key)
+{
 	char value[JAVA_SYMBOL_MAX_LENGTH];
 	memset(value, 0, JAVA_SYMBOL_MAX_LENGTH * sizeof(char));
 	if (!bpf_table_get(t, MAP_MEMORY_JAVA_SYMBOL_MAP_NAME, key, value)) {
@@ -859,7 +907,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 
 			if (matched)
-				set_msg_kvp(ctx, &kv, v, stime, (void *)0);
+				set_msg_kvp(ctx, &kv, v, stime, (void *)0,
+					    __info_p);
 			else {
 				if (ctx->only_matched_data) {
 					if (__info_p)
@@ -895,17 +944,18 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			if (ctx->type == PROFILER_TYPE_MEMORY) {
-				((stack_trace_msg_t *) kv.msg_ptr)->count += v->ext_data.memory.size;
+				((stack_trace_msg_t *) kv.msg_ptr)->count +=
+				    v->ext_data.memory.size;
 			} else if (ctx->use_delta_time) {
 				if (ctx->sample_period > 0) {
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
-		   				(ctx->sample_period / 1000);
+					   (ctx->sample_period / 1000);
 				} else {
 					// Using microseconds for storage.
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
-		 				(v->ext_data.off_cpu.duration_ns / 1000);
+					   (v->ext_data.off_cpu.duration_ns / 1000);
 				}
 			} else {
 				((stack_trace_msg_t *) kv.msg_ptr)->count++;
@@ -927,7 +977,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 						    stack_str_hash, matched,
-						    process_name, info_p, ctx->type == PROFILER_TYPE_MEMORY);
+						    process_name, info_p,
+						    ctx->type ==
+						    PROFILER_TYPE_MEMORY);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -941,7 +993,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 
 			char *class_name = NULL;
 
-			if (ctx->type == PROFILER_TYPE_MEMORY && v->ext_data.memory.class_id != 0) {
+			if (ctx->type == PROFILER_TYPE_MEMORY
+			    && v->ext_data.memory.class_id != 0) {
 				struct java_symbol_map_key key = { 0 };
 				key.tgid = v->tgid;
 				key.class_id = v->ext_data.memory.class_id;
@@ -949,7 +1002,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				if (class_name) {
 					str_len += strlen(class_name) + 1;
 				} else {
-					str_len += strlen(UNKNOWN_JAVA_SYMBOL_STR) + 1;
+					str_len +=
+					    strlen(UNKNOWN_JAVA_SYMBOL_STR) + 1;
 				}
 			}
 
@@ -977,16 +1031,26 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			char *msg_str = (char *)&msg->data[0];
 			int offset = 0;
 			if (matched) {
-				offset += snprintf(msg_str + offset, str_len - offset, "%s%s;", pre_tag, v->comm);
+				offset +=
+				    snprintf(msg_str + offset, str_len - offset,
+					     "%s%s;", pre_tag, v->comm);
 			}
-			offset += snprintf(msg_str + offset, str_len - offset, "%s", trace_str);
+			offset +=
+			    snprintf(msg_str + offset, str_len - offset, "%s",
+				     trace_str);
 			if (ctx->type == PROFILER_TYPE_MEMORY) {
 				if (class_name) {
-					offset += snprintf(msg_str + offset, str_len - offset, ";%s", class_name);
+					offset +=
+					    snprintf(msg_str + offset,
+						     str_len - offset, ";%s",
+						     class_name);
 					clib_mem_free(class_name);
 					class_name = NULL;
 				} else {
-					offset += snprintf(msg_str + offset, str_len - offset, ";%s", UNKNOWN_JAVA_SYMBOL_STR);
+					offset +=
+					    snprintf(msg_str + offset,
+						     str_len - offset, ";%s",
+						     UNKNOWN_JAVA_SYMBOL_STR);
 				}
 			}
 

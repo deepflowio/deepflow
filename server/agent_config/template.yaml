@@ -2178,9 +2178,11 @@ inputs:
           # TODO: 未列入黑名单、白名单的端口是否用 kprobe 做采集？
           port: ""
       # type: section
-      # name: Socket
+      # name:
+      #   en: Tunning
+      #   ch: 调优
       # description:
-      sokcet:
+      tunning:
         # type: bool
         # name:
         #   en: Syscall_trace_id Disabled
@@ -2198,7 +2200,6 @@ inputs:
         #   ch: |-
         #     当 trace_id 注入所有请求时，所有请求的 syscall_trace_id 计算逻辑可以关闭。这将大大减少
         #     eBPF hook 进程的 CPU 消耗。
-        # upgrade_from: static_config.ebpf.syscall-trace-id-disabled
         syscall_trace_id_disabled: false
     # type: section
     # name:
