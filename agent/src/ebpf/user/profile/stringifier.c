@@ -300,15 +300,16 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 			pthread_mutex_lock(&p->mutex);
 			ret = bcc_symcache_resolve(resolver, address, sym);
 			if (ret == 0) {
-				*sym_ptr = proc_symbol_name_fetch(pid, sym);
+				char *symbol = proc_symbol_name_fetch(pid, sym);
 				if (p->is_java) {
 					// handle java encoded symbols
-					char *new_sym = rewrite_java_symbol(*sym_ptr);
+					char *new_sym = rewrite_java_symbol(symbol);
 					if (new_sym != NULL) {
-						clib_mem_free(*sym_ptr);
-						*sym_ptr = new_sym;
+						clib_mem_free(symbol);
+						symbol = new_sym;
 					}
 				}
+				*sym_ptr = symbol;
 				pthread_mutex_unlock(&p->mutex);
 				return ret;
 			}
