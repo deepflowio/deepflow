@@ -1593,6 +1593,17 @@ int find_pid_by_name(const char *process_name, int exclude_pid)
 #undef NAME_SIZE
 }
 
+// DJB2 hash function with 32-bit output
+u32 djb2_32bit(const char *str)
+{
+	u32 hash = 5381;
+	int c;
+	while ((c = *str++)) {
+		hash = ((hash << 5) + hash) + c; // hash * 33 + c
+	}
+	return hash; // 32-bit output
+}
+
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
 {
