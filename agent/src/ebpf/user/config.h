@@ -154,6 +154,12 @@ enum {
 #define PROC_RING_SZ 16384
 
 /*
+ * During stack trace string aggregation and statistics, thread names
+ * are hashed using the DJB2 algorithm.
+ */
+#define USE_DJB2_HASH
+
+/*
  * Process information recalibration time, this time is the number of seconds
  * lost from the process startup time to the current time.
  * For Java :
