@@ -196,33 +196,33 @@ enum {
  */
 
 /*
- * tick every 10 millisecond
+ * tick every 100 millisecond
  *
  * unit: microseconds
  */
-#define EVENT_TIMER_TICK_US    10000
+#define EVENT_TIMER_TICK_US    100000
 
 /*
  * Trigger kernel adaptation.
  */
-#define TRIG_KERN_ADAPT_PERIOD 10 // 10 ticks(100 millisecond)
+#define TRIG_KERN_ADAPT_PERIOD 1 // 1 ticks(100 millisecond)
 
 /*
  * System boot time update cycle time, unit is milliseconds.
  */
-#define SYS_TIME_UPDATE_PERIOD 1000	// 1000 ticks(10 seconds)
+#define SYS_TIME_UPDATE_PERIOD 100	// 100 ticks(10 seconds)
 
 /*
  * Check whether the eBPF Map exceeds the maximum value and use it to release
  * stale data (unit is milliseconds).
  */
-#define CHECK_MAP_EXCEEDED_PERIOD 100	// 100 ticks(1 seconds)
+#define CHECK_MAP_EXCEEDED_PERIOD 10	// 10 ticks(1 seconds)
 
 /* 
  * Used to check whether the kernel adaptation is successful, here is the
  * check cycle time (unit is milliseconds).
  */
-#define CHECK_KERN_ADAPT_PERIOD 100	// 100 ticks(1 seconds)
+#define CHECK_KERN_ADAPT_PERIOD 10	// 10 ticks(1 seconds)
 
 /*
  * The maximum space occupied by the Java symbol files in the target POD.
