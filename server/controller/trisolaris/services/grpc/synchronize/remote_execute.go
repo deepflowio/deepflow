@@ -23,6 +23,7 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	api "github.com/deepflowio/deepflow/message/trident"
@@ -111,7 +112,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				continue
 			}
 
-			// time.Sleep(time.Minute)
+			time.Sleep(time.Minute)
 
 			// heartbeat
 			if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
