@@ -21,6 +21,7 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 )
 
@@ -43,30 +44,30 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 		vtapCacheKey := in.GetCtrlIp() + "-" + in.GetCtrlMac()
 		vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
 		if vtapCache != nil {
-			log.Infof("receive debug gpid sync data by vtap(ctrl_ip: %s, ctrl_mac: %s vtap_id: %d  team_id: %s org_id: %d)",
-				in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID(), in.GetTeamId(), orgID)
+			log.Infof("receive debug gpid sync data by vtap(ctrl_ip: %s, ctrl_mac: %s vtap_id: %d  team_id: %s)",
+				in.GetCtrlIp(), in.GetCtrlMac(), vtapCache.GetVTapID(), in.GetTeamId(), logger.NewORGPrefix(orgID))
 			return processInfo.GetGPIDResponseByVtapID(vtapCache.GetVTapID()), nil
 		}
-		log.Infof("receive invalid gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s team_id: %s org_id: %d), because vtap_id=%d(vtap is not registered)",
-			in.GetCtrlIp(), in.GetCtrlMac(), in.GetTeamId(), orgID, in.GetVtapId())
+		log.Infof("receive invalid gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s team_id: %s), because vtap_id=%d(vtap is not registered)",
+			in.GetCtrlIp(), in.GetCtrlMac(), in.GetTeamId(), in.GetVtapId(), logger.NewORGPrefix(orgID))
 
 		return EmptyGPIDResponse, nil
 	}
 
 	statsd.AddGPIDReceiveCounter(uint64(len(in.GetEntries())))
 
-	log.Infof("receive gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d, team_id: %s, org_id: %d) data_len: %d",
-		in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId(), in.GetTeamId(), orgID, len(in.GetEntries()))
+	log.Infof("receive gpid sync data from vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d, team_id: %s) data_len: %d",
+		in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId(), in.GetTeamId(), len(in.GetEntries()), logger.NewORGPrefix(orgID))
 	processInfo.UpdateAgentGPIDReq(in)
 	resp := processInfo.GetGPIDResponseByReq(in)
-	log.Infof("send gpid response data(len=%d) to vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d, team_id: %s, org_id: %d)",
-		len(resp.GetEntries()), in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId(), in.GetTeamId(), orgID)
+	log.Infof("send gpid response data(len=%d) to vtap(ctrl_ip: %s, ctrl_mac: %s, vtap_id: %d, team_id: %s)",
+		len(resp.GetEntries()), in.GetCtrlIp(), in.GetCtrlMac(), in.GetVtapId(), in.GetTeamId(), logger.NewORGPrefix(orgID))
 	statsd.AddGPIDSendCounter(uint64(len(resp.GetEntries())))
 	return resp, nil
 }
 
 func (e *ProcessInfoEvent) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncRequests) (*api.ShareGPIDSyncRequests, error) {
-	log.Infof("receive gpid sync data from server(%s) ORGID(%d)", in.GetServerIp(), in.GetOrgId())
+	log.Infof("receive gpid sync data from server(%s)", in.GetServerIp(), logger.NewORGPrefix(int(in.GetOrgId())))
 	processInfo := trisolaris.GetORGVTapInfo(int(in.GetOrgId())).GetProcessInfo()
 	if processInfo == nil {
 		return &api.ShareGPIDSyncRequests{}, nil

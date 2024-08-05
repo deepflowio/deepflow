@@ -27,6 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/message/common"
 	api "github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
@@ -323,25 +324,25 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	}
 	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gVTapInfo == nil {
-		log.Errorf("ORGID-%d: ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) not found vtapInfo", orgID, ctrlIP, ctrlMac, teamIDStr, teamIDInt)
+		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) not found vtapInfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, logger.NewORGPrefix(orgID))
 		return e.GetFailedResponse(in, gVTapInfo), nil
 	}
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	vtapCache, err := e.getVTapCache(in, orgID)
 	if err != nil {
-		log.Warningf("ORGID-%d: err:%s ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d), hostIps is %s, name:%s,  revision:%s,  bootTime:%d",
-			orgID, err, ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
+		log.Warningf("err:%s ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d), hostIps is %s, name:%s,  revision:%s,  bootTime:%d",
+			err, ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(), in.GetProcessName(), in.GetRevision(), in.GetBootTime(), logger.NewORGPrefix(orgID))
 		return e.GetFailedResponse(in, gVTapInfo), nil
 	}
 	if vtapCache == nil {
 		if len(teamIDStr) == 0 && trisolaris.GetIsRefused() {
-			log.Errorf("ORGID-%d: ctrlIp is %s, ctrlMac is %s, not team_id refuse(%v) register", orgID, ctrlIP, ctrlMac, trisolaris.GetIsRefused())
+			log.Errorf("ctrlIp is %s, ctrlMac is %s, not team_id refuse(%v) register", ctrlIP, ctrlMac, trisolaris.GetIsRefused(), logger.NewORGPrefix(orgID))
 			return e.GetFailedResponse(in, nil), nil
 		}
-		log.Warningf("ORGID-%d: vtap (ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
+		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), host_ips: %s, kubernetes_cluster_id: %s, kubernetes_force_watch: %t, group_id: %s) not found in cache. "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			orgID, ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
-			in.GetVtapGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
+			ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(), in.GetKubernetesClusterId(), in.GetKubernetesForceWatch(),
+			in.GetVtapGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime(), logger.NewORGPrefix(orgID))
 		// If the kubernetes_force_watch field is true, the ctrl_ip and ctrl_mac of the vtap will not change,
 		// resulting in unsuccessful registration and a large number of error logs.
 		if !in.GetKubernetesForceWatch() {
@@ -363,12 +364,12 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
 	versionGroups := gVTapInfo.GetGroupDataVersion()
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
-	changedInfo := fmt.Sprintf("ORGID-%d: ctrl_ip is %s, ctrl_mac is %s, team_id is (str=%s,int=%d), host_ips is %s, "+
+	changedInfo := fmt.Sprintf("ctrl_ip is %s, ctrl_mac is %s, team_id is (str=%s,int=%d), host_ips is %s, "+
 		"(platform data version  %d -> %d), "+
 		"(acls version %d -> %d), "+
 		"(groups version %d -> %d), "+
 		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-		orgID, ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(),
+		ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(),
 		versionPlatformData, in.GetVersionPlatformData(),
 		versionPolicy, in.GetVersionAcls(),
 		versionGroups, in.GetVersionGroups(),
@@ -376,9 +377,9 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
-		log.Info(changedInfo)
+		log.Info(changedInfo, logger.NewORGPrefix(orgID))
 	} else {
-		log.Debug(changedInfo)
+		log.Debug(changedInfo, logger.NewORGPrefix(orgID))
 	}
 
 	// trident上报的revision与升级trident_revision一致后，则取消预期的`expected_revision`
@@ -449,9 +450,9 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			log.Infof(
-				"ORGID-%d: open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), kubernetes_force_watch: %t)",
-				orgID, in.GetKubernetesClusterId(), ctrlIP, ctrlMac,
-				teamIDStr, teamIDInt, in.GetKubernetesForceWatch())
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), kubernetes_force_watch: %t)",
+				in.GetKubernetesClusterId(), ctrlIP, ctrlMac,
+				teamIDStr, teamIDInt, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
@@ -605,8 +606,8 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest, orgID int) *api.SyncResp
 		if value == vtapCacheKey {
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 			log.Infof(
-				"ORGID-%d: open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
-				orgID, in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch())
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, kubernetes_force_watch: %t)",
+				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
 		}
 		return &api.SyncResponse{
 			Status: &STATUS_SUCCESS,
@@ -654,7 +655,7 @@ func (e *VTapEvent) getVTapCache(in *api.SyncRequest, orgID int) (*vtap.VTapCach
 	ctrlMac := in.GetCtrlMac()
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	if !gVTapInfo.GetVTapCacheIsReady() {
-		return nil, fmt.Errorf("ORGID-%d: VTap cache data not ready", orgID)
+		return nil, fmt.Errorf("VTap cache data not ready")
 	}
 	vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
@@ -678,7 +679,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespon
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gVTapInfo == nil {
-		log.Errorf("ORGID-%d: ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) not found  vtapinfo", orgID, ctrlIP, ctrlMac, teamIDStr, teamIDInt)
+		log.Errorf("ctrlIp is %s, ctrlMac is %s, team_id is (str=%s,int=%d) not found  vtapinfo", ctrlIP, ctrlMac, teamIDStr, teamIDInt, logger.NewORGPrefix(orgID))
 		return &api.SyncResponse{
 			Status:        &STATUS_FAILED,
 			Revision:      proto.String(in.GetRevision()),
@@ -695,7 +696,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespon
 		}, err
 	}
 	if vtapCache == nil {
-		return e.noVTapResponse(in, orgID), fmt.Errorf("ORGID-%d: no find vtap(%s %s) cache", orgID, ctrlIP, ctrlMac)
+		return e.noVTapResponse(in, orgID), fmt.Errorf("no find vtap(%s %s) cache", ctrlIP, ctrlMac)
 	}
 	vtapID := int(vtapCache.GetVTapID())
 	functions := vtapCache.GetFunctions()
@@ -706,13 +707,13 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespon
 	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
 	pushVersionPolicy := vtapCache.GetPushVersionPolicy()
 	newAcls := gVTapInfo.GetVTapPolicyData(vtapID, functions)
-	changedInfo := fmt.Sprintf("ORGID-%d: push data ctrl_ip is %s, ctrl_mac is %s, "+
+	changedInfo := fmt.Sprintf("push data ctrl_ip is %s, ctrl_mac is %s, "+
 		"team_id is (str=%s,int=%d) "+
 		"(platform data version  %d -> %d), "+
 		"(acls version %d -> %d datalen: %d), "+
 		"(groups version %d -> %d), "+
 		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
-		orgID, ctrlIP, ctrlMac,
+		ctrlIP, ctrlMac,
 		teamIDStr, teamIDInt,
 		versionPlatformData, pushVersionPlatformData,
 		versionPolicy, pushVersionPolicy, len(newAcls),
@@ -720,9 +721,9 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespon
 		in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	if versionPlatformData != pushVersionPlatformData ||
 		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
-		log.Infof(changedInfo)
+		log.Infof(changedInfo, logger.NewORGPrefix(orgID))
 	} else {
-		log.Debugf(changedInfo)
+		log.Debugf(changedInfo, logger.NewORGPrefix(orgID))
 	}
 
 	platformData := []byte{}
@@ -757,8 +758,8 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespon
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey, in.GetKubernetesForceWatch())
 		if value == vtapCacheKey {
 			log.Infof(
-				"ORGID-%d: open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), kubernetes_force_watch: %t)",
-				orgID, in.GetKubernetesClusterId(), ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetKubernetesForceWatch())
+				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s, team_id: (str=%s,int=%d), kubernetes_force_watch: %t)",
+				in.GetKubernetesClusterId(), ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetKubernetesForceWatch(), logger.NewORGPrefix(orgID))
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
@@ -788,7 +789,7 @@ func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 	var err error
 	orgID := trisolaris.GetOrgIDByTeamID(r.GetTeamId())
 	if orgID == 0 {
-		log.Errorf("ORGID-%d: get orgid failed by team_id(%s)", orgID, r.GetTeamId())
+		log.Errorf("get orgid failed by team_id(%s)", r.GetTeamId(), logger.NewORGPrefix(orgID))
 		response := &api.SyncResponse{
 			Status: &STATUS_FAILED,
 		}
@@ -820,6 +821,6 @@ func (e *VTapEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 			break
 		}
 	}
-	log.Infof("ORGID-%d: exit agent push", orgID, r.GetCtrlIp(), r.GetCtrlMac())
+	log.Infof("exit agent push", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
 	return err
 }

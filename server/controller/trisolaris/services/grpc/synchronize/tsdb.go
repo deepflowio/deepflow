@@ -170,14 +170,14 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	if nodeInfo == nil {
 		return &api.SyncResponse{
 			Status: &STATUS_FAILED,
-		}, fmt.Errorf("ORGID-%d: no find nodeInfo(%s)", orgID, tsdbIP)
+		}, fmt.Errorf("no find nodeInfo(%s)", tsdbIP)
 	}
 	if processName == TSDB_PROCESS_NAME {
 		tsdbCache := nodeInfo.GetTSDBCache(tsdbIP)
 		if tsdbCache == nil {
 			return &api.SyncResponse{
 				Status: &STATUS_FAILED,
-			}, fmt.Errorf("ORGID-%d: no find tsdb(%s) cache", orgID, tsdbIP)
+			}, fmt.Errorf("no find tsdb(%s) cache", tsdbIP)
 		}
 	}
 	versionPlatformData := nodeInfo.GetPlatformDataVersion()
@@ -232,13 +232,13 @@ func (e *TSDBEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) err
 	for {
 		response, err := e.pushResponse(r)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(orgID))
 			in.Send(response)
 			break
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(orgID))
 			break
 		}
 		pushmanager.IngesterWait(orgID)
