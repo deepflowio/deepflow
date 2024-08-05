@@ -504,66 +504,15 @@ func GetTagDBField(name, db, table string) (string, error) {
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		name := strings.Trim(name, "`")
-		if strings.HasPrefix(name, "k8s.label.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+		// map item tag
+		nameNoPreffix, _, transKey := common.TransMapItem(name, table)
+		if transKey != "" {
+			tagItem, _ = tag.GetTag(transKey, db, table, "default")
+			if strings.HasPrefix(name, "os.app.") || strings.HasPrefix(name, "k8s.env.") {
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			} else {
-				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
 			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-		} else if strings.HasPrefix(name, "k8s.annotation.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-		} else if strings.HasPrefix(name, "k8s.env.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
-		} else if strings.HasPrefix(name, "cloud.tag.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-		} else if strings.HasPrefix(name, "os.app.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("os_app", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == ckcommon.DB_NAME_PROMETHEUS {

@@ -34,3 +34,13 @@ const (
 	TAP_PORT_CHOST    = "tap_port_chost"
 	TAP_PORT_POD_NODE = "tap_port_pod_node"
 )
+
+var PEER_TABLES = []string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}
+
+var TRANS_MAP_ITEM_TAG = map[string]string{
+	"k8s.label.":      "k8s_label",
+	"k8s.annotation.": "k8s_annotation",
+	"k8s.env.":        "k8s_env",
+	"cloud.tag.":      "cloud_tag",
+	"os.app.":         "os_app",
+}
