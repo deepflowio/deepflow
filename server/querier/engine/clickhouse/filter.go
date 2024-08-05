@@ -358,90 +358,14 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 		}
 	default:
 		tagName := strings.Trim(whereTag, "`")
-		if strings.HasPrefix(tagName, "k8s.label.") {
-			nameNoSuffix := tagName
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(tagName, "_0") {
-					tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(tagName, "_1") {
-					tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
-			}
-			if ok {
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
-			}
-		} else if strings.HasPrefix(tagName, "k8s.annotation.") {
-			nameNoSuffix := tagName
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(tagName, "_0") {
-					tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(tagName, "_1") {
-					tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
-			}
-			if ok {
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
-				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
-			}
-		} else if strings.HasPrefix(tagName, "k8s.env.") {
-			nameNoSuffix := tagName
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(tagName, "_0") {
-					tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(tagName, "_1") {
-					tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
-			}
-			if ok {
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
+		// map item tag
+		nameNoPreffix, _, transKey := common.TransMapItem(tagName, table)
+		if transKey != "" {
+			tagItem, _ = tag.GetTag(transKey, db, table, "default")
+			if strings.HasPrefix(tagName, "os.app.") || strings.HasPrefix(tagName, "k8s.env.") {
 				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
-			}
-		} else if strings.HasPrefix(tagName, "cloud.tag.") {
-			nameNoSuffix := tagName
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(tagName, "_0") {
-					tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(tagName, "_1") {
-					tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
 			} else {
-				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
-			}
-			if ok {
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
 				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
-			}
-		} else if strings.HasPrefix(tagName, "os.app.") {
-			nameNoSuffix := tagName
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(tagName, "_0") {
-					tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(tagName, "_1") {
-					tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("os_app", db, table, "default")
-			}
-			if ok {
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "tag.") || strings.HasPrefix(tagName, "attribute.") {
 			if strings.HasPrefix(tagName, "tag.") {

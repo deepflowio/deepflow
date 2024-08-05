@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"golang.org/x/exp/slices"
 )
 
 func IsValueInSliceString(value string, list []string) bool {
@@ -88,4 +90,24 @@ func readFile(fileName string) ([][]interface{}, error) {
 		data = append(data, lineSlice)
 	}
 	return data, nil
+}
+
+func TransMapItem(name, table string) (nameNoPreffix string, nameNoSuffix string, transKey string) {
+	for preffix, tag := range TRANS_MAP_ITEM_TAG {
+		if strings.HasPrefix(name, preffix) {
+			nameNoSuffix = name
+			transKey = tag
+			if slices.Contains(PEER_TABLES, table) {
+				for _, suffix := range []string{"_0", "_1"} {
+					if strings.HasSuffix(name, suffix) {
+						transKey += suffix
+						nameNoSuffix = strings.TrimSuffix(nameNoSuffix, suffix)
+					}
+				}
+			}
+			nameNoPreffix = strings.TrimPrefix(nameNoSuffix, preffix)
+			return
+		}
+	}
+	return
 }
