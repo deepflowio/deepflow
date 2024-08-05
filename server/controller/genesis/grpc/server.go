@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package genesis
+package grpc
 
 import (
 	"context"
@@ -32,9 +32,13 @@ import (
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	kstore "github.com/deepflowio/deepflow/server/controller/genesis/store/kubernetes"
+	sstore "github.com/deepflowio/deepflow/server/controller/genesis/store/sync"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
+
+var log = logger.MustGetLogger("genesis.grpc")
 
 func isInterestedHost(tType tridentcommon.TridentType) bool {
 	types := []tridentcommon.TridentType{tridentcommon.TridentType_TT_PROCESS, tridentcommon.TridentType_TT_HOST_POD, tridentcommon.TridentType_TT_VM_POD, tridentcommon.TridentType_TT_PHYSICAL_MACHINE, tridentcommon.TridentType_TT_PUBLIC_CLOUD, tridentcommon.TridentType_TT_K8S_SIDECAR}
@@ -73,13 +77,18 @@ type SynchronizerServer struct {
 	vtapToLastSeen        sync.Map
 	clusterIDToLastSeen   sync.Map
 	tridentStatsMap       sync.Map
+	gsync                 *sstore.GenesisSync
+	gkubernetes           *kstore.GenesisKubernetes
 }
 
-func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue queue.QueueWriter) *SynchronizerServer {
+func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue queue.QueueWriter,
+	gsync *sstore.GenesisSync, gkubernetes *kstore.GenesisKubernetes) *SynchronizerServer {
 	return &SynchronizerServer{
 		cfg:                 cfg,
 		k8sQueue:            k8sQueue,
 		genesisSyncQueue:    genesisSyncQueue,
+		gsync:               gsync,
+		gkubernetes:         gkubernetes,
 		vtapToVersion:       sync.Map{},
 		vtapToLastSeen:      sync.Map{},
 		clusterIDToVersion:  sync.Map{},
@@ -178,13 +187,13 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 	if version == localVersion || platformData == nil {
 		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID, logger.NewORGPrefix(orgID))
 		g.genesisSyncQueue.Put(
-			VIFRPCMessage{
-				peer:    remote,
-				vtapID:  vtapID,
-				orgID:   orgID,
-				teamID:  uint32(teamID),
-				msgType: common.TYPE_RENEW,
-				message: request,
+			common.VIFRPCMessage{
+				Peer:        remote,
+				VtapID:      vtapID,
+				ORGID:       orgID,
+				TeamID:      uint32(teamID),
+				MessageType: common.TYPE_RENEW,
+				Message:     request,
 			},
 		)
 		return &trident.GenesisSyncResponse{Version: &localVersion}, nil
@@ -192,14 +201,14 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 
 	log.Infof("genesis sync received version %v -> %v from ip %s vtap_id %v", localVersion, version, remote, vtapID, logger.NewORGPrefix(orgID))
 	g.genesisSyncQueue.Put(
-		VIFRPCMessage{
-			peer:         remote,
-			vtapID:       vtapID,
-			orgID:        orgID,
-			teamID:       uint32(teamID),
-			k8sClusterID: k8sClusterID,
-			msgType:      common.TYPE_UPDATE,
-			message:      request,
+		common.VIFRPCMessage{
+			Peer:         remote,
+			VtapID:       vtapID,
+			ORGID:        orgID,
+			TeamID:       uint32(teamID),
+			K8SClusterID: k8sClusterID,
+			MessageType:  common.TYPE_UPDATE,
+			Message:      request,
 		},
 	)
 
@@ -319,12 +328,12 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 		}
 
 		// 正常推送消息到队列中
-		g.k8sQueue.Put(K8SRPCMessage{
-			peer:    remote,
-			orgID:   orgID,
-			vtapID:  vtapID,
-			msgType: 0,
-			message: request,
+		g.k8sQueue.Put(common.K8SRPCMessage{
+			Peer:        remote,
+			ORGID:       orgID,
+			VtapID:      vtapID,
+			MessageType: 0,
+			Message:     request,
 		})
 
 		// 更新内存中的last_seen和version
@@ -335,12 +344,12 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 		log.Infof("kubernetes api sync received version %v from ip %s no vtap_id", version, remote, logger.NewORGPrefix(orgID))
 		//正常上报数据，才推送消息到队列中
 		if len(entries) > 0 {
-			g.k8sQueue.Put(K8SRPCMessage{
-				peer:    remote,
-				orgID:   orgID,
-				vtapID:  vtapID,
-				msgType: 0,
-				message: request,
+			g.k8sQueue.Put(common.K8SRPCMessage{
+				Peer:        remote,
+				ORGID:       orgID,
+				VtapID:      vtapID,
+				MessageType: 0,
+				Message:     request,
 			})
 		}
 		// 采集器未自动发现时，触发trident上报完整数据
@@ -352,7 +361,7 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *con
 	orgID := request.GetOrgId()
 	clusterID := request.GetClusterId()
 
-	if k8sData, ok := GenesisService.GetKubernetesData(int(orgID), clusterID); ok {
+	if k8sData, ok := g.gkubernetes.GetKubernetesData(int(orgID), clusterID); ok {
 		epochStr := k8sData.Epoch.Format(controllercommon.GO_BIRTHDAY)
 		return &controller.GenesisSharingK8SResponse{
 			Epoch:    &epochStr,
@@ -366,7 +375,7 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *con
 
 func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *controller.GenesisSharingSyncRequest) (*controller.GenesisSharingSyncResponse, error) {
 	orgID := request.GetOrgId()
-	gSyncData := GenesisService.GetGenesisSyncData(int(orgID))
+	gSyncData := g.gsync.GetGenesisSyncData(int(orgID))
 
 	gSyncIPs := []*controller.GenesisSyncIP{}
 	for _, ip := range gSyncData.IPLastSeens {
