@@ -48,7 +48,7 @@ extern int btf__set_pointer_size(struct btf *btf, size_t ptr_sz);
 
 static int probe_read_kernel_feat;
 
-static int suspend_stderr()
+int suspend_stderr()
 {
 	fflush(stderr);
 
@@ -70,13 +70,20 @@ static int suspend_stderr()
 	return ret;
 }
 
-static void resume_stderr(int fd)
+void resume_stderr(int fd)
 {
 	fflush(stderr);
 	if (fd < 0)
 		return;
 	dup2(fd, STDERR_FILENO);
 	close(fd);
+}
+
+int df_prog_load(enum bpf_prog_type prog_type, const char *name,
+		 const struct bpf_insn *insns, int prog_len)
+{
+	return bcc_prog_load(prog_type, name, insns, prog_len, LICENSE_DEF,
+			     fetch_kernel_version_code(), 0, NULL, 0);
 }
 
 /*

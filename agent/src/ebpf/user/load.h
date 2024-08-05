@@ -120,4 +120,9 @@ int ebpf_obj_load(struct ebpf_object *obj);
 void release_object(struct ebpf_object *obj);
 struct ebpf_prog *ebpf_obj__get_prog_by_name(const struct ebpf_object *obj,
 					     const char *name);
+// Wrapper for bcc_prog_load()
+int df_prog_load(enum bpf_prog_type prog_type, const char *name,
+		 const struct bpf_insn *insns, int prog_len);
+int suspend_stderr();
+void resume_stderr(int fd);
 #endif /* DF_BPF_LOAD_H */
