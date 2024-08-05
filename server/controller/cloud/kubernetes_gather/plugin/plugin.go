@@ -79,6 +79,7 @@ func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string
 			break
 		}
 	}
+	log.Infof("get type : (%s)  get name : (%s)", podGroupType, podGroupName)
 	return podGroupType, podGroupName, nil
 }
 

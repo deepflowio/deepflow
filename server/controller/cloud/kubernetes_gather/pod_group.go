@@ -67,6 +67,10 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				log.Infof("podgroup (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 				continue
 			}
+			if name == "log-cleaner-daemonset" {
+				log.Info("log-cleaner guo lv")
+				continue
+			}
 			namespace := metaData.Get("namespace").MustString()
 			if namespace == "" {
 				log.Infof("podgroup (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
@@ -105,6 +109,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					label = "inplaceset:" + namespace + ":" + name
 				} else {
 					abstractPGType, abstractPGName, err := plugin.GeneratePodGroup(k.orgID, k.db, metaData)
+					log.Infof("get type : (%s)  get name : (%s)", abstractPGType, abstractPGName)
 					if err != nil {
 						log.Warningf("pod (%s) abstract pod group failed: (%s)", name, err.Error, logger.NewORGPrefix(k.orgID))
 						continue
@@ -122,6 +127,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					}
 
 					uLcuuid = common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
+					//uLcuuid = common.IDGenerateUUID(k.orgID, "657c304d-c55f-4a0c-b49b-52331064c028")
 					k.podLcuuidToPGInfo[uID] = [2]string{uLcuuid, abstractPGType}
 					if k.podGroupLcuuids.Contains(uLcuuid) {
 						log.Debugf("pod (%s) abstract workload already existed", name, logger.NewORGPrefix(k.orgID))
