@@ -25,6 +25,7 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/trident"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 )
@@ -96,17 +97,17 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 	orgID, teamIDInt := trisolaris.GetOrgInfoByTeamID(teamIDStr)
 	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
 	if gVTapInfo == nil {
-		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d info not found", vtapCacheKey, orgID, teamIDStr, teamIDInt)
+		log.Errorf("vtap(%s) teamID:%s-%d info not found", vtapCacheKey, teamIDStr, teamIDInt, logger.NewORGPrefix(orgID))
 		return sendFailed(in)
 	}
 	vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
-		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d cache not found", vtapCacheKey, orgID, teamIDStr, teamIDInt)
+		log.Errorf("vtap(%s) teamID:%s-%d cache not found", vtapCacheKey, teamIDStr, teamIDInt, logger.NewORGPrefix(orgID))
 		return sendFailed(in)
 	}
 	upgradeData, err := e.GetUpgradeFile(vtapCache.GetUpgradePackage(), vtapCache.GetExpectedRevision(), orgID)
 	if err != nil {
-		log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
+		log.Errorf("vtap(%s) teamID:%s-%d, err:%s", vtapCacheKey, teamIDStr, teamIDInt, err, logger.NewORGPrefix(orgID))
 		return sendFailed(in)
 	}
 	if isPodVTap(vtapCache.GetVTapType()) {
@@ -116,7 +117,7 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
+			log.Errorf("vtap(%s) teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err, logger.NewORGPrefix(orgID))
 		}
 	} else {
 		for start := uint64(0); start < upgradeData.totalLen; start += upgradeData.step {
@@ -133,12 +134,12 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 			}
 			err = in.Send(response)
 			if err != nil {
-				log.Errorf("vtap(%s) orgID:%s teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err)
+				log.Errorf("vtap(%s) teamID:%s-%d, err:%s", vtapCacheKey, teamIDStr, teamIDInt, err, logger.NewORGPrefix(orgID))
 				break
 			}
 		}
 	}
 
-	log.Infof("vtap(%s) orgID:%d teamID:%s-%d finishes the upgrade", vtapCacheKey, orgID, teamIDStr, teamIDInt)
+	log.Infof("vtap(%s) teamID:%s-%d finishes the upgrade", vtapCacheKey, teamIDStr, teamIDInt, logger.NewORGPrefix(orgID))
 	return err
 }
