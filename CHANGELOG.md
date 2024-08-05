@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: org log record [#7674](https://github.com/deepflowio/deepflow/pull/7674) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: in flow tag, field value type of int value should be `int` [#7671](https://github.com/deepflowio/deepflow/pull/7671) by [lzf575](https://github.com/lzf575)
 * fix: restart agent after enabling ntp [#7661](https://github.com/deepflowio/deepflow/pull/7661) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent Redis cannot close obfuscation [#7653](https://github.com/deepflowio/deepflow/pull/7653) by [TomatoMr](https://github.com/TomatoMr)
 * fix: need to drop deepflow_tenant/admin database when drop an organization [#7648](https://github.com/deepflowio/deepflow/pull/7648) by [lzf575](https://github.com/lzf575)
