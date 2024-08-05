@@ -36,6 +36,14 @@ var (
 
 type AgentCMDManager map[string]*CMDManager
 
+func AgentCommandLock() {
+	agentCMDMutex.Lock()
+}
+
+func AgentCommandUnlock() {
+	agentCMDMutex.Unlock()
+}
+
 func GetAgentCMDManager(key string) *CMDManager {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
@@ -45,9 +53,16 @@ func GetAgentCMDManager(key string) *CMDManager {
 	return nil
 }
 
+func GetAgentCMDManagerWithoutLock(key string) *CMDManager {
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager
+	}
+	return nil
+}
+
 func AddToCMDManager(key string, requestID uint64) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+	// agentCMDMutex.Lock()
+	// defer agentCMDMutex.Unlock()
 	agentCMDManager[key] = &CMDManager{
 		requestID: requestID,
 		ExecCH:    make(chan *trident.RemoteExecRequest, 1),

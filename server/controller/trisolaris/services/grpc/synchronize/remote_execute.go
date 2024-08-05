@@ -71,22 +71,30 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					continue
 				}
 				key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
-				if manager = service.GetAgentCMDManager(key); manager == nil {
+				service.AgentCommandLock()
+				if manager = service.GetAgentCMDManagerWithoutLock(key); manager == nil {
 					service.AddToCMDManager(key, uint64(1))
 					log.Infof("add agent(key:%s) to cmd manager", key)
 					initDone <- struct{}{}
 				}
-				manager = service.GetAgentCMDManager(key)
+				manager = service.GetAgentCMDManagerWithoutLock(key)
 				if manager == nil {
 					log.Errorf("agent(key: %s) remote exec map not found", key)
+					service.AgentCommandUnlock()
 					continue
 				}
+
+				// time.Sleep(time.Minute)
+
 				// heartbeat
 				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
 					resp.Commands == nil && resp.Errmsg == nil {
 					log.Infof("agent heart beat command response: %s", resp.String())
 					manager.ExecCH <- &api.RemoteExecRequest{RequestId: proto.Uint64(0)}
+					service.AgentCommandUnlock()
 					continue
+				} else {
+					service.AgentCommandUnlock()
 				}
 
 				if err != nil {
