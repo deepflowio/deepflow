@@ -54,85 +54,16 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 	}
 	if !ok {
 		name := strings.Trim(name, "`")
-		if strings.HasPrefix(name, "k8s.label.") {
-			nameNoSuffix := name
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(name, "_0") {
-					tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(name, "_1") {
-					tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
+		// map item tag
+		nameNoPreffix, _, transKey := common.TransMapItem(name, table)
+		if transKey != "" {
+			tagItem, _ = tag.GetTag(transKey, db, table, "default")
+			TagTranslatorStr := name
+			if strings.HasPrefix(name, "os.app.") || strings.HasPrefix(name, "k8s.env.") {
+				TagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			} else {
-				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+				TagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
 			}
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "k8s.annotation.") {
-			nameNoSuffix := name
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(name, "_0") {
-					tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(name, "_1") {
-					tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
-			}
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "k8s.env.") {
-			nameNoSuffix := name
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(name, "_0") {
-					tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(name, "_1") {
-					tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
-			}
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "cloud.tag.") {
-			nameNoSuffix := name
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(name, "_0") {
-					tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(name, "_1") {
-					tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
-			}
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "os.app.") {
-			nameNoSuffix := name
-			if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
-				if strings.HasSuffix(name, "_0") {
-					tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_0")
-				} else if strings.HasSuffix(name, "_1") {
-					tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
-					nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				}
-			} else {
-				tagItem, ok = tag.GetTag("os_app", db, table, "default")
-			}
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, name) {
 			autoTagMap := tagItem.TagTranslatorMap
