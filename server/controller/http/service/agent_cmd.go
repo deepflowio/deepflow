@@ -36,6 +36,14 @@ var (
 
 type AgentCMDManager map[string]*CMDManager
 
+func AgentCommandLock() {
+	agentCMDMutex.Lock()
+}
+
+func AgentCommandUnlock() {
+	agentCMDMutex.Unlock()
+}
+
 func GetAgentCMDManager(key string) *CMDManager {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
@@ -45,15 +53,27 @@ func GetAgentCMDManager(key string) *CMDManager {
 	return nil
 }
 
-func AddToCMDManager(key string, requestID uint64) {
+func GetAgentCMDManagerWithoutLock(key string) *CMDManager {
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager
+	}
+	return nil
+}
+
+func AddToCMDManagerIfNotExist(key string, requestID uint64) (exist bool) {
 	agentCMDMutex.Lock()
 	defer agentCMDMutex.Unlock()
+	if _, ok := agentCMDManager[key]; ok {
+		return true
+	}
+
 	agentCMDManager[key] = &CMDManager{
 		requestID: requestID,
 		ExecCH:    make(chan *trident.RemoteExecRequest, 1),
 
 		requestIDToResp: make(map[uint64]*CMDResp),
 	}
+	return false
 }
 
 func RemoveFromCMDManager(key string, requestID uint64) {
@@ -127,6 +147,13 @@ func GetAgentCMDResp(key string, requestID uint64) *CMDResp {
 	return nil
 }
 
+func GetAgentCMDRespWithoutLock(key string, requestID uint64) *CMDResp {
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager.requestIDToResp[requestID]
+	}
+	return nil
+}
+
 func RemoveAgentCMDResp(key string, requestID uint64) {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
@@ -145,8 +172,6 @@ func GetRequestID(key string) uint64 {
 }
 
 func AppendCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.RemoteCommand = append(resp.data.RemoteCommand, data...)
@@ -155,8 +180,6 @@ func AppendCommands(key string, requestID uint64, data []*trident.RemoteCommand)
 }
 
 func InitCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.RemoteCommand = data
@@ -165,8 +188,6 @@ func InitCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
 }
 
 func AppendNamespaces(key string, requestID uint64, data []*trident.LinuxNamespace) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.LinuxNamespace = append(resp.data.LinuxNamespace, data...)
@@ -175,8 +196,6 @@ func AppendNamespaces(key string, requestID uint64, data []*trident.LinuxNamespa
 }
 
 func InitNamespaces(key string, requestID uint64, data []*trident.LinuxNamespace) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.LinuxNamespace = data
@@ -185,8 +204,6 @@ func InitNamespaces(key string, requestID uint64, data []*trident.LinuxNamespace
 }
 
 func AppendContent(key string, requestID uint64, data []byte) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.Content += string(data)
@@ -195,8 +212,6 @@ func AppendContent(key string, requestID uint64, data []byte) {
 }
 
 func AppendErrorMessage(key string, requestID uint64, data *string) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			resp.data.ErrorMessage = *data
@@ -237,9 +252,27 @@ func GetCommands(key string, requestID uint64) []*trident.RemoteCommand {
 	return nil
 }
 
+func GetCommandsWithoutLock(key string, requestID uint64) []*trident.RemoteCommand {
+	if manager, ok := agentCMDManager[key]; ok {
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.RemoteCommand
+		}
+	}
+	return nil
+}
+
 func GetNamespaces(key string, requestID uint64) []*trident.LinuxNamespace {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.LinuxNamespace
+		}
+	}
+	return nil
+}
+
+func GetNamespacesWithoutLock(key string, requestID uint64) []*trident.LinuxNamespace {
 	if manager, ok := agentCMDManager[key]; ok {
 		if resp, ok := manager.requestIDToResp[requestID]; ok {
 			return resp.data.LinuxNamespace
