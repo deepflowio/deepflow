@@ -32,6 +32,7 @@ import (
 
 func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) error {
 	key := ""
+	isFisrtRecv := false
 	var wg sync.WaitGroup
 	wg.Add(1)
 	defer func() {
@@ -71,21 +72,29 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					continue
 				}
 				key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
-				if manager = service.GetAgentCMDManager(key); manager == nil {
-					service.AddToCMDManager(key, uint64(1))
+				if !isFisrtRecv {
+					isFisrtRecv = true
+					log.Infof("agent(key: %s) call RemoteExecute", key)
+				}
+				if ok := service.AddToCMDManagerIfNotExist(key, uint64(1)); !ok {
 					log.Infof("add agent(key:%s) to cmd manager", key)
 					initDone <- struct{}{}
 				}
-				manager = service.GetAgentCMDManager(key)
+
+				service.AgentCommandLock()
+				manager = service.GetAgentCMDManagerWithoutLock(key)
 				if manager == nil {
 					log.Errorf("agent(key: %s) remote exec map not found", key)
+					service.AgentCommandUnlock()
 					continue
 				}
+
 				// heartbeat
 				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
 					resp.Commands == nil && resp.Errmsg == nil {
 					log.Infof("agent heart beat command response: %s", resp.String())
 					manager.ExecCH <- &api.RemoteExecRequest{RequestId: proto.Uint64(0)}
+					service.AgentCommandUnlock()
 					continue
 				}
 
@@ -93,15 +102,18 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					if err == io.EOF {
 						handleResponse(resp)
 						log.Infof("agent(key: %s) command exec get response finish", key)
+						service.AgentCommandUnlock()
 						continue
 					}
 
 					err := fmt.Errorf("agent(key: %s) command stream error: %v", key, err)
 					log.Error(err)
+					service.AgentCommandUnlock()
 					continue
 				}
 
 				handleResponse(resp)
+				service.AgentCommandUnlock()
 			}
 		}
 	}()
@@ -139,7 +151,7 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 		log.Errorf("agent(key: %s) command resp request id not found", key, resp.RequestId)
 		return
 	}
-	cmdResp := service.GetAgentCMDResp(key, *resp.RequestId)
+	cmdResp := service.GetAgentCMDRespWithoutLock(key, *resp.RequestId)
 	if cmdResp == nil {
 		log.Errorf("agent(key: %s, request id: %v) remote exec map not found", key, resp.RequestId)
 		return
@@ -175,14 +187,14 @@ func handleResponse(resp *trident.RemoteExecResponse) {
 		}
 		return
 	case len(resp.LinuxNamespaces) > 0:
-		if len(service.GetNamespaces(key, *resp.RequestId)) > 0 {
+		if len(service.GetNamespacesWithoutLock(key, *resp.RequestId)) > 0 {
 			service.InitNamespaces(key, *resp.RequestId, resp.LinuxNamespaces)
 		} else {
 			service.AppendNamespaces(key, *resp.RequestId, resp.LinuxNamespaces)
 		}
 		cmdResp.LinuxNamespaceDoneCH <- struct{}{}
 	case len(resp.Commands) > 0:
-		if len(service.GetCommands(key, *resp.RequestId)) > 0 {
+		if len(service.GetCommandsWithoutLock(key, *resp.RequestId)) > 0 {
 			service.InitCommands(key, *resp.RequestId, resp.Commands)
 		} else {
 			service.AppendCommands(key, *resp.RequestId, resp.Commands)
