@@ -513,6 +513,10 @@ type VTapInterface struct {
 	HostIP             string `json:"HOST_IP"`
 	NodeIP             string `json:"NODE_IP"`
 	LastSeen           string `json:"LAST_SEEN"`
+	DeviceCHostID      int    `json:"DEVICE_CHOST_ID"`
+	DeviceCHostName    string `json:"DEVICE_CHOST_NAME"`
+	DevicePodNodeID    int    `json:"DEVICE_POD_NODE_ID"`
+	DevicePodNodeName  string `json:"DEVICE_POD_NODE_NAME"`
 }
 
 type GenesisHost struct {

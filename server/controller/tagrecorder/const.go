@@ -317,6 +317,10 @@ const (
 		"    `name` String,\n" +
 		"    `host_id` Int64,\n" +
 		"    `host_name` String,\n" +
+		"    `chost_id` Int64,\n" +
+		"    `chost_name` String,\n" +
+		"    `pod_node_id` Int64,\n" +
+		"    `pod_node_name` String,\n" +
 		"    `device_type` UInt64,\n" +
 		"    `device_id` UInt64,\n" +
 		"    `device_name` String,\n" +
