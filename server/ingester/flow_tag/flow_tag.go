@@ -63,13 +63,35 @@ func (t FieldType) String() string {
 	}
 }
 
+type FieldValueType uint8
+
+const (
+	FieldValueTypeAuto FieldValueType = iota
+	FieldValueTypeString
+	FieldValueTypeFloat
+	FieldValueTypeInt
+)
+
+func (t FieldValueType) String() string {
+	switch t {
+	case FieldValueTypeString:
+		return "string"
+	case FieldValueTypeFloat:
+		return "float"
+	case FieldValueTypeInt:
+		return "int"
+	default:
+		return "invalid"
+	}
+}
+
 // This structure will be used as a map key, and it is hoped to be as compact as possible in terms of memory layout.
 // In addition, in order to distinguish as early as possible when comparing two values, put the highly distinguishable fields at the front.
 type FlowTagInfo struct {
 	Table          string // Represents virtual_table_name in ext_metrics
 	FieldName      string
 	FieldValue     string
-	FieldValueType string
+	FieldValueType FieldValueType
 	VtapId         uint16
 
 	// IDs only for prometheus
@@ -98,10 +120,10 @@ type FlowTag struct {
 func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(t.Timestamp)
 	fieldValueType := t.FieldValueType
-	if fieldValueType == "" {
-		fieldValueType = "string"
+	if fieldValueType == FieldValueTypeAuto {
+		fieldValueType = FieldValueTypeString
 		if len(t.FieldValue) == 0 && t.FieldType != FieldTag {
-			fieldValueType = "float"
+			fieldValueType = FieldValueTypeFloat
 		}
 	}
 	block.Write(
@@ -110,7 +132,7 @@ func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 		t.PodNsId,
 		t.FieldType.String(),
 		t.FieldName,
-		fieldValueType,
+		fieldValueType.String(),
 		t.TeamID,
 	)
 	if t.TagType == TagFieldValue {

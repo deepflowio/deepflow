@@ -155,11 +155,11 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		if i < tagStrLen {
 			name = e.TagStrKeys[i]
 			value = e.TagStrValues[i]
-			flowTagInfo.FieldValueType = "string"
+			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeString
 		} else {
 			name = e.TagIntKeys[i-tagStrLen]
 			value = strconv.FormatInt(e.TagIntValues[i-tagStrLen], 10)
-			flowTagInfo.FieldValueType = "int"
+			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeInt
 		}
 
 		flowTagInfo.FieldName = name
