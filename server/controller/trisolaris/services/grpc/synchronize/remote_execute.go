@@ -55,80 +55,85 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 			}
 		}()
 
+		<-initDone
+		if manager == nil {
+			err := fmt.Errorf("get agent(key: %s) remote exec manager nil", key)
+			log.Error(err)
+			return
+		}
+
 		for {
 			select {
 			case <-ctx.Done():
 				log.Infof("context done, agent(key: %s)", key)
 				return
-			default:
-				resp, err := stream.Recv()
-				if resp == nil {
-					continue
-				}
-				log.Debugf("agent command response: %s", resp.String())
-				if resp.AgentId == nil {
-					log.Warningf("recevie agent info from remote command is nil")
-					continue
-				}
-				key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
-				if manager = service.GetAgentCMDManager(key); manager == nil {
-					service.AddToCMDManager(key, uint64(1))
-					log.Infof("add agent(key:%s) to cmd manager", key)
-					initDone <- struct{}{}
-				}
-				manager = service.GetAgentCMDManager(key)
-				if manager == nil {
-					log.Errorf("agent(key: %s) remote exec map not found", key)
-					continue
-				}
-				// heartbeat
-				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
-					resp.Commands == nil && resp.Errmsg == nil {
-					log.Infof("agent heart beat command response: %s", resp.String())
-					manager.ExecCH <- &api.RemoteExecRequest{RequestId: proto.Uint64(0)}
-					continue
-				}
-
-				if err != nil {
-					if err == io.EOF {
-						handleResponse(resp)
-						log.Infof("agent(key: %s) command exec get response finish", key)
-						continue
-					}
-
-					err := fmt.Errorf("agent(key: %s) command stream error: %v", key, err)
+			case req, ok := <-manager.ExecCH:
+				if !ok {
+					err := fmt.Errorf("agent(key: %s) exec channel is closed", key)
 					log.Error(err)
-					continue
+					return
 				}
-
-				handleResponse(resp)
+				b, _ := json.Marshal(req)
+				log.Infof("agent(key: %s) request: %s", key, string(b))
+				if err := stream.Send(req); err != nil {
+					log.Errorf("send cmd to agent error: %s, req: %#v", err.Error(), req)
+					return
+				}
 			}
 		}
+
 	}()
 
-	<-initDone
-	if manager == nil {
-		err := fmt.Errorf("get agent(key: %s) remote exec manager nil", key)
-		log.Error(err)
-		return err
-	}
 	for {
 		select {
 		case <-ctx.Done():
 			log.Infof("context done, agent(key: %s)", key)
 			return nil
-		case req, ok := <-manager.ExecCH:
-			if !ok {
-				err := fmt.Errorf("agent(key: %s) exec channel is closed", key)
+		default:
+			resp, err := stream.Recv()
+			if resp == nil {
+				continue
+			}
+			log.Infof("agent command response: %s", resp.String())
+			if resp.AgentId == nil {
+				log.Warningf("recevie agent info from remote command is nil")
+				continue
+			}
+			key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
+			if manager = service.GetAgentCMDManager(key); manager == nil {
+				service.AddToCMDManager(key, uint64(1))
+				log.Infof("add agent(key:%s) to cmd manager", key)
+				initDone <- struct{}{}
+			}
+			manager = service.GetAgentCMDManager(key)
+			if manager == nil {
+				log.Errorf("agent(key: %s) remote exec map not found", key)
+				continue
+			}
+
+			// time.Sleep(time.Minute)
+
+			// heartbeat
+			if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
+				resp.Commands == nil && resp.Errmsg == nil {
+				log.Infof("agent heart beat command response: %s", resp.String())
+				manager.ExecCH <- &api.RemoteExecRequest{RequestId: proto.Uint64(0)}
+				continue
+			}
+
+			if err != nil {
+				if err == io.EOF {
+					handleResponse(resp)
+					log.Infof("agent(key: %s) command exec get response finish", key)
+					continue
+				}
+
+				err := fmt.Errorf("agent(key: %s) command stream error: %v", key, err)
 				log.Error(err)
-				return err
+				continue
 			}
-			b, _ := json.Marshal(req)
-			log.Infof("agent(key: %s) request: %s", key, string(b))
-			if err := stream.Send(req); err != nil {
-				log.Errorf("send cmd to agent error: %s, req: %#v", err.Error(), req)
-				return err
-			}
+
+			handleResponse(resp)
 		}
 	}
 }
