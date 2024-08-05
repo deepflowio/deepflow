@@ -66,10 +66,11 @@ func (t FieldType) String() string {
 // This structure will be used as a map key, and it is hoped to be as compact as possible in terms of memory layout.
 // In addition, in order to distinguish as early as possible when comparing two values, put the highly distinguishable fields at the front.
 type FlowTagInfo struct {
-	Table      string // Represents virtual_table_name in ext_metrics
-	FieldName  string
-	FieldValue string
-	VtapId     uint16
+	Table          string // Represents virtual_table_name in ext_metrics
+	FieldName      string
+	FieldValue     string
+	FieldValueType string
+	VtapId         uint16
 
 	// IDs only for prometheus
 	TableId      uint32
@@ -96,9 +97,12 @@ type FlowTag struct {
 
 func (t *FlowTag) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(t.Timestamp)
-	fieldValueType := "string"
-	if len(t.FieldValue) == 0 && t.FieldType != FieldTag {
-		fieldValueType = "float"
+	fieldValueType := t.FieldValueType
+	if fieldValueType == "" {
+		fieldValueType = "string"
+		if len(t.FieldValue) == 0 && t.FieldType != FieldTag {
+			fieldValueType = "float"
+		}
 	}
 	block.Write(
 		t.Table,
@@ -127,7 +131,7 @@ func (t *FlowTag) Columns() []*ckdb.Column {
 		ckdb.NewColumn("pod_ns_id", ckdb.UInt16),
 		ckdb.NewColumn("field_type", ckdb.LowCardinalityString).SetComment("value: tag, metrics"),
 		ckdb.NewColumn("field_name", ckdb.LowCardinalityString),
-		ckdb.NewColumn("field_value_type", ckdb.LowCardinalityString).SetComment("value: string, float"),
+		ckdb.NewColumn("field_value_type", ckdb.LowCardinalityString).SetComment("value: string, float, int"),
 		ckdb.NewColumn("team_id", ckdb.UInt16),
 	)
 	if t.TagType == TagFieldValue {
