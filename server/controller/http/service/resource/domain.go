@@ -315,11 +315,11 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 		regionLcuuid = confRegion.(string)
 	}
 
-	// 同一区域只允许存在一个(采集器同步)类型
 	// only one type (agent_sync) can exist in the same region
+	// 同一区域只允许存在一个(采集器同步)类型
 	if domainCreate.Type == common.AGENT_SYNC {
 		var agentSyncDomains []mysql.Domain
-		err := db.Where("type = ?", domainCreate.Type).Find(&agentSyncDomains).Error
+		err := db.Where("type = ?", common.AGENT_SYNC).Find(&agentSyncDomains).Error
 		if err != nil {
 			return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, err.Error())
 		}
@@ -464,6 +464,26 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 		}
 		// 如果修改region，则清理掉云平台下所有软删除的数据
 		if region, ok := configUpdate["region_uuid"]; ok {
+			regionLcuuid, ok := region.(string)
+			if !ok {
+				return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, "region lcuuid must be string")
+			}
+			if domain.Type == common.AGENT_SYNC {
+				var agentSyncDomains []mysql.Domain
+				err := db.Where("type = ? AND lcuuid != ?", common.AGENT_SYNC, domain.Lcuuid).Find(&agentSyncDomains).Error
+				if err != nil {
+					return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, err.Error())
+				}
+				for _, asDomain := range agentSyncDomains {
+					configJson, err := simplejson.NewJson([]byte(asDomain.Config))
+					if err != nil {
+						return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, err.Error())
+					}
+					if regionLcuuid == configJson.Get("region_uuid").MustString() {
+						return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("region (%s) already exist agent sync doamin (%s)", regionLcuuid, asDomain.Name))
+					}
+				}
+			}
 			if region != config["region_uuid"] {
 				log.Infof("delete domain (%s) soft deleted resource", domain.Name, db.LogPrefixORGID)
 				cleanSoftDeletedResource(db, lcuuid)
