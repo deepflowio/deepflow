@@ -273,12 +273,13 @@ func (ChPodNamespace) TableName() string {
 }
 
 type ChPodNode struct {
-	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name        string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID      int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID      int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
 }
 
 type ChVTap struct {
@@ -308,11 +309,12 @@ func (ChLBListener) TableName() string {
 }
 
 type ChPodIngress struct {
-	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name        string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	TeamID      int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
 }
 
 type ChPodK8sLabel struct {
