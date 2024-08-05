@@ -168,17 +168,21 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 		} else {
 			if data.VTapID != 0 || tapPort != 0 {
 				keyToItem[tapMacKey] = mysql.ChVTapPort{
-					VTapID:     data.VTapID,
-					TapPort:    tapPort,
-					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
-					Name:       data.TapName,
-					DeviceID:   data.DeviceID,
-					HostID:     data.DeviceHostID,
-					DeviceType: data.DeviceType,
-					DeviceName: data.DeviceName,
-					HostName:   data.DeviceHostName,
-					IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
-					TeamID:     VTapIDToTeamID[data.VTapID],
+					VTapID:      data.VTapID,
+					TapPort:     tapPort,
+					MacType:     CH_VTAP_PORT_TYPE_TAP_MAC,
+					Name:        data.TapName,
+					DeviceID:    data.DeviceID,
+					HostID:      data.DeviceHostID,
+					DeviceType:  data.DeviceType,
+					DeviceName:  data.DeviceName,
+					HostName:    data.DeviceHostName,
+					IconID:      deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
+					TeamID:      VTapIDToTeamID[data.VTapID],
+					CHostID:     data.DeviceCHostID,
+					CHostName:   data.DeviceCHostName,
+					PodNodeID:   data.DevicePodNodeID,
+					PodNodeName: data.DevicePodNodeName,
 				}
 				log.Debugf("add new: %+v", keyToItem[tapMacKey], db.LogPrefixORGID)
 			}
@@ -221,17 +225,21 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysql.ChVTap
 				log.Debugf("update: %+v", vTapPort, db.LogPrefixORGID)
 			} else {
 				keyToItem[macKey] = mysql.ChVTapPort{
-					VTapID:     data.VTapID,
-					TapPort:    macPort,
-					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
-					Name:       data.Name,
-					DeviceID:   data.DeviceID,
-					HostID:     data.DeviceHostID,
-					DeviceType: data.DeviceType,
-					DeviceName: data.DeviceName,
-					HostName:   data.DeviceHostName,
-					IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
-					TeamID:     VTapIDToTeamID[data.VTapID],
+					VTapID:      data.VTapID,
+					TapPort:     macPort,
+					MacType:     CH_VTAP_PORT_TYPE_TAP_MAC,
+					Name:        data.Name,
+					DeviceID:    data.DeviceID,
+					HostID:      data.DeviceHostID,
+					DeviceType:  data.DeviceType,
+					DeviceName:  data.DeviceName,
+					HostName:    data.DeviceHostName,
+					IconID:      deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
+					TeamID:      VTapIDToTeamID[data.VTapID],
+					CHostID:     data.DeviceCHostID,
+					CHostName:   data.DeviceCHostName,
+					PodNodeID:   data.DevicePodNodeID,
+					PodNodeName: data.DevicePodNodeName,
 				}
 				log.Debugf("add new: %+v", keyToItem[tapMacKey], db.LogPrefixORGID)
 			}

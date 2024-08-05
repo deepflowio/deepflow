@@ -234,13 +234,21 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 				switch vtapVIF.DeviceType {
 				case common.VIF_DEVICE_TYPE_HOST:
 					vtapVIF.DeviceName = toolDS.hostIDToName[vtapVIF.DeviceID]
+					vtapVIF.DeviceHostID = vtapVIF.DeviceID
+					vtapVIF.DeviceHostName = vtapVIF.DeviceName
 				case common.VIF_DEVICE_TYPE_VM:
 					if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
 						vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
 						vtapVIF.DeviceID = podNodeID
 						vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
+						vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[podNodeID]
+						vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+						vtapVIF.DevicePodNodeID = podNodeID
+						vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[podNodeID]
 					} else {
 						vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
+						vtapVIF.DeviceCHostID = vtapVIF.DeviceID
+						vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceID]
 					}
 					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceID]]
 					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
@@ -248,6 +256,10 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 					vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
 					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[vtapVIF.DeviceID]]]
 					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
+					vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[vtapVIF.DeviceID]
+					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+					vtapVIF.DevicePodNodeID = vtapVIF.DeviceID
+					vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_VROUTER:
 					vtapVIF.DeviceName = toolDS.vrouterIDToName[vtapVIF.DeviceID]
 				case common.VIF_DEVICE_TYPE_DHCP_PORT:
@@ -266,6 +278,10 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 					vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
 					vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]]]
 					vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
+					vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]
+					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+					vtapVIF.DevicePodNodeID = toolDS.podIDToPodNodeID[vtapVIF.DeviceID]
+					vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DevicePodNodeID]
 				}
 			}
 		} else if vtapID != 0 {
