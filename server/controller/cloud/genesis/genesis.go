@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -50,7 +51,7 @@ type Genesis struct {
 	defaultVpcName  string
 	ips             []cloudmodel.IP
 	subnets         []cloudmodel.Subnet
-	genesisData     genesis.GenesisSyncDataResponse
+	genesisData     gcommon.GenesisSyncDataResponse
 	cloudStatsd     statsd.CloudStatsd
 }
 
@@ -78,7 +79,7 @@ func NewGenesis(orgID int, domain mysqlmodel.Domain, cfg config.CloudConfig) (*G
 		UuidGenerate:    domain.DisplayName,
 		defaultVpcName:  cfg.GenesisDefaultVpcName,
 		regionUuid:      config.Get("region_uuid").MustString(),
-		genesisData:     genesis.GenesisSyncDataResponse{},
+		genesisData:     gcommon.GenesisSyncDataResponse{},
 		cloudStatsd:     statsd.NewCloudStatsd(),
 	}, nil
 }
@@ -104,7 +105,7 @@ func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	}
 }
 
-func (g *Genesis) getGenesisData() (genesis.GenesisSyncDataResponse, error) {
+func (g *Genesis) getGenesisData() (gcommon.GenesisSyncDataResponse, error) {
 	return genesis.GenesisService.GetGenesisSyncResponse(g.orgID)
 }
 
