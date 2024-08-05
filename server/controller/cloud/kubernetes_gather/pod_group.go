@@ -125,7 +125,8 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					if targetIndex != -1 {
 						abstractPGName = resourceName[:targetIndex]
 					}
-					uLcuuid = common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
+					abstractUID := common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
+					uLcuuid = common.IDGenerateUUID(k.orgID, abstractUID)
 					if k.podGroupLcuuids.Contains(uLcuuid) {
 						log.Debugf("sci pod (%s) abstract workload already existed", name)
 						continue
