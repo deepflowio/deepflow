@@ -56,7 +56,7 @@ var AUTO_CUSTOM_TAG_MAP = map[string][]string{}
 var AUTO_CUSTOM_TAG_CHECK_MAP = map[string][]string{}
 
 var tagNativeTagDB = []string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}
-var noCustomTagTable = []string{"traffic_policy", "l4_packet", "l7_packet"}
+var noCustomTagTable = []string{"traffic_policy", "l4_packet", "l7_packet", "alert_event"}
 var noCustomTagDB = []string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}
 
 var tagTypeToOperators = map[string][]string{
@@ -868,6 +868,8 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", whereSql, limit)
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, whereSql, limit)
+		} else if table == "alert_event" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_value_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table, field_value_type ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		}
@@ -876,6 +878,8 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", limit)
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, limit)
+		} else if table == "alert_event" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_value_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table, field_value_type ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		}
@@ -897,6 +901,22 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 				externalTag, externalTag, externalTag, externalTag, "map_item",
 				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
 			})
+		} else if table == "alert_event" {
+			externalTag := tagName.(string)
+			var categoryValue string
+			// fieltValueType := _tagName.([]interface{})[2]
+			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") {
+				categoryValue = "Custom Tag"
+			} else if strings.HasPrefix(externalTag, "tag.") || strings.HasPrefix(externalTag, "attribute.") {
+				categoryValue = "Native Tag"
+			} else {
+				categoryValue = _tagName.([]interface{})[2].(string)
+			}
+
+			response.Values = append(response.Values, []interface{}{
+				externalTag, externalTag, externalTag, externalTag, "map_item",
+				categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+			})
 		} else if slices.Contains(tagNativeTagDB, db) {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
@@ -912,6 +932,38 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		}
 	}
 	return
+}
+
+func GetAlertEventTagDescriptions(staticTag, dynamicTag *common.Result) (response *common.Result, err error) {
+	response = &common.Result{
+		Columns: []interface{}{
+			"name", "client_name", "server_name", "display_name", "type", "category",
+			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+		},
+		Values: []interface{}{},
+	}
+	valuesMap := map[string]interface{}{}
+	staticValues := staticTag.Values
+	dynamiicValues := dynamicTag.Values
+	for _, staticItem := range staticValues {
+		valuesMap[staticItem.([]interface{})[0].(string)] = staticItem
+	}
+
+	// if dynamiic tag_name not in staticvalues, add to result
+	for _, dynamicItem := range dynamiicValues {
+		dynamicTagName := strings.TrimPrefix(dynamicItem.([]interface{})[0].(string), "_0")
+		dynamicTagName = strings.TrimPrefix(dynamicTagName, "_1")
+		dynamicTagName = strings.TrimPrefix(dynamicTagName, "_id")
+		if valuesMap[dynamicTagName] == nil && valuesMap[dynamicItem.([]interface{})[0].(string)] == nil {
+			valuesMap[dynamicTagName] = dynamicItem
+		}
+	}
+
+	for _, value := range valuesMap {
+		response.Values = append(response.Values, value)
+	}
+
+	return response, nil
 }
 
 func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
@@ -932,6 +984,9 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	DynamicResponse, err := GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)
 	if err != nil {
 		return
+	}
+	if table == "alert_event" {
+		return GetAlertEventTagDescriptions(staticResponse, DynamicResponse)
 	}
 	response.Values = append(response.Values, staticResponse.Values...)
 	response.Values = append(response.Values, DynamicResponse.Values...)
