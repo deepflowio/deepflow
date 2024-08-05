@@ -140,6 +140,76 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 				 int conflict_count,
 				 int max_delay,
 				 int total_time, int event_count);
+extern int bpf_raw_tracepoint_open(const char *name, int prog_fd);
+static bool fentry_try_attach(const char *fn)
+{
+	int prog_fd, attach_fd;
+	char kfunc_name[PROBE_NAME_SZ];
+	snprintf(kfunc_name, sizeof(kfunc_name), "kfunc__%s", fn);
+	struct bpf_insn insns[] = {
+		BPF_ALU64_IMM(BPF_MOV, BPF_REG_0, 0),	/* r0 = 0 */
+		BPF_EXIT_INSN(),
+	};
+
+	int stderr_fd = suspend_stderr();
+	if (stderr_fd < 0) {
+		ebpf_warning("Failed to suspend stderr.\n");
+		return false;
+	}
+
+	prog_fd = df_prog_load
+	    (BPF_PROG_TYPE_TRACING, kfunc_name, insns, sizeof(insns));
+
+	if (prog_fd < 0) {
+		resume_stderr(stderr_fd);
+		return false;
+	}
+
+	attach_fd = bpf_raw_tracepoint_open(NULL, prog_fd);
+	if (attach_fd >= 0)
+		close(attach_fd);
+
+	close(prog_fd);
+	resume_stderr(stderr_fd);
+
+	return attach_fd >= 0;
+}
+
+static bool fentry_can_attach(const char *name)
+{
+	const char *vmlinux_path = "/sys/kernel/btf/vmlinux";
+	if (access(vmlinux_path, R_OK))
+		return false;
+	return fentry_try_attach(name);
+}
+
+void config_probe(struct tracer_probes_conf *tps, int type, const char *fn,
+		  const char *tp_name, bool is_exit)
+{
+	switch (type) {
+	case BPF_PROG_TYPE_KPROBE:
+		if (fentry_can_attach(fn)) {
+			kfunc_set_symbol(tps, fn, is_exit);
+		} else {
+			kprobe_set_symbol(tps, fn, is_exit);
+		}
+		break;
+	case BPF_PROG_TYPE_TRACEPOINT:
+		if (fentry_can_attach(fn)) {
+			kfunc_set_symbol(tps, fn, is_exit);
+		} else {
+			if (tp_name == NULL) {
+				ebpf_warning("tracepoint name cannot be empty.\n");
+				exit(1);
+			}
+			tps_set_symbol(tps, tp_name);
+		}
+		break;
+	default:
+		return;
+	};
+}
+
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	probes_set_enter_symbol(tps, "__sys_sendmsg");
@@ -223,8 +293,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
 
 	/* kfuncs */
-	kfunc_set_symbol(tps, "do_unlinkat", false);
-	kfunc_set_symbol(tps, "do_unlinkat", true);
+	config_probe(tps, BPF_PROG_TYPE_KPROBE, "do_unlinkat", NULL, false);
+	config_probe(tps, BPF_PROG_TYPE_KPROBE, "do_unlinkat", NULL, true);
 
 	// 收集go可执行文件uprobe符号信息
 	collect_go_uprobe_syms_from_procfs(tps);

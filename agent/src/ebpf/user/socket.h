@@ -379,4 +379,28 @@ int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
 int disable_syscall_trace_id(void);
+
+/**
+ * eBPF Probe Point Configuration
+ *
+ * Configure probe points. The types of probe points may include:
+ * (1) kprobe/kretprobe
+ * (2) tracepoint
+ * During the configuration process, the kernel is automatically checked
+ * to determine if it supports 'fentry/fexit'. If supported, this type
+ * of probe point is preferred to improve performance. Otherwise,
+ * 'kprobe/kretprobe' or 'tracepoint' types are used.
+ *
+ * @param tps Pointer to the structure that stores the configuration of
+ * 	      all probe points.
+ * @param type eBPF program type.
+ * @param fn Name of the kernel probe interface.
+ * @param tp_name Name of the tracepoint type probe point.
+ * @param is_eixt Used to specify the position of the kernel probe
+ * 		  interface. If probing at the exit of the kernel interface,
+ * 		  it is set to true. Otherwise, it is set to false. This
+ * 		  is not applicable for handling tracepoint type interfaces.
+ */
+void config_probe(struct tracer_probes_conf *tps, int type, const char *fn,
+		  const char *tp_name, bool is_exit);
 #endif /* DF_USER_SOCKET_H */

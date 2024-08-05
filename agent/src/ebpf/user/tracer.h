@@ -213,6 +213,15 @@ do {										\
 		ebpf_error("no memory, kfunc('%s') set failed", fn);		\
 	}									\
 } while(0)
+
+#define kprobe_set_symbol(t, fn, ret)						\
+{										\
+	if ((ret)) {								\
+		probes_set_exit_symbol(t, fn);					\
+	} else {								\
+		probes_set_enter_symbol(t, fn);					\
+	}									\
+}
 /* *INDENT-ON* */
 
 enum {
