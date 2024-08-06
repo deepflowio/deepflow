@@ -3089,6 +3089,182 @@ TCP 和 UDP 的端口白名单列表，白名单生效优先级低于 kprobe 黑
 
 配置样例: `ports: 80,1000-2000`
 
+#### 调优 {#inputs.ebpf.socket.tunning}
+
+##### 最大采集速率 {#inputs.ebpf.socket.tunning.max_capture_rate}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.max_capture_rate`
+
+Upgrade from old version: `static_config.ebpf.global-ebpf-pps-threshold`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        max_capture_rate: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Per Second |
+| Range | [0, 64000000] |
+
+**详细描述**:
+
+eBPF 数据的最大采集速率，设置为 `0` 表示不对 deepflow-agent 的 eBPF 数据采集速率做限制。
+
+##### 禁用 syscall_trace_id 相关的计算 {#inputs.ebpf.socket.tunning.syscall_trace_id_disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.syscall_trace_id_disabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        syscall_trace_id_disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当 trace_id 注入所有请求时，所有请求的 syscall_trace_id 计算逻辑可以关闭。这将大大减少
+eBPF hook 进程的 CPU 消耗。
+
+#### 预处理 {#inputs.ebpf.socket.preprocess}
+
+##### 乱序重排（OOOR）缓冲区大小 {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size`
+
+Upgrade from old version: `static_config.ebpf.syscall-out-of-order-cache-size`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        out_of_order_reassembly_cache_size: 16
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [8, 1024] |
+
+**详细描述**:
+
+由于 eBPF socket 事件是以批处理的方式向用户态空间发送数据，同一个应用调用的请求、响应由不同 CPU 处理时，可能
+会出现请求、响应乱序的情况，开启 Syscall 数据乱序重排特性后，每个 TCP/UDP 流会缓存一定数量的 eBPF socket
+事件，以修正乱序数据对应用调用解析的影响。该参数设置了每个 TCP/UDP 流可以缓存的 eBPF socket 事件数量上限（每
+条事件数据占用的字节数上限受`l7_log_packet_size`控制）。在 Syscall 数据乱序较严重导致应用调用采集不全的环境
+中，可适当调大该参数。
+
+##### 乱序重排（OOOR）协议列表 {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_protocols}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.out_of_order_reassembly_protocols`
+
+Upgrade from old version: `static_config.ebpf.syscall-out-of-order-reassembly`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        out_of_order_reassembly_protocols: []
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
+需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+
+##### 分段重组（SR）协议列表 {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols`
+
+Upgrade from old version: `static_config.ebpf.syscall-segmentation-reassembly`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        segmentation_reassembly_protocols: []
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
+协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`syscall-out-of-order-reassembly`
+开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+
 ### File {#inputs.ebpf.file}
 
 #### IO 事件 {#inputs.ebpf.file.io_event}
@@ -3396,38 +3572,39 @@ inputs:
 
 eBPF memory profile 数据的采集开关。
 
-### 调优 {#inputs.ebpf.tunning}
+#### 预处理 {#inputs.ebpf.profile.preprocess}
 
-#### 最大采集速率 {#inputs.ebpf.tunning.max_capture_rate}
+##### 函数栈压缩 {#inputs.ebpf.profile.preprocess.stack_compression}
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
-`inputs.ebpf.tunning.max_capture_rate`
-
-Upgrade from old version: `static_config.ebpf.global-ebpf-pps-threshold`
+`inputs.ebpf.profile.preprocess.stack_compression`
 
 **默认值**:
 ```yaml
 inputs:
   ebpf:
-    tunning:
-      max_capture_rate: 0
+    profile:
+      preprocess:
+        stack_compression: true
 ```
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | int |
-| Unit | Per Second |
-| Range | [0, 64000000] |
+| Type | bool |
 
 **详细描述**:
 
-eBPF 数据的最大采集速率，设置为 `0` 表示不对 deepflow-agent 的 eBPF 数据采集速率做限制。
+发送数据之前压缩函数调用栈。压缩能够有效降低 agent 的内存开销、数据传输的带宽消耗、以及
+ingester 的 CPU 开销，但是 Agent 也会因此消耗更多的 CPU。测试表明，将deepflow-agent 自身的
+on-cpu 函数调用栈压缩，可以将带宽消耗降低 `x` 倍，但会使得 agent 额外消耗 `y%` 的 CPU。
+
+### 调优 {#inputs.ebpf.tunning}
 
 #### 采集队列大小 {#inputs.ebpf.tunning.collector_queue_size}
 
@@ -3641,116 +3818,6 @@ inputs:
 **详细描述**:
 
 TODO
-
-### 预处理 {#inputs.ebpf.preprocess}
-
-#### 乱序重排（OOOR）缓冲区大小 {#inputs.ebpf.preprocess.out_of_order_reassembly_cache_size}
-
-**标签**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.ebpf.preprocess.out_of_order_reassembly_cache_size`
-
-Upgrade from old version: `static_config.ebpf.syscall-out-of-order-cache-size`
-
-**默认值**:
-```yaml
-inputs:
-  ebpf:
-    preprocess:
-      out_of_order_reassembly_cache_size: 16
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [8, 1024] |
-
-**详细描述**:
-
-由于 eBPF socket 事件是以批处理的方式向用户态空间发送数据，同一个应用调用的请求、响应由不同 CPU 处理时，可能
-会出现请求、响应乱序的情况，开启 Syscall 数据乱序重排特性后，每个 TCP/UDP 流会缓存一定数量的 eBPF socket
-事件，以修正乱序数据对应用调用解析的影响。该参数设置了每个 TCP/UDP 流可以缓存的 eBPF socket 事件数量上限（每
-条事件数据占用的字节数上限受`l7_log_packet_size`控制）。在 Syscall 数据乱序较严重导致应用调用采集不全的环境
-中，可适当调大该参数。
-
-#### 乱序重排（OOOR）协议列表 {#inputs.ebpf.preprocess.out_of_order_reassembly_protocols}
-
-**标签**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.ebpf.preprocess.out_of_order_reassembly_protocols`
-
-Upgrade from old version: `static_config.ebpf.syscall-out-of-order-reassembly`
-
-**默认值**:
-```yaml
-inputs:
-  ebpf:
-    preprocess:
-      out_of_order_reassembly_protocols: []
-```
-
-**枚举可选值**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**详细描述**:
-
-配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
-需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
-
-#### 分段重组（SR）协议列表 {#inputs.ebpf.preprocess.segmentation_reassembly_protocols}
-
-**标签**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.ebpf.preprocess.segmentation_reassembly_protocols`
-
-Upgrade from old version: `static_config.ebpf.syscall-segmentation-reassembly`
-
-**默认值**:
-```yaml
-inputs:
-  ebpf:
-    preprocess:
-      segmentation_reassembly_protocols: []
-```
-
-**枚举可选值**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**详细描述**:
-
-配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
-协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`syscall-out-of-order-reassembly`
-开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
 
 ## 资源 {#inputs.resources}
 
@@ -4439,7 +4506,9 @@ inputs:
 
 deepflow-agent 外部数据接收服务的监听端口。
 
-### 数据压缩 {#inputs.integration.data_compression}
+### 压缩 {#inputs.integration.compression}
+
+#### Trace {#inputs.integration.compression.trace}
 
 **标签**:
 
@@ -4447,7 +4516,7 @@ deepflow-agent 外部数据接收服务的监听端口。
 
 **FQCN**:
 
-`inputs.integration.data_compression`
+`inputs.integration.compression.trace`
 
 Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
 
@@ -4455,7 +4524,8 @@ Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
 ```yaml
 inputs:
   integration:
-    data_compression: false
+    compression:
+      trace: true
 ```
 
 **模式**:
@@ -4465,8 +4535,38 @@ inputs:
 
 **详细描述**:
 
-开启后，deepflow-agent 将对集成数据进行压缩处理（目前仅支持对 OpenTelemetry 数据压缩），压缩
-比例在 5:1~10:1 之间。注意：开启此特性将增加 deepflow-agent 的 CPU 消耗。
+开启后，deepflow-agent 将对集成的追踪数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
+开启此特性将增加 deepflow-agent 的 CPU 消耗。
+
+#### Profile {#inputs.integration.compression.profile}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.integration.compression.profile`
+
+Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
+
+**默认值**:
+```yaml
+inputs:
+  integration:
+    compression:
+      profile: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后，deepflow-agent 将对集成的剖析数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
+开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
 ### Prometheus 额外 Label {#inputs.integration.prometheus_extra_labels}
 
@@ -6222,6 +6322,33 @@ processors:
 **详细描述**:
 
 TODO
+
+#### 应用指标时间一致性开关 {#processors.request_log.tunning.consistent_timestamp_in_l7_metrics}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tunning.consistent_timestamp_in_l7_metrics`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tunning:
+      consistent_timestamp_in_l7_metrics: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当开关打开时对于同一个会话的请求和响应, 它们对应的指标数据会全部统计在请求所在的时间戳里
 
 ## 流日志 {#processors.flow_log}
 
