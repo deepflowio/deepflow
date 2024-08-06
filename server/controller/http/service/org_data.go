@@ -17,11 +17,17 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"sync"
+	"time"
 
 	"github.com/bitly/go-simplejson"
+
 	servercommon "github.com/deepflowio/deepflow/server/common"
 	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -29,7 +35,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
+	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"gorm.io/gorm"
 )
@@ -78,7 +87,22 @@ func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 	if err = migrator.DropDatabase(cfg); err != nil {
 		return err
 	}
-	return servercommon.DropOrg(uint16(orgID))
+	return nil
+}
+
+func DeleteORGDataNonRealTime(orgIDs []int) error {
+	log.Infof("delete orgs (ids: %v) clickhouse data", orgIDs)
+	var msg string
+	for _, id := range orgIDs {
+		if err := servercommon.DropOrg(uint16(id)); err != nil {
+			log.Errorf("failed to drop org %d ck: %s", id, err.Error())
+			msg += fmt.Sprintf("%s. ", err.Error())
+		}
+	}
+	if msg == "" {
+		return nil
+	}
+	return fmt.Errorf(msg)
 }
 
 func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
@@ -125,4 +149,135 @@ func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 	}
 	response := orgResponse.Get("DATA")
 	return response, err
+}
+
+func AllocORGID() (map[string]int, error) {
+	ids, err := idmng.GetIDs(controllerCommon.DEFAULT_ORG_ID, controllerCommon.RESOURCE_TYPE_ORG_EN, 1)
+	if err != nil {
+		log.Errorf("%s request ids failed", controllerCommon.RESOURCE_TYPE_ORG_EN)
+		return nil, err
+	}
+	if len(ids) != 1 {
+		log.Errorf("request ids=%v err", ids)
+		return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("request ids=%v err", ids))
+	}
+	return map[string]int{"ID": ids[0]}, nil
+}
+
+var (
+	deletedORGCheckerOnce sync.Once
+	deleteORGChecker      *DeletedORGChecker
+)
+
+type DeletedORGChecker struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	fpermitCfg controllerCommon.FPermit
+}
+
+func GetDeletedORGChecker(ctx context.Context, fpermitCfg controllerCommon.FPermit) *DeletedORGChecker {
+	deletedORGCheckerOnce.Do(func() {
+		cCtx, cCancel := context.WithCancel(ctx)
+		deleteORGChecker = &DeletedORGChecker{ctx: cCtx, cancel: cCancel, fpermitCfg: fpermitCfg}
+	})
+	return deleteORGChecker
+}
+
+func (c *DeletedORGChecker) Start(sCtx context.Context) {
+	log.Info("deleted org check started")
+	c.checkRegularly(sCtx)
+}
+
+func (c *DeletedORGChecker) Stop() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+	log.Info("deleted org check stopped")
+}
+
+func (c *DeletedORGChecker) checkRegularly(sCtx context.Context) {
+	go func() {
+		ticker := time.NewTicker(time.Duration(1) * time.Minute)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.check()
+			case <-sCtx.Done():
+				break LOOP
+			case <-c.ctx.Done():
+				break LOOP
+			}
+		}
+	}()
+}
+
+func (c *DeletedORGChecker) check() {
+	log.Infof("check deleted orgs start")
+	defer log.Infof("check deleted orgs end")
+
+	deletedORGIDs, err := mysql.GetDeletedORGIDs()
+	if err != nil {
+		log.Errorf("failed to get deleted orgs: %s", err.Error())
+		return
+	}
+	log.Infof("handle deleted orgs: %v", deletedORGIDs)
+	if len(deletedORGIDs) == 0 {
+		return
+	}
+	if err := c.triggerAllServersToDelete(deletedORGIDs); err != nil {
+		log.Errorf("failed to trigger all servers to delete orgs: %s", err.Error())
+		return
+	}
+	if err := c.triggerFpermit(deletedORGIDs); err != nil {
+		log.Errorf("failed to trigger fpermit to delete orgs: %s", err.Error())
+	}
+	return
+}
+
+func (c *DeletedORGChecker) triggerFpermit(ids []int) error {
+	body := map[string]interface{}{
+		"org_ids": ids,
+	}
+	_, err := controllerCommon.CURLPerform(
+		http.MethodDelete,
+		fmt.Sprintf("http://%s/v1/org", net.JoinHostPort(c.fpermitCfg.Host, fmt.Sprintf("%d", c.fpermitCfg.Port))),
+		body,
+	)
+	return err
+}
+
+func (c *DeletedORGChecker) triggerAllServersToDelete(ids []int) error {
+	query := ""
+	for i, id := range ids {
+		if i == 0 {
+			query += fmt.Sprintf("org_id=%d", id)
+		} else {
+			query += fmt.Sprintf("&org_id=%d", id)
+		}
+	}
+	var controllers []*mysql.Controller
+	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
+		log.Errorf("failed to get controllers: %s", err.Error())
+		return err
+	}
+	var res error
+	for _, controller := range controllers {
+		port := controllerCommon.GConfig.HTTPPort
+		if controller.NodeType == controllerCommon.CONTROLLER_NODE_TYPE_SLAVE {
+			port = controllerCommon.GConfig.HTTPNodePort
+		}
+		_, err := controllerCommon.CURLPerform(
+			"DELETE",
+			fmt.Sprintf("http://%s/v1/org/?%s", net.JoinHostPort(controller.IP, fmt.Sprintf("%d", port)), query),
+			nil,
+		)
+		if err != nil {
+			log.Errorf("failed to call controller %s: %s", controller.IP, err.Error())
+			res = err
+		}
+	}
+	return res
 }
