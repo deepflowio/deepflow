@@ -3,6 +3,7 @@ syntax = "proto2";
 package common;
 option go_package = "github.com/deepflowio/deepflow/message/common";
 
+// TODO: To be deleted in the future
 enum TridentType {
     TT_UNKNOWN = 0;
     TT_PROCESS = 1;                        // Agent in KVM
