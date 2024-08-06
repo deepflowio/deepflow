@@ -67,6 +67,7 @@ type KubernetesGather struct {
 	serviceLcuuidToIngressLcuuid map[string]string
 	k8sInfo                      map[string][]string
 	pgLcuuidToPSLcuuids          map[string][]string
+	podLcuuidToPGInfo            map[string][2]string
 	nsLabelToGroupLcuuids        map[string]mapset.Set
 	pgLcuuidTopodTargetPorts     map[string]map[string]int
 	namespaceToExLabels          map[string]map[string]interface{}
@@ -205,6 +206,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysql.Domain, subDomain *mysql.Su
 		serviceLcuuidToIngressLcuuid: map[string]string{},
 		k8sInfo:                      map[string][]string{},
 		pgLcuuidToPSLcuuids:          map[string][]string{},
+		podLcuuidToPGInfo:            map[string][2]string{},
 		nsLabelToGroupLcuuids:        map[string]mapset.Set{},
 		pgLcuuidTopodTargetPorts:     map[string]map[string]int{},
 		namespaceToExLabels:          map[string]map[string]interface{}{},
@@ -260,6 +262,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.serviceLcuuidToIngressLcuuid = map[string]string{}
 	k.nsLabelToGroupLcuuids = map[string]mapset.Set{}
 	k.pgLcuuidToPSLcuuids = map[string][]string{}
+	k.podLcuuidToPGInfo = map[string][2]string{}
 	k.pgLcuuidTopodTargetPorts = map[string]map[string]int{}
 	k.namespaceToExLabels = map[string]map[string]interface{}{}
 	k.nsServiceNameToService = map[string]map[string]map[string]int{}

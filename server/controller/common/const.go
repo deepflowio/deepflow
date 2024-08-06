@@ -658,6 +658,7 @@ const (
 const (
 	PLUGIN_TYPE_WASM = 1
 	PLUGIN_TYPE_SO   = 2
+	PLUGIN_TYPE_LUA  = 3
 )
 
 var (
