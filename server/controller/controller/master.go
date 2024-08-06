@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/http"
+	"github.com/deepflowio/deepflow/server/controller/http/service"
 	resoureservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
@@ -102,6 +103,7 @@ func checkAndStartMasterFunctions(
 	tagRecorder := tagrecorder.GetSingleton()
 	tagrecordercheck.GetSingleton().Init(ctx, *cfg)
 	tr := tagrecordercheck.GetSingleton()
+	deletedORGChecker := service.GetDeletedORGChecker(ctx)
 
 	httpService := http.GetSingleton()
 
@@ -165,6 +167,7 @@ func checkAndStartMasterFunctions(
 
 				if cfg.DFWebService.Enabled {
 					httpService.TaskManager.Start(sCtx, cfg.FPermit, cfg.RedisCfg)
+					deletedORGChecker.Start(sCtx)
 				}
 			} else if thisIsMasterController {
 				thisIsMasterController = false
@@ -179,6 +182,7 @@ func checkAndStartMasterFunctions(
 				// stop prometheus related
 				// stop http task mananger
 				// stop resource cleaner
+				// stop delete org checker
 				if sCancel != nil {
 					sCancel()
 				}
