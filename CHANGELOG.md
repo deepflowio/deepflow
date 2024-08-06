@@ -8,6 +8,15 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: ntp support profile data [#7704](https://github.com/deepflowio/deepflow/pull/7704) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent fixes empty endpoint when setting http-endpoint-extraction.match-rules.prefix: "" [#7698](https://github.com/deepflowio/deepflow/pull/7698) by [TomatoMr](https://github.com/TomatoMr)
+* fix: modify log format [#7690](https://github.com/deepflowio/deepflow/pull/7690) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: Memory leak in stack frame building [#7689](https://github.com/deepflowio/deepflow/pull/7689) by [rvql](https://github.com/rvql)
+* fix: org log record [#7688](https://github.com/deepflowio/deepflow/pull/7688) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: agent remote exec panic [#7685](https://github.com/deepflowio/deepflow/pull/7685) by [roryye](https://github.com/roryye)
+* fix: limit number of agent sync [#7682](https://github.com/deepflowio/deepflow/pull/7682) by [askyrie](https://github.com/askyrie)
+* fix: Modify show tags API error #26063 [#7681](https://github.com/deepflowio/deepflow/pull/7681) by [Ericsssss](https://github.com/Ericsssss)
+* fix: Translate metrics by table [#7677](https://github.com/deepflowio/deepflow/pull/7677) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: org log record [#7674](https://github.com/deepflowio/deepflow/pull/7674) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: in flow tag, field value type of int value should be `int` [#7671](https://github.com/deepflowio/deepflow/pull/7671) by [lzf575](https://github.com/lzf575)
 * fix: restart agent after enabling ntp [#7661](https://github.com/deepflowio/deepflow/pull/7661) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -104,6 +113,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: call lua plugin [#7634](https://github.com/deepflowio/deepflow/pull/7634) by [duandaa](https://github.com/duandaa)
 * feat: agent - eBPF Improve aggregation efficiency of stack-trace string [#7655](https://github.com/deepflowio/deepflow/pull/7655) by [yinjiping](https://github.com/yinjiping)
 * feat: Table alert_event add tags and modify metric_value function error #26054 [#7652](https://github.com/deepflowio/deepflow/pull/7652) by [Ericsssss](https://github.com/Ericsssss)
 * feat: agent add syscall_trace_id_disabled [#7547](https://github.com/deepflowio/deepflow/pull/7547) by [TomatoMr](https://github.com/TomatoMr)
@@ -231,6 +241,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: define field value type using enum [#7686](https://github.com/deepflowio/deepflow/pull/7686) by [lzf575](https://github.com/lzf575)
 * refactor: polish agent config [#7342](https://github.com/deepflowio/deepflow/pull/7342) by [sharang](https://github.com/sharang)
 * refactor: update monitor, server log with org info [#7597](https://github.com/deepflowio/deepflow/pull/7597) by [roryye](https://github.com/roryye)
 * refactor: agent remove prometheus api sync [#7576](https://github.com/deepflowio/deepflow/pull/7576) by [TomatoMr](https://github.com/TomatoMr)
@@ -254,6 +265,7 @@
 * perf: improve parsing RequestResource from http.url of OTel data [#7172](https://github.com/deepflowio/deepflow/pull/7172) by [lzf575](https://github.com/lzf575)
 
 #### Documentation
+* docs: polish compression config [#7701](https://github.com/deepflowio/deepflow/pull/7701) by [sharang](https://github.com/sharang)
 * docs: agent correct the description of inputs.ebpf.socket.tunning [#7664](https://github.com/deepflowio/deepflow/pull/7664) by [TomatoMr](https://github.com/TomatoMr)
 * docs: rename opentemetry to opentelemetry [#7245](https://github.com/deepflowio/deepflow/pull/7245) by [lzf575](https://github.com/lzf575)
 
@@ -262,4 +274,5 @@
 
 
 #### OTHER
+* refector: add agent.proto [#7695](https://github.com/deepflowio/deepflow/pull/7695) by [yuanchaoa](https://github.com/yuanchaoa)
 * Update changelog [#7660](https://github.com/deepflowio/deepflow/pull/7660) by [lzf575](https://github.com/lzf575)
