@@ -498,6 +498,14 @@ impl EbpfCollector {
             let data = &mut *data;
             profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
             profile.timestamp = data.timestamp;
+            if let Some(time_diff) = TIME_DIFF.as_ref() {
+                let diff = time_diff.load(Ordering::Relaxed);
+                if diff > 0 {
+                    profile.timestamp += diff as u64;
+                } else {
+                    profile.timestamp -= (-diff) as u64;
+                }
+            }
             profile.event_type = Self::get_event_type(data.profiler_type, data.event_type);
             profile.stime = data.stime;
             profile.pid = data.pid;
