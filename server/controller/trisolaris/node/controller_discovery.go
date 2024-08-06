@@ -21,6 +21,7 @@ import (
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -34,7 +35,7 @@ type ControllerDiscovery struct {
 }
 
 func newControllerDiscovery(masterIP string, nodeType string, regionDomainPrefix string, orgID ORGID) *ControllerDiscovery {
-	log.Infof("node info: ip=%s, nodeType=%s, regionDomainPrefix=%s, ORGID=%d", masterIP, nodeType, regionDomainPrefix, orgID)
+	log.Infof("node info: ip=%s, nodeType=%s, regionDomainPrefix=%s", masterIP, nodeType, regionDomainPrefix, logger.NewORGPrefix(int(orgID)))
 	nodeTypeInt := CONTROLLER_NODE_TYPE_MASTER
 	if nodeType == "slave" {
 		nodeTypeInt = CONTROLLER_NODE_TYPE_SLAVE
