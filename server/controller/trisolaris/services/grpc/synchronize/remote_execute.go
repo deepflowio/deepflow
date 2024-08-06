@@ -23,6 +23,7 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	api "github.com/deepflowio/deepflow/message/trident"
@@ -81,13 +82,15 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					initDone <- struct{}{}
 				}
 
-				service.AgentCommandLock()
 				manager = service.GetAgentCMDManagerWithoutLock(key)
 				if manager == nil {
 					log.Errorf("agent(key: %s) remote exec map not found", key)
-					service.AgentCommandUnlock()
 					continue
 				}
+
+				// simulate panic
+				time.Sleep(time.Minute)
+				service.AgentCommandLock()
 
 				// heartbeat
 				if resp.CommandResult == nil && resp.LinuxNamespaces == nil &&
