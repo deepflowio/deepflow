@@ -657,13 +657,9 @@ impl HttpEndpointTrie {
     pub fn find_matching_rule(&self, input: &str) -> usize {
         const DEFAULT_KEEP_SEGMENTS: usize = 2;
         let mut node = &self.root;
-        let mut keep_segments = if node.keep_segments.is_some() {
-            node.keep_segments.unwrap()
-        } else {
-            DEFAULT_KEEP_SEGMENTS
-        };
-        let has_rules = node.keep_segments.is_some() || !node.children.is_empty();
-        let mut matched = node.keep_segments.is_some() && node.children.is_empty(); // if it has a rule, and the prefix is "", any path is matched
+        let mut keep_segments = node.keep_segments.unwrap_or(DEFAULT_KEEP_SEGMENTS);
+        let has_rules = node.keep_segments.is_some() || !node.children.is_empty(); // if no rules are set, keep_segments defaults to DEFAULT_KEEP_SEGMENTS: 2
+        let mut matched = node.keep_segments.is_some(); // if it has a rule, and the prefix is "", any path is matched
         for c in input.chars() {
             if let Some(child) = node.children.get(&c) {
                 keep_segments = child.keep_segments.unwrap_or(keep_segments);
@@ -2909,13 +2905,20 @@ mod tests {
             prefix: "/d/e/f".to_string(),
             keep_segments: 3,
         };
+        let rule4 = MatchRule {
+            prefix: "".to_string(),
+            keep_segments: 5,
+        };
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 2); // no rlues, 2 is the default keep_segments
         trie.insert(&rule1);
         trie.insert(&rule2);
         trie.insert(&rule3);
         assert_eq!(trie.find_matching_rule("/a/b/c"), 1);
         assert_eq!(trie.find_matching_rule("/d/e/f"), 3);
         assert_eq!(trie.find_matching_rule("/a/b/c/d"), 3);
-        assert_eq!(trie.find_matching_rule("/x/y/z"), 0);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 0); // there is no matching rule
+        trie.insert(&rule4);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 5); // the keep_segments for any rule that matches "" is 5
     }
 
     #[test]
