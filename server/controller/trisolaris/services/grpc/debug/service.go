@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 )
 
-var log = logger.MustGetLogger("trisolaris/debug")
+var log = logger.MustGetLogger("trisolaris.debug")
 
 type service struct{}
 
