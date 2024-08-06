@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logger.MustGetLogger("trisolaris/cache")
+var log = logger.MustGetLogger("trisolaris.cache")
 
 func init() {
 	http.Register(NewCacheService())

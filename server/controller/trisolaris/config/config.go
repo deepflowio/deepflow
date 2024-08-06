@@ -24,7 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logger.MustGetLogger("trisolaris/config")
+var log = logger.MustGetLogger("trisolaris.config")
 
 type Chrony struct {
 	Host    string `default:"chrony" yaml:"host"`

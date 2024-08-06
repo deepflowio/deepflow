@@ -62,17 +62,17 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 	}
 	db, err := models.GetDB(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("get db(orgID=%d) vtapRepo(name=%s) failed, %s", orgID, upgradePackage, err)
+		return nil, fmt.Errorf("get db vtapRepo(name=%s) failed, %s", upgradePackage, err)
 	}
 
 	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](db.DB).GetFromName(upgradePackage)
 	if err != nil {
-		return nil, fmt.Errorf("get vtapRepo(name=%s, orgID=%d) failed, %s", upgradePackage, orgID, err)
+		return nil, fmt.Errorf("get vtapRepo(name=%s) failed, %s", upgradePackage, err)
 	}
 	dbRevision := vtapRrepo.RevCount + "-" + vtapRrepo.CommitID
 	if dbRevision != expectedRevision {
-		return nil, fmt.Errorf("get vtapRepo(name=%s, orgID=%d) failed, dbRevision(%s) != expectedRevision(%s)",
-			upgradePackage, orgID, dbRevision, expectedRevision)
+		return nil, fmt.Errorf("get vtapRepo(name=%s) failed, dbRevision(%s) != expectedRevision(%s)",
+			upgradePackage, dbRevision, expectedRevision)
 	}
 	content := vtapRrepo.Image
 	totalLen := uint64(len(content))
@@ -117,7 +117,7 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Errorf("vtap(%s) teamID:%s-%d, err:%s", vtapCacheKey, orgID, teamIDStr, teamIDInt, err, logger.NewORGPrefix(orgID))
+			log.Errorf("vtap(%s) teamID:%s-%d, err:%s", vtapCacheKey, teamIDStr, teamIDInt, err, logger.NewORGPrefix(orgID))
 		}
 	} else {
 		for start := uint64(0); start < upgradeData.totalLen; start += upgradeData.step {

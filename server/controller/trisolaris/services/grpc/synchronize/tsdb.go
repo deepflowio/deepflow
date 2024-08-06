@@ -31,7 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 )
 
-var log = logger.MustGetLogger("trisolaris/synchronize")
+var log = logger.MustGetLogger("trisolaris.synchronize")
 
 type TSDBEvent struct{}
 
@@ -88,7 +88,7 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 		log.Infof(
 			"ctrl_ip:%s, cpu_num:%d, memory_size:%d, arch:%s, os:%s, "+
 				"kernel_version:%s, pcap_data_mount_path:%s",
-			orgID, tsdbIP, in.GetCpuNum(), in.GetMemorySize(),
+			tsdbIP, in.GetCpuNum(), in.GetMemorySize(),
 			in.GetArch(), in.GetOs(),
 			in.GetKernelVersion(),
 			in.GetTsdbReportInfo(), logger.NewORGPrefix(orgID))
@@ -187,7 +187,7 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
 		log.Infof("push ctrl_ip is %s, (platform data version %d -> %d), "+
 			"(acl version %d -> %d), (groups version %d -> %d), NAME:%s",
-			orgID, tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
+			tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
 			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
 			processName, logger.NewORGPrefix(orgID))
