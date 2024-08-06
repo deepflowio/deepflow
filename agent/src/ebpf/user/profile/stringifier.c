@@ -458,6 +458,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		if (str) {
 			// ignore frames in library for memory profiling
 			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix) && strncmp(str, lib_sym_prefix, strlen(lib_sym_prefix)) == 0) {
+				clib_mem_free(str);
 				continue;
 			}
 			symbol_array[i] = pointer_to_uword(str);
