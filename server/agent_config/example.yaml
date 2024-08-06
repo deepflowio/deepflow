@@ -125,7 +125,7 @@ process_threshold: 10
 #   Cilium:      lxc.*
 #   Kube-OVN:    [0-9a-f]+_h$
 # Note: Regular expression of NIC name for collecting traffic
-#   When the `tap_interface_regex` is not configured, it indicates 
+#   When the `tap_interface_regex` is not configured, it indicates
 #   that network card traffic is not being collected.
 tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
 

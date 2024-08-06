@@ -2183,6 +2183,22 @@ inputs:
       #   ch: 调优
       # description:
       tunning:
+        # type: int
+        # name:
+        #   en: Max Capture Rate
+        #   ch: 最大采集速率
+        # unit: Per Second
+        # range: [0, 64000000]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Default value `0` means no limitation.
+        #   ch: |-
+        #     eBPF 数据的最大采集速率，设置为 `0` 表示不对 deepflow-agent 的 eBPF 数据采集速率做限制。
+        # upgrade_from: static_config.ebpf.global-ebpf-pps-threshold
+        max_capture_rate: 0
         # type: bool
         # name:
         #   en: Syscall_trace_id Disabled
@@ -2201,6 +2217,93 @@ inputs:
         #     当 trace_id 注入所有请求时，所有请求的 syscall_trace_id 计算逻辑可以关闭。这将大大减少
         #     eBPF hook 进程的 CPU 消耗。
         syscall_trace_id_disabled: false
+      # type: section
+      # name:
+      #   en: Preprocess
+      #   ch: 预处理
+      # description:
+      preprocess:
+        # type: int
+        # name:
+        #   en: OOOR Cache Size
+        #   ch: 乱序重排（OOOR）缓冲区大小
+        # unit:
+        # range: [8, 1024]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     OOOR: Out Of Order Reassembly
+        #
+        #     When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size`
+        #     eBPF socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached
+        #     in each TCP/UDP flow to prevent out-of-order events from impacting application protocol
+        #     parsing. Since eBPF socket events are sent to user space in batches, out-of-order scenarios
+        #     mainly occur when requests and responses within a single session are processed by different
+        #     CPUs, causing the response to reach user space before the request.
+        #   ch: |-
+        #     由于 eBPF socket 事件是以批处理的方式向用户态空间发送数据，同一个应用调用的请求、响应由不同 CPU 处理时，可能
+        #     会出现请求、响应乱序的情况，开启 Syscall 数据乱序重排特性后，每个 TCP/UDP 流会缓存一定数量的 eBPF socket
+        #     事件，以修正乱序数据对应用调用解析的影响。该参数设置了每个 TCP/UDP 流可以缓存的 eBPF socket 事件数量上限（每
+        #     条事件数据占用的字节数上限受`l7_log_packet_size`控制）。在 Syscall 数据乱序较严重导致应用调用采集不全的环境
+        #     中，可适当调大该参数。
+        # upgrade_from: static_config.ebpf.syscall-out-of-order-cache-size
+        out_of_order_reassembly_cache_size: 16
+        # type: string
+        # name:
+        #   en: OOOR Protocols
+        #   ch: 乱序重排（OOOR）协议列表
+        # unit:
+        # range: []
+        # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     OOOR: Out Of Order Reassembly
+        #
+        #     When this capability is enabled for a specific application protocol, the agent will add
+        #     out-of-order-reassembly processing for it. Note that the agent will consume more memory
+        #     in this case, so please adjust the syscall-out-of-order-cache-size accordingly and monitor
+        #     the agent's memory usage.
+        #
+        #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+        #
+        #     Attention: use `HTTP2` for `gRPC` Protocol.
+        #   ch: |-
+        #     配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
+        #     需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+        # upgrade_from: static_config.ebpf.syscall-out-of-order-reassembly
+        out_of_order_reassembly_protocols: []
+        # type: string
+        # name:
+        #   en: SR Protocols
+        #   ch: 分段重组（SR）协议列表
+        # unit:
+        # range: []
+        # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     SR: Segmentation Reassembly
+        #
+        #     When this capability is enabled for a specific application protocol, the agent will add
+        #     segmentation-reassembly processing to merge application protocol content spread across
+        #     multiple syscalls before parsing it. This enhances the success rate of application
+        #     protocol parsing. Note that `syscall-out-of-order-reassembly` must also be enabled for
+        #     this feature to be effective.
+        #
+        #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+        #
+        #     Attention: use `HTTP2` for `gRPC` Protocol.
+        #   ch: |-
+        #     配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
+        #     协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`syscall-out-of-order-reassembly`
+        #     开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+        # upgrade_from: static_config.ebpf.syscall-segmentation-reassembly
+        segmentation_reassembly_protocols: []
     # type: section
     # name:
     #   en: File
@@ -2410,29 +2513,40 @@ inputs:
         #     eBPF memory profile 数据的采集开关。
         # upgrade_from: static_config.ebpf.memory-profile.disabled
         disabled: true
+      # type: section
+      # name:
+      #   en: Preprocess
+      #   ch: 预处理
+      # description:
+      preprocess:
+        # type: bool
+        # name:
+        #   en: Stack Compression
+        #   ch: 函数栈压缩
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Compress the call stack before sending data. Compression can effectively reduce the agent's
+        #     memory usage, data transmission bandwidth consumption, and ingester's CPU overhead. However,
+        #     it also increases the CPU usage of the agent. Tests have shown that compressing the on-cpu
+        #     function call stack of the deepflow-agent can reduce bandwidth consumption by `x` times, but
+        #     it will result in an additional `y%` CPU usage for the agent.
+        #   ch: |-
+        #     发送数据之前压缩函数调用栈。压缩能够有效降低 agent 的内存开销、数据传输的带宽消耗、以及
+        #     ingester 的 CPU 开销，但是 Agent 也会因此消耗更多的 CPU。测试表明，将deepflow-agent 自身的
+        #     on-cpu 函数调用栈压缩，可以将带宽消耗降低 `x` 倍，但会使得 agent 额外消耗 `y%` 的 CPU。
+        # TODO: 6.6 新增能力
+        stack_compression: true
     # type: section
     # name:
     #   en: Tunning
     #   ch: 调优
     # description:
     tunning:
-      # type: int
-      # name:
-      #   en: Max Capture Rate
-      #   ch: 最大采集速率
-      # unit: Per Second
-      # range: [0, 64000000]
-      # enum_options: []
-      # modification: hot_update
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     Default value `0` means no limitation.
-      #   ch: |-
-      #     eBPF 数据的最大采集速率，设置为 `0` 表示不对 deepflow-agent 的 eBPF 数据采集速率做限制。
-      # upgrade_from: static_config.ebpf.global-ebpf-pps-threshold
-      # TODO: 包括哪些 ebpf 数据？socket 相关的（仅 requset_log）
-      max_capture_rate: 0
       # type: int
       # name:
       #   en: Collector Queue Size
@@ -2568,93 +2682,6 @@ inputs:
       # upgrade_from: static_config.ebpf.max-trace-entries
       # TODO: 待明确英文释义。
       max_trace_entries: 131072
-    # type: section
-    # name:
-    #   en: Preprocess
-    #   ch: 预处理
-    # description:
-    preprocess:
-      # type: int
-      # name:
-      #   en: OOOR Cache Size
-      #   ch: 乱序重排（OOOR）缓冲区大小
-      # unit:
-      # range: [8, 1024]
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: true
-      # description:
-      #   en: |-
-      #     OOOR: Out Of Order Reassembly
-      #
-      #     When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size`
-      #     eBPF socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached
-      #     in each TCP/UDP flow to prevent out-of-order events from impacting application protocol
-      #     parsing. Since eBPF socket events are sent to user space in batches, out-of-order scenarios
-      #     mainly occur when requests and responses within a single session are processed by different
-      #     CPUs, causing the response to reach user space before the request.
-      #   ch: |-
-      #     由于 eBPF socket 事件是以批处理的方式向用户态空间发送数据，同一个应用调用的请求、响应由不同 CPU 处理时，可能
-      #     会出现请求、响应乱序的情况，开启 Syscall 数据乱序重排特性后，每个 TCP/UDP 流会缓存一定数量的 eBPF socket
-      #     事件，以修正乱序数据对应用调用解析的影响。该参数设置了每个 TCP/UDP 流可以缓存的 eBPF socket 事件数量上限（每
-      #     条事件数据占用的字节数上限受`l7_log_packet_size`控制）。在 Syscall 数据乱序较严重导致应用调用采集不全的环境
-      #     中，可适当调大该参数。
-      # upgrade_from: static_config.ebpf.syscall-out-of-order-cache-size
-      out_of_order_reassembly_cache_size: 16
-      # type: string
-      # name:
-      #   en: OOOR Protocols
-      #   ch: 乱序重排（OOOR）协议列表
-      # unit:
-      # range: []
-      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
-      # modification: agent_restart
-      # ee_feature: true
-      # description:
-      #   en: |-
-      #     OOOR: Out Of Order Reassembly
-      #
-      #     When this capability is enabled for a specific application protocol, the agent will add
-      #     out-of-order-reassembly processing for it. Note that the agent will consume more memory
-      #     in this case, so please adjust the syscall-out-of-order-cache-size accordingly and monitor
-      #     the agent's memory usage.
-      #
-      #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
-      #
-      #     Attention: use `HTTP2` for `gRPC` Protocol.
-      #   ch: |-
-      #     配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
-      #     需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
-      # upgrade_from: static_config.ebpf.syscall-out-of-order-reassembly
-      out_of_order_reassembly_protocols: []
-      # type: string
-      # name:
-      #   en: SR Protocols
-      #   ch: 分段重组（SR）协议列表
-      # unit:
-      # range: []
-      # enum_options: [_DYNAMIC_OPTIONS_: _DYNAMIC_OPTIONS_]
-      # modification: agent_restart
-      # ee_feature: true
-      # description:
-      #   en: |-
-      #     SR: Segmentation Reassembly
-      #
-      #     When this capability is enabled for a specific application protocol, the agent will add
-      #     segmentation-reassembly processing to merge application protocol content spread across
-      #     multiple syscalls before parsing it. This enhances the success rate of application
-      #     protocol parsing. Note that `syscall-out-of-order-reassembly` must also be enabled for
-      #     this feature to be effective.
-      #
-      #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
-      #
-      #     Attention: use `HTTP2` for `gRPC` Protocol.
-      #   ch: |-
-      #     配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
-      #     协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`syscall-out-of-order-reassembly`
-      #     开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
-      # upgrade_from: static_config.ebpf.syscall-segmentation-reassembly
-      segmentation_reassembly_protocols: []
   # type: section
   # name:
   #   en: Resources
@@ -3112,25 +3139,50 @@ inputs:
     #     deepflow-agent 外部数据接收服务的监听端口。
     # upgrade_from: external_agent_http_proxy_port
     listen_port: 38086
-    # type: bool
+    # type: section
     # name:
-    #   en: Data Compression
-    #   ch: 数据压缩
-    # unit:
-    # range: []
-    # enum_options: []
-    # modification: agent_restart
-    # ee_feature: false
+    #   en: Compression
+    #   ch: 压缩
     # description:
-    #   en: |-
-    #     Whether to compress the integrated data received by deepflow-agent. Currently,
-    #     only opentelemetry data is supported, and the compression ratio is about 5:1~10:1.
-    #     Turning on this feature will result in higher CPU consumption of deepflow-agent.
-    #   ch: |-
-    #     开启后，deepflow-agent 将对集成数据进行压缩处理（目前仅支持对 OpenTelemetry 数据压缩），压缩
-    #     比例在 5:1~10:1 之间。注意：开启此特性将增加 deepflow-agent 的 CPU 消耗。
-    # upgrade_from: static_config.external-agent-http-proxy-compressed
-    data_compression: false
+    compression:
+      # type: bool
+      # name:
+      #   en: Trace
+      #   ch: Trace
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Whether to compress the integrated trace data received by deepflow-agent. The compression
+      #     ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
+      #     of deepflow-agent.
+      #   ch: |-
+      #     开启后，deepflow-agent 将对集成的追踪数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
+      #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
+      # upgrade_from: static_config.external-agent-http-proxy-compressed
+      trace: true
+      # type: bool
+      # name:
+      #   en: Profile
+      #   ch: Profile
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Whether to compress the integrated profile data received by deepflow-agent. The compression
+      #     ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
+      #     of deepflow-agent.
+      #   ch: |-
+      #     开启后，deepflow-agent 将对集成的剖析数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
+      #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
+      # upgrade_from: static_config.external-agent-http-proxy-compressed
+      profile: true
     # type: section
     # name:
     #   en: Prometheus Extra Labels

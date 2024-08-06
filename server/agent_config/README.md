@@ -2025,6 +2025,8 @@ Calico:        cali.*
 Cilium         lxc.*
 Kube-OVN       [0-9a-f]+_h$
 ```
+When the `tap_interface_regex` is not configured, it indicates 
+that network card traffic is not being collected
 
 #### Bond Interfaces {#inputs.cbpf.af_packet.bond_interfaces}
 
@@ -3176,6 +3178,202 @@ TCP&UDP Port Whitelist, Priority lower than kprobe-blacklist.
 
 Example: `ports: 80,1000-2000`
 
+#### Tunning {#inputs.ebpf.socket.tunning}
+
+##### Max Capture Rate {#inputs.ebpf.socket.tunning.max_capture_rate}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.max_capture_rate`
+
+Upgrade from old version: `static_config.ebpf.global-ebpf-pps-threshold`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        max_capture_rate: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Per Second |
+| Range | [0, 64000000] |
+
+**Description**:
+
+Default value `0` means no limitation.
+
+##### Syscall_trace_id Disabled {#inputs.ebpf.socket.tunning.syscall_trace_id_disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.syscall_trace_id_disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        syscall_trace_id_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When the trace_id is injected into all requests, the computation logic for all
+syscall_trace_id can be turned off. This will significantly reduce the impact of the
+eBPF hook on the CPU consumption of the application process.
+
+#### Preprocess {#inputs.ebpf.socket.preprocess}
+
+##### OOOR Cache Size {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size`
+
+Upgrade from old version: `static_config.ebpf.syscall-out-of-order-cache-size`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        out_of_order_reassembly_cache_size: 16
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [8, 1024] |
+
+**Description**:
+
+OOOR: Out Of Order Reassembly
+
+When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size`
+eBPF socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached
+in each TCP/UDP flow to prevent out-of-order events from impacting application protocol
+parsing. Since eBPF socket events are sent to user space in batches, out-of-order scenarios
+mainly occur when requests and responses within a single session are processed by different
+CPUs, causing the response to reach user space before the request.
+
+##### OOOR Protocols {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_protocols}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.out_of_order_reassembly_protocols`
+
+Upgrade from old version: `static_config.ebpf.syscall-out-of-order-reassembly`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        out_of_order_reassembly_protocols: []
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+OOOR: Out Of Order Reassembly
+
+When this capability is enabled for a specific application protocol, the agent will add
+out-of-order-reassembly processing for it. Note that the agent will consume more memory
+in this case, so please adjust the syscall-out-of-order-cache-size accordingly and monitor
+the agent's memory usage.
+
+Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+
+Attention: use `HTTP2` for `gRPC` Protocol.
+
+##### SR Protocols {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols`
+
+Upgrade from old version: `static_config.ebpf.syscall-segmentation-reassembly`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        segmentation_reassembly_protocols: []
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+SR: Segmentation Reassembly
+
+When this capability is enabled for a specific application protocol, the agent will add
+segmentation-reassembly processing to merge application protocol content spread across
+multiple syscalls before parsing it. This enhances the success rate of application
+protocol parsing. Note that `syscall-out-of-order-reassembly` must also be enabled for
+this feature to be effective.
+
+Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
+
+Attention: use `HTTP2` for `gRPC` Protocol.
+
 ### File {#inputs.ebpf.file}
 
 #### IO Event {#inputs.ebpf.file.io_event}
@@ -3493,38 +3691,41 @@ inputs:
 
 eBPF memory profile switch.
 
-### Tunning {#inputs.ebpf.tunning}
+#### Preprocess {#inputs.ebpf.profile.preprocess}
 
-#### Max Capture Rate {#inputs.ebpf.tunning.max_capture_rate}
+##### Stack Compression {#inputs.ebpf.profile.preprocess.stack_compression}
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
-`inputs.ebpf.tunning.max_capture_rate`
-
-Upgrade from old version: `static_config.ebpf.global-ebpf-pps-threshold`
+`inputs.ebpf.profile.preprocess.stack_compression`
 
 **Default value**:
 ```yaml
 inputs:
   ebpf:
-    tunning:
-      max_capture_rate: 0
+    profile:
+      preprocess:
+        stack_compression: true
 ```
 
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | int |
-| Unit | Per Second |
-| Range | [0, 64000000] |
+| Type | bool |
 
 **Description**:
 
-Default value `0` means no limitation.
+Compress the call stack before sending data. Compression can effectively reduce the agent's
+memory usage, data transmission bandwidth consumption, and ingester's CPU overhead. However,
+it also increases the CPU usage of the agent. Tests have shown that compressing the on-cpu
+function call stack of the deepflow-agent can reduce bandwidth consumption by `x` times, but
+it will result in an additional `y%` CPU usage for the agent.
+
+### Tunning {#inputs.ebpf.tunning}
 
 #### Collector Queue Size {#inputs.ebpf.tunning.collector_queue_size}
 
@@ -3746,135 +3947,6 @@ inputs:
 **Description**:
 
 Set the maximum value of hash table entries for thread/coroutine tracking sessions.
-
-### Preprocess {#inputs.ebpf.preprocess}
-
-#### OOOR Cache Size {#inputs.ebpf.preprocess.out_of_order_reassembly_cache_size}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.ebpf.preprocess.out_of_order_reassembly_cache_size`
-
-Upgrade from old version: `static_config.ebpf.syscall-out-of-order-cache-size`
-
-**Default value**:
-```yaml
-inputs:
-  ebpf:
-    preprocess:
-      out_of_order_reassembly_cache_size: 16
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Range | [8, 1024] |
-
-**Description**:
-
-OOOR: Out Of Order Reassembly
-
-When `syscall-out-of-order-reassembly` is enabled, up to `syscall-out-of-order-cache-size`
-eBPF socket events (each event consuming up to `l7_log_packet_size` bytes) will be cached
-in each TCP/UDP flow to prevent out-of-order events from impacting application protocol
-parsing. Since eBPF socket events are sent to user space in batches, out-of-order scenarios
-mainly occur when requests and responses within a single session are processed by different
-CPUs, causing the response to reach user space before the request.
-
-#### OOOR Protocols {#inputs.ebpf.preprocess.out_of_order_reassembly_protocols}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.ebpf.preprocess.out_of_order_reassembly_protocols`
-
-Upgrade from old version: `static_config.ebpf.syscall-out-of-order-reassembly`
-
-**Default value**:
-```yaml
-inputs:
-  ebpf:
-    preprocess:
-      out_of_order_reassembly_protocols: []
-```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-OOOR: Out Of Order Reassembly
-
-When this capability is enabled for a specific application protocol, the agent will add
-out-of-order-reassembly processing for it. Note that the agent will consume more memory
-in this case, so please adjust the syscall-out-of-order-cache-size accordingly and monitor
-the agent's memory usage.
-
-Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
-
-Attention: use `HTTP2` for `gRPC` Protocol.
-
-#### SR Protocols {#inputs.ebpf.preprocess.segmentation_reassembly_protocols}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.ebpf.preprocess.segmentation_reassembly_protocols`
-
-Upgrade from old version: `static_config.ebpf.syscall-segmentation-reassembly`
-
-**Default value**:
-```yaml
-inputs:
-  ebpf:
-    preprocess:
-      segmentation_reassembly_protocols: []
-```
-
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | _DYNAMIC_OPTIONS_ |
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-SR: Segmentation Reassembly
-
-When this capability is enabled for a specific application protocol, the agent will add
-segmentation-reassembly processing to merge application protocol content spread across
-multiple syscalls before parsing it. This enhances the success rate of application
-protocol parsing. Note that `syscall-out-of-order-reassembly` must also be enabled for
-this feature to be effective.
-
-Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
-
-Attention: use `HTTP2` for `gRPC` Protocol.
 
 ## Resources {#inputs.resources}
 
@@ -4585,7 +4657,9 @@ inputs:
 
 Listen port of the data integration socket.
 
-### Data Compression {#inputs.integration.data_compression}
+### Compression {#inputs.integration.compression}
+
+#### Trace {#inputs.integration.compression.trace}
 
 **Tags**:
 
@@ -4593,7 +4667,7 @@ Listen port of the data integration socket.
 
 **FQCN**:
 
-`inputs.integration.data_compression`
+`inputs.integration.compression.trace`
 
 Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
 
@@ -4601,7 +4675,8 @@ Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
 ```yaml
 inputs:
   integration:
-    data_compression: false
+    compression:
+      trace: true
 ```
 
 **Schema**:
@@ -4611,9 +4686,40 @@ inputs:
 
 **Description**:
 
-Whether to compress the integrated data received by deepflow-agent. Currently,
-only opentelemetry data is supported, and the compression ratio is about 5:1~10:1.
-Turning on this feature will result in higher CPU consumption of deepflow-agent.
+Whether to compress the integrated trace data received by deepflow-agent. The compression
+ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
+of deepflow-agent.
+
+#### Profile {#inputs.integration.compression.profile}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.integration.compression.profile`
+
+Upgrade from old version: `static_config.external-agent-http-proxy-compressed`
+
+**Default value**:
+```yaml
+inputs:
+  integration:
+    compression:
+      profile: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to compress the integrated profile data received by deepflow-agent. The compression
+ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
+of deepflow-agent.
 
 ### Prometheus Extra Labels {#inputs.integration.prometheus_extra_labels}
 
@@ -6466,6 +6572,37 @@ The following metrics can be used as reference data for adjusting this configura
 - Metric `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`
   Used to record the number of times eviction is triggered due to reaching the
   LRU capacity limit.
+
+#### Consistent Timestamp in L7 Metrics {#processors.request_log.tunning.consistent_timestamp_in_l7_metrics}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.tunning.consistent_timestamp_in_l7_metrics`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    tunning:
+      consistent_timestamp_in_l7_metrics: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When this configuration is enabled, for the same session, response-related metrics (such as response
+count, latency, exceptions) are recorded in the time slot corresponding to when the request occurred,
+rather than the time slot of the response itself. This means that when calculating metrics for
+requests and responses within a session, a consistent timestamp based on the time of the request
+occurrence is used.
 
 ## Flow Log {#processors.flow_log}
 
