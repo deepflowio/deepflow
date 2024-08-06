@@ -31,7 +31,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logger.MustGetLogger("trisolaris/metadata")
+var log = logger.MustGetLogger("trisolaris.metadata")
 
 type MetaData struct {
 	dbDataCache    *atomic.Value // *DBDataCache 数据库缓存

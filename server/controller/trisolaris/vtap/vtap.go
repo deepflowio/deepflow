@@ -47,7 +47,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
 
-var log = logger.MustGetLogger("trisolaris/vtap")
+var log = logger.MustGetLogger("trisolaris.vtap")
 
 type VTapInfo struct {
 	// key: ctrlIP+ctrlMac

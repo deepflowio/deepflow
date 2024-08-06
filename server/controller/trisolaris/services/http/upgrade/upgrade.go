@@ -30,7 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 )
 
-var log = logger.MustGetLogger("trisolaris/upgrade")
+var log = logger.MustGetLogger("trisolaris.upgrade")
 
 func init() {
 	http.Register(NewUpgradeService())

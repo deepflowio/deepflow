@@ -45,7 +45,7 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logger.MustGetLogger("trisolaris/node")
+var log = logger.MustGetLogger("trisolaris.node")
 
 type NodeInfo struct {
 	tsdbCaches                *TSDBCacheMap // 数据节点缓存
