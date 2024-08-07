@@ -49,7 +49,7 @@ type QuerierConfig struct {
 	ListenPort                      int                           `default:"20416" yaml:"listen-port"`
 	Clickhouse                      Clickhouse                    `yaml:clickhouse`
 	Profile                         profile.ProfileConfig         `yaml:profile`
-	Tracemap                        tracemap.TraceMapConfig       `yaml:tracemap`
+	Tracemap                        tracemap.TraceMapConfig       `yaml:trace-map`
 	DeepflowApp                     DeepflowApp                   `yaml:"deepflow-app"`
 	Prometheus                      prometheus.Prometheus         `yaml:"prometheus"`
 	ExternalAPM                     []tracing_adapter.ExternalAPM `yaml:"external-apm"`
