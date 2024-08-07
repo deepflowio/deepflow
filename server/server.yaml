@@ -353,8 +353,11 @@ querier:
   
   # trace-map 相关配置
   trace-map:
+    # 每次迭代查询上限
     max_trace_per_iteration: 100000
+    # 每次流返回的上限
     batch_traces_count_max: 1000
+    # 迭代的次数，会自动向上取整为2的次方数
     trace_id_query_iterations: 8
     write_interval: 60
     write_batch_size: 1000
