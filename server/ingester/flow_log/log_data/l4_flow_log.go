@@ -728,26 +728,39 @@ func (k *KnowledgeGraph) fill(
 	tapSide uint32,
 	protocol layers.IPProtocol) {
 
-	var info0, info1 *grpc.Info
+	var info0, info1, agentInfo *grpc.Info
 
 	// 对于VIP的流量，需要使用MAC来匹配
 	lookupByMac0, lookupByMac1 := isVipInterface0, isVipInterface1
+	lookupByAgent0, lookupByAgent1 := false, false
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(flow_metrics.Local) {
 		// for local non-unicast IPs, MAC matching is preferred.
 		if isLocalIP(isIPv6, ip40, ip60) {
-			lookupByMac0 = true
+			if mac0 != 0 {
+				lookupByMac0 = true
+			} else {
+				lookupByAgent0 = true
+			}
 		}
 		if isLocalIP(isIPv6, ip41, ip61) {
-			lookupByMac1 = true
+			if mac1 != 0 {
+				lookupByMac1 = true
+			} else {
+				lookupByAgent1 = true
+			}
 		}
 	} else if tapSide == uint32(flow_metrics.ClientProcess) || tapSide == uint32(flow_metrics.ServerProcess) {
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
 			lookupByMac0 = true
+		} else if isLocalIP(isIPv6, ip40, ip60) {
+			lookupByAgent0 = true
 		}
 		if mac1 != 0 {
 			lookupByMac1 = true
+		} else if isLocalIP(isIPv6, ip41, ip61) {
+			lookupByAgent1 = true
 		}
 	}
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
@@ -781,6 +794,12 @@ func (k *KnowledgeGraph) fill(
 		if lookupByMac0 {
 			k.TagSource0 |= uint8(flow_metrics.Mac)
 			info0 = platformData.QueryMacInfo(k.OrgId, l3EpcMac0)
+		} else if lookupByAgent0 {
+			k.TagSource0 |= uint8(flow_metrics.Agent)
+			if info := platformData.QueryVtapInfo(k.OrgId, vtapId); info != nil {
+				agentInfo = common.RegetInfoFromIP(k.OrgId, !info.IsIPv4, info.IP6, info.IP4, info.EpcId, platformData)
+				info0 = agentInfo
+			}
 		}
 		if info0 == nil {
 			k.TagSource0 |= uint8(flow_metrics.EpcIP)
@@ -792,6 +811,15 @@ func (k *KnowledgeGraph) fill(
 		if lookupByMac1 {
 			k.TagSource1 |= uint8(flow_metrics.Mac)
 			info1 = platformData.QueryMacInfo(k.OrgId, l3EpcMac1)
+		} else if lookupByAgent1 {
+			k.TagSource1 |= uint8(flow_metrics.Agent)
+			if lookupByAgent0 && agentInfo != nil {
+				info1 = agentInfo
+			} else {
+				if info := platformData.QueryVtapInfo(k.OrgId, vtapId); info != nil {
+					info1 = common.RegetInfoFromIP(k.OrgId, !info.IsIPv4, info.IP6, info.IP4, info.EpcId, platformData)
+				}
+			}
 		}
 		if info1 == nil {
 			k.TagSource1 |= uint8(flow_metrics.EpcIP)

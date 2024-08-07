@@ -364,7 +364,6 @@ impl EbpfDispatcher {
                 counter.rx.fetch_add(1, Ordering::Relaxed);
 
                 packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
-                packet.set_loopback_mac(ebpf_config.ctrl_mac);
                 Self::inject_meta_packet(packet, &mut flow_map, &config, &mut reorder);
             }
         }

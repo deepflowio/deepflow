@@ -243,8 +243,6 @@ impl LocalModeDispatcher {
                 if meta_packet.lookup_key.src_mac == MacAddr::ZERO
                     && meta_packet.lookup_key.dst_mac == MacAddr::ZERO
                 {
-                    meta_packet.lookup_key.src_mac = base.ctrl_mac;
-                    meta_packet.lookup_key.dst_mac = base.ctrl_mac;
                     meta_packet.lookup_key.l2_end_0 = true;
                     meta_packet.lookup_key.l2_end_1 = true;
                 }
