@@ -18,7 +18,7 @@
 #define DF_JAVA_CONFIG_H
 
 // Maximum length of Java symbol information string
-#define STRING_BUFFER_SIZE 2000
+#define STRING_BUFFER_SIZE 2048
 /*
  * In Unix domain sockets, the maximum length of the path is defined by
  * the macro UNIX_PATH_MAX. For most systems (e.g., Linux), this maximum
