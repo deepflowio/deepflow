@@ -37,6 +37,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		"InPlaceSet":            false,
 		"ReplicaSet":            false,
 		"StatefulSet":           false,
+		"OpenGaussCluster":      false,
 		"ReplicationController": false,
 	}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
@@ -104,9 +105,8 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			}
 			podGroupLcuuid = pgLcuuid
 		}
-		if kind == "StatefulSet" {
-			generate_name := metaData.Get("generate_name").MustString()
-			serialNumber := strings.TrimLeft(name, generate_name)
+		if generateName, ok := metaData.CheckGet("generateName"); ok {
+			serialNumber := strings.TrimLeft(name, generateName.MustString())
 			podLcuuid = common.GetUUIDByOrgID(k.orgID, pgLcuuid+serialNumber)
 		} else {
 			podLcuuid = common.IDGenerateUUID(k.orgID, uID)
