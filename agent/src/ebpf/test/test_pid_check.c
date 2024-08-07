@@ -31,25 +31,24 @@
 #include "../user/load.h"
 
 #define TEST_NAME "test_pid_check"
-static int check_test_running_pid(void)
+static int check_test_is_running(void)
 {
-        int pid = find_pid_by_name(TEST_NAME, getpid());
-        if (pid > 0) {
-                ebpf_warning("The deepflow-agent with process ID %d is already "
-                             "running. You can disable the continuous profiling "
-                             "feature of the deepflow-agent to skip this check.\n",
-                             pid);
-                return ETR_EXIST;
-        }
+	int pid = find_pid_by_name(TEST_NAME, getpid());
+	if (pid > 0) {
+		return check_profiler_running_pid(pid);
+	}
 
-        return ETR_NOTEXIST;
+	return ETR_NOTEXIST;
 }
 
 int main(void)
 {
 	bpf_tracer_init(NULL, true);
-	if (check_test_running_pid() == ETR_EXIST)
-		return 0;
+	if (check_test_is_running() != ETR_NOTEXIST)
+		exit(1);
+
+	if (write_profiler_running_pid() != ETR_OK)
+		return (-1);
 
 	char buf[1024];
 	exec_command("./test_pid_check", "", buf, sizeof(buf));

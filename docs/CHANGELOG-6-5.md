@@ -11,6 +11,12 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: ntp support profile data [#7706](https://github.com/deepflowio/deepflow/pull/7706) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: Modify show tags API error #26063 [#7703](https://github.com/deepflowio/deepflow/pull/7703) by [Ericsssss](https://github.com/Ericsssss)
+* fix: agent fixes empty endpoint when setting http-endpoint-extraction.match-rules.prefix: "" [#7699](https://github.com/deepflowio/deepflow/pull/7699) by [TomatoMr](https://github.com/TomatoMr)
+* fix: agent remote exec panic [#7694](https://github.com/deepflowio/deepflow/pull/7694) by [roryye](https://github.com/roryye)
+* fix: Translate metrics by table [#7678](https://github.com/deepflowio/deepflow/pull/7678) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: abstract pod group association error [#7673](https://github.com/deepflowio/deepflow/pull/7673) by [askyrie](https://github.com/askyrie)
 * fix: restart agent after enabling ntp [#7657](https://github.com/deepflowio/deepflow/pull/7657) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: need to drop deepflow_tenant/admin database when drop an organization [#7649](https://github.com/deepflowio/deepflow/pull/7649) by [lzf575](https://github.com/lzf575)
 * fix: agent - eBPF Fix Kafka protocol inference [#7644](https://github.com/deepflowio/deepflow/pull/7644) by [yinjiping](https://github.com/yinjiping)

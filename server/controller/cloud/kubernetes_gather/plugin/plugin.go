@@ -56,7 +56,7 @@ func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string
 			return "", "", fmt.Errorf("metaData marshal error: (%s)", err.Error())
 		}
 		err = L.CallByParam(lua.P{
-			Fn:      L.GetGlobal("GetLoadsTypeName"),
+			Fn:      L.GetGlobal("GetWorkloadTypeAndName"),
 			NRet:    2,
 			Protect: true,
 		}, lua.LString(string(metaBytes)))
