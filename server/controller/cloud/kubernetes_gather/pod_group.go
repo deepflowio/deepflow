@@ -32,6 +32,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 	podControllers := [5][]string{}
 	podControllers[0] = k.k8sInfo["*v1.Deployment"]
 	podControllers[1] = k.k8sInfo["*v1.StatefulSet"]
+	podControllers[1] = append(podControllers[1], k.k8sInfo["*v1.OpenGaussCluster"]...)
 	podControllers[2] = k.k8sInfo["*v1.DaemonSet"]
 	podControllers[3] = k.k8sInfo["*v1.CloneSet"]
 	podControllers[4] = k.k8sInfo["*v1.Pod"]
@@ -78,22 +79,22 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				continue
 			}
 			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
-			serviceType := common.POD_GROUP_STATEFULSET
-			label := "statefulset:" + namespace + ":" + name
-			replicas := cData.Get("spec").Get("replicas").MustInt()
+			var serviceType int
+			var label string
 			switch t {
 			case 0:
 				serviceType = common.POD_GROUP_DEPLOYMENT
 				label = "deployment:" + namespace + ":" + name
+			case 1:
+				serviceType = common.POD_GROUP_STATEFULSET
+				label = "statefulset:" + namespace + ":" + name
 			case 2:
-				replicas = 0
 				serviceType = common.POD_GROUP_DAEMON_SET
 				label = "daemonset:" + namespace + ":" + name
 			case 3:
 				serviceType = common.POD_GROUP_CLONESET
 				label = "cloneset:" + namespace + ":" + name
 			case 4:
-				replicas = 0
 				if metaData.Get("ownerReferences").GetIndex(0).Get("kind").MustString() == "InPlaceSet" {
 					uLcuuid = common.IDGenerateUUID(k.orgID, metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString())
 					name = metaData.Get("ownerReferences").GetIndex(0).Get("name").MustString()
@@ -199,7 +200,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				Name:               name,
 				Label:              k.GetLabel(labels),
 				Type:               serviceType,
-				PodNum:             replicas,
+				PodNum:             cData.Get("spec").Get("replicas").MustInt(),
 				PodNamespaceLcuuid: namespaceLcuuid,
 				AZLcuuid:           k.azLcuuid,
 				RegionLcuuid:       k.RegionUUID,
@@ -289,13 +290,12 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			}
 		}
 
-		podNum := rData.Get("spec").Get("replicas").MustInt()
 		podRC := model.PodGroup{
 			Lcuuid:             uLcuuid,
 			Name:               name,
 			Label:              k.GetLabel(labels),
 			Type:               serviceType,
-			PodNum:             podNum,
+			PodNum:             rData.Get("spec").Get("replicas").MustInt(),
 			RegionLcuuid:       k.RegionUUID,
 			AZLcuuid:           k.azLcuuid,
 			PodNamespaceLcuuid: namespaceLcuuid,
