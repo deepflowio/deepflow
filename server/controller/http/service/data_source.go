@@ -44,7 +44,7 @@ type DataSource struct {
 func NewDataSource(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *DataSource {
 	dataSource := &DataSource{
 		cfg:            cfg,
-		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+		resourceAccess: &ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
 	}
 
 	dataSource.generateIPToController()
@@ -56,7 +56,7 @@ func NewDataSourceWithIngesterAPIConfig(userInfo *httpcommon.UserInfo, cfg commo
 		cfg: &config.ControllerConfig{
 			IngesterApi: cfg,
 		},
-		resourceAccess: &ResourceAccess{userInfo: userInfo},
+		resourceAccess: &ResourceAccess{UserInfo: userInfo},
 	}
 	if err := dataSource.generateIPToController(); err != nil {
 		log.Warning(err)
@@ -65,7 +65,7 @@ func NewDataSourceWithIngesterAPIConfig(userInfo *httpcommon.UserInfo, cfg commo
 }
 
 func (d *DataSource) generateIPToController() error {
-	db, err := mysql.GetDB(d.resourceAccess.userInfo.ORGID)
+	db, err := mysql.GetDB(d.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return err
 	}

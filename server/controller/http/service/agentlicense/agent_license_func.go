@@ -14,9 +14,15 @@
  * limitations under the License.
  */
 
-package migration
+package agentlicense
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.5.1.48"
+import (
+	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
+
+func GetAgentLicenseFunctions(cfg *config.ControllerConfig, userID int, agent *mysql.VTap,
+	licenseFunctions []interface{}) (string, []mysql.LicenseFuncLog, error) {
+
+	return "", nil, nil
+}

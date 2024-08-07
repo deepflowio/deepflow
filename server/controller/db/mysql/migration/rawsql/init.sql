@@ -2370,6 +2370,18 @@ CREATE TABLE IF NOT EXISTS consumer_bill (
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE consumer_bill;
 
+CREATE TABLE IF NOT EXISTS license_func_log (
+    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
+    agent_id                INTEGER NOT NULL,
+    agent_name              VARCHAR(256) NOT NULL,
+    user_id                 INTEGER NOT NULL,
+    license_function        INTEGER NOT NULL COMMENT '1.traffic distribution 2.network monitoring 3.call monitoring 4.function monitoring 5.application monitoring 6.indicator monitoring 7.database monitoring 8.log monitoring 9.max',
+    enabled                 INTEGER NOT NULL COMMENT '0.false 1.true',
+    created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+TRUNCATE TABLE license_func_log;
+
 CREATE TABLE IF NOT EXISTS kubernetes_cluster (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     cluster_id              VARCHAR(256) NOT NULL ,
