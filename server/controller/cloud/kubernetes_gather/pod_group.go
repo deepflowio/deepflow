@@ -31,6 +31,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 	podControllers := [5][]string{}
 	podControllers[0] = k.k8sInfo["*v1.Deployment"]
 	podControllers[1] = k.k8sInfo["*v1.StatefulSet"]
+	podControllers[1] = append(podControllers[1], k.k8sInfo["*v1.OpenGaussCluster"]...)
 	podControllers[2] = k.k8sInfo["*v1.DaemonSet"]
 	podControllers[3] = k.k8sInfo["*v1.CloneSet"]
 	podControllers[4] = k.k8sInfo["*v1.Pod"]
@@ -76,22 +77,23 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				log.Infof("podgroup (%s) namespace id not found", name)
 				continue
 			}
-			serviceType := common.POD_GROUP_STATEFULSET
-			label := "statefulset:" + namespace + ":" + name
 			replicas := cData.Get("spec").Get("replicas").MustInt()
+			var serviceType int
+			var label string
 			switch t {
 			case 0:
 				serviceType = common.POD_GROUP_DEPLOYMENT
 				label = "deployment:" + namespace + ":" + name
+			case 1:
+				serviceType = common.POD_GROUP_STATEFULSET
+				label = "statefulset:" + namespace + ":" + name
 			case 2:
-				replicas = 0
 				serviceType = common.POD_GROUP_DAEMON_SET
 				label = "daemonset:" + namespace + ":" + name
 			case 3:
 				serviceType = common.POD_GROUP_CLONESET
 				label = "cloneset:" + namespace + ":" + name
 			case 4:
-				replicas = 0
 				if metaData.Get("ownerReferences").GetIndex(0).Get("kind").MustString() == "InPlaceSet" {
 					uID = metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString()
 					name = metaData.Get("ownerReferences").GetIndex(0).Get("name").MustString()
