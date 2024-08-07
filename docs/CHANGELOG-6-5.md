@@ -57,6 +57,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: kubernetes support OpenGaussCluster [#7721](https://github.com/deepflowio/deepflow/pull/7721) by [askyrie](https://github.com/askyrie)
+* feat: agent - eBPF Adjust method for checking if agent is running [#7717](https://github.com/deepflowio/deepflow/pull/7717) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - flow&app log collected by lo nic do not report ctrl_mac [#7713](https://github.com/deepflowio/deepflow/pull/7713) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
 * feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
@@ -90,6 +93,7 @@
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* Cp 66 lo to v65 [#7716](https://github.com/deepflowio/deepflow/pull/7716) by [lzf575](https://github.com/lzf575)
 * V65 trace map [#7445](https://github.com/deepflowio/deepflow/pull/7445) by [taloric](https://github.com/taloric)
 * bump golang.org/x/net to v0.26.0 [#7234](https://github.com/deepflowio/deepflow/pull/7234) by [zhangzujian](https://github.com/zhangzujian)
 
