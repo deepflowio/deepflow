@@ -95,45 +95,41 @@ func (p *Policy) toSerializeString() {
 			p.allDataHash = h64.Sum64()
 		}
 	}
-	if p.billingMethod == BILLING_METHOD_LICENSE {
-		if len(p.npbFlowACLs) > 0 {
-			npbFlowACLsProto := trident.FlowAcls{
-				FlowAcl: p.npbFlowACLs,
-			}
-			p.npbSerializeString, err = npbFlowACLsProto.Marshal()
-			if err != nil {
-				log.Error(p.Log(err.Error()))
-			} else {
-				h64 := fnv.New64()
-				h64.Write(p.npbSerializeString)
-				p.npbDataHash = h64.Sum64()
-			}
+	if len(p.npbFlowACLs) > 0 {
+		npbFlowACLsProto := trident.FlowAcls{
+			FlowAcl: p.npbFlowACLs,
 		}
+		p.npbSerializeString, err = npbFlowACLsProto.Marshal()
+		if err != nil {
+			log.Error(p.Log(err.Error()))
+		} else {
+			h64 := fnv.New64()
+			h64.Write(p.npbSerializeString)
+			p.npbDataHash = h64.Sum64()
+		}
+	}
 
-		if len(p.pcapFlowACLs) > 0 {
-			pcapFlowACLsProto := trident.FlowAcls{
-				FlowAcl: p.pcapFlowACLs,
-			}
-			p.pcapSerializeString, err = pcapFlowACLsProto.Marshal()
-			if err != nil {
-				log.Error(p.Log(err.Error()))
-			} else {
-				h64 := fnv.New64()
-				h64.Write(p.pcapSerializeString)
-				p.pcapDataHash = h64.Sum64()
-			}
+	if len(p.pcapFlowACLs) > 0 {
+		pcapFlowACLsProto := trident.FlowAcls{
+			FlowAcl: p.pcapFlowACLs,
+		}
+		p.pcapSerializeString, err = pcapFlowACLsProto.Marshal()
+		if err != nil {
+			log.Error(p.Log(err.Error()))
+		} else {
+			h64 := fnv.New64()
+			h64.Write(p.pcapSerializeString)
+			p.pcapDataHash = h64.Sum64()
 		}
 	}
 }
 
 func (p *Policy) addFlowACL(flowACL *trident.FlowAcl, aclType int) {
 	p.flowACLs = append(p.flowACLs, flowACL)
-	if p.billingMethod == BILLING_METHOD_LICENSE {
-		if aclType == APPLICATION_NPB {
-			p.npbFlowACLs = append(p.npbFlowACLs, flowACL)
-		} else if aclType == APPLICATION_PCAP {
-			p.pcapFlowACLs = append(p.pcapFlowACLs, flowACL)
-		}
+	if aclType == APPLICATION_NPB {
+		p.npbFlowACLs = append(p.npbFlowACLs, flowACL)
+	} else if aclType == APPLICATION_PCAP {
+		p.pcapFlowACLs = append(p.pcapFlowACLs, flowACL)
 	}
 }
 
@@ -143,38 +139,30 @@ var tFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUT
 var nFunction mapset.Set = mapset.NewSet(VTAP_LICENSE_FUNCTION_NETWORK_MONITORING)
 
 func (p *Policy) getPolicyString(functions mapset.Set) []byte {
-	if p.billingMethod == BILLING_METHOD_LICENSE {
-		if functions.Cardinality() == 0 {
-			return nil
-		}
-		if tnFunction.IsSubset(functions) {
-			return p.serializeString
-		} else if tFunction.IsSubset(functions) {
-			return p.npbSerializeString
-		} else if nFunction.IsSubset(functions) {
-			return p.pcapSerializeString
-		}
-	} else {
+	if functions.Cardinality() == 0 {
+		return nil
+	}
+	if tnFunction.IsSubset(functions) {
 		return p.serializeString
+	} else if tFunction.IsSubset(functions) {
+		return p.npbSerializeString
+	} else if nFunction.IsSubset(functions) {
+		return p.pcapSerializeString
 	}
 
 	return nil
 }
 
 func (p *Policy) getPolicyVersion(functions mapset.Set) uint64 {
-	if p.billingMethod == BILLING_METHOD_LICENSE {
-		if functions.Cardinality() == 0 {
-			return 0xFFFFFFFF
-		}
-		if tnFunction.IsSubset(functions) {
-			return p.version
-		} else if tFunction.IsSubset(functions) {
-			return p.npbVersion
-		} else if nFunction.IsSubset(functions) {
-			return p.pcapVersion
-		}
-	} else {
+	if functions.Cardinality() == 0 {
+		return 0xFFFFFFFF
+	}
+	if tnFunction.IsSubset(functions) {
 		return p.version
+	} else if tFunction.IsSubset(functions) {
+		return p.npbVersion
+	} else if nFunction.IsSubset(functions) {
+		return p.pcapVersion
 	}
 
 	return 0xFFFFFFFF
