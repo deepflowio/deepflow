@@ -169,5 +169,7 @@ int set_profiler_cpu_aggregation(int flag);
 struct bpf_tracer *get_profiler_tracer(void);
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
 void cpdbg_process(stack_trace_msg_t * msg);
-int check_profiler_running_pid(void);
+int check_profiler_running_pid(int pid);
+int check_profiler_is_running(void);
+int write_profiler_running_pid(void);
 #endif /* DF_USER_PERF_PROFILER_H */
