@@ -94,6 +94,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: kubernetes support OpenGaussCluster [#7721](https://github.com/deepflowio/deepflow/pull/7721) by [askyrie](https://github.com/askyrie)
+* feat: agent - eBPF Adjust method for checking if agent is running [#7717](https://github.com/deepflowio/deepflow/pull/7717) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - flow&app log collected by lo nic do not report ctrl_mac [#7713](https://github.com/deepflowio/deepflow/pull/7713) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Improve aggregation efficiency of stack-trace string  [#7663](https://github.com/deepflowio/deepflow/pull/7663) by [yinjiping](https://github.com/yinjiping)
 * feat: add request type from Kafka trace map [#7642](https://github.com/deepflowio/deepflow/pull/7642) by [lzf575](https://github.com/lzf575)
 * feat: server - Add configuration items to server [#7630](https://github.com/deepflowio/deepflow/pull/7630) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -149,6 +152,7 @@
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* Cp 66 lo to v65 [#7716](https://github.com/deepflowio/deepflow/pull/7716) by [lzf575](https://github.com/lzf575)
 * support consistent timestamp in l7metrics [#7626](https://github.com/deepflowio/deepflow/pull/7626) by [yuanchaoa](https://github.com/yuanchaoa)
 * V65 trace map [#7445](https://github.com/deepflowio/deepflow/pull/7445) by [taloric](https://github.com/taloric)
 * bump golang.org/x/net to v0.26.0 [#7234](https://github.com/deepflowio/deepflow/pull/7234) by [zhangzujian](https://github.com/zhangzujian)
