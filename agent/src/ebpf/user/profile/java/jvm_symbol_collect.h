@@ -19,7 +19,6 @@
 
 #include "config.h"
 
-#define STRING_BUFFER_SIZE 2000
 #define UNIX_PATH_MAX 108
 #define JAVA_ADDR_STR_SIZE 13
 
