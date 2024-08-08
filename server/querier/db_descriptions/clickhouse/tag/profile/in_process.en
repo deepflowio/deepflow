@@ -23,6 +23,10 @@ pod_group_type             , K8s Workload Type             ,
 pod_group                  , K8s Workload                  , Such as Deployment, StatefulSet, Daemonset, etc.
 pod                        , K8s POD                       ,
 service                    , Service                       , Deprecated，please use pod_service
+auto_instance_type         , Auto Instance Type            , The type of 'auto_instance'.
+auto_instance              , Auto Instance Tag             , The instance of IP, when the instance is an IP, auto_instance_id displayed as a subnet ID.
+auto_service_type          , Auto Service Type             , The type of 'auto_service'.
+auto_service               , Auto Service Tag              , On the basis of 'auto_instance', aggregate K8s service ClusterIP and workload into service, when the instance is an IP, auto_service_id displayed as a subnet ID.
 gprocess                   , Process                       ,
 host_ip                    , VM Hypervisor                 , The management IP address of VM Hypervisor.
 host_hostname              , VM Hypervisor                 , The hostname of VM Hypervisor.
