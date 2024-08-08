@@ -20,9 +20,11 @@ import (
 	"fmt"
 
 	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("recorder.cache")
+var log = logger.MustGetLogger("recorder.cache")
 
 func dbQueryResourceFailed(resource string, err error) string {
 	return fmt.Sprintf("db query %s failed: %v", resource, err)
@@ -42,30 +44,6 @@ func cacheLcuuidByIDNotFound(resource string, id int) string {
 
 func cacheIDByLcuuidNotFound(resource string, lcuuid string) string {
 	return fmt.Sprintf("cache %s id (lcuuid: %s) not found", resource, lcuuid)
-}
-
-func addDiffBase(resource string, detail interface{}) string {
-	return fmt.Sprintf("cache diff base add %s (detail: %+v) success", resource, detail)
-}
-
-func updateDiffBase(resource string, detail interface{}) string {
-	return fmt.Sprintf("cache diff base update %s (detail: %+v) success", resource, detail)
-}
-
-func deleteDiffBase(resource, lcuuid string) string {
-	return fmt.Sprintf("cache diff base delete %s (lcuuid: %s) success", resource, lcuuid)
-}
-
-func addToToolMap(resource, lcuuid string) string {
-	return fmt.Sprintf("cache tool map add %s (lcuuid: %s) success", resource, lcuuid)
-}
-
-func updateToolMap(resource, lcuuid string) string {
-	return fmt.Sprintf("cache tool map update %s (lcuuid: %s) success", resource, lcuuid)
-}
-
-func deleteFromToolMap(resource, lcuuid string) string {
-	return fmt.Sprintf("cache tool map delete %s (lcuuid: %s) success", resource, lcuuid)
 }
 
 func refreshResource(resource string) string {

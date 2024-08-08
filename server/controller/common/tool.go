@@ -40,9 +40,9 @@ func StrToJsonAndMap(str string) (resJson string, resMap map[string]string) {
 		return
 	}
 	m := map[string]string{}
-	multiPairStr := strings.Split(str, ",")
+	multiPairStr := strings.Split(str, ", ")
 	for _, pairStr := range multiPairStr {
-		pair := strings.Split(pairStr, ":")
+		pair := strings.SplitN(pairStr, ":", 2)
 		if len(pair) == 2 {
 			m[strings.Trim(pair[0], " ")] = strings.Trim(pair[1], " ")
 		}

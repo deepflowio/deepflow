@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
@@ -33,7 +34,7 @@ func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get lbs starting")
+	log.Debug("get lbs starting", logger.NewORGPrefix(b.orgID))
 
 	// 普通型负载均衡器
 	tmpLBs, tmpVInterfaces, tmpIPs, err := b.getBLoadBalances(region, vpcIdToLcuuid, networkIdToLcuuid)
@@ -53,7 +54,7 @@ func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string
 	retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
 	retIPs = append(retIPs, tmpIPs...)
 
-	log.Debug("get lbs complete")
+	log.Debug("get lbs complete", logger.NewORGPrefix(b.orgID))
 	return retLBs, retVInterfaces, retIPs, nil
 }
 
@@ -64,7 +65,7 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get blbs starting")
+	log.Debug("get blbs starting", logger.NewORGPrefix(b.orgID))
 
 	blbClient, _ := blb.NewClient(b.secretID, b.secretKey, "blb."+b.endpoint)
 	blbClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -76,7 +77,7 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 		startTime := time.Now()
 		result, err := blbClient.DescribeLoadBalancers(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("blbDescribeLoadBalancers", len(result.BlbList), startTime)
@@ -92,12 +93,12 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 		for _, lb := range r.BlbList {
 			vpcLcuuid, ok := vpcIdToLcuuid[lb.VpcId]
 			if !ok {
-				log.Debugf("lb (%s) vpc (%s) not found", lb.BlbId, lb.VpcId)
+				log.Debugf("lb (%s) vpc (%s) not found", lb.BlbId, lb.VpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			networkLcuuid, ok := networkIdToLcuuid[lb.SubnetId]
 			if !ok {
-				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId)
+				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			lbLcuuid := common.GenerateUUIDByOrgID(b.orgID, lb.BlbId)
@@ -119,7 +120,7 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 			retIPs = append(retIPs, tmpIPs...)
 		}
 	}
-	log.Debug("get blbs complete")
+	log.Debug("get blbs complete", logger.NewORGPrefix(b.orgID))
 	return retLBs, retVInterfaces, retIPs, nil
 }
 
@@ -130,7 +131,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get app_blbs starting")
+	log.Debug("get app_blbs starting", logger.NewORGPrefix(b.orgID))
 
 	appblbClient, _ := appblb.NewClient(b.secretID, b.secretKey, "blb."+b.endpoint)
 	appblbClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -142,7 +143,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 		startTime := time.Now()
 		result, err := appblbClient.DescribeLoadBalancers(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("appblbDescribeLoadBalancers", len(result.BlbList), startTime)
@@ -158,12 +159,12 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 		for _, lb := range r.BlbList {
 			vpcLcuuid, ok := vpcIdToLcuuid[lb.VpcId]
 			if !ok {
-				log.Debugf("lb (%s) vpc (%s) not found", lb.BlbId, lb.VpcId)
+				log.Debugf("lb (%s) vpc (%s) not found", lb.BlbId, lb.VpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			networkLcuuid, ok := networkIdToLcuuid[lb.SubnetId]
 			if !ok {
-				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId)
+				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			lbLcuuid := common.GenerateUUIDByOrgID(b.orgID, lb.BlbId)
@@ -185,7 +186,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 			retIPs = append(retIPs, tmpIPs...)
 		}
 	}
-	log.Debug("get app_blbs complete")
+	log.Debug("get app_blbs complete", logger.NewORGPrefix(b.orgID))
 	return retLBs, retVInterfaces, retIPs, nil
 }
 

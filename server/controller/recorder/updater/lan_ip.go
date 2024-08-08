@@ -31,8 +31,9 @@ import (
 type LANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
-		mysql.LANIP,
 		*diffbase.LANIP,
+		*mysql.LANIP,
+		mysql.LANIP,
 		*message.LANIPAdd,
 		message.LANIPAdd,
 		*message.LANIPUpdate,
@@ -47,8 +48,9 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 	updater := &LANIP{
 		newUpdaterBase[
 			cloudmodel.IP,
-			mysql.LANIP,
 			*diffbase.LANIP,
+			*mysql.LANIP,
+			mysql.LANIP,
 			*message.LANIPAdd,
 			message.LANIPAdd,
 			*message.LANIPUpdate,
@@ -100,19 +102,26 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 			return nil, false
 		}
 	}
-	subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	if !exists {
-		if i.domainToolDataSet != nil {
-			subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		}
-		if !exists {
-			log.Error(resourceAForResourceBNotFound(
-				ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-				ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
-		}
-	}
+
+	var subnetID int
+
+	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
+	// which may cause recorder performance issues.
+
+	// subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// if !exists {
+	// 	if i.domainToolDataSet != nil {
+	// 		subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 	}
+	// 	if !exists {
+	// 		log.Error(resourceAForResourceBNotFound(
+	// 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+	// 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+	// 		))
+	// 		return nil, false
+	// 	}
+	// }
+
 	ip := rcommon.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
@@ -135,24 +144,28 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (*message.LANIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LANIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
-	if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-		subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-		if !exists {
-			if i.domainToolDataSet != nil {
-				subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-			}
-			if !exists {
-				log.Error(resourceAForResourceBNotFound(
-					ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-					ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-				))
-				return nil, nil, false
-			}
-		}
-		mapInfo["vl2_net_id"] = subnetID
-		structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
-		structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
-	}
+
+	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
+	// which may cause recorder performance issues.
+
+	// if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
+	// 	subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 	if !exists {
+	// 		if i.domainToolDataSet != nil {
+	// 			subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 		}
+	// 		if !exists {
+	// 			log.Error(resourceAForResourceBNotFound(
+	// 				ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
+	// 				ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+	// 			))
+	// 			return nil, nil, false
+	// 		}
+	// 	}
+	// 	mapInfo["vl2_net_id"] = subnetID
+	// 	structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
+	// 	structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
+	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

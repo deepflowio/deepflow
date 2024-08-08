@@ -27,8 +27,11 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
+	servercommon "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/stats"
+	distributed_tracing "github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/router"
+	"github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap"
 	prometheus_router "github.com/deepflowio/deepflow/server/querier/app/prometheus/router"
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/router"
 	"github.com/deepflowio/deepflow/server/querier/common"
@@ -42,11 +45,12 @@ import (
 
 var log = logging.MustGetLogger("querier")
 
-func Start(configPath, serverLogFile string) {
+func Start(configPath, serverLogFile string, shared *servercommon.ControllerIngesterShared) {
 	ServerCfg := config.DefaultConfig()
 	ServerCfg.Load(configPath)
 	config.Cfg = &ServerCfg.QuerierConfig
 	config.TraceConfig = &ServerCfg.TraceIdWithIndex
+	config.ControllerCfg = &ServerCfg.ControllerConfig
 	cfg := ServerCfg.QuerierConfig
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("==================== Launching DeepFlow-Server-Querier ====================")
@@ -74,6 +78,8 @@ func Start(configPath, serverLogFile string) {
 
 	ginLogFile, _ := os.OpenFile(serverLogFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	gin.DefaultWriter = io.MultiWriter(ginLogFile, os.Stdout)
+	tracemap_generator := tracemap.NewTraceMapGenerator(shared.TraceTreeQueue, &cfg)
+	tracemap_generator.Start()
 
 	// 注册router
 	r := gin.New()
@@ -86,6 +92,7 @@ func Start(configPath, serverLogFile string) {
 	profile_router.ProfileRouter(r, &cfg)
 	prometheus_router.PrometheusRouter(r)
 	tracing_adapter.TracingAdapterRouter(r)
+	distributed_tracing.TraceMapRouter(r, &cfg, tracemap_generator)
 	registerRouterCounter(r.Routes())
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {

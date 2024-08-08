@@ -22,10 +22,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getNetworks() ([]model.Network, error) {
-	log.Debug("get networks starting")
+	log.Debug("get networks starting", logger.NewORGPrefix(g.orgID))
 	networks := []model.Network{}
 	networksData := g.genesisData.Networks
 
@@ -33,7 +34,7 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 
 	for _, n := range networksData {
 		if n.SegmentationID == 0 {
-			log.Debug("segmentation id not found")
+			log.Debug("segmentation id not found", logger.NewORGPrefix(g.orgID))
 			continue
 		}
 		vpcLcuuid := n.VPCLcuuid
@@ -58,6 +59,6 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 		}
 		networks = append(networks, network)
 	}
-	log.Debug("get networks complete")
+	log.Debug("get networks complete", logger.NewORGPrefix(g.orgID))
 	return networks, nil
 }

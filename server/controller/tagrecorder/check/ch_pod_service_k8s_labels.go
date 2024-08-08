@@ -42,16 +42,21 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 	var podServices []mysql.PodService
 	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[K8sLabelsKey]mysql.ChPodServiceK8sLabels)
 	for _, podService := range podServices {
+		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), podService, k.db.LogPrefixORGID)
+		}
+
 		labelsMap := map[string]string{}
 		splitLabel := strings.Split(podService.Label, ", ")
 		for _, singleLabel := range splitLabel {
-			splitSingleLabel := strings.Split(singleLabel, ":")
+			splitSingleLabel := strings.SplitN(singleLabel, ":", 2)
 			if len(splitSingleLabel) == 2 {
 				labelsMap[splitSingleLabel[0]] = splitSingleLabel[1]
 			}
@@ -59,19 +64,20 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 		if len(labelsMap) > 0 {
 			labelsStr, err := json.Marshal(labelsMap)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, k.db.LogPrefixORGID)
 				return nil, false
 			}
 			key := K8sLabelsKey{
 				ID: podService.ID,
 			}
 			keyToItem[key] = mysql.ChPodServiceK8sLabels{
-				ID:       podService.ID,
-				Labels:   string(labelsStr),
-				L3EPCID:  podService.VPCID,
-				PodNsID:  podService.PodNamespaceID,
-				TeamID:   tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID: tagrecorder.DomainToDomainID[podService.Domain],
+				ID:          podService.ID,
+				Labels:      string(labelsStr),
+				L3EPCID:     podService.VPCID,
+				PodNsID:     podService.PodNamespaceID,
+				TeamID:      teamID,
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		}
 	}

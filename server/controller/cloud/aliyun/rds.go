@@ -20,6 +20,7 @@ import (
 	rds "github.com/aliyun/alibaba-cloud-sdk-go/services/rds"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getRDSInstances(region model.Region) (
@@ -55,11 +56,11 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 		"Share":    common.RDS_MODEL_SHARE,
 	}
 
-	log.Debug("get rds_instances starting")
+	log.Debug("get rds_instances starting", logger.NewORGPrefix(a.orgID))
 	request := rds.CreateDescribeDBInstancesRequest()
 	response, err := a.getRDSResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retRDSInstances, retVInterfaces, retIPs, err
 	}
 
@@ -107,7 +108,7 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 			attrRequest.DBInstanceId = rdsId
 			attrResponse, err := a.getRDSAttributeResponse(region.Label, attrRequest)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(a.orgID))
 				return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
 			}
 
@@ -151,7 +152,7 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 			retIPs = append(retIPs, tmpIPs...)
 		}
 	}
-	log.Debug("get rds_instances complete")
+	log.Debug("get rds_instances complete", logger.NewORGPrefix(a.orgID))
 	return retRDSInstances, retVInterfaces, retIPs, nil
 }
 
@@ -163,7 +164,7 @@ func (a *Aliyun) getRDSPorts(region model.Region, rdsId string) ([]model.VInterf
 	request.DBInstanceId = rdsId
 	response, err := a.getRDSVInterfaceResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return []model.VInterface{}, []model.IP{}, err
 	}
 

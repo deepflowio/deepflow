@@ -43,7 +43,7 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
-use super::config::{ExtraLogFields, OracleParseConfig};
+use super::config::{ExtraLogFields, L7LogBlacklist, OracleParseConfig};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::EbpfYamlConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
@@ -56,6 +56,7 @@ use super::{
     },
     ConfigError, KubernetesPollerType, RuntimeConfig,
 };
+use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
 use crate::{
     common::{decapsulate::TunnelTypeBitmap, enums::TapType, l7_protocol_log::L7ProtocolBitmap},
@@ -84,6 +85,7 @@ use crate::{
 };
 
 use public::bitmap::Bitmap;
+use public::l7_protocol::L7Protocol;
 use public::proto::{
     common::TridentType,
     trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
@@ -213,6 +215,8 @@ pub struct SenderConfig {
     pub mtu: u32,
     pub dest_ip: String,
     pub vtap_id: u16,
+    pub team_id: u32,
+    pub organize_id: u32,
     pub dest_port: u16,
     pub npb_port: u16,
     pub vxlan_flags: u8,
@@ -222,6 +226,7 @@ pub struct SenderConfig {
     pub npb_dedup_enabled: bool,
     pub npb_bps_threshold: u64,
     pub npb_socket_type: trident::SocketType,
+    pub multiple_sockets_to_ingester: bool,
     pub collector_socket_type: trident::SocketType,
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
@@ -249,6 +254,7 @@ pub struct NpbConfig {
     pub vlan_mode: trident::VlanMode,
     pub socket_type: trident::SocketType,
     pub ignore_overlay_vlan: bool,
+    pub queue_size: usize,
 }
 
 impl Default for NpbConfig {
@@ -281,7 +287,6 @@ pub struct OsProcScanConfig;
 pub struct PlatformConfig {
     pub sync_interval: Duration,
     pub kubernetes_cluster_id: String,
-    pub prometheus_http_api_addresses: Vec<String>,
     pub libvirt_xml_path: PathBuf,
     pub kubernetes_poller_type: KubernetesPollerType,
     pub vtap_id: u16,
@@ -314,6 +319,7 @@ pub struct DispatcherConfig {
     pub capture_packet_size: u32,
     pub l7_log_packet_size: u32,
     pub tunnel_type_bitmap: TunnelTypeBitmap,
+    pub tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub trident_type: TridentType,
     pub vtap_id: u16,
     pub capture_socket_type: CaptureSocketType,
@@ -337,6 +343,9 @@ pub struct DispatcherConfig {
     pub npb_dedup_enabled: bool,
     pub dpdk_enabled: bool,
     pub dispatcher_queue: bool,
+    pub bond_group: Vec<String>,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub cpu_set: CpuSet,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -461,6 +470,8 @@ pub struct FlowConfig {
     pub oracle_parse_conf: OracleParseConfig,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
+    pub server_ports: Vec<u16>,
+    pub consistent_timestamp_in_l7_metrics: bool,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -562,6 +573,8 @@ impl From<&RuntimeConfig> for FlowConfig {
                     .l7_protocol_advanced_features
                     .obfuscate_enabled_protocols,
             ),
+            server_ports: conf.yaml_config.server_ports.clone(),
+            consistent_timestamp_in_l7_metrics: conf.yaml_config.consistent_timestamp_in_l7_metrics,
         }
     }
 }
@@ -610,6 +623,7 @@ impl fmt::Debug for FlowConfig {
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .field("plugins", &self.plugins)
+            .field("server_ports", &self.server_ports)
             .finish()
     }
 }
@@ -655,13 +669,9 @@ impl HttpEndpointTrie {
     pub fn find_matching_rule(&self, input: &str) -> usize {
         const DEFAULT_KEEP_SEGMENTS: usize = 2;
         let mut node = &self.root;
-        let mut keep_segments = if node.keep_segments.is_some() {
-            node.keep_segments.unwrap()
-        } else {
-            DEFAULT_KEEP_SEGMENTS
-        };
-        let has_rules = node.keep_segments.is_some() || !node.children.is_empty();
-        let mut matched = node.keep_segments.is_some() && node.children.is_empty(); // if it has a rule, and the prefix is "", any path is matched
+        let mut keep_segments = node.keep_segments.unwrap_or(DEFAULT_KEEP_SEGMENTS);
+        let has_rules = node.keep_segments.is_some() || !node.children.is_empty(); // if no rules are set, keep_segments defaults to DEFAULT_KEEP_SEGMENTS: 2
+        let mut matched = node.keep_segments.is_some(); // if it has a rule, and the prefix is "", any path is matched
         for c in input.chars() {
             if let Some(child) = node.children.get(&c) {
                 keep_segments = child.keep_segments.unwrap_or(keep_segments);
@@ -692,6 +702,165 @@ impl From<&HttpEndpointExtraction> for HttpEndpointTrie {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Operator {
+    Equal,
+    Prefix,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BlacklistTrieNode {
+    children: HashMap<char, Box<BlacklistTrieNode>>,
+    operator: Option<Operator>,
+}
+
+impl BlacklistTrieNode {
+    pub fn is_on_blacklist(&self, input: &str) -> bool {
+        if input.is_empty() {
+            return false;
+        }
+        let mut node = self;
+        for c in input.chars() {
+            node = match node.children.get(&c) {
+                Some(child) => child,
+                None => return false,
+            };
+            if let Some(op) = &node.operator {
+                if op == &Operator::Prefix {
+                    return true;
+                }
+            }
+        }
+        // If we've reached the end of the input and the last node has an operator,
+        // it must be because we matched a complete word, not a prefix.
+        if let Some(o) = node.operator {
+            o == Operator::Equal
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BlacklistTrie {
+    pub endpoint: BlacklistTrieNode,
+    pub request_type: BlacklistTrieNode,
+    pub request_domain: BlacklistTrieNode,
+    pub request_resource: BlacklistTrieNode,
+}
+
+impl BlacklistTrie {
+    // Currently, the following field names are supported:
+    const ENDPOINT: &'static str = "endpoint";
+    const REQUEST_TYPE: &'static str = "request_type";
+    const REQUEST_DOMAIN: &'static str = "request_domain";
+    const REQUEST_RESOURCE: &'static str = "request_resource";
+
+    // Currently, the following matching operations are supported:
+    const EQUAL: &'static str = "equal";
+    const PREFIX: &'static str = "prefix";
+
+    pub fn new(blacklists: &Vec<L7LogBlacklist>) -> Option<BlacklistTrie> {
+        if blacklists.is_empty() {
+            return None;
+        }
+
+        let mut b = BlacklistTrie::default();
+        for i in blacklists.iter() {
+            b.insert(i);
+        }
+        Some(b)
+    }
+
+    pub fn insert(&mut self, rule: &L7LogBlacklist) {
+        let mut node = match rule.field_name.to_ascii_lowercase().as_str() {
+            Self::ENDPOINT => &mut self.endpoint,
+            Self::REQUEST_TYPE => &mut self.request_type,
+            Self::REQUEST_DOMAIN => &mut self.request_domain,
+            Self::REQUEST_RESOURCE => &mut self.request_resource,
+            _ => {
+                warn!("Unsupported field_name: {}, only supports endpoint, request_type, request_domain, request_resource.", rule.field_name.as_str());
+                return;
+            }
+        };
+
+        let operator = match rule.operator.to_ascii_lowercase().as_str() {
+            Self::EQUAL => Operator::Equal,
+            Self::PREFIX => Operator::Prefix,
+            _ => {
+                warn!(
+                    "Unsupported operator: {}, only supports equal, prefix.",
+                    rule.operator.as_str()
+                );
+                return;
+            }
+        };
+
+        for ch in rule.value.chars() {
+            node = node
+                .children
+                .entry(ch)
+                .or_insert_with(|| Box::new(BlacklistTrieNode::default()));
+        }
+        node.operator = Some(operator);
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct DnsNxdomainTrieNode {
+    children: HashMap<char, Box<DnsNxdomainTrieNode>>,
+    unconcerned: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DnsNxdomainTrie {
+    root: DnsNxdomainTrieNode,
+}
+
+impl DnsNxdomainTrie {
+    pub fn insert(&mut self, rule: &String) {
+        let mut node = &mut self.root;
+        // the reversal is because what is matched is the suffix of the domain name
+        for ch in rule.chars().rev() {
+            node = node
+                .children
+                .entry(ch)
+                .or_insert_with(|| Box::new(DnsNxdomainTrieNode::default()));
+        }
+        node.unconcerned = true;
+    }
+
+    pub fn is_unconcerned(&self, input: &str) -> bool {
+        if input.is_empty() {
+            return false;
+        }
+        let mut node = &self.root;
+        // the reversal is because what is matched is the suffix of the domain name
+        for c in input.chars().rev() {
+            match node.children.get(&c) {
+                Some(child) => {
+                    if child.unconcerned {
+                        return true;
+                    }
+                    node = child.as_ref();
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+        false
+    }
+}
+
+impl From<&Vec<String>> for DnsNxdomainTrie {
+    fn from(v: &Vec<String>) -> Self {
+        let mut t = Self::default();
+        v.iter().for_each(|r| t.insert(r));
+        t
+    }
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
@@ -702,6 +871,10 @@ pub struct LogParserConfig {
     pub http_endpoint_disabled: bool,
     pub http_endpoint_trie: HttpEndpointTrie,
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
+    pub l7_log_blacklist: HashMap<String, Vec<L7LogBlacklist>>,
+    pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
+    pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
+    pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
 }
 
 impl Default for LogParserConfig {
@@ -715,6 +888,10 @@ impl Default for LogParserConfig {
             http_endpoint_disabled: false,
             http_endpoint_trie: HttpEndpointTrie::new(),
             obfuscate_enabled_protocols: L7ProtocolBitmap::default(),
+            l7_log_blacklist: HashMap::new(),
+            l7_log_blacklist_trie: HashMap::new(),
+            unconcerned_dns_nxdomain_response_suffixes: vec![],
+            unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
         }
     }
 }
@@ -749,6 +926,11 @@ impl fmt::Debug for LogParserConfig {
                         }
                     })
                     .collect::<Vec<_>>(),
+            )
+            .field("l7_log_blacklist_trie", &self.l7_log_blacklist)
+            .field(
+                "unconcerned_dns_nxdomain_trie",
+                &self.unconcerned_dns_nxdomain_response_suffixes,
             )
             .finish()
     }
@@ -869,7 +1051,7 @@ pub enum TraceType {
     Sw8,
     TraceParent,
     NewRpcTraceContext,
-    XTingyun,
+    XTingyun(String),
     Customize(String),
 }
 
@@ -884,16 +1066,20 @@ const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
 const TRACE_TYPE_X_TINGYUN: &str = "x-tingyun";
 
 impl From<&str> for TraceType {
-    // 参数支持如下两种格式：
-    // 示例1：" sw8"
-    // 示例2："sw8"
-    // ==================================================
     // The parameter supports the following two formats:
-    // Example 1: "sw8"
-    // Example 2: " sw8"
+    // Example 1: "xxx"
+    // Example 2: "xxx.x"
     fn from(t: &str) -> TraceType {
         let tag_lowercase = t.trim().to_lowercase();
-        match tag_lowercase.as_str() {
+        let (tag, sub_tag) = if let Some(i) = tag_lowercase.find('.') {
+            (
+                tag_lowercase[..i].to_string(),
+                tag_lowercase[i + 1..].to_string(),
+            )
+        } else {
+            (tag_lowercase, String::new())
+        };
+        match tag.as_str() {
             TRACE_TYPE_XB3 => TraceType::XB3,
             TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
             TRACE_TYPE_UBER => TraceType::Uber,
@@ -902,8 +1088,8 @@ impl From<&str> for TraceType {
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
             SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
-            TRACE_TYPE_X_TINGYUN => TraceType::XTingyun,
-            _ if tag_lowercase.len() > 0 => TraceType::Customize(tag_lowercase),
+            TRACE_TYPE_X_TINGYUN => TraceType::XTingyun(sub_tag),
+            _ if tag.len() > 0 => TraceType::Customize(tag),
             _ => TraceType::Disabled,
         }
     }
@@ -922,7 +1108,7 @@ impl TraceType {
             TraceType::NewRpcTraceContext => {
                 context.eq_ignore_ascii_case(SOFA_NEW_RPC_TRACE_CTX_KEY)
             }
-            TraceType::XTingyun => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
+            TraceType::XTingyun(_) => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
             TraceType::Customize(tag) => context.eq_ignore_ascii_case(&tag),
             _ => false,
         }
@@ -938,14 +1124,14 @@ impl TraceType {
             TraceType::Sw8 => TRACE_TYPE_SW8,
             TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT,
             TraceType::NewRpcTraceContext => SOFA_NEW_RPC_TRACE_CTX_KEY,
-            TraceType::XTingyun => TRACE_TYPE_X_TINGYUN,
+            TraceType::XTingyun(_) => TRACE_TYPE_X_TINGYUN,
             TraceType::Customize(tag) => &tag,
             _ => "",
         }
     }
 
-    const TRACE_ID: u8 = 0;
-    const SPAN_ID: u8 = 1;
+    pub const TRACE_ID: u8 = 0;
+    pub const SPAN_ID: u8 = 1;
 
     // uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
     // separeted by ':'
@@ -1027,35 +1213,35 @@ impl TraceType {
         }
     }
 
-    fn decode_tingyun(value: &str, id_type: u8) -> Option<Cow<'_, str>> {
-        if id_type == Self::TRACE_ID {
-            cloud_platform::tingyun::decode_trace_id(value)
-        } else {
-            None
-        }
+    fn decode_tingyun<'a, 'b>(value: &'a str, sub_tag: &'b str) -> Option<Cow<'a, str>> {
+        cloud_platform::tingyun::decode_trace_id(value, sub_tag)
     }
 
-    fn decode_id<'a>(&self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
+    fn decode_id<'a, 'b>(&'b self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
         let value = value.trim();
         match self {
             TraceType::Disabled => None,
-            TraceType::XB3
-            | TraceType::XB3Span
-            | TraceType::NewRpcTraceContext
-            | TraceType::Customize(_) => Some(value.into()),
+            TraceType::XB3 | TraceType::XB3Span | TraceType::Customize(_) => Some(value.into()),
             TraceType::Uber => Self::decode_uber_id(value, id_type).map(|s| s.into()),
             TraceType::Sw3 => Self::decode_skywalking3_id(value, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(value, id_type),
             TraceType::TraceParent => Self::decode_traceparent(value, id_type).map(|s| s.into()),
-            TraceType::XTingyun => Self::decode_tingyun(value, id_type),
+            /*
+                referer https://github.com/sofastack/sofa-rpc/blob/7931102255d6ea95ee75676d368aad37c56b57ee/tracer/tracer-opentracing-resteasy/src/main/java/com/alipay/sofa/rpc/tracer/sofatracer/RestTracerAdapter.java#L75
+                in new version of sofarpc, use new_rpc_trace_context header store trace info
+            */
+            TraceType::NewRpcTraceContext => {
+                decode_new_rpc_trace_context_with_type(value.as_bytes(), id_type)
+            }
+            TraceType::XTingyun(sub_tag) => Self::decode_tingyun(value, sub_tag),
         }
     }
 
-    pub fn decode_trace_id<'a>(&self, value: &'a str) -> Option<Cow<'a, str>> {
+    pub fn decode_trace_id<'a, 'b>(&'b self, value: &'a str) -> Option<Cow<'a, str>> {
         self.decode_id(value, Self::TRACE_ID)
     }
 
-    pub fn decode_span_id<'a>(&self, value: &'a str) -> Option<Cow<'a, str>> {
+    pub fn decode_span_id<'a, 'b>(&'b self, value: &'a str) -> Option<Cow<'a, str>> {
         self.decode_id(value, Self::SPAN_ID)
     }
 }
@@ -1066,7 +1252,7 @@ impl Default for TraceType {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct L7LogDynamicConfig {
     // in lowercase
     pub proxy_client: String,
@@ -1080,6 +1266,28 @@ pub struct L7LogDynamicConfig {
     span_set: HashSet<String>,
     pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
     pub extra_log_fields: ExtraLogFields,
+}
+
+impl fmt::Debug for L7LogDynamicConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("L7LogDynamicConfig")
+            .field("proxy_client", &self.proxy_client)
+            .field("x_request_id", &self.x_request_id)
+            .field("trace_types", &self.trace_types)
+            .field("span_types", &self.span_types)
+            .field("trace_set", &self.trace_set)
+            .field("span_set", &self.span_set)
+            .field(
+                "expected_headers_set",
+                &self
+                    .expected_headers_set
+                    .iter()
+                    .map(|v| String::from_utf8_lossy(v).to_string())
+                    .collect::<HashSet<_>>(),
+            )
+            .field("extra_log_fields", &self.extra_log_fields)
+            .finish()
+    }
 }
 
 impl PartialEq for L7LogDynamicConfig {
@@ -1260,6 +1468,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 dispatcher_queue: conf.yaml_config.dispatcher_queue,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
+                tunnel_type_trim_bitmap: TunnelTypeBitmap::from_strings(
+                    &conf.yaml_config.trim_tunnel_types,
+                ),
                 trident_type: conf.trident_type,
                 vtap_id: conf.vtap_id as u16,
                 capture_socket_type: conf.capture_socket_type,
@@ -1283,11 +1494,22 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 pod_cluster_id: conf.pod_cluster_id,
                 enabled: conf.enabled,
                 npb_dedup_enabled: conf.npb_dedup_enabled,
+                bond_group: if conf.yaml_config.tap_interface_bond_groups.is_empty() {
+                    vec![]
+                } else {
+                    conf.yaml_config.tap_interface_bond_groups[0]
+                        .tap_interfaces
+                        .clone()
+                },
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                cpu_set: CpuSet::new(),
             },
             sender: SenderConfig {
                 mtu: conf.mtu,
                 dest_ip: dest_ip.clone(),
                 vtap_id: conf.vtap_id as u16,
+                team_id: conf.team_id,
+                organize_id: conf.organize_id,
                 dest_port: conf.analyzer_port,
                 npb_port: conf.yaml_config.npb_port,
                 vxlan_flags: conf.yaml_config.vxlan_flags,
@@ -1299,6 +1521,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 npb_socket_type: conf.npb_socket_type,
                 server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold,
                 bandwidth_probe_interval: conf.bandwidth_probe_interval,
+                multiple_sockets_to_ingester: conf.yaml_config.multiple_sockets_to_ingester,
                 collector_socket_type: conf.collector_socket_type,
                 standalone_data_file_size: conf.yaml_config.standalone_data_file_size,
                 standalone_data_file_dir: conf.yaml_config.standalone_data_file_dir.clone(),
@@ -1315,6 +1538,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 vlan_mode: conf.npb_vlan_mode,
                 dedup_enabled: conf.npb_dedup_enabled,
                 socket_type: conf.npb_socket_type,
+                queue_size: conf.yaml_config.collector_sender_queue_size,
             },
             collector: CollectorConfig {
                 enabled: conf.collector_enabled,
@@ -1405,7 +1629,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
-                prometheus_http_api_addresses: conf.prometheus_http_api_addresses.clone(),
                 agent_enabled: conf.enabled,
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.extra_netns_regex.to_string(),
@@ -1458,6 +1681,30 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .yaml_config
                         .l7_protocol_advanced_features
                         .obfuscate_enabled_protocols,
+                ),
+                l7_log_blacklist: conf.yaml_config.l7_log_blacklist.clone(),
+                l7_log_blacklist_trie: {
+                    let mut blacklist_trie = HashMap::new();
+                    for (k, v) in conf.yaml_config.l7_log_blacklist.iter() {
+                        let l7_protocol = L7Protocol::from(k.to_string());
+                        if l7_protocol == L7Protocol::Unknown {
+                            warn!("Unsupported l7_protocol: {:?}", k);
+                            continue;
+                        }
+                        BlacklistTrie::new(v).map(|x| blacklist_trie.insert(l7_protocol, x));
+                    }
+                    blacklist_trie
+                },
+                unconcerned_dns_nxdomain_response_suffixes: conf
+                    .yaml_config
+                    .l7_protocol_advanced_features
+                    .unconcerned_dns_nxdomain_response_suffixes
+                    .clone(),
+                unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::from(
+                    &conf
+                        .yaml_config
+                        .l7_protocol_advanced_features
+                        .unconcerned_dns_nxdomain_response_suffixes,
                 ),
             },
             debug: DebugConfig {
@@ -1801,7 +2048,7 @@ impl ConfigHandler {
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity {
+        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity || components.is_none() {
             info!(
                 "CPU Affinity set to {}.",
                 new_config.yaml_config.cpu_affinity
@@ -1847,6 +2094,7 @@ impl ConfigHandler {
                 if let Err(e) = sched_setaffinity(Pid::from_raw(pid), &cpu_set) {
                     warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                 }
+                new_config.dispatcher.cpu_set = cpu_set;
             }
         }
 
@@ -2479,35 +2727,6 @@ impl ConfigHandler {
                     "Kubernetes API enabled set to {}",
                     new_cfg.kubernetes_api_enabled
                 );
-                #[cfg(target_os = "linux")]
-                if new_cfg.kubernetes_api_enabled {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.start();
-                    });
-                } else {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.stop();
-                    });
-                }
-            }
-            #[cfg(target_os = "linux")]
-            if old_cfg.prometheus_http_api_addresses != new_cfg.prometheus_http_api_addresses {
-                info!(
-                    "prometheus_http_api_addresses set to {:?}",
-                    new_cfg.prometheus_http_api_addresses
-                );
-                if new_cfg.prometheus_http_api_addresses.is_empty() {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.stop();
-                    });
-                } else {
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.stop();
-                    });
-                    callbacks.push(|_, components| {
-                        components.prometheus_targets_watcher.start();
-                    });
-                }
             }
 
             // restart api watcher if it keeps running and config changes
@@ -2756,7 +2975,7 @@ impl ConfigHandler {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut AgentComponents) {
                 let dispatcher_builders = &components.dispatcher_components;
                 for e in dispatcher_builders {
-                    let mut builders = e.handler_builders.lock().unwrap();
+                    let mut builders = e.handler_builders.write().unwrap();
                     for e in builders.iter_mut() {
                         match e {
                             PacketHandlerBuilder::Npb(n) => {
@@ -2912,13 +3131,20 @@ mod tests {
             prefix: "/d/e/f".to_string(),
             keep_segments: 3,
         };
+        let rule4 = MatchRule {
+            prefix: "".to_string(),
+            keep_segments: 5,
+        };
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 2); // no rlues, 2 is the default keep_segments
         trie.insert(&rule1);
         trie.insert(&rule2);
         trie.insert(&rule3);
         assert_eq!(trie.find_matching_rule("/a/b/c"), 1);
         assert_eq!(trie.find_matching_rule("/d/e/f"), 3);
         assert_eq!(trie.find_matching_rule("/a/b/c/d"), 3);
-        assert_eq!(trie.find_matching_rule("/x/y/z"), 0);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 0); // there is no matching rule
+        trie.insert(&rule4);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 5); // the keep_segments for any rule that matches "" is 5
     }
 
     #[test]

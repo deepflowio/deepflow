@@ -17,6 +17,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -42,11 +43,14 @@ import (
 type Agent struct {
 	cfg *config.ControllerConfig
 
-	userInfo *UserInfo
+	resourceAccess *ResourceAccess
 }
 
-func NewAgent(userInfo *UserInfo, cfg *config.ControllerConfig) *Agent {
-	return &Agent{userInfo: userInfo, cfg: cfg}
+func NewAgent(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *Agent {
+	return &Agent{
+		cfg:            cfg,
+		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+	}
 }
 
 const (
@@ -61,7 +65,8 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	var azs []mysql.AZ
 	var vtapRepos []mysql.VTapRepo
 
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	userInfo := a.resourceAccess.userInfo
+	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +123,7 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 		vtapRepoNameToRevision[item.Name] = item.Branch + " " + item.RevCount
 	}
 
-	agents, err := getAgentByUser(a.userInfo, &a.cfg.FPermit, allVTaps)
+	agents, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return nil, err
 	}
@@ -171,8 +176,8 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			if upgradeRevision, ok := vtapRepoNameToRevision[vtap.UpgradePackage]; ok {
 				vtapResp.UpgradeRevision = upgradeRevision
 			} else {
-				log.Errorf("ORG(id=%d database=%s) vtap upgrade package(%v) cannot assoicated with vtap repo",
-					dbInfo.ORGID, dbInfo.Name, vtap.UpgradePackage)
+				log.Errorf("vtap upgrade package(%v) cannot assoicated with vtap repo",
+					vtap.UpgradePackage, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 			}
 		}
 		// exceptions
@@ -237,10 +242,10 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 }
 
 func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
-	if err := IsAddPermitted(a.cfg.FPermit, a.userInfo, vtapCreate.TeamID); err != nil {
+	if err := a.resourceAccess.CanAddResource(vtapCreate.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.Vtap{}, err
 	}
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -292,7 +297,8 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 }
 
 func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	orgID := a.resourceAccess.userInfo.ORGID
+	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -312,11 +318,11 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	} else {
 		return model.Vtap{}, NewError(httpcommon.INVALID_PARAMETERS, "must specify name or lcuuid")
 	}
-	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
-		return model.Vtap{}, err
+	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.SET_RESOURCE_TYPE_AGENT, "", nil); err != nil {
+		return model.Vtap{}, fmt.Errorf("%w agent(name: %s) has no permission to operate.", err, vtap.Name)
 	}
 
-	log.Infof("ORG(id=%d database=%s) update vtap (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
+	log.Infof("update vtap (%s) config %v", vtap.Name, vtapUpdate, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 
 	// enable/state/vtap_group_lcuuid
 	for _, key := range []string{"ENABLE", "STATE", "VTAP_GROUP_LCUUID", "LICENSE_TYPE"} {
@@ -338,12 +344,12 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
 		key := vtap.CtrlIP + "-" + vtap.CtrlMac
 		if err := db.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
-			log.Errorf("ORG(id=%d database=%s) error: %v", dbInfo.ORGID, dbInfo.Name, err)
+			log.Errorf("error: %v", err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 		}
 	}
 
 	response, _ := a.Get(map[string]interface{}{"lcuuid": vtap.Lcuuid})
-	refresh.RefreshCache(a.userInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return response[0], nil
 }
 
@@ -352,11 +358,15 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (resp map[string
 	var succeedLcuuids []string
 	var failedLcuuids []string
 
+	var isNoPermission bool
 	for _, vtapUpdate := range updateMap {
 		if lcuuid, ok := vtapUpdate["LCUUID"].(string); ok {
 			_, _err := a.Update(lcuuid, "", vtapUpdate)
+			if errors.Is(err, httpcommon.ERR_NO_PERMISSIONS) {
+				isNoPermission = true
+			}
 			if _err != nil {
-				description += _err.Error()
+				description += strings.TrimPrefix(_err.Error(), httpcommon.NO_PERMISSIONS)
 				failedLcuuids = append(failedLcuuids, lcuuid)
 			} else {
 				succeedLcuuids = append(succeedLcuuids, lcuuid)
@@ -369,6 +379,9 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (resp map[string
 		"FAILED_LCUUID":  failedLcuuids,
 	}
 
+	if isNoPermission {
+		return response, NewError(httpcommon.NO_PERMISSIONS, description)
+	}
 	if description != "" {
 		return response, NewError(httpcommon.SERVER_ERROR, description)
 	} else {
@@ -392,7 +405,7 @@ func (a *Agent) checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
 }
 
 func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -404,11 +417,11 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return model.Vtap{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
-	if err := IsUpdatePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+	if err := a.resourceAccess.CanUpdateResource(vtap.TeamID, common.SET_RESOURCE_TYPE_AGENT, "", nil); err != nil {
 		return model.Vtap{}, err
 	}
 
-	log.Infof("ORG(id=%d database=%s) update vtap (%s) license %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
+	log.Infof("update vtap (%s) license %v", vtap.Name, vtapUpdate, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 
 	if _, ok := vtapUpdate["LICENSE_TYPE"]; ok {
 		dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
@@ -437,7 +450,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 }
 
 func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +511,7 @@ func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (
 }
 
 func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
-	dbInfo, err := mysql.GetDB(a.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -508,11 +521,11 @@ func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
-	if err := IsDeletePermitted(a.cfg.FPermit, a.userInfo, vtap.TeamID); err != nil {
+	if err := a.resourceAccess.CanDeleteResource(vtap.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return nil, err
 	}
 
-	log.Infof("ORG(id=%d database=%s) delete vtap (%s)", dbInfo.ORGID, dbInfo.Name, vtap.Name)
+	log.Infof("delete vtap (%s)", vtap.Name, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 
 	db.Delete(&vtap)
 	return map[string]string{"LCUUID": lcuuid}, nil
@@ -615,7 +628,7 @@ func execAZRebalance(
 			if hostType == "controller" {
 				log.Infof(
 					"rebalance vtap (%s) controller_ip from (%s) to (%s)",
-					vtap.Name, vtap.ControllerIP, reallocHostIP,
+					vtap.Name, vtap.ControllerIP, reallocHostIP, db.LogPrefixORGID,
 				)
 				if vtap.ControllerIP == reallocHostIP {
 					continue
@@ -626,7 +639,7 @@ func execAZRebalance(
 			} else {
 				log.Infof(
 					"rebalance vtap (%s) analyzer_ip from (%s) to (%s)",
-					vtap.Name, vtap.AnalyzerIP, reallocHostIP,
+					vtap.Name, vtap.AnalyzerIP, reallocHostIP, db.LogPrefixORGID,
 				)
 				if vtap.AnalyzerIP == reallocHostIP {
 					continue
@@ -827,12 +840,19 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 	return response, nil
 }
 
-func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (*model.VTapRebalanceResult, error) {
+func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (interface{}, error) {
 	var azs []mysql.AZ
 
 	hostType := "controller"
 	if argsType, ok := args["type"]; ok {
 		hostType = argsType.(string)
+	}
+
+	if _, ok := args["is_debug"]; ok && hostType == "controller" {
+		return nil, errors.New("rebalance agent debug only support analyzer type")
+	}
+	if _, ok := args["is_debug"]; ok && cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
+		return nil, errors.New("rebalance agent debug algorithm only support by-ingested-data")
 	}
 
 	ifCheck := false
@@ -845,7 +865,10 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 		return vtapControllerRebalance(db, azs, ifCheck)
 	} else {
 		if cfg.Algorithm == common.ANALYZER_ALLOC_BY_INGESTED_DATA {
-			return rebalance.NewAnalyzerInfo().RebalanceAnalyzerByTraffic(db, ifCheck, cfg.DataDuration)
+			if _, ok := args["is_debug"]; ok {
+				return rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTrafficDebug(db, cfg.DataDuration)
+			}
+			return rebalance.NewAnalyzerInfo(false).RebalanceAnalyzerByTraffic(db, ifCheck, cfg.DataDuration)
 		} else if cfg.Algorithm == common.ANALYZER_ALLOC_BY_AGENT_COUNT {
 			result, err := vtapAnalyzerRebalance(db, azs, ifCheck)
 			if err != nil {
@@ -867,7 +890,7 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 // and virtual network type is VIF_DEVICE_TYPE_VM or VIF_DEVICE_TYPE_POD.
 func GetVTapPortsCount() (int, error) {
 	var vtaps []mysql.VTap
-	if err := mysql.Db.Find(&vtaps).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&vtaps).Error; err != nil {
 		return 0, err
 	}
 	vtapHostIPs, vtapNodeIPs := mapset.NewSet(), mapset.NewSet()
@@ -885,7 +908,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var vms []mysql.VM
-	if err := mysql.Db.Find(&vms).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&vms).Error; err != nil {
 		return 0, err
 	}
 	vtapVMIDs := mapset.NewSet()
@@ -896,7 +919,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var podNodes []mysql.PodNode
-	if err := mysql.Db.Find(&podNodes).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&podNodes).Error; err != nil {
 		return 0, err
 	}
 	podNodeIDs := mapset.NewSet()
@@ -907,7 +930,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var pods []mysql.Pod
-	if err := mysql.Db.Find(&pods).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&pods).Error; err != nil {
 		return 0, err
 	}
 	vtapPodIDs := mapset.NewSet()
@@ -918,7 +941,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	var lanIPs []mysql.LANIP
-	if err := mysql.Db.Find(&lanIPs).Error; err != nil {
+	if err := mysql.DefaultDB.Find(&lanIPs).Error; err != nil {
 		return 0, err
 	}
 	pubVTapVIFs := mapset.NewSet()
@@ -930,7 +953,7 @@ func GetVTapPortsCount() (int, error) {
 
 	vtapVifCount := 0
 	var vinterfaces []mysql.VInterface
-	if err := mysql.Db.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
+	if err := mysql.DefaultDB.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
 		Find(&vinterfaces).Error; err != nil {
 		return 0, err
 	}

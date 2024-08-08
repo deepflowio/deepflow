@@ -24,13 +24,13 @@ import (
 	"gopkg.in/yaml.v2"
 
 	simplejson "github.com/bitly/go-simplejson"
-	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("cloud.filereader")
+var log = logger.MustGetLogger("cloud.filereader")
 
 type FileReader struct {
 	orgID        int
@@ -53,13 +53,13 @@ type FileReader struct {
 func NewFileReader(orgID int, domain mysql.Domain) (*FileReader, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	filePath, err := config.Get("path").String()
 	if err != nil {
-		log.Error("path must be specified")
+		log.Error("path must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
@@ -91,7 +91,7 @@ func (f *FileReader) getRegionLcuuid(regionName string) (string, error) {
 	regionLcuuid, ok := f.regionNameToLcuuid[regionName]
 	if !ok {
 		err := errors.New(fmt.Sprintf("region (%s) not in file", regionName))
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(f.orgID))
 		return "", err
 	}
 	return regionLcuuid, nil
@@ -110,68 +110,68 @@ func (f *FileReader) GetCloudData() (model.Resource, error) {
 
 	fileBytes, err := os.ReadFile(f.filePath)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	var fileInfo FileInfo
 	if err = yaml.Unmarshal(fileBytes, &fileInfo); err != nil {
-		log.Errorf("Unmarshal yaml error: %v", err)
+		log.Errorf("Unmarshal yaml error: %v", err, logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	// region
 	regions, err := f.getRegions(&fileInfo)
 	if err != nil {
-		log.Error("get region data failed")
+		log.Error("get region data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	// az
 	azs, err := f.getAZs(&fileInfo)
 	if err != nil {
-		log.Error("get az data failed")
+		log.Error("get az data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	hosts, err := f.getHosts(&fileInfo)
 	if err != nil {
-		log.Error("get host data failed")
+		log.Error("get host data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	// VPC
 	vpcs, err := f.getVPCs(&fileInfo)
 	if err != nil {
-		log.Error("get vpc data failed")
+		log.Error("get vpc data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	// network
 	networks, err := f.getNetworks(&fileInfo)
 	if err != nil {
-		log.Error("get network data failed")
+		log.Error("get network data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	// subnet
 	subnets, err := f.getSubnets(&fileInfo)
 	if err != nil {
-		log.Error("get subnet data failed")
+		log.Error("get subnet data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	// vm, vinterface and ip
 	vms, vinterfaces, ips, err := f.getVMs(&fileInfo)
 	if err != nil {
-		log.Error("get vm data failed")
+		log.Error("get vm data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 
 	// vrouter, vinterface and ip
 	vrouters, tmpVInterfaces, tmpIPs, err := f.getRouters(&fileInfo)
 	if err != nil {
-		log.Error("get router data failed")
+		log.Error("get router data failed", logger.NewORGPrefix(f.orgID))
 		return resource, err
 	}
 	vinterfaces = append(vinterfaces, tmpVInterfaces...)

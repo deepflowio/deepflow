@@ -33,12 +33,12 @@ func (b *DataSet) AddLB(dbItem *mysql.LB, seq int) {
 		VIP:          dbItem.VIP,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteLB(lcuuid string) {
 	delete(b.LBs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type LB struct {

@@ -19,6 +19,7 @@ package mysql
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
@@ -58,7 +59,22 @@ func GetNonDefaultORGIDs() ([]int, error) {
 	for _, org := range orgs {
 		ids = append(ids, org.ORGID)
 	}
+	sort.Ints(ids)
 	return ids, nil
+}
+
+func CheckORGNumberAndLog() ([]int, error) {
+	orgIDs, err := GetORGIDs()
+	if err != nil {
+		return nil, err
+	}
+	msg := fmt.Sprintf("the number of organizations is %d. If you see a `Too many connections` error in the logs, please increase the `max_connections` setting in MySQL.", len(orgIDs))
+	if len(orgIDs) > 20 {
+		log.Warning(msg)
+	} else if len(orgIDs) > 10 {
+		log.Info(msg)
+	}
+	return orgIDs, nil
 }
 
 // SyncDefaultOrgData synchronizes a slice of data items of any type T to all organization databases except the default one.
@@ -67,9 +83,14 @@ func GetNonDefaultORGIDs() ([]int, error) {
 //
 // Parameters:
 // - data: A slice of data items of any type T to be synchronized. The type T must have an "ID" field tagged as the primary key.
-func SyncDefaultOrgData[T any](data []T) error {
+func SyncDefaultOrgData[T any](data []T, excludeFields []string) error {
 	if len(data) == 0 {
 		return nil
+	}
+
+	excludeFieldsMap := make(map[string]bool)
+	for _, field := range excludeFields {
+		excludeFieldsMap[field] = true
 	}
 
 	// get fields to update
@@ -80,22 +101,33 @@ func SyncDefaultOrgData[T any](data []T) error {
 		dbTag := field.Tag.Get("gorm")
 		if dbTag != "" {
 			columnName := GetColumnNameFromTag(dbTag)
-			if columnName != "" {
+			if columnName != "" && !excludeFieldsMap[columnName] {
 				fields = append(fields, columnName)
 			}
 		}
 	}
 
-	for orgID, db := range dbs.orgIDToDB {
+	orgIDs, err := GetORGIDs()
+	if err != nil {
+		return err
+	}
+
+	for _, orgID := range orgIDs {
 		if orgID == DefaultDB.ORGID {
 			continue
 		}
+		dbInfo, err := GetDB(orgID)
+		if err != nil {
+			log.Errorf("get org id (%d) mysql session failed", orgID)
+			continue
+		}
 
-		err := db.Transaction(func(tx *gorm.DB) error {
+		db := dbInfo.DB
+		err = db.Transaction(func(tx *gorm.DB) error {
 			// delete
 			var existingIDs []int
 			var t T
-			if err := db.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
+			if err := tx.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
 				return err
 			}
 			existingIDMap := make(map[int]bool)
@@ -108,14 +140,14 @@ func SyncDefaultOrgData[T any](data []T) error {
 			}
 			for id, exists := range existingIDMap {
 				if exists {
-					if err := db.Where("id = ?", id).Delete(&t).Error; err != nil {
+					if err := tx.Where("id = ?", id).Delete(&t).Error; err != nil {
 						return err
 					}
 				}
 			}
 
 			// add or update
-			if err := db.Clauses(clause.OnConflict{
+			if err := tx.Clauses(clause.OnConflict{
 				DoUpdates: clause.AssignmentColumns(fields), // `UpdateAll: true,` can not update time
 			}).Save(&data).Error; err != nil {
 				return fmt.Errorf("failed to sync data: %v", err)
@@ -123,7 +155,7 @@ func SyncDefaultOrgData[T any](data []T) error {
 			return nil
 		})
 		if err != nil {
-			log.Errorf("org(id:%d, name:%s) error: %s", db.ORGID, db.Name, err.Error())
+			log.Errorf("%s", err.Error(), dbInfo.LogPrefixORGID)
 		}
 	}
 	return nil

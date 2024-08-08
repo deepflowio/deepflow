@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2024 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package agent_config
 
 type TypeInfo struct {
@@ -83,7 +99,6 @@ type AgentGroupConfigResponse struct {
 	HTTPLogXRequestID                 *string        `json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled     *int           `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort        *int           `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
-	PrometheusHttpAPIAddresses        *string        `json:"PROMETHEUS_HTTP_API_ADDRESSES"` // separate by ","
 	AnalyzerPort                      *int           `json:"ANALYZER_PORT"`
 	ProxyControllerPort               *int           `json:"PROXY_CONTROLLER_PORT"`
 	ProxyControllerIP                 *string        `json:"PROXY_CONTROLLER_IP"`
@@ -91,4 +106,5 @@ type AgentGroupConfigResponse struct {
 	WasmPlugins                       []string       `json:"WASM_PLUGINS"`
 	SoPlugins                         []string       `json:"SO_PLUGINS"`
 	TeamID                            int            `json:"TEAM_ID"`
+	UserID                            int            `json:"USER_ID"`
 }

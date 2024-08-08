@@ -67,6 +67,7 @@ type L7Base struct {
 	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
 	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
 	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	TapSideEnum  uint8
 	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
 	ReqTcpSeq    uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
 	RespTcpSeq   uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
@@ -88,6 +89,8 @@ type L7Base struct {
 	SyscallCoroutine1      uint64 `json:"syscall_coroutine_1" category:"$tag" sub:"tracing_info"`
 	SyscallCapSeq0         uint32 `json:"syscall_cap_seq_0" category:"$tag" sub:"tracing_info"`
 	SyscallCapSeq1         uint32 `json:"syscall_cap_seq_1" category:"$tag" sub:"tracing_info"`
+
+	EncodedSpan []byte
 }
 
 func L7BaseColumns() []*ckdb.Column {
@@ -237,8 +240,8 @@ type L7FlowLog struct {
 	DirectionScore   uint8 `json:"direction_score" category:"$metrics" sub:"l4_throughput"`
 
 	// For Packet signal sources, it represents the packet length captured by AF_PACKET, excluding the layer 4 headers; for eBPF signal sources, it indicates the number of bytes for a single system call, and note that when TCP stream reassembly is enabled, it represents the total number of bytes from multiple system calls.
-	CapturedRequestByte  uint32
-	CapturedResponseByte uint32
+	CapturedRequestByte  uint32 `json:"captured_request_byte" category:"$metrics" sub:"throughput"`
+	CapturedResponseByte uint32 `json:"captured_response_byte" category:"$metrics" sub:"throughput"`
 
 	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
 	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
@@ -280,7 +283,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),
 		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetComment("app service"),
-		ckdb.NewColumn("app_instance", ckdb.String).SetComment("app instance"),
+		ckdb.NewColumn("app_instance", ckdb.LowCardinalityString).SetComment("app instance"),
 
 		ckdb.NewColumn("response_duration", ckdb.UInt64),
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
@@ -367,7 +370,7 @@ func base64ToHexString(str string) string {
 var lastTraceIdIndex uint64
 
 func parseTraceIdIndex(traceId string, traceIdIndexCfg *config.TraceIdWithIndex) uint64 {
-	if !traceIdIndexCfg.Enabled {
+	if traceIdIndexCfg.Disabled {
 		return 0
 	}
 	if len(traceId) == 0 {
@@ -477,7 +480,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 	switch datatype.L7Protocol(h.L7Protocol) {
 	case datatype.L7_PROTOCOL_KAFKA:
 		if l.Req != nil {
-			if h.responseCode == 0 && l.Req.ReqType != datatype.KafkaCommandString[datatype.Fetch] {
+			if h.responseCode == 0 && !IsKafkaSupportedCommand(l.Req.ReqType) {
 				h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 				h.ResponseCode = nil
 			}
@@ -487,6 +490,15 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 		// assume protobuf and sofa rpc Always have request_id and maybe equal to 0
 		h.RequestId = &h.requestId
 	}
+}
+
+func IsKafkaSupportedCommand(cmd string) bool {
+	for _, supportedCmd := range []datatype.KafkaCommand{datatype.Fetch, datatype.Produce, datatype.JoinGroup, datatype.LeaveGroup, datatype.SyncGroup} {
+		if cmd == datatype.KafkaCommandString[supportedCmd] {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *L7FlowLog) fillExceptionDesc(l *pb.AppProtoLogsData) {
@@ -575,6 +587,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	}
 	b.TunnelType = uint8(tunnelType)
 	b.TapSide = flow_metrics.TAPSideEnum(l.TapSide).String()
+	b.TapSideEnum = uint8(l.TapSide)
+
 	b.VtapID = uint16(l.VtapId)
 	b.ReqTcpSeq = l.ReqTcpSeq
 	b.RespTcpSeq = l.RespTcpSeq
@@ -643,8 +657,9 @@ func ReleaseL7FlowLog(l *L7FlowLog) {
 
 var L7FlowLogCounter uint32
 
-func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
+func ProtoLogToL7FlowLog(orgId, teamId uint16, l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
 	h := AcquireL7FlowLog()
+	h.OrgId, h.TeamID = orgId, teamId
 	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
 	h.Fill(l, platformData, cfg)
 	return h

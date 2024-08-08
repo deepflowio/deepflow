@@ -1,3 +1,8 @@
-[<MODULE>] <What's in this commit> (#<issue id>)
-
-<More descriptions here, or remove this line>
+# feat:     A new feature
+# fix:      A bug fix
+# docs:     Documentation only changes
+# style:    Formatting, missing semi-colons, white-space, etc
+# refactor: A code change that neither fixes a bug nor adds a feature
+# perf:     A code change that improves performance
+# test:     Adding missing tests
+# chore:    Maintain. Changes to the build process or auxiliary tools/libraries/documentation

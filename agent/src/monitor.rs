@@ -218,20 +218,16 @@ impl RefCountable for SysStatusBroker {
             CounterValue::Unsigned(current_sys_free_memory_percentage as u64),
         ));
 
+        let sys_free_memory_limit = self.config.load().sys_free_memory_limit as f64;
+        let sys_free_memory_limit_ratio = if sys_free_memory_limit > 0.0 {
+            current_sys_free_memory_percentage as f64 / sys_free_memory_limit
+        } else {
+            0.0 // If sys_free_memory_limit is set to 0, it means that there is no need to check if the system's free memory is too low. In this case, 0.0 will be directly returned, indicating that there will be no low system free memory alert.
+        };
         metrics.push((
-            "max_memory",
+            "sys_free_memory_limit_ratio",
             CounterType::Gauged,
-            CounterValue::Unsigned(self.config.load().max_memory as u64),
-        ));
-        metrics.push((
-            "max_millicpus",
-            CounterType::Gauged,
-            CounterValue::Unsigned(self.config.load().max_millicpus as u64),
-        ));
-        metrics.push((
-            "system_free_memory_limit",
-            CounterType::Gauged,
-            CounterValue::Unsigned(self.config.load().sys_free_memory_limit as u64),
+            CounterValue::Float(sys_free_memory_limit_ratio),
         ));
 
         match get_file_and_size_sum(&self.log_dir) {
@@ -262,9 +258,19 @@ impl RefCountable for SysStatusBroker {
                     CounterValue::Float(cpu_usage),
                 ));
                 metrics.push((
+                    "max_millicpus_ratio",
+                    CounterType::Gauged,
+                    CounterValue::Float(cpu_usage * 10.0 / self.config.load().max_millicpus as f64),
+                ));
+                metrics.push((
                     "memory",
                     CounterType::Gauged,
                     CounterValue::Unsigned(mem_used),
+                ));
+                metrics.push((
+                    "max_memory_ratio",
+                    CounterType::Gauged,
+                    CounterValue::Float(mem_used as f64 / self.config.load().max_memory as f64),
                 ));
                 metrics.push((
                     "create_time",

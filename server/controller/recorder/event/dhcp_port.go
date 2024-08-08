@@ -84,7 +84,7 @@ func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = p.ToolDataSet.GetDHCPPortNameByID(id)
 			if err != nil {
-				log.Error(p.metadata.LogPre("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err))
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err, p.metadata.LogPrefixes)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

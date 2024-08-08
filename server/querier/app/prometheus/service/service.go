@@ -68,11 +68,11 @@ func NewPrometheusService() *PrometheusService {
 	}
 }
 
-func (s *PrometheusService) PromRemoteReadService(req *prompb.ReadRequest, ctx context.Context, offloading bool) (resp *prompb.ReadResponse, err error) {
+func (s *PrometheusService) PromRemoteReadService(req *prompb.ReadRequest, ctx context.Context, offloading bool, orgID string) (resp *prompb.ReadResponse, err error) {
 	if offloading {
-		return s.executor.promRemoteReadOffloadingExecute(ctx, req)
+		return s.executor.promRemoteReadOffloadingExecute(ctx, req, orgID)
 	} else {
-		return s.executor.promRemoteReadExecute(ctx, req)
+		return s.executor.promRemoteReadExecute(ctx, req, orgID)
 	}
 }
 
@@ -100,8 +100,8 @@ func (s *PrometheusService) PromSeriesQueryService(args *model.PromQueryParams, 
 	return s.executor.series(ctx, args)
 }
 
-func (s *PrometheusService) PromQLAnalysis(ctx context.Context, metric string, targetLabels []string, appLabels []string, startTime string, endTime string) (*common.Result, error) {
-	return s.executor.promQLAnalysis(ctx, metric, targetLabels, appLabels, startTime, endTime)
+func (s *PrometheusService) PromQLAnalysis(ctx context.Context, metric string, targetLabels []string, appLabels []string, startTime string, endTime string, orgID string) (*common.Result, error) {
+	return s.executor.promQLAnalysis(ctx, metric, targetLabels, appLabels, startTime, endTime, orgID)
 }
 
 func (s *PrometheusService) PromQLAdapter(m *model.PromQueryResponse) *model.PromQueryWrapper {

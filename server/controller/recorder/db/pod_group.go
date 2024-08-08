@@ -22,21 +22,16 @@ import (
 )
 
 type PodGroup struct {
-	OperatorBase[mysql.PodGroup]
+	OperatorBase[*mysql.PodGroup, mysql.PodGroup]
 }
 
 func NewPodGroup() *PodGroup {
 	operater := &PodGroup{
-		OperatorBase[mysql.PodGroup]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PodGroup](
+			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *PodGroup) setDBItemID(dbItem *mysql.PodGroup, id int) {
-	dbItem.ID = id
 }

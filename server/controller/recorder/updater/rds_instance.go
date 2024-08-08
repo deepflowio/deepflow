@@ -29,8 +29,9 @@ import (
 type RDSInstance struct {
 	UpdaterBase[
 		cloudmodel.RDSInstance,
-		mysql.RDSInstance,
 		*diffbase.RDSInstance,
+		*mysql.RDSInstance,
+		mysql.RDSInstance,
 		*message.RDSInstanceAdd,
 		message.RDSInstanceAdd,
 		*message.RDSInstanceUpdate,
@@ -45,8 +46,9 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 	updater := &RDSInstance{
 		newUpdaterBase[
 			cloudmodel.RDSInstance,
-			mysql.RDSInstance,
 			*diffbase.RDSInstance,
+			*mysql.RDSInstance,
+			mysql.RDSInstance,
 			*message.RDSInstanceAdd,
 			message.RDSInstanceAdd,
 			*message.RDSInstanceUpdate,
@@ -74,10 +76,10 @@ func (r *RDSInstance) getDiffBaseByCloudItem(cloudItem *cloudmodel.RDSInstance) 
 func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*mysql.RDSInstance, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, cloudItem.Lcuuid,
-		)))
+		), r.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.RDSInstance{

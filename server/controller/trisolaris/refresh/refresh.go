@@ -22,15 +22,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 )
 
-var log = logging.MustGetLogger("trisolaris/refresh")
+var log = logger.MustGetLogger("trisolaris.refresh")
 
 type RefreshOP struct {
 	db               *gorm.DB

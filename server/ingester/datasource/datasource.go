@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/deepflowio/deepflow/server/ingester/common"
+	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/gorilla/mux"
@@ -45,7 +47,8 @@ type DatasourceManager struct {
 	readTimeout      int
 	replicaEnabled   bool
 	ckdbColdStorages map[string]*ckdb.ColdStorage
-	isModifyingFlags []bool
+	isModifyingFlags [ckdb.MAX_ORG_ID + 1][MAX_DATASOURCE_COUNT]bool
+	cks              common.DBs
 
 	ckdbCluster       string
 	ckdbStoragePolicy string
@@ -62,7 +65,6 @@ func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManage
 		ckdbCluster:       cfg.CKDB.ClusterName,
 		ckdbStoragePolicy: cfg.CKDB.StoragePolicy,
 		ckdbColdStorages:  cfg.GetCKDBColdStorages(),
-		isModifyingFlags:  make([]bool, MAX_DATASOURCE_COUNT),
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),
@@ -208,6 +210,11 @@ func (m *DatasourceManager) RegisterHandlers() {
 
 func (m *DatasourceManager) Start() {
 	m.RegisterHandlers()
+	cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
+	if err != nil {
+		log.Fatalf("new ck connections failed: %s", err)
+	}
+	m.cks = cks
 
 	go func() {
 		if err := m.server.ListenAndServe(); err != http.ErrServerClosed {
@@ -221,6 +228,7 @@ func (m *DatasourceManager) Close() error {
 	if m.server == nil {
 		return nil
 	}
+	m.cks.Close()
 	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 
 	err := m.server.Shutdown(ctx)

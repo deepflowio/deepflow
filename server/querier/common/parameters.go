@@ -69,6 +69,11 @@ type KeyValue struct {
 	Value string
 }
 
+type EntryKey struct {
+	ORGID  string
+	Filter string
+}
+
 type EntryValue struct {
 	Filter string
 	Time   time.Time

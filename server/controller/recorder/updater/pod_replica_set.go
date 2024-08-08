@@ -29,8 +29,9 @@ import (
 type PodReplicaSet struct {
 	UpdaterBase[
 		cloudmodel.PodReplicaSet,
-		mysql.PodReplicaSet,
 		*diffbase.PodReplicaSet,
+		*mysql.PodReplicaSet,
+		mysql.PodReplicaSet,
 		*message.PodReplicaSetAdd,
 		message.PodReplicaSetAdd,
 		*message.PodReplicaSetUpdate,
@@ -45,8 +46,9 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 	updater := &PodReplicaSet{
 		newUpdaterBase[
 			cloudmodel.PodReplicaSet,
-			mysql.PodReplicaSet,
 			*diffbase.PodReplicaSet,
+			*mysql.PodReplicaSet,
+			mysql.PodReplicaSet,
 			*message.PodReplicaSetAdd,
 			message.PodReplicaSetAdd,
 			*message.PodReplicaSetUpdate,
@@ -74,26 +76,26 @@ func (r *PodReplicaSet) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodReplicaS
 func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet) (*mysql.PodReplicaSet, bool) {
 	podNamespaceID, exists := r.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
-		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
-		)))
+		), r.metadata.LogPrefixes)
 		return nil, false
 	}
 	podClusterID, exists := r.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
-		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
-		)))
+		), r.metadata.LogPrefixes)
 		return nil, false
 	}
 	podGroupID, exists := r.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {
-		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.Lcuuid,
-		)))
+		), r.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.PodReplicaSet{
@@ -127,10 +129,10 @@ func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, clo
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	mapInfo["az"] = cloudItem.AZLcuuid
+	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+	// }
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)

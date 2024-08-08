@@ -18,23 +18,20 @@ package genesis
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"inet.af/netaddr"
 
-	"github.com/bitly/go-simplejson"
 	tridentcommon "github.com/deepflowio/deepflow/message/common"
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -55,6 +52,7 @@ type GenesisSyncRpcUpdater struct {
 	excludeIPRanges       []netaddr.IPPrefix
 	multiNSMode           bool
 	singleVPCMode         bool
+	vmNameField           string
 	ignoreNICRegex        *regexp.Regexp
 	genesisSyncDataByVtap map[string]GenesisSyncDataOperation
 }
@@ -141,6 +139,7 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		excludeIPRanges:       excludeIPRanges,
 		multiNSMode:           cfg.MultiNSMode,
 		singleVPCMode:         cfg.SingleVPCMode,
+		vmNameField:           cfg.VMNameField,
 		ignoreNICRegex:        ignoreNICRegex,
 		genesisSyncDataByVtap: map[string]GenesisSyncDataOperation{},
 	}
@@ -155,7 +154,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 	VIFs := []model.GenesisVinterface{}
 	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
-		log.Errorf("get sync data (raw ip addrs) empty")
+		log.Errorf("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.orgID))
 		return []model.GenesisVinterface{}
 	}
 	netNSs := info.message.GetPlatformData().GetRawIpNetns()
@@ -164,7 +163,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 		ipAddrs = ipAddrs[:1]
 	}
 	if len(ipAddrs) != len(netNSs) {
-		log.Error("the quantities of (raw ip addrs) and (raw ip netns) do not match")
+		log.Error("the quantities of (raw ip addrs) and (raw ip netns) do not match", logger.NewORGPrefix(info.orgID))
 		return []model.GenesisVinterface{}
 	}
 	rootNSMacs := map[string]bool{}
@@ -174,7 +173,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 		nsName := netNSs[i]
 		parsedGlobalIPs, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddr, " "))
 		if err != nil {
-			log.Errorf("parse ip output error: (%s)", err)
+			log.Errorf("parse ip output error: (%s)", err, logger.NewORGPrefix(info.orgID))
 			return []model.GenesisVinterface{}
 		}
 
@@ -220,6 +219,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			vIF.LastSeen = epoch
 			vIF.VtapID = vtapID
 			vIF.KubernetesClusterID = k8sClusterID
+			vIF.TeamID = info.teamID
 			VIFs = append(VIFs, vIF)
 		}
 	}
@@ -253,14 +253,14 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			if hasNetMask {
 				ipPrefix, err := netaddr.ParseIPPrefix(addr)
 				if err != nil {
-					log.Error(err.Error())
+					log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
 					continue
 				}
 				netIP = ipPrefix.IP()
 			} else {
 				ipAddr, err := netaddr.ParseIP(addr)
 				if err != nil {
-					log.Error(err.Error())
+					log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
 					continue
 				}
 				netIP = ipAddr
@@ -315,6 +315,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 		vIF.LastSeen = epoch
 		vIF.VtapID = vtapID
 		vIF.KubernetesClusterID = k8sClusterID
+		vIF.TeamID = info.teamID
 		VIFs = append(VIFs, vIF)
 	}
 	return VIFs
@@ -325,13 +326,13 @@ func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []mo
 
 	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
-		log.Errorf("get sync data (raw ip addrs) empty")
+		log.Errorf("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.orgID))
 		return []model.GenesisVIP{}
 	}
 	for _, ipAddr := range ipAddrs {
 		parsedGlobalIPs, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddr, " "))
 		if err != nil {
-			log.Errorf("parse ip output error: (%s)", err)
+			log.Errorf("parse ip output error: (%s)", err, logger.NewORGPrefix(info.orgID))
 			return []model.GenesisVIP{}
 		}
 
@@ -342,7 +343,7 @@ func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []mo
 			for _, ip := range item.IPs {
 				ipObj, err := netaddr.ParseIP(ip.Address)
 				if err != nil {
-					log.Warningf("parse lo vip (%s) field: (%s)", ip.Address, err)
+					log.Warningf("parse lo vip (%s) field: (%s)", ip.Address, err, logger.NewORGPrefix(info.orgID))
 					continue
 				}
 				if ipObj.IsLoopback() {
@@ -361,19 +362,23 @@ func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []mo
 
 func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, peer, natIP string, vtapID uint32) GenesisSyncDataOperation {
 	hostName := strings.Trim(info.message.GetPlatformData().GetRawHostname(), " \n")
+	if hostName == "" {
+		log.Error("get sync data (raw hostname) empty", logger.NewORGPrefix(info.orgID))
+		return GenesisSyncDataOperation{}
+	}
 	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
-		log.Errorf("get sync data (raw ip addrs) empty")
+		log.Error("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.orgID))
 		return GenesisSyncDataOperation{}
 	}
 	interfaces, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddrs[0], " "))
 	if err != nil {
-		log.Error(err.Error())
+		log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
 		return GenesisSyncDataOperation{}
 	}
 	// check if vm is behind NAT
 	behindNat := peer != natIP
-	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode)
+	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode, logger.NewORGPrefix(info.orgID))
 	vpc := model.GenesisVpc{
 		Name:   "default-public-cloud-vpc",
 		Lcuuid: common.GetUUIDByOrgID(info.orgID, "default-public-cloud-vpc"),
@@ -404,7 +409,8 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	ports := []model.GenesisPort{}
 	ipLastSeens := []model.GenesisIP{}
 	for _, iface := range interfaces {
-		if iface.MAC == "" {
+		if iface.MAC == "" || iface.Name == "lo" {
+			log.Debugf("not found mac or netcard is loopback (%#v)", iface, logger.NewORGPrefix(info.orgID))
 			continue
 		}
 		ips := iface.IPs
@@ -424,7 +430,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 		for _, ipItem := range ips {
 			pIP, err := netaddr.ParseIP(ipItem.Address)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
 				return GenesisSyncDataOperation{}
 			}
 
@@ -478,7 +484,7 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 			}
 			oIP, err := netaddr.ParseIP(p.Address)
 			if err != nil {
-				log.Warning(err.Error())
+				log.Warning(err.Error(), logger.NewORGPrefix(info.orgID))
 				continue
 			}
 			ipLastSeen := model.GenesisIP{
@@ -576,12 +582,12 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	pCSVkeys := []string{"_uuid", "other_config", "tag"}
 	nameToOvsPort, err := genesiscommon.ParseCSVWithKey(rawOVSPorts, "name", pCSVkeys...)
 	if err != nil {
-		log.Warning("parse csv with key failed: " + err.Error())
+		log.Warning("parse csv with key failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
 	}
 	pCSVs := []string{"name", "external_ids"}
 	nameToOvsIfs, err := genesiscommon.ParseCSV(rawOVSInterface, pCSVs...)
 	if err != nil {
-		log.Warning("parse csv failed: " + err.Error())
+		log.Warning("parse csv failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
 	}
 	for _, nameToOvsIf := range nameToOvsIfs {
 		name, ok := nameToOvsIf["name"]
@@ -590,11 +596,11 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 		}
 		eIDs, err := genesiscommon.ParseKVString(nameToOvsIf["external_ids"])
 		if err != nil {
-			log.Warning("parse kvstring failed: " + err.Error())
+			log.Warning("parse kvstring failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
 		}
 		mac, ok := eIDs["attached-mac"]
 		if !ok {
-			log.Debugf("ovs interface %s does not have external_ids:attached-mac", name)
+			log.Debugf("ovs interface %s does not have external_ids:attached-mac", name, logger.NewORGPrefix(info.orgID))
 			continue
 		}
 		if ovsPort, ok := nameToOvsPort[name]; ok {
@@ -608,7 +614,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 		}
 		vlanConfig, err := genesiscommon.ParseVLANConfig(rawVlanConfig)
 		if err != nil {
-			log.Warning("parse vlan config failed: " + err.Error())
+			log.Warning("parse vlan config failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
 		}
 		for br, ifaces := range bridges {
 			vlan := 1
@@ -636,7 +642,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 		ipObj := net.IP(tIP.GetIp())
 		nIPObj, ok := netaddr.FromStdIP(ipObj)
 		if !ok {
-			log.Warningf("ip (%s) invalid", ipObj.String())
+			log.Warningf("ip (%s) invalid", ipObj.String(), logger.NewORGPrefix(info.orgID))
 			continue
 		}
 		ip.IP = ipObj.String()
@@ -658,11 +664,11 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	ips := []model.GenesisIP{}
 	vmStates, err := genesiscommon.ParseVMStates(rawVMStates)
 	if err != nil {
-		log.Warning("parse vm states failed: " + err.Error())
+		log.Warning("parse vm states failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
 	}
-	xmlVMs, err := genesiscommon.ParseVMXml(rawVM)
+	xmlVMs, err := genesiscommon.ParseVMXml(rawVM, v.vmNameField)
 	if err != nil {
-		log.Warning("parse vm xml failed: " + err.Error())
+		log.Warning("parse vm xml failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
 	}
 	for _, xmlVM := range xmlVMs {
 		vm := model.GenesisVM{}
@@ -701,13 +707,13 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 				} else if oP, ok := nameToOvsPort[ifName]; ok {
 					portMap = oP
 				} else {
-					log.Debugf("vm %s interface %s mac %s not found in ovs ports", vm.Label, ifName, mac)
+					log.Debugf("vm %s interface %s mac %s not found in ovs ports", vm.Label, ifName, mac, logger.NewORGPrefix(info.orgID))
 					continue
 				}
 				port.Lcuuid = portMap["_uuid"]
 				options, err := genesiscommon.ParseKVString(portMap["other_config"])
 				if err != nil {
-					log.Warning("parse kv string failed: " + err.Error())
+					log.Warning("parse kv string failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
 				}
 				if nLcuuid, ok := options["net_uuid"]; ok {
 					network.Lcuuid = nLcuuid
@@ -871,11 +877,11 @@ func (v *GenesisSyncRpcUpdater) run() {
 		genesisSyncDataOper := GenesisSyncDataOperation{}
 		info := v.outputQueue.Get().(VIFRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("sync from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
+			log.Warningf("sync from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType, logger.NewORGPrefix(info.orgID))
 			continue
 		}
 
-		log.Debugf("sync received (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message)
+		log.Debugf("sync received (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message, logger.NewORGPrefix(info.orgID))
 
 		vtap := fmt.Sprintf("%d%d", info.orgID, info.vtapID)
 		if info.msgType == genesiscommon.TYPE_RENEW {
@@ -936,12 +942,13 @@ func (k *KubernetesRpcUpdater) run() {
 	for {
 		info := k.outputQueue.Get().(K8SRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("k8s from (%s) vtap_id (%v) type (%v) exit", info.peer, info.vtapID, info.msgType)
+			log.Warningf("k8s from (%s) vtap_id (%v) type (%v) exit", info.peer, info.vtapID, info.msgType, logger.NewORGPrefix(info.orgID))
 			break
 		}
-		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion())
+		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion(), logger.NewORGPrefix(info.orgID))
 		// 更新和保存内存数据
 		k.storage.Add(info.orgID, KubernetesInfo{
+			ORGID:     info.orgID,
 			Epoch:     time.Now(),
 			ClusterID: info.message.GetClusterId(),
 			ErrorMSG:  info.message.GetErrorMsg(),
@@ -958,159 +965,5 @@ func (k *KubernetesRpcUpdater) Start() {
 func (k *KubernetesRpcUpdater) Stop() {
 	if k.kCancel != nil {
 		k.kCancel()
-	}
-}
-
-type PrometheusRpcUpdater struct {
-	kCtx        context.Context
-	kCancel     context.CancelFunc
-	storage     *PrometheusStorage
-	outputQueue queue.QueueReader
-}
-
-func NewPrometheuspInfoRpcUpdater(storage *PrometheusStorage, queue queue.QueueReader, ctx context.Context) *PrometheusRpcUpdater {
-	pCtx, pCancel := context.WithCancel(ctx)
-	return &PrometheusRpcUpdater{
-		kCtx:        pCtx,
-		kCancel:     pCancel,
-		storage:     storage,
-		outputQueue: queue,
-	}
-}
-
-func (p *PrometheusRpcUpdater) ParsePrometheusEntries(info PrometheusMessage) ([]cloudmodel.PrometheusTarget, error) {
-	result := []cloudmodel.PrometheusTarget{}
-	entries := info.message.GetEntries()
-	for index, e := range entries {
-		pJobNameToHonorLabelsConfig := map[string]bool{}
-		configOut, err := genesiscommon.ParseCompressedInfo(e.GetConfigCompressedInfo())
-		if err != nil {
-			log.Warningf("index (%d): config decompress error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		cEntryJson, err := simplejson.NewJson(configOut.Bytes())
-		if err != nil {
-			log.Warningf("index (%d): config marshal json error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		cStatus := cEntryJson.Get("status").MustString()
-		if cStatus != "success" {
-			errMSG := fmt.Sprintf("index (%d): config api status (%s)", index+1, cStatus)
-			log.Warning(errMSG)
-			return []cloudmodel.PrometheusTarget{}, errors.New(errMSG)
-		}
-		prometheusConfig, err := genesiscommon.ParseYMAL(cEntryJson.GetPath("data", "yaml").MustString())
-		if err != nil {
-			log.Warningf("index (%d): config parse yaml error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		for _, scrapeConfig := range prometheusConfig.ScrapeConfigs {
-			pJobNameToHonorLabelsConfig[scrapeConfig.JobName] = scrapeConfig.HonorLabels
-		}
-
-		targetOut, err := genesiscommon.ParseCompressedInfo(e.GetTargetCompressedInfo())
-		if err != nil {
-			log.Warningf("index (%d): target decompress error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		tEntryJson, err := simplejson.NewJson(targetOut.Bytes())
-		if err != nil {
-			log.Warningf("index (%d): target marshal json error: %s", index+1, err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		tStatus := tEntryJson.Get("status").MustString()
-		if tStatus != "success" {
-			errMSG := fmt.Sprintf("index (%d): target api status (%s)", index+1, tStatus)
-			log.Warning(errMSG)
-			return []cloudmodel.PrometheusTarget{}, errors.New(errMSG)
-		}
-		targets := tEntryJson.GetPath("data", "activeTargets")
-		for t := range targets.MustArray() {
-			target := targets.GetIndex(t)
-			scrapeUrl := target.Get("scrapeUrl").MustString()
-			labels := target.Get("labels")
-			job := labels.Get("job").MustString()
-			instance := labels.Get("instance").MustString()
-
-			labelsSlice := []string{}
-			honorLabelsConfig, ok := pJobNameToHonorLabelsConfig[job]
-			if !ok {
-				honorLabelsConfig = true
-			}
-			labelsMap := labels.MustMap()
-			delete(labelsMap, "job")
-			delete(labelsMap, "instance")
-			keys := []string{}
-			for key := range labelsMap {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				v := labelsMap[k]
-				vString, ok := v.(string)
-				if !ok {
-					vString = ""
-				}
-				newString := k + ":" + vString
-				labelsSlice = append(labelsSlice, newString)
-			}
-
-			otherLabelsString := strings.Join(labelsSlice, ", ")
-
-			result = append(result, cloudmodel.PrometheusTarget{
-				ScrapeURL:         scrapeUrl,
-				Job:               job,
-				Instance:          instance,
-				OtherLabels:       otherLabelsString,
-				HonorLabelsConfig: honorLabelsConfig,
-			})
-		}
-	}
-
-	return result, nil
-}
-
-func (p *PrometheusRpcUpdater) run() {
-	currentVersion := map[string]uint64{}
-	for {
-		info := p.outputQueue.Get().(PrometheusMessage)
-		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("prometheus from (%s) vtap_id (%v) type (%v) exit", info.peer, info.vtapID, info.msgType)
-			break
-		}
-		// 更新和保存内存数据
-		var err error
-		var entries []cloudmodel.PrometheusTarget
-		clusterID := info.message.GetClusterId()
-		version := info.message.GetVersion()
-		errMSG := info.message.GetErrorMsg()
-		cVersion := currentVersion[clusterID]
-		parseFlag := version != cVersion
-		if errMSG == "" && parseFlag {
-			entries, err = p.ParsePrometheusEntries(info)
-			if err != nil {
-				errMSG = err.Error()
-			}
-			currentVersion[clusterID] = version
-		}
-
-		log.Debugf("prometheus from %s vtap_id %v received cluster_id %s version %v,  error message (%s)", info.peer, info.vtapID, clusterID, version, errMSG)
-
-		p.storage.Add(info.orgID, parseFlag, PrometheusInfo{
-			ClusterID: clusterID,
-			Entries:   entries,
-			Epoch:     time.Now(),
-			ErrorMSG:  errMSG,
-		})
-	}
-}
-
-func (p *PrometheusRpcUpdater) Start() {
-	go p.run()
-}
-
-func (p *PrometheusRpcUpdater) Stop() {
-	if p.kCancel != nil {
-		p.kCancel()
 	}
 }

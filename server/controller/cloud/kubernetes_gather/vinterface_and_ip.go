@@ -29,11 +29,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/mikioh/ipaddr"
 )
 
 func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []model.Subnet, nodeVInterfaces, podVInterfaces []model.VInterface, nodeIPs, podIPs []model.IP, err error) {
-	log.Debug("get vinterfaces,ips starting")
+	log.Debug("get vinterfaces,ips starting", logger.NewORGPrefix(k.orgID))
 	hostIPToNodeIPs := map[string][]string{}
 	deviceUUIDToPodLcuuid := map[string]string{}
 	vinterfaceLcuuids := mapset.NewSet()
@@ -52,7 +53,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 
 	portNameRegex, err := regexp.Compile(k.PortNameRegex)
 	if err != nil {
-		log.Errorf("config port name regex (%s) complie failed", k.PortNameRegex)
+		log.Errorf("config port name regex (%s) complie failed", k.PortNameRegex, logger.NewORGPrefix(k.orgID))
 		return
 	}
 
@@ -63,7 +64,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse(k.orgID)
 	if err != nil {
-		log.Error(err.Error())
+		log.Error(err.Error(), logger.NewORGPrefix(k.orgID))
 		return
 	}
 	vData := genesisData.Vinterfaces
@@ -144,7 +145,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			podLcuuid = deviceUUIDToPodLcuuid[vUUID]
 		}
 		if podLcuuid == "" {
-			log.Debugf("vinterface,ip port (%s) pod not found", vItem.Mac)
+			log.Debugf("vinterface,ip port (%s) pod not found", vItem.Mac, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 
@@ -191,7 +192,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			}
 			ipPrefix, err = netaddr.ParseIPPrefix(ipString)
 			if err != nil {
-				log.Errorf("vinterface,ip parse cidrs (%s) error: (%s)", ipString, err.Error())
+				log.Errorf("vinterface,ip parse cidrs (%s) error: (%s)", ipString, err.Error(), logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			ip := ipPrefix.IP()
@@ -201,7 +202,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			for _, podNetworkCIDR := range k.podNetworkLcuuidCIDRs.cidrs {
 				netPrefix, err := netaddr.ParseIPPrefix(podNetworkCIDR)
 				if err != nil {
-					log.Errorf("vinterface,ip parse cidr (%s) error: (%s)", podNetworkCIDR, err.Error())
+					log.Errorf("vinterface,ip parse cidr (%s) error: (%s)", podNetworkCIDR, err.Error(), logger.NewORGPrefix(k.orgID))
 					continue
 				}
 				if netPrefix.Contains(ip) {
@@ -229,7 +230,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				} else {
 					rangePrefix, ok := ipPrefix.Range().Prefix()
 					if !ok {
-						log.Warningf("vinterface,ip pod ip (%s) to cidr format not valid", ipString)
+						log.Warningf("vinterface,ip pod ip (%s) to cidr format not valid", ipString, logger.NewORGPrefix(k.orgID))
 					}
 					subnetLcuuid = common.GetUUIDByOrgID(k.orgID, k.podNetworkLcuuidCIDRs.networkLcuuid+rangePrefix.String())
 					if _, ok := subnetLcuuidToCIDR[subnetLcuuid]; !ok {
@@ -265,7 +266,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	for _, cidr := range k.podNetworkLcuuidCIDRs.cidrs {
 		cPrefix, err := netaddr.ParseIPPrefix(cidr)
 		if err != nil {
-			log.Errorf("vinterface,ip parse pod network cidr (%s) error: (%s)", cidr, err.Error())
+			log.Errorf("vinterface,ip parse pod network cidr (%s) error: (%s)", cidr, err.Error(), logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		existCIDR = append(existCIDR, cPrefix)
@@ -383,7 +384,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		for _, noMaskIPString := range aggNoMaskNets {
 			noMaskIP, _ := netaddr.ParseIPPrefix(noMaskIPString)
 			if !ipNetPrefix.Contains(noMaskIP.IP()) {
-				log.Debugf("vinterface,ip ip (%s) not found aggregated subnet", noMaskIPString)
+				log.Debugf("vinterface,ip ip (%s) not found aggregated subnet", noMaskIPString, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			vinterfaceLcuuid := ipToVinterfaceLcuuid[noMaskIPString]
@@ -391,7 +392,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			ipLcuuid := common.GetUUIDByOrgID(k.orgID, vinterfaceLcuuid+noMaskIPPrefix.IP().String())
 			podIPModel, ok := podIPsMap[ipLcuuid]
 			if !ok {
-				log.Debugf("vinterface,ip ip (%s) not relevancy subnet (%s)", noMaskIPPrefix.IP().String(), ipNetPrefix.String())
+				log.Debugf("vinterface,ip ip (%s) not relevancy subnet (%s)", noMaskIPPrefix.IP().String(), ipNetPrefix.String(), logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			podIPModel.SubnetLcuuid = subnetLcuuid
@@ -417,7 +418,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 
 		nIPs, ok := hostIPToNodeIPs[hostIP]
 		if !ok {
-			log.Infof("vinterface,ip node (%s) not found", hostIP)
+			log.Infof("vinterface,ip node (%s) not found", hostIP, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		// 如果该host所对应的ip里面有能够获取到lcuuid的则说明这个ip是有效的node ip
@@ -429,7 +430,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			}
 		}
 		if len(nodeIPSlice) == 0 {
-			log.Infof("vinterface,ip (%s) node not found", nMAC)
+			log.Infof("vinterface,ip (%s) node not found", nMAC, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 
@@ -438,7 +439,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		for _, ipString := range IPs {
 			ipPrefix, err := netaddr.ParseIPPrefix(ipString)
 			if err != nil {
-				log.Errorf("vinterface,ip parse cidrs (%s) error: (%s)", ipString, err.Error())
+				log.Errorf("vinterface,ip parse cidrs (%s) error: (%s)", ipString, err.Error(), logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			switch {
@@ -447,7 +448,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			case k8sNodeIPs.Contains(ipPrefix.IP().String()):
 				rangePrefix, ok := ipPrefix.Range().Prefix()
 				if !ok {
-					log.Warningf("vinterface,ip node ip (%s) to cidr format not valid", ipString)
+					log.Warningf("vinterface,ip node ip (%s) to cidr format not valid", ipString, logger.NewORGPrefix(k.orgID))
 				}
 				if len(k.nodeNetworkLcuuidCIDRs.cidrs) == 1 {
 					k.nodeNetworkLcuuidCIDRs.cidrs = []string{rangePrefix.String()}
@@ -458,7 +459,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						for _, c := range k.nodeNetworkLcuuidCIDRs.cidrs {
 							nCIDR, err := netaddr.ParseIPPrefix(c)
 							if err != nil {
-								log.Warningf("vinterface,ip node cidr (%s) parse faild", c)
+								log.Warningf("vinterface,ip node cidr (%s) parse faild", c, logger.NewORGPrefix(k.orgID))
 								continue
 							}
 							if nCIDR.IP().Is6() {
@@ -469,7 +470,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 						for _, c := range k.nodeNetworkLcuuidCIDRs.cidrs {
 							nCIDR, err := netaddr.ParseIPPrefix(c)
 							if err != nil {
-								log.Warningf("vinterface,ip node cidr (%s) parse faild", c)
+								log.Warningf("vinterface,ip node cidr (%s) parse faild", c, logger.NewORGPrefix(k.orgID))
 								continue
 							}
 							if nCIDR.IP().Is4() {
@@ -517,14 +518,14 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				networkLcuuid := k.nodeNetworkLcuuidCIDRs.networkLcuuid
 				hostip, err := netaddr.ParseIP(ipPrefix.IP().String())
 				if err != nil {
-					log.Errorf("vinterface,ip parse host ip (%s) error: (%s)", ipPrefix.IP().String(), err.Error())
+					log.Errorf("vinterface,ip parse host ip (%s) error: (%s)", ipPrefix.IP().String(), err.Error(), logger.NewORGPrefix(k.orgID))
 					continue
 				}
 
 				for _, nCIDR := range k.nodeNetworkLcuuidCIDRs.cidrs {
 					nodeIPPrefix, err := netaddr.ParseIPPrefix(nCIDR)
 					if err != nil {
-						log.Errorf("vinterface,ip parse node network cidr (%s) error: (%s)", nCIDR, err.Error())
+						log.Errorf("vinterface,ip parse node network cidr (%s) error: (%s)", nCIDR, err.Error(), logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					if nodeIPPrefix.Contains(hostip) {
@@ -536,7 +537,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					for _, pCIDR := range k.podNetworkLcuuidCIDRs.cidrs {
 						podIPPrefix, err := netaddr.ParseIPPrefix(pCIDR)
 						if err != nil {
-							log.Errorf("vinterface,ip parse pod network cidr (%s) error: (%s)", pCIDR, err.Error())
+							log.Errorf("vinterface,ip parse pod network cidr (%s) error: (%s)", pCIDR, err.Error(), logger.NewORGPrefix(k.orgID))
 							continue
 						}
 						if podIPPrefix.Contains(hostip) {
@@ -563,7 +564,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					hostIPMask, _ := ipPrefix.IPNet().Mask.Size()
 					cidr, err := cloudcommon.IPAndMaskToCIDR(ipPrefix.IP().String(), hostIPMask)
 					if err != nil {
-						log.Errorf("vinterface,ip gnenerate host cidr (%s) error: (%s)", ipPrefix.IP().String(), err.Error())
+						log.Errorf("vinterface,ip gnenerate host cidr (%s) error: (%s)", ipPrefix.IP().String(), err.Error(), logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					nodeSubnetLcuuid = common.GetUUIDByOrgID(k.orgID, k.nodeNetworkLcuuidCIDRs.networkLcuuid+cidr)
@@ -761,7 +762,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			sLcuuid = pV6SLcuuid
 		}
 		if sLcuuid == "" {
-			log.Infof("vinterface,ip pod ip (%s) not found subnet", ip.String())
+			log.Infof("vinterface,ip pod ip (%s) not found subnet", ip.String(), logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		modelIP := model.IP{
@@ -774,6 +775,6 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		podIPs = append(podIPs, modelIP)
 	}
 
-	log.Debug("get vinterfaces,ips complete")
+	log.Debug("get vinterfaces,ips complete", logger.NewORGPrefix(k.orgID))
 	return
 }

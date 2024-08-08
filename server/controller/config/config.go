@@ -25,6 +25,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	shared_common "github.com/deepflowio/deepflow/server/common"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	mysql "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
@@ -40,11 +41,6 @@ import (
 
 var log = logging.MustGetLogger("config")
 
-type IngesterApi struct {
-	Port    int `default:"30106" yaml:"port"`
-	Timeout int `default:"60" yaml:"timeout"`
-}
-
 type Specification struct {
 	VTapGroupMax                 int `default:"1000" yaml:"vtap_group_max"`
 	VTapMaxPerGroup              int `default:"10000" yaml:"vtap_max_per_group"`
@@ -59,13 +55,6 @@ type DFWebService struct {
 	Enabled bool   `default:"false" yaml:"enabled"`
 	Host    string `default:"df-web" yaml:"host"`
 	Port    int    `default:"20825" yaml:"port"`
-	Timeout int    `default:"30" yaml:"timeout"`
-}
-
-type FPermit struct {
-	Enabled bool   `default:"false" yaml:"enabled"`
-	Host    string `default:"fpermit" yaml:"host"`
-	Port    int    `default:"20823" yaml:"port"`
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
@@ -88,16 +77,19 @@ type ControllerConfig struct {
 	BillingMethod                  string `default:"license" yaml:"billing-method"`
 	PodClusterInternalIPToIngester int    `default:"0" yaml:"pod-cluster-internal-ip-to-ingester"`
 	NoTeamIDRefused                bool   `default:"false" yaml:"no-teamid-refused"`
+	AllAgentConnectToNatIP         bool   `default:"false" yaml:"all-agent-connect-to-nat-ip"`
+	NoIPOverlapping                bool   `default:"false" yaml:"no-ip-overlapping"`
+	AgentCommandTimeout            int    `default:"30" yaml:"agent-cmd-timeout"`
 
-	DFWebService DFWebService `yaml:"df-web-service"`
-	FPermit      FPermit      `yaml:"fpermit"`
+	DFWebService DFWebService   `yaml:"df-web-service"`
+	FPermit      common.FPermit `yaml:"fpermit"`
 
 	MySqlCfg      mysql.MySqlConfig           `yaml:"mysql"`
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
-	IngesterApi IngesterApi   `yaml:"ingester-api"`
-	Spec        Specification `yaml:"spec"`
+	IngesterApi common.IngesterApi `yaml:"ingester-api"`
+	Spec        Specification      `yaml:"spec"`
 
 	MonitorCfg     monitor.MonitorConfig         `yaml:"monitor"`
 	ManagerCfg     manager.ManagerConfig         `yaml:"manager"`
@@ -138,6 +130,10 @@ func (c *Config) Load(path string) {
 	c.ControllerConfig.TrisolarisCfg.SetPodClusterInternalIPToIngester(c.ControllerConfig.PodClusterInternalIPToIngester)
 	c.ControllerConfig.TrisolarisCfg.SetGrpcMaxMessageLength(c.ControllerConfig.GrpcMaxMessageLength)
 	c.ControllerConfig.TrisolarisCfg.SetNoTeamIDRefused(c.ControllerConfig.NoTeamIDRefused)
+	c.ControllerConfig.TrisolarisCfg.SetFPermitConfig(c.ControllerConfig.FPermit)
+	c.ControllerConfig.TrisolarisCfg.SetIngesterAPI(c.ControllerConfig.IngesterApi) // for data source
+	c.ControllerConfig.TrisolarisCfg.SetAllAgentConnectToNatIP(c.ControllerConfig.AllAgentConnectToNatIP)
+	c.ControllerConfig.TrisolarisCfg.SetNoIPOverlapping(c.ControllerConfig.NoIPOverlapping)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)

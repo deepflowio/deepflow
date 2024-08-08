@@ -6,6 +6,9 @@ default-run = "deepflow-agent"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ["crates/*"]
+exclude = ["src/ebpf/samples/rust/profiler", "src/ebpf/samples/rust/socket-tracer"]
 
 [dependencies]
 ahash = "0.8"
@@ -26,6 +29,7 @@ dashmap = "5.3.3"
 dns-lookup = "1.0.8"
 elf = "0.4.0"
 enum_dispatch = "0.3.7"
+enterprise-utils = { path = "crates/enterprise-utils", optional = true }
 flate2 = "1.0.23"
 # the feature flag fixes the following problem:
 #
@@ -43,6 +47,7 @@ humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 ipnet = "2.4.0"
 ipnetwork = "0.18.0"
+lazy_static = "1.5.0"
 l7 = { path = "plugins/l7" }
 libc = "0.2.103"
 log = "0.4"
@@ -90,6 +95,7 @@ cgroups-rs = "0.2.9"
 nix = "0.23"
 pcap = "0.9.1"
 procfs = { git = "https://github.com/deepflowio/procfs/" }
+reorder = { path = "plugins/reorder" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 k8s-openapi = { version = "^0.15", features = ["v1_19", "schemars"] }
@@ -133,12 +139,12 @@ uluru = "3.0.0"
 
 [build-dependencies]
 chrono = "0.4"
-dunce = "0.1.1"
+dunce = "1"
 tonic-build = "0.8.0"
 
 [features]
-enterprise = ["off_cpu"]
-off_cpu = []
+enterprise = ["extended_profile", "enterprise-utils"]
+extended_profile = []
 
 [[bench]]
 name = "common"

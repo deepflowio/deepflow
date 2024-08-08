@@ -8,7 +8,8 @@ TRUNCATE TABLE db_version;
 CREATE TABLE IF NOT EXISTS plugin (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
-    type                INTEGER NOT NULL COMMENT '1: wasm',
+    type                INTEGER NOT NULL COMMENT '1: wasm 2: so 3: lua',
+    user                INTEGER NOT NULL DEFAULT 1 COMMENT '1: agent 2: server',
     image               LONGBLOB NOT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -75,24 +76,6 @@ CREATE TABLE IF NOT EXISTS process (
     deleted_at          DATETIME DEFAULT NULL
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
-
-CREATE TABLE IF NOT EXISTS prometheus_target (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    lcuuid              CHAR(64) DEFAULT '',
-    instance            VARCHAR(255) DEFAULT '',
-    job                 VARCHAR(255) DEFAULT '',
-    scrape_url          VARCHAR(2083) DEFAULT '',
-    other_labels        TEXT COMMENT 'separated by ,',
-    epc_id              INTEGER NOT NULL DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    pod_cluster_id      INTEGER,
-    create_method       TINYINT(1) DEFAULT 1 COMMENT '1.recorder learning 2.prometheus learning',
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
-) ENGINE = innodb DEFAULT CHARSET = utf8mb4 AUTO_INCREMENT = 1;
-TRUNCATE TABLE prometheus_target;
 
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
@@ -206,7 +189,9 @@ CREATE TABLE IF NOT EXISTS routing_table (
     nexthop_type        TEXT,
     nexthop             TEXT,
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64)
+    lcuuid              CHAR(64),
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )engine=innodb AUTO_INCREMENT=1  DEFAULT CHARSET=utf8;
 TRUNCATE TABLE routing_table;
 
@@ -287,13 +272,15 @@ CREATE TABLE IF NOT EXISTS vl2_net (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     prefix              CHAR(64) DEFAULT '',
     netmask             CHAR(64) DEFAULT '',
-    vl2id               INTEGER REFERENCES vl2(id),
+    vl2id               INTEGER DEFAULT 0,
     net_index           INTEGER DEFAULT 0,
     name                VARCHAR(256) DEFAULT '',
     label               VARCHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM vl2_net;
@@ -327,8 +314,6 @@ CREATE TABLE IF NOT EXISTS vm (
 DELETE FROM vm;
 
 CREATE TABLE IF NOT EXISTS vinterface (
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     name                CHAR(64) DEFAULT '',
     ifindex             INTEGER NOT NULL,
@@ -348,27 +333,29 @@ CREATE TABLE IF NOT EXISTS vinterface (
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id,domain),
     INDEX mac_index(mac)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 DELETE FROM vinterface;
 
 CREATE TABLE IF NOT EXISTS vinterface_ip (
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     ip                  CHAR(64) DEFAULT '',
     netmask             CHAR(64) DEFAULT '',
     gateway             CHAR(64) DEFAULT '',
     create_method       INTEGER DEFAULT 0 COMMENT '0.learning 1.user_defined',
-    vl2id               INTEGER REFERENCES vl2(id),
+    vl2id               INTEGER DEFAULT 0,
     vl2_net_id          INTEGER DEFAULT 0,
     net_index           INTEGER DEFAULT 0,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    vifid               INTEGER REFERENCES vinterface(id),
+    vifid               INTEGER DEFAULT 0,
     isp                 INTEGER DEFAULT 0 COMMENT 'Used for multi-ISP access',
     lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM vinterface_ip;
@@ -378,13 +365,13 @@ CREATE TABLE IF NOT EXISTS vip (
     lcuuid      CHAR(64),
     ip          CHAR(64),
     domain      CHAR(64) DEFAULT '',
-    vtap_id     INTEGER
+    vtap_id     INTEGER,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE vip;
 
 CREATE TABLE IF NOT EXISTS ip_resource (
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     ip                  CHAR(64) DEFAULT '',
     alias               CHAR(64) DEFAULT '',
@@ -399,6 +386,8 @@ CREATE TABLE IF NOT EXISTS ip_resource (
     domain              CHAR(64) DEFAULT '',
     region              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id,domain)
 )ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM ip_resource;
@@ -412,6 +401,8 @@ CREATE TABLE IF NOT EXISTS floatingip (
     vm_id               INTEGER,
     ip                  CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id,domain)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE floatingip;
@@ -450,13 +441,14 @@ INSERT INTO az (id, name, lcuuid, region, domain) values(1, '系统默认', 'fff
 CREATE TABLE IF NOT EXISTS domain (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id             INTEGER DEFAULT 1,
+    user_id             INTEGER DEFAULT 1,
     name                VARCHAR(64),
     icon_id             INTEGER,
     display_name        VARCHAR(64) DEFAULT '',
     cluster_id          CHAR(64),
     ip                  VARCHAR(64),
     role                INTEGER DEFAULT 0 COMMENT '1.BSS 2.OSS 3.OpenStack 4.VSphere',
-    type                INTEGER DEFAULT 0 COMMENT '1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 7.pingan 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce',
+    type                INTEGER DEFAULT 0 COMMENT '1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce',
     public_ip           VARCHAR(64) DEFAULT NULL,
     config              TEXT,
     error_msg           TEXT,
@@ -473,6 +465,8 @@ TRUNCATE TABLE domain;
 
 CREATE TABLE IF NOT EXISTS sub_domain (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id             INTEGER DEFAULT 1,
+    user_id             INTEGER DEFAULT 1,
     domain              CHAR(64) DEFAULT '',
     name                VARCHAR(64) DEFAULT '',
     display_name        VARCHAR(64) DEFAULT '',
@@ -642,7 +636,9 @@ CREATE TABLE IF NOT EXISTS nat_rule (
     fixed_ip_port       INTEGER DEFAULT NULL,
     port_id             INTEGER DEFAULT NULL,
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE nat_rule;
 
@@ -651,7 +647,9 @@ CREATE TABLE IF NOT EXISTS nat_vm_connection (
     nat_id              INTEGER,
     vm_id               INTEGER,
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE nat_vm_connection;
 
@@ -742,7 +740,9 @@ CREATE TABLE IF NOT EXISTS lb_target_server (
     port                INTEGER DEFAULT NULL,
     protocol            CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE lb_target_server;
 
@@ -751,7 +751,9 @@ CREATE TABLE IF NOT EXISTS lb_vm_connection (
     lb_id               INTEGER,
     vm_id               INTEGER,
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE lb_vm_connection;
 
@@ -761,7 +763,9 @@ CREATE TABLE IF NOT EXISTS vm_pod_node_connection (
     pod_node_id         INTEGER,
     domain              CHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE vm_pod_node_connection;
 
@@ -924,7 +928,9 @@ CREATE TABLE IF NOT EXISTS pod_service_port (
     pod_service_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64)
+    lcuuid              CHAR(64),
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_service_port;
 
@@ -937,7 +943,9 @@ CREATE TABLE IF NOT EXISTS pod_group_port (
     pod_service_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_group_port;
 
@@ -966,7 +974,9 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule (
     pod_ingress_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_ingress_rule;
 
@@ -979,7 +989,9 @@ CREATE TABLE IF NOT EXISTS pod_ingress_rule_backend (
     pod_ingress_id      INTEGER DEFAULT NULL,
     sub_domain          CHAR(64) DEFAULT '',
     domain              CHAR(64) DEFAULT '',
-    lcuuid              CHAR(64) DEFAULT ''
+    lcuuid              CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_ingress_rule_backend;
 
@@ -1011,7 +1023,8 @@ CREATE TABLE IF NOT EXISTS `report` (
   `lcuuid`                 varchar(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',
   `created_at`             datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  INDEX lcuuid(`lcuuid`)
+  INDEX lcuuid(`lcuuid`),
+  INDEX policy_id(`policy_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 COMMENT='report records';
 
 CREATE TABLE IF NOT EXISTS vtap (
@@ -1059,7 +1072,8 @@ TRUNCATE TABLE vtap;
 
 CREATE TABLE IF NOT EXISTS vtap_group (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id                 INTEGER,
+    team_id                 INTEGER DEFAULT 1,
+    user_id                 INTEGER DEFAULT 1,
     name                    VARCHAR(64) NOT NULL,
     created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1315,75 +1329,31 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.host`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
-    "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "控制器系统负载高",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"load\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.host`\",\"METRICS\":[\"Min(`metrics.load1`*100/`metrics.cpu_num`) AS `load`\"]}]}",
-    "[{\"METRIC_LABEL\":\"load\",\"return_field_description\":\"持续 5 分钟 (系统负载/CPU总数)\",\"unit\":\"%\"}]", "数据节点系统负载高",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"load\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_critical, lcuuid)
     values(1, 1, "过滤项: N/A | 分组项: 采集器", "", "/v1/alarm/vtap-exception/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"最近 1 分钟异常状态个数\", \"return_field_unit\": \" 个\"}}]", "采集器异常",  1, 1, 1, 20, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"个\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_critical, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: 控制器", "", "/v1/alarm/controller-lost/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"最近 1 分钟失联次数\", \"return_field_unit\": \" 次\"}}]", "控制器失联",  2, 1, 1, 20, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"次\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
+    threshold_warning, monitoring_interval, lcuuid)
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_monitor\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.max_millicpus_ratio\",\"METRIC_NAME\":\"metrics.max_millicpus_ratio\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"checked\":true,\"operatorLv2\":[{\"operateLabel\":\"Math\",\"mathOperator\":\"*\",\"operatorValue\":100}],\"_key\":\"38813299-6cca-9b7f-4a08-5861fa7d6ee3\",\"perOperator\":\"\",\"operatorLv1\":\"Min\",\"percentile\":null,\"markLine\":null,\"METRIC_LABEL\":\"cpu_usage\",\"ORIGIN_METRIC_LABEL\":\"Math(Min(metrics.max_millicpus_ratio)*100)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_monitor\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.max_millicpus_ratio`)*100 AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.max_millicpus_ratio`)*100 AS `cpu_usage`\"]}]}",
+    "[{\"METRIC_LABEL\":\"cpu_usage\",\"return_field_description\":\"持续 5 分钟 (CPU用量/阈值)\",\"unit\":\"%\"}]", "采集器 CPU 超限",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"cpu_usage\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", "5m", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_error, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: 数据节点", "", "/v1/alarm/analyzer-lost/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"最近 1 分钟失联次数\", \"return_field_unit\": \" 次\"}}]", "数据节点失联",  2, 1, 1, 20, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"次\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip, tag.path, tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_monitor_disk\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Last(`metrics.used_percent`) AS `disk_used_percent`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.path`, `tag.host`\",\"METRICS\":[\"Last(`metrics.used_percent`) AS `disk_used_percent`\"]}]}",
-    "[{\"METRIC_LABEL\":\"disk_used_percent\",\"return_field_description\":\"磁盘用量百分比\",\"unit\":\"%\"}]", "控制器磁盘空间不足",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"disk_used_percent\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host_ip, tag.path, tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_monitor_disk\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Last(`metrics.used_percent`) AS `disk_used_percent`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host_ip`, `tag.path`, `tag.host`\",\"METRICS\":[\"Last(`metrics.used_percent`) AS `disk_used_percent`\"]}]}",
-    "[{\"METRIC_LABEL\":\"disk_used_percent\",\"return_field_description\":\"磁盘用量百分比\",\"unit\":\"%\"}]", "数据节点磁盘空间不足",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"disk_used_percent\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"(Min(`metrics.cpu_percent`/`metrics.max_millicpus`)*1000) AS `cpu_usage`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"(Min(`metrics.cpu_percent`/`metrics.max_millicpus`)*1000) AS `cpu_usage`\"]}]}",
-    "[{\"METRIC_LABEL\":\"cpu_usage\",\"return_field_description\":\"持续 5 分钟 (CPU用量/阈值)\",\"unit\":\"%\"}]", "采集器 CPU 超限",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"cpu_usage\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.memory`*100/`metrics.max_memory`) AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.memory`*100/`metrics.max_memory`) AS `used_bytes`\"]}]}",
-    "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (内存用量/阈值)\",\"unit\":\"%\"}]", "采集器内存超限",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"used_bytes\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", @lcuuid);
+    threshold_warning, monitoring_interval, lcuuid)
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_monitor\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.max_memory_ratio\",\"METRIC_NAME\":\"metrics.max_memory_ratio\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"checked\":true,\"operatorLv2\":[{\"operateLabel\":\"Math\",\"mathOperator\":\"*\",\"operatorValue\":100}],\"_key\":\"38813299-6cca-9b7f-4a08-5861fa7d6ee3\",\"perOperator\":\"\",\"operatorLv1\":\"Min\",\"percentile\":null,\"markLine\":null,\"METRIC_LABEL\":\"used_bytes\",\"ORIGIN_METRIC_LABEL\":\"Math(Min(metrics.max_memory_ratio)*100)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_monitor\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.max_memory_ratio`)*100 AS `used_bytes`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.max_memory_ratio`)*100 AS `used_bytes`\"]}]}",
+    "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (内存用量/阈值)\",\"unit\":\"%\"}]", "采集器内存超限",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"used_bytes\", \"unit\": \"%\"}", "{\"OP\":\">=\",\"VALUE\":70}", "5m", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, agg,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: host", "", "/v1/stats/querier/UniversalPromHistory", "{\"DATABASE\":\"\",\"PROM_SQL\":\"delta(min(deepflow_system__deepflow_agent_monitor__create_time)by(host)[1m:10s])\",\"interval\":60,\"metric\":\"process_start_time_delta\",\"time_tag\":\"toi\"}",
+    values(1, 1, "过滤项: N/A | 分组项: host", "", "/v1/stats/querier/UniversalPromHistory", "{\"DATABASE\":\"\",\"PROM_SQL\":\"delta(min(deepflow_tenant__deepflow_agent_monitor__create_time)by(host)[1m:10s])\",\"interval\":60,\"metric\":\"process_start_time_delta\",\"time_tag\":\"toi\"}",
     "[{\"METRIC_LABEL\":\"process_start\",\"return_field_description\":\"最近 1 分钟进程启动时间变化\",\"unit\":\" 毫秒\"}]", "采集器重启",  0, 1, 1, 20, 1, "", "", "{\"displayName\":\"process_start_time_delta\", \"unit\": \"毫秒\"}", 1, "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, agg,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: 主机名, 进程", "", "/v1/alarm/process-end/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"最近 1 分钟进程停止次数\", \"return_field_unit\": \"次\"}}]", "进程停止",  0, 1, 1, 20, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"次\"}", 1, "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
@@ -1399,68 +1369,34 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, data_level, agg, delay,
-    threshold_error, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: *", "", "/v1/alarm/voucher-30days/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"余额预估可用天数\", \"return_field_unit\": \"天\"}}]", "DeepFlow 服务即将停止",  1, 1, 1, 24, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"天\"}", "1d", 1, 0, "{\"OP\":\"<=\",\"VALUE\":30}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, data_level, agg, delay,
-    threshold_critical, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: *", "", "/v1/alarm/voucher-0days/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"余额可用天数\", \"return_field_unit\": \"天\"}}]", "DeepFlow 服务停止",  2, 1, 1, 24, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"天\"}", "1d", 1, 0, "{\"OP\":\"<=\",\"VALUE\":0}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, data_level, agg, delay,
-    threshold_error, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: *", "","/v1/alarm/license-30days/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"至少一个授权文件剩余有效期\", \"return_field_unit\": \"天\"}}]", "DeepFlow 授权即将过期",  1, 1, 1, 24, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"天\"}", "1d", 1, 0, "{\"OP\":\"<=\",\"VALUE\":30}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field, data_level, agg, delay,
-    threshold_critical, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: *", "", "/v1/alarm/license-0days/", "{}", "[{\"OPERATOR\": {\"return_field\": \"sysalarm_value\", \"return_field_description\": \"至少一个授权文件剩余有效期\", \"return_field_unit\": \"天\"}}]", "DeepFlow 授权过期",  2, 1, 1, 24, 1, "", "", "{\"displayName\":\"sysalarm_value\", \"unit\": \"天\"}", "1d", 1, 0, "{\"OP\":\"<=\",\"VALUE\":0}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.sys_free_memory`*100/`metrics.system_free_memory_limit`) AS `used_bytes`\",\"WHERE\":\"`metrics.system_free_memory_limit`!=0\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.sys_free_memory`*100/`metrics.system_free_memory_limit`) AS `used_bytes`\"]}]}",
-    "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (系统空闲内存百分比/阈值)\",\"unit\":\"%\"}]", "采集器所在系统空闲内存低",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"used_bytes\", \"unit\": \"%\"}", "{\"OP\":\"<=\",\"VALUE\":150}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_log_counter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.warning`) AS `log_counter_warning`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.warning`) AS `log_counter_warning`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_log_counter\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.warning\",\"METRIC_NAME\":\"metrics.warning\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.error\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"log_counter_warning\",\"checked\":true,\"percentile\":null,\"_key\":\"50d7a2a2-a14d-d202-1f3d-85fe7b9efac3\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.warning)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_log_counter\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_log_counter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.warning`) AS `log_counter_warning`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.warning`) AS `log_counter_warning`\"]}]}",
     "[{\"METRIC_LABEL\":\"log_counter_warning\",\"return_field_description\":\"最近 1 分钟 WARN 日志总条数\",\"unit\":\" 条\"}]", "采集器 WARN 日志过多",  0, 1, 1, 20, 1, "", "", "{\"displayName\":\"log_counter_warning\", \"unit\": \"条\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_error, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_log_counter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.error`) AS `log_counter_error`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.error`) AS `log_counter_error`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_log_counter\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.error\",\"METRIC_NAME\":\"metrics.error\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.error\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"log_counter_error\",\"checked\":true,\"percentile\":null,\"_key\":\"50d7a2a2-a14d-d202-1f3d-85fe7b9efac3\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.error)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_log_counter\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_log_counter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.error`) AS `log_counter_error`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.error`) AS `log_counter_error`\"]}]}",
     "[{\"METRIC_LABEL\":\"log_counter_error\",\"return_field_description\":\"最近 1 分钟 ERR 日志总条数\",\"unit\":\" 条\"}]", "采集器 ERR 日志过多",  1, 1, 1, 20, 1, "", "", "{\"displayName\":\"log_counter_error\", \"unit\": \"条\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_error, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.cluster_id", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_controller_genesis_k8sinfo_delay\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Last(`metrics.avg`) AS `delay`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.cluster_id`\",\"METRICS\":[\"Last(`metrics.avg`) AS `delay`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.cluster_id", "[{\"type\":\"deepflow\",\"tableName\":\"controller_genesis_k8sinfo_delay\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.avg\",\"METRIC_NAME\":\"metrics.avg\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.avg\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Last\",\"perOperator\":\"\",\"METRIC_LABEL\":\"delay\",\"checked\":true,\"percentile\":null,\"_key\":\"8e92e913-a37f-ef34-8a4d-9169b96c6087\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Last(metrics.avg)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"controller_genesis_k8sinfo_delay\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"controller_genesis_k8sinfo_delay\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Last(`metrics.avg`) AS `delay`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.cluster_id`\",\"METRICS\":[\"Last(`metrics.avg`) AS `delay`\"]}]}",
     "[{\"METRIC_LABEL\":\"delay\",\"return_field_description\":\"资源同步滞后时间\",\"unit\":\" 秒\"}]", "K8s 资源同步滞后",  1, 1, 1, 23, 1, "", "", "{\"displayName\":\"delay\", \"unit\": \"秒\"}", "{\"OP\":\">=\",\"VALUE\":600}", @lcuuid);
 
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host, tag.db, tag.table, tag.partition", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_force_delete_clickhouse_data\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.bytes_on_disk`) AS `force_delete_clickhouse_data_bytes_on_disk`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`, `tag.db`, `tag.table`, `tag.partition`\",\"METRICS\":[\"Sum(`metrics.bytes_on_disk`) AS `force_delete_clickhouse_data_bytes_on_disk`\"]}]}",
-    "[{\"METRIC_LABEL\":\"force_delete_clickhouse_data_bytes_on_disk\",\"return_field_description\":\"最近 1 分钟数据节点数据强制删除\",\"unit\":\"字节\"}]", "数据节点数据强制删除",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"force_delete_clickhouse_data_bytes_on_disk\", \"unit\": \"字节\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.kernel_drops`) AS `dispatcher.metrics.kernel_drops`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kernel_drops`) AS `dispatcher.metrics.kernel_drops`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_dispatcher\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.kernel_drops\",\"METRIC_NAME\":\"metrics.kernel_drops\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.err\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"dispatcher.metrics.kernel_drops\",\"checked\":true,\"percentile\":null,\"_key\":\"96fd254b-e6c1-4cc1-69fa-da5f4dd927ed\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.kernel_drops)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_dispatcher\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.kernel_drops`) AS `dispatcher.metrics.kernel_drops`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kernel_drops`) AS `dispatcher.metrics.kernel_drops`\"]}]}",
      "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.kernel_drops\",\"unit\":\"\"}]",
      "采集器数据丢失 (dispatcher.metrics.kernel_drops)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"dispatcher.metrics.kernel_drops\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1468,7 +1404,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_queue\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.overwritten`) AS `queue.metrics.overwritten`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.overwritten`) AS `queue.metrics.overwritten`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host, tag.module", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_queue\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.overwritten\",\"METRIC_NAME\":\"metrics.overwritten\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.in\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"queue.metrics.overwritten\",\"checked\":true,\"percentile\":null,\"_key\":\"d61628e5-df0b-9337-6ee6-a3316a047e24\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.overwritten)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_queue\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\",\"tag.module\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\",\"tag.module\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_queue\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.overwritten`) AS `queue.metrics.overwritten`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`, `tag.module`\",\"METRICS\":[\"Sum(`metrics.overwritten`) AS `queue.metrics.overwritten`\"]}]}",
      "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 queue.metrics.overwritten\",\"unit\":\"\"}]",
      "采集器数据丢失 (queue.metrics.overwritten)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"queue.metrics.overwritten\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1476,7 +1413,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_l7_session_aggr\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.throttle-drop`) AS `l7_session_aggr.metrics.throttle-drop`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.throttle-drop`) AS `l7_session_aggr.metrics.throttle-drop`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_l7_session_aggr\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.throttle-drop\",\"METRIC_NAME\":\"metrics.throttle-drop\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.cached\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"l7_session_aggr.metrics.throttle-drop\",\"checked\":true,\"percentile\":null,\"_key\":\"c511eb55-3d46-c7a2-bfed-ebb42d02493c\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.throttle-drop)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_l7_session_aggr\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_l7_session_aggr\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.throttle-drop`) AS `l7_session_aggr.metrics.throttle-drop`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.throttle-drop`) AS `l7_session_aggr.metrics.throttle-drop`\"]}]}",
      "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 l7_session_aggr.metrics.throttle-drop\",\"unit\":\"\"}]",
      "采集器数据丢失 (l7_session_aggr.metrics.throttle-drop)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"l7_session_aggr.metrics.throttle-drop\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1484,7 +1422,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_aggr\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-in-throttle`) AS `flow_aggr.metrics.drop-in-throttle`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-in-throttle`) AS `flow_aggr.metrics.drop-in-throttle`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_flow_aggr\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.drop-in-throttle\",\"METRIC_NAME\":\"metrics.drop-in-throttle\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.drop-before-window\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"flow_aggr.metrics.drop-in-throttle\",\"checked\":true,\"percentile\":null,\"_key\":\"e395cbb3-d5a2-283b-1b0a-834977bb6393\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.drop-in-throttle)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_flow_aggr\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_flow_aggr\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-in-throttle`) AS `flow_aggr.metrics.drop-in-throttle`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-in-throttle`) AS `flow_aggr.metrics.drop-in-throttle`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_aggr.metrics.drop-in-throttle\",\"unit\":\"\"}]",
      "采集器数据丢失 (flow_aggr.metrics.drop-in-throttle)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_aggr.metrics.drop-in-throttle\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1492,7 +1431,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_ebpf_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.kern_lost`) AS `ebpf_collector.metrics.kern_lost`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kern_lost`) AS `ebpf_collector.metrics.kern_lost`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_ebpf_collector\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.kern_lost\",\"METRIC_NAME\":\"metrics.kern_lost\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.boot_time_update_diff\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"ebpf_collector.metrics.kern_lost\",\"checked\":true,\"percentile\":null,\"_key\":\"8f28cb9b-ec39-d605-c056-53b0f2788c13\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.kern_lost)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_ebpf_collector\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_ebpf_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.kern_lost`) AS `ebpf_collector.metrics.kern_lost`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kern_lost`) AS `ebpf_collector.metrics.kern_lost`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 ebpf_collector.metrics.kern_lost\",\"unit\":\"\"}]",
      "采集器数据丢失 (ebpf_collector.metrics.kern_lost)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"ebpf_collector.metrics.kern_lost\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1500,7 +1440,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_ebpf_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.user_enqueue_lost`) AS `ebpf_collector.metrics.user_enqueue_lost`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kernuser_enqueue_lost_lost`) AS `ebpf_collector.metrics.user_enqueue_lost`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_ebpf_collector\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.user_enqueue_lost\",\"METRIC_NAME\":\"metrics.user_enqueue_lost\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.boot_time_update_diff\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"ebpf_collector.metrics.user_enqueue_lost\",\"checked\":true,\"percentile\":null,\"_key\":\"8f28cb9b-ec39-d605-c056-53b0f2788c13\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.user_enqueue_lost)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_ebpf_collector\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_ebpf_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.user_enqueue_lost`) AS `ebpf_collector.metrics.user_enqueue_lost`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.kernuser_enqueue_lost_lost`) AS `ebpf_collector.metrics.user_enqueue_lost`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 ebpf_collector.metrics.user_enqueue_lost\",\"unit\":\"\"}]",
      "采集器数据丢失 (ebpf_collector.metrics.user_enqueue_lost)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"ebpf_collector.metrics.user_enqueue_lost\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1508,7 +1449,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.invalid_packets`) AS `dispatcher.metrics.invalid_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.invalid_packets`) AS `dispatcher.metrics.invalid_packets`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_dispatcher\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.invalid_packets\",\"METRIC_NAME\":\"metrics.invalid_packets\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.err\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"dispatcher.metrics.invalid_packets\",\"checked\":true,\"percentile\":null,\"_key\":\"41f6303b-f31e-8b7e-83c8-67a8edf735af\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.invalid_packets)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_dispatcher\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.invalid_packets`) AS `dispatcher.metrics.invalid_packets`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.invalid_packets`) AS `dispatcher.metrics.invalid_packets`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.invalid_packets\",\"unit\":\"\"}]",
      "采集器数据丢失 (dispatcher.metrics.invalid_packets)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"dispatcher.metrics.invalid_packets\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1516,7 +1458,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.err`) AS `dispatcher.metrics.err`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.err`) AS `dispatcher.metrics.err`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_dispatcher\",\"dbName\":\"deepflow_tenant\",\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_dispatcher\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]},\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.err\",\"METRIC_NAME\":\"metrics.err\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"checked\":true,\"operatorLv2\":[],\"_key\":\"6fb3545a-74eb-ac62-4e84-622c0265a840\",\"perOperator\":\"\",\"operatorLv1\":\"Sum\",\"percentile\":null,\"markLine\":null,\"METRIC_LABEL\":\"dispatcher.metrics.err\",\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.err)\"}]}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_dispatcher\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.err`) AS `dispatcher.metrics.err`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.err`) AS `dispatcher.metrics.err`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 dispatcher.metrics.err\",\"unit\":\"\"}]",
      "采集器数据丢失 (dispatcher.metrics.err)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"dispatcher.metrics.err\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1524,7 +1467,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_flow_map\",\"dbName\":\"deepflow_tenant\",\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_flow_map\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]},\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.drop_by_window\",\"METRIC_NAME\":\"metrics.drop_by_window\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.closed\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"flow_map.metrics.drop_by_window\",\"checked\":true,\"percentile\":null,\"_key\":\"629edc91-d806-d7ac-bdea-517f46ad6530\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.drop_by_window)\"}]}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_window`) AS `flow_map.metrics.drop_by_window`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_map.metrics.drop_by_window\",\"unit\":\"\"}]",
      "采集器数据丢失 (flow_map.metrics.drop_by_window)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_map.metrics.drop_by_window\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1532,7 +1476,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_flow_map\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.drop_by_capacity\",\"METRIC_NAME\":\"metrics.drop_by_capacity\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.closed\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"flow_map.metrics.drop_by_capacity\",\"checked\":true,\"percentile\":null,\"_key\":\"988eb89d-d8cd-6827-d359-86b6c29fdbb6\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.drop_by_capacity)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_flow_map\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_flow_map\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_by_capacity`) AS `flow_map.metrics.drop_by_capacity`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_map.metrics.drop_by_capacity\",\"unit\":\"\"}]",
      "采集器数据丢失 (flow_map.metrics.drop_by_capacity)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_map.metrics.drop_by_capacity\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1540,7 +1485,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_flow_aggr\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-before-window`) AS `flow_aggr.metrics.drop-before-window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-before-window`) AS `flow_aggr.metrics.drop-before-window`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_flow_aggr\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.drop-before-window\",\"METRIC_NAME\":\"metrics.drop-before-window\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.drop-before-window\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"flow_aggr.metrics.drop-before-window\",\"checked\":true,\"percentile\":null,\"_key\":\"d5ebf837-b5b6-e853-7933-e09506a781ff\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.drop-before-window)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_flow_aggr\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_flow_aggr\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-before-window`) AS `flow_aggr.metrics.drop-before-window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-before-window`) AS `flow_aggr.metrics.drop-before-window`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 flow_aggr.metrics.drop-before-window\",\"unit\":\"\"}]",
      "采集器数据丢失 (flow_aggr.metrics.drop-before-window)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"flow_aggr.metrics.drop-before-window\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1548,7 +1494,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_quadruple_generator\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-before-window`) AS `quadruple_generator.metrics.drop-before-window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-before-window`) AS `quadruple_generator.metrics.drop-before-window`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_quadruple_generator\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.drop-before-window\",\"METRIC_NAME\":\"metrics.drop-before-window\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.drop-before-window\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"quadruple_generator.metrics.drop-before-window\",\"checked\":true,\"percentile\":null,\"_key\":\"79facee8-3875-df77-e375-2f7f955b0035\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.drop-before-window)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_quadruple_generator\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_quadruple_generator\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-before-window`) AS `quadruple_generator.metrics.drop-before-window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-before-window`) AS `quadruple_generator.metrics.drop-before-window`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 quadruple_generator.metrics.drop_before_window\",\"unit\":\"\"}]",
      "采集器数据丢失 (quadruple_generator.metrics.drop-before-window)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"quadruple_generator.metrics.drop-before-window\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1556,7 +1503,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-before-window`) AS `collector.metrics.drop-before-window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-before-window`) AS `collector.metrics.drop-before-window`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_collector\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.drop-before-window\",\"METRIC_NAME\":\"metrics.drop-before-window\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.drop-before-window\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"collector.metrics.drop-before-window\",\"checked\":true,\"percentile\":null,\"_key\":\"e63575a2-333a-b612-0b57-684387f80431\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.drop-before-window)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_collector\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-before-window`) AS `collector.metrics.drop-before-window`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-before-window`) AS `collector.metrics.drop-before-window`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 collector.metrics.drop_before_window\",\"unit\":\"\"}]",
      "采集器数据丢失 (collector.metrics.drop-before-window)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"collector.metrics.drop-before-window\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1564,7 +1512,8 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-inactive`) AS `collector.metrics.drop-inactive`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-inactive`) AS `collector.metrics.drop-inactive`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_collector\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.drop-inactive\",\"METRIC_NAME\":\"metrics.drop-inactive\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.drop-before-window\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"collector.metrics.drop-inactive\",\"checked\":true,\"percentile\":null,\"_key\":\"e63575a2-333a-b612-0b57-684387f80431\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.drop-inactive)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_collector\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_collector\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop-inactive`) AS `collector.metrics.drop-inactive`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop-inactive`) AS `collector.metrics.drop-inactive`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 collector.metrics.drop-inactive\",\"unit\":\"\"}]",
      "采集器数据丢失 (collector.metrics.drop-inactive)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"collector.metrics.drop-inactive\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
@@ -1572,41 +1521,10 @@ set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_agent_collect_sender\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.dropped`) AS `collect_sender.metrics.dropped`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.dropped`) AS `collect_sender.metrics.dropped`\"]}]}",
+    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_collect_sender\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.dropped\",\"METRIC_NAME\":\"metrics.dropped\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.dropped\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"collect_sender.metrics.dropped\",\"checked\":true,\"percentile\":null,\"_key\":\"7848fead-8554-591f-b0da-dec4180fa576\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.dropped)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_collect_sender\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
+    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_collect_sender\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.dropped`) AS `collect_sender.metrics.dropped`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.dropped`) AS `collect_sender.metrics.dropped`\"]}]}",
     "[{\"METRIC_LABEL\":\"drop_packets\",\"return_field_description\":\"最近 1 分钟 collect_sender.metrics.dropped\",\"unit\":\"\"}]",
      "采集器数据丢失 (collect_sender.metrics.dropped)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"collect_sender.metrics.dropped\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_recviver\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.invalid`) AS `ingester.recviver.metrics.invalid`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.invalid`) AS `ingester.recviver.metrics.invalid`\"]}]}",
-    "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.recviver.metrics.invalid\",\"unit\":\"\"}]",
-    "数据节点数据丢失 (ingester.recviver.metrics.invalid)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"ingester.recviver.metrics.invalid\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_queue\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.overwritten`) AS `ingester.queue.metrics.overwritten`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.overwritten`) AS `ingester.queue.metrics.overwritten`\"]}]}",
-     "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.queue.metrics.overwritten\",\"unit\":\"\"}]",
-     "数据节点数据丢失 (ingester.queue.metrics.overwritten)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"ingester.queue.metrics.overwritten\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_decoder\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.drop_count`) AS `ingester.decoder.metrics.drop_count`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.drop_count`) AS `ingester.decoder.metrics.drop_count`\"]}]}",
-     "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.decoder.metrics.drop_count\",\"unit\":\"\"}]",
-     "数据节点数据丢失 (ingester.decoder.metrics.drop_count)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"ingester.decoder.metrics.drop_count\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "", "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_system\",\"TABLE\":\"deepflow_server_ingester_ckwriter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.write_failed_count`) AS `ingester.ckwriter.metrics.write_failed_count`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.write_failed_count`) AS `ingester.ckwriter.metrics.write_failed_count`\"]}]}",
-     "[{\"METRIC_LABEL\":\"rx_drop_packets\",\"return_field_description\":\"最近 1 分钟 ingester.ckwriter.metrics.write_failed_count\",\"unit\":\"\"}]",
-     "数据节点数据丢失 (ingester.ckwriter.metrics.write_failed_count)",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"ingester.ckwriter.metrics.write_failed_count\", \"unit\": \"\"}", "{\"OP\":\">=\",\"VALUE\":1}", @lcuuid);
 
 CREATE TABLE IF NOT EXISTS report_policy (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -1637,7 +1555,8 @@ TRUNCATE TABLE policy_acl_group;
 
 CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     id                                      INTEGER        NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id                                 INTEGER,
+    user_id                                 INTEGER        DEFAULT 1,
+    team_id                                 INTEGER        DEFAULT 1,
     max_collect_pps                         INTEGER        DEFAULT NULL,
     max_npb_bps                             BIGINT         DEFAULT NULL     COMMENT 'unit: bps',
     max_cpus                                INTEGER        DEFAULT NULL,
@@ -1701,7 +1620,6 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     log_file_size                           INTEGER        DEFAULT NULL     COMMENT 'unit: MB',
     external_agent_http_proxy_enabled       TINYINT(1)     COMMENT '0: disabled 1: enabled',
     external_agent_http_proxy_port          INTEGER        DEFAULT NULL,
-    prometheus_http_api_addresses           VARCHAR(1024),
     proxy_controller_port                   INTEGER        DEFAULT NULL,
     analyzer_port                           INTEGER        DEFAULT NULL,
     proxy_controller_ip                     VARCHAR(128),
@@ -1859,6 +1777,7 @@ CREATE TABLE IF NOT EXISTS genesis_vinterface (
     last_seen             DATETIME,
     vtap_id               INTEGER,
     kubernetes_cluster_id CHAR(64),
+    team_id               INTEGER DEFAULT 1,
     PRIMARY KEY (`lcuuid`,`vtap_id`, `node_ip`)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4;
 TRUNCATE TABLE genesis_vinterface;
@@ -2000,6 +1919,7 @@ CREATE TABLE IF NOT EXISTS ch_subnet (
     icon_id                 INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_subnet;
@@ -2010,6 +1930,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_cluster (
     icon_id                 INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_cluster;
@@ -2020,6 +1941,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_node (
     icon_id                 INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_node;
@@ -2031,6 +1953,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ns (
     pod_cluster_id          INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns;
@@ -2044,6 +1967,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_group (
     pod_ns_id               INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_group;
@@ -2059,6 +1983,7 @@ CREATE TABLE IF NOT EXISTS ch_pod (
     pod_group_id            INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod;
@@ -2073,10 +1998,13 @@ CREATE TABLE IF NOT EXISTS ch_device (
     hostname                VARCHAR(256),
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (devicetype, deviceid)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_device;
+INSERT INTO ch_device (devicetype, deviceid, name, icon_id, team_id, domain_id, sub_domain_id) values(63999, 63999, "Internet", -1, 0, 0, 0);
+INSERT INTO ch_device (devicetype, deviceid, icon_id, team_id, domain_id, sub_domain_id) values(64000, 64000, -10, 0, 0, 0);
 
 CREATE TABLE IF NOT EXISTS ch_vtap_port (
     vtap_id                 INTEGER NOT NULL,
@@ -2085,6 +2013,10 @@ CREATE TABLE IF NOT EXISTS ch_vtap_port (
     mac_type                INTEGER DEFAULT 1 COMMENT '1:tap_mac,2:mac',
     host_id                 INTEGER,
     host_name               VARCHAR(256),
+    chost_id                INTEGER,
+    chost_name              VARCHAR(256),
+    pod_node_id             INTEGER,
+    pod_node_name           VARCHAR(256),
     device_type             INTEGER,
     device_id               INTEGER,
     device_name             VARCHAR(256),
@@ -2112,26 +2044,28 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
 TRUNCATE TABLE ch_vtap;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_label (
-    `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256),
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`               INTEGER NOT NULL,
+    `key`              VARCHAR(256) NOT NULL,
+    `value`            VARCHAR(256),
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_label;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_labels (
-    `id`            INTEGER NOT NULL PRIMARY KEY,
-    `labels`        TEXT,
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`               INTEGER NOT NULL PRIMARY KEY,
+    `labels`           TEXT,
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_labels;
 
@@ -2299,6 +2233,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ingress (
     name                    VARCHAR(256),
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ingress;
@@ -2358,7 +2293,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (11, '网络-PCAP 数据', 'flow_log.l7_packet', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (12, '系统监控数据', 'deepflow_system.*', 0, 7*24, @lcuuid);
+                 VALUES (12, '租户侧监控数据', 'deepflow_tenant.*', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (13, '外部指标数据', 'ext_metrics.*', 0, 7*24, @lcuuid);
@@ -2373,13 +2308,16 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (16, '事件-IO 事件', 'event.perf_event', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (17, '事件-告警事件', 'event.alarm_event', 0, 30*24, @lcuuid);
+                 VALUES (17, '事件-告警事件', 'event.alert_event', 0, 30*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (19, '网络-网络策略', 'flow_metrics.traffic_policy', 60, 3*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
+                 VALUES (20, '日志-日志数据', 'application_log.log', 1, 30*24, @lcuuid);
 
 
 CREATE TABLE IF NOT EXISTS license (
@@ -2414,6 +2352,8 @@ TRUNCATE TABLE voucher;
 
 CREATE TABLE IF NOT EXISTS consumer_bill (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
+    org_id                  INTEGER DEFAULT 1,
     vtap_name               VARCHAR(256) DEFAULT NULL,
     vtap_ctrl_ip            CHAR(64) DEFAULT NULL,
     vtap_ctrl_mac           CHAR(64) DEFAULT NULL,
@@ -2505,12 +2445,13 @@ CREATE TABLE IF NOT EXISTS ch_chost_cloud_tag (
 TRUNCATE TABLE ch_chost_cloud_tag;
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tag (
-    `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256),
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`               INTEGER NOT NULL,
+    `key`              VARCHAR(256) NOT NULL,
+    `value`            VARCHAR(256),
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns_cloud_tag;
@@ -2525,31 +2466,34 @@ CREATE TABLE IF NOT EXISTS ch_chost_cloud_tags (
 TRUNCATE TABLE ch_chost_cloud_tags;
 
 CREATE TABLE IF NOT EXISTS ch_pod_ns_cloud_tags (
-    `id`            INTEGER NOT NULL PRIMARY KEY,
-    `cloud_tags`    TEXT,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`               INTEGER NOT NULL PRIMARY KEY,
+    `cloud_tags`       TEXT,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ns_cloud_tags;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tag (
-    `pid`           INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256),
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `pid`              INTEGER NOT NULL,
+    `key`              VARCHAR(256) NOT NULL,
+    `value`            VARCHAR(256),
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`pid`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_os_app_tag;
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tags (
-    `pid`           INTEGER NOT NULL PRIMARY KEY,
-    `os_app_tags`   TEXT,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `pid`              INTEGER NOT NULL PRIMARY KEY,
+    `os_app_tags`      TEXT,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_os_app_tags;
 
@@ -2561,79 +2505,86 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     l3_epc_id               INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
+    sub_domain_id           INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_gprocess;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_label (
-    `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256),
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`               INTEGER NOT NULL,
+    `key`              VARCHAR(256) NOT NULL,
+    `value`            VARCHAR(256),
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service_k8s_label;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_labels (
-    `id`            INTEGER NOT NULL PRIMARY KEY,
-    `labels`        TEXT,
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`               INTEGER NOT NULL PRIMARY KEY,
+    `labels`           TEXT,
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service_k8s_labels;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotation (
-    `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256),
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`               INTEGER NOT NULL,
+    `key`              VARCHAR(256) NOT NULL,
+    `value`            VARCHAR(256),
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotation;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_annotations (
-    `id`            INTEGER NOT NULL PRIMARY KEY,
-    `annotations`   TEXT,
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`               INTEGER NOT NULL PRIMARY KEY,
+    `annotations`      TEXT,
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotations;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotation (
-    `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256),
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`               INTEGER NOT NULL,
+    `key`              VARCHAR(256) NOT NULL,
+    `value`            VARCHAR(256),
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotation;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service_k8s_annotations (
-    `id`            INTEGER NOT NULL PRIMARY KEY,
-    `annotations`   TEXT,
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`               INTEGER NOT NULL PRIMARY KEY,
+    `annotations`      TEXT,
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_annotations;
 
@@ -2701,27 +2652,40 @@ CREATE TABLE IF NOT EXISTS prometheus_metric_target (
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_metric_target;
 
+CREATE TABLE IF NOT EXISTS `resource_version` (
+    `id`            INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `name`          VARCHAR(255) NOT NULL UNIQUE,
+    `version`       INTEGER NOT NULL DEFAULT 0,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE resource_version;
+SET @prometheus_version = UNIX_TIMESTAMP(NOW());
+INSERT INTO resource_version (name, version) VALUES ('prometheus', @prometheus_version);
+
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (
-    `id`            INTEGER NOT NULL,
-    `key`           VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256),
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `id`               INTEGER NOT NULL,
+    `key`              VARCHAR(256) NOT NULL,
+    `value`            VARCHAR(256),
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_env;
 
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_envs (
-    `id`            INTEGER NOT NULL PRIMARY KEY,
-    `envs`          TEXT,
-    `l3_epc_id`     INTEGER,
-    `pod_ns_id`     INTEGER,
-    `team_id`       INTEGER,
-    `domain_id`     INTEGER,
-    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`               INTEGER NOT NULL PRIMARY KEY,
+    `envs`             TEXT,
+    `l3_epc_id`        INTEGER,
+    `pod_ns_id`        INTEGER,
+    `team_id`          INTEGER,
+    `domain_id`        INTEGER,
+    `sub_domain_id`    INTEGER,
+    `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_k8s_envs;
 
@@ -2776,13 +2740,14 @@ CREATE TABLE IF NOT EXISTS ch_prometheus_target_label_layout (
 TRUNCATE TABLE ch_prometheus_target_label_layout;
 
 CREATE TABLE IF NOT EXISTS ch_pod_service (
-    `id`              INTEGER NOT NULL PRIMARY KEY,
-    `name`            VARCHAR(256),
-    `pod_cluster_id`  INTEGER,
-    `pod_ns_id`       INTEGER,
-    `team_id`         INTEGER,
-    `domain_id`       INTEGER,
-    `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `id`                 INTEGER NOT NULL PRIMARY KEY,
+    `name`               VARCHAR(256),
+    `pod_cluster_id`     INTEGER,
+    `pod_ns_id`          INTEGER,
+    `team_id`            INTEGER,
+    `domain_id`          INTEGER,
+    `sub_domain_id`      INTEGER,
+    `updated_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_service;
 
@@ -2826,3 +2791,10 @@ CREATE TABLE IF NOT EXISTS ch_alarm_policy (
     `updated_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_alarm_policy;
+
+CREATE TABLE IF NOT EXISTS ch_user (
+    id                      INTEGER NOT NULL PRIMARY KEY,
+    name                    VARCHAR(256),
+    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_user;

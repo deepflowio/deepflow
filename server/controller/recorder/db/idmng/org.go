@@ -60,18 +60,19 @@ func (m *IDManagers) Init(ctx context.Context, cfg config.RecorderConfig) {
 	m.orgIDToIDMng = make(map[int]*IDManager)
 }
 
-func (m *IDManagers) Start() error {
+func (m *IDManagers) Start(ctx context.Context) error {
 	if m.inUse {
 		return nil
 	}
 	m.inUse = true
+	m.ctx, m.cancel = context.WithCancel(ctx)
 
 	orgIDs, err := mysql.GetORGIDs()
 	if err != nil {
 		return fmt.Errorf("failed to get org ids: %v", err)
 	}
 	for _, id := range orgIDs {
-		if _, err := m.NewIDManagerAndInitIfNotExists(id); err != nil {
+		if _, err := m.lazyCreate(id); err != nil {
 			return fmt.Errorf("failed to start id manager for org %d: %v", id, err)
 		}
 	}
@@ -106,6 +107,26 @@ func (m *IDManagers) timedRefresh() {
 			}
 		}
 	}()
+}
+
+func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
+	db, err := mysql.GetDB(orgID)
+	if err != nil {
+		log.Error("failed to get db: %v", err)
+		return nil, err
+	}
+	// 仅当组织中存在 domain 时，才创建组织的 IDManager，以避免内存浪费
+	var domain *mysql.Domain
+	result := db.Limit(1).Find(&domain)
+	if result.Error != nil {
+		log.Errorf("failed to get domain: %v", err, db.LogPrefixORGID)
+		return nil, err
+	}
+	if result.RowsAffected == 0 {
+		log.Infof("no domain in db, skip creating id manager", db.LogPrefixORGID)
+		return nil, nil
+	}
+	return m.NewIDManagerAndInitIfNotExists(orgID)
 }
 
 func (m *IDManagers) NewIDManagerAndInitIfNotExists(orgID int) (*IDManager, error) {

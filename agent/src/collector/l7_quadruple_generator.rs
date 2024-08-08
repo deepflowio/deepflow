@@ -65,6 +65,8 @@ struct AppMeterWithL7Protocol {
     app_meter: AppMeter,
     endpoint: Option<String>,
     endpoint_hash: u32,
+    // request-reponse time span
+    time_span: u32,
     l7_protocol: L7Protocol,
     biz_type: u8,
 }
@@ -261,16 +263,21 @@ impl SubQuadGen {
                 .fetch_add(1, Ordering::Relaxed);
             return;
         }
-
         let slot = (((time_in_second - self.window_start).as_secs() / self.slot_interval) as usize)
             .min(self.stashs.len() - 1);
+        let current_span = time_in_second.as_secs() / self.slot_interval;
+        let request_span =
+            (time_in_second.as_secs() - l7_stats.time_span as u64) / self.slot_interval;
+        let time_span = (current_span - request_span) as u32;
         let stash = &mut self.stashs[slot];
         let value = stash.l7_stats.get_mut(&l7_stats.flow_id);
+
         if let Some(meters) = value {
-            if let Some(meter) = meters
-                .iter_mut()
-                .find(|m| m.endpoint == l7_stats.endpoint && m.biz_type == l7_stats.biz_type)
-            {
+            if let Some(meter) = meters.iter_mut().find(|m| {
+                m.endpoint == l7_stats.endpoint
+                    && m.biz_type == l7_stats.biz_type
+                    && m.time_span == time_span
+            }) {
                 // flow L7Protocol of different client ports on the same server port may be inconsistent.
                 // unknown l7_protocol needs to be judged by the close_type and duration of the flow,
                 // so the L7Protocol of the same flow may be different. The principles are as follows:
@@ -288,6 +295,7 @@ impl SubQuadGen {
                     endpoint: l7_stats.endpoint.clone(),
                     endpoint_hash,
                     biz_type: l7_stats.biz_type,
+                    time_span,
                 };
                 meters.push(meter);
             }
@@ -299,6 +307,11 @@ impl SubQuadGen {
                 let (is_active_host0, is_active_host1) =
                     check_active(time_in_second.as_secs(), possible_host, &flow);
                 for meter in meters.drain(..) {
+                    // meter.app_meter.traffic.request and meter.app_meter.traffic.response are 0, there is no need to save
+                    if meter.app_meter.traffic.request == 0 && meter.app_meter.traffic.response == 0
+                    {
+                        continue;
+                    }
                     let boxed_app_meter = Box::new(AppMeterWithFlow {
                         app_meter: meter.app_meter,
                         flow: flow.clone(),
@@ -309,6 +322,7 @@ impl SubQuadGen {
                         is_active_host1,
                         time_in_second: tagged_flow.flow.flow_stat_time,
                         biz_type: meter.biz_type,
+                        time_span,
                     });
 
                     if close_type != CloseType::Unknown && close_type != CloseType::ForcedReport {
@@ -343,6 +357,7 @@ impl SubQuadGen {
                     is_active_host1,
                     time_in_second: tagged_flow.flow.flow_stat_time,
                     biz_type: l7_stats.biz_type,
+                    time_span,
                 });
                 if close_type != CloseType::Unknown && close_type != CloseType::ForcedReport {
                     Self::push_closed_app_meter(
@@ -360,6 +375,7 @@ impl SubQuadGen {
                     endpoint: l7_stats.endpoint.clone(),
                     endpoint_hash,
                     biz_type: l7_stats.biz_type,
+                    time_span,
                 };
                 let _ = stash.l7_stats.insert(l7_stats.flow_id, vec![meter]);
             }

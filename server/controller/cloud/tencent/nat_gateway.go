@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
-	log.Debug("get nat gateways starting")
+	log.Debug("get nat gateways starting", logger.NewORGPrefix(t.orgID))
 	var natGateways []model.NATGateway
 	var natVinterfaces []model.VInterface
 	var natIPs []model.IP
@@ -33,7 +34,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGateways", region.name, "NatGatewaySet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("nat gateway request tencent api error: (%s)", err.Error())
+		log.Errorf("nat gateway request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, err
 	}
 	for _, nData := range resp {
@@ -79,6 +80,6 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 			}
 		}
 	}
-	log.Debug("get nat gateways complete")
+	log.Debug("get nat gateways complete", logger.NewORGPrefix(t.orgID))
 	return natGateways, natVinterfaces, natIPs, nil
 }

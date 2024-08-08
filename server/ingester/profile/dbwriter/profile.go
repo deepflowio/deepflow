@@ -131,18 +131,18 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("ip6", ckdb.IPv6).SetComment("IPV6地址"),
 		ckdb.NewColumn("is_ipv4", ckdb.UInt8).SetComment("是否为IPv4地址").SetIndex(ckdb.IndexMinmax),
 
-		ckdb.NewColumn("app_service", ckdb.String).SetComment("应用名称, 用户配置上报"),
+		ckdb.NewColumn("app_service", ckdb.LowCardinalityString).SetComment("应用名称, 用户配置上报"),
 		ckdb.NewColumn("profile_location_str", ckdb.String).SetComment("单次 profile 堆栈"),
 		ckdb.NewColumn("profile_value", ckdb.Int64).SetComment("profile self value"),
-		ckdb.NewColumn("profile_value_unit", ckdb.String).SetComment("profile value 的单位"),
-		ckdb.NewColumn("profile_event_type", ckdb.String).SetComment("剖析类型"),
+		ckdb.NewColumn("profile_value_unit", ckdb.LowCardinalityString).SetComment("profile value 的单位"),
+		ckdb.NewColumn("profile_event_type", ckdb.LowCardinalityString).SetComment("剖析类型"),
 		ckdb.NewColumn("profile_create_timestamp", ckdb.DateTime64us).SetIndex(ckdb.IndexSet).SetComment("client 端聚合时间"),
 		ckdb.NewColumn("profile_in_timestamp", ckdb.DateTime64us).SetComment("DeepFlow 的写入时间，同批上报的批次数据具备相同的值"),
-		ckdb.NewColumn("profile_language_type", ckdb.String).SetComment("语言类型"),
+		ckdb.NewColumn("profile_language_type", ckdb.LowCardinalityString).SetComment("语言类型"),
 		ckdb.NewColumn("profile_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 span_id"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("含义等同 l7_flow_log 的 trace_id"),
 		ckdb.NewColumn("span_name", ckdb.String).SetComment("含义等同 l7_flow_log 的 endpoint"),
-		ckdb.NewColumn("app_instance", ckdb.String).SetComment("应用实例名称, 用户上报"),
+		ckdb.NewColumn("app_instance", ckdb.LowCardinalityString).SetComment("应用实例名称, 用户上报"),
 		ckdb.NewColumn("tag_names", ckdb.ArrayLowCardinalityString).SetComment("profile 上报的 tagnames"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("profile 上报的 tagvalues"),
 		ckdb.NewColumn("compression_algo", ckdb.LowCardinalityString).SetComment("压缩算法"),
@@ -271,9 +271,19 @@ func ReleaseInProcess(p *InProcessProfile) {
 	poolInProcess.Put(p)
 }
 
+func (p *InProcessProfile) Clone() *InProcessProfile {
+	c := AcquireInProcess()
+	*c = *p
+	c.TagNames = make([]string, len(p.TagNames))
+	copy(p.TagNames, p.TagNames)
+	c.TagValues = make([]string, len(p.TagValues))
+	copy(p.TagValues, p.TagValues)
+	return c
+}
+
 func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	platformData *grpc.PlatformInfoTable,
-	vtapID uint16,
+	vtapID, orgId, teamId uint16,
 	podID uint32,
 	profileName string,
 	eventType string,
@@ -304,16 +314,20 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	if input.Key.Labels() != nil {
 		p.SpanName = input.Key.Labels()[LabelSpanName]
 	}
+	// app_instance should upload by user with label, if empty use app_service
+	if p.AppInstance == "" {
+		p.AppInstance = p.AppService
+	}
 	p.ProcessID = pid
 	p.ProcessStartTime = stime
-	p.GPID = platformData.QueryProcessInfo(vtapID, pid)
+	p.GPID = platformData.QueryProcessInfo(orgId, vtapID, pid)
 	tagNames = append(tagNames, LabelAppService, LabelLanguageType, LabelTraceID, LabelSpanName, LabelAppInstance)
 	tagValues = append(tagValues, p.AppService, p.ProfileLanguageType, p.TraceID, p.SpanName, p.AppInstance)
 	p.TagNames = tagNames
 	p.TagValues = tagValues
 
+	p.OrgId, p.TeamID = orgId, teamId
 	p.fillResource(vtapID, podID, platformData)
-	p.OrgId, p.TeamID = platformData.QueryVtapOrgAndTeamID(vtapID)
 }
 
 func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
@@ -322,7 +336,7 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 }
 
 func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformData *grpc.PlatformInfoTable) {
-	vtapInfo := platformData.QueryVtapInfo(vtapID)
+	vtapInfo := platformData.QueryVtapInfo(p.OrgId, vtapID)
 	var vtapPlatformInfo *grpc.Info
 	if vtapInfo != nil {
 		p.L3EpcID = vtapInfo.EpcId
@@ -333,14 +347,14 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 			if ip4 := vtapIP.To4(); ip4 != nil {
 				// fill ip from Vtap first, can be overwritten by podInfo later
 				IP4 := utils.IpToUint32(ip4)
-				vtapPlatformInfo = platformData.QueryIPV4Infos(vtapInfo.EpcId, IP4)
+				vtapPlatformInfo = platformData.QueryIPV4Infos(p.OrgId, vtapInfo.EpcId, IP4)
 				if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 					p.IP4 = IP4
 					p.IsIPv4 = true
 				}
 			} else {
 				IP6 := vtapIP
-				vtapPlatformInfo = platformData.QueryIPV6Infos(vtapInfo.EpcId, IP6)
+				vtapPlatformInfo = platformData.QueryIPV6Infos(p.OrgId, vtapInfo.EpcId, IP6)
 				if p.IP4 == 0 && (len(p.IP6) == 0 || p.IP6.Equal(net.IPv6zero)) {
 					p.IP6 = IP6
 					p.IsIPv4 = false
@@ -352,7 +366,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 	var info *grpc.Info
 	// 1. try to find platform info by podID first
 	if podID != 0 {
-		info = platformData.QueryPodIdInfo(podID)
+		info = platformData.QueryPodIdInfo(p.OrgId, podID)
 		if info != nil {
 			// rewirte ip from podInfo
 			p.IsIPv4, p.IP4, p.IP6 = info.IsIPv4, info.IP4, info.IP6
@@ -364,9 +378,9 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 		// app profile: submit IP from agent
 		// ebpf profile with hostnetwork: when PodID get nil infos, try to get info from PodNodeID
 		if p.IsIPv4 {
-			info = platformData.QueryIPV4Infos(p.L3EpcID, p.IP4)
+			info = platformData.QueryIPV4Infos(p.OrgId, p.L3EpcID, p.IP4)
 		} else {
-			info = platformData.QueryIPV6Infos(p.L3EpcID, p.IP6)
+			info = platformData.QueryIPV6Infos(p.OrgId, p.L3EpcID, p.IP6)
 		}
 	}
 
@@ -386,7 +400,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 		p.PodGroupID = info.PodGroupID
 		p.L3DeviceType = uint8(info.DeviceType)
 		p.L3DeviceID = info.DeviceID
-		p.ServiceID = platformData.QueryService(p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
+		p.ServiceID = platformData.QueryService(p.OrgId, p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
 	}
 
 	// fix up when all resource match failed
@@ -400,7 +414,7 @@ func (p *InProcessProfile) fillPodInfo(vtapID uint16, containerID string, platfo
 		log.Debugf("%s-%s uploaded empty containerID by vtapID: %d", p.AppService, p.ProfileEventType, vtapID)
 		return
 	}
-	podInfo := platformData.QueryPodContainerInfo(vtapID, containerID)
+	podInfo := platformData.QueryPodContainerInfo(p.OrgId, vtapID, containerID)
 	if podInfo != nil {
 		p.PodID = podInfo.PodId
 		ip := net.ParseIP(podInfo.Ip)

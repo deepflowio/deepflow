@@ -42,16 +42,21 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 	var podServices []mysql.PodService
 	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations)
 	for _, podService := range podServices {
+		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), podService, k.db.LogPrefixORGID)
+		}
+
 		annotationsMap := map[string]string{}
 		annotations := strings.Split(podService.Annotation, ", ")
 		for _, singleAnnotation := range annotations {
-			annotationInfo := strings.Split(singleAnnotation, ":")
+			annotationInfo := strings.SplitN(singleAnnotation, ":", 2)
 			if len(annotationInfo) == 2 {
 				annotationsMap[annotationInfo[0]] = annotationInfo[1]
 			}
@@ -59,7 +64,7 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 		if len(annotationsMap) > 0 {
 			annotationStr, err := json.Marshal(annotationsMap)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, k.db.LogPrefixORGID)
 				return nil, false
 			}
 			key := K8sAnnotationsKey{
@@ -70,8 +75,9 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 				Annotations: string(annotationStr),
 				L3EPCID:     podService.VPCID,
 				PodNsID:     podService.PodNamespaceID,
-				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		}
 	}

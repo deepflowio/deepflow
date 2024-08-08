@@ -19,11 +19,11 @@ package rsctask
 import (
 	"context"
 
-	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 )
 
 type ResourceTaskManager interface {
-	Start(context.Context, config.FPermit, redis.Config)
+	Start(context.Context, common.FPermit, redis.Config)
 	Stop()
 }

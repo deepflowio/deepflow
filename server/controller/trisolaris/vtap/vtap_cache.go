@@ -17,6 +17,7 @@
 package vtap
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
@@ -32,7 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -40,7 +41,7 @@ import (
 )
 
 type VTapConfig struct {
-	agent_config.RAgentGroupConfigModel
+	agent_config.AgentGroupConfigModel
 	ConvertedL4LogTapTypes       []uint32
 	ConvertedL4LogIgnoreTapSides []uint32
 	ConvertedL7LogIgnoreTapSides []uint32
@@ -54,49 +55,59 @@ type VTapConfig struct {
 
 func (f *VTapConfig) convertData() {
 	var err error
-	f.ConvertedL4LogTapTypes, err = ConvertStrToU32List(f.L4LogTapTypes)
-	if err != nil {
-		log.Error(err)
+	if f.L4LogTapTypes != nil {
+		f.ConvertedL4LogTapTypes, err = ConvertStrToU32List(*f.L4LogTapTypes)
+		if err != nil {
+			log.Error(err)
+		}
 	}
-	f.ConvertedL4LogIgnoreTapSides, err = ConvertStrToU32List(f.L4LogIgnoreTapSides)
-	if err != nil {
-		log.Error(err)
+	if f.L4LogIgnoreTapSides != nil {
+		f.ConvertedL4LogIgnoreTapSides, err = ConvertStrToU32List(*f.L4LogIgnoreTapSides)
+		if err != nil {
+			log.Error(err)
+		}
 	}
-	f.ConvertedL7LogIgnoreTapSides, err = ConvertStrToU32List(f.L7LogIgnoreTapSides)
-	if err != nil {
-		log.Error(err)
+	if f.L7LogIgnoreTapSides != nil {
+		f.ConvertedL7LogIgnoreTapSides, err = ConvertStrToU32List(*f.L7LogIgnoreTapSides)
+		if err != nil {
+			log.Error(err)
+		}
 	}
-	f.ConvertedL7LogStoreTapTypes, err = ConvertStrToU32List(f.L7LogStoreTapTypes)
-	if err != nil {
-		log.Error(err)
+	if f.L7LogStoreTapTypes != nil {
+		f.ConvertedL7LogStoreTapTypes, err = ConvertStrToU32List(*f.L7LogStoreTapTypes)
+		if err != nil {
+			log.Error(err)
+		}
 	}
-	f.ConvertedDecapType, err = ConvertStrToU32List(f.DecapType)
-	if err != nil {
-		log.Error(err)
+	if f.DecapType != nil {
+		f.ConvertedDecapType, err = ConvertStrToU32List(*f.DecapType)
+		if err != nil {
+			log.Error(err)
+		}
 	}
-	if len(f.Domains) != 0 {
-		f.ConvertedDomains = strings.Split(f.Domains, ",")
+	if f.Domains != nil && len(*f.Domains) != 0 {
+		f.ConvertedDomains = strings.Split(*f.Domains, ",")
 	}
 	sort.Strings(f.ConvertedDomains)
 
-	if len(f.WasmPlugins) != 0 {
-		f.ConvertedWasmPlugins = strings.Split(f.WasmPlugins, ",")
+	if f.WasmPlugins != nil && len(*f.WasmPlugins) != 0 {
+		f.ConvertedWasmPlugins = strings.Split(*f.WasmPlugins, ",")
 	}
-	if len(f.SoPlugins) != 0 {
-		f.ConvertedSoPlugins = strings.Split(f.SoPlugins, ",")
+	if f.SoPlugins != nil && len(*f.SoPlugins) != 0 {
+		f.ConvertedSoPlugins = strings.Split(*f.SoPlugins, ",")
 	}
 
-	if f.HTTPLogProxyClient == SHUT_DOWN_STR {
-		f.HTTPLogProxyClient = ""
+	if f.HTTPLogProxyClient != nil && *f.HTTPLogProxyClient == SHUT_DOWN_STR {
+		f.HTTPLogProxyClient = proto.String("")
 	}
-	if f.HTTPLogTraceID == SHUT_DOWN_STR {
-		f.HTTPLogTraceID = ""
+	if f.HTTPLogTraceID != nil && *f.HTTPLogTraceID == SHUT_DOWN_STR {
+		f.HTTPLogTraceID = proto.String("")
 	}
-	if f.HTTPLogSpanID == SHUT_DOWN_STR {
-		f.HTTPLogSpanID = ""
+	if f.HTTPLogSpanID != nil && *f.HTTPLogSpanID == SHUT_DOWN_STR {
+		f.HTTPLogSpanID = proto.String("")
 	}
-	if f.HTTPLogXRequestID == SHUT_DOWN_STR {
-		f.HTTPLogXRequestID = ""
+	if f.HTTPLogXRequestID != nil && *f.HTTPLogXRequestID == SHUT_DOWN_STR {
+		f.HTTPLogXRequestID = proto.String("")
 	}
 	if Find[uint32](f.ConvertedL4LogTapTypes, SHUT_DOWN_UINT) {
 		f.ConvertedL4LogTapTypes = []uint32{}
@@ -124,9 +135,9 @@ func (f *VTapConfig) modifyConfig(v *VTapInfo) {
 	}
 }
 
-func NewVTapConfig(config *agent_config.RAgentGroupConfigModel) *VTapConfig {
+func NewVTapConfig(config *agent_config.AgentGroupConfigModel) *VTapConfig {
 	vTapConfig := &VTapConfig{}
-	vTapConfig.RAgentGroupConfigModel = *config
+	vTapConfig.AgentGroupConfigModel = *config
 	vTapConfig.convertData()
 	return vTapConfig
 }
@@ -165,6 +176,7 @@ type VTapCache struct {
 	licenseType        int
 	tapMode            int
 	teamID             int
+	organizeID         int
 	lcuuid             *string
 	licenseFunctions   *string
 	licenseFunctionSet mapset.Set
@@ -211,7 +223,29 @@ type VTapCache struct {
 	vTapInfo *VTapInfo
 }
 
-func NewVTapCache(vtap *models.VTap, vTapInfo *VTapInfo) *VTapCache {
+func (c *VTapCache) String() string {
+	return fmt.Sprintf(
+		"{id: %d, name: %s, rawHostname: %s, state: %d, enable: %d, vTapType: %d, "+
+			"ctrlIP:%s, ctrlMac:%s, tsdbIP: %s, curTSDBIP: %s, controllerIP: %s, "+
+			"curControllerIP: %s, launchServer: %s, launchServerID: %d, syncedControllerAt: %s, "+
+			"syncedTSDBAt: %s, bootTime: %d, exceptions: %d, vTapGroupLcuuid: %s, licenseType: %d, "+
+			"tapMode: %d, teamID: %d, organizeID: %d, licenseFunctionSet: %s, enabledTrafficDistribution: %v, "+
+			"enabledNetworkMonitoring: %v, enabledCallMonitoring: %v, enabledFunctionMonitoring: %v, "+
+			"enabledApplicationMonitoring: %v, enabledIndicatorMonitoring: %v, enabledLogMonitoring: %v, "+
+			"podDomains: %v, pushVersionPlatformData: %d, pushVersionPolicy: %d, pushVersionGroups: %d, "+
+			"expectedRevision: %s, upgradePackage: %s, podClusterID: %d, VPCID: %d}",
+		c.GetVTapID(), c.GetVTapHost(), c.GetVTapRawHostname(), c.state, c.enable, c.vTapType,
+		c.GetCtrlIP(), c.GetCtrlMac(), c.GetTSDBIP(), c.GetCurTSDBIP(), c.GetControllerIP(),
+		c.GetCurControllerIP(), c.GetLaunchServer(), c.GetLaunchServerID(), c.GetSyncedControllerAt(),
+		c.GetSyncedTSDBAt(), c.GetBootTime(), c.GetExceptions(), c.GetVTapGroupLcuuid(), c.licenseType,
+		c.tapMode, c.teamID, c.organizeID, c.licenseFunctionSet, c.EnabledTrafficDistribution(),
+		c.EnabledNetworkMonitoring(), c.EnabledCallMonitoring(), c.EnabledFunctionMonitoring(),
+		c.EnabledApplicationMonitoring(), c.EnabledIndicatorMonitoring(), c.EnabledLogMonitoring(),
+		c.podDomains, c.pushVersionPlatformData, c.pushVersionPolicy, c.pushVersionGroups,
+		c.GetExpectedRevision(), c.GetUpgradePackage(), c.podClusterID, c.VPCID)
+}
+
+func NewVTapCache(vtap *mysql.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache := &VTapCache{}
 	vTapCache.id = vtap.ID
 	vTapCache.name = proto.String(vtap.Name)
@@ -249,6 +283,7 @@ func NewVTapCache(vtap *models.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.tapMode = vtap.TapMode
 	vTapCache.teamID = vtap.TeamID
+	vTapCache.organizeID = vTapInfo.GetORGID()
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
 	vTapCache.licenseFunctionSet = mapset.NewSet()
@@ -359,8 +394,11 @@ func (c *VTapCache) GetLocalConfig() string {
 	if configure == nil {
 		return ""
 	}
+	if configure.YamlConfig == nil {
+		return ""
+	}
 
-	return configure.YamlConfig
+	return *configure.YamlConfig
 }
 
 var NetWorkL7ProtocolEnabled = []string{"HTTP", "DNS"}
@@ -371,21 +409,22 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 	if c.EnabledCallMonitoring() == false &&
 		c.EnabledNetworkMonitoring() == false {
-		configure.L7MetricsEnabled = DISABLED
+		*configure.L7MetricsEnabled = DISABLED
 		configure.ConvertedL7LogStoreTapTypes = nil
 	}
 
 	if c.EnabledNetworkMonitoring() == false {
-		configure.L4PerformanceEnabled = DISABLED
+		*configure.L4PerformanceEnabled = DISABLED
 		configure.ConvertedL4LogTapTypes = nil
 	}
 	v := c.vTapInfo
 	// modify static config
 	yamlConfig := &agent_config.StaticConfig{}
-	err := yaml.Unmarshal([]byte(configure.YamlConfig), yamlConfig)
-	if err != nil {
-		log.Error(v.Logf("%s", err))
-		return
+	if configure.YamlConfig != nil {
+		if err := yaml.Unmarshal([]byte(*configure.YamlConfig), yamlConfig); err != nil {
+			log.Error(v.Logf("%s", err))
+			return
+		}
 	}
 
 	if c.EnabledNetworkMonitoring() == true &&
@@ -434,10 +473,10 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 
 	b, err := yaml.Marshal(yamlConfig)
 	if err != nil {
-		log.Error(v.Logf("%s", err))
+		log.Error(err)
 		return
 	}
-	configure.YamlConfig = string(b)
+	configure.YamlConfig = proto.String(string(b))
 }
 
 func (c *VTapCache) EnabledCallMonitoring() bool {
@@ -563,8 +602,11 @@ func (c *VTapCache) GetConfigSyncInterval() int {
 	if config == nil {
 		return DefaultSyncInterval
 	}
+	if config.SyncInterval == nil {
+		return DefaultSyncInterval
+	}
 
-	return config.SyncInterval
+	return *config.SyncInterval
 }
 
 func (c *VTapCache) updateVTapHost(host string) {
@@ -667,8 +709,11 @@ func (c *VTapCache) GetExternalAgentHTTPProxyEnabledConfig() int {
 	if config == nil {
 		return 0
 	}
+	if config.ExternalAgentHTTPProxyEnabled == nil {
+		return 0
+	}
 
-	return config.ExternalAgentHTTPProxyEnabled
+	return *config.ExternalAgentHTTPProxyEnabled
 }
 
 func (c *VTapCache) UpdateLaunchServer(launcherServer string) {
@@ -840,6 +885,14 @@ func (c *VTapCache) GetTeamID() int {
 
 func (c *VTapCache) updateTeamID(teamID int) {
 	c.teamID = teamID
+}
+
+func (c *VTapCache) updateOrganizeID(organizeID int) {
+	c.organizeID = organizeID
+}
+
+func (c *VTapCache) GetOrganizeID() int {
+	return c.organizeID
 }
 
 func (c *VTapCache) UpdateRevision(revision string) {
@@ -1046,10 +1099,13 @@ func (c *VTapCache) GetConfigTapMode() int {
 	if config == nil {
 		return -1
 	}
-	return config.TapMode
+	if config.TapMode == nil {
+		return -1
+	}
+	return *config.TapMode
 }
 
-func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap) {
+func (c *VTapCache) updateVTapCacheFromDB(vtap *mysql.VTap) {
 	v := c.vTapInfo
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State

@@ -11,7 +11,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
-    config::handler::{L7LogDynamicConfig, TraceType},
+    config::handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -145,6 +145,13 @@ macro_rules! all_openwire_commands {
             fn from(command: OpenWireCommand) -> Self {
                 match command {
                     $(OpenWireCommand::$variant => $command_id),*
+                }
+            }
+        }
+        impl OpenWireCommand {
+            fn as_str(&self) -> &'static str {
+                match self {
+                    $(OpenWireCommand::$variant => stringify!($variant)),*
                 }
             }
         }
@@ -1653,6 +1660,8 @@ pub struct OpenWireInfo {
     captured_response_byte: u32,
 
     rtt: u64,
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 impl Default for OpenWireInfo {
@@ -1683,6 +1692,7 @@ impl Default for OpenWireInfo {
             rtt: 0,
             captured_request_byte: 0,
             captured_response_byte: 0,
+            is_on_blacklist: false,
         }
     }
 }
@@ -1711,6 +1721,25 @@ impl OpenWireInfo {
             self.err_msg = res.err_msg.clone();
         }
         self.captured_response_byte = res.captured_response_byte;
+        if res.is_on_blacklist {
+            self.is_on_blacklist = res.is_on_blacklist;
+        }
+    }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::OpenWire) {
+            self.is_on_blacklist = t.request_type.is_on_blacklist(self.command_type.as_str())
+                || self
+                    .topic
+                    .as_ref()
+                    .map(|p| t.request_resource.is_on_blacklist(p) || t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .broker_url
+                    .as_ref()
+                    .map(|p| t.request_domain.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
     }
 }
 
@@ -1744,6 +1773,9 @@ impl L7ProtocolInfoInterface for OpenWireInfo {
     }
     fn get_endpoint(&self) -> Option<String> {
         self.topic.clone()
+    }
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -1828,6 +1860,7 @@ pub struct OpenWireLog {
     client_next_skip_len: Option<usize>,
     server_next_skip_len: Option<usize>,
     perf_stats: Option<L7PerfStats>,
+    last_is_on_blacklist: bool,
 }
 
 impl Default for OpenWireLog {
@@ -1844,6 +1877,7 @@ impl Default for OpenWireLog {
             client_next_skip_len: None,
             server_next_skip_len: None,
             perf_stats: None,
+            last_is_on_blacklist: false,
         }
     }
 }
@@ -1864,22 +1898,40 @@ impl L7ProtocolParserInterface for OpenWireLog {
                 L7ProtocolInfo::OpenWireInfo(info) => info,
                 _ => return,
             };
-            if info.msg_type != LogMessageType::Session {
-                info.cal_rrt(param).map(|rtt| {
-                    info.rtt = rtt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-                });
-            }
             set_captured_byte!(info, param);
-
-            match param.direction {
-                PacketDirection::ClientToServer => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
+            if let Some(config) = param.parse_config {
+                info.set_is_on_blacklist(config);
+            }
+            if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                match param.direction {
+                    PacketDirection::ClientToServer => {
+                        self.perf_stats.as_mut().map(|p| p.inc_req());
+                    }
+                    PacketDirection::ServerToClient => {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    }
                 }
-                PacketDirection::ServerToClient => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                match info.status {
+                    L7ResponseStatus::ClientError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_req_err());
+                    }
+                    L7ResponseStatus::ServerError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                    }
+                    _ => {}
+                }
+                if info.msg_type != LogMessageType::Session {
+                    info.cal_rrt(param).map(|rtt| {
+                        info.rtt = rtt;
+                        self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                    });
                 }
             }
+            self.last_is_on_blacklist = info.is_on_blacklist;
         });
 
         if !param.parse_log {

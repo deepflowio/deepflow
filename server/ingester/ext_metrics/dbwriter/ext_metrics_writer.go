@@ -38,13 +38,35 @@ import (
 var log = logging.MustGetLogger("ext_metrics.dbwriter")
 
 const (
-	QUEUE_BATCH_SIZE             = 1024
-	EXT_METRICS_DB               = "ext_metrics"
-	EXT_METRICS_TABLE            = "metrics"
-	DEEPFLOW_SYSTEM_DB           = "deepflow_system"
-	DEEPFLOW_SYSTEM_SERVER_TABLE = "deepflow_system_server"
-	DEEPFLOW_SYSTEM_AGENT_TABLE  = "deepflow_system_agent"
+	QUEUE_BATCH_SIZE  = 1024
+	EXT_METRICS_DB    = "ext_metrics"
+	EXT_METRICS_TABLE = "metrics"
+
+	DEEPFLOW_ADMIN_DB           = "deepflow_admin"
+	DEEPFLOW_ADMIN_SERVER_TABLE = "deepflow_server"
+
+	DEEPFLOW_TENANT_DB              = "deepflow_tenant"
+	DEEPFLOW_TENANT_COLLECTOR_TABLE = "deepflow_collector"
 )
+
+type WriterDBID uint8
+
+const (
+	EXT_METRICS_DB_ID WriterDBID = iota
+	DEEPFLOW_TENANT_DB_ID
+	DEEPFLOW_ADMIN_DB_ID
+	MAX_DB_ID
+)
+
+var writerDbStrings = []string{
+	EXT_METRICS_DB_ID:     EXT_METRICS_DB,
+	DEEPFLOW_TENANT_DB_ID: DEEPFLOW_TENANT_DB,
+	DEEPFLOW_ADMIN_DB_ID:  DEEPFLOW_ADMIN_DB,
+}
+
+func (t WriterDBID) String() string {
+	return writerDbStrings[t]
+}
 
 type ClusterNode struct {
 	Addr string
@@ -175,9 +197,12 @@ func NewExtMetricsWriter(
 		counter: &Counter{},
 	}
 
-	s := AcquireExtMetrics()
+	s := &ExtMetrics{}
 	s.Timestamp = uint32(time.Now().Unix())
 	s.MsgType = msgType
+	if flowTagTablePrefix == DEEPFLOW_TENANT_DB {
+		s.OrgId, s.RawOrgId = ckdb.DEFAULT_ORG_ID, ckdb.DEFAULT_ORG_ID
+	}
 	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()))
 	ckwriter, err := ckwriter.NewCKWriter(
 		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
@@ -190,6 +215,6 @@ func NewExtMetricsWriter(
 	w.ckWriter = ckwriter
 	w.ckWriter.Run()
 
-	common.RegisterCountableForIngester("ext_metrics_writer", w, stats.OptionStatTags{"msg": msgType.String(), "decoder_index": strconv.Itoa(decoderIndex)})
+	common.RegisterCountableForIngester("ext_metrics_writer", w, stats.OptionStatTags{"msg": msgType.String(), "decoder_index": strconv.Itoa(decoderIndex), "table": flowTagTablePrefix})
 	return w, nil
 }

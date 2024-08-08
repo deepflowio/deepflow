@@ -13,7 +13,6 @@ service Synchronizer {
     rpc Query(NtpRequest) returns (NtpResponse) {}
     rpc GenesisSync(GenesisSyncRequest) returns (GenesisSyncResponse) {}
     rpc KubernetesAPISync(KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
-    rpc PrometheusAPISync(PrometheusAPISyncRequest) returns (PrometheusAPISyncResponse) {}
     rpc GetKubernetesClusterID(KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync(GPIDSyncRequest) returns (GPIDSyncResponse) {}
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
@@ -23,6 +22,7 @@ service Synchronizer {
     rpc GetUniversalTagNameMaps(UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
     // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
     rpc RemoteExecute(stream RemoteExecResponse) returns (stream RemoteExecRequest) {}
+    rpc GetOrgIDs(OrgIDsRequest) returns (OrgIDsResponse) {}
 }
 
 // debug service
@@ -115,6 +115,8 @@ message SyncRequest {
 
     optional string kubernetes_cluster_id = 45;    // 仅对容器类型的采集器有意义
     optional string kubernetes_cluster_name = 46;  // 仅对容器类型的采集器有意义
+
+    optional uint32 org_id = 50;  // only used by Ingester
 }
 
 enum Status {
@@ -198,7 +200,7 @@ message Config {
     optional uint32 max_cpus = 2 [default = 1];
     optional uint32 max_memory = 3 [default = 768];  // in MiB
     optional uint32 sync_interval = 4 [default = 60];
-    optional uint32 stats_interval = 5 [default = 60];
+    optional uint32 stats_interval = 5 [default = 10];
     optional uint64 global_pps_threshold = 6 [default = 200000];
 
     // capture network namespace regex besides root ns
@@ -210,7 +212,7 @@ message Config {
     // calico: cali.*
     // cilium: lxc.*
     // kube-ovn: [0-9a-f]+_h$
-    optional string tap_interface_regex = 8 [default = "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"];
+    optional string tap_interface_regex = 8;
     optional string host = 9;  // override statsd host tag
     optional bool rsyslog_enabled = 10 [default = true];
     optional uint32 output_vlan = 11 [default = 0];
@@ -244,6 +246,8 @@ message Config {
     optional uint32 vtap_id = 40;  // 限制在64000
     optional common.TridentType trident_type = 41 [default = TT_UNKNOWN];
     optional uint32 platform_sync_interval = 42 [default = 10];
+    optional uint32 team_id = 43 [default = 0];
+    optional uint32 organize_id = 44 [default = 0];
 
     optional SocketType collector_socket_type = 45 [default = TCP];
     // _ = 46; // deprecated
@@ -286,7 +290,7 @@ message Config {
     optional bool external_agent_http_proxy_enabled = 406 [default = true];  // 外部Agent数据HTTP代理开关
     optional uint32 external_agent_http_proxy_port = 407 [default = 38086];  // 外部Agent数据HTTP代理端口
     // _ = 408; // deprecated. 408 was once occupied by prometheus_http_api_address.
-    repeated string prometheus_http_api_addresses = 409;
+    // repeated string prometheus_http_api_addresses = 409; // 6.5 delete
 
     optional uint32 packet_sequence_flag = 410 [default = 0];
 
@@ -340,6 +344,7 @@ enum AutoServiceType {
     AUTO_SERVICE_TYPE_VGATEWAY = 5;
     AUTO_SERVICE_TYPE_HOST = 6;
     AUTO_SERVICE_TYPE_DHCP_PORT = 9;
+    AUTO_SERVICE_TYPE_POD = 10;
     AUTO_SERVICE_TYPE_POD_SERVICE = 11;
     AUTO_SERVICE_TYPE_REDIS_INSTANCE = 12;
     AUTO_SERVICE_TYPE_RDS_INSTANCE = 13;
@@ -349,6 +354,7 @@ enum AutoServiceType {
 
     AUTO_SERVICE_TYPE_POD_GROUP = 101;
     AUTO_SERVICE_TYPE_SERVICE = 102;
+    AUTO_SERVICE_TYPE_POD_CLUSTER = 103;
     AUTO_SERVICE_TYPE_PROCESS = 120;
     AUTO_SERVICE_TYPE_POD_GROUP_DEPLOYMENT = 130;
     AUTO_SERVICE_TYPE_POD_GROUP_STATEFULSET = 131;
@@ -751,20 +757,6 @@ message KubernetesAPISyncResponse {
     optional uint64 version = 1;
 }
 
-message PrometheusAPISyncRequest {
-    optional string cluster_id = 1;
-    optional uint64 version = 2;
-    optional string error_msg = 3;
-    optional uint32 vtap_id = 4;
-    optional string source_ip = 5;
-    optional string team_id = 6;  // agent team identity
-    repeated common.PrometheusAPIInfo entries = 10;
-}
-
-message PrometheusAPISyncResponse {
-    optional uint64 version = 1;
-}
-
 message KubernetesClusterIDRequest {
     optional string ca_md5 = 1;                    // md5 of /run/secrets/[kubernetes.io/serviceaccount/ca.crt
     optional string team_id = 2;                   // agent team identity
@@ -980,16 +972,29 @@ message TargetResponse {
     optional uint32 org_id = 11;
 }
 
-// when the request content is empty, it means requesting all metric label and target information
 message PrometheusLabelRequest {
     repeated MetricLabelRequest request_labels = 1;
     repeated TargetRequest request_targets = 2;
+    // When the request content is empty except version, it means requesting all metric label and target information.
+
+    // the verson is used to identify whether the total data has changed due to expiration.
+    // if the version of the Controller is inconsistent with the requested version by Ingester, the Controller need to send the full amount of data.
+    // if they are consistent, there is no need to send the data.
+    optional uint32 version = 3;
 }
 
 message PrometheusLabelResponse {
     repeated MetricLabelResponse response_label_ids = 1;
     repeated TargetResponse response_target_ids = 2;
-    repeated LabelResponse response_labels = 3;  // when requesting all, you need to carry the label value list
+
+    // when requesting all, the Controller need to carry the label value list and the version
+    repeated OrgLabelResponse org_response_labels = 3;
+    optional uint32 version = 4;
+}
+
+message OrgLabelResponse {
+    optional uint32 org_id = 1;
+    repeated LabelResponse response_labels = 2;
 }
 
 message PrometheusTargetRequest {
@@ -1018,7 +1023,9 @@ message IdNameMap {
     optional string name = 2;
 }
 
-message UniversalTagNameMapsRequest {}
+message UniversalTagNameMapsRequest {
+    optional uint32 org_id = 1;
+}
 
 message UniversalTagNameMapsResponse {
     optional uint32 version = 1;
@@ -1053,12 +1060,29 @@ enum CommandType {
     KUBERNETES = 1;
 }
 
+enum ParamType {
+    PF_TEXT = 0;
+    PF_BOOLEAN = 1;
+}
+
+message CommandParam {
+    optional string name = 1;
+    optional string regex = 2;
+    optional bool required = 3;
+    optional ParamType param_type = 4;
+    optional string description = 5;
+}
+
 message RemoteCommand {
-    optional uint32 id = 1;
     optional string cmd = 2;
-    repeated string param_names = 3;
     optional OutputFormat output_format = 4;
-    optional CommandType cmd_type = 5;
+    optional string ident = 6;
+    repeated CommandParam params = 7;
+    optional string type_name = 8;
+
+    optional uint32 id = 1; // deprecated, use `ident` instead
+    repeated string param_names = 3; // deprecated, use `params` instead
+    optional CommandType cmd_type = 5; // deprecated, use `type_name` instead
 }
 
 message LinuxNamespace {
@@ -1071,13 +1095,12 @@ message LinuxNamespace {
 
 message CommandResult {
     optional int32 errno = 1;
-    optional string errmsg = 2; // error message in command execution
-    optional bytes content = 3;
+    optional bytes content = 2;
     // will only be populated in the last segment
     // also used as end of result
-    optional string md5 = 4;
-    optional uint64 total_len = 5;
-    optional uint32 pkt_count = 6;
+    optional string md5 = 3;
+    optional uint64 total_len = 4;
+    optional uint32 pkt_count = 5;
 }
 
 enum ExecutionType {
@@ -1093,18 +1116,31 @@ message Parameter {
 
 // message from server to agent
 message RemoteExecRequest {
-    optional ExecutionType exec_type = 1;
-    optional uint32 command_id = 2;
-    repeated Parameter params = 3; // parameters to use in commands
-    optional uint32 linux_ns_pid = 4; // execute command in agent namespace if null
-    optional uint32 batch_len = 5 [default = 1048576]; // batch len of command execution results, min 1024
+    optional uint64 request_id = 1;
+
+    optional ExecutionType exec_type = 2;
+    repeated Parameter params = 4; // parameters to use in commands
+    optional uint32 linux_ns_pid = 5; // execute command in agent namespace if null
+    optional uint32 batch_len = 6 [default = 1048576]; // batch len of command execution results, min 1024
+    optional string command_ident = 7;
+
+    optional uint32 command_id = 3; // deprecated, use `command_ident` instead
 }
 
 // message from agent to server
 message RemoteExecResponse {
     optional AgentId agent_id = 1;
+    optional uint64 request_id = 2;
 
-    repeated RemoteCommand commands = 2;
-    repeated LinuxNamespace linux_namespaces = 3;
-    optional CommandResult command_result = 4;
+    optional string errmsg = 3;
+
+    repeated RemoteCommand commands = 4;
+    repeated LinuxNamespace linux_namespaces = 5;
+    optional CommandResult command_result = 6;
+}
+
+message OrgIDsRequest {}
+
+message OrgIDsResponse {
+    repeated uint32 org_ids = 1;
 }

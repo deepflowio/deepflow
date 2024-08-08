@@ -318,7 +318,7 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
 		buf.WriteString("`")
-		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString(strings.ReplaceAll(f.Alias, "`", ""))
 		buf.WriteString("`")
 	}
 
@@ -610,7 +610,7 @@ func (f *PerSecondFunction) Init() {
 				interval = f.Time.Interval
 			}
 		} else {
-			interval = int(f.Time.TimeEnd - f.Time.TimeStart)
+			interval = int(f.Time.TimeEnd-f.Time.TimeStart) + f.Time.DatasourceInterval
 		}
 	} else {
 		interval = f.Time.DatasourceInterval
@@ -880,7 +880,11 @@ type CounterAvgFunction struct {
 func (f *CounterAvgFunction) WriteTo(buf *bytes.Buffer) {
 	var interval int
 	if f.Time.Interval > 0 {
-		interval = f.Time.Interval
+		if f.Time.DatasourceInterval > f.Time.Interval {
+			interval = f.Time.DatasourceInterval
+		} else {
+			interval = f.Time.Interval
+		}
 	} else {
 		interval = int(f.Time.TimeEnd-f.Time.TimeStart) + f.Time.DatasourceInterval
 	}

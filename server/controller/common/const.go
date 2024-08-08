@@ -30,6 +30,7 @@ const (
 	DEFAULT_USER_TYPE = 1
 	DEFAULT_USER_ID   = 1
 	DEFAULT_TEAM_ID   = 1
+	DEFAULT_APP_KEY   = "8c434f9a48bf1b7e729bde006e0409f8"
 	ORG_ID_MAX        = 1024
 )
 
@@ -270,7 +271,6 @@ const (
 	TENCENT           = 4
 	FILEREADER        = 5
 	AWS               = 6
-	PINGAN            = 7
 	ZSTACK            = 8
 	ALIYUN            = 9
 	HUAWEI_PRIVATE    = 10
@@ -291,6 +291,9 @@ const (
 	ESHORE            = 26
 	CLOUD_TOWER       = 27
 	NFVO              = 28
+	SUGON             = 29
+	VOLCENGINE        = 30
+	H3C               = 31
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -298,7 +301,6 @@ const (
 	TENCENT_EN           = "tencent"
 	FILEREADER_EN        = "filereader"
 	AWS_EN               = "aws"
-	PINGAN_EN            = "pingan"
 	ZSTACK_EN            = "zstack"
 	ALIYUN_EN            = "aliyun"
 	HUAWEI_PRIVATE_EN    = "huawei_private"
@@ -320,9 +322,11 @@ const (
 	BAIDU_BCE_EN         = "baidu_bce"
 	CLOUD_TOWER_EN       = "cloudtower"
 	NFVO_EN              = "nfvo"
+	SUGON_EN             = "sugon"
+	VOLCENGINE_EN        = "volcengine"
+	H3C_EN               = "h3c"
 
 	TENCENT_CH          = "腾讯云"
-	PINGAN_CH           = "平安云"
 	ALIYUN_CH           = "阿里云"
 	HUAWEI_CH           = "华为云"
 	QINGCLOUD_CH        = "青云"
@@ -331,6 +335,9 @@ const (
 	BAIDU_BCE_CH        = "百度云"
 	ESHORE_CH           = "亿迅云"
 	NFVO_CH             = "华为NFVO+"
+	SUGON_CH            = "曙光云"
+	VOLCENGINE_CH       = "火山云"
+	H3C_CH              = "华三云"
 
 	OPENSTACK_CH   = "OpenStack"
 	VSPHERE_CH     = "vSphere"
@@ -345,14 +352,12 @@ var DomainTypeToIconID = map[int]int{
 	KUBERNETES: 14,
 }
 
-// TODO delete tagrecorder dup definition
 var IconNameToDomainTypes = map[string][]int{
 	OPENSTACK_CH:        {OPENSTACK},
 	VSPHERE_CH:          {VSPHERE},
 	NSP_CH:              {NSP},
 	TENCENT_CH:          {TENCENT, TENCENT_TCE},
 	AWS_CH:              {AWS},
-	PINGAN_CH:           {PINGAN},
 	ZSTACK_CH:           {ZSTACK},
 	ALIYUN_CH:           {ALIYUN, APSARA_STACK},
 	KUBERNETES_CH:       {KUBERNETES},
@@ -361,6 +366,7 @@ var IconNameToDomainTypes = map[string][]int{
 	MICROSOFT_CH:        {AZURE, CMB_CMDB, MICROSOFT_ACS},
 	KINGSOFT_PRIVATE_CH: {KINGSOFT_PRIVATE},
 	BAIDU_BCE_CH:        {BAIDU_BCE},
+	VOLCENGINE_CH:       {VOLCENGINE},
 }
 
 const (
@@ -405,6 +411,7 @@ const (
 	VIF_DEVICE_TYPE_INTERNET                        = 0
 	VIF_DEVICE_TYPE_POD_GROUP                       = 101
 	VIF_DEVICE_TYPE_SERVICE                         = 102
+	VIF_DEVICE_TYPE_POD_CLUSTER                     = 103
 	VIF_DEVICE_TYPE_GPROCESS                        = 120
 	VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT            = 130
 	VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET           = 131
@@ -651,6 +658,7 @@ const (
 const (
 	PLUGIN_TYPE_WASM = 1
 	PLUGIN_TYPE_SO   = 2
+	PLUGIN_TYPE_LUA  = 3
 )
 
 var (
@@ -679,8 +687,31 @@ const (
 )
 
 const (
+	HEADER_KEY_CONTENT_TYPE = "Content-Type"
+	HEADER_KEY_ACCEPT       = "Accept"
+	CONTENT_TYPE_JSON       = "application/json"
+	CONTEXT_TYPE_FORM       = "application/x-www-form-urlencoded"
+	ACCEPT_JSON             = "application/json, text/plain"
+
 	HEADER_KEY_X_ORG_ID    = "X-Org-Id"
-	INGESTER_BODY_ORG_ID   = "org-id"
 	HEADER_KEY_X_USER_TYPE = "X-User-Type"
 	HEADER_KEY_X_USER_ID   = "X-User-Id"
+	HEADER_X_APP_KEY       = "X-App-Key"
+
+	USER_TYPE_SUPER_ADMIN = 1
+	USER_TYPE_ADMIN       = 2
+	USER_ID_SUPER_ADMIN   = 1
+
+	INGESTER_BODY_ORG_ID = "org-id"
 )
+
+const (
+	SET_RESOURCE_TYPE_DOMAIN             = "domain"
+	SET_RESOURCE_TYPE_SUB_DOMAIN         = "sub_domain"
+	SET_RESOURCE_TYPE_AGENT              = "agent"
+	SET_RESOURCE_TYPE_AGENT_GROUP        = "agent_group"
+	SET_RESOURCE_TYPE_AGENT_GROUP_CONFIG = "agent_group_config"
+	SET_RESOURCE_TYPE_DATA_SOURCE        = "datasource"
+)
+
+const TRISOLARIS_NODE_TYPE_MASTER = "master"

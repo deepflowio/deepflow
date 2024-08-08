@@ -90,6 +90,7 @@ const (
 	RESOURCE_TYPE_CH_POD_INGRESS    = "ch_pod_ingress"
 	RESOURCE_TYPE_CH_POD_NAMESPACE  = "ch_pod_namespace"
 	RESOURCE_TYPE_CH_POD_NODE       = "ch_pod_node"
+	RESOURCE_TYPE_CH_POD_CLUSTER    = "ch_pod_cluster"
 	RESOURCE_TYPE_TAP_TYPE          = "ch_tap_type"
 	RESOURCE_TYPE_CH_VTAP           = "ch_vtap"
 	RESOURCE_TYPE_CH_VTAP_PORT      = "ch_vtap_port"
@@ -737,24 +738,6 @@ var DBNodeTypeToResourceType = map[string]string{
 	"gprocess":    RESOURCE_TYPE_GPROCESS,
 }
 
-// icon名称不会重复
-var IconNameToDomainType = map[string][]int{
-	"OpenStack":                {common.OPENSTACK},
-	"vSphere":                  {common.VSPHERE},
-	"NSP":                      {common.NSP},
-	common.TENCENT_CH:          {common.TENCENT, common.TENCENT_TCE},
-	"AWS":                      {common.AWS},
-	common.PINGAN_CH:           {common.PINGAN},
-	"ZStack":                   {common.ZSTACK},
-	common.ALIYUN_CH:           {common.ALIYUN, common.APSARA_STACK},
-	"Kubernetes":               {common.KUBERNETES},
-	common.HUAWEI_CH:           {common.HUAWEI, common.HUAWEI_PRIVATE},
-	common.QINGCLOUD_CH:        {common.QINGCLOUD, common.QINGCLOUD_PRIVATE},
-	common.MICROSOFT_CH:        {common.AZURE, common.CMB_CMDB, common.MICROSOFT_ACS},
-	common.KINGSOFT_PRIVATE_CH: {common.KINGSOFT_PRIVATE},
-	common.BAIDU_BCE_CH:        {common.BAIDU_BCE},
-}
-
 var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_REGION:                 CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_AZ:                     CREATE_DICTIONARY_SQL,
@@ -838,6 +821,7 @@ var RESOURCE_TYPE_TO_NODE_TYPE = map[int]string{
 	common.VIF_DEVICE_TYPE_REDIS_INSTANCE:                  "redis",
 	common.VIF_DEVICE_TYPE_RDS_INSTANCE:                    "rds",
 	common.VIF_DEVICE_TYPE_POD_NODE:                        RESOURCE_TYPE_POD_NODE,
+	common.VIF_DEVICE_TYPE_POD_CLUSTER:                     RESOURCE_TYPE_POD_CLUSTER,
 	common.VIF_DEVICE_TYPE_LB:                              RESOURCE_TYPE_LB,
 	common.VIF_DEVICE_TYPE_NAT_GATEWAY:                     "natgw",
 	common.VIF_DEVICE_TYPE_INTERNET:                        RESOURCE_TYPE_INTERNET_IP,

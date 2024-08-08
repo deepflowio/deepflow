@@ -3,6 +3,7 @@ syntax = "proto2";
 package common;
 option go_package = "github.com/deepflowio/deepflow/message/common";
 
+// TODO: To be deleted in the future
 enum TridentType {
     TT_UNKNOWN = 0;
     TT_PROCESS = 1;                        // Agent in KVM
@@ -23,9 +24,4 @@ message KubernetesAPIInfo {
     optional string type = 1;
     optional string info = 2;
     optional bytes compressed_info = 3;
-}
-
-message PrometheusAPIInfo {
-    optional bytes target_compressed_info = 1;
-    optional bytes config_compressed_info = 2;
 }

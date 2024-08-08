@@ -40,9 +40,6 @@ const (
 	PubSubTypeWANIP                 = common.RESOURCE_TYPE_WAN_IP_EN
 	PubSubTypeLANIP                 = common.RESOURCE_TYPE_LAN_IP_EN
 	PubSubTypeVIP                   = common.RESOURCE_TYPE_VIP_EN
-	PubSubTypeSecurityGroup         = common.RESOURCE_TYPE_SECURITY_GROUP_EN
-	PubSubTypeVMSecurityGroup       = common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN
-	PubSubTypeSecurityGroupRule     = common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN
 	PubSubTypeNATGateway            = common.RESOURCE_TYPE_NAT_GATEWAY_EN
 	PubSubTypeNATRule               = common.RESOURCE_TYPE_NAT_RULE_EN
 	PubSubTypeNATVMConnection       = common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN
@@ -67,5 +64,4 @@ const (
 	PubSubTypePodReplicaSet         = common.RESOURCE_TYPE_POD_REPLICA_SET_EN
 	PubSubTypePod                   = common.RESOURCE_TYPE_POD_EN
 	PubSubTypeProcess               = common.RESOURCE_TYPE_PROCESS_EN
-	PubSubTypePrometheusTarget      = common.RESOURCE_TYPE_PROMETHEUS_TARGET_EN
 )

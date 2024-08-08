@@ -73,7 +73,7 @@ func GetWhere(name, value string) WhereStatement {
 	}
 }
 
-func TransWhereTagFunction(db string, name string, args []string) (filter string) {
+func TransWhereTagFunction(db, table string, name string, args []string) (filter string) {
 	funcName := strings.ToLower(name)
 	switch funcName {
 	case "exist":
@@ -89,13 +89,16 @@ func TransWhereTagFunction(db string, name string, args []string) (filter string
 		}
 		resource := strings.ToLower(strings.Trim(args[0], "`"))
 		suffix := ""
-		if strings.HasSuffix(resource, "_0") {
-			suffix = "_0"
-		} else if strings.HasSuffix(resource, "_1") {
-			suffix = "_1"
+		resourceNoSuffix := resource
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+			if strings.HasSuffix(resource, "_0") {
+				suffix = "_0"
+				resourceNoSuffix = strings.TrimSuffix(resourceNoSuffix, "_0")
+			} else if strings.HasSuffix(resource, "_1") {
+				suffix = "_1"
+				resourceNoSuffix = strings.TrimSuffix(resourceNoSuffix, "_1")
+			}
 		}
-		resourceNoSuffix := strings.TrimSuffix(resource, "_0")
-		resourceNoSuffix = strings.TrimSuffix(resourceNoSuffix, "_1")
 		resourceNoID := strings.TrimSuffix(resourceNoSuffix, "_id")
 		deviceTypeValue, ok := tag.DEVICE_MAP[resourceNoID]
 		if ok {
@@ -167,11 +170,94 @@ type WhereTag struct {
 	Value string
 }
 
+// k8s.label, k8s.annotation, cloud.tag
+func TransLabelFilter(translator, regexpTranslator, key, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value, key, op, value, key)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, key, "match", value, key) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value, key, "ilike", value, key) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value, key, "in", value, key) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value, key, "=", value, key) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value, key, op, value, key)
+	}
+	return
+}
+
+// k8s.env, os.app
+func TransEnvFilter(translator, regexpTranslator, key, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value, key)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, key) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value, key) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value, key) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value, key) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value, key)
+	}
+	return
+}
+
+// service, chost, chost_hostname, chost_ip, router, dhcpgw, redis, rds, lb_listener,
+// natgw, lb, host, host_hostname, host_ip, pod_node, pod_node_hostname, pod_node_ip,
+// pod_group_type
+func TransChostFilter(translator, regexpTranslator, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value)
+	}
+	return
+}
+
+// pod_ingress, pod_service,
+// x_request_id, syscall_thread, syscall_coroutine, syscall_cap_seq, syscall_trace_id, tcp_seq
+func TransIngressFilter(translator, regexpTranslator, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value, op, value)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, "match", value) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value, "ilike", value) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value, "in", value) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value, "=", value) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value, op, value)
+	}
+	return
+}
+
+// The tag is not in the tagResourceMap
 func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter string, isRemoteRead bool, e *CHEngine) (filter string, err error) {
 	tagItem := &tag.Tag{}
 	ok := false
-	switch whereTag {
-	case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1", "tunnel_tx_mac", "tunnel_rx_mac":
+	noSuffixTag := strings.TrimSuffix(whereTag, "_0")
+	noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
+	noIDTag := strings.TrimSuffix(noSuffixTag, "_id")
+	switch noIDTag {
+	case "mac", "tunnel_tx_mac", "tunnel_rx_mac":
 		macValue := strings.TrimLeft(value, "(")
 		macValue = strings.TrimRight(macValue, ")")
 		macSlice := strings.Split(macValue, ",")
@@ -242,97 +328,44 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 			}
 			filter = fmt.Sprintf("%s %s %s", postAsTag, op, macsStr)
 		}
+	case "body":
+		if strings.Contains(op, "match") {
+			filter = fmt.Sprintf("%s(%s,%s)", op, postAsTag, value)
+		} else {
+			filter = fmt.Sprintf("%s %s %s", postAsTag, op, value)
+		}
+		switch strings.ToLower(op) {
+		case "=", "!=":
+			tokenRegStr := "^[\u4E00-\u9FA5a-zA-Z0-9\\s]+$"
+			tokenReg := regexp.MustCompile(tokenRegStr)
+			if !tokenReg.MatchString(strings.Trim(value, "'")) {
+				tokenErr := fmt.Errorf("body can only contain letters or numbers and be separated by whitespace， please check:  %s", value)
+				return "", tokenErr
+			}
+			if strings.Contains(value, " ") {
+				valueSlice := strings.Split(strings.Trim(value, "'"), " ")
+				var filterSlice []string
+				for _, token := range valueSlice {
+					filterSlice = append(filterSlice, fmt.Sprintf("%s(%s,'%s')", "hasToken", postAsTag, token))
+				}
+				filter = strings.Join(filterSlice, " AND ")
+			} else {
+				filter = fmt.Sprintf("%s(%s,%s)", "hasToken", postAsTag, value)
+			}
+			if op == "!=" {
+				filter = fmt.Sprintf("NOT (%s)", filter)
+			}
+		}
 	default:
 		tagName := strings.Trim(whereTag, "`")
-		if strings.HasPrefix(tagName, "k8s.label.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+		// map item tag
+		nameNoPreffix, _, transKey := common.TransMapItem(tagName, table)
+		if transKey != "" {
+			tagItem, _ = tag.GetTag(transKey, db, table, "default")
+			if strings.HasPrefix(tagName, "os.app.") || strings.HasPrefix(tagName, "k8s.env.") {
+				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			} else {
-				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
-			}
-			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				}
-			}
-		} else if strings.HasPrefix(tagName, "k8s.annotation.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
-			}
-			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				}
-			}
-		} else if strings.HasPrefix(tagName, "k8s.env.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
-			}
-			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix)
-				}
-			}
-		} else if strings.HasPrefix(tagName, "cloud.tag.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
-			}
-			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix, op, value, nameNoPreffix)
-				}
-			}
-		} else if strings.HasPrefix(tagName, "os.app.") {
-			if strings.HasSuffix(tagName, "_0") {
-				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-			} else if strings.HasSuffix(tagName, "_1") {
-				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("os_app", db, table, "default")
-			}
-			if ok {
-				nameNoSuffix := strings.TrimSuffix(tagName, "_0")
-				nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-				nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, value, nameNoPreffix)
-				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, value, nameNoPreffix)
-				}
+				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "tag.") || strings.HasPrefix(tagName, "attribute.") {
 			if strings.HasPrefix(tagName, "tag.") {
@@ -343,7 +376,7 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 					}
 				}
 				if db == chCommon.DB_NAME_PROMETHEUS {
-					filter, err = GetPrometheusFilter(tagName, table, op, value)
+					filter, err = GetPrometheusFilter(tagName, table, op, value, e)
 					if err != nil {
 						return filter, err
 					}
@@ -427,8 +460,30 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		filter := ""
 		switch t.Tag {
-		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id", "team_id":
-			filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+		case "value", "devicetype", "device_type", "tag_name", "field_name", "field_type", "1", "user_id", "team_id", "app_service", "app_instance":
+			if table == "user_map" && t.Tag == "user_id" {
+				tagItem, ok := tag.GetTag("value", db, table, "default")
+				if ok {
+					switch strings.ToLower(op) {
+					case "match":
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+					case "not match":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+					case "not ilike":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+					case "not in":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+					case "!=":
+						filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+					default:
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+					}
+					return &view.Expr{Value: filter}, nil
+				}
+			} else {
+				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+			}
+
 		case "type":
 			if table == "vtap_map" {
 				filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
@@ -676,6 +731,60 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		}
 		return &view.Expr{Value: filter}, nil
+	} else if table == "alert_event" {
+		tagItem, ok := tag.GetTag(strings.Trim(t.Tag, "`"), db, table, "default")
+		tagName := strings.Trim(t.Tag, "`")
+		if !ok {
+			preAsTag, ok := asTagMap[t.Tag]
+			if ok {
+				// whereTag = preAsTag
+				tagName = preAsTag
+				tagItem, ok = tag.GetTag(strings.Trim(preAsTag, "`"), db, table, "default")
+			}
+		}
+		if ok {
+			switch t.Tag {
+			case "service", "chost", "router", "dhcpgw", "redis", "rds", "lb_listener",
+				"natgw", "lb", "host", "pod_node", "user", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess",
+				"pod_ingress", "pod_service", "alert_policy":
+				filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
+			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+				} else {
+					filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+				}
+			default:
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
+				} else {
+					filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+				}
+			}
+		} else {
+			switch t.Tag {
+			case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1":
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
+				} else {
+					filter = fmt.Sprintf("%s %s %s", t.Tag, op, t.Value)
+				}
+			default:
+				_, err := strconv.Atoi(t.Value)
+				if err != nil {
+					tagItem, ok = tag.GetTag("string_tags", db, table, "default")
+				} else {
+					tagItem, ok = tag.GetTag("int_tags", db, table, "default")
+				}
+				if strings.Contains(op, "match") {
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, tagName, t.Value)
+				} else {
+					filter = fmt.Sprintf(tagItem.WhereTranslator, tagName, op, t.Value)
+				}
+			}
+		}
+
+		return &view.Expr{Value: filter}, nil
 	} else {
 		if t.Tag == "tap_port" {
 			t.Tag = "capture_nic"
@@ -708,7 +817,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		}
 		whereFilter := tagItem.WhereTranslator
 		if whereFilter != "" {
-			switch whereTag {
+			noSuffixTag := strings.TrimSuffix(whereTag, "_0")
+			noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
+			noIDTag := noSuffixTag
+			if !slices.Contains([]string{"_id", "pod_service_id"}, noSuffixTag) {
+				noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
+			}
+			switch noIDTag {
 			case "ip_version":
 				versionValue := strings.TrimLeft(t.Value, "(")
 				versionValue = strings.TrimRight(versionValue, ")")
@@ -728,7 +843,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, versionsStr)
 				}
-			case "is_internet", "is_internet_0", "is_internet_1":
+			case "is_internet":
 				internetValue := strings.TrimLeft(t.Value, "(")
 				internetValue = strings.TrimRight(internetValue, ")")
 				internetSlice := strings.Split(internetValue, ",")
@@ -789,7 +904,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 						}
 					}
 				}
-			case "ip", "ip_0", "ip_1", "tunnel_tx_ip", "tunnel_tx_ip_0", "tunnel_tx_ip_1", "tunnel_rx_ip", "tunnel_rx_ip_0", "tunnel_rx_ip_1", "nat_real_ip", "nat_real_ip_0", "nat_real_ip_1":
+			case "ip", "tunnel_tx_ip", "tunnel_rx_ip", "nat_real_ip":
 				equalFilter := ""
 				ipValues := strings.TrimLeft(t.Value, "(")
 				ipValues = strings.TrimRight(ipValues, ")")
@@ -885,43 +1000,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				default:
 					whereFilter = equalFilter
 				}
-			case "pod_service_id", "pod_service_id_0", "pod_service_id_1", "natgw_id", "natgw_id_0", "natgw_id_1", "natgw", "natgw_0", "natgw_1",
-				"lb_id", "lb_id_0", "lb_id_1", "lb", "lb_0", "lb_1", "lb_listener_id", "lb_listener_id_0", "lb_listener_id_1", "lb_listener", "lb_listener_0", "lb_listener_1", "pod_group_type", "pod_group_type_0", "pod_group_type_1":
-				switch strings.ToLower(op) {
-				case "not match":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
-				case "not ilike":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
-				case "not in":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
-				case "!=":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
-				case "match":
-					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
-				default:
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
-				}
-			case "pod_ingress_id", "pod_ingress_id_0", "pod_ingress_id_1", "pod_ingress", "pod_ingress_0", "pod_ingress_1",
-				"pod_service", "pod_service_0", "pod_service_1", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
-				switch strings.ToLower(op) {
-				case "not match":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, "match", t.Value) + ")"
-				case "not ilike":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value, "ilike", t.Value) + ")"
-				case "not in":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value, "in", t.Value) + ")"
-				case "!=":
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, "=", t.Value) + ")"
-				case "match":
-					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
-				default:
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
-				}
-			case "resource_gl0", "resource_gl0_0", "resource_gl0_1", "resource_gl1", "resource_gl1_0", "resource_gl1_1",
-				"resource_gl2", "resource_gl2_0", "resource_gl2_1", "resource_gl0_id", "resource_gl0_id_0", "resource_gl0_id_1",
-				"resource_gl1_id", "resource_gl1_id_0", "resource_gl1_id_1", "resource_gl2_id", "resource_gl2_id_0", "resource_gl2_id_1",
-				"auto_instance", "auto_instance_0", "auto_instance_1", "auto_instance_id", "auto_instance_id_0", "auto_instance_id_1",
-				"auto_service", "auto_service_0", "auto_service_1", "auto_service_id", "auto_service_id_0", "auto_service_id_1":
+			case "service", "chost", "chost_hostname", "chost_ip", "router", "dhcpgw", "redis", "rds", "lb_listener",
+				"natgw", "lb", "host", "host_hostname", "host_ip", "pod_node", "pod_node_hostname", "pod_node_ip", "user",
+				"pod_group_type", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "pod_service_id", "pod_service":
+				whereFilter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
+			case "pod_ingress", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
+				whereFilter = TransIngressFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
+			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 				if strings.Contains(op, "match") {
 					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
 				} else {
@@ -949,15 +1034,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 
 }
 
-func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
+func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string, error) {
 	filter := ""
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
@@ -970,7 +1055,7 @@ func GetPrometheusFilter(promTag, table, op, value string) (string, error) {
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -1002,12 +1087,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	sql := ""
 	isAppLabel := false
 	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
@@ -1020,11 +1105,12 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	}
 	prometheusSubqueryCache := GetPrometheusSubqueryCache()
 	// Determine whether the tag is app_label or target_label
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				cacheFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(originFilter)
+				entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
+				cacheFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(entryKey)
 				if ok {
 					filter = cacheFilter.Filter
 					timeout := cacheFilter.Time
@@ -1035,7 +1121,8 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 				if value == "''" {
 					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.AppLabelColumnIndex, op)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
-					prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
+					entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
+					prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
 					return filter, nil
 				}
 
@@ -1052,7 +1139,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					Password: config.Cfg.Clickhouse.Password,
 					DB:       "flow_tag",
 				}
-				appLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				appLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, ORGID: e.ORGID})
 				if err != nil {
 					return "", err
 				}
@@ -1070,7 +1157,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.AppLabelColumnIndex, valueIDFilter)
 				}
 				entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
-				prometheusSubqueryCache.PrometheusSubqueryCache.Add(originFilter, entryValue)
+				prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
 				return filter, nil
 			}
 		}
@@ -1141,6 +1228,11 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 	}
 	function := strings.Trim(f.Function.ToString(), "`")
 	if strings.HasPrefix(function, "Enum(") {
+		tagName := strings.TrimPrefix(function, "Enum(")
+		tagName = strings.TrimSuffix(tagName, ")")
+		tagName = strings.Trim(tagName, "`")
+		tagEnum := strings.TrimSuffix(tagName, "_0")
+		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		if db == "flow_tag" {
 			if strings.ToLower(opName) == "like" || strings.ToLower(opName) == "not like" {
 				f.Value = strings.ReplaceAll(f.Value, "*", "%")
@@ -1164,6 +1256,17 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				}
 			}
 			filter := ""
+			if tagName == "app_service" || tagName == "app_instance" {
+				tagItem, ok := tag.GetTag("other_id", db, table, "default")
+				if ok {
+					if strings.Contains(opName, "match") {
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, tagName, f.Value)
+					} else {
+						filter = fmt.Sprintf(tagItem.WhereTranslator, tagName, opName, f.Value)
+					}
+				}
+				return &view.Expr{Value: "(" + filter + ")"}, nil
+			}
 			tagItem, ok := tag.GetTag("enum_tag_name", db, table, "default")
 			if ok {
 				switch strings.ToLower(opName) {
@@ -1185,11 +1288,6 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 
 		}
 		var isIntEnum = true
-		tagName := strings.TrimPrefix(function, "Enum(")
-		tagName = strings.TrimSuffix(tagName, ")")
-		tagName = strings.Trim(tagName, "`")
-		tagEnum := strings.TrimSuffix(tagName, "_0")
-		tagEnum = strings.TrimSuffix(tagEnum, "_1")
 		tagDescription, ok := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
 			DB: db, Table: table, TagName: tagEnum,
 		}]
@@ -1230,6 +1328,14 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 				} else {
 					opName = "not match"
 				}
+			}
+			if tagName == "app_service" || tagName == "app_instance" {
+				if strings.Contains(opName, "match") {
+					whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, opName, tagName, f.Value)
+				} else {
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, tagName, opName, f.Value)
+				}
+				return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 			}
 			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {
@@ -1298,7 +1404,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 		traceConfig := config.TraceConfig
 		TypeIsIncrementalId := traceConfig.Type == chCommon.IndexTypeIncremetalId
 		FormatIsHex := traceConfig.IncrementalIdLocation.Format == chCommon.FormatHex
-		if !traceConfig.Enabled {
+		if traceConfig.Disabled {
 			filter := fmt.Sprintf("trace_id %s %s", opName, f.Value)
 			return &view.Expr{Value: "(" + filter + ")"}, nil
 		}

@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+      - v6.[1-9]
+      - v7.[1-9]
     paths:
       - 'server/**'
       - 'message/**'

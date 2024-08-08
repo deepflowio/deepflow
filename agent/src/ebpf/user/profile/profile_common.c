@@ -34,7 +34,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
-#include "java/gen_syms_file.h"
+#include "java/collect_symbol_files.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -45,8 +45,12 @@
 #include "../table.h"
 #include <regex.h>
 #include "java/config.h"
-#include "java/df_jattach.h"
+#include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
+#include "../proc.h"
+#include "stringifier.h"
+
+#define UNKNOWN_JAVA_SYMBOL_STR "Unknown"
 
 /*
  * This section is for symbolization of Java addresses, and we need
@@ -67,10 +71,12 @@
 extern struct bpf_tracer *profiler_tracer;
 extern char *flame_graph_start_time;
 extern int major, minor;
+extern struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 
 static bool java_installed;
 
 int profiler_context_init(struct profiler_context *ctx,
+			  const char *name,
 			  const char *tag, u8 type,
 			  bool enable_profiler,
 			  const char *state_map_name,
@@ -80,6 +86,7 @@ int profiler_context_init(struct profiler_context *ctx,
 			  bool use_delta_time, u64 sample_period)
 {
 	memset(ctx, 0, sizeof(struct profiler_context));
+	ctx->name = name;
 	ctx->tag = tag;
 	atomic64_init(&ctx->process_lost_count);
 	if (!enable_profiler)
@@ -377,8 +384,9 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 	}
 }
 
-static void print_profiler_status(struct profiler_context *ctx,
-				  struct bpf_tracer *t, u64 iter_count)
+static void __attribute__ ((__unused__))
+print_profiler_status(struct profiler_context *ctx,
+		      struct bpf_tracer *t, u64 iter_count)
 {
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
@@ -450,11 +458,11 @@ void push_and_release_stack_trace_msg(struct profiler_context *ctx,
 	 * to the upper-level processing:
 	 *
 	 *   If the time interval since the last push exceeds or equals
-	 *   the maximum time interval (MAX_PUSH_MSG_TIME_INTERVAL).
+	 *   the maximum time interval (MAX_PUSH_MSG_TIME_INTERVAL_NS).
 	 *
 	 * Otherwise, it should return directly.
 	 */
-	if (!((elapsed >= MAX_PUSH_MSG_TIME_INTERVAL) || is_force))
+	if (!((elapsed >= MAX_PUSH_MSG_TIME_INTERVAL_NS) || is_force))
 		return;
 
 	/* update last push time. */
@@ -539,19 +547,71 @@ static void set_msg_kvp_by_comm(stack_trace_msg_kv_t * kvp,
 	kvp->c_k.cpu = v->cpu;
 	kvp->c_k.pid = v->tgid;
 	kvp->c_k.reserved = 0;
+	kvp->c_k.padding = 0;
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 }
 
-static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
-			struct stack_trace_key_t *v, u64 stime, void *msg_value)
+static void set_msg_kvp(struct profiler_context *ctx,
+			stack_trace_msg_kv_t * kvp,
+			struct stack_trace_key_t *v, u64 stime, void *msg_value,
+			struct symbolizer_proc_info *p)
 {
 	kvp->k.tgid = v->tgid;
-	kvp->k.pid = v->pid;
 	kvp->k.stime = stime;
 	kvp->k.cpu = v->cpu;
 	kvp->k.u_stack_id = (u32) v->userstack;
 	kvp->k.k_stack_id = (u32) v->kernstack;
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		kvp->k.e_stack_id = v->ext_data.memory.class_id;
+	} else {
+		kvp->k.e_stack_id = 0;
+	}
+
 	kvp->msg_ptr = pointer_to_uword(msg_value);
+
+	/*
+	 * It is possible that multiple threads of a process (or the process itself)
+	 * use the same task name (kernel structure: 'task_struct.comm[]'). To improve
+	 * aggregation efficiency, we use a unique value to fill 'kvp->k.pid' for
+	 * threads with the same name.
+	 */
+	struct task_comm_info_s matched_name;
+	if (v->tgid == v->pid)
+		snprintf(matched_name.comm, sizeof(matched_name.comm), "P%s",
+			 v->comm);
+	else
+		snprintf(matched_name.comm, sizeof(matched_name.comm), "T%s",
+			 v->comm);
+
+#ifdef USE_DJB2_HASH
+	/*
+	 * For the DJB2 hash algorithm, with string lengths up to 16 bytes and a total
+	 * of 100 strings, the collision probability is approximately 0.0000575%. This
+	 * collision rate is very low, indicating that with such a small dataset,
+	 * collisions with a 32-bit DJB2 hash value are almost unlikely.
+	 */
+	kvp->k.pid = djb2_32bit(matched_name.comm);
+#else
+	struct task_comm_info_s *name;
+	thread_names_lock(p);
+	vec_foreach(name, p->thread_names) {
+		if (strcmp(name->comm, matched_name.comm) == 0) {
+			kvp->k.pid = name->idx;
+			thread_names_unlock(p);
+			return;
+		}
+	}
+
+	kvp->k.pid = vec_len(p->thread_names);
+	matched_name.idx = kvp->k.pid;
+	int ret = VEC_OK;
+	vec_add1(p->thread_names, matched_name, ret);
+	if (ret != VEC_OK) {
+		ebpf_warning("vec add failed\n");
+		kvp->k.pid = v->pid;
+	}
+	thread_names_unlock(p);
+#endif
 }
 
 static void set_stack_trace_msg(struct profiler_context *ctx,
@@ -572,6 +632,10 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	msg->stime = stime;
 	msg->netns_id = ns_id;
 	msg->profiler_type = ctx->type;
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		// TODO: add mem_in_use type
+		msg->event_type = PROFILE_EVENT_MEM_ALLOC;
+	}
 	if (container_id != NULL) {
 		strcpy_s_inline(msg->container_id, sizeof(msg->container_id),
 				container_id, strlen(container_id));
@@ -619,13 +683,15 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	}
 
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
-	if (ctx->use_delta_time) {
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		msg->count = v->ext_data.memory.size;
+	} else if (ctx->use_delta_time) {
 		// If sampling is used
 		if (ctx->sample_period > 0) {
 			msg->count = ctx->sample_period / 1000;
 		} else {
 			// Using microseconds for storage.
-			msg->count = v->duration_ns / 1000;
+			msg->count = v->ext_data.off_cpu.duration_ns / 1000;
 		}
 	} else {
 		msg->count = 1;
@@ -700,6 +766,27 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 	} else {
 		__sync_fetch_and_add(&msg_hash->hash_elems_count, 1);
 	}
+}
+
+static char *get_java_symbol(struct bpf_tracer *t,
+			     struct java_symbol_map_key *key)
+{
+	char value[JAVA_SYMBOL_MAX_LENGTH];
+	memset(value, 0, JAVA_SYMBOL_MAX_LENGTH * sizeof(char));
+	if (!bpf_table_get(t, MAP_MEMORY_JAVA_SYMBOL_MAP_NAME, key, value)) {
+		return NULL;
+	}
+	char *ret = rewrite_java_symbol(value);
+	if (!ret) {
+		int len = strlen(value);
+		ret = clib_mem_alloc_aligned("symbol_str", len + 1, 0, NULL);
+		if (ret == NULL) {
+			return NULL;
+		}
+		memcpy(ret, value, len);
+		ret[len] = '\0';
+	}
+	return ret;
 }
 
 static void aggregate_stack_traces(struct profiler_context *ctx,
@@ -820,13 +907,12 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 
 			if (matched)
-				set_msg_kvp(&kv, v, stime, (void *)0);
+				set_msg_kvp(ctx, &kv, v, stime, (void *)0,
+					    __info_p);
 			else {
 				if (ctx->only_matched_data) {
-					if (__info_p
-					    && AO_SUB_F(&__info_p->use, 1) == 0)
-						free_proc_cache(__info_p);
-
+					if (__info_p)
+						AO_DEC(&__info_p->use);
 					continue;
 				}
 
@@ -834,9 +920,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 		} else {
 			if (ctx->only_matched_data) {
-				if (__info_p
-				    && AO_SUB_F(&__info_p->use, 1) == 0)
-					free_proc_cache(__info_p);
+				if (__info_p)
+					AO_DEC(&__info_p->use);
 				continue;
 			}
 
@@ -858,21 +943,25 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 		     (stack_trace_msg_hash_kv *) & kv) == 0) {
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-			if (ctx->use_delta_time) {
+			if (ctx->type == PROFILER_TYPE_MEMORY) {
+				((stack_trace_msg_t *) kv.msg_ptr)->count +=
+				    v->ext_data.memory.size;
+			} else if (ctx->use_delta_time) {
 				if (ctx->sample_period > 0) {
-					((stack_trace_msg_t *) kv.msg_ptr)->
-					    count += ctx->sample_period / 1000;
+					((stack_trace_msg_t *) kv.
+					 msg_ptr)->count +=
+					   (ctx->sample_period / 1000);
 				} else {
 					// Using microseconds for storage.
-					((stack_trace_msg_t *) kv.msg_ptr)->
-					    count += (v->duration_ns / 1000);
+					((stack_trace_msg_t *) kv.
+					 msg_ptr)->count +=
+					   (v->ext_data.off_cpu.duration_ns / 1000);
 				}
-
 			} else {
 				((stack_trace_msg_t *) kv.msg_ptr)->count++;
 			}
-			if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
-				free_proc_cache(__info_p);
+			if (__info_p)
+				AO_DEC(&__info_p->use);
 			continue;
 		}
 
@@ -888,8 +977,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
 						    stack_str_hash, matched,
-						    process_name, info_p);
-
+						    process_name, info_p,
+						    ctx->type ==
+						    PROFILER_TYPE_MEMORY);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -901,14 +991,31 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			if (matched)
 				str_len += strlen(v->comm) + sizeof(pre_tag);
 
+			char *class_name = NULL;
+
+			if (ctx->type == PROFILER_TYPE_MEMORY
+			    && v->ext_data.memory.class_id != 0) {
+				struct java_symbol_map_key key = { 0 };
+				key.tgid = v->tgid;
+				key.class_id = v->ext_data.memory.class_id;
+				class_name = get_java_symbol(t, &key);
+				if (class_name) {
+					str_len += strlen(class_name) + 1;
+				} else {
+					str_len +=
+					    strlen(UNKNOWN_JAVA_SYMBOL_STR) + 1;
+				}
+			}
+
 			int len = sizeof(stack_trace_msg_t) + str_len;
 			stack_trace_msg_t *msg = alloc_stack_trace_msg(len);
 			if (msg == NULL) {
 				clib_mem_free(trace_str);
-				if (__info_p
-				    && AO_SUB_F(&__info_p->use, 1) == 0)
-					free_proc_cache(__info_p);
-
+				if (__info_p)
+					AO_DEC(&__info_p->use);
+				if (class_name) {
+					clib_mem_free(class_name);
+				}
 				continue;
 			}
 
@@ -920,13 +1027,32 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 
 			snprintf(pre_tag, sizeof(pre_tag), "%s ",
 				 v->pid == v->tgid ? "[p]" : "[t]");
-			if (matched)
-				snprintf((char *)&msg->data[0], str_len,
-					 "%s%s;%s", pre_tag, v->comm,
-					 trace_str);
-			else
-				snprintf((char *)&msg->data[0], str_len, "%s",
-					 trace_str);
+
+			char *msg_str = (char *)&msg->data[0];
+			int offset = 0;
+			if (matched) {
+				offset +=
+				    snprintf(msg_str + offset, str_len - offset,
+					     "%s%s;", pre_tag, v->comm);
+			}
+			offset +=
+			    snprintf(msg_str + offset, str_len - offset, "%s",
+				     trace_str);
+			if (ctx->type == PROFILER_TYPE_MEMORY) {
+				if (class_name) {
+					offset +=
+					    snprintf(msg_str + offset,
+						     str_len - offset, ";%s",
+						     class_name);
+					clib_mem_free(class_name);
+					class_name = NULL;
+				} else {
+					offset +=
+					    snprintf(msg_str + offset,
+						     str_len - offset, ";%s",
+						     UNKNOWN_JAVA_SYMBOL_STR);
+				}
+			}
 
 			msg->data_len = strlen((char *)msg->data);
 			clib_mem_free(trace_str);
@@ -946,11 +1072,9 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			}
 		}
 
-		if (__info_p && AO_SUB_F(&__info_p->use, 1) == 0)
-			free_proc_cache(__info_p);
+		if (__info_p)
+			AO_DEC(&__info_p->use);
 
-		/* check and clean symbol cache */
-		exec_proc_info_cache_update();
 	}
 
 	vec_free(ctx->raw_stack_data);
@@ -1079,11 +1203,52 @@ release_iter:
 	bpf_table_set_value(t, ctx->state_map_name,
 			    sample_count_idx, &sample_cnt_val);
 
-	print_profiler_status(ctx, t, count);
+	//print_profiler_status(ctx, t, count);
 
 	/* free all elems */
 	clean_stack_strs(&ctx->stack_str_hash);
 
 	/* Push messages and free stack_trace_msg_hash */
 	push_and_release_stack_trace_msg(ctx, &ctx->msg_hash, false);
+}
+
+bool check_profiler_regex(struct profiler_context *ctx, const char *name)
+{
+	bool matched = false;
+	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
+		if (g_ctx_array[i] == NULL)
+			continue;
+
+		if (ctx != NULL && ctx->name != NULL) {
+			if (strcmp(g_ctx_array[i]->name, ctx->name))
+				continue;
+		}
+
+		if (g_ctx_array[i]->regex_existed) {
+			profile_regex_lock(g_ctx_array[i]);
+			matched =
+			    (regexec
+			     (&g_ctx_array[i]->profiler_regex, name, 0, NULL, 0)
+			     == 0);
+			profile_regex_unlock(g_ctx_array[i]);
+			if (matched) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool profiler_is_running(void)
+{
+	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
+		if (g_ctx_array[i] == NULL)
+			continue;
+		if (g_ctx_array[i]->enable_bpf_profile == 1)
+			return true;
+
+	}
+
+	return false;
 }

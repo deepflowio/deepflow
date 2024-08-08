@@ -19,6 +19,8 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+#include <arpa/inet.h>
+#include <linux/bpf_perf_event.h>
 #include "config.h"
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
@@ -92,7 +94,7 @@ MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1)
  * 可以存储176年(如果从2022年开始)的数据而UID不会出现重复。
  * ((2^56 - 1) - sys_boot_time)/10/1000/1000/60/60/24/365 = 176 years
  */
-MAP_PERARRAY(trace_conf_map, __u32, struct trace_conf_t, 1)
+MAP_PERARRAY(tracer_ctx_map, __u32, struct tracer_ctx_s, 1)
 
 /*
  * 对各类map进行统计
@@ -101,6 +103,14 @@ MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
+
+/**
+ * @brief Record which protocols allow data segmentation
+ * reassembly processing.
+ *
+ * key: protocol id, value: is protocol allowed?, size: PROTO_NUM
+ */
+MAP_ARRAY(allow_reasm_protos_map, int, bool, PROTO_NUM)
 
 // 0: allow bitmap; 1: bypass bitmap
 MAP_ARRAY(kprobe_port_bitmap, __u32, struct kprobe_port_bitmap, 2)
@@ -122,8 +132,8 @@ BPF_HASH(active_write_args_map, __u64, struct data_args_t)
 BPF_HASH(active_read_args_map, __u64, struct data_args_t)
 
 // socket_info_map, 这是个hash表，用于记录socket信息，
-// Key is {pid + fd}. value is struct socket_info_t
-BPF_HASH(socket_info_map, __u64, struct socket_info_t)
+// Key is {pid + fd}. value is struct socket_info_s
+BPF_HASH(socket_info_map, __u64, struct socket_info_s)
 
 // socket_info lifecycle is inconsistent with socket. If the role information
 // is saved to the socket_info_map, it will affect the generation of syscall
@@ -157,8 +167,14 @@ static __inline bool is_protocol_enabled(int protocol)
 	return (enabled) ? (*enabled) : (0);
 }
 
+static __inline bool is_proto_reasm_enabled(int protocol)
+{
+	bool *enabled = allow_reasm_protos_map__lookup(&protocol);
+	return (enabled) ? (*enabled) : false;
+}
+
 static __inline void delete_socket_info(__u64 conn_key,
-					struct socket_info_t *socket_info_ptr)
+					struct socket_info_s *socket_info_ptr)
 {
 	if (socket_info_ptr == NULL)
 		return;
@@ -171,6 +187,8 @@ static __inline void delete_socket_info(__u64 conn_key,
 	if (!socket_info_map__delete(&conn_key)) {
 		__sync_fetch_and_add(&trace_stats->socket_map_count, -1);
 	}
+
+	socket_role_map__delete(&conn_key);
 }
 
 static __u32 __inline get_tcp_write_seq_from_fd(int fd)
@@ -247,24 +265,25 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 static __inline int iovecs_copy(struct __socket_data *v,
 				struct __socket_data_buffer *v_buff,
 				const struct data_args_t *args,
-				size_t syscall_len, __u32 send_len)
+				size_t real_len, __u32 send_len)
 {
-#define LOOP_LIMIT 12
+/*
+ * The number of loops in eBPF is limited; tests have shown that the
+ * Linux 4.14 kernel supports a maximum of 27 iterations.
+ */
+#define LOOP_LIMIT 27
 
 	struct copy_data_s {
-		char data[CAP_DATA_SIZE];
+		char data[sizeof(v->data)];
 	};
 
 	int bytes_copy = 0;
 	__u32 total_size = 0;
 
-	if (syscall_len >= sizeof(v->data))
+	if (real_len >= sizeof(v->data))
 		total_size = sizeof(v->data);
 	else
 		total_size = send_len;
-
-	if (total_size > syscall_len)
-		total_size = syscall_len;
 
 	char *first_iov = NULL;
 	__u32 first_iov_size = 0;
@@ -557,6 +576,8 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	conn_info->sk = sk;
 	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+	if (conn_info->socket_info_ptr)
+		conn_info->no_trace = conn_info->socket_info_ptr->no_trace;
 }
 
 static __inline bool get_socket_info(struct __socket_data *v, void *sk,
@@ -584,14 +605,12 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.rcv_saddr, 16,
 					      sk +
-					      offset->
-					      struct_sock_ip6saddr_offset);
+					      offset->struct_sock_ip6saddr_offset);
 		}
 		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
 			bpf_probe_read_kernel(v->tuple.daddr, 16,
 					      sk +
-					      offset->
-					      struct_sock_ip6daddr_offset);
+					      offset->struct_sock_ip6daddr_offset);
 		}
 		v->tuple.addr_len = 16;
 		break;
@@ -970,11 +989,11 @@ do { \
 #define TRACE_MAP_ACT_NEW   1
 #define TRACE_MAP_ACT_DEL   2
 
-static __inline void trace_process(struct socket_info_t *socket_info_ptr,
+static __inline void trace_process(struct socket_info_s *socket_info_ptr,
 				   struct conn_info_s *conn_info,
 				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
-				   struct trace_conf_t *trace_conf,
+				   struct tracer_ctx_s *tracer_ctx,
 				   struct trace_stats *trace_stats,
 				   __u64 * thread_trace_id,
 				   __u64 time_stamp,
@@ -1034,10 +1053,31 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
 		    (pre_trace_id ==
-		     0 ? ++trace_conf->thread_trace_id : pre_trace_id);
-		if (conn_info->message_type == MSG_REQUEST)
+		     0 ? ++tracer_ctx->thread_trace_id : pre_trace_id);
+		/*
+		 * For NGINX tracing, 'MSG_REQUEST' and 'MSG_RESPONSE' are used
+		 * as judgment conditions. After enabling data segment reassembly,
+		 * the reassembled segments are set to 'MSG_REQUEST'. Here, we need
+		 * to correct it so that only the beginning of the segment data can
+		 * be judged. It should be 'MSG_REASM_START', not is 'MSG_REASM_SEG'.
+		 */
+		if (conn_info->message_type == MSG_REQUEST &&
+		    !conn_info->is_reasm_seg)
+			/*
+			 * Below is the processing scenario for NGINX:
+			 * Save the fd for requests to the nginx frontend. The
+			 * backend will query this trace information when 'socket()'
+			 * is called and will set its 'sk_info.peer_fd'.
+			 * The backend will not reach this point, as the request
+			 * direction for the backend is outbound rather than inbound.
+			 */
 			trace_info.peer_fd = conn_info->fd;
 		else if (conn_info->message_type == MSG_RESPONSE) {
+			/*
+			 * Currently, only the backend of NGINX sets the 'socket_info_ptr->peer_fd'
+			 * value. This value contains the frontend fd. Essentially, this sets the
+			 * 'peer_fd' to the frontend fd within the trace information.
+			 */
 			if (is_socket_info_valid(socket_info_ptr) &&
 			    socket_info_ptr->peer_fd != 0)
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
@@ -1108,33 +1148,36 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	__u32 tcp_seq = args->tcp_seq;
 	__u64 thread_trace_id = 0;
 	__u32 k0 = 0;
-	struct socket_info_t sk_info = { 0 };
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL)
+	struct socket_info_s sk_info = { 0 };
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
 		return SUBMIT_INVALID;
+
+	if (tracer_ctx->disable_tracing)
+		conn_info->no_trace = true;
 
 	/*
 	 * It is possible that these values were modified during ebpf running,
 	 * so they are saved here.
 	 */
-	int data_max_sz = trace_conf->data_limit_max;
+	int data_max_sz = tracer_ctx->data_limit_max;
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
 		return SUBMIT_INVALID;
 
 	struct trace_key_t trace_key =
-	    get_trace_key(trace_conf->go_tracing_timeout,
+	    get_trace_key(tracer_ctx->go_tracing_timeout,
 			  true);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 
-	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
+	struct socket_info_s *socket_info_ptr = conn_info->socket_info_ptr;
 	// 'socket_id' used to resolve non-tracing between the same socket
 	__u64 socket_id = 0;
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		// Not use "++trace_conf->socket_id" here,
+		// Not use "++tracer_ctx->socket_id" here,
 		// because it did not pass the verification of linux 4.14.x, 4.15.x
-		socket_id = trace_conf->socket_id + 1;
+		socket_id = tracer_ctx->socket_id + 1;
 	} else {
 		socket_id = socket_info_ptr->uid;
 	}
@@ -1147,30 +1190,55 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	// AAAA record To ensure that the call chain will not be broken.
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
-	    (trace_conf->go_tracing_timeout != 0
+	    !conn_info->no_trace &&
+	    (tracer_ctx->go_tracing_timeout != 0
 	     || extra->is_go_process == false)
 	    && !(conn_info->protocol == PROTO_DNS
 		 && conn_info->dns_q_type == DNS_AAAA_TYPE_ID))
 		trace_process(socket_info_ptr, conn_info, socket_id,
 			      bpf_get_current_pid_tgid(), trace_info_ptr,
-			      trace_conf, trace_stats, &thread_trace_id,
+			      tracer_ctx, trace_stats, &thread_trace_id,
 			      time_stamp, &trace_key);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
+		/*
+		 * In the context of NGINX, the backend socket information is
+		 * established during the 'socket()' system call, with 'peer_fd' and
+		 * 'trace_id' set accordingly to maintain consistency.
+		 */
+		if (socket_info_ptr &&
+		    conn_info->direction == T_EGRESS &&
+		    !conn_info->no_trace &&
+		    socket_info_ptr->peer_fd > 0) {
 			sk_info.peer_fd = socket_info_ptr->peer_fd;
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
-		sk_info.uid = trace_conf->socket_id + 1;
-		trace_conf->socket_id++;	// Ensure that socket_id is incremented.
+		sk_info.no_trace = conn_info->no_trace;
+		sk_info.uid = tracer_ctx->socket_id + 1;
+		tracer_ctx->socket_id++;	// Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
+		//Confirm whether data reassembly is required for this socket.
+		if (is_proto_reasm_enabled(conn_info->protocol)) {
+			sk_info.allow_reassembly = true;
+			sk_info.reasm_bytes =
+			    syscall_len >
+			    data_max_sz ? data_max_sz : syscall_len;
+		}
 		sk_info.direction = conn_info->direction;
+		sk_info.pre_direction = conn_info->direction;
 		sk_info.role = conn_info->role;
-		sk_info.msg_type = conn_info->message_type;
 		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
 		sk_info.correlation_id = conn_info->correlation_id;
+		if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
+		    args->port > 0) {
+			bpf_probe_read_kernel(sk_info.ipaddr,
+					      sizeof(sk_info.ipaddr),
+					      args->addr);
+			sk_info.udp_pre_set_addr = 1;
+			sk_info.port = args->port;
+		}
 
 		/*
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
@@ -1197,15 +1265,37 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	    conn_info->message_type == MSG_RECONFIRM)
 		return SUBMIT_INVALID;
 
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		return SUBMIT_INVALID;
+
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
+
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return SUBMIT_INVALID;
+	}
+
+	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+	if (get_socket_info(v, conn_info->sk, conn_info) == false) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return SUBMIT_INVALID;
+	}
+
+	__u32 send_reasm_bytes = 0;
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
+		sk_info.allow_reassembly = socket_info_ptr->allow_reassembly;
 
 		/*
 		 * The kernel syscall interface determines that it is the TLS
 		 * handshake protocol, and for the uprobe program, it needs to
 		 * be re inferred to determine the upper layer protocol of TLS.
 		 */
-		if (socket_info_ptr->l7_proto == PROTO_TLS)
+		if (socket_info_ptr->l7_proto == PROTO_TLS ||
+		    socket_info_ptr->l7_proto == PROTO_UNKNOWN)
 			socket_info_ptr->l7_proto = conn_info->protocol;
 
 		/*
@@ -1216,45 +1306,86 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
 		sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
-		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
+		/*
+		 * Currently, only the backend socket of NGINX sets the 'socket_info_ptr->peer_fd'
+		 * value, which is the frontend fd. This handles notifying the frontend socket
+		 * to use the current backend traceID when returning data.
+		 */
 		if (socket_info_ptr->peer_fd != 0
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
-							      socket_info_ptr->peer_fd);
-			struct socket_info_t *peer_socket_info_ptr =
+							      socket_info_ptr->
+							      peer_fd);
+			/*
+			 * Query the socket information of the NGINX frontend and modify the
+			 * traceID of the data returned by the frontend.
+			 */
+			struct socket_info_s *peer_socket_info_ptr =
 			    socket_info_map__lookup(&peer_conn_key);
 			if (is_socket_info_valid(peer_socket_info_ptr))
 				peer_socket_info_ptr->trace_id =
 				    thread_trace_id;
 		}
 
+		/*
+		 * Below is the processing in the NGINX scenario:
+		 * 1.The backend sets the 'socket_info_ptr->trace_id' during the 'socket()'
+		 *   system call to ensure the traceID carried by the backend request is
+		 *   consistent with the frontend request’s traceID.
+		 * 2.The frontend sets the 'socket_info_ptr->trace_id' when the backend receives
+		 *   a response to ensure the traceID carried by the frontend response data is
+		 *   consistent with the traceID during the backend response.
+		 */
 		if (conn_info->direction == T_EGRESS
 		    && socket_info_ptr->trace_id != 0) {
 			thread_trace_id = socket_info_ptr->trace_id;
 			socket_info_ptr->trace_id = 0;
 		}
+
+		if (!conn_info->is_reasm_seg)
+			socket_info_ptr->reasm_bytes = 0;
+
+		/*
+		 * Below, confirm the actual size of the data to be transmitted after
+		 * enabling data reassembly. The data transmission size is limited by
+		 * the maximum transmission configuration value.
+		 */
+		if (sk_info.allow_reassembly
+		    && socket_info_ptr->reasm_bytes < data_max_sz) {
+			__u32 remain_bytes =
+			    data_max_sz - socket_info_ptr->reasm_bytes;
+			send_reasm_bytes =
+			    (syscall_len >
+			     remain_bytes ? remain_bytes : syscall_len);
+			socket_info_ptr->reasm_bytes += send_reasm_bytes;
+		}
 	}
-
-	struct __socket_data_buffer *v_buff =
-	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (!v_buff)
-		return SUBMIT_INVALID;
-
-	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
-		return SUBMIT_INVALID;
-
-	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-	if (get_socket_info(v, conn_info->sk, conn_info) == false)
-		return SUBMIT_INVALID;
 
 	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 	v->tuple.dport = conn_info->tuple.dport;
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
+	if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
+	    args->port > 0) {
+		if (conn_info->skc_family == PF_INET) {
+			bpf_probe_read_kernel(v->tuple.daddr, 4,
+					      args->addr);
+			v->tuple.addr_len = 4;
+		} else if (conn_info->skc_family == PF_INET6) {
+			if (*(__u64 *)&args->addr[0] == 0 &&
+			    *(__u32 *)&args->addr[8] == 0xffff0000) {
+				*(__u32 *)v->tuple.daddr = 
+					*(__u32 *)&args->addr[12];
+				v->tuple.addr_len = 4;
+			} else {
+				bpf_probe_read_kernel(v->tuple.daddr, 16,
+						      args->addr);
+				v->tuple.addr_len = 16;
+			}
+		}
+	}
 
 	__u32 *socket_role = socket_role_map__lookup(&conn_key);
 	v->socket_role = socket_role ? *socket_role : 0;
@@ -1272,7 +1403,16 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	    time_stamp;
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
-	v->msg_type = conn_info->message_type;
+	v->msg_type = MSG_COMMON;
+
+	// Reassembly modification type
+	if (sk_info.allow_reassembly) {
+		v->msg_type = MSG_REASM_START;
+		if (conn_info->is_reasm_seg)
+			v->msg_type = MSG_REASM_SEG;
+		else
+			send_reasm_bytes = 0;
+	}
 	v->tcp_seq = 0;
 
 	if ((extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
@@ -1287,27 +1427,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
 		 */
 		v->tcp_seq = tcp_seq;
-		if (tcp_seq == 0 && conn_info->fd > 0) {
-			if (conn_info->direction == T_INGRESS) {
-				tcp_seq =
-				    get_tcp_read_seq_from_fd(conn_info->fd);
-				/*
-				 * If the current state is TCPF_CLOSE_WAIT, the FIN
-				 * frame already has been received.
-				 * Since tcp_sock->copied_seq has done such an operation +1,
-				 * need to fix the value of tcp_seq.
-				 */
-				if ((1 << conn_info->skc_state) &
-				    TCPF_CLOSE_WAIT) {
-					tcp_seq--;
-				}
-			} else {
-				tcp_seq =
-				    get_tcp_write_seq_from_fd(conn_info->fd);
-			}
-
-			v->tcp_seq = tcp_seq - syscall_len;
-		}
 	}
 
 	v->thread_trace_id = thread_trace_id;
@@ -1318,22 +1437,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		v->tcp_seq -= 2;
 		conn_info->prev_count = 0;
 	}
-
-	/*
-	 * Due to differences in the data captured through the `af_packet` and
-	 * `eBPF methods` for HTTP/2, for example:
-	 * - Data captured using the af_packet method:
-	 *   `PING[0], HEADERS[86125]: 200 OK, DATA[86125]`
-	 * - Data captured using the eBPF method:
-	 *   `HEADERS[86125]: 200 OK, DATA[86125]`
-	 *
-	 * Furthermore, both sides are unaware of the differences in the captured data.
-	 * This inconsistency can lead to inconsistent `tcpseq` values, making it chal-
-	 * lenging to correlate the data. To address this issue, it is agreed that both
-	 * methods adjust the `tcpseq` to the starting position of the first `HEADER`.
-	 */
-	if (conn_info->protocol == PROTO_HTTP2)
-		v->tcp_seq += conn_info->tcpseq_offset;
 
 	if (conn_info->prev_count > 0) {
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
@@ -1362,6 +1465,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
+	context->push_reassembly_bytes = send_reasm_bytes;
 	context->vecs = (bool) vecs;
 	context->is_close = false;
 	context->dir = conn_info->direction;
@@ -1371,7 +1475,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 
 static __inline int process_data(struct pt_regs *ctx, __u64 id,
 				 const enum traffic_direction direction,
-				 const struct data_args_t *args,
+				 struct data_args_t *args,
 				 ssize_t bytes_count,
 				 const struct process_data_extra *extra)
 {
@@ -1411,6 +1515,18 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	}
 
 	init_conn_info(id >> 32, args->fd, conn_info, sk, offset);
+	if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
+	    conn_info->tuple.dport == 0) {
+		conn_info->tuple.dport = args->port;
+		if (conn_info->tuple.dport == 0 &&
+		    is_socket_info_valid(conn_info->socket_info_ptr) &&
+		    conn_info->socket_info_ptr->udp_pre_set_addr) {
+			conn_info->tuple.dport = conn_info->socket_info_ptr->port;
+			args->port = conn_info->tuple.dport;
+			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
+					      conn_info->socket_info_ptr->ipaddr);
+		}
+	}
 
 	conn_info->direction = direction;
 
@@ -1426,35 +1542,36 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		}
 	}
 
-	bool data_submit_dircet = false;
 	struct kprobe_port_bitmap *allow = kprobe_port_bitmap__lookup(&k0);
 	if (allow) {
 		if (is_set_bitmap(allow->bitmap, conn_info->tuple.dport) ||
 		    is_set_bitmap(allow->bitmap, conn_info->tuple.num)) {
-			data_submit_dircet = true;
+			conn_info->protocol = PROTO_CUSTOM;
 		}
 	}
-	if (data_submit_dircet) {
-		conn_info->protocol = PROTO_ORTHER;
-		conn_info->message_type = MSG_REQUEST;
-	} else {
-		int act;
-		act = infer_l7_class_1(ctx_map, conn_info, direction, args,
-				       bytes_count, sock_state, extra);
 
-		if (act == INFER_CONTINUE) {
-			ctx_map->tail_call.conn_info = __conn_info;
-			ctx_map->tail_call.extra = *extra;
-			ctx_map->tail_call.bytes_count = bytes_count;
-			ctx_map->tail_call.offset = offset;
-			ctx_map->tail_call.dir = direction;
-			/* Enter the protocol inference tail call program. */
-			if (extra->source == DATA_SOURCE_SYSCALL)
-				bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
-					      PROG_PROTO_INFER_TP_IDX);
-			else
-				bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
-					      PROG_PROTO_INFER_KP_IDX);
+	int act;
+	act = infer_l7_class_1(ctx_map, conn_info, direction, args,
+			       bytes_count, sock_state, extra);
+
+	if (act == INFER_CONTINUE) {
+		ctx_map->tail_call.conn_info = __conn_info;
+		ctx_map->tail_call.extra = *extra;
+		ctx_map->tail_call.bytes_count = bytes_count;
+		ctx_map->tail_call.offset = offset;
+		ctx_map->tail_call.dir = direction;
+		/* Enter the protocol inference tail call program. */
+		if (extra->source == DATA_SOURCE_SYSCALL)
+			bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+				      PROG_PROTO_INFER_TP_IDX);
+		else
+			bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+				      PROG_PROTO_INFER_KP_IDX);
+	}
+
+	if (conn_info->protocol == PROTO_CUSTOM) {
+		if (conn_info->enable_reasm) {
+			conn_info->is_reasm_seg = true;
 		}
 	}
 
@@ -1479,7 +1596,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 static __inline void process_syscall_data(struct pt_regs *ctx, __u64 id,
 					  const enum traffic_direction
 					  direction,
-					  const struct data_args_t *args,
+					  struct data_args_t *args,
 					  ssize_t bytes_count)
 {
 	struct process_data_extra extra = {
@@ -1500,7 +1617,7 @@ static __inline void process_syscall_data(struct pt_regs *ctx, __u64 id,
 static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
 					       const enum traffic_direction
 					       direction,
-					       const struct data_args_t *args,
+					       struct data_args_t *args,
 					       ssize_t bytes_count)
 {
 	struct process_data_extra extra = {
@@ -1521,7 +1638,7 @@ static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
 /***********************************************************
  * BPF syscall probe/tracepoint function entry-points
  ***********************************************************/
-TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_write) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1538,7 +1655,7 @@ TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_write/format
-TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_write) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1555,7 +1672,7 @@ TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx * ctx) {
 }
 
 // ssize_t read(int fd, void *buf, size_t count);
-TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_read) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int fd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
@@ -1572,7 +1689,7 @@ TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_read/format
-TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_read) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1588,9 +1705,29 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-// ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
-//              const struct sockaddr *dest_addr, socklen_t addrlen);
-TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
+/*
+ * The `sendto` functions are generally used in UDP protocols, but can also be used
+ * in TCP after the connect function is called. `sendto()` use the datagram method
+ * to transmit data.
+ * In the connectionless datagram socket mode, since the local socket has not
+ * established a connection with the remote machine, the destination address should
+ * be specified when sending data. The sendto() function prototype is:
+ *
+ * `int sendto(socket s, const void *msg, int len, unsigned int flags, const
+ *             struct sockaddr *to, int tolen);`
+ *
+ * The sendto() function has two more parameters than the send() function. The "to"
+ * parameter specifies the IP address and port number information of the destination
+ * machine.
+ * 
+ * Our current logic is as follows: network tuple information (IP, PORT) is obtained
+ * by reading the corresponding fields of the kernel structure 'struct sock_common'.
+ * Since the IP address and port are specified in the sendto() system calls,
+ * the tuple data will not be populated into the kernel structure 'struct sock_common'.
+ * As a result, we cannot obtain the tuple information. Therefore, when entering these
+ * types of system calls, we need to save this information beforehand.
+ */
+TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)ctx->fd;
 
@@ -1604,21 +1741,35 @@ TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx * ctx) {
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
 	write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
+	if (write_args.tcp_seq == 0) {
+		struct syscall_sendto_enter_ctx *sendto_ctx =
+			(struct syscall_sendto_enter_ctx *)ctx;
+		struct sockaddr_in addr = { 0 };
+		bpf_probe_read_user(&addr, sizeof(addr), sendto_ctx->addr);
+		write_args.port = __bpf_ntohs(addr.sin_port);
+		if (write_args.port > 0 && addr.sin_family == AF_INET) {
+			*(__u32 *)write_args.addr =
+				__bpf_ntohl(addr.sin_addr.s_addr);
+		} else if (write_args.port > 0 &&
+			   addr.sin_family == AF_INET6) {
+			struct sockaddr_in6 addr = { 0 };
+			bpf_probe_read_user(&addr, sizeof(addr),
+					    sendto_ctx->addr);
+			bpf_probe_read_kernel(&write_args.addr[0], 16,
+					      &addr.sin6_addr.s6_addr[0]);
+                }
+	}
+
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendto/format
-TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
-	// 潜在的问题:如果sentto() addr是由TCP连接提供的，系统调用可能会忽略它，但我们仍然会跟踪它。在实践中，TCP连接不应该使用带addr参数的sendto()。
-	// 在手册页中:
-	//     如果sendto()用于连接模式(SOCK_STREAM, SOCK_SEQPACKET)套接字，参数
-	//     dest_addr和addrlen会被忽略(如果不是，可能会返回EISCONN错误空和0)
-	//
 	// Unstash arguments, and process syscall.
 	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
@@ -1633,7 +1784,7 @@ TPPROG(sys_exit_sendto) (struct syscall_comm_exit_ctx * ctx) {
 
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                struct sockaddr *src_addr, socklen_t *addrlen);
-TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
 	// If flags contains MSG_PEEK, it is returned directly.
 	// ref : https://linux.die.net/man/2/recvfrom
 	if (ctx->flags & MSG_PEEK)
@@ -1654,7 +1805,7 @@ TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvfrom/format
-TPPROG(sys_exit_recvfrom) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvfrom) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
@@ -1697,7 +1848,7 @@ KPROG(__sys_sendmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmsg/format
-TPPROG(sys_exit_sendmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1740,7 +1891,7 @@ KPROG(__sys_sendmmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmmsg/format
-TPPROG(sys_exit_sendmmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_sendmmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 
 	int num_msgs = ctx->ret;
@@ -1791,7 +1942,7 @@ KPROG(__sys_recvmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmsg/format
-TPPROG(sys_exit_recvmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1848,7 +1999,7 @@ KPROG(__sys_recvmmsg) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_recvmmsg/format
-TPPROG(sys_exit_recvmmsg) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	int num_msgs = ctx->ret;
 	// Unstash arguments, and process syscall.
@@ -1891,7 +2042,7 @@ KPROG(do_writev) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_writev/format
-TPPROG(sys_exit_writev) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_writev) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 
@@ -1932,7 +2083,7 @@ KPROG(do_readv) (struct pt_regs * ctx) {
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_readv/format
-TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_readv) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
@@ -1946,8 +2097,50 @@ TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
+static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
+					struct member_fields_offset *offset,
+				        struct syscall_comm_enter_ctx *ctx)
+{
+	__u32 k0 = 0;
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
+		return;
+	int data_max_sz = tracer_ctx->data_limit_max;
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		return;
+
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return;
+	}
+
+	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
+	v->socket_id = uid;
+	v->tgid = (__u32) (pid_tgid >> 32);
+	v->pid = (__u32) pid_tgid;
+	v->timestamp = bpf_ktime_get_ns();
+	v->source = DATA_SOURCE_CLOSE;
+	v->syscall_len = 0;
+	v->data_seq = seq;
+	v->msg_type = MSG_COMMON;
+	bpf_get_current_comm(v->comm, sizeof(v->comm));
+	struct tail_calls_context *context =
+	    (struct tail_calls_context *)v->data;
+	context->max_size_limit = data_max_sz;
+	context->vecs = false;
+	context->is_close = true;
+	context->dir = T_INGRESS;
+
+	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
+}
+
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
-TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_close) (struct syscall_comm_enter_ctx * ctx) {
 	int fd = ctx->fd;
 	//Ignore stdin, stdout and stderr
 	if (fd <= 2)
@@ -1960,143 +2153,31 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx * ctx) {
 
 	INFER_OFFSET_PHASE_2(fd);
 
-	__u64 sock_addr = (__u64) get_socket_from_fd(fd, offset);
-	if (sock_addr) {
-		__u64 id = bpf_get_current_pid_tgid();
-		__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
-		struct socket_info_t *socket_info_ptr =
-		    socket_info_map__lookup(&conn_key);
-		if (socket_info_ptr != NULL) {
-			if (socket_info_ptr->uid) {
-				struct data_args_t read_args = {};
-				__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-				read_args.data_seq = socket_info_ptr->seq;
-				read_args.socket_id = socket_info_ptr->uid;
-				active_read_args_map__update(&id, &read_args);
-			}
-			delete_socket_info(conn_key, socket_info_ptr);
-		}
-
+	__u64 id = bpf_get_current_pid_tgid();
+	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+		socket_info_map__lookup(&conn_key);
+	if (socket_info_ptr == NULL) {
 		socket_role_map__delete(&conn_key);
+		return 0;
 	}
 
-	return 0;
-}
-
-// /sys/kernel/debug/tracing/events/syscalls/sys_exit_close/format
-TPPROG(sys_exit_close) (struct syscall_comm_exit_ctx * ctx) {
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	struct data_args_t *read_args = active_read_args_map__lookup(&pid_tgid);
-	if (read_args == NULL)
-		return 0;
-
-	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
-	if (!offset)
-		goto exit;
-
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL)
-		goto exit;
-	int data_max_sz = trace_conf->data_limit_max;
-	struct __socket_data_buffer *v_buff =
-	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (!v_buff)
-		goto exit;
-
-	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
-		goto exit;
-
-	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
-	v->socket_id = read_args->socket_id;
-	v->tgid = (__u32) (pid_tgid >> 32);
-	v->pid = (__u32) pid_tgid;
-	v->timestamp = bpf_ktime_get_ns();
-	v->source = DATA_SOURCE_CLOSE;
-	v->syscall_len = 0;
-	v->data_seq = read_args->data_seq;
-	bpf_get_current_comm(v->comm, sizeof(v->comm));
-	struct tail_calls_context *context =
-	    (struct tail_calls_context *)v->data;
-	context->max_size_limit = data_max_sz;
-	context->vecs = false;
-	context->is_close = true;
-	context->dir = T_INGRESS;
-
-	bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), PROG_OUTPUT_DATA_TP_IDX);
-
-exit:
-	active_read_args_map__delete(&pid_tgid);
-	return 0;
-}
-
-// /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
-// Here, the tracepoint is used to periodically send the data residing in the cache but not
-// yet transmitted to the user-level receiving program for processing.
-TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx * ctx) {
-	// Only pre-specified Pid is allowed to trigger.
-	if (!check_pid_validity())
-		return 0;
-
-	int k0 = 0;
-	struct __socket_data_buffer *v_buff =
-	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (v_buff) {
-		if (v_buff->events_num > 0) {
-			struct __socket_data *v =
-			    (struct __socket_data *)&v_buff->data[0];
-			if ((bpf_ktime_get_ns() - v->timestamp * NS_PER_US) >
-			    NS_PER_SEC) {
-				__u32 buf_size =
-				    (v_buff->len +
-				     offsetof(typeof
-					      (struct __socket_data_buffer),
-					      data))
-				    & (sizeof(*v_buff) - 1);
-				/* 
-				 * Note that when 'buf_size == 0', it indicates that the data being
-				 * sent is at its maximum value (sizeof(*v_buff)), and it should
-				 * be sent accordingly.
-				 */
-				if (buf_size < sizeof(*v_buff) && buf_size > 0) {
-					/* 
-					 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
-					 * (Linux 4.14.x) length checks.
-					 */
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      buf_size + 1);
-				} else {
-					bpf_perf_event_output(ctx,
-							      &NAME
-							      (socket_data),
-							      BPF_F_CURRENT_CPU,
-							      v_buff,
-							      sizeof(*v_buff));
-				}
-
-				v_buff->events_num = 0;
-				v_buff->len = 0;
-			}
-		}
-	}
-
+	if (socket_info_ptr->uid)
+		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
+	delete_socket_info(conn_key, socket_info_ptr);
+	__push_close_event(id, socket_info_ptr->uid, socket_info_ptr->seq,
+			   offset, ctx);
 	return 0;
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_socket/format
-TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	__u64 fd = (__u64) ctx->ret;
 	char comm[TASK_COMM_LEN];
 	bpf_get_current_comm(comm, sizeof(comm));
 
-	// 试用于nginx负载均衡场景
+	// Used in NGINX load balancing scenarios.
 	if (!(comm[0] == 'n' && comm[1] == 'g' && comm[2] == 'i' &&
 	      comm[3] == 'n' && comm[4] == 'x' && comm[5] == '\0'))
 		return 0;
@@ -2105,7 +2186,15 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	struct trace_key_t key = get_trace_key(0, true);
 	struct trace_info_t *trace = trace_map__lookup(&key);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32) fd) {
-		struct socket_info_t sk_info = { 0 };
+		struct socket_info_s sk_info = { 0 };
+		/*
+		 * In the NGINX backend socket information, record 'peer_fd' with
+		 * the value of the frontend fd, and 'trace_id' with the value of
+		 * the frontend request’s 'trace_id'. The purpose of this is to
+		 * ensure that the traceID of frontend requests and backend requests,
+		 * as well as the traceID of frontend responses and backend responses,
+		 * remain consistent.
+		 */
 		sk_info.peer_fd = trace->peer_fd;
 		sk_info.trace_id = trace->thread_trace_id;
 		__u64 conn_key = gen_conn_key_id(id >> 32, fd);
@@ -2122,7 +2211,7 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-TPPROG(sys_exit_accept) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_accept) (struct syscall_comm_exit_ctx * ctx) {
 	int sockfd = ctx->ret;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
@@ -2132,7 +2221,7 @@ TPPROG(sys_exit_accept) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-TPPROG(sys_exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
+TP_SYSCALL_PROG(exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
 	int sockfd = ctx->ret;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
@@ -2142,7 +2231,7 @@ TPPROG(sys_exit_accept4) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-TPPROG(sys_enter_connect) (struct syscall_comm_enter_ctx * ctx) {
+TP_SYSCALL_PROG(enter_connect) (struct syscall_comm_enter_ctx * ctx) {
 	int sockfd = ctx->fd;
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
@@ -2168,6 +2257,11 @@ static __inline int output_data_common(void *ctx)
 	bool is_close = false;
 	__u32 k0 = 0;
 	char *buffer = NULL;
+	__u32 reassembly_bytes = 0;
+
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
+		return 0;
 
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
@@ -2188,15 +2282,13 @@ static __inline int output_data_common(void *ctx)
 	vecs = context->vecs;
 	is_close = context->is_close;
 	max_size = context->max_size_limit;
+	reassembly_bytes = context->push_reassembly_bytes;
 
 	struct data_args_t *args;
 	if (dir == T_INGRESS)
 		args = active_read_args_map__lookup(&id);
 	else
 		args = active_write_args_map__lookup(&id);
-
-	if (args == NULL)
-		goto clear_args_map_1;
 
 	struct __socket_data *v =
 	    (struct __socket_data *)(v_buff->data + v_buff->len);
@@ -2207,6 +2299,9 @@ static __inline int output_data_common(void *ctx)
 		v->data_len = 0;
 		goto skip_copy;
 	}
+
+	if (args == NULL)
+		goto clear_args_map_1;
 
 	if (v->source == DATA_SOURCE_IO_EVENT) {
 		buffer = (char *)io_event_buffer__lookup(&k0);
@@ -2220,13 +2315,20 @@ static __inline int output_data_common(void *ctx)
 	__u32 __len = v->syscall_len > max_size ? max_size : v->syscall_len;
 
 	/*
+	 * If data reassembly is enabled, the amount of data pushed must not
+	 * exceed the reassembly transmission limit.
+	 */
+	if (reassembly_bytes > 0)
+		__len = reassembly_bytes;
+
+	/*
 	 * the bitwise AND operation will set the range of possible values for
 	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
 	 */
 	__u32 len = __len & (sizeof(v->data) - 1);
 
 	if (vecs) {
-		len = iovecs_copy(v, v_buff, args, v->syscall_len, len);
+		len = iovecs_copy(v, v_buff, args, __len, len);
 	} else {
 		if (__len >= sizeof(v->data)) {
 			if (v->source != DATA_SOURCE_IO_EVENT) {
@@ -2273,7 +2375,14 @@ skip_copy:
 	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
 
-	if (v_buff->events_num >= EVENT_BURST_NUM ||
+	/*
+	 * If the delay of the periodic push event exceeds the threshold, it
+	 * will be pushed immediately.
+	 */
+	__u64 curr_time = bpf_ktime_get_ns();
+	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
+	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
+	    v_buff->events_num >= EVENT_BURST_NUM ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		__u32 buf_size =
 		    (v_buff->len +
@@ -2300,9 +2409,21 @@ skip_copy:
 
 		v_buff->events_num = 0;
 		v_buff->len = 0;
+		if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS) {
+			struct trace_stats *stats;
+			tracer_ctx->last_period_timestamp =
+				tracer_ctx->period_timestamp;
+			tracer_ctx->period_timestamp = curr_time;
+			stats = trace_stats_map__lookup(&k0);
+			if (stats == NULL)
+				goto clear_args_map_1;
+			if (diff > stats->period_event_max_delay)
+				stats->period_event_max_delay = diff;
+		}
 	}
 
 clear_args_map_1:
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 	if (dir == T_INGRESS)
 		active_read_args_map__delete(&id);
 	else
@@ -2311,6 +2432,7 @@ clear_args_map_1:
 	return 0;
 
 clear_args_map_2:
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 	active_read_args_map__delete(&id);
 	active_write_args_map__delete(&id);
 	return 0;
@@ -2338,6 +2460,8 @@ static __inline int data_submit(void *ctx)
 	conn_info = &__conn_info;
 	__u64 conn_key = gen_conn_key_id(id >> 32, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+	if (!conn_info->is_reasm_seg && conn_info->socket_info_ptr)
+		conn_info->socket_info_ptr->finish_reasm = false;
 
 	struct data_args_t *args;
 	if (conn_info->direction == T_INGRESS)
@@ -2489,34 +2613,34 @@ static __inline void trace_io_event_common(void *ctx,
 		return;
 	}
 
-	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
-	if (trace_conf == NULL) {
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL) {
 		return;
 	}
 
-	if (trace_conf->io_event_collect_mode == 0) {
+	if (tracer_ctx->io_event_collect_mode == 0) {
 		return;
 	}
 
-	__u32 timeout = trace_conf->go_tracing_timeout;
+	__u32 timeout = tracer_ctx->go_tracing_timeout;
 	struct trace_key_t trace_key = get_trace_key(timeout, false);
 	struct trace_info_t *trace_info_ptr = trace_map__lookup(&trace_key);
 	if (trace_info_ptr) {
 		trace_id = trace_info_ptr->thread_trace_id;
 	}
 
-	if (trace_id == 0 && trace_conf->io_event_collect_mode == 1) {
+	if (trace_id == 0 && tracer_ctx->io_event_collect_mode == 1) {
 		return;
 	}
 
-	int data_max_sz = trace_conf->data_limit_max;
+	int data_max_sz = tracer_ctx->data_limit_max;
 
 	if (!is_regular_file(data_args->fd)) {
 		return;
 	}
 
 	latency = bpf_ktime_get_ns() - data_args->enter_ts;
-	if (latency < trace_conf->io_event_minimal_duration) {
+	if (latency < tracer_ctx->io_event_minimal_duration) {
 		return;
 	}
 
@@ -2539,10 +2663,13 @@ static __inline void trace_io_event_common(void *ctx,
 	if (!v_buff)
 		return;
 
+	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 		return;
+	}
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
@@ -2556,11 +2683,13 @@ static __inline void trace_io_event_common(void *ctx,
 	v->source = DATA_SOURCE_IO_EVENT;
 
 	v->thread_trace_id = trace_id;
+	v->msg_type = MSG_COMMON;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
+	context->push_reassembly_bytes = 0;
 	context->vecs = false;
 	context->is_close = false;
 	context->dir = direction;
@@ -2586,6 +2715,96 @@ PROGTP(io_event) (void *ctx) {
 		trace_io_event_common(ctx, data_args, T_EGRESS, id);
 		active_write_args_map__delete(&id);
 		return 0;
+	}
+
+	return 0;
+}
+
+/*
+ * Here, the perf event is used to periodically send the data residing in
+ * the cache but not yet transmitted to the user-level receiving program
+ * for processing.
+ */
+PERF_EVENT_PROG(push_socket_data) (struct bpf_perf_event_data * ctx) {
+	__u32 k0 = 0;
+	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
+	if (tracer_ctx == NULL)
+		return 0;
+
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_stats == NULL)
+		return 0;
+
+	/*
+	 * For perf event's periodic events, we have set them to push data
+	 * from the kernel buffer every 10 milliseconds. This periodic event
+	 * is implemented based on the kernel's high-resolution timer (hrtimer),
+	 * which triggers a timer interrupt when the time expires. However, in
+	 * reality, the timer does not always trigger the interrupt exactly every
+	 * 10 milliseconds to execute the ebpf program. This is because the timer
+	 * interrupt may be masked off during certain operations, such as when
+	 * interrupts are disabled during locking operations. Consequently, the
+	 * timer may trigger the interrupt after the expected time, resulting in a
+	 * delay in the periodic event. We need to monitor and record the maximum
+	 * delay time, the total runtime, and the number of occurrences of the
+	 * periodic event.
+	 */
+	tracer_ctx->last_period_timestamp = tracer_ctx->period_timestamp;
+	tracer_ctx->period_timestamp = bpf_ktime_get_ns();
+	__u64 diff = tracer_ctx->period_timestamp -
+	    tracer_ctx->last_period_timestamp;
+	if (diff > trace_stats->period_event_max_delay)
+		trace_stats->period_event_max_delay = diff;
+
+	__sync_fetch_and_add(&trace_stats->period_event_total_time, diff);
+	__sync_fetch_and_add(&trace_stats->period_event_count, 1);
+
+	/*
+	 * If a previous system call is in the process of modifying the push buffer to
+	 * push data when it is interrupted by a periodic event interrupt, the interrupt
+	 * handler cannot further manipulate the buffer to avoid conflicts. In such cases,
+	 * we record the number of conflicts.
+	 */
+	if (tracer_ctx->push_buffer_refcnt != 0) {
+		__sync_fetch_and_add(&trace_stats->push_conflict_count, 1);
+		return 0;
+	}
+
+	struct __socket_data_buffer *v_buff =
+	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (v_buff) {
+		if (v_buff->events_num > 0) {
+			__u32 buf_size =
+			    (v_buff->len +
+			     offsetof(typeof(struct __socket_data_buffer),
+				      data))
+			    & (sizeof(*v_buff) - 1);
+			/* 
+			 * Note that when 'buf_size == 0', it indicates that the data being
+			 * sent is at its maximum value (sizeof(*v_buff)), and it should
+			 * be sent accordingly.
+			 */
+			if (buf_size < sizeof(*v_buff) && buf_size > 0) {
+				/* 
+				 * Use 'buf_size + 1' instead of 'buf_size' to circumvent
+				 * (Linux 4.14.x) length checks.
+				 */
+				bpf_perf_event_output(ctx,
+						      &NAME
+						      (socket_data),
+						      BPF_F_CURRENT_CPU,
+						      v_buff, buf_size + 1);
+			} else {
+				bpf_perf_event_output(ctx,
+						      &NAME
+						      (socket_data),
+						      BPF_F_CURRENT_CPU,
+						      v_buff, sizeof(*v_buff));
+			}
+
+			v_buff->events_num = 0;
+			v_buff->len = 0;
+		}
 	}
 
 	return 0;

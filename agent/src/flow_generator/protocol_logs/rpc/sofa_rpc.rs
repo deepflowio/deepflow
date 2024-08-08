@@ -15,6 +15,8 @@
  */
 mod hessian;
 
+use std::borrow::Cow;
+
 use nom::InputTakeAtPosition;
 use public::{
     bytes::{read_u16_be, read_u32_be},
@@ -29,12 +31,13 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::{LogParserConfig, TraceType},
     flow_generator::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, L7ResponseStatus,
+            set_captured_byte, swap_if, L7ResponseStatus,
         },
-        AppProtoHead, Error, HttpLog, LogMessageType, Result,
+        AppProtoHead, Error, LogMessageType, Result,
     },
 };
 
@@ -186,6 +189,11 @@ pub struct SofaRpcInfo {
 
     resp_code: u16,
     status: L7ResponseStatus,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    endpoint: Option<String>,
 }
 
 impl SofaRpcInfo {
@@ -201,6 +209,18 @@ impl SofaRpcInfo {
             self.parent_span_id = ctx.parent_span_id;
         }
     }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::SofaRPC) {
+            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.target_serv)
+                || t.request_type.is_on_blacklist(&self.method)
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default();
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for SofaRpcInfo {
@@ -214,6 +234,10 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
             self.resp_code = s.resp_code;
             self.status = s.status;
             self.captured_response_byte = s.captured_response_byte;
+            swap_if!(self, endpoint, is_none, s);
+            if s.is_on_blacklist {
+                self.is_on_blacklist = s.is_on_blacklist;
+            }
         }
         Ok(())
     }
@@ -237,6 +261,10 @@ impl L7ProtocolInfoInterface for SofaRpcInfo {
             None
         }
     }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
 }
 
 impl From<SofaRpcInfo> for L7ProtocolSendLog {
@@ -254,7 +282,7 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: s.method.clone(),
                 resource: s.target_serv.clone(),
-                endpoint: format!("{}/{}", s.target_serv.clone(), s.method),
+                endpoint: s.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -279,15 +307,10 @@ impl From<SofaRpcInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SofaRpcLog {
     perf_stats: Option<L7PerfStats>,
-}
-
-impl Default for SofaRpcLog {
-    fn default() -> Self {
-        Self { perf_stats: None }
-    }
+    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for SofaRpcLog {
@@ -305,9 +328,16 @@ impl L7ProtocolParserInterface for SofaRpcLog {
                 if !ok {
                     return Ok(L7ParseResult::None);
                 }
-                self.cal_perf(param, &mut info);
+                info.endpoint = info.get_endpoint();
                 info.is_tls = param.is_tls();
                 set_captured_byte!(info, param);
+                if let Some(config) = param.parse_config {
+                    info.set_is_on_blacklist(config);
+                }
+                if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                    self.cal_perf(param, &mut info);
+                }
+                self.last_is_on_blacklist = info.is_on_blacklist;
                 if param.parse_log {
                     Ok(L7ParseResult::Single(L7ProtocolInfo::SofaRpcInfo(info)))
                 } else {
@@ -588,14 +618,17 @@ pub fn decode_new_rpc_trace_context(mut payload: &[u8]) -> RpcTraceContext {
     ctx
 }
 
-pub fn decode_new_rpc_trace_context_with_type(mut payload: &[u8], id_type: u8) -> Option<String> {
+pub fn decode_new_rpc_trace_context_with_type(
+    mut payload: &[u8],
+    id_type: u8,
+) -> Option<Cow<'_, str>> {
     while let Some((key, val)) = read_url_param_kv(&mut payload) {
         match key {
-            RPC_TRACE_CONTEXT_TCID if id_type == HttpLog::TRACE_ID => {
-                return Some(String::from_utf8_lossy(val).to_string())
+            RPC_TRACE_CONTEXT_TCID if id_type == TraceType::TRACE_ID => {
+                return Some(String::from_utf8_lossy(val))
             }
-            RPC_TRACE_CONTEXT_SPID if id_type == HttpLog::SPAN_ID => {
-                return Some(String::from_utf8_lossy(val).to_string())
+            RPC_TRACE_CONTEXT_SPID if id_type == TraceType::SPAN_ID => {
+                return Some(String::from_utf8_lossy(val))
             }
             _ => {}
         }

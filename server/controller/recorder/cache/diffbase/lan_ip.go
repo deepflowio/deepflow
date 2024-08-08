@@ -24,21 +24,23 @@ import (
 )
 
 func (b *DataSet) AddLANIP(dbItem *mysql.LANIP, seq int, toolDataSet *tool.DataSet) {
-	subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
+	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
+	// which may cause recorder performance issues.
+	// subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
 	b.LANIPs[dbItem.Lcuuid] = &LANIP{
 		DiffBase: DiffBase{
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
-		SubnetLcuuid:    subnetLcuuid,
+		// SubnetLcuuid:    subnetLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteLANIP(lcuuid string) {
 	delete(b.LANIPs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type LANIP struct {

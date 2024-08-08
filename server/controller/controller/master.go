@@ -100,11 +100,13 @@ func checkAndStartMasterFunctions(
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
 	tagRecorder := tagrecorder.GetSingleton()
+	tagrecordercheck.GetSingleton().Init(ctx, *cfg)
+	tr := tagrecordercheck.GetSingleton()
 
 	httpService := http.GetSingleton()
 
-	tagrecordercheck.GetSingleton().Init(ctx, *cfg)
-	tr := tagrecordercheck.GetSingleton()
+	var sCtx context.Context
+	var sCancel context.CancelFunc
 
 	masterController := ""
 	thisIsMasterController := false
@@ -118,10 +120,12 @@ func checkAndStartMasterFunctions(
 				thisIsMasterController = true
 				log.Infof("I am the master controller now, previous master controller is %s", masterController)
 
+				sCtx, sCancel = context.WithCancel(ctx)
+
 				migrateMySQL(cfg)
 
 				// 启动资源ID管理器
-				err := recorderResource.IDManagers.Start()
+				err := recorderResource.IDManagers.Start(sCtx)
 				if err != nil {
 					log.Errorf("resource id manager start failed: %s", err.Error())
 					time.Sleep(time.Second)
@@ -129,73 +133,58 @@ func checkAndStartMasterFunctions(
 				}
 
 				// 启动tagrecorder
-				tagRecorder.UpdaterManager.Start()
+				tagRecorder.UpdaterManager.Start(sCtx)
 				tr.Check()
-				// tagRecorder.SubscriberManager.HealthCheck()
 
 				// 控制器检查
-				controllerCheck.Start()
+				controllerCheck.Start(sCtx)
 
 				// 数据节点检查
-				analyzerCheck.Start()
+				analyzerCheck.Start(sCtx)
 
 				// vtap check
-				vtapCheck.Start()
+				vtapCheck.Start(sCtx)
 
 				// rebalance vtap check
-				vtapRebalanceCheck.Start()
+				vtapRebalanceCheck.Start(sCtx)
 
 				// license分配和检查
 				if cfg.BillingMethod == common.BILLING_METHOD_LICENSE {
-					vtapLicenseAllocation.Start()
+					vtapLicenseAllocation.Start(sCtx)
 				}
 
 				// 资源数据清理
-				recorderResource.Cleaners.Start()
+				recorderResource.Cleaners.Start(sCtx)
 
 				// domain检查及自愈
-				domainChecker.Start()
+				domainChecker.Start(sCtx)
 
-				prometheus.Encoders.Start()
-				prometheus.APPLabelLayoutUpdater.Start()
-				prometheus.Clear.Start()
+				prometheus.Encoders.Start(sCtx)
+				// prometheus.APPLabelLayoutUpdater.Start()
+				prometheus.Clear.Start(sCtx)
 
 				if cfg.DFWebService.Enabled {
-					httpService.TaskManager.Start(ctx, cfg.FPermit, cfg.RedisCfg)
+					httpService.TaskManager.Start(sCtx, cfg.FPermit, cfg.RedisCfg)
 				}
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
 
 				// stop tagrecorder
-				tagRecorder.UpdaterManager.Stop()
-				tr.Stop()
-
 				// stop controller check
-				controllerCheck.Stop()
-
 				// stop analyzer check
-				analyzerCheck.Stop()
-
 				// stop vtap check
-				vtapCheck.Stop()
-
 				// stop vtap license allocation and check
-				vtapLicenseAllocation.Stop()
-
-				recorderResource.Cleaners.Stop()
-
-				domainChecker.Stop()
+				// stop domain checker
+				// stop prometheus related
+				// stop http task mananger
+				// stop resource cleaner
+				if sCancel != nil {
+					sCancel()
+				}
 
 				recorderResource.IDManagers.Stop()
-
 				prometheus.Encoders.Stop()
-				prometheus.APPLabelLayoutUpdater.Stop()
-				prometheus.Clear.Stop()
-
-				if cfg.DFWebService.Enabled {
-					httpService.TaskManager.Stop()
-				}
 			} else {
 				log.Infof(
 					"current master controller is %s, previous master controller is %s",
@@ -207,7 +196,10 @@ func checkAndStartMasterFunctions(
 	}
 }
 
-func checkAndStartAllRegionMasterFunctions() {
+func checkAndStartAllRegionMasterFunctions(ctx context.Context) {
+	var sCtx context.Context
+	var sCancel context.CancelFunc
+
 	tr := tagrecorder.GetSingleton()
 	masterController := ""
 	thisIsMasterController := false
@@ -218,9 +210,10 @@ func checkAndStartAllRegionMasterFunctions() {
 		}
 		if masterController != newMasterController {
 			if newThisIsMasterController {
+				sCtx, sCancel = context.WithCancel(ctx)
 				thisIsMasterController = true
 				log.Infof("I am the master controller now, previous master controller is %s", masterController)
-				go tr.Dictionary.Start()
+				go tr.Dictionary.Start(sCtx)
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
@@ -229,6 +222,9 @@ func checkAndStartAllRegionMasterFunctions() {
 					"current master controller is %s, previous master controller is %s",
 					newMasterController, masterController,
 				)
+				if sCancel != nil {
+					sCancel()
+				}
 			}
 		}
 		masterController = newMasterController

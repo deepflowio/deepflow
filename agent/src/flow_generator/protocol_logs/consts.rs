@@ -32,6 +32,7 @@ pub const HTTP_METHOD_AND_SPACE_MAX_OFFSET: usize = 9; // Method：OPTIONS
 pub const HTTP_V1_0_VERSION: &str = "HTTP/1.0";
 pub const HTTP_V1_1_VERSION: &str = "HTTP/1.1";
 pub const HTTP_V1_VERSION_LEN: usize = 8;
+pub const HTTP_STATUS_OK: u16 = 200;
 pub const HTTP_STATUS_CODE_MIN: u16 = 100;
 pub const HTTP_STATUS_CODE_MAX: u16 = 600;
 pub const HTTP_STATUS_CLIENT_ERROR_MIN: u16 = 400;
@@ -55,6 +56,19 @@ pub const HTTPV2_FRAME_HEADERS_TYPE: u8 = 0x01;
 
 pub const HTTPV2_FRAME_TYPE_MIN: u8 = 0x00;
 pub const HTTPV2_FRAME_TYPE_MAX: u8 = 0x09;
+
+// GRPC
+pub const GRPC_HEADER_SIZE: u32 = 5;
+pub const GRPC_MESSAGE_LENGTH_OFFSET: usize = 1;
+pub const GRPC_STATUS_OK: u16 = 0;
+pub const GRPC_STATUS_CANCELLED: u16 = 1;
+pub const GRPC_STATUS_INVALID_ARGUMENT: u16 = 3;
+pub const GRPC_STATUS_NOT_FOUND: u16 = 5;
+pub const GRPC_STATUS_ALREADY_EXISTS: u16 = 6;
+pub const GRPC_STATUS_PERMISSION_DENIED: u16 = 7;
+pub const GRPC_STATUS_FAILED_PRECONDITION: u16 = 9;
+pub const GRPC_STATUS_OUT_OF_RANGE: u16 = 11;
+pub const GRPC_STATUS_UNAUTHENTICATED: u16 = 16;
 
 pub const TRACE_ID_TYPE: usize = 0;
 pub const SPAN_ID_TYPE: usize = 1;
@@ -104,6 +118,10 @@ pub const BODY_PARAM_MAX: u8 = 5;
 
 // Mysql constants
 pub const PROTOCOL_VERSION: u8 = 10;
+
+// Compressed Header
+pub const COMPRESS_HEADER_LEN: usize = 7;
+pub const COMPRESS_HEADER_UNCOMPRESS_OFFSET: usize = 4;
 
 // Header
 pub const HEADER_LEN: usize = 4;
@@ -385,6 +403,13 @@ pub const AFFECTED_ROWS_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN
 pub const SQL_STATE_OFFSET: usize = ERROR_CODE_OFFSET + ERROR_CODE_LEN;
 pub const STATEMENT_ID_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN;
 pub const EXECUTE_STATEMENT_PARAMS_OFFSET: usize = STATEMENT_ID_OFFSET + STATEMENT_ID_LEN + 5;
+
+// Login
+pub const CLIENT_PROTOCOL_41: u16 = 512;
+pub const CLIENT_CAPABILITIES_FLAGS_OFFSET: usize = 0;
+pub const FILTER_OFFSET: usize = 9;
+pub const FILTER_SIZE: usize = 23;
+pub const LOGIN_USERNAME_OFFSET: usize = 32;
 
 // int
 pub const INT_FLAGS_2: u8 = 0xfc;

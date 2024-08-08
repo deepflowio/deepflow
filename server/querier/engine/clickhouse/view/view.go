@@ -359,9 +359,20 @@ func (sv *SubView) removeDup(ns NodeSet) []Node {
 	targetList := nodeList[:0]
 	for _, node := range nodeList {
 		str := node.ToString()
-		if _, ok := tmpMap[str]; !ok {
+		strNoPreffix := strings.Trim(str, "`")
+		if _, ok := tmpMap[strNoPreffix]; !ok {
 			targetList = append(targetList, node)
-			tmpMap[str] = nil
+			tmpMap[strNoPreffix] = nil
+			// if the tag after as already exists, it is also considered duplicate​​​
+			strUpper := strNoPreffix
+			if strings.Contains(strNoPreffix, " as ") {
+				strUpper = strings.ReplaceAll(strNoPreffix, " as ", " AS ")
+			}
+			strSlice := strings.Split(strUpper, " AS ")
+			if len(strSlice) == 2 {
+				postAsNoPrefix := strings.Trim(strSlice[1], "`")
+				tmpMap[postAsNoPrefix] = nil
+			}
 		}
 	}
 	return targetList
@@ -386,7 +397,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 	}
 	if !sv.Filters.IsNull() {
 		from := sv.From.ToString()
-		if strings.Contains(from, "flow_tag.") || strings.Contains(from, "deepflow_system.") {
+		if strings.Contains(from, "flow_tag.") {
 			buf.WriteString(" WHERE ")
 		} else if strings.Contains(from, "flow_metrics.") && !strings.HasSuffix(from, ".1m`") && !strings.HasSuffix(from, ".1s`") {
 			buf.WriteString(" WHERE ")

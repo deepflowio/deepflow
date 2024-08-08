@@ -17,6 +17,7 @@
 package kubernetes
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -28,6 +29,7 @@ import (
 	"gorm.io/gorm/schema"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 )
 
 const (
@@ -73,7 +75,7 @@ func TestRefresh(t *testing.T) {
 	mysql.Db.Create(&domain)
 	subDomain := mysql.SubDomain{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 	mysql.Db.Create(&subDomain)
-	k8sInfo := NewKubernetesInfo(mysql.Db, nil)
+	k8sInfo := NewKubernetesInfo(mysql.Db, nil, common.DEFAULT_ORG_ID, context.Background())
 	k8sInfo.refresh()
 	if len(k8sInfo.clusterIDToDomain) != 1 {
 		fmt.Println("cluster id domain map is not expected.")
@@ -90,7 +92,7 @@ func TestCheckDomainSubDomainByClusterID(t *testing.T) {
 	for _, val := range GetModels() {
 		mysql.Db.AutoMigrate(val)
 	}
-	k8sInfo := NewKubernetesInfo(mysql.Db, nil)
+	k8sInfo := NewKubernetesInfo(mysql.Db, nil, common.DEFAULT_ORG_ID, context.Background())
 	k8sInfo.clusterIDToDomain = map[string]string{"a": "b"}
 	k8sInfo.clusterIDToSubDomain = map[string]string{"b": "c"}
 	if ok, _ := k8sInfo.checkClusterID("a"); !ok {

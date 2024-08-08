@@ -42,16 +42,21 @@ func (k *ChPodK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodK8sLabel
 	var pods []mysql.Pod
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[K8sLabelsKey]mysql.ChPodK8sLabels)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod, k.db.LogPrefixORGID)
+		}
+
 		labelsMap := map[string]string{}
 		splitLabel := strings.Split(pod.Label, ", ")
 		for _, singleLabel := range splitLabel {
-			splitSingleLabel := strings.Split(singleLabel, ":")
+			splitSingleLabel := strings.SplitN(singleLabel, ":", 2)
 			if len(splitSingleLabel) == 2 {
 				labelsMap[splitSingleLabel[0]] = splitSingleLabel[1]
 			}
@@ -59,19 +64,20 @@ func (k *ChPodK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodK8sLabel
 		if len(labelsMap) > 0 {
 			labelsStr, err := json.Marshal(labelsMap)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, k.db.LogPrefixORGID)
 				return nil, false
 			}
 			key := K8sLabelsKey{
 				ID: pod.ID,
 			}
 			keyToItem[key] = mysql.ChPodK8sLabels{
-				ID:       pod.ID,
-				Labels:   string(labelsStr),
-				L3EPCID:  pod.VPCID,
-				PodNsID:  pod.PodNamespaceID,
-				TeamID:   tagrecorder.DomainToTeamID[pod.Domain],
-				DomainID: tagrecorder.DomainToDomainID[pod.Domain],
+				ID:          pod.ID,
+				Labels:      string(labelsStr),
+				L3EPCID:     pod.VPCID,
+				PodNsID:     pod.PodNamespaceID,
+				TeamID:      teamID,
+				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		}
 	}

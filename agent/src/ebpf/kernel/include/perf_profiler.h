@@ -41,6 +41,14 @@ typedef enum {
 	PROFILER_CNT
 } profiler_idx;
 
+#define JAVA_SYMBOL_MAX_LENGTH 128
+#define MAP_MEMORY_JAVA_SYMBOL_MAP_NAME "__memory_java_symbol_map"
+
+struct java_symbol_map_key {
+	__u32 tgid;
+	__u64 class_id;
+};
+
 struct stack_trace_key_t {
 	__u32 pid;		// processID or threadID
 	__u32 tgid;		// processID
@@ -49,7 +57,16 @@ struct stack_trace_key_t {
 	int kernstack;
 	int userstack;
 	__u64 timestamp;
-	__u64 duration_ns;
+
+	union {
+		struct {
+			__u64 duration_ns;
+		} off_cpu;
+		struct {
+			__u64 size;
+			__u64 class_id; // Use symbol address as class_id
+		} memory;
+	} ext_data;
 };
 
 #endif /* DF_BPF_PERF_PROFILER_H */

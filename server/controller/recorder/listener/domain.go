@@ -17,14 +17,13 @@
 package listener
 
 import (
-	"github.com/op/go-logging"
-
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-var log = logging.MustGetLogger("recorder/listener")
+var log = logger.MustGetLogger("recorder/listener")
 
 type WholeDomain struct {
 	cache         *cache.Cache

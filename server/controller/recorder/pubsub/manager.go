@@ -62,9 +62,6 @@ func GetManager() *Manager {
 				PubSubTypeWANIP:                 NewWANIP(),
 				PubSubTypeLANIP:                 NewLANIP(),
 				PubSubTypeVIP:                   NewVIP(),
-				PubSubTypeSecurityGroup:         NewSecurityGroup(),
-				PubSubTypeSecurityGroupRule:     NewSecurityGroupRule(),
-				PubSubTypeVMSecurityGroup:       NewVMSecurityGroup(),
 				PubSubTypeNATGateway:            NewNATGateway(),
 				PubSubTypeNATRule:               NewNATRule(),
 				PubSubTypeNATVMConnection:       NewNATVMConnection(),
@@ -90,7 +87,6 @@ func GetManager() *Manager {
 				PubSubTypePodReplicaSet:         NewPodReplicaSet(),
 				PubSubTypePod:                   NewPod(),
 				PubSubTypeProcess:               NewProcess(),
-				PubSubTypePrometheusTarget:      NewPrometheusTarget(),
 			},
 		}
 	})

@@ -5,6 +5,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -86,6 +87,17 @@ impl Default for FrameType {
     }
 }
 
+impl FrameType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FrameType::Greeting => "Greeting",
+            FrameType::Command => "Command",
+            FrameType::Message => "Message",
+            FrameType::Unknown => "Unknown",
+        }
+    }
+}
+
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct ZmtpInfo {
     msg_type: LogMessageType,
@@ -113,6 +125,9 @@ pub struct ZmtpInfo {
     attributes: Vec<KeyVal>,
     #[serde(skip)]
     l7_protocol_str: Option<String>,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 impl ZmtpInfo {
@@ -132,6 +147,9 @@ impl ZmtpInfo {
             self.err_msg = res.err_msg.take();
         }
         self.captured_response_byte = res.captured_response_byte;
+        if res.is_on_blacklist {
+            self.is_on_blacklist = res.is_on_blacklist;
+        }
     }
     fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8]) {
         let mut vm_ref = param.wasm_vm.borrow_mut();
@@ -155,6 +173,19 @@ impl ZmtpInfo {
             if custom.proto_str.len() > 0 {
                 self.l7_protocol_str = Some(custom.proto_str);
             }
+        }
+    }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::ZMTP) {
+            self.is_on_blacklist = t.request_type.is_on_blacklist(self.frame_type.as_str())
+                || self
+                    .subscription
+                    .as_ref()
+                    .map(|p| {
+                        t.request_domain.is_on_blacklist(p) || t.request_resource.is_on_blacklist(p)
+                    })
+                    .unwrap_or_default();
         }
     }
 }
@@ -224,6 +255,9 @@ impl L7ProtocolInfoInterface for ZmtpInfo {
     fn get_request_domain(&self) -> String {
         self.subscription.clone().unwrap_or_default()
     }
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
 }
 
 #[derive(Default)]
@@ -235,6 +269,7 @@ pub struct ZmtpLog {
     mechanism: Option<Mechanism>,
 
     perf_stats: Option<L7PerfStats>,
+    last_is_on_blacklist: bool,
 }
 
 fn parse_byte(payload: &[u8]) -> Option<(&[u8], u8)> {
@@ -597,21 +632,39 @@ impl L7ProtocolParserInterface for ZmtpLog {
                 L7ProtocolInfo::ZmtpInfo(info) => info,
                 _ => return,
             };
-            info.cal_rrt(param).map(|rtt| {
-                info.rtt = rtt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
-            });
             set_captured_byte!(info, param);
-            match param.direction {
-                PacketDirection::ClientToServer => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                }
-                PacketDirection::ServerToClient => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                }
-            }
-
             info.wasm_hook(param, payload);
+            if let Some(config) = param.parse_config {
+                info.set_is_on_blacklist(config);
+            }
+            if !info.is_on_blacklist && !self.last_is_on_blacklist {
+                match param.direction {
+                    PacketDirection::ClientToServer => {
+                        self.perf_stats.as_mut().map(|p| p.inc_req());
+                    }
+                    PacketDirection::ServerToClient => {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    }
+                }
+                match info.status {
+                    L7ResponseStatus::ClientError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_req_err());
+                    }
+                    L7ResponseStatus::ServerError => {
+                        self.perf_stats
+                            .as_mut()
+                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
+                    }
+                    _ => {}
+                }
+                info.cal_rrt(param).map(|rtt| {
+                    info.rtt = rtt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rtt));
+                });
+            }
+            self.last_is_on_blacklist = info.is_on_blacklist;
         });
 
         if !param.parse_log {

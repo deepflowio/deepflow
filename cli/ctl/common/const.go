@@ -61,6 +61,9 @@ const (
 	DOMAIN_TYPE_ESHORE            DomainType = 26 // eshore
 	DOMAIN_TYPE_CLOUD_TOWER       DomainType = 27 // cloudtower
 	DOMAIN_TYPE_NFVO              DomainType = 28 // nfvo
+	DOMAIN_TYPE_SUGON             DomainType = 29 // sugon
+	DOMAIN_TYPE_VOLCENGINE        DomainType = 30 // volcengine
+	DOMAIN_TYPE_H3C               DomainType = 31 // h3c
 )
 
 var DomainTypes []DomainType = []DomainType{
@@ -85,6 +88,9 @@ var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_ESHORE,
 	DOMAIN_TYPE_CLOUD_TOWER,
 	DOMAIN_TYPE_NFVO,
+	DOMAIN_TYPE_SUGON,
+	DOMAIN_TYPE_VOLCENGINE,
+	DOMAIN_TYPE_H3C,
 }
 
 func GetDomainTypeByName(domainTypeName string) DomainType {
@@ -189,6 +195,16 @@ const (
 	// attention: following line comments are used by `stringer`
 	PLUGIN_TYPE_WASM PluginType = 1 + iota
 	PLUGIN_TYPE_SO
+	PLUGIN_TYPE_LUA
+)
+
+type PluginUser int
+
+//go:generate stringer -type=PluginUser -trimprefix=PLUGIN_USER_ -linecomment
+const (
+	// attention: following line comments are used by `stringer`
+	PLUGIN_USER_AGENT PluginUser = 1 + iota
+	PLUGIN_USER_SERVER
 )
 
 var (

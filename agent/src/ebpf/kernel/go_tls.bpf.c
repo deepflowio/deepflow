@@ -60,15 +60,14 @@ do { \
 #endif
 
 /*
- *  uprobe_go_tls_write_enter  (In tls_conn_map record A(tcp_seq) before syscall)
+ *      go_tls_write_enter  (In tls_conn_map record A(tcp_seq) before syscall)
  *               |
  *               | - syscall write()
  *               |
- *  uprobe_go_tls_write_exit(return)  lookup A(tcp_seq) from tls_conn_map
+ *      go_tls_write_exit(return)  lookup A(tcp_seq) from tls_conn_map
  *     send to user finally tcp sequence is "A(tcp_seq) + bytes_count"
-#ifdef TLS_DEBUG */
-SEC("uprobe/go_tls_write_enter")
-int uprobe_go_tls_write_enter(struct pt_regs *ctx)
+ */
+UPROG(go_tls_write_enter) (struct pt_regs *ctx)
 {
 	DEFINE_DBG_DATA(dbg_data);
 	submit_debug(1, 0, 0);
@@ -112,8 +111,7 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 	return 0;
 }
 
-SEC("uprobe/go_tls_write_exit")
-int uprobe_go_tls_write_exit(struct pt_regs *ctx)
+UPROG(go_tls_write_exit) (struct pt_regs *ctx)
 {
 	DEFINE_DBG_DATA(dbg_data);
 	submit_debug(2, 0, 0);
@@ -183,15 +181,14 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 }
 
 /*
- *  uprobe_go_tls_read_enter  (In tls_conn_map record A(tcp_seq) before syscall)
+ *      go_tls_read_enter  (In tls_conn_map record A(tcp_seq) before syscall)
  *               |
  *               | - syscall read()
  *               |
- *  uprobe_go_tls_read_exit(return)  lookup A(tcp_seq) from tls_conn_map
+ *      go_tls_read_exit(return)  lookup A(tcp_seq) from tls_conn_map
  *     send to user finally tcp sequence is "A(tcp_seq) + bytes_count"
  */
-SEC("uprobe/go_tls_read_enter")
-int uprobe_go_tls_read_enter(struct pt_regs *ctx)
+UPROG(go_tls_read_enter) (struct pt_regs *ctx)
 {
 	DEFINE_DBG_DATA(dbg_data);
 	submit_debug(3, 0, 0);
@@ -236,8 +233,7 @@ int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 	return 0;
 }
 
-SEC("uprobe/go_tls_read_exit")
-int uprobe_go_tls_read_exit(struct pt_regs *ctx)
+UPROG(go_tls_read_exit) (struct pt_regs *ctx)
 {
 	DEFINE_DBG_DATA(dbg_data);
 	submit_debug(4, 0, 0);

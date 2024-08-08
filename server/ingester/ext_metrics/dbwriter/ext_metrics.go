@@ -17,6 +17,7 @@
 package dbwriter
 
 import (
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
@@ -40,8 +41,8 @@ type ExtMetrics struct {
 
 	// Not stored, only determines which database to store in.
 	// When Orgid is 0 or 1, it is stored in database '<DatabaseName()>', otherwise stored in '<OrgId>_<DatabaseName()>'.
-	OrgId  uint16
-	TeamID uint16
+	OrgId, RawOrgId uint16 // RawOrgId is read from server-stats message, only used to distinguish which database data is written to
+	TeamID          uint16
 
 	TagNames  []string
 	TagValues []string
@@ -51,19 +52,31 @@ type ExtMetrics struct {
 }
 
 func (m *ExtMetrics) DatabaseName() string {
-	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS || m.MsgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
-		return DEEPFLOW_SYSTEM_DB
-	} else {
+	switch m.MsgType {
+	case datatype.MESSAGE_TYPE_DFSTATS:
+		return DEEPFLOW_TENANT_DB
+	case datatype.MESSAGE_TYPE_SERVER_DFSTATS:
+		if ckdb.IsValidOrgID(m.RawOrgId) {
+			return DEEPFLOW_TENANT_DB
+		} else {
+			return DEEPFLOW_ADMIN_DB
+		}
+	default:
 		return EXT_METRICS_DB
 	}
 }
 
 func (m *ExtMetrics) TableName() string {
-	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
-		return DEEPFLOW_SYSTEM_AGENT_TABLE
-	} else if m.MsgType == datatype.MESSAGE_TYPE_SERVER_DFSTATS {
-		return DEEPFLOW_SYSTEM_SERVER_TABLE
-	} else {
+	switch m.MsgType {
+	case datatype.MESSAGE_TYPE_DFSTATS:
+		return DEEPFLOW_TENANT_COLLECTOR_TABLE
+	case datatype.MESSAGE_TYPE_SERVER_DFSTATS:
+		if ckdb.IsValidOrgID(m.RawOrgId) {
+			return DEEPFLOW_TENANT_COLLECTOR_TABLE
+		} else {
+			return DEEPFLOW_ADMIN_SERVER_TABLE
+		}
+	default:
 		return EXT_METRICS_TABLE
 	}
 }
@@ -130,6 +143,7 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 	}
 
 	return &ckdb.Table{
+		Version:         common.CK_VERSION,
 		Database:        m.DatabaseName(),
 		LocalName:       m.TableName() + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      m.TableName(),

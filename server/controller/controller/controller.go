@@ -104,7 +104,7 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 	router.SetInitStageForHealthChecker("Resource ID manager init")
 	recorderResource := recorder.GetResource().Init(ctx, cfg.ManagerCfg.TaskCfg.RecorderCfg)
 	if isMasterController {
-		err := recorderResource.IDManagers.Start()
+		err := recorderResource.IDManagers.Start(ctx)
 		if err != nil {
 			log.Errorf("resource id manager start failed: %s", err.Error())
 			time.Sleep(time.Second)
@@ -157,15 +157,15 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 
 	router.SetInitStageForHealthChecker("Prometheus init")
 	prometheus := prometheus.GetSingleton()
-	prometheus.SynchronizerCache.Start(ctx, &cfg.PrometheusCfg)
+	prometheus.SynchronizerCaches.Start(ctx, &cfg.PrometheusCfg)
 	prometheus.Encoders.Init(ctx, cfg.PrometheusCfg)
-	prometheus.Clear.Init(ctx, &cfg.PrometheusCfg)
-	prometheus.APPLabelLayoutUpdater.Init(ctx, &cfg.PrometheusCfg)
+	prometheus.Clear.Init(ctx, cfg.PrometheusCfg)
+	// prometheus.APPLabelLayoutUpdater.Init(ctx, &cfg.PrometheusCfg)
 	if isMasterController {
-		prometheus.Encoders.Start()
+		prometheus.Encoders.Start(ctx)
 	}
 
-	go checkAndStartAllRegionMasterFunctions()
+	go checkAndStartAllRegionMasterFunctions(ctx)
 
 	router.SetInitStageForHealthChecker("Master function init")
 	controllerCheck := monitor.NewControllerCheck(cfg, ctx)

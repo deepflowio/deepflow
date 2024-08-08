@@ -37,7 +37,6 @@ type ToolDataSet struct {
 	macToFloatingIP               map[string]string
 	floatingIPToVInterface        map[string]model.VInterface
 	natGatewayLcuuidToFloatingIPs map[string][]string
-	keyToSecurityGroupLcuuid      map[ProjectSecurityGroupKey]string
 	keyToVMLcuuid                 map[SubnetIPKey]string
 	keyToNATGatewayLcuuid         map[VPCIPKey]string
 	vinterfaceLcuuidToPublicIP    map[string]string
@@ -64,7 +63,6 @@ func NewToolDataSet() *ToolDataSet {
 		macToFloatingIP:               make(map[string]string),
 		floatingIPToVInterface:        make(map[string]model.VInterface),
 		natGatewayLcuuidToFloatingIPs: make(map[string][]string),
-		keyToSecurityGroupLcuuid:      make(map[ProjectSecurityGroupKey]string),
 		keyToVMLcuuid:                 make(map[SubnetIPKey]string),
 		keyToNATGatewayLcuuid:         make(map[VPCIPKey]string),
 		vinterfaceLcuuidToPublicIP:    make(map[string]string),
@@ -74,11 +72,6 @@ func NewToolDataSet() *ToolDataSet {
 		regionLcuuidToResourceNum:     make(map[string]int),
 		azLcuuidToResourceNum:         make(map[string]int),
 	}
-}
-
-type ProjectSecurityGroupKey struct {
-	projectID         string
-	securityGroupName string
 }
 
 type SubnetIPKey struct {

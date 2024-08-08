@@ -23,6 +23,7 @@ use super::pb_adapter::{
     ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
 };
 use super::{set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use crate::config::handler::LogParserConfig;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -259,6 +260,9 @@ pub struct TlsInfo {
     rrt: u64,
     tls_rtt: u64,
     session_id: Option<u32>,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 impl L7ProtocolInfoInterface for TlsInfo {
@@ -295,10 +299,17 @@ impl L7ProtocolInfoInterface for TlsInfo {
     fn get_request_resource_length(&self) -> usize {
         self.request_resource.len()
     }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
 }
 
 impl TlsInfo {
     pub fn merge(&mut self, other: &mut Self) {
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
+        }
         match other.msg_type {
             LogMessageType::Request => {
                 std::mem::swap(&mut self.handshake_protocol, &mut other.handshake_protocol);
@@ -333,6 +344,14 @@ impl TlsInfo {
                 self.captured_response_byte = other.captured_response_byte;
             }
             _ => {}
+        }
+    }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::TLS) {
+            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.request_resource)
+                || t.request_type.is_on_blacklist(&self.request_type)
+                || t.request_domain.is_on_blacklist(&self.request_domain);
         }
     }
 }
@@ -399,6 +418,8 @@ impl From<TlsInfo> for L7ProtocolSendLog {
             });
         }
         let log = L7ProtocolSendLog {
+            captured_request_byte: f.captured_request_byte,
+            captured_response_byte: f.captured_response_byte,
             req: L7Request {
                 resource: f.request_resource,
                 domain: f.request_domain,
@@ -448,6 +469,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
 pub struct TlsLog {
     change_cipher_spec_count: u8,
     perf_stats: Option<L7PerfStats>,
+    last_is_on_blacklist: bool,
 }
 
 //解析器接口实现
@@ -468,20 +490,44 @@ impl L7ProtocolParserInterface for TlsLog {
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = TlsInfo::default();
         self.parse(payload, &mut info, param)?;
-        if info.session_id.is_some() {
-            // Triggered by Client Hello and the last Change cipher spec
-            info.cal_rrt(param).map(|rtt| {
-                info.tls_rtt = rtt;
-                self.perf_stats.as_mut().map(|p| p.update_tls_rtt(rtt));
-            });
-            info.session_id = None;
+
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
         }
-        if info.msg_type != LogMessageType::Session {
-            info.cal_rrt(param).map(|rrt| {
-                info.rrt = rrt;
-                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-            });
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+            }
+            match info.status {
+                L7ResponseStatus::ClientError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                }
+                L7ResponseStatus::ServerError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                }
+                _ => {}
+            }
+            if info.session_id.is_some() {
+                // Triggered by Client Hello and the last Change cipher spec
+                info.cal_rrt(param).map(|rtt| {
+                    info.tls_rtt = rtt;
+                    self.perf_stats.as_mut().map(|p| p.update_tls_rtt(rtt));
+                });
+                info.session_id = None;
+            }
+            if info.msg_type != LogMessageType::Session {
+                info.cal_rrt(param).map(|rrt| {
+                    info.rrt = rrt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                });
+            }
         }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::TlsInfo(info)))
         } else {
@@ -545,10 +591,7 @@ impl TlsLog {
                         info.session_id = Some(0xff);
                     }
                     if h.is_alert() {
-                        self.perf_stats
-                            .as_mut()
-                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
-                        info.status = L7ResponseStatus::ServerError;
+                        info.status = L7ResponseStatus::ClientError;
                         info.msg_type = LogMessageType::Session;
                     }
                     if h.is_change_cipher_spec() {
@@ -582,8 +625,6 @@ impl TlsLog {
                     .collect::<Vec<String>>()
                     .join("|")
                     .to_string();
-
-                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
                 info.msg_type = LogMessageType::Response;
@@ -602,9 +643,6 @@ impl TlsLog {
 
                 tls_headers.iter().for_each(|h| {
                     if h.is_alert() {
-                        self.perf_stats
-                            .as_mut()
-                            .map(|p: &mut L7PerfStats| p.inc_resp_err());
                         info.status = L7ResponseStatus::ServerError;
                         info.msg_type = LogMessageType::Session;
                     }
@@ -646,8 +684,6 @@ impl TlsLog {
                     .collect::<Vec<String>>()
                     .join("|")
                     .to_string();
-
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         set_captured_byte!(info, param);

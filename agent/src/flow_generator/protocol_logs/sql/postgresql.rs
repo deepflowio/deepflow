@@ -28,6 +28,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
@@ -95,6 +96,21 @@ pub struct PostgreInfo {
 
     captured_request_byte: u32,
     captured_response_byte: u32,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    at_lease_one_block: bool, // is at lease one validate block in payload, prevent miscalculate to other protocol
+}
+
+impl PostgreInfo {
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::PostgreSQL) {
+            self.is_on_blacklist = t.request_resource.is_on_blacklist(&self.context)
+                || t.request_type
+                    .is_on_blacklist(get_request_str(self.req_type));
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for PostgreInfo {
@@ -104,6 +120,9 @@ impl L7ProtocolInfoInterface for PostgreInfo {
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
         if let L7ProtocolInfo::PostgreInfo(pg) = other {
+            if pg.is_on_blacklist {
+                self.is_on_blacklist = pg.is_on_blacklist;
+            }
             match pg.msg_type {
                 LogMessageType::Request => {
                     self.req_type = pg.req_type;
@@ -178,6 +197,7 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
 pub struct PostgresqlLog {
     perf_stats: Option<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
+    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for PostgresqlLog {
@@ -189,7 +209,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             return true;
         }
 
-        self.parse(payload, param, true, &mut info).is_ok()
+        self.parse(payload, &mut info).is_ok()
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -205,8 +225,41 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        self.parse(payload, param, false, &mut info)?;
+        self.parse(payload, &mut info)?;
         set_captured_byte!(info, param);
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
+        }
+        if !info.is_on_blacklist
+            && !self.last_is_on_blacklist
+            && !info.ignore
+            && info.at_lease_one_block
+        {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+            }
+            match info.status {
+                L7ResponseStatus::ClientError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                }
+                L7ResponseStatus::ServerError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                }
+                _ => {}
+            }
+            if info.at_lease_one_block {
+                info.cal_rrt(param).map(|rrt| {
+                    info.rrt = rrt;
+                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+                });
+            }
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         Ok(if info.ignore || !param.parse_log {
             L7ParseResult::None
         } else {
@@ -239,16 +292,8 @@ impl PostgresqlLog {
         }
     }
 
-    fn parse(
-        &mut self,
-        payload: &[u8],
-        param: &ParseParam,
-        check: bool,
-        info: &mut PostgreInfo,
-    ) -> Result<()> {
+    fn parse(&mut self, payload: &[u8], info: &mut PostgreInfo) -> Result<()> {
         let mut offset = 0;
-        // is at lease one validate block in payload, prevent miscalculate to other protocol
-        let mut at_lease_one_block = false;
         loop {
             if offset >= payload.len() {
                 break;
@@ -258,29 +303,23 @@ impl PostgresqlLog {
                 offset += len + 5; // len(data) + len 4B + tag 1B
                 let parsed = match info.msg_type {
                     LogMessageType::Request => {
-                        self.on_req_block(tag, &sub_payload[5..5 + len], check, info)?
+                        self.on_req_block(tag, &sub_payload[5..5 + len], info)?
                     }
                     LogMessageType::Response => {
-                        self.on_resp_block(tag, &sub_payload[5..5 + len], check, info)?
+                        self.on_resp_block(tag, &sub_payload[5..5 + len], info)?
                     }
 
                     _ => unreachable!(),
                 };
 
-                if parsed && !at_lease_one_block {
-                    at_lease_one_block = true;
+                if parsed && !info.at_lease_one_block {
+                    info.at_lease_one_block = true;
                 }
             } else {
                 break;
             }
         }
-        if at_lease_one_block {
-            if !info.ignore && !check {
-                info.cal_rrt(param).map(|rrt| {
-                    info.rrt = rrt;
-                    self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-                });
-            }
+        if info.at_lease_one_block {
             return Ok(());
         }
         Err(Error::L7ProtocolUnknown)
@@ -292,13 +331,7 @@ impl PostgresqlLog {
             && read_u64_be(payload) == SSL_REQ
     }
 
-    fn on_req_block(
-        &mut self,
-        tag: char,
-        data: &[u8],
-        check: bool,
-        info: &mut PostgreInfo,
-    ) -> Result<bool> {
+    fn on_req_block(&mut self, tag: char, data: &[u8], info: &mut PostgreInfo) -> Result<bool> {
         match tag {
             'Q' => {
                 info.req_type = tag;
@@ -308,9 +341,6 @@ impl PostgresqlLog {
                         String::from_utf8_lossy(&m).to_string()
                     });
                 info.ignore = false;
-                if !check {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                }
                 Ok(true)
             }
             'P' => {
@@ -333,9 +363,6 @@ impl PostgresqlLog {
                                 String::from_utf8_lossy(&m).to_string()
                             });
                         if postgresql {
-                            if !check {
-                                self.perf_stats.as_mut().map(|p| p.inc_req());
-                            }
                             return Ok(true);
                         }
                     }
@@ -347,13 +374,7 @@ impl PostgresqlLog {
         }
     }
 
-    fn on_resp_block(
-        &mut self,
-        tag: char,
-        data: &[u8],
-        check: bool,
-        info: &mut PostgreInfo,
-    ) -> Result<bool> {
+    fn on_resp_block(&mut self, tag: char, data: &[u8], info: &mut PostgreInfo) -> Result<bool> {
         let mut data = data;
         match tag {
             'C' => {
@@ -393,9 +414,6 @@ impl PostgresqlLog {
                     }
                 }
 
-                if !check {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                }
                 Ok(true)
             }
             'E' => {
@@ -426,18 +444,6 @@ impl PostgresqlLog {
                     let (err_desc, status) = get_code_desc(info.result.as_str());
                     info.error_message = String::from(err_desc);
                     info.status = status;
-                    if !check {
-                        match info.status {
-                            L7ResponseStatus::ClientError => {
-                                self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                            }
-                            L7ResponseStatus::ServerError => {
-                                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                            }
-                            _ => {}
-                        }
-                        self.perf_stats.as_mut().map(|p| p.inc_resp());
-                    }
                     return Ok(true);
                 }
                 Err(Error::L7ProtocolUnknown)

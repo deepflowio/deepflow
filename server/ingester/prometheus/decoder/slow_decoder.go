@@ -51,6 +51,8 @@ type SlowItem struct {
 	vtapId       uint16
 	epcId        uint16
 	podClusterId uint16
+	orgId        uint16
+	teamId       uint16
 	ts           prompb.TimeSeries
 }
 
@@ -58,11 +60,13 @@ var slowItemPool = pool.NewLockFreePool(func() interface{} {
 	return &SlowItem{}
 })
 
-func AcquireSlowItem(vtapId, epcId, podClusterId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
+func AcquireSlowItem(vtapId, epcId, podClusterId, orgId, teamId uint16, ts *prompb.TimeSeries, extraLabels []prompb.Label) *SlowItem {
 	s := slowItemPool.Get().(*SlowItem)
-	s.vtapId = podClusterId
+	s.vtapId = vtapId
 	s.epcId = epcId
 	s.podClusterId = podClusterId
+	s.orgId = orgId
+	s.teamId = teamId
 
 	for _, l := range append(extraLabels, ts.Labels...) {
 		s.ts.Labels = append(s.ts.Labels, prompb.Label{
@@ -148,22 +152,21 @@ func (d *SlowDecoder) Run() {
 				continue
 			}
 			slowItems = append(slowItems, slowItem)
-			metricLabelReq, targetReq := d.TimeSeriesToLableIDRequest(&slowItem.ts, slowItem.epcId, slowItem.podClusterId)
+			metricLabelReq := d.TimeSeriesToLableIDRequest(&slowItem.ts, slowItem.epcId, slowItem.podClusterId, slowItem.orgId)
 			addMetricLabelRequest(req, metricLabelReq)
-			addTargetRequest(req, targetReq)
 		}
 
 		if len(slowItems) < batchSize && queueTicker == 0 {
 			continue
 		}
 
-		if len(req.GetRequestLabels()) > 0 || len(req.GetRequestTargets()) > 0 {
+		if len(req.GetRequestLabels()) > 0 {
 			d.labelTable.RequestLabelIDs(req)
 			d.counter.RequestCount++
 		}
 
 		for _, item := range slowItems {
-			d.sendPrometheusSamples(item.vtapId, item.epcId, item.podClusterId, &item.ts)
+			d.sendPrometheusSamples(item.vtapId, item.epcId, item.podClusterId, item.orgId, item.teamId, &item.ts)
 			ReleaseSlowItem(item)
 		}
 		req.RequestLabels = req.RequestLabels[:0]
@@ -216,47 +219,25 @@ func addMetricLabelRequest(req *trident.PrometheusLabelRequest, metricLabel *tri
 	req.RequestLabels = append(req.RequestLabels, metricLabel)
 }
 
-func isTargetRequestEqual(l, r *trident.TargetRequest) bool {
-	return l.GetJob() == r.GetJob() && l.GetInstance() == r.GetInstance()
-}
-
-func addTargetRequest(req *trident.PrometheusLabelRequest, target *trident.TargetRequest) {
-	for _, r := range req.RequestTargets {
-		if isTargetRequestEqual(r, target) {
-			return
-		}
-	}
-	req.RequestTargets = append(req.RequestTargets, target)
-}
-
-func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, epcId, podClusterId uint16) (*trident.MetricLabelRequest, *trident.TargetRequest) {
+func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, epcId, podClusterId, orgId uint16) *trident.MetricLabelRequest {
 	labelReq := &trident.MetricLabelRequest{}
-	targetReq := &trident.TargetRequest{}
 	var metricId uint32
 	hasMetricId := false
 
 	labelReq.PodClusterId = proto.Uint32(uint32(podClusterId))
 	labelReq.EpcId = proto.Uint32(uint32(epcId))
+	labelReq.OrgId = proto.Uint32(uint32(orgId))
 	// first, get metric
 	for _, l := range ts.Labels {
 		if l.Name == model.MetricNameLabel {
 			labelReq.MetricName = proto.String(l.Value)
-			metricId, hasMetricId = d.labelTable.QueryMetricID(l.Value)
+			metricId, hasMetricId = d.labelTable.QueryMetricID(orgId, l.Value)
 			break
 		}
 	}
 
-	job, instance := "", ""
 	for _, l := range ts.Labels {
 		if l.Name == model.MetricNameLabel {
-			continue
-		} else if l.Name == model.JobLabel {
-			job = l.Value
-			addLabel(labelReq, l.Name, l.Value)
-			continue
-		} else if l.Name == model.InstanceLabel {
-			instance = l.Value
-			addLabel(labelReq, l.Name, l.Value)
 			continue
 		}
 		// if not have matricId, add all label request
@@ -265,64 +246,34 @@ func (d *SlowDecoder) TimeSeriesToLableIDRequest(ts *prompb.TimeSeries, epcId, p
 			continue
 		}
 
-		valueId, ok := d.labelTable.QueryLabelValueID(l.Value)
+		valueId, ok := d.labelTable.QueryLabelValueID(orgId, l.Value)
 		if !ok {
 			addLabel(labelReq, l.Name, l.Value)
 			continue
 		}
-		nameId, ok := d.labelTable.QueryLabelNameID(l.Name)
+		nameId, ok := d.labelTable.QueryLabelNameID(orgId, l.Name)
 		if !ok {
 			addLabel(labelReq, l.Name, l.Value)
 			continue
 		}
-		if !d.labelTable.QueryLabelNameValue(nameId, valueId) {
+		if !d.labelTable.QueryLabelNameValue(orgId, nameId, valueId) {
 			addLabel(labelReq, l.Name, l.Value)
 			continue
 		}
 
-		if _, ok := d.labelTable.QueryColumnIndex(metricId, nameId); !ok {
+		if _, ok := d.labelTable.QueryColumnIndex(orgId, metricId, nameId); !ok {
 			addLabel(labelReq, l.Name, l.Value)
 		}
 	}
-	if job == "" {
-		addLabel(labelReq, model.JobLabel, "")
-	}
-	if instance == "" {
-		addLabel(labelReq, model.InstanceLabel, "")
-	}
 
-	instanceId, hasInstanceId := d.labelTable.QueryLabelValueID(instance)
-	if !hasInstanceId {
-		targetReq.Job = proto.String(job)
-		targetReq.Instance = proto.String(instance)
-		targetReq.PodClusterId = proto.Uint32(uint32(podClusterId))
-		targetReq.EpcId = proto.Uint32(uint32(epcId))
-		return labelReq, targetReq
-	}
-
-	jobId, hasJobId := d.labelTable.QueryLabelValueID(job)
-	if !hasJobId {
-		targetReq.Job = proto.String(job)
-		targetReq.Instance = proto.String(instance)
-		targetReq.PodClusterId = proto.Uint32(uint32(podClusterId))
-		targetReq.EpcId = proto.Uint32(uint32(epcId))
-		return labelReq, targetReq
-	}
-
-	if _, hasTargetId := d.labelTable.QueryTargetID(epcId, podClusterId, jobId, instanceId); !hasTargetId {
-		targetReq.Job = proto.String(job)
-		targetReq.Instance = proto.String(instance)
-		targetReq.PodClusterId = proto.Uint32(uint32(podClusterId))
-		targetReq.EpcId = proto.Uint32(uint32(epcId))
-	}
-	return labelReq, targetReq
+	return labelReq
 }
 
-func (d *SlowDecoder) sendPrometheusSamples(vtapID, epcId, podClusterId uint16, ts *prompb.TimeSeries) {
+func (d *SlowDecoder) sendPrometheusSamples(vtapID, epcId, podClusterId, orgId, teamId uint16, ts *prompb.TimeSeries) {
 	if d.debugEnabled {
 		log.Debugf("slow decoder %d vtap %d recv promtheus timeseries: %v", d.index, vtapID, ts)
 	}
-	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, epcId, podClusterId, ts, nil)
+	isSlowItem, err := d.samplesBuilder.TimeSeriesToStore(vtapID, epcId, podClusterId, orgId, teamId, ts, nil)
 	if !isSlowItem && err != nil {
 		if d.counter.TimeSeriesErr == 0 {
 			log.Warning(err)

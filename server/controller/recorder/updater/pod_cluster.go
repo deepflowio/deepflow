@@ -29,8 +29,9 @@ import (
 type PodCluster struct {
 	UpdaterBase[
 		cloudmodel.PodCluster,
-		mysql.PodCluster,
 		*diffbase.PodCluster,
+		*mysql.PodCluster,
+		mysql.PodCluster,
 		*message.PodClusterAdd,
 		message.PodClusterAdd,
 		*message.PodClusterUpdate,
@@ -45,8 +46,9 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 	updater := &PodCluster{
 		newUpdaterBase[
 			cloudmodel.PodCluster,
-			mysql.PodCluster,
 			*diffbase.PodCluster,
+			*mysql.PodCluster,
+			mysql.PodCluster,
 			*message.PodClusterAdd,
 			message.PodClusterAdd,
 			*message.PodClusterUpdate,
@@ -74,10 +76,10 @@ func (c *PodCluster) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodCluster) (d
 func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*mysql.PodCluster, bool) {
 	vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(c.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.Lcuuid,
-		)))
+		), c.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.PodCluster{
@@ -109,10 +111,10 @@ func (c *PodCluster) generateUpdateInfo(diffBase *diffbase.PodCluster, cloudItem
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	mapInfo["az"] = cloudItem.AZLcuuid
+	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

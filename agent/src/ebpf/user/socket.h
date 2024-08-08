@@ -22,6 +22,10 @@
 #define CACHE_LINE_SIZE 64
 #endif
 
+#define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
+#define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
+#define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
+
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
 #define OFFSET_INFER_SERVER_PORT 54583
@@ -105,6 +109,14 @@ struct socket_bpf_data {
  * @boot_time_update_diff 这里用于记录相邻两次更新后，系统启动时间之间的差异（单位为纳秒）。
  * @probes_count How many probes now 
  * @data_limit_max Maximum data length limit
+ *
+ * @period_push_conflict_count When the periodic push event detects that the
+ *    buffer is being modified by another eBPF program, a conflict will occur.
+ *    This is used to record the number of conflicts. 
+ * @period_push_max_delay The maximum latency time for periodic push events, in microseconds.
+ * @period_push_avg_delay The average latency time for periodic push events, in microseconds.
+ * @proc_exec_event_count The number of events for process execute.
+ * @proc_exit_event_count The number of events for process exits.
  */
 struct socket_trace_stats {
 
@@ -142,6 +154,19 @@ struct socket_trace_stats {
 	int64_t boot_time_update_diff;
 	uint32_t probes_count;
 	uint32_t data_limit_max;
+
+	/*
+	 * Period push events statistics.
+	 */
+	uint64_t period_push_conflict_count;
+	uint64_t period_push_max_delay;
+	uint64_t period_push_avg_delay;
+
+	/*
+	 * Process start and exit events.
+	 */
+	uint64_t proc_exec_event_count;
+	uint64_t proc_exit_event_count;
 };
 
 struct bpf_offset_param {
@@ -179,6 +204,8 @@ struct bpf_socktrace_params {
 	uint32_t kern_socket_map_used;
 	uint32_t kern_trace_map_max;
 	uint32_t kern_trace_map_used;
+	uint64_t proc_exec_event_count;
+	uint64_t proc_exit_event_count;
 	bool datadump_enable;
 	int datadump_pid;
 	uint8_t datadump_proto;
@@ -318,9 +345,14 @@ prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 		if (block_head->fn != NULL) {
 			block_head->fn(sd);
 		} else {
+			int64_t boot_time = get_sysboot_time_ns();
 			if (t->datadump)
-				t->datadump((void *)sd);
-
+				t->datadump((void *)sd, boot_time);
+			/*
+			 * Modify socket data time to real time, 
+			 * time precision is in microseconds.
+			 */
+			sd->timestamp = (sd->timestamp + boot_time) / NS_IN_USEC;
 			callback(sd);
 		}
 
@@ -346,4 +378,5 @@ int socket_tracer_stop(void);
 int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
+int disable_syscall_trace_id(void);
 #endif /* DF_USER_SOCKET_H */

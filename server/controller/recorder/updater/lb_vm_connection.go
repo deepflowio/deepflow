@@ -29,8 +29,9 @@ import (
 type LBVMConnection struct {
 	UpdaterBase[
 		cloudmodel.LBVMConnection,
-		mysql.LBVMConnection,
 		*diffbase.LBVMConnection,
+		*mysql.LBVMConnection,
+		mysql.LBVMConnection,
 		*message.LBVMConnectionAdd,
 		message.LBVMConnectionAdd,
 		*message.LBVMConnectionUpdate,
@@ -45,8 +46,9 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 	updater := &LBVMConnection{
 		newUpdaterBase[
 			cloudmodel.LBVMConnection,
-			mysql.LBVMConnection,
 			*diffbase.LBVMConnection,
+			*mysql.LBVMConnection,
+			mysql.LBVMConnection,
 			*message.LBVMConnectionAdd,
 			message.LBVMConnectionAdd,
 			*message.LBVMConnectionUpdate,

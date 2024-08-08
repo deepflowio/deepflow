@@ -130,7 +130,8 @@ struct conn_info_s {
 	__u16 skc_family;	/* PF_INET, PF_INET6... */
 	__u16 sk_type;		/* socket type (SOCK_STREAM, etc) */
 	__u8 skc_ipv6only:1;
-	__u8 reserved:1;
+	__u8 enable_reasm:1;	/* Is data restructuring allowed? */
+
 	/*
 	 * Whether the socket l7 protocol type needs
 	 * to be confirmed again.
@@ -180,7 +181,12 @@ struct conn_info_s {
 	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
 	enum traffic_protocol protocol;
 	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
-	enum message_type message_type;
+	__u32 message_type: 4;
+	// Is this segment of data reassembled?
+	__u32 is_reasm_seg: 1;
+	__u32 no_trace: 1;    /* When set to 1 (or true), tracing will not be performed. */
+	__u32 reserved: 26;
+
 	union {
 		__u8  encoding_type;    // Currently used for OpenWire encoding inference
 		__s32 correlation_id;	// Currently used for Kafka determination
@@ -188,11 +194,11 @@ struct conn_info_s {
 	__u32 prev_count;	// Prestored data length
 	__u32 syscall_infer_len;
 	__u64 count:40;
-	__u64 tcpseq_offset:24;
+	__u64 unused_bits:24;
 	char prev_buf[EBPF_CACHE_SIZE];
 	char *syscall_infer_addr;
 	void *sk;
-	struct socket_info_t *socket_info_ptr;	/* lookup __socket_info_map */
+	struct socket_info_s *socket_info_ptr;	/* lookup __socket_info_map */
 };
 
 struct process_data_extra {
@@ -205,14 +211,14 @@ struct process_data_extra {
 	enum message_type message_type;
 } __attribute__ ((packed));
 
-#define DATA_BUF_MAX  32
+#define INFER_BUF_MAX  32
 
 /*
  * BPF Tail Calls context
  */
 struct infer_data_s {
 	__u32 len;
-	char data[DATA_BUF_MAX * 2];
+	char data[INFER_BUF_MAX * 2];
 };
 
 struct tail_calls_context {
@@ -224,6 +230,7 @@ struct tail_calls_context {
 	 */
 	char private_data[sizeof(struct infer_data_s)];
 	int max_size_limit;		// The maximum size of the socket data that can be transferred.
+	__u32 push_reassembly_bytes;	// The number of bytes pushed after enabling data reassembly.
 	enum traffic_direction dir;	// Data flow direction.
 	__u8 vecs: 1;			// Whether a memory vector is used ? (for specific syscall)
 	__u8 is_close: 1;		// Is it a close() systemcall ?
@@ -284,6 +291,9 @@ struct data_args_t {
 		ssize_t bytes_count;	// io event
 		ssize_t data_seq;	// Use for socket close
 	};
+	// Scenario for using sendto() with a specified address
+	__u16 port;
+	__u8 addr[16];
 } __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {
@@ -311,6 +321,18 @@ struct sched_comm_exit_ctx {
 	char comm[16];		/*     offset:8;       size:16 */
 	pid_t pid;		/*     offset:24;      size:4  */
 	int prio;		/*     offset:28;      size:4  */
+};
+
+struct syscall_sendto_enter_ctx {
+	__u64 __pad_0;
+	int __syscall_nr;  // offset:8     size:4 
+	__u32 __pad_1;     // offset:12    size:4
+	int fd;   	   //offset:16;      size:8; signed:0;
+	void * buff;       //offset:24;      size:8; signed:0;
+	size_t len;        //offset:32;      size:8; signed:0;
+	unsigned int flags;       //offset:40;      size:8; signed:0;
+	struct sockaddr * addr;   //offset:48;      size:8; signed:0;
+	int addr_len;     //offset:56;      size:8; signed:0;
 };
 
 struct sched_comm_fork_ctx {

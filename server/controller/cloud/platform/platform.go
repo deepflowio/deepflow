@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	logging "github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/cloud/aliyun"
 	"github.com/deepflowio/deepflow/server/controller/cloud/aws"
 	"github.com/deepflowio/deepflow/server/controller/cloud/baidubce"
@@ -33,11 +31,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/qingcloud"
 	"github.com/deepflowio/deepflow/server/controller/cloud/tencent"
+	"github.com/deepflowio/deepflow/server/controller/cloud/volcengine"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("cloud.platform")
+var log = logger.MustGetLogger("cloud.platform")
 
 type Platform interface {
 	CheckAuth() error
@@ -68,6 +68,8 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig, db *mysql.DB) (Pla
 		platform, err = huawei.NewHuaWei(db.ORGID, domain, cfg)
 	case common.FILEREADER:
 		platform, err = filereader.NewFileReader(db.ORGID, domain)
+	case common.VOLCENGINE:
+		platform, err = volcengine.NewVolcEngine(db.ORGID, domain, cfg)
 	// TODO: other platform
 	default:
 		return nil, errors.New(fmt.Sprintf("domain type (%d) not supported", domain.Type))

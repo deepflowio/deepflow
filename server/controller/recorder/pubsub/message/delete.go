@@ -130,21 +130,6 @@ type VIPDelete struct {
 	MySQLItems[mysql.VIP]
 }
 
-type SecurityGroupDelete struct {
-	Lcuuids
-	MySQLItems[mysql.SecurityGroup]
-}
-
-type SecurityGroupRuleDelete struct {
-	Lcuuids
-	MySQLItems[mysql.SecurityGroupRule]
-}
-
-type VMSecurityGroupDelete struct {
-	Lcuuids
-	MySQLItems[mysql.VMSecurityGroup]
-}
-
 type NATGatewayDelete struct {
 	Lcuuids
 	MySQLItems[mysql.NATGateway]
@@ -263,9 +248,4 @@ type PodDelete struct {
 type ProcessDelete struct {
 	Lcuuids
 	MySQLItems[mysql.Process]
-}
-
-type PrometheusTargetDelete struct {
-	Lcuuids
-	MySQLItems[mysql.PrometheusTarget]
 }

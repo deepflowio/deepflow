@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
@@ -32,8 +33,9 @@ import (
 type VInterface struct {
 	UpdaterBase[
 		cloudmodel.VInterface,
-		mysql.VInterface,
 		*diffbase.VInterface,
+		*mysql.VInterface,
+		mysql.VInterface,
 		*message.VInterfaceAdd,
 		message.VInterfaceAdd,
 		*message.VInterfaceUpdate,
@@ -48,8 +50,9 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 	updater := &VInterface{
 		newUpdaterBase[
 			cloudmodel.VInterface,
-			mysql.VInterface,
 			*diffbase.VInterface,
+			*mysql.VInterface,
+			mysql.VInterface,
 			*message.VInterfaceAdd,
 			message.VInterfaceAdd,
 			*message.VInterfaceUpdate,
@@ -85,21 +88,21 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 				networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 			}
 			if !exists {
-				log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
+				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-				)))
+				), i.metadata.LogPrefixes)
 				return nil, false
 			}
 		}
 	}
 	deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
 	if !exists {
-		log.Error(i.metadata.LogPre(
+		log.Errorf(
 			"device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
 			cloudItem.DeviceType, cloudItem.DeviceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-		))
+			i.metadata.LogPrefixes)
 		return nil, false
 	}
 
@@ -136,10 +139,10 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 					networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 				}
 				if !exists {
-					log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
+					log.Error(resourceAForResourceBNotFound(
 						ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 						ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-					)))
+					), i.metadata.LogPrefixes)
 					return nil, nil, false
 				}
 			}
@@ -147,6 +150,17 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 		}
 		structInfo.NetworkID.SetNew(mapInfo["subnetid"].(int))
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
+	}
+	if diffBase.DeviceLcuuid != cloudItem.DeviceLcuuid {
+		deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
+		if !exists {
+			log.Errorf(resourceAForResourceBNotFound(
+				common.VIF_DEVICE_TYPE_TO_RESOURCE_TYPE[cloudItem.DeviceType], cloudItem.DeviceLcuuid,
+				common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
+			))
+			return nil, nil, false
+		}
+		mapInfo["deviceid"] = deviceID
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

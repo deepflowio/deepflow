@@ -29,12 +29,12 @@ func (b *DataSet) AddPodIngressRule(dbItem *mysql.PodIngressRule, seq int) {
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodIngressRule(lcuuid string) {
 	delete(b.PodIngressRules, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodIngressRule struct {

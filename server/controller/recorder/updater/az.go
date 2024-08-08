@@ -29,8 +29,9 @@ import (
 type AZ struct {
 	UpdaterBase[
 		cloudmodel.AZ,
-		mysql.AZ,
 		*diffbase.AZ,
+		*mysql.AZ,
+		mysql.AZ,
 		*message.AZAdd,
 		message.AZAdd,
 		*message.AZUpdate,
@@ -45,8 +46,9 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 	updater := &AZ{
 		newUpdaterBase[
 			cloudmodel.AZ,
-			mysql.AZ,
 			*diffbase.AZ,
+			*mysql.AZ,
+			mysql.AZ,
 			*message.AZAdd,
 			message.AZAdd,
 			*message.AZUpdate,

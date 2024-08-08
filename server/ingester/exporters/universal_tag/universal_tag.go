@@ -20,15 +20,18 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 
 	logging "github.com/op/go-logging"
 	"golang.org/x/net/context"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	exportercfg "github.com/deepflowio/deepflow/server/ingester/exporters/config"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -192,69 +195,16 @@ type UniversalTagMaps struct {
 	vtapMap        map[uint16]string
 }
 
-func (u *UniversalTagsManager) QueryRegion(regionID uint16) string {
-	return u.universalTagMaps.regionMap[regionID]
-}
-
-func (u *UniversalTagsManager) QueryAZ(azID uint16) string {
-	return u.universalTagMaps.azMap[azID]
-}
-
-func (u *UniversalTagsManager) QueryHost(hostID uint16) string {
-	return u.universalTagMaps.deviceMap[uint64(TYPE_HOST)<<32|uint64(hostID)]
-}
-
-func (u *UniversalTagsManager) QueryL3Device(l3DeviceType uint8, l3DeviceID uint32) (string, string) {
-	return DeviceType(l3DeviceType).String(), u.universalTagMaps.deviceMap[uint64(l3DeviceType)<<32|uint64(l3DeviceID)]
-}
-
-func (u *UniversalTagsManager) QueryPodNode(podNodeID uint32) string {
-	return u.universalTagMaps.podNodeMap[podNodeID]
-}
-
-func (u *UniversalTagsManager) QueryPodNs(podNsID uint16) string {
-	return u.universalTagMaps.podNsMap[podNsID]
-}
-
-func (u *UniversalTagsManager) QueryPodGroup(podGroupID uint32) string {
-	return u.universalTagMaps.podGroupMap[podGroupID]
-}
-
-func (u *UniversalTagsManager) QueryPod(podID uint32) string {
-	return u.universalTagMaps.podMap[podID]
-}
-
-func (u *UniversalTagsManager) QueryPodCluster(podClusterID uint16) string {
-	return u.universalTagMaps.podClusterMap[podClusterID]
-}
-
-func (u *UniversalTagsManager) QueryEpc(l3EpcID int32) string {
-	return u.universalTagMaps.l3EpcMap[uint32(l3EpcID)]
-}
-
-func (u *UniversalTagsManager) QuerySubnet(subnetID uint16) string {
-	return u.universalTagMaps.subnetMap[subnetID]
-}
-
-func (u *UniversalTagsManager) QueryGProcess(gprocessID uint32) string {
-	return u.universalTagMaps.gprocessMap[gprocessID]
-}
-
-func (u *UniversalTagsManager) QueryVtap(agentID uint16) string {
-	return u.universalTagMaps.vtapMap[agentID]
-}
-
-func (u *UniversalTagsManager) QueryAuto(autoType uint8, autoID uint32, isIPv4 bool, ip4 uint32, ip6 net.IP) (string, string) {
-	return DeviceType(autoType).String(), u.getAuto(DeviceType(autoType), autoID, isIPv4, ip4, ip6)
-}
-
 func (u *UniversalTagsManager) QueryUniversalTags(
-	regionID, azID, hostID, podNsID, podClusterID, subnetID, agentID uint16,
+	orgId, regionID, azID, hostID, podNsID, podClusterID, subnetID, agentID uint16,
 	l3DeviceType, autoServiceType, autoInstanceType uint8,
 	l3DeviceID, autoServiceID, autoInstanceID, podNodeID, podGroupID, podID, l3EpcID, gprocessID, serviceID uint32,
 	isIPv4 bool, ip4 uint32, ip6 net.IP,
 ) *UniversalTags {
-	tagMaps := u.universalTagMaps
+	tagMaps := u.universalTagMaps[orgId]
+	if tagMaps == nil {
+		return nil
+	}
 	tags := &UniversalTags{
 		Region:       tagMaps.regionMap[regionID],
 		AZ:           tagMaps.azMap[azID],
@@ -276,9 +226,9 @@ func (u *UniversalTagsManager) QueryUniversalTags(
 	fillDevice(tags, DeviceType(l3DeviceType), tags[L3Device])
 
 	tags[AutoServiceType] = DeviceType(autoServiceType).String()
-	tags[AutoService] = u.getAuto(DeviceType(autoServiceType), autoServiceID, isIPv4, ip4, ip6)
+	tags[AutoService] = u.getAuto(orgId, DeviceType(autoServiceType), autoServiceID, isIPv4, ip4, ip6)
 	tags[AutoInstanceType] = DeviceType(autoInstanceType).String()
-	tags[AutoInstance] = u.getAuto(DeviceType(autoInstanceType), autoInstanceID, isIPv4, ip4, ip6)
+	tags[AutoInstance] = u.getAuto(orgId, DeviceType(autoInstanceType), autoInstanceID, isIPv4, ip4, ip6)
 
 	return tags
 }
@@ -302,7 +252,7 @@ func fillDevice(tags *UniversalTags, deviceType DeviceType, device string) {
 	}
 }
 
-func (u *UniversalTagsManager) getAuto(autoType DeviceType, autoID uint32, isIPv4 bool, ip4 uint32, ip6 net.IP) string {
+func (u *UniversalTagsManager) getAuto(orgId uint16, autoType DeviceType, autoID uint32, isIPv4 bool, ip4 uint32, ip6 net.IP) string {
 	if autoType == TYPE_IP || autoType == TYPE_INTERNET {
 		if isIPv4 {
 			return utils.IpFromUint32(ip4).String()
@@ -310,26 +260,25 @@ func (u *UniversalTagsManager) getAuto(autoType DeviceType, autoID uint32, isIPv
 			return ip6.String()
 		}
 	}
-	return u.universalTagMaps.deviceMap[uint64(autoType)<<32|uint64(autoID)]
+	return u.universalTagMaps[orgId].deviceMap[uint64(autoType)<<32|uint64(autoID)]
 }
 
-func (u *UniversalTagsManager) QueryCustomK8sLabels(podID uint32) Labels {
-	return u.universalTagMaps.podK8SLabelMap[podID]
+func (u *UniversalTagsManager) QueryCustomK8sLabels(orgId uint16, podID uint32) Labels {
+	return u.universalTagMaps[orgId].podK8SLabelMap[podID]
 }
 
 type UniversalTagsManager struct {
-	universalTagMaps *UniversalTagMaps
+	universalTagMaps [grpc.MAX_ORG_COUNT]*UniversalTagMaps
 	tapPortNameMap   map[uint64]string
 
 	k8sLabelFields  []string
 	k8sLabelRegexps []*regexp.Regexp
 
 	grpcSession             *grpc.GrpcSession
-	versionUniversalTagMaps uint32
+	versionUniversalTagMaps [grpc.MAX_ORG_COUNT]uint32
 }
 
 func NewUniversalTagsManager(k8sLabelConfig []string, baseCfg *config.Config) *UniversalTagsManager {
-	universalTagMaps := &UniversalTagMaps{}
 	var k8sLabelRegexps []*regexp.Regexp
 	var k8sLabelFields []string
 	for _, k8sLabel := range k8sLabelConfig {
@@ -344,16 +293,19 @@ func NewUniversalTagsManager(k8sLabelConfig []string, baseCfg *config.Config) *U
 		}
 	}
 	m := &UniversalTagsManager{
-		k8sLabelFields:   k8sLabelFields,
-		k8sLabelRegexps:  k8sLabelRegexps,
-		universalTagMaps: universalTagMaps,
-		tapPortNameMap:   make(map[uint64]string),
-		grpcSession:      &grpc.GrpcSession{},
+		k8sLabelFields:  k8sLabelFields,
+		k8sLabelRegexps: k8sLabelRegexps,
+		// universalTagMaps: universalTagMaps,
+		tapPortNameMap: make(map[uint64]string),
+		grpcSession:    &grpc.GrpcSession{},
 	}
 
 	runOnce := func() {
-		if err := m.Reload(); err != nil {
-			log.Warning(err)
+		orgIds := grpc.QueryAllOrgIDs()
+		for _, orgId := range orgIds {
+			if err := m.Reload(orgId); err != nil {
+				log.Warning(err)
+			}
 		}
 	}
 
@@ -378,7 +330,7 @@ func (u *UniversalTagsManager) Close() {
 	u.grpcSession.Close()
 }
 
-func (u *UniversalTagsManager) Reload() error {
+func (u *UniversalTagsManager) Reload(orgId uint16) error {
 	var response *trident.UniversalTagNameMapsResponse
 	err := u.grpcSession.Request(func(ctx context.Context, remote net.IP) error {
 		var err error
@@ -387,7 +339,10 @@ func (u *UniversalTagsManager) Reload() error {
 			return fmt.Errorf("can't get grpc client to %s", remote)
 		}
 		client := trident.NewSynchronizerClient(c)
-		response, err = client.GetUniversalTagNameMaps(ctx, &trident.UniversalTagNameMapsRequest{})
+		response, err = client.GetUniversalTagNameMaps(ctx,
+			&trident.UniversalTagNameMapsRequest{
+				OrgId: proto.Uint32(uint32(orgId)),
+			})
 		return err
 	})
 	if err != nil {
@@ -395,14 +350,14 @@ func (u *UniversalTagsManager) Reload() error {
 	}
 
 	newVersion := response.GetVersion()
-	if newVersion == u.versionUniversalTagMaps {
+	if newVersion == u.versionUniversalTagMaps[orgId] {
 		return nil
 	}
 
-	u.universalTagMaps = u.GetUniversalTagMaps(response)
+	u.universalTagMaps[orgId] = u.GetUniversalTagMaps(response)
 
-	log.Infof("Event update rpc universalTagNames version %d -> %d", u.versionUniversalTagMaps, newVersion)
-	u.versionUniversalTagMaps = newVersion
+	log.Infof("org %d eporter update rpc universalTagNames version %d -> %d", orgId, u.versionUniversalTagMaps, newVersion)
+	u.versionUniversalTagMaps[orgId] = newVersion
 
 	return nil
 }
@@ -478,19 +433,27 @@ func (u *UniversalTagsManager) isK8sLabelExport(name string) bool {
 }
 
 func (u *UniversalTagsManager) HandleSimpleCommand(operate uint16, arg string) string {
+	orgId, _ := strconv.Atoi(arg)
+	if orgId > ckdb.MAX_ORG_ID {
+		return fmt.Sprintf("org %s invalid", arg)
+	}
+	if u.universalTagMaps[orgId] == nil {
+		return fmt.Sprintf("org %s empty", arg)
+	}
+	universalTagMaps := u.universalTagMaps[orgId]
 	sb := &strings.Builder{}
-	sb.WriteString(fmt.Sprintf("podK8SLabelMap: %+v\n", u.universalTagMaps.podK8SLabelMap))
-	sb.WriteString(fmt.Sprintf("regionMap: %+v\n", u.universalTagMaps.regionMap))
+	sb.WriteString(fmt.Sprintf("podK8SLabelMap: %+v\n", universalTagMaps.podK8SLabelMap))
+	sb.WriteString(fmt.Sprintf("regionMap: %+v\n", universalTagMaps.regionMap))
 
-	sb.WriteString(fmt.Sprintf("azMap: %+v\n", u.universalTagMaps.azMap))
-	sb.WriteString(fmt.Sprintf("deviceMap: %+v\n", u.universalTagMaps.deviceMap))
-	sb.WriteString(fmt.Sprintf("podNodeMap: %+v\n", u.universalTagMaps.podNodeMap))
-	sb.WriteString(fmt.Sprintf("podGroupMap: %+v\n", u.universalTagMaps.podGroupMap))
-	sb.WriteString(fmt.Sprintf("podMap: %+v\n", u.universalTagMaps.podMap))
-	sb.WriteString(fmt.Sprintf("podClusterMap: %+v\n", u.universalTagMaps.podClusterMap))
-	sb.WriteString(fmt.Sprintf("l3EpcMap: %+v\n", u.universalTagMaps.l3EpcMap))
-	sb.WriteString(fmt.Sprintf("subnetMap: %+v\n", u.universalTagMaps.subnetMap))
-	sb.WriteString(fmt.Sprintf("gprocessMap: %+v\n", u.universalTagMaps.gprocessMap))
-	sb.WriteString(fmt.Sprintf("agentMap: %+v\n", u.universalTagMaps.vtapMap))
+	sb.WriteString(fmt.Sprintf("azMap: %+v\n", universalTagMaps.azMap))
+	sb.WriteString(fmt.Sprintf("deviceMap: %+v\n", universalTagMaps.deviceMap))
+	sb.WriteString(fmt.Sprintf("podNodeMap: %+v\n", universalTagMaps.podNodeMap))
+	sb.WriteString(fmt.Sprintf("podGroupMap: %+v\n", universalTagMaps.podGroupMap))
+	sb.WriteString(fmt.Sprintf("podMap: %+v\n", universalTagMaps.podMap))
+	sb.WriteString(fmt.Sprintf("podClusterMap: %+v\n", universalTagMaps.podClusterMap))
+	sb.WriteString(fmt.Sprintf("l3EpcMap: %+v\n", universalTagMaps.l3EpcMap))
+	sb.WriteString(fmt.Sprintf("subnetMap: %+v\n", universalTagMaps.subnetMap))
+	sb.WriteString(fmt.Sprintf("gprocessMap: %+v\n", universalTagMaps.gprocessMap))
+	sb.WriteString(fmt.Sprintf("agentMap: %+v\n", universalTagMaps.vtapMap))
 	return sb.String()
 }

@@ -29,17 +29,17 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/scs"
 	"github.com/baidubce/bce-sdk-go/services/vpc"
 	simplejson "github.com/bitly/go-simplejson"
-	logging "github.com/op/go-logging"
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 )
 
-var log = logging.MustGetLogger("cloud.baidu")
+var log = logger.MustGetLogger("cloud.baidu")
 
 type BaiduBce struct {
 	orgID        int
@@ -64,30 +64,30 @@ type BaiduBce struct {
 func NewBaiduBce(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*BaiduBce, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretID, err := config.Get("secret_id").String()
 	if err != nil {
-		log.Error("secret_id must be specified")
+		log.Error("secret_id must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	secretKey, err := config.Get("secret_key").String()
 	if err != nil {
-		log.Error("secret_key must be specified")
+		log.Error("secret_key must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 	decryptSecretKey, err := common.DecryptSecretKey(secretKey)
 	if err != nil {
-		log.Error("decrypt secret_key failed (%s)", err.Error())
+		log.Error("decrypt secret_key failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
 	endpoint, err := config.Get("endpoint").String()
 	if err != nil {
-		log.Error("endpoint must be specified")
+		log.Error("endpoint must be specified", logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 
@@ -144,7 +144,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	// 区域和可用区
 	regions, azs, zoneNameToAZLcuuid, err := b.getRegionAndAZs()
 	if err != nil {
-		log.Error("get region and az data failed")
+		log.Error("get region and az data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 	// 页面指定区域时，优先使用页面指定区域
@@ -158,21 +158,21 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	// VPC
 	vpcs, vpcIdToLcuuid, vpcIdToName, err := b.getVPCs(region)
 	if err != nil {
-		log.Error("get vpc data failed")
+		log.Error("get vpc data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 
 	// 子网及网段信息
 	networks, subnets, networkIdToLcuuid, err := b.getNetworks(region, zoneNameToAZLcuuid, vpcIdToLcuuid)
 	if err != nil {
-		log.Error("get network and subnet data failed")
+		log.Error("get network and subnet data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 
 	// 虚拟机
 	vms, tmpVInterfaces, tmpIPs, err := b.getVMs(region, zoneNameToAZLcuuid, vpcIdToLcuuid, networkIdToLcuuid)
 	if err != nil {
-		log.Error("get vm data failed")
+		log.Error("get vm data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 	vinterfaces = append(vinterfaces, tmpVInterfaces...)
@@ -181,21 +181,14 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	// 路由器及路由表
 	vrouters, routingTables, err := b.getRouterAndTables(region, vpcIdToLcuuid, vpcIdToName)
 	if err != nil {
-		log.Error("get vrouter data failed")
-		return resource, err
-	}
-
-	// 安全组及规则（暂不支持对接虚拟机与安全组的关联关系）
-	securityGroups, securityGroupRules, err := b.getSecurityGroups(region, vpcIdToLcuuid)
-	if err != nil {
-		log.Error("get security_group data failed")
+		log.Error("get vrouter data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 
 	// NAT网关及IP
 	natGateways, tmpVInterfaces, tmpIPs, err := b.getNatGateways(region, vpcIdToLcuuid)
 	if err != nil {
-		log.Error("get nat_gateway data failed")
+		log.Error("get nat_gateway data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 	vinterfaces = append(vinterfaces, tmpVInterfaces...)
@@ -204,7 +197,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	// 负载均衡器
 	lbs, tmpVInterfaces, tmpIPs, err := b.getLoadBalances(region, vpcIdToLcuuid, networkIdToLcuuid)
 	if err != nil {
-		log.Error("get load_balance data failed")
+		log.Error("get load_balance data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 	vinterfaces = append(vinterfaces, tmpVInterfaces...)
@@ -213,7 +206,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	// 对等连接
 	peerConnections, err := b.getPeerConnections(region, vpcIdToLcuuid)
 	if err != nil {
-		log.Error("get peer_connection data failed")
+		log.Error("get peer_connection data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 
@@ -222,7 +215,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	if err != nil {
 		resource.ErrorState = common.RESOURCE_STATE_CODE_WARNING
 		resource.ErrorMessage = err.Error()
-		log.Warning(err)
+		log.Warning(err, logger.NewORGPrefix(b.orgID))
 	}
 
 	// RDS
@@ -230,7 +223,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 		region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid,
 	)
 	if err != nil {
-		log.Error("get rds_instance data failed")
+		log.Error("get rds_instance data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 	vinterfaces = append(vinterfaces, tmpVInterfaces...)
@@ -241,7 +234,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 		region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid,
 	)
 	if err != nil {
-		log.Error("get redis_instance data failed")
+		log.Error("get redis_instance data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 	vinterfaces = append(vinterfaces, redisVInterfaces...)
@@ -250,7 +243,7 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	// 附属容器集群
 	subDomains, err := b.getSubDomains(region, vpcIdToLcuuid)
 	if err != nil {
-		log.Error("get sub_domain data failed")
+		log.Error("get sub_domain data failed", logger.NewORGPrefix(b.orgID))
 		return resource, err
 	}
 
@@ -262,8 +255,6 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	resource.VMs = vms
 	resource.VInterfaces = vinterfaces
 	resource.IPs = ips
-	resource.SecurityGroups = securityGroups
-	resource.SecurityGroupRules = securityGroupRules
 	resource.VRouters = vrouters
 	resource.RoutingTables = routingTables
 	resource.NATGateways = natGateways

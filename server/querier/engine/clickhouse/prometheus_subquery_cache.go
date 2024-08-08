@@ -30,13 +30,13 @@ var (
 )
 
 type PrometheusSubqueryCache struct {
-	PrometheusSubqueryCache *lru.Cache[string, common.EntryValue]
+	PrometheusSubqueryCache *lru.Cache[common.EntryKey, common.EntryValue]
 }
 
 func GetPrometheusSubqueryCache() *PrometheusSubqueryCache {
 	prometheusSubqueryCacheOnce.Do(func() {
 		prometheusSubqueryCacheIns = &PrometheusSubqueryCache{
-			PrometheusSubqueryCache: lru.NewCache[string, common.EntryValue](config.Cfg.MaxPrometheusIdSubqueryLruEntry),
+			PrometheusSubqueryCache: lru.NewCache[common.EntryKey, common.EntryValue](config.Cfg.MaxPrometheusIdSubqueryLruEntry),
 		}
 	})
 	return prometheusSubqueryCacheIns

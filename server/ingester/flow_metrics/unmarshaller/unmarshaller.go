@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	logging "github.com/op/go-logging"
@@ -28,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/exporters"
 	"github.com/deepflowio/deepflow/server/ingester/exporters/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
@@ -77,27 +79,29 @@ type Counter struct {
 }
 
 type Unmarshaller struct {
-	index              int
-	platformData       *grpc.PlatformInfoTable
-	disableSecondWrite bool
-	unmarshallQueue    queue.QueueReader
-	dbwriter           dbwriter.DbWriter
-	queueBatchCache    QueueCache
-	counter            *Counter
-	tableCounter       [flow_metrics.METRICS_TABLE_ID_MAX + 1]int64
-	exporters          *exporters.Exporters
+	index               int
+	platformData        *grpc.PlatformInfoTable
+	disableSecondWrite  bool
+	unmarshallQueue     queue.QueueReader
+	dbwriter            dbwriter.DbWriter
+	queueBatchCache     QueueCache
+	counter             *Counter
+	tableCounter        [flow_metrics.METRICS_TABLE_ID_MAX + 1]int64
+	exporters           *exporters.Exporters
+	appServiceTagWriter *flow_tag.AppServiceTagWriter
 	utils.Closable
 }
 
-func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite bool, unmarshallQueue queue.QueueReader, dbwriter dbwriter.DbWriter, exporters *exporters.Exporters) *Unmarshaller {
+func NewUnmarshaller(index int, platformData *grpc.PlatformInfoTable, disableSecondWrite bool, unmarshallQueue queue.QueueReader, dbwriter dbwriter.DbWriter, exporters *exporters.Exporters, appServiceTagWriter *flow_tag.AppServiceTagWriter) *Unmarshaller {
 	return &Unmarshaller{
-		index:              index,
-		platformData:       platformData,
-		disableSecondWrite: disableSecondWrite,
-		unmarshallQueue:    unmarshallQueue,
-		counter:            &Counter{MaxDelay: -3600, MinDelay: 3600},
-		dbwriter:           dbwriter,
-		exporters:          exporters,
+		index:               index,
+		platformData:        platformData,
+		disableSecondWrite:  disableSecondWrite,
+		unmarshallQueue:     unmarshallQueue,
+		counter:             &Counter{MaxDelay: -3600, MinDelay: 3600},
+		dbwriter:            dbwriter,
+		exporters:           exporters,
+		appServiceTagWriter: appServiceTagWriter,
 	}
 }
 
@@ -234,6 +238,8 @@ func (u *Unmarshaller) QueueProcess() {
 						log.Warningf("Decode failed, bytes len=%d err=%s", len([]byte(bytes)), err)
 						break
 					}
+					doc.Tags().TeamID = uint16(recvBytes.TeamID)
+					doc.Tags().OrgId = uint16(recvBytes.OrgID)
 					u.isGoodDocument(int64(doc.Time()))
 
 					// 秒级数据是否写入
@@ -259,6 +265,7 @@ func (u *Unmarshaller) QueueProcess() {
 					}
 					u.tableCounter[tableID]++
 
+					u.appServiceTagWrite(tableID, doc)
 					u.export(doc)
 					u.putStoreQueue(doc)
 				}
@@ -293,4 +300,28 @@ func (u *Unmarshaller) export(doc app.Document) {
 	case *app.DocumentUsage:
 		u.exporters.Put(v.DataSource(), u.index, (*ExportDocumentUsage)(v))
 	}
+}
+
+// just write the app_service_tag of `1m` data, the app_service_tag of `1s`, `1h`... and other, can also use `1m` app_service_tag.
+var APP_SERVICE_TAG_APPLICATION = strings.Split(flow_metrics.APPLICATION_1M.TableName(), ".")[0]
+var APP_SERVICE_TAG_APPLICATION_MAP = strings.Split(flow_metrics.APPLICATION_MAP_1M.TableName(), ".")[0]
+
+func (u *Unmarshaller) appServiceTagWrite(tableID uint8, doc app.Document) {
+	if u.appServiceTagWriter == nil {
+		return
+	}
+	var table string
+	if tableID == uint8(flow_metrics.APPLICATION_1M) {
+		table = APP_SERVICE_TAG_APPLICATION
+	} else if tableID == uint8(flow_metrics.APPLICATION_MAP_1M) {
+		table = APP_SERVICE_TAG_APPLICATION_MAP
+	} else {
+		return
+	}
+	tags := doc.Tags()
+	if tags.AppService == "" && tags.AppInstance == "" {
+		return
+	}
+
+	u.appServiceTagWriter.Write(doc.Time(), table, tags.AppService, tags.AppInstance, tags.OrgId, tags.TeamID)
 }

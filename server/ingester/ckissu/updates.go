@@ -160,7 +160,7 @@ var ColumnAdd65 = []*ColumnAdds{
 	},
 	{
 		Dbs:          []string{"event"},
-		Tables:       []string{"event_local", "event", "alarm_event_local", "alarm_event", "perf_event", "perf_event_local"},
+		Tables:       []string{"event_local", "event", "perf_event", "perf_event_local"},
 		ColumnNames:  []string{"team_id"},
 		ColumnType:   ckdb.UInt16,
 		DefaultValue: "1",
@@ -187,17 +187,8 @@ var ColumnAdd65 = []*ColumnAdds{
 		DefaultValue: "1",
 	},
 	{
-		Dbs:          []string{"deepflow_system"},
-		Tables:       []string{"deepflow_system_local", "deepflow_system"},
-		ColumnNames:  []string{"team_id"},
-		ColumnType:   ckdb.UInt16,
-		DefaultValue: "1",
-	},
-	{
 		Dbs: []string{"flow_tag"},
 		Tables: []string{
-			"deepflow_system_custom_field_local", "deepflow_system_custom_field",
-			"deepflow_system_custom_field_value_local", "deepflow_system_custom_field_value",
 			"event_custom_field_local", "event_custom_field",
 			"event_custom_field_value_local", "event_custom_field_value",
 			"ext_metrics_custom_field_local", "ext_metrics_custom_field",
@@ -358,5 +349,15 @@ var ColumnDatasourceAdd65 = []*ColumnDatasourceAdds{
 		OnlyMapTable:   false,
 		OnlyAppTable:   false,
 		DefaultValue:   "1",
+	},
+	{
+		ColumnNames:      []string{"server_syn_miss", "client_ack_miss"},
+		OldColumnNames:   []string{"", ""},
+		ColumnTypes:      []ckdb.ColumnType{ckdb.UInt64, ckdb.UInt64},
+		OnlyMapTable:     false,
+		OnlyAppTable:     false,
+		OnlyNetworkTable: true,
+		IsMetrics:        true,
+		IsSummable:       true,
 	},
 }

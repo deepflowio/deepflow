@@ -62,7 +62,7 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 			} else {
 				if oldV != v {
 					updateKey = K8sAnnotationKey{ID: sourceID, Key: k}
-					updateInfo[k] = v
+					updateInfo["value"] = v
 					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, K8sAnnotationKey{ID: sourceID, Key: k})
@@ -102,11 +102,12 @@ func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysql.
 	for k, v := range annotationMap {
 		keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sAnnotation{
-			ID:       source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			ID:          source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return

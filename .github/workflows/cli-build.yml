@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+      - v6.[1-9]
+      - v7.[1-9]
       - 'feature-**'
     paths:
       - 'cli/**'
@@ -15,10 +17,6 @@ on:
         description: "Why trigger?"
         required: true 
         type: string
-#   release:
-#     branches: 
-#       - main
-#       - release-*
 
 jobs:
   build_cli:
@@ -34,7 +32,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@master
         with:
-          go-version: 1.20.x
+          go-version: 1.21.x
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1

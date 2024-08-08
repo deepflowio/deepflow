@@ -23,6 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
+use ahash::AHashMap;
 use flate2::{read::GzDecoder, write::ZlibEncoder, Compression};
 use http::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use http::HeaderMap;
@@ -82,10 +83,6 @@ type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
 const NOT_FOUND: &[u8] = b"Not Found";
 const GZIP: &str = "gzip";
-const OPEN_TELEMETRY: u32 = 20220607;
-const OPEN_TELEMETRY_COMPRESSED: u32 = 20221024;
-const PROMETHEUS: u32 = 20220613;
-const TELEGRAF: u32 = 20220613;
 
 // Otel的protobuf数据
 // ingester使用该proto https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto进行解析
@@ -102,10 +99,6 @@ impl Sendable for OpenTelemetry {
     fn message_type(&self) -> SendMessageType {
         SendMessageType::OpenTelemetry
     }
-
-    fn version(&self) -> u32 {
-        OPEN_TELEMETRY
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -120,10 +113,6 @@ impl Sendable for OpenTelemetryCompressed {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::OpenTelemetryCompressed
-    }
-
-    fn version(&self) -> u32 {
-        OPEN_TELEMETRY_COMPRESSED
     }
 }
 
@@ -161,10 +150,6 @@ impl Sendable for BoxedPrometheusExtra {
     fn message_type(&self) -> SendMessageType {
         SendMessageType::Prometheus
     }
-
-    fn version(&self) -> u32 {
-        PROMETHEUS
-    }
 }
 
 /// Telegraf metric， 是influxDB标准行协议的UTF8编码的文本数据
@@ -180,10 +165,6 @@ impl Sendable for TelegrafMetric {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::Telegraf
-    }
-
-    fn version(&self) -> u32 {
-        TELEGRAF
     }
 }
 
@@ -533,7 +514,7 @@ fn fill_l7_stats(
     };
     let flow_perf_stats = FlowPerfStats {
         tcp: Default::default(),
-        l7: stats.clone(),
+        l7: AHashMap::new(),
         l4_protocol,
         l7_protocol,
         ..Default::default()
@@ -571,6 +552,7 @@ fn fill_l7_stats(
         signal_source: SignalSource::OTel,
         time_in_second: flow_stat_time.into(),
         biz_type: 0,
+        time_span: 0,
     }
 }
 

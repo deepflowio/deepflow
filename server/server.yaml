@@ -20,8 +20,8 @@ log-level: info
 
 ## extract an integer (generally used timestamp) from traceId as an additional index to speed up traceId queries.
 #trace-id-with-index:
-#  enabled: false
-#  type: hash           # hash/incremental-id
+#  disabled: false
+#  type: hash           # hash/incremental-id, default: hash
 #  #eg. traceId: 'abcdef1234',  if want to match index '1234', 'format' must set 'decimal', `start` can be set as 6 or -4 , and `length` must set: 4
 #  incremental-id-location:      # it is valid when 'type' is 'incremental-id'
 #    start: 0           # >= 0 means counting from the beginning, < 0 means counting from the end.
@@ -55,6 +55,14 @@ controller:
   reporting-disabled: false
   # Deepflow billing mode  license/voucher
   billing-method: license
+  ## If no-teamid-refused is set to true, agent must report team_id to server
+  #no-teamid-refused: false
+  ## If all-agent-connect-to-nat-ip is set to true, All agents connect to the server via nat-ip 
+  #all-agent-connect-to-nat-ip: false
+  ## If no-ip-overlapping is set to true, All IP and cidr issued by the controller to agent are wan
+  #no-ip-overlapping: false
+  ## exec agent command timeout
+  # agent-cmd-timeout: 30
 
   # ingester plaform data, default: 0
   # 0 (All K8s Cluster)
@@ -89,12 +97,18 @@ controller:
     user-password: deepflow
     host: mysql
     port: 30130
+    proxy-host:
+    proxy-port:
     timeout: 30
     # whether drop database when init failed
     drop-database-enabled: false
     auto_increment_increment: 1
     # limit the total number of process queried at a time
     result_set_max: 100000
+    max_open_conns: 100
+    max_idle_conns: 50
+    # unit: minute
+    conn_max_life_time: 60
 
   # redis相关配置
   redis:
@@ -119,7 +133,8 @@ controller:
 
   # datasource-api from ingester
   ingester-api:
-    port: 30106
+    port: 20106
+    node-port: 30106
     timeout: 60
 
   # 规格相关定义
@@ -300,6 +315,12 @@ controller:
     # 忽略网卡正则表达式配置，匹配到会忽略该网卡，默认为 ^(kube-ipvs) ，增加其他的网卡名称需要在此基础上新增
     ignore_nic_regex:
 
+    ## 采集器同步 KVM ，解析虚拟机的 XML 时，默认为 metadata 即使用 domian.metadata.instance.name 字段作为虚拟机的名称
+    ## 可通过此配置将虚拟机名称指定为 domain.name、domain.title、domain.uuid 之一，默认为空
+    ## 当使用此配置指定的字段取不到虚拟机名称或虚拟机名称为空时，则将使用 domain.name 的值作为虚拟机名称
+    ## 例：vm_name_field: title ，指定 domain.title 作为虚拟机的名称
+    #vm_name_field: metadata
+
   prometheus:
     # synchronizer cache refresh interval, unit: second
     synchronizer_cache_refresh_interval: 60
@@ -308,6 +329,8 @@ controller:
     # time interval for regularly clearing prometheus expired data, unit: minute, default: 60 * 24
     # time interval should be greater than or equal to ingester: prometheus-label-cache-expiration configuration
     data_clean_interval: 1440
+    # limit the total number of querier queried at a time
+    querier_query_limit: 1000000
 
 querier:
   # querier http listenport
@@ -327,6 +350,15 @@ querier:
   # profile相关配置
   profile:
     flame_query_limit: 1000000
+  
+  # trace-map 相关配置
+  trace-map:
+    max_trace_per_iteration: 100000
+    batch_traces_count_max: 1000
+    trace_id_query_iterations: 8
+    write_interval: 60
+    write_batch_size: 1000
+    debug_sql_len_max: 1000
 
   # deepflow-app相关配置
   deepflow-app:
@@ -403,7 +435,6 @@ ingester:
 
   #ckdb-auth:
   #  username: default
-  #  # '#','@' special characters are not supported in passwords
   #  password:
 
   # local node ip, if not set will get from environment variable 'NODE_IP', dafault: ""
@@ -415,14 +446,6 @@ ingester:
 
   ## controller listening port
   #controller-port: 20035
-
-  ## es的相关的配置syslog写es
-  #es-host-port:
-  #  - 127.0.0.1:20042
-
-  #es-auth:
-  #  user:
-  #  password:
 
   ## stats collect interval(unit: s)
   # stats-interval: 10
@@ -470,6 +493,9 @@ ingester:
   #  l7-flow-log: 72
   #  l4-packet: 72
 
+  ## whether to store trace tree information
+  #flow-log-trace-tree-enabled: false
+
   ## resource event data write config
   #event-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
@@ -488,9 +514,9 @@ ingester:
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #event-ttl-hour: 720
 
-  ## alarm event table data retention time(unit: hour)
+  ## alert event table data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
-  #alarm-event-ttl-hour: 720
+  #alert-event-ttl-hour: 720
 
   ## perf event data write config
   #perf-event-ck-writer:
@@ -532,6 +558,9 @@ ingester:
   ## profile compression algorithm, default is zstd, empty string for not compress
   #profile-compression-algorithm: "zstd"
 
+  ## off-cpu pofile splitting granularity, 0 mean disable splitting (unit: second)
+  #profile-off-cpu-splitting-granularity: 1
+
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
 
@@ -564,6 +593,21 @@ ingester:
   ## prometheus cache expiration of label ids. uint: s
   #prometheus-label-cache-expiration: 86400
 
+  ## application log data writer config
+  #application-log-ck-writer:
+  #  queue-count: 2      # parallelism of table writing
+  #  queue-size: 25600   # size of writing queue
+  #  batch-size: 12800   # size of batch writing
+  #  flush-timeout: 5   # timeout of table writing
+
+  ## app log decoder queue count/size
+  #application-log-decoder-queue-count: 2
+  #application-log-decoder-queue-size: 16384
+
+  ## app log database data retention time(unit: hour)
+  ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
+  #application-log-ttl-hour: 720
+
   #ck-disk-monitor:
   #  check-interval: 180 # check time interval (unit: seconds)
   #  ttl-check-disabled: false # whether to not check TTL expired data
@@ -579,22 +623,18 @@ ingester:
   #    free-space: 300          #  uint: GB, disk minimum free threshold
   #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
   #  priority-drops:     # set which database and table data will be deleted first when disk is full
-  #  - database: flow_log
+  #  - database: flow_log   # databases under all organizations
   #    tables-contain:      # tables name containing the string will be priority-dropped. If it is empty, it means all the tables under the database
   #  - database: flow_metrics
   #    tables-contain: 1s_local
+  #  - database: profile
+  #  - database: application_log
 
   ## ingester模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #ingester-enabled: true
 
   # whether to enable deepflow-aget syslog to write to files in syslog-directory
   #agent-log-to-file: false
-
-  ## syslog存储位置
-  #syslog-directory: /var/log/deepflow-agent
-
-  ## syslog是否写入elasticsearch，默认启用
-  #es-syslog: true
 
   ## udp socket receiver buffer: 64M
   #udp-read-buffer: 67108864
@@ -661,10 +701,18 @@ ingester:
   #  # randomly select an address that can be sent successfully. Kafka address format as: 'broker1.example.com:9092'
   #  endpoints: [broker1.example.com:9092, broker2.example.com:9092]
   #  # the data source that needs to be exported format as $db_name.$table_name, is also the topic name of Kafka
-  #  data-sources:
+  #  data-sources: # currently only supports 'flow_metrics.*', 'flow_log.l4/l7_flow_log', 'event.perf_event'
   #  - flow_log.l7_flow_log
-  #  - flow_log.network.1m
-  #  - flow_log.application_map.1m
+  #  # - flow_log.l4_flow_log
+  #  # - flow_metrics.application_map.1s
+  #  # - flow_metrics.application_map.1m
+  #  # - flow_metrics.application.1s
+  #  # - flow_metrics.application.1m
+  #  # - flow_metrics.network_map.1s
+  #  # - flow_metrics.network_map.1m
+  #  # - flow_metrics.network.1s
+  #  # - flow_metrics.network.1m
+  #  # - event.perf_event
   #  # number of queues exported in parallel
   #  queue-count: 4
   #  # size of exporting queue
@@ -680,10 +728,14 @@ ingester:
   #  enum-translate-to-name-disabled: false
   #  # whether the id value of universal-tag is not converted into a resource name for output
   #  universal-tag-translate-to-name-disabled: false
+  #  tag-filter-condition:
+  #    # Condition type, default is "and"
+  #    # and: Logical AND between tag-filters / or: Logical OR between tag-filters
+  #    type: "and"
   #  tag-filters:
-  #  - field-name: signal_source # database column name
-  #    operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
-  #    field-values: [3]         # vlaues
+  #  #- field-name: signal_source # database column name
+  #  #  operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"
+  #  #  field-values: [3]         # vlaues
   #  export-fields: # field_name or $category
   #  - $tag
   #  - $metrics
@@ -700,14 +752,18 @@ ingester:
   #  endpoints: [http://127.0.0.1:9091/receive, http://1.1.1.1:9091/receive]
   #  data-sources: # currently only supports 'flow_metrics.*'
   #  - flow_metrics.application_map.1s
+  #  # - flow_metrics.application_map.1m
+  #  # - flow_metrics.application.1s
+  #  # - flow_metrics.application.1m
+  #  # - flow_metrics.network_map.1s
+  #  # - flow_metrics.network_map.1m
+  #  # - flow_metrics.network.1s
+  #  # - flow_metrics.network.1m
   #  queue-count: 4
   #  queue-size: 100000
   #  batch-size: 1024
   #  flush-timeout: 10
   #  tag-filters:
-  #  - field-name: signal_source
-  #    operator: "="
-  #    field-values: [3]
   #  export-fields:
   #  - $tag
   #  - $metrics
@@ -718,7 +774,7 @@ ingester:
   #  export-empty-metrics-disabled: false
   #  enum-translate-to-name-disabled: false
   #  universal-tag-translate-to-name-disabled: false
-  #- protocol: opentemetry
+  #- protocol: opentelemetry
   #  enabled: true
   #  # Randomly select an address that can be sent successfully, otlp address format as: 127.0.0.1:4317, only supports grpc protocol
   #  endpoints: [127.0.0.1:4317, 1.1.1.1:4317]
@@ -729,9 +785,6 @@ ingester:
   #  batch-size: 32
   #  flush-timeout: 10
   #  tag-filters:
-  #  - field-name: signal_source
-  #    operator: "="
-  #    field-values: [3]
   #  export-fields:
   #  - $tag
   #  - $metrics

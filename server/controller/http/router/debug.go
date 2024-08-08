@@ -18,15 +18,18 @@ package router
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/manager"
+	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 type Debug struct {
@@ -48,9 +51,9 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/genesis-storage/:vtapID/", getGenesisStorage(d.g))
 	e.GET("/v1/kubernetes-refresh/", triggerKubernetesRefresh(d.m)) // TODO: Move to a better path
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(d.g))
-	e.GET("/v1/prometheus-info/:clusterID/", getGenesisPrometheusData(d.g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(d.m))
-	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(d.m))
+	e.GET("/v1/sub-domain-info/:lcuuid/", getSubDomainResource(d.m))
+	e.GET("/v1/kubernetes-gather-info/:lcuuid/", getKubernetesGatherResource(d.m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/", getRecorderCache(d.m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/diff-bases/", getRecorderCacheDiffBaseDataSet(d.m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/tool-maps/", getRecorderCacheToolDataSet(d.m))
@@ -90,9 +93,40 @@ func getKubernetesGatherBasicInfos(m *manager.Manager) gin.HandlerFunc {
 	})
 }
 
-func getKubernetesGatherResources(m *manager.Manager) gin.HandlerFunc {
+func getSubDomainResource(m *manager.Manager) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetKubernetesGatherResources(c.Param("lcuuid"), m)
+		db, err := GetContextOrgDB(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			return
+		}
+		subDomainLcuuid := c.Param("lcuuid")
+		var subDomain mysql.SubDomain
+		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		data, err := service.GetSubDomainResource(subDomain.Domain, subDomainLcuuid, m)
+		JsonResponse(c, data, err)
+	})
+}
+
+func getKubernetesGatherResource(m *manager.Manager) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		db, err := GetContextOrgDB(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			return
+		}
+		subDomainLcuuid := c.Param("lcuuid")
+		var subDomain mysql.SubDomain
+		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		data, err := service.GetKubernetesGatherResource(subDomain.Domain, subDomainLcuuid, m)
 		JsonResponse(c, data, err)
 	})
 }
@@ -169,7 +203,12 @@ func getAgentStats(g *genesis.Genesis) gin.HandlerFunc {
 
 func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"))
+		db, err := GetContextOrgDB(c)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.GET_ORG_DB_FAIL, err.Error())
+			return
+		}
+		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"), db)
 		JsonResponse(c, data, err)
 	})
 }
@@ -208,7 +247,42 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 		case "ip":
 			data = ret.IPLastSeens
 		case "vinterface":
-			data = ret.Vinterfaces
+			teamIDList := map[uint32]bool{}
+			teamIDs, _ := c.GetQueryArray("team_id")
+			for _, t := range teamIDs {
+				teamID, err := strconv.Atoi(t)
+				if err != nil {
+					log.Warningf(err.Error())
+					continue
+				}
+				teamIDList[uint32(teamID)] = false
+			}
+
+			filterType := c.Query("team_id_filter")
+			switch filterType {
+			case "":
+				data = ret.Vinterfaces
+			case "whitelist":
+				retVinterfaces := []model.GenesisVinterface{}
+				for _, v := range ret.Vinterfaces {
+					if _, ok := teamIDList[v.TeamID]; !ok {
+						continue
+					}
+					retVinterfaces = append(retVinterfaces, v)
+				}
+				data = retVinterfaces
+			case "blacklist":
+				retVinterfaces := []model.GenesisVinterface{}
+				for _, v := range ret.Vinterfaces {
+					if _, ok := teamIDList[v.TeamID]; ok {
+						continue
+					}
+					retVinterfaces = append(retVinterfaces, v)
+				}
+				data = retVinterfaces
+			default:
+				err = fmt.Errorf("invalid team_id_filter (%s) for vinterface", filterType)
+			}
 		case "process":
 			data = ret.Processes
 		case "vip":
@@ -228,18 +302,6 @@ func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 			return
 		}
 		data, err := service.GetGenesisKubernetesData(g, orgID, c.Param("clusterID"))
-		JsonResponse(c, data, err)
-	})
-}
-
-func getGenesisPrometheusData(g *genesis.Genesis) gin.HandlerFunc {
-	return gin.HandlerFunc(func(c *gin.Context) {
-		orgID, err := GetContextOrgID(c)
-		if err != nil {
-			BadRequestResponse(c, httpcommon.ORG_ID_INVALID, err.Error())
-			return
-		}
-		data, err := service.GetGenesisPrometheusData(g, orgID, c.Param("clusterID"))
 		JsonResponse(c, data, err)
 	})
 }

@@ -88,7 +88,7 @@ func RegisterDomainCommand() *cobra.Command {
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
 		Long:    "supported types: " + strings.Trim(fmt.Sprint(common.DomainTypes), "[]"),
-		Example: "deepflow-ctl domain example agent_sync \nsupport example type: aliyun | aws | baidu_bce | filereader | agent_sync | \nhuawei | kubernetes | qingcloud | tencent ",
+		Example: "deepflow-ctl domain example agent_sync \nsupport example type: aliyun | aws | baidu_bce | filereader | agent_sync | \nhuawei | kubernetes | qingcloud | tencent | volcengine",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
 		},
@@ -115,7 +115,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		url += fmt.Sprintf("?name=%s", name)
 	}
 
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -311,6 +311,8 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		fmt.Printf(string(example.YamlDomainGenesis))
 	case common.DOMAIN_TYPE_FILEREADER:
 		fmt.Printf(string(example.YamlDomainFileReader))
+	case common.DOMAIN_TYPE_VOLCENGINE:
+		fmt.Printf(string(example.YamlDomainVolcengine))
 	default:
 		err := fmt.Sprintf("domain_type %s not supported\n", args[0])
 		fmt.Fprintln(os.Stderr, err)

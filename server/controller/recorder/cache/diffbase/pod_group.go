@@ -36,12 +36,12 @@ func (b *DataSet) AddPodGroup(dbItem *mysql.PodGroup, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodGroup(lcuuid string) {
 	delete(b.PodGroups, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodGroup struct {

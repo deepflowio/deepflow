@@ -19,6 +19,7 @@ package model
 import (
 	"time"
 
+	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/agent_config"
 )
 
@@ -226,6 +227,7 @@ type VtapGroup struct {
 	ShortUUID          string   `json:"SHORT_UUID"`
 	Lcuuid             string   `json:"LCUUID"`
 	TeamID             int      `json:"TEAM_ID"`
+	UserID             int      `json:"USER_ID"`
 	VtapLcuuids        []string `json:"VTAP_LCUUIDS"`
 	DisableVtapLcuuids []string `json:"DISABLE_VTAP_LCUUIDS"`
 	PendingVtapLcuuids []string `json:"PENDING_VTAP_LCUUIDS"`
@@ -275,8 +277,8 @@ type DataSourceCreate struct {
 }
 
 type DataSourceUpdate struct {
-	RetentionTime int    `json:"RETENTION_TIME" binding:"required,min=1"`
-	DisplayName   string `json:"DISPLAY_NAME"`
+	RetentionTime *int    `json:"RETENTION_TIME"`
+	DisplayName   *string `json:"DISPLAY_NAME"`
 }
 
 type LicenseConsumption struct {
@@ -315,6 +317,7 @@ type Domain struct {
 	VTapCtrlMAC    string                 `json:"VTAP_CTRL_MAC"`
 	IconID         int                    `json:"ICON_ID"`
 	TeamID         int                    `json:"TEAM_ID"`
+	UserID         int                    `json:"USER_ID"`
 	K8sEnabled     int                    `json:"K8S_ENABLED"`
 	Config         map[string]interface{} `json:"CONFIG"`
 	AZCount        int                    `json:"AZ_COUNT"`
@@ -329,7 +332,7 @@ type DomainCreate struct {
 	Name                string                 `json:"NAME" binding:"required"`
 	Type                int                    `json:"TYPE" binding:"required"`
 	TeamID              int                    `json:"TEAM_ID"`
-	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
+	KubernetesClusterID string                 `json:"CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required
 	Config              map[string]interface{} `json:"CONFIG"`
@@ -339,13 +342,15 @@ type DomainUpdate struct {
 	Name         string                 `json:"NAME"`
 	Enabled      int                    `json:"ENABLED"`
 	IconID       int                    `json:"ICON_ID"`
-	TeamID       int                    `json:"TEAM_ID"`
+	UserID       int                    `json:"USER_ID"`
 	ControllerIP string                 `json:"CONTROLLER_IP"`
 	Config       map[string]interface{} `json:"CONFIG"`
 }
 
 type SubDomain struct {
 	ID           int                    `json:"ID"`
+	TeamID       int                    `json:"TEAM_ID"`
+	UserID       int                    `json:"USER_ID"`
 	Name         string                 `json:"NAME"`
 	DisplayName  string                 `json:"DISPLAY_NAME"`
 	ClusterID    string                 `json:"CLUSTER_ID"`
@@ -362,12 +367,16 @@ type SubDomain struct {
 }
 
 type SubDomainCreate struct {
-	Name   string                 `json:"NAME" binding:"required"`
-	Config map[string]interface{} `json:"CONFIG" binding:"required"`
-	Domain string                 `json:"DOMAIN" binding:"required"`
+	Domain    string                 `json:"DOMAIN" binding:"required"`
+	Name      string                 `json:"NAME" binding:"required"`
+	ClusterID string                 `json:"CLUSTER_ID"`
+	TeamID    int                    `json:"TEAM_ID"`
+	Config    map[string]interface{} `json:"CONFIG" binding:"required"`
 }
 
 type SubDomainUpdate struct {
+	TeamID int                    `json:"TEAM_ID"`
+	UserID int                    `json:"USER_ID"`
 	Config map[string]interface{} `json:"CONFIG"`
 }
 
@@ -486,6 +495,7 @@ type DetailedConfig struct {
 
 type VTapInterface struct {
 	ID                 int    `json:"ID"`
+	TeamID             int    `json:"TEAM_ID"`
 	Name               string `json:"NAME"`
 	MAC                string `json:"MAC"`
 	TapName            string `json:"TAP_NAME"`
@@ -503,6 +513,10 @@ type VTapInterface struct {
 	HostIP             string `json:"HOST_IP"`
 	NodeIP             string `json:"NODE_IP"`
 	LastSeen           string `json:"LAST_SEEN"`
+	DeviceCHostID      int    `json:"DEVICE_CHOST_ID"`
+	DeviceCHostName    string `json:"DEVICE_CHOST_NAME"`
+	DevicePodNodeID    int    `json:"DEVICE_POD_NODE_ID"`
+	DevicePodNodeName  string `json:"DEVICE_POD_NODE_NAME"`
 }
 
 type GenesisHost struct {
@@ -591,6 +605,7 @@ func (GenesisPort) TableName() string {
 }
 
 type GenesisVinterface struct {
+	TeamID              uint32    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 	NetnsID             uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID"`
 	VtapID              uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	Lcuuid              string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
@@ -698,6 +713,7 @@ type CSVHeader struct {
 type Plugin struct {
 	Name      string `json:"NAME" binding:"required"`
 	Type      int    `json:"TYPE" binding:"required"`
+	User      int    `json:"USER" binding:"required"`
 	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
 	UpdatedAt string `json:"UPDATED_AT"`
 }
@@ -738,4 +754,19 @@ type MailServer struct {
 	NtlmName     string `json:"NTLM_NAME"`
 	NtlmPassword string `json:"NTLM_PASSWORD"`
 	Lcuuid       string `json:"LCUUID"`
+}
+
+type RemoteExecReq struct {
+	trident.RemoteExecRequest
+
+	OutputFormat   *trident.OutputFormat `json:"output_format"` // 0: "TEXT", 1: "BINARY"
+	OutputFilename string                `json:"output_filename"`
+	CMD            string                `json:"cmd" binding:"required"`
+}
+
+type RemoteExecResp struct {
+	Content        string                    `json:"content,omitempty"` // RUN_COMMAND
+	ErrorMessage   string                    `json:"-"`
+	RemoteCommand  []*trident.RemoteCommand  `json:"remote_commands,omitempty"`  // LIST_COMMAND
+	LinuxNamespace []*trident.LinuxNamespace `json:"linux_namespaces,omitempty"` // LIST_NAMESPACE
 }

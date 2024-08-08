@@ -21,7 +21,7 @@ import (
 
 	"github.com/cornelk/hashmap"
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -85,7 +85,7 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 	}
 	err = addBatch(mn.org.DB, dbToAdd, mn.resourceType)
 	if err != nil {
-		log.Error(mn.org.Logf("add %s error: %s", mn.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", mn.resourceType, err.Error(), mn.org.LogPrefix)
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -101,7 +101,7 @@ func (mn *metricName) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusMetricName
 	err = mn.org.DB.Find(&items).Error
 	if err != nil {
-		log.Error(mn.org.Logf("db query %s failed: %v", mn.resourceType, err))
+		log.Errorf("db query %s failed: %v", mn.resourceType, err, mn.org.LogPrefix)
 		return nil, err
 	}
 	inUseIDsSet := mapset.NewSet[int]()
@@ -116,14 +116,14 @@ func (mn *metricName) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusMetricName
 	err = mn.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Error(mn.org.Logf("db query %s failed: %v", mn.resourceType, err))
+		log.Errorf("db query %s failed: %v", mn.resourceType, err, mn.org.LogPrefix)
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, item.ID)
 		}
-		log.Info(mn.org.Logf("%s ids: %+v are in use.", mn.resourceType, inUseIDs))
+		log.Infof("%s ids: %+v are in use.", mn.resourceType, inUseIDs, mn.org.LogPrefix)
 	}
 	return
 }

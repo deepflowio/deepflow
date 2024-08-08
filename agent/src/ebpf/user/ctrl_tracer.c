@@ -99,7 +99,7 @@ static void datadump_help(void)
 		DF_BPF_NAME);
 	fprintf(stderr, "PROTO_NUM:\n");
 	fprintf(stderr, "    0:   PROTO_ALL\n");
-	fprintf(stderr, "    1:   PROTO_ORTHER\n");
+	fprintf(stderr, "    1:   PROTO_OTHER\n");
 	fprintf(stderr, "    20:  PROTO_HTTP1\n");
 	fprintf(stderr, "    21:  PROTO_HTTP2\n");
 	fprintf(stderr, "    40:  PROTO_DUBBO\n");
@@ -472,6 +472,10 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 		       sk_trace_params->kern_trace_map_max);
 		printf("kern_trace_map_used:\t%u\n",
 		       sk_trace_params->kern_trace_map_used);
+		printf("proc_exec_event_count:\t%lu\n",
+		       sk_trace_params->proc_exec_event_count);
+		printf("proc_exit_event_count:\t%lu\n",
+		       sk_trace_params->proc_exit_event_count);
 		printf("datadump_enable:\t%s\n",
 		       sk_trace_params->datadump_enable ? "true" : "false");
 		printf("datadump_pid:\t%d\n", sk_trace_params->datadump_pid);

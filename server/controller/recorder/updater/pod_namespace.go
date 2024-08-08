@@ -32,8 +32,9 @@ import (
 type PodNamespace struct {
 	UpdaterBase[
 		cloudmodel.PodNamespace,
-		mysql.PodNamespace,
 		*diffbase.PodNamespace,
+		*mysql.PodNamespace,
+		mysql.PodNamespace,
 		*message.PodNamespaceAdd,
 		message.PodNamespaceAdd,
 		*message.PodNamespaceUpdate,
@@ -48,8 +49,9 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 	updater := &PodNamespace{
 		newUpdaterBase[
 			cloudmodel.PodNamespace,
-			mysql.PodNamespace,
 			*diffbase.PodNamespace,
+			*mysql.PodNamespace,
+			mysql.PodNamespace,
 			*message.PodNamespaceAdd,
 			message.PodNamespaceAdd,
 			*message.PodNamespaceUpdate,
@@ -77,10 +79,10 @@ func (n *PodNamespace) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNamespace
 func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (*mysql.PodNamespace, bool) {
 	podClusterID, exists := n.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
-		log.Error(n.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.Lcuuid,
-		)))
+		), n.metadata.LogPrefixes)
 		return nil, false
 	}
 	cloudTags := map[string]string{}
@@ -107,10 +109,10 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloud
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	mapInfo["az"] = cloudItem.AZLcuuid
+	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+	// }
 	if cloudcommon.DiffMap(diffBase.CloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
 		if cloudItem.CloudTags != nil {

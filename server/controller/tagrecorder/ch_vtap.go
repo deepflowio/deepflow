@@ -40,7 +40,7 @@ func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChVTap, bool) {
 	var vTaps []mysql.VTap
 	err := db.Unscoped().Find(&vTaps).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 

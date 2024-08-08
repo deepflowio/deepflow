@@ -25,6 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
@@ -43,7 +44,13 @@ func (p *Plugin) RegisterTo(e *gin.Engine) {
 }
 
 func getPlugin(c *gin.Context) {
-	data, err := service.GetPlugin(nil)
+	dbInfo, err := mysql.GetDB(httpcommon.GetUserInfo(c).ORGID)
+	if err != nil {
+		JsonResponse(c, nil, err)
+		return
+	}
+	data, err := service.GetPlugin(dbInfo, nil)
+
 	JsonResponse(c, data, err)
 }
 
@@ -53,9 +60,15 @@ func createPlugin(c *gin.Context) {
 		JsonResponse(c, nil, err)
 		return
 	}
+	u, err := strconv.Atoi(c.PostForm("USER"))
+	if err != nil {
+		JsonResponse(c, nil, err)
+		return
+	}
 	plugin := &mysql.Plugin{
 		Name: c.PostForm("NAME"),
 		Type: t,
+		User: u,
 	}
 
 	// get file
@@ -73,18 +86,28 @@ func createPlugin(c *gin.Context) {
 	}
 	plugin.Image = buf.Bytes()
 
-	data, err := service.CreatePlugin(plugin)
+	dbInfo, err := mysql.GetDB(httpcommon.GetUserInfo(c).ORGID)
+	if err != nil {
+		JsonResponse(c, nil, err)
+		return
+	}
+	data, err := service.CreatePlugin(dbInfo, plugin)
 	if err == nil {
-		refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
+		refresh.RefreshCache(dbInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	}
 	JsonResponse(c, data, err)
 }
 
 func deletePlugin(c *gin.Context) {
+	dbInfo, err := mysql.GetDB(httpcommon.GetUserInfo(c).ORGID)
+	if err != nil {
+		JsonResponse(c, nil, err)
+		return
+	}
+
 	name := c.Param("name")
-	err := service.DeletePlugin(name)
-	if err == nil {
-		refresh.RefreshCache(1, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	if err = service.DeletePlugin(dbInfo, name); err == nil {
+		refresh.RefreshCache(dbInfo.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	}
 	JsonResponse(c, nil, err)
 }

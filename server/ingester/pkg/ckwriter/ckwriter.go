@@ -41,9 +41,9 @@ import (
 var log = logging.MustGetLogger("ckwriter")
 
 const (
-	FLUSH_TIMEOUT        = 10 * time.Second
-	SQL_LOG_LENGTH       = 256
-	MAX_ORGANIZATINON_ID = 1024
+	FLUSH_TIMEOUT  = 10 * time.Second
+	SQL_LOG_LENGTH = 256
+	RETRY_COUNT    = 3
 )
 
 type CKWriter struct {
@@ -85,7 +85,19 @@ func ExecSQL(conn clickhouse.Conn, query string) error {
 	} else {
 		log.Info("Exec SQL: ", query)
 	}
-	return conn.Exec(context.Background(), query)
+	err := conn.Exec(context.Background(), query)
+	retryTimes := RETRY_COUNT
+	for err != nil && retryTimes > 0 {
+		log.Warningf("Exec SQL (%s) failed: %s, will retry", query, err)
+		time.Sleep(time.Second)
+		err = conn.Exec(context.Background(), query)
+		if err == nil {
+			log.Infof("Retry exec SQL (%s) success", query)
+			return nil
+		}
+		retryTimes--
+	}
+	return err
 }
 
 func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint16) error {
@@ -98,11 +110,6 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 	}
 	if err := ExecSQL(conn, t.MakeOrgGlobalTableCreateSQL(orgID)); err != nil {
 		return err
-	}
-	for _, view := range t.MakeViewsCreateSQLForDeepflowSystem(orgID) {
-		if err := ExecSQL(conn, view); err != nil {
-			return err
-		}
 	}
 
 	for _, c := range t.Columns {
@@ -129,6 +136,7 @@ func InitTable(addr, user, password, timeZone string, t *ckdb.Table, orgID uint1
 			Username: user,
 			Password: password,
 		},
+		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
 		return err
@@ -298,7 +306,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 
 	rawItems := make([]interface{}, 1024)
 	var cache *Cache
-	orgCaches := make([]*Cache, MAX_ORGANIZATINON_ID+1)
+	orgCaches := make([]*Cache, ckdb.MAX_ORG_ID+1)
 	for i := range orgCaches {
 		orgCaches[i] = new(Cache)
 		orgCaches[i].items = make([]CKItem, 0)
@@ -312,7 +320,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 			item := rawItems[i]
 			if ck, ok := item.(CKItem); ok {
 				orgID := ck.OrgID()
-				if orgID > MAX_ORGANIZATINON_ID {
+				if orgID > ckdb.MAX_ORG_ID {
 					if w.counters[queueID].OrgInvalidCount == 0 {
 						log.Warningf("writer queue (%s) item wrong orgID %d", w.name, orgID)
 					}
@@ -353,6 +361,7 @@ func (w *CKWriter) ResetConnection(connID int) error {
 			Username: w.user,
 			Password: w.password,
 		},
+		DialTimeout: 5 * time.Second,
 	})
 	return err
 }

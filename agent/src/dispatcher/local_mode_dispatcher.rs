@@ -25,6 +25,11 @@ use std::time::Duration;
 
 use arc_swap::access::Access;
 use log::{debug, info, log_enabled, warn};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::{
+    sched::{sched_setaffinity, CpuSet},
+    unistd::Pid,
+};
 use regex::Regex;
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
@@ -63,10 +68,17 @@ impl LocalModeDispatcher {
         info!("Start dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
-
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let cpu_set = base.options.lock().unwrap().cpu_set;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if cpu_set != CpuSet::new() {
+            if let Err(e) = sched_setaffinity(Pid::from_raw(0), &cpu_set) {
+                warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
+            }
+        }
         let mut flow_map = FlowMap::new(
             base.id as u32,
-            base.flow_output_queue.clone(),
+            Some(base.flow_output_queue.clone()),
             base.l7_stats_output_queue.clone(),
             base.policy_getter,
             base.log_output_queue.clone(),
@@ -76,6 +88,7 @@ impl LocalModeDispatcher {
             base.stats.clone(),
             false, // !from_ebpf
         );
+        let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
 
         while !base.terminated.load(Ordering::Relaxed) {
             let config = Config {
@@ -162,7 +175,7 @@ impl LocalModeDispatcher {
 
             // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
 
-            let tunnel_type_bitmap = base.tunnel_type_bitmap.lock().unwrap().clone();
+            let tunnel_type_bitmap = base.tunnel_type_bitmap.read().unwrap().clone();
 
             #[cfg(any(target_os = "linux", target_os = "android"))]
             let decap_length = match BaseDispatcher::decap_tunnel(
@@ -170,6 +183,7 @@ impl LocalModeDispatcher {
                 &base.tap_type_handler,
                 &mut base.tunnel_info,
                 tunnel_type_bitmap,
+                tunnel_type_trim_bitmap,
             ) {
                 Ok((l, _)) => l,
                 Err(e) => {
@@ -185,6 +199,7 @@ impl LocalModeDispatcher {
                 &base.tap_type_handler,
                 &mut base.tunnel_info,
                 tunnel_type_bitmap,
+                tunnel_type_trim_bitmap,
             ) {
                 Ok((l, _)) => l,
                 Err(e) => {
@@ -228,8 +243,6 @@ impl LocalModeDispatcher {
                 if meta_packet.lookup_key.src_mac == MacAddr::ZERO
                     && meta_packet.lookup_key.dst_mac == MacAddr::ZERO
                 {
-                    meta_packet.lookup_key.src_mac = base.ctrl_mac;
-                    meta_packet.lookup_key.dst_mac = base.ctrl_mac;
                     meta_packet.lookup_key.l2_end_0 = true;
                     meta_packet.lookup_key.l2_end_1 = true;
                 }
@@ -238,7 +251,7 @@ impl LocalModeDispatcher {
             meta_packet.tap_port = TapPort::from_local_mac(
                 meta_packet.lookup_key.get_nat_source(),
                 base.tunnel_info.tunnel_type,
-                u64::from(pipeline.vm_mac) as u32,
+                u64::from(pipeline.bond_mac) as u32,
             );
             BaseDispatcher::prepare_flow(
                 &mut meta_packet,
@@ -323,10 +336,6 @@ impl LocalModeDispatcherListener {
 
     pub fn id(&self) -> usize {
         return self.base.id;
-    }
-
-    pub fn local_dispatcher_count(&self) -> usize {
-        return self.base.local_dispatcher_count;
     }
 
     pub fn flow_acl_change(&self) {

@@ -23,12 +23,13 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/cce"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]string) ([]model.SubDomain, error) {
 	var retSubDomains []model.SubDomain
 
-	log.Debug("get sub_domains starting")
+	log.Debug("get sub_domains starting", logger.NewORGPrefix(b.orgID))
 
 	cceClient, _ := cce.NewClient(b.secretID, b.secretKey, "cce."+b.endpoint)
 	cceClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -40,7 +41,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 		startTime := time.Now()
 		result, err := cceClient.ListClusters(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListClusters", len(result.Clusters), startTime)
@@ -56,7 +57,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 		for _, cluster := range r.Clusters {
 			vpcLcuuid, ok := vpcIdToLcuuid[cluster.VpcId]
 			if !ok {
-				log.Debugf("cluster (%s) vpc (%s) not found", cluster.ClusterUuid, cluster.VpcId)
+				log.Debugf("cluster (%s) vpc (%s) not found", cluster.ClusterUuid, cluster.VpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 
@@ -72,6 +73,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 			}
 			configJson, _ := json.Marshal(config)
 			retSubDomains = append(retSubDomains, model.SubDomain{
+				TeamID:      b.teamID,
 				Lcuuid:      common.GenerateUUIDByOrgID(b.orgID, cluster.ClusterUuid),
 				Name:        cluster.ClusterName,
 				DisplayName: cluster.ClusterUuid,
@@ -81,6 +83,6 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 			})
 		}
 	}
-	log.Debug("get sub_domains complete")
+	log.Debug("get sub_domains complete", logger.NewORGPrefix(b.orgID))
 	return retSubDomains, nil
 }

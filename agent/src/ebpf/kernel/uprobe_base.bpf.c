@@ -29,11 +29,11 @@ struct http2_tcp_seq_key {
 
 /* *INDENT-OFF* */
 /*
- * In uprobe_go_tls_read_exit()
+ * In uprobe go_tls_read_exit()
  * Save the TCP sequence number before the syscall(read())
  * 
  * In uprobe http2 read() (after syscall read()), lookup TCP sequence number recorded previously on the map.
- * e.g.: In uprobe_go_http2serverConn_processHeaders(), get TCP sequence before syscall read(). 
+ * e.g.: In go_http2serverConn_processHeaders(), get TCP sequence before syscall read(). 
  * 
  * Note:  Use for after uprobe read() only.
  */
@@ -447,8 +447,7 @@ static __inline bool is_register_based_call(struct ebpf_proc_info *info)
 #endif
 }
 
-SEC("uprobe/runtime.execute")
-int runtime_execute(struct pt_regs *ctx)
+UPROG(runtime_execute) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -484,13 +483,12 @@ int runtime_execute(struct pt_regs *ctx)
 }
 
 // This function creates a new go coroutine, and the parent and child 
-// coroutine numbers are in the parameters and return values ​​respectively.
+// coroutine numbers are in the parameters and return values respectively.
 // Pass the function parameters through pid_tgid_callerid_map
 //
 // go 1.15 ~ 1.17: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr) *g
 // go1.18+ :func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
-SEC("uprobe/enter_runtime.newproc1")
-int enter_runtime_newproc1(struct pt_regs *ctx)
+UPROG(enter_runtime_newproc1) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -552,8 +550,7 @@ int enter_runtime_newproc1(struct pt_regs *ctx)
 //
 // go 1.15 ~ 1.17: func newproc1(fn *funcval, argp unsafe.Pointer, narg int32, callergp *g, callerpc uintptr) *g
 // go1.18+ :func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
-SEC("uprobe/exit_runtime.newproc1")
-int exit_runtime_newproc1(struct pt_regs *ctx)
+UPROG(exit_runtime_newproc1) (struct pt_regs *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -612,8 +609,7 @@ int exit_runtime_newproc1(struct pt_regs *ctx)
 }
 
 // /sys/kernel/debug/tracing/events/sched/sched_process_exit/format
-SEC("tracepoint/sched/sched_process_exit")
-int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
+TP_SCHED_PROG(process_exit) (struct sched_comm_exit_ctx *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -641,29 +637,19 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 	return 0;
 }
 
-// /sys/kernel/debug/tracing/events/sched/sched_process_fork/format
-SEC("tracepoint/sched/sched_process_fork")
-int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
+static inline int kernel_clone_exit(bool is_kprobe, bool maybe_thread,
+				    long ret, void *ctx)
 {
-	/*
-	 * When you find that the golang process starts, sometimes you
-	 * don't get the process start information, all you get is
-	 * threads. Take the following example:
-	 *
-	 * # pstree -p 4157
-	 * deepflow-server(4157)─┬─{deepflow-server}(4214)
-	 *                       ├─{deepflow-server}(4216)
-	 *                       ├─{deepflow-server}(4217)
-	 *                       ├─{deepflow-server}(4218)
-	 *                       ├─{deepflow-server}(4219)
-	 *                       ├─{deepflow-server}(4229)
-	 *
-	 * fetch data:
-	 * .... 296916.616252: 0: parent_pid 4216 child_pid 4218
-	 * .... 296916.616366: 0: parent_pid 4218 child_pid 4219
-	 *
-	 * To get process startup information we add probe 'sched_process_exec'.
-	 */
+	// For tracepoint: error or parent process
+	if (ret != 0 && !is_kprobe)
+		return 0;
+
+	__u64 id = bpf_get_current_pid_tgid();
+	int pid = (int)id;
+	int tgid = (int)(id >> 32);
+	// filter threads
+	if (pid != tgid)
+		return 0;
 
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -671,7 +657,17 @@ int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 
 	struct process_event_t data;
 	data.meta.event_type = EVENT_TYPE_PROC_EXEC;
-	data.pid = ctx->child_pid;
+	/*
+	 * For kprobe type, it was found that the return value is never 0, which
+	 * indicates that the current process is the parent process rather than
+	 * the child process. In this case, we take the return value (since the
+	 * return value is the child process ID).
+	 */
+	if (ret > 0)
+		data.pid = ret;
+	else
+		data.pid = pid;
+	data.maybe_thread = maybe_thread;
 	bpf_get_current_comm(data.name, sizeof(data.name));
 	bpf_perf_event_output(ctx, &NAME(socket_data),
 			      BPF_F_CURRENT_CPU, &data, sizeof(data));
@@ -679,9 +675,32 @@ int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 	return 0;
 }
 
+/*
+ * In order to handle older kernels, such as Linux 4.14 and 3.10.0-957.el7,
+ * which lack '/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork' and
+ * '/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone', we use
+ * kretprobe as a substitute for tracepoint type.
+ */
+KRETPROG(sys_fork) (struct pt_regs* ctx) {
+	return kernel_clone_exit(true, false, (long)PT_REGS_RC(ctx), ctx);
+}
+
+KRETPROG(sys_clone) (struct pt_regs* ctx) {
+	return kernel_clone_exit(true, true, (long)PT_REGS_RC(ctx), ctx);
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_exit_fork/format
+TP_SYSCALL_PROG(exit_fork) (struct syscall_comm_exit_ctx * ctx) {
+	return kernel_clone_exit(false, false, (long)ctx->ret, ctx);
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_exit_clone/format
+TP_SYSCALL_PROG(exit_clone) (struct syscall_comm_exit_ctx * ctx) {
+	return kernel_clone_exit(false, false, (long)ctx->ret, ctx);
+}
+
 // /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
-SEC("tracepoint/sched/sched_process_exec")
-int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
+TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
 {
 	struct member_fields_offset *offset = retrieve_ready_kern_offset();
 	if (offset == NULL)
@@ -695,6 +714,7 @@ int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
 	if (pid == tid) {
 		data.meta.event_type = EVENT_TYPE_PROC_EXEC;
 		data.pid = pid;
+		data.maybe_thread = false;
 		bpf_get_current_comm(data.name, sizeof(data.name));
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, &data, sizeof(data));

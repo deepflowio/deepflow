@@ -86,18 +86,6 @@ type VIPAdd struct {
 	MySQLItems[mysql.VIP]
 }
 
-type SecurityGroupAdd struct {
-	MySQLItems[mysql.SecurityGroup]
-}
-
-type SecurityGroupRuleAdd struct {
-	MySQLItems[mysql.SecurityGroupRule]
-}
-
-type VMSecurityGroupAdd struct {
-	MySQLItems[mysql.VMSecurityGroup]
-}
-
 type NATGatewayAdd struct {
 	MySQLItems[mysql.NATGateway]
 }
@@ -192,8 +180,4 @@ type PodAdd struct {
 
 type ProcessAdd struct {
 	MySQLItems[mysql.Process]
-}
-
-type PrometheusTargetAdd struct {
-	MySQLItems[mysql.PrometheusTarget]
 }

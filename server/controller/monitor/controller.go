@@ -61,32 +61,46 @@ func NewControllerCheck(cfg *config.ControllerConfig, ctx context.Context) *Cont
 	}
 }
 
-func (c *ControllerCheck) Start() {
+func (c *ControllerCheck) Start(sCtx context.Context) {
 	log.Info("controller check start")
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second) {
-			c.SyncDefaultOrgData()
+		ticker := time.NewTicker(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP1:
+		for {
+			select {
+			case <-ticker.C:
+				c.SyncDefaultOrgData()
+			case <-sCtx.Done():
+				break LOOP1
+			case <-c.cCtx.Done():
+				break LOOP1
+			}
 		}
 	}()
 
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.SyncDefaultORGDataInterval) * time.Second) {
-			c.SyncDefaultOrgData()
-		}
-	}()
-
-	go func() {
-		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
-			if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
-				// 控制器健康检查
-				c.healthCheck(db)
-				// 检查没有分配控制器的采集器，并进行分配
-				c.vtapControllerCheck(db)
-				// check az_controller_connection, delete unused item
-				c.azConnectionCheck(db)
-				return nil
-			}); err != nil {
-				log.Error(err)
+		ticker := time.NewTicker(time.Duration(c.cfg.HealthCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP2:
+		for {
+			select {
+			case <-ticker.C:
+				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+					// 控制器健康检查
+					c.healthCheck(db)
+					// 检查没有分配控制器的采集器，并进行分配
+					c.vtapControllerCheck(db)
+					// check az_controller_connection, delete unused item
+					c.azConnectionCheck(db)
+					return nil
+				}); err != nil {
+					log.Error(err)
+				}
+			case <-sCtx.Done():
+				break LOOP2
+			case <-c.cCtx.Done():
+				break LOOP2
 			}
 		}
 	}()
@@ -165,7 +179,9 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.exceptionControllerDict[controller.IP]; ok {
 					if c.exceptionControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.exceptionControllerDict, controller.IP)
-						mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION)
+						if err := mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_EXCEPTION).Error; err != nil {
+							log.Errorf("update controller(name: %s, ip: %s) state error: %v", controller.Name, controller.IP, err)
+						}
 						exceptionIPs = append(exceptionIPs, controller.IP)
 						log.Infof("set controller (%s) state to exception", controller.IP)
 						// 根据exceptionIP，重新分配对应采集器的控制器
@@ -186,7 +202,9 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {
 					if c.normalControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalControllerDict, controller.IP)
-						mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_COMPLETE)
+						if err := mysql.DefaultDB.Model(&controller).Update("state", common.HOST_STATE_COMPLETE).Error; err != nil {
+							log.Errorf("update controller(name: %s, ip: %s) state error: %v", controller.Name, controller.IP, err)
+						}
 						log.Infof("set controller (%s) state to normal", controller.IP)
 						delete(checkExceptionControllers, controller.IP)
 					}
@@ -207,7 +225,9 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 	controllerIPs := []string{}
 	for ip, dfhostCheck := range checkExceptionControllers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			orgDB.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip)
+			if err := orgDB.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip).Error; err != nil {
+				log.Errorf("delete az_controller_connection(ip: %s) error: %s", ip, err.Error(), orgDB.LogPrefixORGID)
+			}
 			err := mysql.DefaultDB.Delete(mysql.Controller{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete controller(%s) failed, err:%s", ip, err)
@@ -230,20 +250,25 @@ func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
 	var vtaps []mysql.VTap
 	var noControllerVtapCount int64
 
-	log.Info("vtap controller check start")
+	log.Info("vtap controller check start", orgDB.LogPrefixORGID)
 
 	ipMap, err := getIPMap(common.HOST_TYPE_CONTROLLER)
 	if err != nil {
 		log.Error(err)
 	}
 
-	orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
+	if err := orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {
+		log.Error(err, orgDB.LogPrefixORGID)
+		return
+	}
 	for _, vtap := range vtaps {
 		// check vtap.controller_ip is not in controller.ip, set to empty if not exist
 		if _, ok := ipMap[vtap.ControllerIP]; !ok {
-			log.Infof("controller ip(%s) in vtap(%s) is invalid", vtap.ControllerIP, vtap.Name)
+			log.Infof("controller ip(%s) in vtap(%s) is invalid", vtap.ControllerIP, vtap.Name, orgDB.LogPrefixORGID)
 			vtap.ControllerIP = ""
-			orgDB.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "")
+			if err := orgDB.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "").Error; err != nil {
+				log.Errorf("update vtap(lcuuid: %s, name: %s) controller ip to empty error: %v", vtap.Lcuuid, vtap.Name, err, orgDB.LogPrefixORGID)
+			}
 		}
 
 		if vtap.ControllerIP == "" {
@@ -258,7 +283,7 @@ func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
 	if noControllerVtapCount > 0 {
 		c.TriggerReallocController(orgDB, "")
 	}
-	log.Info("vtap controller check end")
+	log.Info("vtap controller check end", orgDB.LogPrefixORGID)
 }
 
 func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string) {
@@ -269,8 +294,14 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 
 	log.Info("vtap controller alloc start")
 
-	orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
-	orgDB.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers)
+	if err := orgDB.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps).Error; err != nil {
+		log.Error(err, orgDB.LogPrefixORGID)
+		return
+	}
+	if err := orgDB.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers).Error; err != nil {
+		log.Error(err, orgDB.LogPrefixORGID)
+		return
+	}
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取控制器当前已分配的采集器个数
@@ -295,7 +326,10 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 	}
 
 	// 根据可用区查询region信息
-	orgDB.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs)
+	if err := orgDB.Where("lcuuid IN (?)", azLcuuids.ToSlice()).Find(&azs).Error; err != nil {
+		log.Error(err, orgDB.LogPrefixORGID)
+		return
+	}
 	regionToAZLcuuids := make(map[string][]string)
 	regionLcuuids := mapset.NewSet()
 	for _, az := range azs {
@@ -336,9 +370,11 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 		for _, vtap := range noControllerVtaps {
 			// 分配控制器失败，更新异常错误码
 			if len(controllerAvailableVTapNum) == 0 {
-				log.Warningf("no available controller for vtap (%s)", vtap.Name)
+				log.Warningf("no available controller for vtap (%s)", vtap.Name, orgDB.LogPrefixORGID)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				orgDB.Model(&vtap).Update("exceptions", exceptions)
+				if err := orgDB.Model(&vtap).Update("exceptions", exceptions).Error; err != nil {
+					log.Errorf("update vtap(name: %s) exceptions(%d) error: %v", vtap.Name, exceptions, err, orgDB.LogPrefixORGID)
+				}
 				continue
 			}
 			sort.Slice(controllerAvailableVTapNum, func(i, j int) bool {
@@ -355,40 +391,54 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 			controllerIPToAvailableVTapNum[controllerAvailableVTapNum[0].Key] -= 1
 
 			// 分配控制器成功，更新控制器IP + 清空控制器分配失败的错误码
-			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[0].Key, vtap.Name)
-			orgDB.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
+			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[0].Key, vtap.Name, orgDB.LogPrefixORGID)
+			if err := orgDB.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key).Error; err != nil {
+				log.Error(err, orgDB.LogPrefixORGID, orgDB.LogPrefixORGID)
+			}
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				orgDB.Model(&vtap).Update("exceptions", exceptions)
+				if err := orgDB.Model(&vtap).Update("exceptions", exceptions).Error; err != nil {
+					log.Error(err, orgDB.LogPrefixORGID, orgDB.LogPrefixORGID)
+				}
 			}
 		}
 	}
-	log.Info("vtap controller alloc end")
+	log.Info("vtap controller alloc end", orgDB.LogPrefixORGID)
 }
 
 func (c *ControllerCheck) azConnectionCheck(orgDB *mysql.DB) {
 	var azs []mysql.AZ
 	var azControllerConns []mysql.AZControllerConnection
 
-	log.Info("az connection check start")
+	log.Info("az connection check start", orgDB.LogPrefixORGID)
 
-	orgDB.Find(&azs)
+	if err := orgDB.Find(&azs).Error; err != nil {
+		log.Error(err, orgDB.LogPrefixORGID)
+		return
+	}
 	azLcuuidToName := make(map[string]string)
 	for _, az := range azs {
 		azLcuuidToName[az.Lcuuid] = az.Name
 	}
 
-	orgDB.Find(&azControllerConns)
+	if err := orgDB.Find(&azControllerConns).Error; err != nil {
+		log.Error(err, orgDB.LogPrefixORGID)
+	}
 	for _, conn := range azControllerConns {
 		if conn.AZ == "ALL" {
 			continue
 		}
 		if name, ok := azLcuuidToName[conn.AZ]; !ok {
-			orgDB.Delete(&conn)
-			log.Infof("delete controller (%s) az (%s) connection", conn.ControllerIP, name)
+			if err := orgDB.Delete(&conn).Error; err != nil {
+				log.Infof("fail to delete controller (ip: %s) az (name: %s, lcuuid: %s, region: %s) connection, err: %s",
+					conn.ControllerIP, name, conn.AZ, conn.Region, err.Error(), orgDB.LogPrefixORGID)
+				continue
+			}
+			log.Infof("delete controller (ip: %s) az (name: %s, lcuuid: %s, region: %s) connection",
+				conn.ControllerIP, name, conn.AZ, conn.Region, orgDB.LogPrefixORGID)
 		}
 	}
-	log.Info("az connection check end")
+	log.Info("az connection check end", orgDB.LogPrefixORGID)
 }
 
 func (c *ControllerCheck) cleanExceptionControllerData(orgDB *mysql.DB, controllerIPs []string) {
@@ -399,18 +449,20 @@ func (c *ControllerCheck) cleanExceptionControllerData(orgDB *mysql.DB, controll
 	// delete genesis vinterface on invalid controller
 	err := orgDB.Where("node_ip IN ?", controllerIPs).Delete(&model.GenesisVinterface{}).Error
 	if err != nil {
-		log.Errorf("clean controllers (%s) genesis vinterface failed: %s", controllerIPs, err)
+		log.Errorf("clean controllers (%s) genesis vinterface failed: %s", controllerIPs, err, orgDB.LogPrefixORGID)
 	} else {
-		log.Infof("clean controllers (%s) genesis vinterface success", controllerIPs)
+		log.Infof("clean controllers (%s) genesis vinterface success", controllerIPs, orgDB.LogPrefixORGID)
 	}
 }
+
+var SyncControllerExcludeField = []string{"nat_ip", "state"}
 
 func (c *ControllerCheck) SyncDefaultOrgData() {
 	var controllers []mysql.Controller
 	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Error(err)
 	}
-	if err := mysql.SyncDefaultOrgData(controllers); err != nil {
+	if err := mysql.SyncDefaultOrgData(controllers, SyncControllerExcludeField); err != nil {
 		log.Error(err)
 	}
 }

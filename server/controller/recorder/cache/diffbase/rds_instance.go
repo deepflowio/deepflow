@@ -35,12 +35,12 @@ func (b *DataSet) AddRDSInstance(dbItem *mysql.RDSInstance, seq int) {
 		RegionLcuuid: dbItem.Region,
 		AZLcuuid:     dbItem.AZ,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteRDSInstance(lcuuid string) {
 	delete(b.RDSInstances, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type RDSInstance struct {

@@ -42,28 +42,34 @@ func (k *ChPodK8sEnv) generateNewData() (map[K8sEnvKey]mysql.ChPodK8sEnv, bool) 
 
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[K8sEnvKey]mysql.ChPodK8sEnv)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod, k.db.LogPrefixORGID)
+		}
+
 		envs := strings.Split(pod.ENV, ", ")
 		for _, singleEnv := range envs {
-			envInfo := strings.Split(singleEnv, ":")
+			envInfo := strings.SplitN(singleEnv, ":", 2)
 			if len(envInfo) == 2 {
 				key := K8sEnvKey{
 					ID:  pod.ID,
 					Key: envInfo[0],
 				}
 				keyToItem[key] = mysql.ChPodK8sEnv{
-					ID:       pod.ID,
-					Key:      envInfo[0],
-					Value:    envInfo[1],
-					L3EPCID:  pod.VPCID,
-					PodNsID:  pod.PodNamespaceID,
-					TeamID:   tagrecorder.DomainToTeamID[pod.Domain],
-					DomainID: tagrecorder.DomainToDomainID[pod.Domain],
+					ID:          pod.ID,
+					Key:         envInfo[0],
+					Value:       envInfo[1],
+					L3EPCID:     pod.VPCID,
+					PodNsID:     pod.PodNamespaceID,
+					TeamID:      teamID,
+					DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+					SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 				}
 			}
 		}

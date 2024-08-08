@@ -17,12 +17,12 @@
 package common
 
 var (
-	ResourcePrometheusMetricName           = "prometheus_metric_name"
-	ResourcePrometheusLabelName            = "prometheus_label_name"
-	ResourcePrometheusLabelValue           = "prometheus_label_value"
-	ResourcePrometheusMetricAPPLabelLayout = "prometheus_metric_app_label_layout"
-	ResourcePrometheusLabel                = "prometheus_label"
-	ResourcePrometheusMetricTarget         = "prometheus_metric_target"
+	ResourcePrometheusMetricName           = "metric_name"
+	ResourcePrometheusLabelName            = "label_name"
+	ResourcePrometheusLabelValue           = "label_value"
+	ResourcePrometheusMetricAPPLabelLayout = "metric_app_label_layout"
+	ResourcePrometheusLabel                = "label"
+	ResourcePrometheusMetricLabelName      = "metric_label_name"
 )
 
 var (

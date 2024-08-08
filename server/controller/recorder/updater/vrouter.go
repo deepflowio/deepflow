@@ -30,8 +30,9 @@ import (
 type VRouter struct {
 	UpdaterBase[
 		cloudmodel.VRouter,
-		mysql.VRouter,
 		*diffbase.VRouter,
+		*mysql.VRouter,
+		mysql.VRouter,
 		*message.VRouterAdd,
 		message.VRouterAdd,
 		*message.VRouterUpdate,
@@ -46,8 +47,9 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 	updater := &VRouter{
 		newUpdaterBase[
 			cloudmodel.VRouter,
-			mysql.VRouter,
 			*diffbase.VRouter,
+			*mysql.VRouter,
+			mysql.VRouter,
 			*message.VRouterAdd,
 			message.VRouterAdd,
 			*message.VRouterUpdate,
@@ -75,10 +77,10 @@ func (r *VRouter) getDiffBaseByCloudItem(cloudItem *cloudmodel.VRouter) (diffBas
 func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysql.VRouter, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
-		)))
+		), r.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.VRouter{
@@ -100,10 +102,10 @@ func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *clou
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(r.metadata.LogPre(resourceAForResourceBNotFound(
+			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.Lcuuid,
-			)))
+			), r.metadata.LogPrefixes)
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID

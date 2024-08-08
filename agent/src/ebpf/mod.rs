@@ -27,7 +27,7 @@ use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 // 最大长度
-pub const CAP_LEN_MAX: usize = 8192;
+pub const CAP_LEN_MAX: usize = 16384;
 
 // process_kname is up to 16 bytes, if the length of process_kname exceeds 15, the ending char is '\0'
 pub const PACKET_KNAME_MAX_PADDING: usize = 15;
@@ -88,6 +88,8 @@ pub const SOCK_DATA_ZMTP: u16 = 106;
 pub const SOCK_DATA_DNS: u16 = 120;
 #[allow(dead_code)]
 pub const SOCK_DATA_TLS: u16 = 121;
+#[allow(dead_code)]
+pub const SOCK_DATA_CUSTOM: u16 = 127;
 
 // Feature
 #[allow(dead_code)]
@@ -96,6 +98,8 @@ pub const FEATURE_UPROBE_GOLANG_SYMBOL: c_int = 0;
 pub const FEATURE_UPROBE_OPENSSL: c_int = 1;
 #[allow(dead_code)]
 pub const FEATURE_UPROBE_GOLANG: c_int = 2;
+#[allow(dead_code)]
+pub const FEATURE_UPROBE_JAVA: c_int = 3;
 
 //L7层协议是否需要重新核实
 #[allow(dead_code)]
@@ -135,9 +139,10 @@ pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_CLOSE: u8 = 6;
 
-// 消息类型
-// 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
-// go http2 uprobe 目前 只用了MSG_RESPONSE_END, 用于判断流结束.
+// Message types
+// Currently, except for source=EBPF_TYPE_GO_HTTP2_UPROBE,
+// the correctness of this direction cannot be guaranteed.
+// The go http2 uprobe currently only uses MSG_RESPONSE_END to determine the end of the stream.
 #[allow(dead_code)]
 pub const MSG_REQUEST: u8 = 1;
 #[allow(dead_code)]
@@ -146,6 +151,17 @@ pub const MSG_RESPONSE: u8 = 2;
 pub const MSG_REQUEST_END: u8 = 3;
 #[allow(dead_code)]
 pub const MSG_RESPONSE_END: u8 = 4;
+// The start of data reassembly.
+#[allow(dead_code)]
+pub const MSG_REASM_START: u8 = 5;
+// The segment of data reassembly.
+#[allow(dead_code)]
+pub const MSG_REASM_SEG: u8 = 6;
+// When the message type obtained by eBPF cannot accurately
+// indicate a request or response, it should be uniformly
+// set to 'MSG_COMMON'.
+#[allow(dead_code)]
+pub const MSG_COMMON: u8 = 7;
 
 //Register event types
 #[allow(dead_code)]
@@ -158,9 +174,26 @@ pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 6;
 pub const PROFILER_TYPE_UNKNOWN: u8 = 0;
 #[allow(dead_code)]
 pub const PROFILER_TYPE_ONCPU: u8 = 1;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "extended_profile")] {
+        #[allow(dead_code)]
+        pub const PROFILER_TYPE_OFFCPU: u8 = 2;
+        #[allow(dead_code)]
+        pub const PROFILER_TYPE_MEMORY: u8 = 3;
+    }
+}
+
+// Profile event types
 #[allow(dead_code)]
-#[cfg(feature = "off_cpu")]
-pub const PROFILER_TYPE_OFFCPU: u8 = 2;
+pub const PROFILE_EVENT_UNKNOWN: u8 = 0;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "extended_profile")] {
+        #[allow(dead_code)]
+        pub const PROFILE_EVENT_MEM_ALLOC: u8 = 1;
+        #[allow(dead_code)]
+        pub const PROFILE_EVENT_MEM_IN_USE: u8 = 2;
+    }
+}
 
 //Process exec/exit events
 #[repr(C)]
@@ -371,12 +404,24 @@ pub struct SK_TRACE_STATS {
     pub probes_count: u32,
     // Maximum length limit of eBPF data transmission
     pub data_limit_max: u32,
+
+    /*
+     * When the periodic push event detects that the buffer is being modified by
+     * another eBPF program, a conflict will occur. This is used to record the
+     * number of conflicts.
+     */
+    pub period_push_conflict_count: u64,
+    pub period_push_max_delay: u64, // The maximum latency time for periodic push events, in microseconds.
+    pub period_push_avg_delay: u64, // The average latency time for periodic push events, in microseconds.
+    pub proc_exec_event_count: u64, // The number of events for process execute.
+    pub proc_exit_event_count: u64, // The number of events for process exits.
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
     pub profiler_type: u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
+    pub event_type: u8,    // Profile event type, such as 1 (PROFILE_EVENT_ONCPU)
     pub timestamp: u64,    // Timestamp of the stack trace data(unit: nanoseconds).
     pub pid: u32,          // User-space process-ID.
     /*
@@ -395,8 +440,9 @@ pub struct stack_profile_data {
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
      * In microseconds as the unit of time.
+     * If event_type is MEM_ALLOC or MEM_IN_USE, this is byte count value
      */
-    pub count: u32,
+    pub count: u64,
     /*
      * comm in task_struct(linux kernel), always 16 bytes
      * If the capture is a process, fill in the process name here.
@@ -435,6 +481,7 @@ extern "C" {
     pub fn set_allow_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn set_bypass_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
+    pub fn enable_ebpf_seg_reasm_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
     /*
      * Configuring application layer protocol ports
@@ -526,11 +573,6 @@ extern "C" {
     /*
      * start continuous profiler
      * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
-     * @java_syms_space_limit The maximum space occupied by the Java symbol files
-     *   in the '/' directory of the target POD container.The recommended range for
-     *   values is [2, 100], which means it falls within the interval of 2Mi to 100Mi.
-     *   If the configuration value is outside this range, the default value of
-     *   10(10Mi), will be used.
      * @java_syms_update_delay To allow Java to run for an extended period and gather
      *   more symbol information, we delay symbol retrieval when encountering unknown
      *   symbols. The unit of measurement used is seconds.
@@ -540,7 +582,6 @@ extern "C" {
      */
     pub fn start_continuous_profiler(
         freq: c_int,
-        java_syms_space_limit: c_int,
         java_syms_update_delay: c_int,
         callback: extern "C" fn(_data: *mut stack_profile_data),
     ) -> c_int;
@@ -660,20 +701,29 @@ extern "C" {
     ) -> c_int;
 
     pub fn enable_oncpu_profiler() -> c_int;
-
     pub fn disable_oncpu_profiler() -> c_int;
+    pub fn show_collect_pool();
+    pub fn disable_syscall_trace_id() -> c_int;
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "off_cpu")] {
+        if #[cfg(feature = "extended_profile")] {
             pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
 
             pub fn enable_offcpu_profiler() -> c_int;
 
             pub fn disable_offcpu_profiler() -> c_int;
 
+            pub fn set_offcpu_cpuid_aggregation(flag: c_int) -> c_int;
+
             pub fn set_offcpu_minblock_time(
                 block_time: c_uint,
             ) -> c_int;
+
+            pub fn set_memory_profiler_regex(pattern: *const c_char) -> c_int;
+
+            pub fn enable_memory_profiler() -> c_int;
+
+            pub fn disable_memory_profiler() -> c_int;
         }
     }
 }

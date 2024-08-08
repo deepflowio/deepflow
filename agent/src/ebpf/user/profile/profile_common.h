@@ -18,6 +18,8 @@
 #define DF_USER_PROFILE_COMMON_H
 
 struct profiler_context {
+	// profiler name
+	const char *name;
 	// log output flag string
 	const char *tag;
 	// Profiler type
@@ -152,6 +154,7 @@ int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx);
 void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 			 u64 enable_flag);
 int profiler_context_init(struct profiler_context *ctx,
+			  const char *name,
 			  const char *tag,
 			  u8 type,
 			  bool enable_profiler,
@@ -165,4 +168,16 @@ int java_libs_and_tools_install(void);
 void push_and_release_stack_trace_msg(struct profiler_context *ctx,
 				      stack_trace_msg_hash_t * h,
 				      bool is_force);
+/**
+ * @brief **check_profiler_regex()** check if the process name matches
+ * the regular expression.
+ *
+ * @param ctx Profiler context(runtime environment status & configuration)
+ * address
+ * @param name Process name to be checked
+ * @return true successfully passed the check, false otherwise
+ */
+bool check_profiler_regex(struct profiler_context *ctx, const char *name);
+// Check if the profiler is currently running.
+bool profiler_is_running(void);
 #endif /*DF_USER_PROFILE_COMMON_H */

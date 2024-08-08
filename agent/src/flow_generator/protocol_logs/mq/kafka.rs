@@ -27,7 +27,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
-    config::handler::TraceType,
+    config::handler::{LogParserConfig, TraceType},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -36,8 +36,8 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
-            LogMessageType,
+            set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
+            L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::{read_i16_be, read_i32_be, read_i64_be, read_u16_be, read_u32_be},
@@ -90,6 +90,14 @@ pub struct KafkaInfo {
     captured_response_byte: u32,
 
     rrt: u64,
+    #[serde(skip)]
+    is_on_blacklist: bool,
+    #[serde(skip)]
+    resource: Option<String>,
+    #[serde(skip)]
+    endpoint: Option<String>,
+    #[serde(skip)]
+    command: Option<String>,
 }
 
 impl L7ProtocolInfoInterface for KafkaInfo {
@@ -120,15 +128,19 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        if self.topic_name.is_empty() {
+        if self.topic_name.is_empty() || self.partition < 0 {
             None
         } else {
-            Some(self.topic_name.clone())
+            Some(format!("{}-{}", self.topic_name, self.partition))
         }
     }
 
     fn get_request_resource_length(&self) -> usize {
         self.topic_name.len()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
     }
 }
 
@@ -136,9 +148,7 @@ impl KafkaInfo {
     // https://kafka.apache.org/protocol.html
     const API_KEY_MAX: u16 = 67;
     pub fn merge(&mut self, other: &mut Self) {
-        if self.resp_msg_size.is_none() {
-            self.resp_msg_size = other.resp_msg_size;
-        }
+        swap_if!(self, resp_msg_size, is_none, other);
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }
@@ -153,7 +163,13 @@ impl KafkaInfo {
         }
         self.msg_type = LogMessageType::Session;
         self.captured_response_byte = other.captured_response_byte;
-        crate::flow_generator::protocol_logs::swap_if!(self, topic_name, is_empty, other);
+        swap_if!(self, topic_name, is_empty, other);
+        swap_if!(self, resource, is_none, other);
+        swap_if!(self, endpoint, is_none, other);
+        swap_if!(self, command, is_none, other);
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
+        }
     }
 
     pub fn check(&self) -> bool {
@@ -163,7 +179,7 @@ impl KafkaInfo {
         return self.client_id.len() > 0 && self.client_id.is_ascii();
     }
 
-    pub fn get_command(&self) -> &'static str {
+    pub fn get_command(&self) -> Option<String> {
         let command_str = [
             "Produce",
             "Fetch",
@@ -231,33 +247,39 @@ impl KafkaInfo {
             "AllocateProducerIds",
         ];
         match self.api_key {
-            0..=58 => command_str[self.api_key as usize],
-            _ => "",
+            0..=58 => Some(command_str[self.api_key as usize].to_string()),
+            _ => None,
+        }
+    }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Kafka) {
+            self.is_on_blacklist = self
+                .command
+                .as_ref()
+                .map(|p| t.request_type.is_on_blacklist(p))
+                .unwrap_or_default()
+                || self
+                    .resource
+                    .as_ref()
+                    .map(|p| t.request_resource.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || self
+                    .endpoint
+                    .as_ref()
+                    .map(|p| t.endpoint.is_on_blacklist(p))
+                    .unwrap_or_default()
+                || t.request_domain.is_on_blacklist(&self.topic_name);
         }
     }
 }
 
 impl From<KafkaInfo> for L7ProtocolSendLog {
     fn from(f: KafkaInfo) -> Self {
-        let command_str = f.get_command();
         let flags = if f.is_tls {
             EbpfFlags::TLS.bits()
         } else {
             EbpfFlags::NONE.bits()
-        };
-        let resource = match (f.api_key, f.msg_type) {
-            (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session)
-                if !f.topic_name.is_empty() =>
-            {
-                format!("{}-{}:{}", f.topic_name, f.partition, f.offset)
-            }
-            (KAFKA_PRODUCE, LogMessageType::Response)
-            | (KAFKA_PRODUCE, LogMessageType::Session)
-                if !f.topic_name.is_empty() =>
-            {
-                format!("{}-{}:{}", f.topic_name, f.partition, f.offset)
-            }
-            _ => String::new(),
         };
         let mut attributes = vec![];
         if !f.group_id.is_empty() {
@@ -272,9 +294,9 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
             req: L7Request {
-                req_type: String::from(command_str),
-                resource,
-                endpoint: format!("{}-{}", f.topic_name, f.partition),
+                req_type: f.command.unwrap_or_default(),
+                resource: f.resource.unwrap_or_default(),
+                endpoint: f.endpoint.unwrap_or_default(),
                 domain: f.topic_name,
                 ..Default::default()
             },
@@ -318,6 +340,7 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
 pub struct KafkaLog {
     perf_stats: Option<L7PerfStats>,
     sessions: LruCache<u32, (u16, u16)>,
+    last_is_on_blacklist: bool,
 }
 
 impl Default for KafkaLog {
@@ -325,6 +348,7 @@ impl Default for KafkaLog {
         Self {
             perf_stats: None,
             sessions: LruCache::new(NonZeroUsize::new(Self::MAX_SESSION_PER_FLOW).unwrap()),
+            last_is_on_blacklist: false,
         }
     }
 }
@@ -350,11 +374,47 @@ impl L7ProtocolParserInterface for KafkaLog {
         let mut info = KafkaInfo::default();
         Self::parse(self, payload, param.l4_protocol, param.direction, &mut info)?;
         info.is_tls = param.is_tls();
-        info.cal_rrt(param).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
         set_captured_byte!(info, param);
+        info.resource = match (info.api_key, info.msg_type) {
+            (KAFKA_FETCH, LogMessageType::Request) | (KAFKA_FETCH, LogMessageType::Session)
+                if !info.topic_name.is_empty() =>
+            {
+                Some(format!(
+                    "{}-{}:{}",
+                    info.topic_name, info.partition, info.offset
+                ))
+            }
+            (KAFKA_PRODUCE, LogMessageType::Response)
+            | (KAFKA_PRODUCE, LogMessageType::Session)
+                if !info.topic_name.is_empty() =>
+            {
+                Some(format!(
+                    "{}-{}:{}",
+                    info.topic_name, info.partition, info.offset
+                ))
+            }
+            _ => None,
+        };
+        info.command = info.get_command();
+        info.endpoint = info.get_endpoint();
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
+        }
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+            }
+            info.cal_rrt(param).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::KafkaInfo(info)))
         } else {
@@ -865,6 +925,10 @@ impl KafkaLog {
         info.partition = read_i32_be(&payload[offset..]);
         offset += 4;
 
+        if info.status_code.is_some() {
+            return Ok(offset);
+        }
+
         if offset + 2 > payload.len() {
             return Err(Error::KafkaLogParseFailed);
         }
@@ -930,16 +994,26 @@ impl KafkaLog {
             //     high_watermark => INT64
             //     records => RECORDS
             7..=11 => {
-                if 14 > payload.len() {
+                let mut offset = 4;
+                if offset + 2 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let respones_count = read_u32_be(&payload[10..]);
+                info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
+                offset += 2 + 4;
+
+                if offset + 4 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                let respones_count = read_u32_be(&payload[offset..]);
                 if respones_count == 0 {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let topic_name_len = Self::decode_topic_name(&payload[14..], info)?;
+                offset += 4;
 
-                Self::decode_fetch_partition_response(&payload[14 + topic_name_len..], info)?;
+                let topic_name_len = Self::decode_topic_name(&payload[offset..], info)?;
+                offset += topic_name_len;
+
+                Self::decode_fetch_partition_response(&payload[offset..], info)?;
             }
             // Fetch Response (Version: 12) => throttle_time_ms error_code session_id [responses] TAG_BUFFER
             // throttle_time_ms => INT32
@@ -952,21 +1026,28 @@ impl KafkaLog {
             //     error_code => INT16
             //     high_watermark => INT64
             12 => {
-                if 10 > payload.len() {
+                let mut offset = 4;
+                if offset + 2 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let (responses_counter, responses_header_len) = Self::decode_varint(&payload[10..]);
+                info.status_code = Some(read_i16_be(&payload[offset..]) as i32);
+                offset += 2 + 4;
+
+                if offset > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                let (responses_counter, responses_header_len) =
+                    Self::decode_varint(&payload[offset..]);
                 // topic name offset: [responses]
                 if responses_counter == 0 {
                     return Err(Error::KafkaLogParseFailed);
                 }
-                let topic_name_len =
-                    Self::decode_compact_topic_name(&payload[10 + responses_header_len..], info)?;
+                offset += responses_header_len;
 
-                Self::decode_fetch_partition_response(
-                    &payload[10 + responses_header_len + topic_name_len..],
-                    info,
-                )?;
+                let topic_name_len = Self::decode_compact_topic_name(&payload[offset..], info)?;
+                offset += topic_name_len;
+
+                Self::decode_fetch_partition_response(&payload[offset..], info)?;
             }
             // TODO
             _ => {}
@@ -996,9 +1077,17 @@ impl KafkaLog {
             //   group_instance_id => COMPACT_NULLABLE_STRING
             //   reason => COMPACT_NULLABLE_STRING
             4..=5 => {
-                if let Some((group_id, group_id_len)) = Self::decode_compact_string(payload) {
+                // _tagged_fields
+                if payload.len() < 1 {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                offset += 1;
+
+                if let Some((group_id, group_id_len)) =
+                    Self::decode_compact_string(&payload[offset..])
+                {
                     info.group_id = group_id;
-                    offset = group_id_len;
+                    offset += group_id_len;
                 }
             }
             _ => return Err(Error::KafkaLogParseFailed),
@@ -1020,11 +1109,23 @@ impl KafkaLog {
             // LeaveGroup Response (Version: 1) => throttle_time_ms error_code
             //   throttle_time_ms => INT32
             //   error_code => INT16
-            1..=5 => {
+            1..=3 => {
                 if 6 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 info.status_code = Some(read_i16_be(&payload[4..]) as i32);
+            }
+            // LeaveGroup Response (Version: 4) => throttle_time_ms error_code
+            //   throttle_time_ms => INT32
+            //   error_code => INT16
+            4..=5 => {
+                // _tagged_field
+                let offset = 1;
+                if offset + 6 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+
+                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
             }
             _ => return Err(Error::KafkaLogParseFailed),
         }
@@ -1061,9 +1162,17 @@ impl KafkaLog {
             //     metadata => COMPACT_BYTES
             //   reason => COMPACT_NULLABLE_STRING
             6..=9 => {
-                if let Some((group_id, group_id_len)) = Self::decode_compact_string(payload) {
+                // _tagged_fields
+                if payload.len() < 1 {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                offset += 1;
+
+                if let Some((group_id, group_id_len)) =
+                    Self::decode_compact_string(&payload[offset..])
+                {
                     info.group_id = group_id;
-                    offset = group_id_len;
+                    offset += group_id_len;
                 }
             }
             _ => return Err(Error::KafkaLogParseFailed),
@@ -1099,11 +1208,30 @@ impl KafkaLog {
             //   members => member_id metadata
             //     member_id => STRING
             //     metadata => BYTES
-            2..=9 => {
+            2..=5 => {
                 if 6 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 info.status_code = Some(read_i16_be(&payload[4..]) as i32);
+            }
+            // JoinGroup Response (Version: 6) => throttle_time_ms error_code generation_id protocol_name leader member_id [members]
+            //   throttle_time_ms => INT32
+            //   error_code => INT16
+            //   generation_id => INT32
+            //   protocol_name => COMPACT_STRING
+            //   leader => COMPACT_STRING
+            //   member_id => COMPACT_STRING
+            //   members => member_id metadata
+            //     member_id => COMPACT_STRING
+            //     group_instance_id => COMPACT_NULLABLE_STRING
+            //     metadata => BYTES
+            6..=9 => {
+                // _tagged_field
+                let offset = 1;
+                if offset + 6 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
             }
             _ => return Err(Error::KafkaLogParseFailed),
         }
@@ -1139,9 +1267,17 @@ impl KafkaLog {
             //     member_id => COMPACT_STRING
             //     assignment => COMPACT_BYTES
             4..=5 => {
-                if let Some((group_id, group_id_len)) = Self::decode_compact_string(payload) {
+                // _tagged_field
+                if 1 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                offset += 1;
+
+                if let Some((group_id, group_id_len)) =
+                    Self::decode_compact_string(&payload[offset..])
+                {
                     info.group_id = group_id;
-                    offset = group_id_len;
+                    offset += group_id_len;
                 }
             }
             _ => return Err(Error::KafkaLogParseFailed),
@@ -1161,17 +1297,31 @@ impl KafkaLog {
                 }
                 info.status_code = Some(read_i16_be(payload) as i32);
             }
-            // SyncGroup Response (Version: [1-5]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
+            // SyncGroup Response (Version: [1-3]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
             //   throttle_time_ms => INT32
             //   error_code => INT16
             //   protocol_type => COMPACT_NULLABLE_STRING
             //   protocol_name => COMPACT_NULLABLE_STRING
             //   assignment => COMPACT_BYTES
-            1..=5 => {
+            1..=3 => {
                 if 6 > payload.len() {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 info.status_code = Some(read_i16_be(&payload[4..]) as i32);
+            }
+            // SyncGroup Response (Version: [4-5]) => throttle_time_ms error_code protocol_type protocol_name assignment TAG_BUFFER
+            //   throttle_time_ms => INT32
+            //   error_code => INT16
+            //   protocol_type => COMPACT_NULLABLE_STRING
+            //   protocol_name => COMPACT_NULLABLE_STRING
+            //   assignment => COMPACT_BYTES
+            4..=5 => {
+                // _tagged_fields
+                let offset = 1;
+                if offset + 6 > payload.len() {
+                    return Err(Error::KafkaLogParseFailed);
+                }
+                info.status_code = Some(read_i16_be(&payload[offset + 4..]) as i32);
             }
             _ => return Err(Error::KafkaLogParseFailed),
         }
@@ -1397,14 +1547,12 @@ impl KafkaLog {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 self.request(payload, false, info)?;
-                self.perf_stats.as_mut().map(|p| p.inc_req());
             }
             PacketDirection::ServerToClient => {
                 if payload.len() < KAFKA_RESP_HEADER_LEN {
                     return Err(Error::KafkaLogParseFailed);
                 }
                 self.response(payload, info)?;
-                self.perf_stats.as_mut().map(|p| p.inc_resp());
             }
         }
         Ok(())
@@ -1487,6 +1635,10 @@ mod tests {
             ("produce.pcap", "produce.result"),
             ("produce-v9.pcap", "produce-v9.result"),
             ("kafka-sw8.pcap", "kafka-sw8.result"),
+            ("kafka-leave-v4.pcap", "kafka-leave-v4.result"),
+            ("kafka-sync-v5.pcap", "kafka-sync-v5.result"),
+            ("kafka-join-v7.pcap", "kafka-join-v7.result"),
+            ("kafka-fetch-v12.pcap", "kafka-fetch-v12.result"),
         ];
 
         for item in files.iter() {

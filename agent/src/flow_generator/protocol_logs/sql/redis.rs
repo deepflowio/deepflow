@@ -31,6 +31,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
         meta_packet::EbpfFlags,
     },
+    config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
@@ -79,6 +80,9 @@ pub struct RedisInfo {
     captured_response_byte: u32,
 
     rrt: u64,
+
+    #[serde(skip)]
+    is_on_blacklist: bool,
 }
 
 impl L7ProtocolInfoInterface for RedisInfo {
@@ -108,6 +112,10 @@ impl L7ProtocolInfoInterface for RedisInfo {
     fn get_request_resource_length(&self) -> usize {
         self.request.len()
     }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
 }
 
 pub fn vec_u8_to_string<S>(v: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -123,7 +131,20 @@ impl RedisInfo {
         std::mem::swap(&mut self.error, &mut other.error);
         self.resp_status = other.resp_status;
         self.captured_response_byte = other.captured_response_byte;
+        if other.is_on_blacklist {
+            self.is_on_blacklist = other.is_on_blacklist;
+        }
         Ok(())
+    }
+
+    fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
+        if let Some(t) = config.l7_log_blacklist_trie.get(&L7Protocol::Redis) {
+            self.is_on_blacklist = t
+                .request_resource
+                .is_on_blacklist(str::from_utf8(&self.request).unwrap_or_default())
+                || t.request_type
+                    .is_on_blacklist(str::from_utf8(&self.request_type).unwrap_or_default());
+        }
     }
 }
 
@@ -184,6 +205,7 @@ pub struct RedisLog {
     has_request: bool,
     perf_stats: Option<L7PerfStats>,
     obfuscate: bool,
+    last_is_on_blacklist: bool,
 }
 
 impl L7ProtocolParserInterface for RedisLog {
@@ -204,18 +226,29 @@ impl L7ProtocolParserInterface for RedisLog {
         };
         let mut info = RedisInfo::default();
         info.is_tls = param.is_tls();
-        self.parse(
-            payload,
-            param.l4_protocol,
-            param.direction,
-            param.is_from_ebpf(),
-            &mut info,
-        )?;
-        info.cal_rrt(param).map(|rrt| {
-            info.rrt = rrt;
-            self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
-        });
+        self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
         set_captured_byte!(info, param);
+        if let Some(config) = param.parse_config {
+            info.set_is_on_blacklist(config);
+        }
+        if !info.is_on_blacklist && !self.last_is_on_blacklist {
+            match param.direction {
+                PacketDirection::ClientToServer => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                PacketDirection::ServerToClient => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if info.resp_status == L7ResponseStatus::ServerError {
+                        self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                    }
+                }
+            }
+            info.cal_rrt(param).map(|rrt| {
+                info.rrt = rrt;
+                self.perf_stats.as_mut().map(|p| p.update_rrt(rrt));
+            });
+        }
+        self.last_is_on_blacklist = info.is_on_blacklist;
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
         } else {
@@ -250,13 +283,11 @@ impl RedisLog {
         info.msg_type = LogMessageType::Request;
         info.request = request.stringify(self.obfuscate);
         self.has_request = true;
-        self.perf_stats.as_mut().map(|p| p.inc_req());
     }
 
     fn fill_response(&mut self, context: Vec<u8>, info: &mut RedisInfo) {
         info.msg_type = LogMessageType::Response;
         self.has_request = false;
-        self.perf_stats.as_mut().map(|p| p.inc_resp());
 
         info.resp_status = L7ResponseStatus::Ok;
 
@@ -268,7 +299,6 @@ impl RedisLog {
             b'-' | b'!' => {
                 info.error = context;
                 info.resp_status = L7ResponseStatus::ServerError;
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
             }
             _ => {}
         }
@@ -279,7 +309,6 @@ impl RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        is_from_ebpf: bool,
         info: &mut RedisInfo,
     ) -> Result<()> {
         if proto != IpProtocol::TCP {
@@ -294,8 +323,7 @@ impl RedisLog {
             PacketDirection::ClientToServer if payload.get(0) == Some(&b'*') => {
                 self.fill_request(CommandLine::new(payload)?, info)
             }
-            // When packet comes from AfPacket, there must be a request before parsing the response.
-            PacketDirection::ServerToClient if self.has_request || is_from_ebpf => {
+            PacketDirection::ServerToClient if self.has_request => {
                 self.fill_response(stringifier::decode(payload, false)?, info)
             }
             _ => return Err(Error::L7ProtocolUnknown),

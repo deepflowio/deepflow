@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	kubernetes_gather_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
+	gathermodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
@@ -61,14 +61,16 @@ func TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid string, version int,
 	return m.TriggerKubernetesRefresh(domainLcuuid, subDomainLcuuid, version)
 }
 
-func GetKubernetesGatherBasicInfos(lcuuid string, m *manager.Manager) (resp []kubernetes_gather_model.KubernetesGatherBasicInfo, err error) {
-	response, err := m.GetKubernetesGatherBasicInfos(lcuuid)
-	return response, err
+func GetKubernetesGatherBasicInfos(lcuuid string, m *manager.Manager) (resp []gathermodel.KubernetesGatherBasicInfo, err error) {
+	return m.GetKubernetesGatherBasicInfos(lcuuid)
 }
 
-func GetKubernetesGatherResources(lcuuid string, m *manager.Manager) (resp []kubernetes_gather_model.KubernetesGatherResource, err error) {
-	response, err := m.GetKubernetesGatherResources(lcuuid)
-	return response, err
+func GetSubDomainResource(lcuuid, subDomainLcuuid string, m *manager.Manager) (resp cloudmodel.SubDomainResource, err error) {
+	return m.GetSubDomainResource(lcuuid, subDomainLcuuid)
+}
+
+func GetKubernetesGatherResource(lcuuid, subDomainLcuuid string, m *manager.Manager) (resp gathermodel.KubernetesGatherResource, err error) {
+	return m.GetKubernetesGatherResource(lcuuid, subDomainLcuuid)
 }
 
 func GetRecorderDomainCache(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp cache.Cache, err error) {
@@ -143,20 +145,16 @@ func GetGenesisKubernetesData(g *genesis.Genesis, orgID int, clusterID string) (
 	return g.GetKubernetesResponse(orgID, clusterID)
 }
 
-func GetGenesisPrometheusData(g *genesis.Genesis, orgID int, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
-	return g.GetPrometheusResponse(orgID, clusterID)
-}
-
 func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (genesis.TridentStats, error) {
 	return genesis.Synchronizer.GetAgentStats(orgID, vtapID)
 }
 
-func GetGenesisAgentStorage(vtapIDString string) (model.GenesisStorage, error) {
+func GetGenesisAgentStorage(vtapIDString string, orgDB *mysql.DB) (model.GenesisStorage, error) {
 	var gStorage model.GenesisStorage
 	vtapID, err := strconv.Atoi(vtapIDString)
 	if err != nil {
 		return gStorage, errors.New(fmt.Sprintf("invalid vtap id (%s)", vtapIDString))
 	}
-	err = mysql.Db.Where("vtap_id = ?", vtapID).First(&gStorage).Error
+	err = orgDB.Where("vtap_id = ?", vtapID).First(&gStorage).Error
 	return gStorage, err
 }

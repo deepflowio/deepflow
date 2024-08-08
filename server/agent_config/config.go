@@ -87,7 +87,6 @@ type AgentGroupConfig struct {
 	HTTPLogXRequestID                 *string       `json:"HTTP_LOG_X_REQUEST_ID" yaml:"http_log_x_request_id,omitempty"`
 	ExternalAgentHTTPProxyEnabled     *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED" yaml:"external_agent_http_proxy_enabled,omitempty"`
 	ExternalAgentHTTPProxyPort        *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT" yaml:"external_agent_http_proxy_port,omitempty"`
-	PrometheusHttpAPIAddresses        []string      `json:"PROMETHEUS_HTTP_API_ADDRESSES" yaml:"prometheus_http_api_addresses,omitempty"` // ip:port
 	AnalyzerPort                      *int          `json:"ANALYZER_PORT" yaml:"analyzer_port,omitempty"`
 	ProxyControllerPort               *int          `json:"PROXY_CONTROLLER_PORT" yaml:"proxy_controller_port,omitempty"`
 	ProxyControllerIP                 *string       `json:"PROXY_CONTROLLER_IP" yaml:"proxy_controller_ip,omitempty"`
@@ -97,102 +96,113 @@ type AgentGroupConfig struct {
 	YamlConfig                        *StaticConfig `yaml:"static_config,omitempty"`
 }
 
+type BondGroup struct {
+	TapInterfaces []string `yaml:"tap-interfaces,omitempty"`
+}
+
 type StaticConfig struct {
-	ProxyControllerPort                *uint16                     `yaml:"proxy-controller-port,omitempty"`
-	LogLevel                           *string                     `yaml:"log-level,omitempty"`
-	Profiler                           *bool                       `yaml:"profiler,omitempty"`
-	AfpacketBlocksEnabled              *bool                       `yaml:"afpacket-blocks-enabled,omitempty"`
-	AfpacketBlocks                     *int                        `yaml:"afpacket-blocks,omitempty"`
-	AnalyzerRawPacketBlockSize         *int                        `yaml:"analyzer-raw-packet-block-size,omitempty"`
-	BatchedBufferSizeLimit             *int                        `yaml:"batched-buffer-size-limit,omitempty"`
-	EnableDebugStats                   *bool                       `yaml:"enable-debug-stats,omitempty"`
-	AnalyzerDedupDisabled              *bool                       `yaml:"analyzer-dedup-disabled,omitempty"`
-	DefaultTapType                     *uint32                     `yaml:"default-tap-type,omitempty"`
-	DebugListenPort                    *uint16                     `yaml:"debug-listen-port,omitempty"`
-	EnableQosBypass                    *bool                       `yaml:"enable-qos-bypass,omitempty"`
-	FastPathMapSize                    *int                        `yaml:"fast-path-map-size,omitempty"`
-	FirstPathLevel                     *int                        `yaml:"first-path-level,omitempty"`
-	LocalDispatcherCount               *int                        `yaml:"local-dispatcher-count,omitempty"`
-	SrcInterfaces                      []string                    `yaml:"src-interfaces,omitempty"`
-	CloudGatewayTraffic                *bool                       `yaml:"cloud-gateway-traffic,omitempty"`
-	MirrorTrafficPcp                   *uint16                     `yaml:"mirror-traffic-pcp,omitempty"`
-	PCap                               *PCapConfig                 `yaml:"pcap,omitempty"`
-	Flow                               *FlowGeneratorConfig        `yaml:"flow,omitempty"`
-	FlowQueueSize                      *int                        `yaml:"flow-queue-size,omitempty"`
-	QuadrupleQueueSize                 *int                        `yaml:"quadruple-queue-size,omitempty"`
-	AnalyzerQueueSize                  *int                        `yaml:"analyzer-queue-size,omitempty"`
-	DpdkEnabled                        *bool                       `yaml:"dpdk-enabled,omitempty"`
-	LibpcapEnabled                     *bool                       `yaml:"libpcap-enabled,omitempty"`
-	XflowCollector                     *XflowCollectorConfig       `yaml:"xflow-collector,omitempty"`
-	NpbPort                            *uint16                     `yaml:"npb-port,omitempty"`
-	VxlanFlags                         *uint8                      `yaml:"vxlan-flags,omitempty"`
-	IgnoreOverlayVlan                  *bool                       `yaml:"ignore-overlay-vlan,omitempty"`
-	CollectorSenderQueueSize           *int                        `yaml:"collector-sender-queue-size,omitempty"`
-	CollectorSenderQueueCount          *int                        `yaml:"collector-sender-queue-count,omitempty"`
-	ToaSenderQueueSize                 *int                        `yaml:"toa-sender-queue-size,omitempty"`
-	ToaLruCacheSize                    *int                        `yaml:"toa-lru-cache-size,omitempty"`
-	FlowSenderQueueSize                *int                        `yaml:"flow-sender-queue-size,omitempty"`
-	FlowSenderQueueCount               *int                        `yaml:"flow-sender-queue-count,omitempty"`
-	SecondFlowExtraDelaySecond         *string                     `yaml:"second-flow-extra-delay-second,omitempty"`
-	PacketDelay                        *string                     `yaml:"packet-delay,omitempty"`
-	Triple                             *TripleMapConfig            `yaml:"triple,omitempty"`
-	KubernetesPollerType               *string                     `yaml:"kubernetes-poller-type,omitempty"`
-	DecapErspan                        *bool                       `yaml:"decap-erspan,omitempty"`
-	AnalyzerIp                         *string                     `yaml:"analyzer-ip,omitempty"`
-	AnalyzerPort                       *uint16                     `yaml:"analyzer-port,omitempty"`
-	KubernetesNamespace                *string                     `yaml:"kubernetes-namespace,omitempty"`
-	KubernetesAPIListLimit             *uint32                     `yaml:"kubernetes-api-list-limit,omitempty"`
-	KubernetesAPIListInterval          *string                     `yaml:"kubernetes-api-list-interval,omitempty"`
-	KubernetesResources                []KubernetesResourceConfig  `yaml:"kubernetes-resources,omitempty"`
-	IngressFlavour                     *string                     `yaml:"ingress-flavour,omitempty"`
-	GrpcBufferSize                     *int                        `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
-	L7LogSessionAggrTimeout            *string                     `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
-	L7LogSessionQueueSize              *int                        `yaml:"l7-log-session-queue-size,omitempty"`
-	TapMacScript                       *string                     `yaml:"tap-mac-script,omitempty"`
-	BpfDisabled                        *bool                       `yaml:"bpf-disabled,omitempty"`
-	L7ProtocolInferenceMaxFailCount    *uint64                     `yaml:"l7-protocol-inference-max-fail-count,omitempty"`
-	L7ProtocolInferenceTtl             *uint64                     `yaml:"l7-protocol-inference-ttl,omitempty"`
-	OracleParseConfig                  *OracleConfig               `yaml:"oracle-parse-config,omitempty"`
-	PacketSequenceBlockSize            *int                        `yaml:"packet-sequence-block-size,omitempty"`
-	PacketSequenceQueueSize            *int                        `yaml:"packet-sequence-queue-size,omitempty"`
-	PacketSequenceQueueCount           *int                        `yaml:"packet-sequence-queue-count,omitempty"`
-	PacketSequenceFlag                 *uint8                      `yaml:"packet-sequence-flag,omitempty"`
-	L7ProtocolEnabled                  []string                    `yaml:"l7-protocol-enabled,omitempty"`
-	StandaloneDataFileSize             *uint64                     `yaml:"standalone-data-file-size,omitempty"`
-	StandaloneDataFileDir              *string                     `yaml:"standalone-data-file-dir,omitempty"`
-	LogFile                            *string                     `yaml:"log-file,omitempty"`
-	ExternalAgentHttpProxyCompressed   *bool                       `yaml:"external-agent-http-proxy-compressed,omitempty"`
-	FeatureFlags                       []string                    `yaml:"feature-flags,omitempty"`
-	L7ProtocolPorts                    map[string]string           `yaml:"l7-protocol-ports,omitempty"`
-	L7ProtocolAdvancedFeatures         *L7ProtocolAdvancedFeatures `yaml:"l7-protocol-advanced-features,omitempty"`
-	Ebpf                               *EbpfConfig                 `yaml:"ebpf,omitempty"`
-	OsAppTagExecUser                   *string                     `yaml:"os-app-tag-exec-user,omitempty"`
-	OsAppTagExec                       []string                    `yaml:"os-app-tag-exec,omitempty"`
-	OsProcRoot                         *string                     `yaml:"os-proc-root,omitempty"`
-	OsProcSocketSyncInterval           *int                        `yaml:"os-proc-socket-sync-interval,omitempty"`
-	OsProcSocketMinLifetime            *int                        `yaml:"os-proc-socket-min-lifetime,omitempty"`
-	OsProcRegex                        []*OsProcRegex              `yaml:"os-proc-regex,omitempty"`
-	OsProcSyncEnabled                  *bool                       `yaml:"os-proc-sync-enabled,omitempty"`
-	OsProcSyncTaggedOnly               *bool                       `yaml:"os-proc-sync-tagged-only,omitempty"`
-	GuardInterval                      *string                     `yaml:"guard-interval,omitempty"`
-	CheckCoreFileDisabled              *bool                       `yaml:"check-core-file-disabled,omitempty"`
-	SoPlugins                          []string                    `yaml:"so-plugins,omitempty"`
-	MemoryTrimDisabled                 *bool                       `yaml:"memory-trim-disabled,omitempty"`
-	FastPathDisabled                   *bool                       `yaml:"fast-path-disabled,omitempty"`
-	ForwardCapacity                    *uint32                     `yaml:"forward-capacity,omitempty"`
-	RrtTcpTimeout                      *string                     `yaml:"rrt-tcp-timeout,omitempty"`
-	RrtUdpTimeout                      *string                     `yaml:"rrt-udp-timeout,omitempty"`
-	PrometheusExtraConfig              *PrometheusExtraConfig      `yaml:"prometheus-extra-config,omitempty"`
-	ProcessSchedulingPriority          *int8                       `yaml:"process-scheduling-priority,omitempty"`
-	CpuAffinity                        *string                     `yaml:"cpu-affinity,omitempty"`
-	ExternalProfileIntegrationDisabled *bool                       `yaml:"external-profile-integration-disabled,omitempty"`
-	ExternalTraceIntegrationDisabled   *bool                       `yaml:"external-trace-integration-disabled,omitempty"`
-	ExternalMetricIntegrationDisabled  *bool                       `yaml:"external-metric-integration-disabled,omitempty"`
-	ExternalLogIntegrationDisabled     *bool                       `yaml:"external_log_integration_disabled,omitempty"`
-	NtpMaxInterval                     *string                     `yaml:"ntp-max-interval,omitempty"`
-	NtpMinInterval                     *string                     `yaml:"ntp-min-interval,omitempty"`
-	DispatcherQueue                    *bool                       `yaml:"dispatcher-queue,omitempty"`
-	EbpfCollectorQueueSize             *int                        `yaml:"ebpf-collector-queue-size,omitempty"`
+	ProxyControllerPort                *uint16                      `yaml:"proxy-controller-port,omitempty"`
+	LogLevel                           *string                      `yaml:"log-level,omitempty"`
+	Profiler                           *bool                        `yaml:"profiler,omitempty"`
+	AfpacketBlocksEnabled              *bool                        `yaml:"afpacket-blocks-enabled,omitempty"`
+	AfpacketBlocks                     *int                         `yaml:"afpacket-blocks,omitempty"`
+	AnalyzerRawPacketBlockSize         *int                         `yaml:"analyzer-raw-packet-block-size,omitempty"`
+	BatchedBufferSizeLimit             *int                         `yaml:"batched-buffer-size-limit,omitempty"`
+	EnableDebugStats                   *bool                        `yaml:"enable-debug-stats,omitempty"`
+	AnalyzerDedupDisabled              *bool                        `yaml:"analyzer-dedup-disabled,omitempty"`
+	DefaultTapType                     *uint32                      `yaml:"default-tap-type,omitempty"`
+	DebugListenPort                    *uint16                      `yaml:"debug-listen-port,omitempty"`
+	EnableQosBypass                    *bool                        `yaml:"enable-qos-bypass,omitempty"`
+	MultipleSocketsToIngester          *bool                        `yaml:"multiple-sockets-to-ingester,omitempty"`
+	FastPathMapSize                    *int                         `yaml:"fast-path-map-size,omitempty"`
+	FirstPathLevel                     *int                         `yaml:"first-path-level,omitempty"`
+	LocalDispatcherCount               *int                         `yaml:"local-dispatcher-count,omitempty"`
+	PacketFanoutMode                   *int                         `yaml:"packet-fanout-mode,omitempty"`
+	SrcInterfaces                      []string                     `yaml:"src-interfaces,omitempty"`
+	TapInterfaceBondGroup              []BondGroup                  `yaml:"tap-interface-bond-groups,omitempty"`
+	CloudGatewayTraffic                *bool                        `yaml:"cloud-gateway-traffic,omitempty"`
+	MirrorTrafficPcp                   *uint16                      `yaml:"mirror-traffic-pcp,omitempty"`
+	PCap                               *PCapConfig                  `yaml:"pcap,omitempty"`
+	Flow                               *FlowGeneratorConfig         `yaml:"flow,omitempty"`
+	FlowQueueSize                      *int                         `yaml:"flow-queue-size,omitempty"`
+	QuadrupleQueueSize                 *int                         `yaml:"quadruple-queue-size,omitempty"`
+	AnalyzerQueueSize                  *int                         `yaml:"analyzer-queue-size,omitempty"`
+	DpdkEnabled                        *bool                        `yaml:"dpdk-enabled,omitempty"`
+	LibpcapEnabled                     *bool                        `yaml:"libpcap-enabled,omitempty"`
+	VhostSocketPath                    *string                      `yaml:"vhost-socket-path,omitempty"`
+	XflowCollector                     *XflowCollectorConfig        `yaml:"xflow-collector,omitempty"`
+	NpbPort                            *uint16                      `yaml:"npb-port,omitempty"`
+	VxlanFlags                         *uint8                       `yaml:"vxlan-flags,omitempty"`
+	IgnoreOverlayVlan                  *bool                        `yaml:"ignore-overlay-vlan,omitempty"`
+	CollectorSenderQueueSize           *int                         `yaml:"collector-sender-queue-size,omitempty"`
+	CollectorSenderQueueCount          *int                         `yaml:"collector-sender-queue-count,omitempty"`
+	ToaSenderQueueSize                 *int                         `yaml:"toa-sender-queue-size,omitempty"`
+	ToaLruCacheSize                    *int                         `yaml:"toa-lru-cache-size,omitempty"`
+	FlowSenderQueueSize                *int                         `yaml:"flow-sender-queue-size,omitempty"`
+	FlowSenderQueueCount               *int                         `yaml:"flow-sender-queue-count,omitempty"`
+	SecondFlowExtraDelaySecond         *string                      `yaml:"second-flow-extra-delay-second,omitempty"`
+	PacketDelay                        *string                      `yaml:"packet-delay,omitempty"`
+	Triple                             *TripleMapConfig             `yaml:"triple,omitempty"`
+	KubernetesPollerType               *string                      `yaml:"kubernetes-poller-type,omitempty"`
+	TrimTunnelTypes                    []string                     `yaml:"trim-tunnel-types,omitempty"`
+	AnalyzerIp                         *string                      `yaml:"analyzer-ip,omitempty"`
+	AnalyzerPort                       *uint16                      `yaml:"analyzer-port,omitempty"`
+	KubernetesNamespace                *string                      `yaml:"kubernetes-namespace,omitempty"`
+	KubernetesAPIListLimit             *uint32                      `yaml:"kubernetes-api-list-limit,omitempty"`
+	KubernetesAPIListInterval          *string                      `yaml:"kubernetes-api-list-interval,omitempty"`
+	KubernetesResources                []KubernetesResourceConfig   `yaml:"kubernetes-resources,omitempty"`
+	IngressFlavour                     *string                      `yaml:"ingress-flavour,omitempty"`
+	GrpcBufferSize                     *int                         `yaml:"grpc-buffer-size,omitempty"`            // 单位：M
+	L7LogSessionAggrTimeout            *string                      `yaml:"l7-log-session-aggr-timeout,omitempty"` // 单位: s
+	L7LogSessionSlotCapacity           *int                         `yaml:"l7-log-session-slot-capacity,omitempty"`
+	TapMacScript                       *string                      `yaml:"tap-mac-script,omitempty"`
+	BpfDisabled                        *bool                        `yaml:"bpf-disabled,omitempty"`
+	L7ProtocolInferenceMaxFailCount    *uint64                      `yaml:"l7-protocol-inference-max-fail-count,omitempty"`
+	L7ProtocolInferenceTtl             *uint64                      `yaml:"l7-protocol-inference-ttl,omitempty"`
+	OracleParseConfig                  *OracleConfig                `yaml:"oracle-parse-config,omitempty"`
+	PacketSequenceBlockSize            *int                         `yaml:"packet-sequence-block-size,omitempty"`
+	PacketSequenceQueueSize            *int                         `yaml:"packet-sequence-queue-size,omitempty"`
+	PacketSequenceQueueCount           *int                         `yaml:"packet-sequence-queue-count,omitempty"`
+	PacketSequenceFlag                 *uint8                       `yaml:"packet-sequence-flag,omitempty"`
+	L7ProtocolEnabled                  []string                     `yaml:"l7-protocol-enabled,omitempty"`
+	StandaloneDataFileSize             *uint64                      `yaml:"standalone-data-file-size,omitempty"`
+	StandaloneDataFileDir              *string                      `yaml:"standalone-data-file-dir,omitempty"`
+	LogFile                            *string                      `yaml:"log-file,omitempty"`
+	ExternalAgentHttpProxyCompressed   *bool                        `yaml:"external-agent-http-proxy-compressed,omitempty"`
+	FeatureFlags                       []string                     `yaml:"feature-flags,omitempty"`
+	L7ProtocolPorts                    map[string]string            `yaml:"l7-protocol-ports,omitempty"`
+	L7LogBlacklist                     map[string][]*L7LogBlacklist `yaml:"l7-log-blacklist,omitempty"`
+	L7ProtocolAdvancedFeatures         *L7ProtocolAdvancedFeatures  `yaml:"l7-protocol-advanced-features,omitempty"`
+	ConsistentTimestampInL7Metrics     *bool                        `yaml:"consistent-timestamp-in-l7-metrics,omitempty"`
+	ServerPorts                        []uint16                     `yaml:"server-ports,omitempty"`
+	Ebpf                               *EbpfConfig                  `yaml:"ebpf,omitempty"`
+	OsAppTagExecUser                   *string                      `yaml:"os-app-tag-exec-user,omitempty"`
+	OsAppTagExec                       []string                     `yaml:"os-app-tag-exec,omitempty"`
+	OsProcRoot                         *string                      `yaml:"os-proc-root,omitempty"`
+	OsProcSocketSyncInterval           *int                         `yaml:"os-proc-socket-sync-interval,omitempty"`
+	OsProcSocketMinLifetime            *int                         `yaml:"os-proc-socket-min-lifetime,omitempty"`
+	OsProcRegex                        []*OsProcRegex               `yaml:"os-proc-regex,omitempty"`
+	OsProcSyncEnabled                  *bool                        `yaml:"os-proc-sync-enabled,omitempty"`
+	OsProcSyncTaggedOnly               *bool                        `yaml:"os-proc-sync-tagged-only,omitempty"`
+	GuardInterval                      *string                      `yaml:"guard-interval,omitempty"`
+	CheckCoreFileDisabled              *bool                        `yaml:"check-core-file-disabled,omitempty"`
+	SoPlugins                          []string                     `yaml:"so-plugins,omitempty"`
+	MemoryTrimDisabled                 *bool                        `yaml:"memory-trim-disabled,omitempty"`
+	FastPathDisabled                   *bool                        `yaml:"fast-path-disabled,omitempty"`
+	ForwardCapacity                    *uint32                      `yaml:"forward-capacity,omitempty"`
+	RrtTcpTimeout                      *string                      `yaml:"rrt-tcp-timeout,omitempty"`
+	RrtUdpTimeout                      *string                      `yaml:"rrt-udp-timeout,omitempty"`
+	PrometheusExtraConfig              *PrometheusExtraConfig       `yaml:"prometheus-extra-config,omitempty"`
+	ProcessSchedulingPriority          *int8                        `yaml:"process-scheduling-priority,omitempty"`
+	CpuAffinity                        *string                      `yaml:"cpu-affinity,omitempty"`
+	ExternalProfileIntegrationDisabled *bool                        `yaml:"external-profile-integration-disabled,omitempty"`
+	ExternalTraceIntegrationDisabled   *bool                        `yaml:"external-trace-integration-disabled,omitempty"`
+	ExternalMetricIntegrationDisabled  *bool                        `yaml:"external-metric-integration-disabled,omitempty"`
+	ExternalLogIntegrationDisabled     *bool                        `yaml:"external-log-integration-disabled,omitempty"`
+	NtpMaxInterval                     *string                      `yaml:"ntp-max-interval,omitempty"`
+	NtpMinInterval                     *string                      `yaml:"ntp-min-interval,omitempty"`
+	DispatcherQueue                    *bool                        `yaml:"dispatcher-queue,omitempty"`
+	EbpfCollectorQueueSize             *int                         `yaml:"ebpf-collector-queue-size,omitempty"`
 }
 
 type XflowCollectorConfig struct {
@@ -253,7 +263,13 @@ type OnCpuProfile struct {
 type OffCpuProfile struct {
 	Disabled *bool   `yaml:"disabled,omitempty"`
 	Regex    *string `yaml:"regex,omitempty"`
+	Cpu      *int    `yaml:"cpu,omitempty"`
 	MinBlock *string `yaml:"minblock,omitempty"`
+}
+
+type MemoryProfile struct {
+	Disabled *bool   `yaml:"disabled,omitempty"`
+	Regex    *string `yaml:"regex,omitempty"`
 }
 
 type EbpfConfig struct {
@@ -274,6 +290,11 @@ type EbpfConfig struct {
 	JavaSymbolFileRefreshDeferInterval *string                            `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
 	OnCpuProfile                       *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 	OffCpuProfile                      *OffCpuProfile                     `yaml:"off-cpu-profile,omitempty"`
+	MemoryProfile                      *MemoryProfile                     `yaml:"memory-profile,omitempty"`
+	SyscallOutOfOrderReassembly        []string                           `yaml:"syscall-out-of-order-reassembly,omitempty"`
+	SyscallSegmentationReassembly      []string                           `yaml:"syscall-segmentation-reassembly,omitempty"`
+	SyscallOutOfOrderCacheSize         *int                               `yaml:"syscall-out-of-order-cache-size,omitempty"`
+	SyscallTraceIdDisabled             *bool                              `yaml:"syscall-trace-id-disabled,omitempty"`
 }
 
 type OsProcRegex struct {
@@ -291,10 +312,11 @@ type PrometheusExtraConfig struct {
 }
 
 type KubernetesResourceConfig struct {
-	Name     *string `yaml:"name,omitempty"`
-	Group    *string `yaml:"group,omitempty"`
-	Version  *string `yaml:"version,omitempty"`
-	Disabled *bool   `yaml:"disabled,omitempty"`
+	Name          *string `yaml:"name,omitempty"`
+	Group         *string `yaml:"group,omitempty"`
+	Version       *string `yaml:"version,omitempty"`
+	Disabled      *bool   `yaml:"disabled,omitempty"`
+	FieldSelector *string `yaml:"field-selector,omitempty"`
 }
 
 type MatchRule struct {
@@ -317,10 +339,17 @@ type ExtraLogFields struct {
 	Grpc  []ExtraLogFieldsInfo `yaml:"grpc,omitempty"`
 }
 
+type L7LogBlacklist struct {
+	FieldName string `yaml:"field-name,omitempty"`
+	Operator  string `yaml:"operator,omitempty"`
+	Value     string `yaml:"value,omitempty"`
+}
+
 type L7ProtocolAdvancedFeatures struct {
-	HttpEndpointExtraction    *HttpEndpointExtraction `yaml:"http-endpoint-extraction,omitempty"`
-	ObfuscateEnabledProtocols []string                `yaml:"obfuscate-enabled-protocols,omitempty"`
-	ExtraLogFields            *ExtraLogFields         `yaml:"extra-log-fields,omitempty"`
+	HttpEndpointExtraction                 *HttpEndpointExtraction `yaml:"http-endpoint-extraction,omitempty"`
+	ObfuscateEnabledProtocols              []string                `yaml:"obfuscate-enabled-protocols,omitempty"`
+	ExtraLogFields                         *ExtraLogFields         `yaml:"extra-log-fields,omitempty"`
+	UnconcernedDnsNxdomainResponseSuffixes []string                `yaml:"unconcerned-dns-nxdomain-response-suffixes,omitempty"`
 }
 
 type OracleConfig struct {

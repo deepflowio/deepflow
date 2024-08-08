@@ -75,6 +75,11 @@ func TestMain(m *testing.M) {
 			AutoTaggingPrefix:       "df_",
 			ExternalTagCacheSize:    1024,
 			ExternalTagLoadInterval: 300,
+			Cache: cfg.PrometheusCache{
+				RemoteReadCache:    false,
+				ResponseCache:      false,
+				CacheCleanInterval: 100,
+			},
 		},
 	}
 	// run for test
@@ -85,26 +90,26 @@ func TestParseMetric(t *testing.T) {
 	metrics := []metricParse{
 		{
 			// illegal query
-			input:  "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
-			output: "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
-			table:  "flow_metrics_vtap_flow_edge_port_rtt_max_1s",
+			input:  "flow_metrics_network_map_rtt_max_1s",
+			output: "flow_metrics_network_map_rtt_max_1s",
+			table:  "flow_metrics_network_map_rtt_max_1s",
 			alias:  "value",
 			prefix: prefixDeepFlow,
 		},
 		{
-			input:  "flow_metrics__vtap_flow_port__rtt_max__1m",
+			input:  "flow_metrics__network__rtt_max__1m",
 			output: "rtt_max",
 			db:     "flow_metrics",
-			table:  "vtap_flow_port",
+			table:  "network",
 			ds:     "1m",
 			alias:  "%s as value",
 			prefix: prefixNone,
 		},
 		{
-			input:  "flow_metrics__vtap_flow_edge_port__rtt_max__1s",
+			input:  "flow_metrics__network_map__rtt_max__1s",
 			output: "rtt_max",
 			db:     "flow_metrics",
-			table:  "vtap_flow_edge_port",
+			table:  "network_map",
 			ds:     "1s",
 			alias:  "%s as value",
 			prefix: prefixNone,
@@ -165,10 +170,14 @@ func TestParseMetric(t *testing.T) {
 
 func TestPromReaderTransToSQL(t *testing.T) {
 	executor := NewPrometheusExecutor(5 * time.Minute)
-	executor.extraLabelCache.Add("k8s_label_k8s_app", "k8s.label/k8s_app")
+	executor.extraLabelCache = map[string]*lru.Cache[string, string]{
+		"1": lru.NewCache[string, string](100),
+	}
+	executor.extraLabelCache["1"].Add("k8s_label_k8s_app", "k8s.label/k8s_app")
 	prometheusReader := &prometheusReader{
 		getExternalTagFromCache: executor.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   executor.addExtraLabelsToCache,
+		orgID:                   "1",
 	}
 	endMs := time.Now().UnixMicro()
 	startMs := endMs - 5*60*1e3 // minus 5mins
@@ -182,58 +191,58 @@ func TestPromReaderTransToSQL(t *testing.T) {
 
 	promqls := []promqlParse{
 		{
-			hints:    promqlHints{matcher: "flow_metrics__vtap_flow_port__rtt_max__1m"},
-			input:    "flow_metrics__vtap_flow_port__rtt_max__1m",
+			hints:    promqlHints{matcher: "flow_metrics__network__rtt_max__1m"},
+			input:    "flow_metrics__network__rtt_max__1m",
 			hasError: true,
 		},
 		{
-			hints:    promqlHints{matcher: "flow_metrics__vtap_flow_port__rtt_max__1m"},
-			input:    "stddev(flow_metrics__vtap_flow_port__rtt_max__1m)",
+			hints:    promqlHints{matcher: "flow_metrics__network__rtt_max__1m"},
+			input:    "stddev(flow_metrics__network__rtt_max__1m)",
 			hasError: true,
 		},
 		{
-			hints:    promqlHints{matcher: "flow_metrics__vtap_flow_port__rtt_max__1m"},
-			input:    "topk(flow_metrics__vtap_flow_port__rtt_max__1m)",
+			hints:    promqlHints{matcher: "flow_metrics__network__rtt_max__1m"},
+			input:    "topk(flow_metrics__network__rtt_max__1m)",
 			hasError: true,
 		},
 		{
-			hints:    promqlHints{matcher: "flow_metrics__vtap_flow_port__rtt_max__1m"},
-			input:    "sum(flow_metrics__vtap_flow_port__rtt_max__1m)",
+			hints:    promqlHints{matcher: "flow_metrics__network__rtt_max__1m"},
+			input:    "sum(flow_metrics__network__rtt_max__1m)",
 			hasError: true,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_flow_port__rtt_max__1m", by: false},
-			input:    "sum(flow_metrics__vtap_flow_port__rtt_max__1m)without(auto_instance)",
+			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__network__rtt_max__1m", by: false},
+			input:    "sum(flow_metrics__network__rtt_max__1m)without(auto_instance)",
 			hasError: true,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_flow_port__rtt_max__1m", by: true},
-			input:    "sum(flow_metrics__vtap_flow_port__rtt_max__1m)by(auto_instance)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Sum(`rtt_max`) as value FROM `vtap_flow_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__network__rtt_max__1m", by: true},
+			input:    "sum(flow_metrics__network__rtt_max__1m)by(auto_instance)",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Sum(`rtt_max`) as value FROM `network` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1m",
 			db:       "flow_metrics",
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_flow_port__rtt_max__1s", by: true},
-			input:    "sum by(auto_instance)(flow_metrics__vtap_flow_port__rtt_max__1s)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Sum(`rtt_max`) as value FROM `vtap_flow_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__network__rtt_max__1s", by: true},
+			input:    "sum by(auto_instance)(flow_metrics__network__rtt_max__1s)",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Sum(`rtt_max`) as value FROM `network` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1s",
 			db:       "flow_metrics",
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"k8s_label_k8s_app"}, matcher: "flow_metrics__vtap_flow_port__rtt_max__1s", by: true},
-			input:    "sum by(k8s_label_k8s_app)(flow_metrics__vtap_flow_port__rtt_max__1s)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`k8s.label/k8s_app`,Sum(`rtt_max`) as value FROM `vtap_flow_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`k8s.label/k8s_app` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hints:    promqlHints{stepMs: 0, aggOp: "sum", grouping: []string{"k8s_label_k8s_app"}, matcher: "flow_metrics__network__rtt_max__1s", by: true},
+			input:    "sum by(k8s_label_k8s_app)(flow_metrics__network__rtt_max__1s)",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`k8s.label/k8s_app`,Sum(`rtt_max`) as value FROM `network` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`k8s.label/k8s_app` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1s",
 			db:       "flow_metrics",
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "avg", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_app_port__request__1m", by: true},
-			input:    "avg(flow_metrics__vtap_app_port__request__1m) by(auto_instance)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Avg(`request`) as value FROM `vtap_app_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hints:    promqlHints{stepMs: 0, aggOp: "avg", grouping: []string{"auto_instance"}, matcher: "flow_metrics__application__request__1m", by: true},
+			input:    "avg(flow_metrics__application__request__1m) by(auto_instance)",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Avg(`request`) as value FROM `application` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1m",
 			db:       "flow_metrics",
 			hasError: false,
@@ -248,9 +257,9 @@ func TestPromReaderTransToSQL(t *testing.T) {
 		},
 		// flow_metrics don't support count
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "count", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_app_port__rrt__1m", by: true},
-			input:    "count(flow_metrics__vtap_app_port__rrt__1m) by(auto_instance)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Count(row) as value FROM `vtap_app_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hints:    promqlHints{stepMs: 0, aggOp: "count", grouping: []string{"auto_instance"}, matcher: "flow_metrics__application__rrt__1m", by: true},
+			input:    "count(flow_metrics__application__rrt__1m) by(auto_instance)",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance`,Count(row) as value FROM `application` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1m",
 			db:       "flow_metrics",
 			hasError: false,
@@ -272,17 +281,17 @@ func TestPromReaderTransToSQL(t *testing.T) {
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "group", grouping: []string{"auto_instance_1"}, matcher: "flow_metrics__vtap_app_edge_port__request__1m", by: true},
-			input:    "group(flow_metrics__vtap_app_edge_port__request__1m) by(auto_instance_1)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_1`,1 as value FROM `vtap_app_edge_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_1` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hints:    promqlHints{stepMs: 0, aggOp: "group", grouping: []string{"auto_instance_1"}, matcher: "flow_metrics__application_map__request__1m", by: true},
+			input:    "group(flow_metrics__application_map__request__1m) by(auto_instance_1)",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`auto_instance_1`,1 as value FROM `application_map` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance_1` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1m",
 			db:       "flow_metrics",
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "stddev", grouping: []string{"tap_side"}, matcher: "flow_metrics__vtap_app_edge_port__request__1s", by: true},
-			input:    "stddev(flow_metrics__vtap_app_edge_port__request__1s) by(tap_side)",
-			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`tap_side`,Stddev(`request`) as value FROM `vtap_app_edge_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`tap_side` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
+			hints:    promqlHints{stepMs: 0, aggOp: "stddev", grouping: []string{"tap_side"}, matcher: "flow_metrics__application_map__request__1s", by: true},
+			input:    "stddev(flow_metrics__application_map__request__1s) by(tap_side)",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`tap_side`,Stddev(`request`) as value FROM `application_map` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`tap_side` ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			ds:       "1s",
 			db:       "flow_metrics",
 			hasError: false,
@@ -296,8 +305,8 @@ func TestPromReaderTransToSQL(t *testing.T) {
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 0, aggOp: "quantile", grouping: []string{"auto_instance_1"}, matcher: "flow_metrics__vtap_flow_edge_port__rtt_max__1s", by: true},
-			input:    "quantile by(auto_instance_1)(0.5,flow_metrics__vtap_flow_edge_port__rtt_max__1s)",
+			hints:    promqlHints{stepMs: 0, aggOp: "quantile", grouping: []string{"auto_instance_1"}, matcher: "flow_metrics__network_map__rtt_max__1s", by: true},
+			input:    "quantile by(auto_instance_1)(0.5,flow_metrics__network_map__rtt_max__1s)",
 			hasError: true,
 		},
 		{
@@ -327,19 +336,28 @@ func TestPromReaderTransToSQL(t *testing.T) {
 
 		// range query
 		{
-			hints:    promqlHints{stepMs: 10000, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_flow_port__rtt_max__1m", by: true},
-			input:    "sum(flow_metrics__vtap_flow_port__rtt_max__1m)by(auto_instance)",
-			output:   fmt.Sprintf("SELECT time(time, %d, 1, 0, %d) AS timestamp,`auto_instance`,Sum(`rtt_max`) as value FROM `vtap_flow_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", 10000/1000, (startMs%10000)/1e3, startS, endS, limit),
+			hints:    promqlHints{stepMs: 10000, aggOp: "sum", grouping: []string{"auto_instance"}, matcher: "flow_metrics__network__rtt_max__1m", by: true},
+			input:    "sum(flow_metrics__network__rtt_max__1m)by(auto_instance)",
+			output:   fmt.Sprintf("SELECT time(time, %d, 1, 0, %d) AS timestamp,`auto_instance`,Sum(`rtt_max`) as value FROM `network` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", 10000/1000, (startMs%10000)/1e3, startS, endS, limit),
 			ds:       "1m",
 			db:       "flow_metrics",
 			hasError: false,
 		},
 		{
-			hints:    promqlHints{stepMs: 10000, aggOp: "avg", grouping: []string{"auto_instance"}, matcher: "flow_metrics__vtap_app_port__request__1m", by: true},
-			input:    "avg(flow_metrics__vtap_app_port__request__1m) by(auto_instance)",
-			output:   fmt.Sprintf("SELECT time(time, %d, 1, 0, %d) AS timestamp,`auto_instance`,Avg(`request`) as value FROM `vtap_app_port` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", 10000/1000, (startMs%10000)/1e3, startS, endS, limit),
+			hints:    promqlHints{stepMs: 10000, aggOp: "avg", grouping: []string{"auto_instance"}, matcher: "flow_metrics__application__request__1m", by: true},
+			input:    "avg(flow_metrics__application__request__1m) by(auto_instance)",
+			output:   fmt.Sprintf("SELECT time(time, %d, 1, 0, %d) AS timestamp,`auto_instance`,Avg(`request`) as value FROM `application` WHERE (time >= %d AND time <= %d) GROUP BY timestamp,`auto_instance` ORDER BY timestamp desc LIMIT %s", 10000/1000, (startMs%10000)/1e3, startS, endS, limit),
 			ds:       "1m",
 			db:       "flow_metrics",
+			hasError: false,
+		},
+
+		// filter escape
+		{
+
+			hints:    promqlHints{matcher: "node_cpu_seconds_total{instance=\"'demo\"}"},
+			input:    "node_cpu_seconds_total{instance=\"'demo\"}",
+			output:   fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,value,`tag` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = '''demo'  ORDER BY timestamp desc LIMIT %s", startS, endS, limit),
 			hasError: false,
 		},
 	}
@@ -352,8 +370,11 @@ func TestPromReaderTransToSQL(t *testing.T) {
 
 			queries := make([]*prompb.Query, 0, 1)
 			matchers := make([]*prompb.LabelMatcher, 0, len(labelMatchers[0]))
-
+			metric_name_from_testcase := ""
 			for _, l := range labelMatchers[0] {
+				if l.Name == "__name__" {
+					metric_name_from_testcase = l.Value
+				}
 				matchers = append(matchers, &prompb.LabelMatcher{
 					Type:  prompb.LabelMatcher_Type(l.Type),
 					Name:  l.Name,
@@ -383,7 +404,7 @@ func TestPromReaderTransToSQL(t *testing.T) {
 				So(sql, ShouldEqual, p.output)
 				So(db, ShouldEqual, p.db)
 				So(ds, ShouldEqual, p.ds)
-				So(metricName, ShouldEqual, p.hints.matcher)
+				So(metricName, ShouldEqual, metric_name_from_testcase)
 			} else {
 				So(err, ShouldNotBeNil)
 			}
@@ -394,10 +415,12 @@ func TestPromReaderTransToSQL(t *testing.T) {
 func TestParsePromQLTag(t *testing.T) {
 	// mock test data
 	executor := &prometheusExecutor{
-		extraLabelCache: lru.NewCache[string, string](1),
+		extraLabelCache: map[string]*lru.Cache[string, string]{"1": lru.NewCache[string, string](1)},
 	}
-	executor.extraLabelCache.Add("app_kubernetes_io_managed_by", "app.kubernetes.io/managed-by")
-	p := &prometheusReader{}
+	executor.extraLabelCache["1"].Add("app_kubernetes_io_managed_by", "app.kubernetes.io/managed-by")
+	p := &prometheusReader{
+		orgID: "1",
+	}
 	p.getExternalTagFromCache = executor.convertExternalTagToQuerierAllowTag
 	tagdescription.TAG_ENUMS["l7_protocol"] = []*tagdescription.TagEnum{{Value: 20, DisplayName: "HTTP"}}
 	tagdescription.TAG_ENUMS["auto_service_type.ch"] = []*tagdescription.TagEnum{{Value: 1, DisplayName: "云服务器"}}
@@ -436,7 +459,7 @@ func TestParsePromQLTag(t *testing.T) {
 
 	// Test case for default prefixType
 	t.Run("default prefixType", func(t *testing.T) {
-		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixNone, chCommon.DB_NAME_DEEPFLOW_SYSTEM, "example")
+		tagName, tagAlias, isDeepFlowTag := p.parsePromQLTag(prefixNone, chCommon.DB_NAME_DEEPFLOW_ADMIN, "example")
 		assert.Equal(t, "`tag.example`", tagName)
 		assert.Equal(t, "", tagAlias)
 		assert.True(t, isDeepFlowTag)
@@ -490,6 +513,9 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 	endMs := end * 1000
 	min_5 := 5 * time.Minute
 	var interval int64 = 14 * 1000
+	queryInterval := ((startMs % interval) + min_interval.Milliseconds()) / 1e3
+	rateInterval := (startMs % interval) / 1e3
+	irateInterval := (startMs%min_interval.Milliseconds() + min_interval.Milliseconds()) / 1e3
 
 	// instant query
 	instantQueryTestcases := []queryRequestParse{
@@ -497,7 +523,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 			input: &QueryHint{
 				start: startMs,
 				end:   endMs,
-				step:  0,
+				step:  interval,
 				query: "eval sum(rate(node_cpu_seconds_total[5m])) by (cpu)",
 				funcs: []functionCall{
 					{Range: min_5, Name: "rate"},
@@ -509,7 +535,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: "",
+			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,FastTrans(tag) as __labels_index__,Percentile(toUnixTimestamp(time),1) as _last_timestamp,Percentile(toUnixTimestamp(time),0) as _first_timestamp,Percentile(value, 0) as _first_value,Max(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", rateInterval, start, end),
 			err:    nil,
 		},
 
@@ -624,7 +650,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`tag`,Sum(value) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", start, end),
+			output: fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,FastTrans(tag) as __labels_index__,Sum(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", start, end),
 			err:    nil,
 		},
 
@@ -663,6 +689,24 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 			output: fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`tag`,Last(Derivative(value,tag)) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", start, end),
 			err:    nil,
 		},
+
+		{
+			input: &QueryHint{
+				start: startMs,
+				end:   endMs,
+				step:  0,
+				query: "eval irate(node_cpu_seconds_total[5m])",
+				funcs: []functionCall{{Name: "irate", Range: min_5}},
+				matchers: []*labels.Matcher{
+					{Name: "__name__", Type: labels.MatchEqual, Value: "node_cpu_seconds_total"},
+					{Name: "instance", Type: labels.MatchEqual, Value: "localhost"},
+					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
+					{Name: "instance", Type: labels.MatchEqual, Value: "'demo"},
+				},
+			},
+			output: fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`tag`,Last(Derivative(value,tag)) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' AND `tag.instance` = '''demo' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", start, end),
+			err:    nil,
+		},
 	}
 
 	// range query
@@ -683,7 +727,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: "",
+			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,FastTrans(tag) as __labels_index__,Percentile(toUnixTimestamp(time),1) as _last_timestamp,Percentile(toUnixTimestamp(time),0) as _first_timestamp,Percentile(value, 0) as _first_value,Max(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", rateInterval, start, end),
 			err:    nil,
 		},
 
@@ -702,7 +746,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,FastTrans(tag) as __labels_index__,Sum(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", (startMs%interval)/1e3, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,FastTrans(tag) as __labels_index__,Sum(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", queryInterval, start, end),
 			err:    nil,
 		},
 
@@ -721,7 +765,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,`tag`,Max(value) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", (startMs%interval)/1e3, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,`tag`,Max(value) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", queryInterval, start, end),
 			err:    nil,
 		},
 
@@ -759,7 +803,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,`tag`,1 as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", (startMs%interval)/1e3, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,`tag`,1 as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", queryInterval, start, end),
 			err:    nil,
 		},
 
@@ -778,7 +822,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,`tag`,Last(value) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", (startMs%interval)/1e3, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,`tag`,Sum(value) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", queryInterval, start, end),
 			err:    nil,
 		},
 
@@ -798,7 +842,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,`tag`,Last(value) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", (startMs%interval)/1e3, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1,'', %d) AS timestamp,FastTrans(tag) as __labels_index__,Sum(value) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", queryInterval, start, end),
 			err:    nil,
 		},
 
@@ -817,7 +861,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,FastTrans(tag) as __labels_index__,Percentile(value, 0.5) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", (startMs%interval)/1e3, start, end),
+			output: fmt.Sprintf("SELECT time(time, 14, 1, '', %d) AS timestamp,FastTrans(tag) as __labels_index__,Percentile(value, 0.5) as value,`tag.cpu` FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY __labels_index__,`tag.cpu`,timestamp ORDER BY timestamp desc LIMIT 1000000", queryInterval, start, end),
 			err:    nil,
 		},
 		{
@@ -833,7 +877,7 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 					{Name: "job", Type: labels.MatchEqual, Value: "prometheus"},
 				},
 			},
-			output: fmt.Sprintf("SELECT toUnixTimestamp(time) AS timestamp,`tag`,Last(Derivative(value,tag)) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", start, end),
+			output: fmt.Sprintf("SELECT time(time, 10, 1,'', %d) AS timestamp,`tag`,Last(Derivative(value,tag)) as value FROM `node_cpu_seconds_total` WHERE (time >= %d AND time <= %d) AND `tag.instance` = 'localhost' AND `tag.job` = 'prometheus' GROUP BY `tag`,timestamp ORDER BY timestamp desc LIMIT 1000000", irateInterval, start, end),
 			err:    nil,
 		},
 	}

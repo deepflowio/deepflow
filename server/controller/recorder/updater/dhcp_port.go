@@ -29,8 +29,9 @@ import (
 type DHCPPort struct {
 	UpdaterBase[
 		cloudmodel.DHCPPort,
-		mysql.DHCPPort,
 		*diffbase.DHCPPort,
+		*mysql.DHCPPort,
+		mysql.DHCPPort,
 		*message.DHCPPortAdd,
 		message.DHCPPortAdd,
 		*message.DHCPPortUpdate,
@@ -45,8 +46,9 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 	updater := &DHCPPort{
 		newUpdaterBase[
 			cloudmodel.DHCPPort,
-			mysql.DHCPPort,
 			*diffbase.DHCPPort,
+			*mysql.DHCPPort,
+			mysql.DHCPPort,
 			*message.DHCPPortAdd,
 			message.DHCPPortAdd,
 			*message.DHCPPortUpdate,
@@ -74,10 +76,10 @@ func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffB
 func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*mysql.DHCPPort, bool) {
 	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(p.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cloudItem.Lcuuid,
-		)))
+		), p.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.DHCPPort{
@@ -97,10 +99,10 @@ func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cl
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(p.metadata.LogPre(resourceAForResourceBNotFound(
+			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, cloudItem.Lcuuid,
-			)))
+			), p.metadata.LogPrefixes)
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID

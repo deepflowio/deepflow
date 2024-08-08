@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface, []model.IP, []model.NATRule, error) {
-	log.Debug("get vinterfaces,ips starting")
+	log.Debug("get vinterfaces,ips starting", logger.NewORGPrefix(t.orgID))
 	t.publicIPToVinterface = map[string]model.VInterface{}
 	var vinterfaces []model.VInterface
 	var ips []model.IP
@@ -34,7 +35,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 	iAttrs := []string{"PrivateIpAddress", "PublicIpAddress"}
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNetworkInterfaces", region.name, "NetworkInterfaceSet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("vinterface request tencent api error: (%s)", err.Error())
+		log.Errorf("vinterface request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.VInterface{}, []model.IP{}, []model.NATRule{}, err
 	}
 	for _, vData := range resp {
@@ -45,7 +46,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 		mac := vData.Get("MacAddress").MustString()
 		deviceID := vData.Get("Attachment").Get("InstanceId").MustString()
 		if deviceID == "" {
-			log.Infof("vinterface (%s) not binding device", mac)
+			log.Infof("vinterface (%s) not binding device", mac, logger.NewORGPrefix(t.orgID))
 			continue
 		}
 
@@ -88,7 +89,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 				})
 			} else {
-				log.Infof("ip (%s) not support", privateIP)
+				log.Infof("ip (%s) not support", privateIP, logger.NewORGPrefix(t.orgID))
 			}
 
 			publicIP := privateIPData.Get("PublicIpAddress").MustString()
@@ -128,6 +129,6 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 			}
 		}
 	}
-	log.Debug("get vinterfaces,ips complete")
+	log.Debug("get vinterfaces,ips complete", logger.NewORGPrefix(t.orgID))
 	return vinterfaces, ips, vNatRules, nil
 }

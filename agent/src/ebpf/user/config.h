@@ -26,24 +26,25 @@
 #define MAP_SOCKET_INFO_NAME            "__socket_info_map"
 #define MAP_TRACE_NAME                  "__trace_map"
 #define MAP_PERF_SOCKET_DATA_NAME       "__socket_data"
-#define MAP_TRACE_CONF_NAME             "__trace_conf_map"
+#define MAP_TRACER_CTX_NAME             "__tracer_ctx_map"
 #define MAP_TRACE_STATS_NAME            "__trace_stats_map"
 #define MAP_PROTO_FILTER_NAME		"__protocol_filter"
 #define MAP_KPROBE_PORT_BITMAP_NAME	"__kprobe_port_bitmap"
 #define MAP_ADAPT_KERN_UID_NAME		"__adapt_kern_uid_map"
 #define MAP_PROTO_PORTS_BITMAPS_NAME	"__proto_ports_bitmap"
+#define MAP_ALLOW_REASM_PROTOS_NAME     "__allow_reasm_protos_map"
 
 //Program jmp tables
 #define MAP_PROGS_JMP_KP_NAME		"__progs_jmp_kp_map"
 #define MAP_PROGS_JMP_TP_NAME		"__progs_jmp_tp_map"
 
-#define PROG_DATA_SUBMIT_NAME_FOR_KP	"bpf_prog_kp__data_submit"
-#define PROG_DATA_SUBMIT_NAME_FOR_TP	"bpf_prog_tp__data_submit"
-#define PROG_OUTPUT_DATA_NAME_FOR_KP	"bpf_prog_kp__output_data"
-#define PROG_OUTPUT_DATA_NAME_FOR_TP	"bpf_prog_tp__output_data"
-#define PROG_IO_EVENT_NAME_FOR_TP	"bpf_prog_tp__io_event"
-#define PROG_PROTO_INFER_FOR_KP		"bpf_prog_kp__proto_infer_2"
-#define PROG_PROTO_INFER_FOR_TP		"bpf_prog_tp__proto_infer_2"
+#define PROG_DATA_SUBMIT_NAME_FOR_KP	"df_KP_data_submit"
+#define PROG_DATA_SUBMIT_NAME_FOR_TP	"df_TP_data_submit"
+#define PROG_OUTPUT_DATA_NAME_FOR_KP	"df_KP_output_data"
+#define PROG_OUTPUT_DATA_NAME_FOR_TP	"df_TP_output_data"
+#define PROG_IO_EVENT_NAME_FOR_TP	"df_TP_io_event"
+#define PROG_PROTO_INFER_FOR_KP		"df_KP_proto_infer_2"
+#define PROG_PROTO_INFER_FOR_TP		"df_TP_proto_infer_2"
 
 // perf profiler
 #define MAP_PERF_PROFILER_BUF_A_NAME	"__profiler_output_a"
@@ -68,7 +69,10 @@ enum {
 //thread index for bihash
 enum {
 	THREAD_PROFILER_READER_IDX = 0,
-	THREAD_PROC_ACT_IDX_BASE = 2,
+	THREAD_OFFCPU_READER_IDX = 1,
+	THREAD_MEMORY_READER_IDX = 2,
+	THREAD_PROC_EVENTS_HANDLE_IDX = 3,
+	THREAD_SOCK_READER_IDX_BASE = 4,
 };
 
 /*
@@ -99,6 +103,7 @@ enum {
 #define GO_TRACING_TIMEOUT_DEFAULT      120
 
 #define SK_TRACER_NAME			"socket-trace"
+#define CP_TRACER_NAME	                "continuous_profiler"
 
 #define DATADUMP_FILE_PATH_SIZE		1024
 #define DATADUMP_FILE_PATH_PREFIX	"/var/log"
@@ -145,6 +150,15 @@ enum {
 #define PROFILER_READER_EPOLL_TIMEOUT		500	//msecs
 #define EPOLL_SHORT_TIMEOUT			100	//mescs
 
+// The queue size for managing process execution/exit events.
+#define PROC_RING_SZ 16384
+
+/*
+ * During stack trace string aggregation and statistics, thread names
+ * are hashed using the DJB2 algorithm.
+ */
+#define USE_DJB2_HASH
+
 /*
  * Process information recalibration time, this time is the number of seconds
  * lost from the process startup time to the current time.
@@ -173,7 +187,15 @@ enum {
 #define JAVA_SYMS_UPDATE_DELAY_MAX 3600	// 3600 seconds
 
 /* Profiler - maximum data push interval time (in nanosecond). */
-#define MAX_PUSH_MSG_TIME_INTERVAL 1000000000ULL	/* 1 seconds */
+#define MAX_PUSH_MSG_TIME_INTERVAL_NS 1000000000ULL	/* 1 seconds */
+
+/*
+ * The kernel uses bundled burst to send data to the user.
+ * The implementation method is that all CPUs trigger timeout checks and send
+ * the data resident in the eBPF buffer. This value is the periodic time, unit
+ * is milliseconds.
+ */
+#define KICK_KERN_PERIOD 10
 
 /*
  * timer config
@@ -187,12 +209,9 @@ enum {
 #define EVENT_TIMER_TICK_US    10000
 
 /*
- * The kernel uses bundled burst to send data to the user.
- * The implementation method is that all CPUs trigger timeout checks and send
- * the data resident in the eBPF buffer. This value is the periodic time, unit
- * is milliseconds.
+ * Trigger kernel adaptation.
  */
-#define KICK_KERN_PERIOD 10	// 10 ticks(100 milliseconds)
+#define TRIG_KERN_ADAPT_PERIOD 10 // 10 ticks(100 millisecond)
 
 /*
  * System boot time update cycle time, unit is milliseconds.
@@ -264,5 +283,29 @@ enum {
  */
 
 #define PROFILER_DEFER_RANDOM_MAX 60	// 60 seconds
+
+/*
+ * Scaling factor is sized to avoid hash table collisions and timing variations.
+ */
+#define STACKMAP_SCALING_FACTOR 3.0
+#define STACKMAP_CAPACITY_THRESHOLD 32768 // The capacity limit of the Stack trace map, power of two. 
+
+/*
+ * eBPF utilizes perf event's periodic events to push all data residing in the kernel
+ * cache. We have set this to push data from the kernel buffer every 10 milliseconds.
+ * This periodic event is implemented using the kernel's high-resolution timer (hrtimer),
+ * which triggers a timer interrupt when the specified time elapses. However, in practice,
+ * this timer does not always trigger interrupts precisely every 10 milliseconds to execute
+ * the eBPF program. This discrepancy occurs because timer interrupts may be masked off
+ * during certain operations, such as when interrupts are disabled during locking operations.
+ * Therefore, the timer may trigger interrupts after the expected time, resulting in latency
+ * for periodic events.
+ *
+ * The system call phase will check the time delay of the push period, and if it exceeds this
+ * threshold, the data will be pushed immediately. From the tests, the maximum delay is
+ * approximately in the range of 30 to 60 milliseconds. Therefore, it is appropriate to set the
+ * threshold for the system call phase check to 60 milliseconds.
+ */
+#define PERIODIC_PUSH_DELAY_THRESHOLD_NS 60000000ULL // 60 milliseconds 
 
 #endif /* DF_EBPF_CONFIG_H */

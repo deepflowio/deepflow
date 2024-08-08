@@ -17,11 +17,14 @@
 package common
 
 import (
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	l "log"
 	"os"
 	"time"
 
+	mysql_driver "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -31,33 +34,49 @@ import (
 )
 
 func GetSession(cfg config.MySqlConfig) (*gorm.DB, error) {
-	dsn := GenerateDSN(cfg, true, cfg.TimeOut, false)
-	return InitSession(dsn)
+	connector, err := GetConnector(cfg, true, cfg.TimeOut, false)
+	if err != nil {
+		return nil, err
+	}
+	return InitSession(cfg, connector)
 }
 
-func GenerateDSN(cfg config.MySqlConfig, useDatabase bool, timeout uint32, multiStatements bool) string {
+func GetConnector(cfg config.MySqlConfig, useDatabase bool, timeout uint32, multiStatements bool) (driver.Connector, error) {
 	var database string
 	if useDatabase {
 		database = cfg.Database
 	}
-	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=%ds",
-		cfg.UserName,
-		cfg.UserPassword,
-		cfg.Host,
-		cfg.Port,
-		database,
-		timeout,
-	)
-	if multiStatements {
-		dsn += "&multiStatements=true"
+
+	location, err := time.LoadLocation("Local")
+	if err != nil {
+		log.Error("Get location failed with error: %v", err.Error())
+		return nil, err
 	}
-	return dsn
+
+	config := mysql_driver.NewConfig()
+	config.User = cfg.UserName
+	config.Passwd = cfg.UserPassword
+	config.Net = "tcp"
+	config.Addr = fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	config.DBName = database
+	config.AllowNativePasswords = true
+	config.Loc = location
+	config.Timeout = time.Duration(timeout) * time.Second
+	config.ParseTime = true
+	config.MultiStatements = multiStatements
+	config.Params = map[string]string{"charset": "utf8mb4"}
+
+	connector, err := mysql_driver.NewConnector(config)
+	if err != nil {
+		log.Error("Get database(%s) connector failed with error: %v", database, err.Error())
+		return nil, err
+	}
+	return connector, nil
 }
 
-func InitSession(dsn string) (*gorm.DB, error) {
+func InitSession(cfg config.MySqlConfig, connector driver.Connector) (*gorm.DB, error) {
 	db, err := gorm.Open(mysql.New(mysql.Config{
-		DSN:                       dsn,   // DSN data source name
+		Conn:                      sql.OpenDB(connector),
 		DefaultStringSize:         256,   // string 类型字段的默认长度
 		DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
 		DontSupportRenameIndex:    true,  // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引
@@ -75,15 +94,16 @@ func InitSession(dsn string) (*gorm.DB, error) {
 			}), // 配置log
 	})
 	if err != nil {
-		log.Errorf("failed to initialize session: %v, dsn: %s", err.Error(), dsn)
+		log.Errorf("failed to initialize session: %v", err.Error())
 		return nil, err
 	}
-	log.Infof("initialized mysql session successfully, dsn: %s", dsn)
+	log.Infof("%s, initialized mysql session successfully", cfg.Database)
 
 	sqlDB, _ := db.DB()
 	// 限制最大空闲连接数、最大连接数和连接的生命周期
-	sqlDB.SetMaxIdleConns(50)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetMaxIdleConns(int(cfg.MaxIdleConns))
+	sqlDB.SetMaxOpenConns(int(cfg.MaxOpenConns))
+	sqlDB.SetConnMaxLifetime(time.Duration(int(cfg.ConnMaxLifeTime) * int(time.Minute)))
+	log.Infof("%s, db stats: %#v", cfg.Database, sqlDB.Stats())
 	return db, nil
 }

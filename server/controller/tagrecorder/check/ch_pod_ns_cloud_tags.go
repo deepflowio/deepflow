@@ -41,12 +41,17 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSClou
 	var podNamespaces []mysql.PodNamespace
 	err := p.db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[CloudTagsKey]mysql.ChPodNSCloudTags)
 	for _, podNamespace := range podNamespaces {
+		teamID, err := tagrecorder.GetTeamID(podNamespace.Domain, podNamespace.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podNamespace, p.db.LogPrefixORGID)
+		}
+
 		cloudTagsMap := map[string]string{}
 		for k, v := range podNamespace.CloudTags {
 			cloudTagsMap[k] = v
@@ -54,17 +59,18 @@ func (p *ChPodNSCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChPodNSClou
 		if len(cloudTagsMap) > 0 {
 			cloudTagsStr, err := json.Marshal(cloudTagsMap)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, p.db.LogPrefixORGID)
 				return nil, false
 			}
 			key := CloudTagsKey{
 				ID: podNamespace.ID,
 			}
 			keyToItem[key] = mysql.ChPodNSCloudTags{
-				ID:        podNamespace.ID,
-				CloudTags: string(cloudTagsStr),
-				TeamID:    tagrecorder.DomainToTeamID[podNamespace.Domain],
-				DomainID:  tagrecorder.DomainToDomainID[podNamespace.Domain],
+				ID:          podNamespace.ID,
+				CloudTags:   string(cloudTagsStr),
+				TeamID:      teamID,
+				DomainID:    tagrecorder.DomainToDomainID[podNamespace.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNamespace.SubDomain],
 			}
 		}
 	}

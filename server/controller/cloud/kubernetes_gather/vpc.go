@@ -19,10 +19,11 @@ package kubernetes_gather
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getVPC() (model.VPC, error) {
-	log.Debug("get vpc starting")
+	log.Debug("get vpc starting", logger.NewORGPrefix(k.orgID))
 	if k.VPCUUID == "" {
 		k.VPCUUID = common.GetVPCLcuuidFromUUIDGenerate(k.orgID, k.UuidGenerate)
 	}
@@ -31,6 +32,6 @@ func (k *KubernetesGather) getVPC() (model.VPC, error) {
 		Name:         k.Name,
 		RegionLcuuid: k.RegionUUID,
 	}
-	log.Debug("get vpc complete")
+	log.Debug("get vpc complete", logger.NewORGPrefix(k.orgID))
 	return vpc, nil
 }

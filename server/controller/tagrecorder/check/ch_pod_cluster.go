@@ -29,7 +29,7 @@ type ChPodCluster struct {
 func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	updater := &ChPodCluster{
 		UpdaterBase[mysql.ChPodCluster, IDKey]{
-			resourceTypeName: RESOURCE_TYPE_CH_POD,
+			resourceTypeName: RESOURCE_TYPE_CH_POD_CLUSTER,
 		},
 		resourceTypeToIconID,
 	}
@@ -41,27 +41,33 @@ func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 	var podClusters []mysql.PodCluster
 	err := p.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[IDKey]mysql.ChPodCluster)
 	for _, podCluster := range podClusters {
+		teamID, err := tagrecorder.GetTeamID(podCluster.Domain, podCluster.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podCluster, p.db.LogPrefixORGID)
+		}
 		if podCluster.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
-				ID:       podCluster.ID,
-				Name:     podCluster.Name + " (deleted)",
-				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
-				TeamID:   tagrecorder.DomainToTeamID[podCluster.Domain],
-				DomainID: tagrecorder.DomainToDomainID[podCluster.Domain],
+				ID:          podCluster.ID,
+				Name:        podCluster.Name + " (deleted)",
+				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:      teamID,
+				DomainID:    tagrecorder.DomainToDomainID[podCluster.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
-				ID:       podCluster.ID,
-				Name:     podCluster.Name,
-				IconID:   p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
-				TeamID:   tagrecorder.DomainToTeamID[podCluster.Domain],
-				DomainID: tagrecorder.DomainToDomainID[podCluster.Domain],
+				ID:          podCluster.ID,
+				Name:        podCluster.Name,
+				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:      teamID,
+				DomainID:    tagrecorder.DomainToDomainID[podCluster.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
 			}
 		}
 	}

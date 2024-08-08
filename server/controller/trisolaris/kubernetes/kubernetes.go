@@ -22,23 +22,26 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	"context"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	cconfig "github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	resourceservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logging.MustGetLogger("trisolaris.kubernetes")
+var log = logger.MustGetLogger("trisolaris.kubernetes")
 
 type KubernetesInfo struct {
 	mutex                sync.RWMutex
@@ -117,8 +120,8 @@ func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(teamUID, clusterID, cl
 }
 
 func (k *KubernetesInfo) checkClusterID(clusterID string) (bool, error) {
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
+	k.mutex.RLock()
+	defer k.mutex.RUnlock()
 	_, dok := k.clusterIDToDomain[clusterID]
 	_, sdok := k.clusterIDToSubDomain[clusterID]
 	ok := dok || sdok
@@ -183,6 +186,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 	}
 
 	teamID := DEFAULT_TEAM_ID
+	orgID := DEFAULT_ORG_ID
 	if teamUID != "" {
 		var team *mysql.Team
 		if err := k.db.Where("short_lcuuid = ?", teamUID).First(&team).Error; err != nil {
@@ -190,6 +194,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 			return "", err
 		}
 		teamID = team.ID
+		orgID = team.ORGID
 	}
 	domainConf := map[string]interface{}{
 		"controller_ip":              k.cfg.NodeIP,
@@ -215,7 +220,21 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 		// icon id value only for enterprise edition
 		IconID: DomainTypeToIconID[KUBERNETES],
 	}
-	domain, err := resourceservice.CreateDomain(&mysql.DB{k.db, k.GetORGID(), mysqlcommon.ORGIDToDatabaseName(k.GetORGID())}, domainCreate, nil)
+
+	userInfo := httpcommon.UserInfo{
+		ID:    common.DEFAULT_USER_ID,
+		Type:  common.DEFAULT_USER_TYPE,
+		ORGID: orgID,
+	}
+	mysqlDB := mysql.DB{
+		DB:    k.db,
+		ORGID: k.GetORGID(),
+		Name:  mysqlcommon.ORGIDToDatabaseName(k.GetORGID()),
+	}
+	cConfig := cconfig.ControllerConfig{
+		FPermit: k.cfg.FPermit,
+	}
+	domain, err := resourceservice.CreateDomain(domainCreate, &userInfo, &mysqlDB, &cConfig)
 	if err != nil {
 		log.Errorf(k.Logf("create domain failed: %s", err.Error()))
 		return "", err

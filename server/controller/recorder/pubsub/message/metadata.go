@@ -17,15 +17,48 @@
 package message
 
 type Metadata struct {
-	ORGID    int
-	TeamID   int
-	DomainID int
+	ORGID       int
+	TeamID      int
+	DomainID    int
+	SubDomainID int
+
+	AdditionalMetadata // Additional metadata for specific message types
 }
 
-func NewMetadata(orgID, teamID, domainID int) *Metadata {
-	return &Metadata{
-		ORGID:    orgID,
-		TeamID:   teamID,
-		DomainID: domainID,
+func NewMetadata(orgID int, options ...func(*Metadata)) *Metadata {
+	md := &Metadata{
+		ORGID: orgID,
 	}
+	for _, option := range options {
+		option(md)
+	}
+	return md
+}
+
+func MetadataSubDomainID(id int) func(*Metadata) {
+	return func(m *Metadata) {
+		m.SubDomainID = id
+	}
+}
+
+func MetadataTeamID(id int) func(*Metadata) {
+	return func(m *Metadata) {
+		m.TeamID = id
+	}
+}
+
+func MetadataDomainID(id int) func(*Metadata) {
+	return func(m *Metadata) {
+		m.DomainID = id
+	}
+}
+
+func MetadataSoftDelete(flag bool) func(*Metadata) {
+	return func(m *Metadata) {
+		m.AdditionalMetadata.SoftDelete = flag
+	}
+}
+
+type AdditionalMetadata struct {
+	SoftDelete bool // for message type of delete action
 }

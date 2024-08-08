@@ -67,7 +67,9 @@ func (w *EventWriter) Write(e *EventStore) {
 	w.ckWriter.Put(e)
 }
 
-func (w *EventWriter) WriteAlarmEvent(e *AlarmEventStore) {
+func (w *EventWriter) WriteAlertEvent(e *AlertEventStore) {
+	e.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
 	w.ckWriter.Put(e)
 }
 
@@ -94,7 +96,7 @@ func NewEventWriter(eventType common.EventType, decoderIndex int, config *config
 		return nil, fmt.Errorf("unsupport event %s", eventType)
 	}
 	table := eventType.TableName()
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, table, EVENT_DB, w.ttl, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(decoderIndex, eventType.String(), EVENT_DB, w.ttl, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +105,7 @@ func NewEventWriter(eventType common.EventType, decoderIndex int, config *config
 	ckTable := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, table, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, table))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		table, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
+		fmt.Sprintf("%s-%d", eventType, decoderIndex), config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
 	if err != nil {
 		return nil, err
 	}

@@ -29,8 +29,9 @@ import (
 type LBListener struct {
 	UpdaterBase[
 		cloudmodel.LBListener,
-		mysql.LBListener,
 		*diffbase.LBListener,
+		*mysql.LBListener,
+		mysql.LBListener,
 		*message.LBListenerAdd,
 		message.LBListenerAdd,
 		*message.LBListenerUpdate,
@@ -45,8 +46,9 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 	updater := &LBListener{
 		newUpdaterBase[
 			cloudmodel.LBListener,
-			mysql.LBListener,
 			*diffbase.LBListener,
+			*mysql.LBListener,
+			mysql.LBListener,
 			*message.LBListenerAdd,
 			message.LBListenerAdd,
 			*message.LBListenerUpdate,
@@ -74,10 +76,10 @@ func (l *LBListener) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBListener) (d
 func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mysql.LBListener, bool) {
 	lbID, exists := l.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
-		log.Error(l.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.Lcuuid,
-		)))
+		), l.metadata.LogPrefixes)
 		return nil, false
 	}
 

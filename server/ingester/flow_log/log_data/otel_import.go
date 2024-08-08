@@ -36,7 +36,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) []*L7FlowLog {
+func OTelTracesDataToL7FlowLogs(vtapID, orgId, teamId uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) []*L7FlowLog {
 	ret := []*L7FlowLog{}
 	for _, resourceSpan := range l.GetResourceSpans() {
 		var resAttributes []*v11.KeyValue
@@ -46,29 +46,29 @@ func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *g
 		}
 		for _, scopeSpan := range resourceSpan.GetScopeSpans() {
 			for _, span := range scopeSpan.GetSpans() {
-				ret = append(ret, spanToL7FlowLog(vtapID, span, resAttributes, platformData, cfg))
+				ret = append(ret, spanToL7FlowLog(vtapID, orgId, teamId, span, resAttributes, platformData, cfg))
 			}
 		}
 	}
 	return ret
 }
 
-func spanToL7FlowLog(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
+func spanToL7FlowLog(vtapID, orgId, teamId uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable, cfg *flowlogCfg.Config) *L7FlowLog {
 	h := AcquireL7FlowLog()
 	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, platformData.QueryAnalyzerID())
-	h.VtapID = vtapID
+	h.VtapID, h.OrgId, h.TeamID = vtapID, orgId, teamId
 	h.FillOTel(span, resAttributes, platformData, cfg)
 	return h
 }
 
-func spanKindToTapSide(spanKind v1.Span_SpanKind) string {
+func spanKindToTapSide(spanKind v1.Span_SpanKind) flow_metrics.TAPSideEnum {
 	switch spanKind {
 	case v1.Span_SPAN_KIND_PRODUCER, v1.Span_SPAN_KIND_CLIENT:
-		return "c-app"
+		return flow_metrics.ClientApp
 	case v1.Span_SPAN_KIND_CONSUMER, v1.Span_SPAN_KIND_SERVER:
-		return "s-app"
+		return flow_metrics.ServerApp
 	default:
-		return "app"
+		return flow_metrics.App
 	}
 }
 
@@ -144,18 +144,24 @@ func skywalkingGetParentSpanIdFromLinks(links []*v1.Span_Link) string {
 	return ""
 }
 
-func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link) {
+func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link, cfg *flowlogCfg.Config) {
 	h.IsIPv4 = true
 	sw8SegmentId := ""
 	attributeNames, attributeValues := []string{}, []string{}
 	metricsNames, metricsValues := []string{}, []float64{}
+	isHttp := false
+	httpURL := ""
 	for i, attr := range append(spanAttributes, resAttributes...) {
 		key := attr.GetKey()
 		value := attr.GetValue()
 		if value == nil {
 			continue
 		}
-		is_metrics := false
+		isMetrics := false
+		// the presence of attributes starting with `http` is considered the HTTP protocol.
+		if !isHttp && strings.HasPrefix(key, "http") {
+			isHttp = true
+		}
 
 		if i >= len(spanAttributes) {
 			switch key {
@@ -191,6 +197,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 				}
 			case "sw8.trace_id":
 				h.TraceId = getValueString(value)
+				h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 			}
 
 		} else {
@@ -236,6 +243,8 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 				h.RequestType = value.GetStringValue()
 			case "http.target", "db.statement", "messaging.url", "rpc.service":
 				h.RequestResource = value.GetStringValue()
+			case "http.url":
+				httpURL = value.GetStringValue()
 			case "sw8.span_id":
 				h.SpanId = getValueString(value)
 			case "sw8.parent_span_id":
@@ -245,23 +254,23 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 			case "http.request_content_length":
 				h.requestLength = value.GetIntValue()
 				h.RequestLength = &h.requestLength
-				is_metrics = true
+				isMetrics = true
 			case "http.response_content_length":
 				h.responseLength = value.GetIntValue()
 				h.ResponseLength = &h.responseLength
-				is_metrics = true
+				isMetrics = true
 			case "db.cassandra.page_size":
 				h.sqlAffectedRows = uint64(value.GetIntValue())
 				h.SqlAffectedRows = &h.sqlAffectedRows
-				is_metrics = true
+				isMetrics = true
 			case "message.uncompressed_size", "messaging.message_payload_size_bytes", "messaging.message_payload_compressed_size_bytes":
-				is_metrics = true
+				isMetrics = true
 			default:
 				// nothing
 			}
 		}
 
-		if is_metrics {
+		if isMetrics {
 			metricsNames = append(metricsNames, key)
 			v, _ := strconv.ParseFloat(getValueString(value), 64)
 			metricsValues = append(metricsValues, v)
@@ -278,6 +287,21 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 			h.ParentSpanId = sw8SegmentId + "-" + h.ParentSpanId
 		} else {
 			h.ParentSpanId = skywalkingGetParentSpanIdFromLinks(links)
+		}
+	}
+
+	if isHttp && len(h.L7ProtocolStr) == 0 {
+		h.L7ProtocolStr = datatype.L7_PROTOCOL_HTTP_1.String(false)
+	}
+
+	// If http.target exists, read it for RequestResource. If not exist, read the part after the domain name from http.url.
+	// eg. http.url = http://nacos:8848/nacos/v1/ns/instance/list, mapped to request_resource is /nacos/v1/ns/instance/list
+	if h.RequestResource == "" && httpURL != "" {
+		parsedURLPath, err := parseUrlPath(httpURL)
+		if err != nil {
+			log.Debugf("http.url (%s) parse failed: %s", httpURL, err)
+		} else {
+			h.RequestResource = parsedURLPath
 		}
 	}
 
@@ -319,7 +343,8 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
-	h.TapSide = spanKindToTapSide(l.Kind)
+	h.TapSideEnum = uint8(spanKindToTapSide(l.Kind))
+	h.TapSide = flow_metrics.TAPSideEnum(h.TapSideEnum).String()
 	h.Endpoint = l.Name
 	h.SpanKind = uint8(l.Kind)
 	h.spanKind = &h.SpanKind
@@ -334,7 +359,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 		h.Events = string(eventsJSON)
 	}
 
-	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks())
+	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks(), cfg)
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {
 		h.ResponseStatus = uint8(httpCodeToResponseStatus(h.responseCode))
@@ -366,17 +391,17 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 	switch l.TapSide {
 	case "c-app":
 		// fill Epc0 with the Epc the Vtap belongs to
-		k.L3EpcID0 = platformData.QueryVtapEpc0(l.VtapID)
+		k.L3EpcID0 = platformData.QueryVtapEpc0(k.OrgId, l.VtapID)
 		// fill in Epc1 with other rules, see function description for details
-		k.L3EpcID1 = platformData.QueryVtapEpc1(l.VtapID, l.IsIPv4, uint32(l.IP41), l.IP61)
+		k.L3EpcID1 = platformData.QueryVtapEpc1(k.OrgId, l.VtapID, l.IsIPv4, uint32(l.IP41), l.IP61)
 	case "s-app":
 		// fill Epc1 with the Epc the Vtap belongs to
-		k.L3EpcID1 = platformData.QueryVtapEpc0(l.VtapID)
+		k.L3EpcID1 = platformData.QueryVtapEpc0(k.OrgId, l.VtapID)
 		// fill in Epc0 with other rules, see function description for details
-		k.L3EpcID0 = platformData.QueryVtapEpc1(l.VtapID, l.IsIPv4, l.IP40, l.IP60)
+		k.L3EpcID0 = platformData.QueryVtapEpc1(k.OrgId, l.VtapID, l.IsIPv4, l.IP40, l.IP60)
 	default: // "app" or others
 		// fill Epc0 and Epc1 with the Epc the Vtap belongs to
-		k.L3EpcID0 = platformData.QueryVtapEpc0(l.VtapID)
+		k.L3EpcID0 = platformData.QueryVtapEpc0(k.OrgId, l.VtapID)
 		k.L3EpcID1 = k.L3EpcID0
 	}
 	k.fill(
@@ -387,7 +412,7 @@ func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoT
 		l.IP60, l.IP61,
 		0, 0,
 		l.GPID0, l.GPID1,
-		0, 0, 0,
+		l.VtapID, 0, 0,
 		uint16(l.ServerPort),
 		flow_metrics.Rest,
 		layers.IPProtocol(l.Protocol),

@@ -796,14 +796,15 @@ impl Synchronizer {
         updated = status_guard.get_local_epc(&runtime_config) || updated;
         let wait_ntp = status_guard.ntp_enabled && status_guard.first;
         drop(status_guard);
-        if updated {
+        if wait_ntp {
             let (ntp_state, ncond) = &**ntp_state;
-            if wait_ntp {
-                let ntp_state_guard = ntp_state.lock().unwrap();
-                // Here, it is necessary to wait for the NTP synchronization timestamp to start
-                // collecting traffic and avoid using incorrect timestamps
-                drop(ncond.wait(ntp_state_guard).unwrap());
-            }
+            info!("Waitting for NTP ...");
+            let ntp_state_guard = ntp_state.lock().unwrap();
+            // Here, it is necessary to wait for the NTP synchronization timestamp to start
+            // collecting traffic and avoid using incorrect timestamps
+            drop(ncond.wait(ntp_state_guard).unwrap());
+        }
+        if updated {
             let status_guard = status.write();
             // 更新策略相关
             let last = SystemTime::now();
@@ -840,7 +841,10 @@ impl Synchronizer {
         drop(status_guard);
 
         let (trident_state, cvar) = &**trident_state;
-        if !runtime_config.enabled || exception_handler.has(Exception::SystemLoadCircuitBreaker) {
+        if !runtime_config.enabled
+            || exception_handler.has(Exception::SystemLoadCircuitBreaker)
+            || exception_handler.has(Exception::FreeMemExceeded)
+        {
             *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
         } else {
             *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
@@ -1101,9 +1105,7 @@ impl Synchronizer {
                 resp_packet.ts_orig = NtpTime::from(&send_time).0;
                 let offset = resp_packet.offset(&recv_time) / NANOS_IN_SECOND * NANOS_IN_SECOND;
                 match ntp_diff.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
-                    if (x > offset && x - offset >= min_interval)
-                        || (offset > x && offset - x >= min_interval)
-                    {
+                    if (x - offset).abs() >= min_interval {
                         info!("NTP Set time offset {}s.", offset / NANOS_IN_SECOND);
                         Some(offset)
                     } else {
@@ -1111,7 +1113,7 @@ impl Synchronizer {
                     }
                 }) {
                     Ok(last_offset) => {
-                        if !first && (last_offset > offset && last_offset - offset >= max_interval) {
+                        if !first && (last_offset - offset).abs() >= max_interval {
                             warn!("Openning NTP causes the timestamp to fall back by {}s, and the agent needs to be restarted.", offset/ NANOS_IN_SECOND);
                             crate::utils::notify_exit(NORMAL_EXIT_WITH_RESTART);
                             return;

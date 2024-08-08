@@ -21,15 +21,18 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
+	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/plugin"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error) {
-	log.Debug("get podgroups starting")
+	log.Debug("get podgroups starting", logger.NewORGPrefix(k.orgID))
 	podControllers := [5][]string{}
 	podControllers[0] = k.k8sInfo["*v1.Deployment"]
 	podControllers[1] = k.k8sInfo["*v1.StatefulSet"]
+	podControllers[1] = append(podControllers[1], k.k8sInfo["*v1.OpenGaussCluster"]...)
 	podControllers[2] = k.k8sInfo["*v1.DaemonSet"]
 	podControllers[3] = k.k8sInfo["*v1.CloneSet"]
 	podControllers[4] = k.k8sInfo["*v1.Pod"]
@@ -47,91 +50,89 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			cData, cErr := simplejson.NewJson([]byte(c))
 			if cErr != nil {
 				err = cErr
-				log.Errorf("podgroup initialization simplejson error: (%s)", cErr.Error())
+				log.Errorf("podgroup initialization simplejson error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
 				return
 			}
 			metaData, ok := cData.CheckGet("metadata")
 			if !ok {
-				log.Info("podgroup metadata not found")
+				log.Info("podgroup metadata not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			uID := metaData.Get("uid").MustString()
 			if uID == "" {
-				log.Info("podgroup uid not found")
+				log.Info("podgroup uid not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			name := metaData.Get("name").MustString()
 			if name == "" {
-				log.Infof("podgroup (%s) name not found", uID)
+				log.Infof("podgroup (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			namespace := metaData.Get("namespace").MustString()
 			if namespace == "" {
-				log.Infof("podgroup (%s) namespace not found", name)
+				log.Infof("podgroup (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 			if !ok {
-				log.Infof("podgroup (%s) namespace id not found", name)
+				log.Infof("podgroup (%s) namespace id not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
-			serviceType := common.POD_GROUP_STATEFULSET
-			label := "statefulset:" + namespace + ":" + name
-			replicas := cData.Get("spec").Get("replicas").MustInt()
+			var serviceType int
+			var label string
 			switch t {
 			case 0:
 				serviceType = common.POD_GROUP_DEPLOYMENT
 				label = "deployment:" + namespace + ":" + name
+			case 1:
+				serviceType = common.POD_GROUP_STATEFULSET
+				label = "statefulset:" + namespace + ":" + name
 			case 2:
-				replicas = 0
 				serviceType = common.POD_GROUP_DAEMON_SET
 				label = "daemonset:" + namespace + ":" + name
 			case 3:
 				serviceType = common.POD_GROUP_CLONESET
 				label = "cloneset:" + namespace + ":" + name
 			case 4:
-				replicas = 0
 				if metaData.Get("ownerReferences").GetIndex(0).Get("kind").MustString() == "InPlaceSet" {
 					uLcuuid = common.IDGenerateUUID(k.orgID, metaData.Get("ownerReferences").GetIndex(0).Get("uid").MustString())
 					name = metaData.Get("ownerReferences").GetIndex(0).Get("name").MustString()
 					if k.podGroupLcuuids.Contains(uLcuuid) {
-						log.Debugf("inplaceset pod (%s) abstract workload already existed", name)
+						log.Debugf("inplaceset pod (%s) abstract workload already existed", name, logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					serviceType = common.POD_GROUP_DEPLOYMENT
 					label = "inplaceset:" + namespace + ":" + name
 				} else {
-					providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
-					if providerType != "serverless" && providerType != "proprietary" {
-						log.Debugf("sci pod (%s) type (%s) not support", name, providerType)
+					// when certain Pods do not have a corresponding workload or the corresponding workload is not supported,
+					// the lua plugin can be used to abstract the name and type of the workload according to the pod information
+					// 当某些 pod 因为缺少对应的工作负载或对应的工作负载不被支持的时候，
+					// 可以通过 lua 插件根据 pod 的信息来抽象出符合规则的工作负载名称和类型
+					abstractPGType, abstractPGName, err := plugin.GeneratePodGroup(k.orgID, k.db, metaData)
+					if err != nil {
+						log.Warningf("pod (%s) abstract pod group failed: (%s)", name, err.Error, logger.NewORGPrefix(k.orgID))
 						continue
 					}
-					abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
-					if abstractPGType == "" {
-						if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
-							abstractPGType = "StatefulSet"
-						} else {
-							abstractPGType = "Deployment"
-						}
-					}
-					resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
-					if resourceName == "" {
-						log.Debugf("sci pod (%s) abstract pod group not found provider resource name", name)
+					if abstractPGType == "" || abstractPGName == "" {
+						log.Debugf("pod (%s) abstract not found pod group type (%s) or name (%s)", name, abstractPGType, abstractPGName, logger.NewORGPrefix(k.orgID))
 						continue
 					}
-					abstractPGName := resourceName
-					targetIndex := strings.LastIndex(resourceName, "-")
-					if targetIndex != -1 {
-						abstractPGName = resourceName[:targetIndex]
-					}
-					uLcuuid = common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
-					if k.podGroupLcuuids.Contains(uLcuuid) {
-						log.Debugf("sci pod (%s) abstract workload already existed", name)
-						continue
-					}
+
 					typeName := strings.ToLower(abstractPGType)
-					serviceType = pgNameToTypeID[typeName]
+					serviceType, ok = pgNameToTypeID[typeName]
+					if !ok {
+						log.Infof("pod (%s) abstract workload type (%s) not support", name, abstractPGType, logger.NewORGPrefix(k.orgID))
+						continue
+					}
+
+					abstractUID := common.GetUUIDByOrgID(k.orgID, namespace+abstractPGName)
+					k.podLcuuidToPGInfo[uID] = [2]string{abstractUID, abstractPGType}
+					uLcuuid = common.IDGenerateUUID(k.orgID, abstractUID)
+					if k.podGroupLcuuids.Contains(uLcuuid) {
+						log.Debugf("pod (%s) abstract workload already existed", name, logger.NewORGPrefix(k.orgID))
+						continue
+					}
 					label = typeName + ":" + namespace + ":" + abstractPGName
 					name = abstractPGName
 				}
@@ -199,7 +200,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				Name:               name,
 				Label:              k.GetLabel(labels),
 				Type:               serviceType,
-				PodNum:             replicas,
+				PodNum:             cData.Get("spec").Get("replicas").MustInt(),
 				PodNamespaceLcuuid: namespaceLcuuid,
 				AZLcuuid:           k.azLcuuid,
 				RegionLcuuid:       k.RegionUUID,
@@ -210,40 +211,40 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			k.pgLcuuidTopodTargetPorts[uLcuuid] = podTargetPorts
 		}
 	}
-	log.Debug("get podgroups complete")
+	log.Debug("get podgroups complete", logger.NewORGPrefix(k.orgID))
 	return
 }
 
 func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGroup, err error) {
-	log.Debug("get replicationcontrollers starting")
+	log.Debug("get replicationcontrollers starting", logger.NewORGPrefix(k.orgID))
 	for _, r := range k.k8sInfo["*v1.ReplicationController"] {
 		podTargetPorts := map[string]int{}
 		rData, rErr := simplejson.NewJson([]byte(r))
 		if rErr != nil {
 			err = rErr
-			log.Errorf("replicationcontroller initialization simplejson error: (%s)", rErr.Error())
+			log.Errorf("replicationcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
 		metaData, ok := rData.CheckGet("metadata")
 		if !ok {
-			log.Info("replicationcontroller metadata not found")
+			log.Info("replicationcontroller metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uID := metaData.Get("uid").MustString()
 		if uID == "" {
-			log.Info("replicationcontroller uid not found")
+			log.Info("replicationcontroller uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		name := metaData.Get("name").MustString()
 		if name == "" {
-			log.Infof("replicationcontroller (%s) name not found", uID)
+			log.Infof("replicationcontroller (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 		namespace := metaData.Get("namespace").MustString()
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
-			log.Infof("replicationcontroller (%s) namespace not found", name)
+			log.Infof("replicationcontroller (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		label := "replicationcontroller:" + namespace + ":" + name
@@ -289,13 +290,12 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 			}
 		}
 
-		podNum := rData.Get("spec").Get("replicas").MustInt()
 		podRC := model.PodGroup{
 			Lcuuid:             uLcuuid,
 			Name:               name,
 			Label:              k.GetLabel(labels),
 			Type:               serviceType,
-			PodNum:             podNum,
+			PodNum:             rData.Get("spec").Get("replicas").MustInt(),
 			RegionLcuuid:       k.RegionUUID,
 			AZLcuuid:           k.azLcuuid,
 			PodNamespaceLcuuid: namespaceLcuuid,
@@ -305,6 +305,6 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 		k.podGroupLcuuids.Add(uLcuuid)
 		k.pgLcuuidTopodTargetPorts[uLcuuid] = podTargetPorts
 	}
-	log.Debug("get replicationcontrollers complete")
+	log.Debug("get replicationcontrollers complete", logger.NewORGPrefix(k.orgID))
 	return
 }

@@ -29,8 +29,9 @@ import (
 type VIP struct {
 	UpdaterBase[
 		cloudmodel.VIP,
-		mysql.VIP,
 		*diffbase.VIP,
+		*mysql.VIP,
+		mysql.VIP,
 		*message.VIPAdd,
 		message.VIPAdd,
 		*message.VIPUpdate,
@@ -45,8 +46,9 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 	updater := &VIP{
 		newUpdaterBase[
 			cloudmodel.VIP,
-			mysql.VIP,
 			*diffbase.VIP,
+			*mysql.VIP,
+			mysql.VIP,
 			*message.VIPAdd,
 			message.VIPAdd,
 			*message.VIPUpdate,

@@ -29,8 +29,9 @@ import (
 type PodIngressRuleBackend struct {
 	UpdaterBase[
 		cloudmodel.PodIngressRuleBackend,
-		mysql.PodIngressRuleBackend,
 		*diffbase.PodIngressRuleBackend,
+		*mysql.PodIngressRuleBackend,
+		mysql.PodIngressRuleBackend,
 		*message.PodIngressRuleBackendAdd,
 		message.PodIngressRuleBackendAdd,
 		*message.PodIngressRuleBackendUpdate,
@@ -45,8 +46,9 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 	updater := &PodIngressRuleBackend{
 		newUpdaterBase[
 			cloudmodel.PodIngressRuleBackend,
-			mysql.PodIngressRuleBackend,
 			*diffbase.PodIngressRuleBackend,
+			*mysql.PodIngressRuleBackend,
+			mysql.PodIngressRuleBackend,
 			*message.PodIngressRuleBackendAdd,
 			message.PodIngressRuleBackendAdd,
 			*message.PodIngressRuleBackendUpdate,
@@ -74,26 +76,26 @@ func (b *PodIngressRuleBackend) getDiffBaseByCloudItem(cloudItem *cloudmodel.Pod
 func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRuleBackend) (*mysql.PodIngressRuleBackend, bool) {
 	podIngressRuleID, exists := b.cache.ToolDataSet.GetPodIngressRuleIDByLcuuid(cloudItem.PodIngressRuleLcuuid)
 	if !exists {
-		log.Error(b.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, cloudItem.PodIngressRuleLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, cloudItem.Lcuuid,
-		)))
+		), b.metadata.LogPrefixes)
 		return nil, false
 	}
 	podIngressID, exists := b.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 	if !exists {
-		log.Error(b.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, cloudItem.Lcuuid,
-		)))
+		), b.metadata.LogPrefixes)
 		return nil, false
 	}
 	podServiceID, exists := b.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
 	if !exists {
-		log.Error(b.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, cloudItem.Lcuuid,
-		)))
+		), b.metadata.LogPrefixes)
 		return nil, false
 	}
 

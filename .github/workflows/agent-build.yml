@@ -2,6 +2,8 @@ on:
   push:
     branches:
       - main
+      - v6.[1-9]
+      - v7.[1-9]
       - 'feature-**'
     paths:
       - 'agent/**'
@@ -14,10 +16,6 @@ on:
         description: "Why trigger?"
         required: true 
         type: string
-#   release:
-#     branches: 
-#       - main
-#       - release-*
 
 name: build agent
 

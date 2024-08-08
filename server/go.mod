@@ -10,7 +10,10 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table => ./controller/db/mysql/migrator/table
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
+	github.com/deepflowio/deepflow/server/controller/logger/blocker => ./controller/logger/blocker
 	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
+	github.com/deepflowio/deepflow/server/ingester/config/configdefaults => ./ingester/config/configdefaults
+	github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap => ./querier/app/distributed_tracing/service/tracemap
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter => ./querier/app/prometheus/router/packet_adapter
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper => ./querier/app/prometheus/service/packet_wrapper
 	github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service => ./querier/app/tracing-adapter/service/packet_service
@@ -36,13 +39,13 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240508092310-e45a3d549f9b
+	github.com/deepflowio/deepflow/message v0.0.0-20240725065348-535fb6f1efdc
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/controller/http/service/configuration v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/ingester/config/configdefaults v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/tempopb v0.0.0-20230215110519-15853baf3a79
 	github.com/docker/go-units v0.4.0
@@ -56,7 +59,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
-	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
@@ -97,7 +99,10 @@ require (
 	bou.ke/monkey v1.0.2
 	github.com/IBM/sarama v1.43.0
 	github.com/aws/aws-sdk-go-v2/service/eks v1.26.0
+	github.com/bytedance/sonic v1.11.8
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/logger/blocker v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/service/packet_service v0.0.0-00010101000000-000000000000
@@ -108,18 +113,20 @@ require (
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pyroscope-io/pyroscope v0.37.1
+	github.com/volcengine/volcengine-go-sdk v1.0.141
 	go.opentelemetry.io/collector/pdata v1.0.0
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	skywalking.apache.org/repo/goapi v0.0.0-20230712035303-201c1fb2d6ec
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/DataDog/zstd v1.4.1 // indirect
-	github.com/bytedance/sonic v1.11.2 // indirect
+	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
-	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
-	github.com/chenzhuoyu/iasm v0.9.1 // indirect
+	github.com/cloudwego/base64x v0.1.4 // indirect
+	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.2 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 // indirect
@@ -149,6 +156,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/volcengine/volc-sdk-golang v1.0.23 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240308144416-29370a3891b7 // indirect
@@ -189,7 +197,7 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.19.0 // indirect
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/goccy/go-json v0.10.2
 	github.com/golang/snappy v0.0.4
 	github.com/google/gnostic v0.5.7-v3refs // indirect
@@ -234,6 +242,7 @@ require (
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
+	github.com/yuin/gopher-lua v1.1.1
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	go.opentelemetry.io/otel v1.24.0
@@ -242,17 +251,17 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/goleak v1.1.12 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
-	go4.org/unsafe/assume-no-moving-gc v0.0.0-20230426161633-7e06285ff160 // indirect
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
 	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/oauth2 v0.19.0 // indirect
 	golang.org/x/sync v0.7.0
 	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.70.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect

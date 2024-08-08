@@ -20,7 +20,7 @@ use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
-    Arc, Mutex,
+    Arc, Mutex, RwLock,
 };
 use std::thread;
 use std::time::Duration;
@@ -72,20 +72,20 @@ pub(super) struct BaseDispatcher {
     pub(super) src_interface_index: u32,
     pub(super) src_interface: String,
     pub(super) ctrl_mac: MacAddr,
-    pub(super) local_dispatcher_count: usize,
 
     pub(super) options: Arc<Mutex<Options>>,
     pub(super) bpf_options: Arc<Mutex<BpfOptions>>,
 
     pub(super) leaky_bucket: Arc<LeakyBucket>,
-    pub(super) handler_builder: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    pub(super) handler_builder: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     pub(super) pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
     pub(super) log_parse_config: LogParserAccess,
     pub(super) collector_config: CollectorAccess,
 
-    pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
+    pub(super) tunnel_type_bitmap: Arc<RwLock<TunnelTypeBitmap>>,
+    pub(super) tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub(super) tunnel_info: TunnelInfo,
 
     pub(super) tap_type_handler: TapTypeHandler,
@@ -121,6 +121,8 @@ pub(super) struct BaseDispatcher {
 
     #[cfg(target_os = "linux")]
     pub(super) netns: public::netns::NsFile,
+
+    pub(super) bond_group_map: HashMap<u32, MacAddr>,
 
     // dispatcher id for easy debugging
     pub log_id: String,
@@ -166,6 +168,7 @@ impl BaseDispatcher {
             analyzer_ip: default_address.to_string(),
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
+            tunnel_type_trim_bitmap: self.tunnel_type_trim_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
             #[cfg(target_os = "linux")]
             netns: self.netns.clone(),
@@ -173,7 +176,7 @@ impl BaseDispatcher {
             log_id: self.log_id.clone(),
             reset_whitelist: self.reset_whitelist.clone(),
             pause: self.pause.clone(),
-            local_dispatcher_count: self.local_dispatcher_count,
+            bond_group_map: self.bond_group_map.clone(),
         }
     }
 
@@ -340,6 +343,7 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
+        trim_bitmap: &TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         let mut decap_len = 0;
         let mut tap_type = TapType::Any;
@@ -357,7 +361,7 @@ impl BaseDispatcher {
             if tunnel_info.tunnel_type == TunnelType::None {
                 break;
             }
-            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
+            if trim_bitmap.has(tunnel_info.tunnel_type) {
                 // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
                 // vxlan-erspan：隧道信息为空
                 // erspan-vxlan；隧道信息为vxlan，隧道层数为1
@@ -377,9 +381,10 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
+        trim_bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         *tunnel_info = Default::default();
-        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
+        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
 
     pub(super) fn check_and_update_bpf(&mut self) {
@@ -463,6 +468,7 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
+        trim_bitmap: &TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         let mut decap_len = 0;
         let mut tap_type = TapType::Any;
@@ -480,7 +486,7 @@ impl BaseDispatcher {
             if tunnel_info.tunnel_type == TunnelType::None {
                 break;
             }
-            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
+            if trim_bitmap.has(tunnel_info.tunnel_type) {
                 // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
                 // vxlan-erspan：隧道信息为空
                 // erspan-vxlan；隧道信息为vxlan，隧道层数为1
@@ -497,9 +503,10 @@ impl BaseDispatcher {
         tap_type_handler: &TapTypeHandler,
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
+        trim_bitmap: TunnelTypeBitmap,
     ) -> Result<(usize, TapType)> {
         *tunnel_info = Default::default();
-        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
+        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
 
     pub(super) fn check_and_update_bpf(&mut self) {
@@ -539,39 +546,86 @@ pub(super) struct TapTypeHandler {
 }
 
 impl TapTypeHandler {
+    const OUTER_VLAN: u16 = 8;
+    const INNER_VLAN: u16 = 9;
+
     // returns tap_type, ethernet_type and l2_len
     pub(super) fn get_l2_info(&self, packet: &[u8]) -> Result<(TapType, EthernetType, usize)> {
         let mut eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE..]);
         let mut tap_type = self.default_tap_type;
-        let mut l2_len = ETH_HEADER_SIZE;
-        if eth_type == EthernetType::DOT1Q && packet.len() >= ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
+        let mut l2_opt_size = 0;
+        let (outer_vlan_tag, inner_vlan_tag) = if eth_type == EthernetType::DOT1Q
+            && packet.len() >= ETH_HEADER_SIZE + VLAN_HEADER_SIZE
+        {
             let vlan_tag = read_u16_be(&packet[ETH_HEADER_SIZE..]);
-            eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE..]);
-            // tap_type从qinq外层的vlan获取
-            let pcp = (vlan_tag >> 13) & 0x7;
-            if pcp == self.mirror_traffic_pcp && self.tap_mode == TapMode::Analyzer {
-                let vid = vlan_tag & VLAN_ID_MASK;
-                if let Some(t) = self.tap_typer.get_tap_type_by_vlan(vid) {
+            l2_opt_size += VLAN_HEADER_SIZE;
+            eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + l2_opt_size..]);
+            if eth_type == EthernetType::DOT1Q
+                && packet.len() >= ETH_HEADER_SIZE + 2 * VLAN_HEADER_SIZE
+            {
+                l2_opt_size += VLAN_HEADER_SIZE;
+                eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + l2_opt_size..]);
+                (
+                    vlan_tag,
+                    read_u16_be(&packet[ETH_HEADER_SIZE + VLAN_HEADER_SIZE..]),
+                )
+            } else {
+                (vlan_tag, vlan_tag)
+            }
+        } else {
+            (0, 0)
+        };
+
+        if self.tap_mode == TapMode::Analyzer {
+            if l2_opt_size == 0 {
+                if let Some(t) = self.tap_typer.get_tap_type_by_vlan(0) {
                     if t != TapType::Unknown {
                         tap_type = t;
                     }
                 }
-            }
-            l2_len += VLAN_HEADER_SIZE;
-            if eth_type == EthernetType::DOT1Q
-                && packet.len() >= ETH_HEADER_SIZE + 2 * VLAN_HEADER_SIZE
-            {
-                eth_type = read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + 2 * VLAN_HEADER_SIZE..]);
-                l2_len += VLAN_HEADER_SIZE;
-            }
-        } else if self.tap_mode == TapMode::Analyzer {
-            if let Some(t) = self.tap_typer.get_tap_type_by_vlan(0) {
-                if t != TapType::Unknown {
-                    tap_type = t;
-                }
+            } else {
+                match self.mirror_traffic_pcp {
+                    Self::OUTER_VLAN => {
+                        if let Some(t) = self
+                            .tap_typer
+                            .get_tap_type_by_vlan(outer_vlan_tag & VLAN_ID_MASK)
+                        {
+                            if t != TapType::Unknown {
+                                tap_type = t;
+                            }
+                        }
+                    }
+                    Self::INNER_VLAN => {
+                        if let Some(t) = self
+                            .tap_typer
+                            .get_tap_type_by_vlan(inner_vlan_tag & VLAN_ID_MASK)
+                        {
+                            if t != TapType::Unknown {
+                                tap_type = t;
+                            }
+                        }
+                    }
+                    _ => {
+                        if (outer_vlan_tag >> 13) & 0x7 == self.mirror_traffic_pcp {
+                            if let Some(t) = self
+                                .tap_typer
+                                .get_tap_type_by_vlan(outer_vlan_tag & VLAN_ID_MASK)
+                            {
+                                if t != TapType::Unknown {
+                                    tap_type = t;
+                                }
+                            }
+                        }
+                    }
+                };
             }
         }
-        Ok((tap_type, EthernetType::from(eth_type), l2_len))
+
+        Ok((
+            tap_type,
+            EthernetType::from(eth_type),
+            ETH_HEADER_SIZE + l2_opt_size,
+        ))
     }
 }
 
@@ -625,16 +679,18 @@ pub struct BaseDispatcherListener {
     pub src_interface_index: usize,
     pub options: Arc<Mutex<Options>>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
-    pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
+    pub handler_builders: Arc<RwLock<Vec<PacketHandlerBuilder>>>,
     pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_bpf: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
     pub platform_poller: Arc<crate::platform::GenericPoller>,
-    pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
+    pub tunnel_type_bitmap: Arc<RwLock<TunnelTypeBitmap>>,
+    pub tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub npb_dedup_enabled: Arc<AtomicBool>,
     pub reset_whitelist: Arc<AtomicBool>,
     pub pause: Arc<AtomicBool>,
+    pub bond_group_map: HashMap<u32, MacAddr>,
     capture_bpf: String,
     proxy_controller_ip: String,
     analyzer_ip: String,
@@ -645,12 +701,11 @@ pub struct BaseDispatcherListener {
 
     // dispatcher id for easy debugging
     pub log_id: String,
-    pub local_dispatcher_count: usize,
 }
 
 impl BaseDispatcherListener {
     fn on_decap_type_change(&mut self, config: &DispatcherConfig) {
-        let mut old_map = self.tunnel_type_bitmap.lock().unwrap();
+        let mut old_map = self.tunnel_type_bitmap.write().unwrap();
         if *old_map != config.tunnel_type_bitmap {
             info!("Decap tunnel type change to {}", config.tunnel_type_bitmap);
             *old_map = config.tunnel_type_bitmap;
@@ -770,15 +825,21 @@ impl BaseDispatcherListener {
             added.push(vm_mac);
             let handlers = self
                 .handler_builders
-                .lock()
+                .read()
                 .unwrap()
                 .iter()
                 .map(|b| b.build_with(self.id, *key, vm_mac))
                 .collect();
+            let bond_mac = self
+                .bond_group_map
+                .get(key)
+                .unwrap_or_else(|| &vm_mac)
+                .clone();
             pipelines.insert(
                 *key,
                 Arc::new(Mutex::new(Pipeline {
                     vm_mac,
+                    bond_mac,
                     handlers,
                     timestamp: Duration::ZERO,
                 })),
@@ -821,7 +882,6 @@ impl BaseDispatcherListener {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, deepflow-agent restart...");
             crate::utils::notify_exit(1);
-            thread::sleep(Duration::from_secs(1));
         }
     }
 }

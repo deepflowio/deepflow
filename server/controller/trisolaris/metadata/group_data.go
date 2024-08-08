@@ -82,8 +82,7 @@ func (g *GroupProto) SetStartTime(startTime int64) {
 	g.startTime = startTime
 }
 
-func (g *GroupProto) checkVersion(groupHash uint64) bool {
-	changed := false
+func (g *GroupProto) checkVersion(groupHash uint64) {
 	if g.groupHash != groupHash {
 		g.groupHash = groupHash
 		if g.groupVersion == 0 {
@@ -92,9 +91,7 @@ func (g *GroupProto) checkVersion(groupHash uint64) bool {
 			atomic.AddUint64(&g.groupVersion, 1)
 		}
 		log.Infof(g.Logf("group data changed to %s", g))
-		changed = true
 	}
-	return changed
 }
 
 func (g *GroupProto) GetVersion() uint64 {
@@ -113,7 +110,7 @@ func (g *GroupProto) GenerateIngesterGroup(groupData *GroupData) {
 	g.generateGroupProto(groupData.groupsProto, groupData.svcsProto)
 }
 
-func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*trident.ServiceInfo) bool {
+func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*trident.ServiceInfo) {
 	groups := &trident.Groups{
 		Groups: groupsProto,
 		Svcs:   svcs,
@@ -123,12 +120,10 @@ func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*tr
 		g.updateGroups(groupBytes)
 		h64 := fnv.New64()
 		h64.Write(groupBytes)
-		return g.checkVersion(h64.Sum64())
+		g.checkVersion(h64.Sum64())
 	} else {
 		log.Error(g.Log(err.Error()))
 	}
-
-	return false
 }
 
 type GroupData struct {
@@ -153,13 +148,11 @@ func (d *GroupData) Merge(other *GroupData) {
 }
 
 type GroupDataOP struct {
-	metaData                  *MetaData
-	serviceDataOP             *ServiceDataOP
-	groupRawData              *GroupRawData
-	tridentGroupProto         *GroupProto
-	dropletGroupProto         *GroupProto
-	dropletGroupData          *GroupData
-	nodifyIngesterDataChanged func()
+	metaData          *MetaData
+	serviceDataOP     *ServiceDataOP
+	groupRawData      *GroupRawData
+	tridentGroupProto *GroupProto
+	dropletGroupProto *GroupProto
 	ORGID
 }
 
@@ -170,7 +163,6 @@ func newGroupDataOP(metaData *MetaData) *GroupDataOP {
 		metaData:          metaData,
 		tridentGroupProto: NewGroupProto(metaData.ORGID, metaData.startTime),
 		dropletGroupProto: NewGroupProto(metaData.ORGID, metaData.startTime),
-		dropletGroupData:  NewGroupData(nil, nil),
 		ORGID:             metaData.ORGID,
 	}
 }
@@ -180,10 +172,6 @@ var tridentGroup = []int{NPB_BUSINESS_ID, PCAP_BUSINESS_ID}
 type GroupIP struct {
 	cidrs    []string
 	ipRanges []string
-}
-
-func (g *GroupDataOP) RegisteNotifyIngesterDatachanged(notify func()) {
-	g.nodifyIngesterDataChanged = notify
 }
 
 func (g *GroupDataOP) SetStartTime(startTime int64) {
@@ -213,10 +201,6 @@ func (g *GroupDataOP) getDropletGroups() []byte {
 
 func (g *GroupDataOP) getDropletGroupsVersion() uint64 {
 	return g.dropletGroupProto.GetVersion()
-}
-
-func (g *GroupDataOP) GetDropletGroupsData() *GroupData {
-	return g.dropletGroupData
 }
 
 // The data traversal must be kept in order to ensure
@@ -597,12 +581,7 @@ func (g *GroupDataOP) generateTridentGroupProto() {
 func (g *GroupDataOP) generateDropletGroupProto() {
 	groupsProto := g.generateResourceGroupData(g.groupRawData.dropletGroups)
 	svcsProto := g.serviceDataOP.GetServiceData()
-	g.dropletGroupData = NewGroupData(groupsProto, svcsProto)
-	if g.dropletGroupProto.generateGroupProto(groupsProto, svcsProto) == true {
-		if g.nodifyIngesterDataChanged != nil {
-			g.nodifyIngesterDataChanged()
-		}
-	}
+	g.dropletGroupProto.generateGroupProto(groupsProto, svcsProto)
 }
 
 func (g *GroupDataOP) generateGroupData() {

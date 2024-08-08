@@ -19,7 +19,7 @@ package encoder
 import (
 	"sync"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -44,7 +44,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	var items []*mysql.PrometheusLabelValue
 	err := lv.org.DB.Unscoped().Find(&items).Error
 	if err != nil {
-		log.Error(lv.org.Logf("db query %s failed: %v", lv.resourceType, err))
+		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
 		return err
 	}
 	for _, item := range items {
@@ -73,7 +73,7 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 
 	err := addBatch(lv.org.DB, dbToAdd, lv.resourceType)
 	if err != nil {
-		log.Error(lv.org.Logf("add %s error: %s", lv.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", lv.resourceType, err.Error(), lv.org.LogPrefix)
 		return nil, err
 	}
 	for i := range dbToAdd {

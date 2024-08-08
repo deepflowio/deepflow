@@ -35,10 +35,6 @@ import (
 
 var CAMD5 string
 
-func init() {
-	CAMD5 = getCAMD5()
-}
-
 func GenerateAesKey(input []byte) string {
 	return fmt.Sprintf("%x", md5.Sum(input))
 }

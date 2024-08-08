@@ -30,8 +30,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
-func ListDomainAdditionalResource(resourceType, resourceName string) (map[string]interface{}, error) {
-	resource, err := GetDomainAdditionalResource(resourceType, resourceName)
+func ListDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql.DB) (map[string]interface{}, error) {
+	resource, err := GetDomainAdditionalResource(resourceType, resourceName, orgDB)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +41,8 @@ func ListDomainAdditionalResource(resourceType, resourceName string) (map[string
 	return data, nil
 }
 
-func GetDomainAdditionalResource(resourceType, resourceName string) (*model.AdditionalResource, error) {
-	domainToResource, err := getResourceFromDB()
+func GetDomainAdditionalResource(resourceType, resourceName string, orgDB *mysql.DB) (*model.AdditionalResource, error) {
+	domainToResource, err := getResourceFromDB(orgDB)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func GetDomainAdditionalResource(resourceType, resourceName string) (*model.Addi
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
 		case "cloud-tag":
-			cloudTags, err := getClouTags(resource, domain, resourceName)
+			cloudTags, err := getClouTags(orgDB, resource, domain, resourceName)
 			if err != nil {
 				return nil, err
 			}
@@ -79,7 +79,7 @@ func GetDomainAdditionalResource(resourceType, resourceName string) (*model.Addi
 			resp.CHosts = append(resp.CHosts, getCHosts(resource.CHosts, resource.VInterfaces, resource.IPs, domain, resourceName)...)
 			resp.LB = append(resp.LB, getLBs(resource.LB, resource.LBListeners, resource.LBTargetServers,
 				resource.VInterfaces, resource.IPs, domain, resourceName)...)
-			cloudTags, err := getClouTags(resource, domain, resourceName)
+			cloudTags, err := getClouTags(orgDB, resource, domain, resourceName)
 			if err != nil {
 				return nil, err
 			}
@@ -273,11 +273,11 @@ func convertToUpperMap(data map[string]interface{}, v reflect.Value) {
 	}
 }
 
-func getResourceFromDB() (map[string]*cloudmodel.AdditionalResource, error) {
+func getResourceFromDB(orgDB *mysql.DB) (map[string]*cloudmodel.AdditionalResource, error) {
 	var items []mysql.DomainAdditionalResource
-	mysql.Db.Select("domain", "content").Where("content!=''").Find(&items)
+	orgDB.Select("domain", "content").Where("content!=''").Find(&items)
 	if len(items) == 0 {
-		mysql.Db.Select("domain", "compressed_content").Find(&items)
+		orgDB.Select("domain", "compressed_content").Find(&items)
 		if len(items) == 0 {
 			return nil, gorm.ErrRecordNotFound
 		}
@@ -291,7 +291,7 @@ func getResourceFromDB() (map[string]*cloudmodel.AdditionalResource, error) {
 		}
 		additionalResource := &cloudmodel.AdditionalResource{}
 		if err := json.Unmarshal(content, &additionalResource); err != nil {
-			log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", item.Domain, err.Error())
+			log.Errorf("domain (lcuuid: %s) json unmarshal content failed: %s", item.Domain, err.Error(), orgDB.LogPrefixORGID)
 			continue
 		}
 		domainToResource[item.Domain] = additionalResource
@@ -323,20 +323,20 @@ func getVinterfaces(deviceUUID string, vifs []cloudmodel.VInterface, ips []cloud
 	return resp
 }
 
-func getClouTags(resource *cloudmodel.AdditionalResource, domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
+func getClouTags(orgDB *mysql.DB, resource *cloudmodel.AdditionalResource, domain, resourceName string) ([]model.AdditionalResourceCloudTag, error) {
 	chostUUIDToName := make(map[string]string)
 	podNSUUIDToName := make(map[string]string)
 	podNSUUIDToSubdomain := make(map[string]string)
 
 	var vms []mysql.VM
-	if err := mysql.Db.Find(&vms).Error; err != nil {
+	if err := orgDB.Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	for _, vm := range vms {
 		chostUUIDToName[vm.Lcuuid] = vm.Name
 	}
 	var podNamespaces []mysql.PodNamespace
-	if err := mysql.Db.Find(&podNamespaces).Error; err != nil {
+	if err := orgDB.Find(&podNamespaces).Error; err != nil {
 		return nil, err
 	}
 	for _, podNS := range podNamespaces {

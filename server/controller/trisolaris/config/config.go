@@ -20,12 +20,11 @@ import (
 	"net"
 	"os"
 
-	"github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("trisolaris/config")
+var log = logger.MustGetLogger("trisolaris.config")
 
 type Chrony struct {
 	Host    string `default:"chrony" yaml:"host"`
@@ -61,6 +60,10 @@ type Config struct {
 	ExportersEnabled               bool
 	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
 	NoTeamIDRefused                bool
+	FPermit                        common.FPermit
+	IngesterAPI                    common.IngesterApi // data source
+	AllAgentConnectToNatIP         bool
+	NoIPOverlapping                bool
 }
 
 func (c *Config) Convert() {
@@ -83,6 +86,22 @@ func (c *Config) Convert() {
 	}
 }
 
+func (c *Config) SetAllAgentConnectToNatIP(data bool) {
+	c.AllAgentConnectToNatIP = data
+}
+
+func (c *Config) GetAllAgentConnectToNatIP() bool {
+	return c.AllAgentConnectToNatIP
+}
+
+func (c *Config) SetNoIPOverlapping(data bool) {
+	c.NoIPOverlapping = data
+}
+
+func (c *Config) GetNoIPOverlapping() bool {
+	return c.NoIPOverlapping
+}
+
 func (c *Config) SetGrpcPort(port int) {
 	c.GrpcPort = port
 }
@@ -97,6 +116,14 @@ func (c *Config) GetGrpcPort() int {
 
 func (c *Config) GetIngesterPort() int {
 	return c.IngesterPort
+}
+
+func (c *Config) SetIngesterAPI(ingesterAPI common.IngesterApi) {
+	c.IngesterAPI = ingesterAPI
+}
+
+func (c *Config) GetIngesterAPI() common.IngesterApi {
+	return c.IngesterAPI
 }
 
 func (c *Config) SetLogLevel(logLevel string) {
@@ -133,4 +160,12 @@ func (c *Config) SetNoTeamIDRefused(refused bool) {
 
 func (c *Config) GetNoTeamIDRefused() bool {
 	return c.NoTeamIDRefused
+}
+
+func (c *Config) SetFPermitConfig(fpermit common.FPermit) {
+	c.FPermit = fpermit
+}
+
+func (c *Config) GetFPermitConfig() common.FPermit {
+	return c.FPermit
 }

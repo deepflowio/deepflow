@@ -17,7 +17,7 @@
 package encoder
 
 import (
-	"errors"
+	"fmt"
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -57,11 +57,13 @@ func newIDAllocator(org *common.ORG, resourceType string, min, max int) idAlloca
 
 func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 	if len(ia.usableIDs) == 0 {
-		return nil, errors.New(ia.org.Logf("%s has no more usable ids, usable ids count: 0", ia.resourceType))
+		log.Errorf("%s has no more usable ids, usable ids count: 0", ia.resourceType, ia.org.LogPrefix)
+		return nil, fmt.Errorf("%s has no more usable ids, usable ids count: 0", ia.resourceType)
 	}
 
 	if len(ia.usableIDs) < count {
-		return nil, errors.New(ia.org.Logf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count))
+		log.Errorf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count, ia.org.LogPrefix)
+		return nil, fmt.Errorf("%s has no more usable ids, usable ids count: %d, except ids count: %d", ia.resourceType, len(ia.usableIDs), count)
 	}
 
 	ids = make([]int, count)
@@ -72,28 +74,23 @@ func (ia *idAllocator) allocate(count int) (ids []int, err error) {
 		return
 	}
 	if len(inUseIDs) != 0 {
-		return nil, errors.New(ia.org.Logf("%s ids: %v are in use", ia.resourceType, inUseIDs))
+		log.Errorf("%s ids: %v are in use", ia.resourceType, inUseIDs, ia.org.LogPrefix)
+		return nil, fmt.Errorf("%s ids: %v are in use", ia.resourceType, inUseIDs)
 	}
 
-	log.Info(ia.org.Logf("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids)))
+	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", ia.resourceType, ids, count, len(ids), ia.org.LogPrefix)
 	ia.usableIDs = ia.usableIDs[count:]
 	return
 }
 
-func (ia *idAllocator) recycle(ids []int) {
-	ia.sorter.sort(ids)
-	ia.usableIDs = append(ia.usableIDs, ids...)
-	log.Info(ia.org.Logf("recycle %s ids: %v", ia.resourceType, ids))
-}
-
 func (ia *idAllocator) refresh() error {
-	log.Debug(ia.org.Logf("refresh %s id pools started", ia.resourceType))
+	log.Debugf("refresh %s id pools started", ia.resourceType, ia.org.LogPrefix)
 	inUseIDSet, err := ia.rawDataProvider.load()
 	if err != nil {
 		return err
 	}
 	ia.usableIDs = ia.getSortedUsableIDs(ia.getAllIDSet(), inUseIDSet)
-	log.Debug(ia.org.Logf("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs)))
+	log.Debugf("refresh %s id pools (usable ids count: %d) completed", ia.resourceType, len(ia.usableIDs), ia.org.LogPrefix)
 	return nil
 }
 
@@ -115,18 +112,21 @@ func (ia *idAllocator) getSortedUsableIDs(allIDSet, inUseIDSet mapset.Set[int]) 
 		usableIDSet := allIDSet.Difference(inUseIDSet)
 		usableIDs = ia.sorter.sortSet(usableIDSet)
 
-		// usable ids that have been used and returned
-		// 可用 id 中被使用过后已归还的 id
-		usedIDSet := ia.sorter.getUsedIDSet(usableIDs, inUseIDSet)
-		usedIDs := ia.sorter.sortSet(usedIDSet)
+		// 通过直接查询 clickhouse 检查数据活跃度后再删除 MySQL 无效数据，不需要考虑立刻使用已归还的 id 会产生 MySQL 与 clickhouse 数据 id 不一致的问题，
+		// 注释掉以下代码，后续根据实际情况决定是否删除。
 
-		// usable ids that have not been used
-		// 可用 id 中未被使用过的 id
-		unusedIDs := ia.sorter.sortSet(usableIDSet.Difference(usedIDSet))
+		// // usable ids that have been used and returned
+		// // 可用 id 中被使用过后已归还的 id
+		// usedIDSet := ia.sorter.getUsedIDSet(usableIDs, inUseIDSet)
+		// usedIDs := ia.sorter.sortSet(usedIDSet)
 
-		// id pool allocation order: ids that have not been used first, ids that have been returned after use
-		// id 池分配顺序：未被使用过的 id 优先，被使用过后已归还的 id 在后
-		usableIDs = append(unusedIDs, usedIDs...)
+		// // usable ids that have not been used
+		// // 可用 id 中未被使用过的 id
+		// unusedIDs := ia.sorter.sortSet(usableIDSet.Difference(usedIDSet))
+
+		// // id pool allocation order: ids that have not been used first, ids that have been returned after use
+		// // id 池分配顺序：未被使用过的 id 优先，被使用过后已归还的 id 在后
+		// usableIDs = append(unusedIDs, usedIDs...)
 	}
 	return usableIDs
 }

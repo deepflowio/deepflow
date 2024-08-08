@@ -21,10 +21,12 @@ import (
 	"time"
 
 	dropletqueue "github.com/deepflowio/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowio/deepflow/server/ingester/profile/config"
 	"github.com/deepflowio/deepflow/server/ingester/profile/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/profile/decoder"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -74,6 +76,10 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 			}
 			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_PROFILE, platformDatas[i])
 		}
+		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, dbwriter.PROFILE_DB, config.ProfileTTL, ckdb.TimeFuncTwelveHour, config.Base)
+		if err != nil {
+			return nil, err
+		}
 		profileWriter, err := dbwriter.NewProfileWriter(datatype.MESSAGE_TYPE_PROFILE, i, config)
 		if err != nil {
 			return nil, err
@@ -82,9 +88,11 @@ func NewProfiler(msgType datatype.MessageType, config *config.Config, platformDa
 			i,
 			msgType,
 			*config.CompressionAlgorithm,
+			config.OffCpuSplittingGranularity,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			profileWriter,
+			appServiceTagWriter,
 		)
 	}
 	return &Profiler{

@@ -205,7 +205,7 @@ func (t *TransportLayer) WriteBlock(block *ckdb.Block) {
 }
 
 type ApplicationLayer struct {
-	L7Protocol uint8 `json:"l7_protocol"` // HTTP, DNS, others
+	L7Protocol uint8 `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"` // HTTP, DNS, others
 }
 
 var ApplicationLayerColumns = []*ckdb.Column{
@@ -728,39 +728,52 @@ func (k *KnowledgeGraph) fill(
 	tapSide uint32,
 	protocol layers.IPProtocol) {
 
-	var info0, info1 *grpc.Info
+	var info0, info1, agentInfo *grpc.Info
 
 	// 对于VIP的流量，需要使用MAC来匹配
 	lookupByMac0, lookupByMac1 := isVipInterface0, isVipInterface1
+	lookupByAgent0, lookupByAgent1 := false, false
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(flow_metrics.Local) {
 		// for local non-unicast IPs, MAC matching is preferred.
 		if isLocalIP(isIPv6, ip40, ip60) {
-			lookupByMac0 = true
+			if mac0 != 0 {
+				lookupByMac0 = true
+			} else {
+				lookupByAgent0 = true
+			}
 		}
 		if isLocalIP(isIPv6, ip41, ip61) {
-			lookupByMac1 = true
+			if mac1 != 0 {
+				lookupByMac1 = true
+			} else {
+				lookupByAgent1 = true
+			}
 		}
 	} else if tapSide == uint32(flow_metrics.ClientProcess) || tapSide == uint32(flow_metrics.ServerProcess) {
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
 			lookupByMac0 = true
+		} else if isLocalIP(isIPv6, ip40, ip60) {
+			lookupByAgent0 = true
 		}
 		if mac1 != 0 {
 			lookupByMac1 = true
+		} else if isLocalIP(isIPv6, ip41, ip61) {
+			lookupByAgent1 = true
 		}
 	}
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
 	if gpID0 != 0 && podId0 == 0 {
-		vtapID, podId := platformData.QueryGprocessInfo(gpID0)
+		vtapID, podId := platformData.QueryGprocessInfo(k.OrgId, gpID0)
 		if podId != 0 && vtapID == vtapId {
 			podId0 = podId
 			k.TagSource0 |= uint8(flow_metrics.GpId)
 		}
 	}
 	if gpID1 != 0 && podId1 == 0 {
-		vtapID, podId := platformData.QueryGprocessInfo(gpID1)
+		vtapID, podId := platformData.QueryGprocessInfo(k.OrgId, gpID1)
 		if podId != 0 && vtapID == vtapId {
 			podId1 = podId
 			k.TagSource1 |= uint8(flow_metrics.GpId)
@@ -770,42 +783,57 @@ func (k *KnowledgeGraph) fill(
 	// use podId to match first
 	if podId0 != 0 {
 		k.TagSource0 |= uint8(flow_metrics.PodId)
-		info0 = platformData.QueryPodIdInfo(podId0)
+		info0 = platformData.QueryPodIdInfo(k.OrgId, podId0)
 	}
 	if podId1 != 0 {
 		k.TagSource1 |= uint8(flow_metrics.PodId)
-		info1 = platformData.QueryPodIdInfo(podId1)
+		info1 = platformData.QueryPodIdInfo(k.OrgId, podId1)
 	}
 
 	if info0 == nil {
 		if lookupByMac0 {
 			k.TagSource0 |= uint8(flow_metrics.Mac)
-			info0 = platformData.QueryMacInfo(l3EpcMac0)
+			info0 = platformData.QueryMacInfo(k.OrgId, l3EpcMac0)
+		} else if lookupByAgent0 {
+			k.TagSource0 |= uint8(flow_metrics.Agent)
+			if info := platformData.QueryVtapInfo(k.OrgId, vtapId); info != nil {
+				agentInfo = common.RegetInfoFromIP(k.OrgId, !info.IsIPv4, info.IP6, info.IP4, info.EpcId, platformData)
+				info0 = agentInfo
+			}
 		}
 		if info0 == nil {
 			k.TagSource0 |= uint8(flow_metrics.EpcIP)
-			info0 = common.RegetInfoFromIP(isIPv6, ip60, ip40, l3EpcID0, platformData)
+			info0 = common.RegetInfoFromIP(k.OrgId, isIPv6, ip60, ip40, l3EpcID0, platformData)
 		}
 	}
 
 	if info1 == nil {
 		if lookupByMac1 {
 			k.TagSource1 |= uint8(flow_metrics.Mac)
-			info1 = platformData.QueryMacInfo(l3EpcMac1)
+			info1 = platformData.QueryMacInfo(k.OrgId, l3EpcMac1)
+		} else if lookupByAgent1 {
+			k.TagSource1 |= uint8(flow_metrics.Agent)
+			if lookupByAgent0 && agentInfo != nil {
+				info1 = agentInfo
+			} else {
+				if info := platformData.QueryVtapInfo(k.OrgId, vtapId); info != nil {
+					info1 = common.RegetInfoFromIP(k.OrgId, !info.IsIPv4, info.IP6, info.IP4, info.EpcId, platformData)
+				}
+			}
 		}
 		if info1 == nil {
 			k.TagSource1 |= uint8(flow_metrics.EpcIP)
-			info1 = common.RegetInfoFromIP(isIPv6, ip61, ip41, l3EpcID1, platformData)
+			info1 = common.RegetInfoFromIP(k.OrgId, isIPv6, ip61, ip41, l3EpcID1, platformData)
 		}
 	}
 
 	var l2Info0, l2Info1 *grpc.Info
 	if l3EpcID0 > 0 && l3EpcID1 > 0 {
-		l2Info0, l2Info1 = platformData.QueryMacInfosPair(l3EpcMac0, l3EpcMac1)
+		l2Info0, l2Info1 = platformData.QueryMacInfosPair(k.OrgId, l3EpcMac0, l3EpcMac1)
 	} else if l3EpcID0 > 0 {
-		l2Info0 = platformData.QueryMacInfo(l3EpcMac0)
+		l2Info0 = platformData.QueryMacInfo(k.OrgId, l3EpcMac0)
 	} else if l3EpcID1 > 0 {
-		l2Info1 = platformData.QueryMacInfo(l3EpcMac1)
+		l2Info1 = platformData.QueryMacInfo(k.OrgId, l3EpcMac1)
 	}
 
 	if info0 != nil {
@@ -846,20 +874,17 @@ func (k *KnowledgeGraph) fill(
 
 	// 0端如果是clusterIP或后端podIP需要匹配service_id
 	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType0), k.PodID0, 0) {
-		k.ServiceID0 = platformData.QueryService(k.PodID0, k.PodNodeID0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
+		k.ServiceID0 = platformData.QueryService(k.OrgId, k.PodID0, k.PodNodeID0, uint32(k.PodClusterID0), k.PodGroupID0, l3EpcID0, isIPv6, ip40, ip60, protocol, 0)
 	}
 	if common.IsPodServiceIP(flow_metrics.DeviceType(k.L3DeviceType1), k.PodID1, k.PodNodeID1) {
-		k.ServiceID1 = platformData.QueryService(k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
+		k.ServiceID1 = platformData.QueryService(k.OrgId, k.PodID1, k.PodNodeID1, uint32(k.PodClusterID1), k.PodGroupID1, l3EpcID1, isIPv6, ip41, ip61, protocol, port)
 	}
 
-	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
-	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, gpID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
+	k.AutoInstanceID0, k.AutoInstanceType0 = common.GetAutoInstance(k.PodID0, gpID0, k.PodNodeID0, k.L3DeviceID0, uint32(k.SubnetID0), k.L3DeviceType0, k.L3EpcID0)
+	k.AutoServiceID0, k.AutoServiceType0 = common.GetAutoService(k.ServiceID0, k.PodGroupID0, gpID0, uint32(k.PodClusterID0), k.L3DeviceID0, uint32(k.SubnetID0), k.L3DeviceType0, k.PodGroupType0, k.L3EpcID0)
 
-	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
-	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
-
-	k.OrgId, k.TeamID = platformData.QueryVtapOrgAndTeamID(vtapId)
-
+	k.AutoInstanceID1, k.AutoInstanceType1 = common.GetAutoInstance(k.PodID1, gpID1, k.PodNodeID1, k.L3DeviceID1, uint32(k.SubnetID1), k.L3DeviceType1, k.L3EpcID1)
+	k.AutoServiceID1, k.AutoServiceType1 = common.GetAutoService(k.ServiceID1, k.PodGroupID1, gpID1, uint32(k.PodClusterID1), k.L3DeviceID1, uint32(k.SubnetID1), k.L3DeviceType1, k.PodGroupType1, k.L3EpcID1)
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
@@ -1070,10 +1095,11 @@ func genID(time uint32, counter *uint32, analyzerID uint32) uint64 {
 	return uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
 }
 
-func TaggedFlowToL4FlowLog(f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *L4FlowLog {
+func TaggedFlowToL4FlowLog(orgId, teamId uint16, f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *L4FlowLog {
 	isIPV6 := f.Flow.EthType == uint32(layers.EthernetTypeIPv6)
 
 	s := AcquireL4FlowLog()
+	s.OrgId, s.TeamID = orgId, teamId
 	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, platformData.QueryAnalyzerID())
 	s.DataLinkLayer.Fill(f.Flow)
 	s.NetworkLayer.Fill(f.Flow, isIPV6)

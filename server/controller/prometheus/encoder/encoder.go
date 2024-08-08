@@ -19,35 +19,32 @@ package encoder
 import (
 	"sync"
 
-	"github.com/op/go-logging"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/message/controller"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 )
 
-var log = logging.MustGetLogger("prometheus.synchronizer.encoder")
+var log = logger.MustGetLogger("prometheus.synchronizer.encoder")
 
 type Encoder struct {
 	org *common.ORG
 	mux sync.Mutex
 
-	metricName      *metricName
-	labelName       *labelName
-	labelValue      *labelValue
-	LabelLayout     *labelLayout
-	label           *label
-	metricLabelName *metricLabelName
-	metricTarget    *metricTarget
-	target          *target
+	metricName  *metricName
+	labelName   *labelName
+	labelValue  *labelValue
+	LabelLayout *labelLayout
+	label       *label
 }
 
 func newEncoder(cfg prometheuscfg.Config, orgID int) (*Encoder, error) {
-	log.Infof("[OID-%d] new prometheus encoder", orgID)
+	log.Infof("new prometheus encoder", logger.NewORGPrefix(orgID))
 	org, err := common.NewORG(orgID)
 	if err != nil {
-		log.Errorf("[OID-%d] failed to create org object: %s", orgID, err.Error())
+		log.Errorf("failed to create org object", err.Error(), logger.NewORGPrefix(orgID))
 		return nil, err
 	}
 	e := &Encoder{org: org}
@@ -56,9 +53,6 @@ func newEncoder(cfg prometheuscfg.Config, orgID int) (*Encoder, error) {
 	e.labelValue = newLabelValue(org)
 	e.label = newLabel(org)
 	e.LabelLayout = newLabelLayout(org, cfg)
-	e.metricLabelName = newMetricLabelName(org, e.metricName, e.labelName)
-	e.target = newTarget(org, cfg.ResourceMaxID1)
-	e.metricTarget = newMetricTarget(org, e.target)
 	return e, nil
 }
 
@@ -66,18 +60,15 @@ func (e *Encoder) Refresh() error {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 
-	log.Info(e.org.Log("prometheus encoder refresh started"))
+	log.Infof("prometheus encoder refresh started", e.org.LogPrefix)
 	e.label.refresh()
 	eg := &errgroup.Group{}
 	common.AppendErrGroup(eg, e.metricName.refresh)
 	common.AppendErrGroup(eg, e.labelName.refresh)
 	common.AppendErrGroup(eg, e.labelValue.refresh)
 	common.AppendErrGroup(eg, e.LabelLayout.refresh)
-	common.AppendErrGroup(eg, e.metricLabelName.refresh)
-	common.AppendErrGroup(eg, e.metricTarget.refresh)
-	common.AppendErrGroup(eg, e.target.refresh)
 	err := eg.Wait()
-	log.Info(e.org.Log("prometheus encoder refresh completed"))
+	log.Infof("prometheus encoder refresh completed", e.org.LogPrefix)
 	return err
 }
 
@@ -94,15 +85,7 @@ func (e *Encoder) Encode(req *controller.SyncPrometheusRequest) (*controller.Syn
 	eg2RunAhead := &errgroup.Group{}
 	common.AppendErrGroup(eg2RunAhead, e.encodeLabel, resp, req.GetLabels())
 	common.AppendErrGroup(eg2RunAhead, e.encodeLabelIndex, resp, req.GetMetricAppLabelLayouts())
-	common.AppendErrGroup(eg2RunAhead, e.encodeTarget, resp, req.GetTargets())
 	err = eg2RunAhead.Wait()
-	if err != nil {
-		return resp, err
-	}
-	eg := &errgroup.Group{}
-	common.AppendErrGroup(eg, e.encodeMetricLabelName, resp, req.GetMetricLabelNames())
-	common.AppendErrGroup(eg, e.encodeMetricTarget, resp, req.GetMetricTargets())
-	err = eg.Wait()
 	return resp, err
 }
 
@@ -158,38 +141,5 @@ func (e *Encoder) encodeLabel(args ...interface{}) error {
 		return err
 	}
 	resp.Labels = ls
-	return nil
-}
-
-func (e *Encoder) encodeMetricLabelName(args ...interface{}) error {
-	resp := args[0].(*controller.SyncPrometheusResponse)
-	metricLabelNames := args[1].([]*controller.PrometheusMetricLabelNameRequest)
-	encodedData, err := e.metricLabelName.encode(metricLabelNames)
-	if err != nil {
-		return err
-	}
-	resp.MetricLabelNames = encodedData
-	return nil
-}
-
-func (e *Encoder) encodeMetricTarget(args ...interface{}) error {
-	resp := args[0].(*controller.SyncPrometheusResponse)
-	metricTargets := args[1].([]*controller.PrometheusMetricTargetRequest)
-	mts, err := e.metricTarget.encode(metricTargets)
-	if err != nil {
-		return err
-	}
-	resp.MetricTargets = mts
-	return nil
-}
-
-func (e *Encoder) encodeTarget(args ...interface{}) error {
-	resp := args[0].(*controller.SyncPrometheusResponse)
-	targets := args[1].([]*controller.PrometheusTargetRequest)
-	ts, err := e.target.encode(targets)
-	if err != nil {
-		return err
-	}
-	resp.Targets = ts
 	return nil
 }

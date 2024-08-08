@@ -439,7 +439,7 @@ func ConvertToFloat64(data interface{}) (float64, string, bool) {
 		if v {
 			return 1, "1", true
 		} else {
-			return 0, "1", true
+			return 0, "0", true
 		}
 	case *uint:
 		return float64(*v), strconv.FormatUint(uint64(*v), 10), true
@@ -475,4 +475,14 @@ func IsNil(i interface{}) bool {
 		return vi.IsNil()
 	}
 	return false
+}
+
+// EscapeJSONString is used to escape special characters in JSON strings
+func EscapeJSONString(value string) string {
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`"`, `\"`,
+		"\n", `\n`,
+	)
+	return replacer.Replace(value)
 }

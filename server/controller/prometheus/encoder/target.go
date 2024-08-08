@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -89,7 +89,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 			continue
 		}
 		di := podClusterIDToDomainInfo[podClusterID]
-		dbToAdd = append(dbToAdd, &mysql.PrometheusTarget{ // TODO  id 复用
+		dbToAdd = append(dbToAdd, &mysql.PrometheusTarget{
 			Base:         mysql.Base{Lcuuid: common.GenerateUUID(ins + job + fmt.Sprintf("%d-%d", vpcID, podClusterID) + "prometheus")},
 			CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS,
 			Instance:     ins,
@@ -112,7 +112,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 	}
 	err = addBatch(ln.org.DB, dbToAdd, ln.resourceType)
 	if err != nil {
-		log.Error(ln.org.Logf("add %s error: %s", ln.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", ln.resourceType, err.Error(), ln.org.LogPrefix)
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -134,7 +134,7 @@ func (ln *target) load() (ids mapset.Set[int], err error) {
 	var items []*mysql.PrometheusTarget
 	err = ln.org.DB.Unscoped().Where(&mysql.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
 	if err != nil {
-		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
+		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return nil, err
 	}
 
@@ -150,14 +150,14 @@ func (ln *target) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusTarget
 	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
-		log.Error(ln.org.Logf("db query %s failed: %v", ln.resourceType, err))
+		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, item.ID)
 		}
-		log.Info(ln.org.Logf("%s ids: %+v are in use.", ln.resourceType, inUseIDs))
+		log.Infof("%s ids: %+v are in use.", ln.resourceType, inUseIDs, ln.org.LogPrefix)
 	}
 	return
 }
@@ -171,7 +171,7 @@ func (ln *target) getPodClusterIDToDomainInfo() (podClusterIDToDomainInfo map[in
 	var podClusters []*mysql.PodCluster
 	err = ln.org.DB.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		log.Error(ln.org.Logf("db query pod cluster failed: %v", err))
+		log.Errorf("db query pod cluster failed: %v", err, ln.org.LogPrefix)
 		return
 	}
 	podClusterIDToDomainInfo = make(map[int]domainInfo)

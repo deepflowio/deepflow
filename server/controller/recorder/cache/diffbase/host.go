@@ -38,12 +38,12 @@ func (b *DataSet) AddHost(dbItem *mysql.Host, seq int) {
 		MemTotal:     dbItem.MemTotal,
 		ExtraInfo:    dbItem.ExtraInfo,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteHost(lcuuid string) {
 	delete(b.Hosts, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type Host struct {

@@ -42,28 +42,34 @@ func (k *ChPodK8sAnnotation) generateNewData() (map[K8sAnnotationKey]mysql.ChPod
 
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[K8sAnnotationKey]mysql.ChPodK8sAnnotation)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod, k.db.LogPrefixORGID)
+		}
+
 		annotations := strings.Split(pod.Annotation, ", ")
 		for _, singleAnnotation := range annotations {
-			annotationInfo := strings.Split(singleAnnotation, ":")
+			annotationInfo := strings.SplitN(singleAnnotation, ":", 2)
 			if len(annotationInfo) == 2 {
 				key := K8sAnnotationKey{
 					ID:  pod.ID,
 					Key: annotationInfo[0],
 				}
 				keyToItem[key] = mysql.ChPodK8sAnnotation{
-					ID:       pod.ID,
-					Key:      annotationInfo[0],
-					Value:    annotationInfo[1],
-					L3EPCID:  pod.VPCID,
-					PodNsID:  pod.PodNamespaceID,
-					TeamID:   tagrecorder.DomainToTeamID[pod.Domain],
-					DomainID: tagrecorder.DomainToDomainID[pod.Domain],
+					ID:          pod.ID,
+					Key:         annotationInfo[0],
+					Value:       annotationInfo[1],
+					L3EPCID:     pod.VPCID,
+					PodNsID:     pod.PodNamespaceID,
+					TeamID:      teamID,
+					DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+					SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 				}
 			}
 		}

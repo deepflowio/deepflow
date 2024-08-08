@@ -65,7 +65,7 @@ struct __socket_data {
 	/* 追踪数据信息 */
 	__u64 timestamp;     // 数据捕获时间戳
 	__u8 direction: 1;  // bits[0]: 方向，值为T_EGRESS(0), T_INGRESS(1)
-	__u8 msg_type:  6;  // bits[1-7]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 msg_type:  6;  // bits[1-6]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
 	__u8 is_tls: 1;
 
 	__u64 syscall_len;   // 本次系统调用读、写数据的总长度
@@ -86,23 +86,62 @@ struct __socket_data_buffer {
 	char data[32760]; // 32760 + len(4bytes) + events_num(4bytes) = 2^15 = 32768
 };
 
-struct trace_conf_t {
-	__u64 socket_id;       // 会话标识
-	__u64 coroutine_trace_id;  // 同一协程的数据转发关联
-	__u64 thread_trace_id; // 同一进程/线程的数据转发关联，用于多事务流转场景
-	__u32 data_limit_max;  // Maximum number of data transfers
-	__u32 go_tracing_timeout;
-	__u32 io_event_collect_mode;
-	__u64 io_event_minimal_duration;
+/**
+ * @brief Used to describe the runtime state of the tracer.
+ */
+struct tracer_ctx_s {
+	__u64 socket_id;          /**< Session identifier */
+	__u64 coroutine_trace_id; /**< Data forwarding association within the same coroutine */
+	__u64 thread_trace_id;    /**< Data forwarding association within the same process/thread, used for multi-transaction scenarios */
+	__u32 data_limit_max;     /**< Maximum number of data transfers */
+	__u32 go_tracing_timeout; /**< Go tracing timeout */
+	__u32 io_event_collect_mode; /**< IO event collection mode */
+	__u64 io_event_minimal_duration; /**< Minimum duration for IO events */
+	int push_buffer_refcnt; /**< Reference count of the data push buffer */
+	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
+	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
+	bool disable_tracing;  /**< Disable tracing feature. */
 };
 
+/**
+ * @brief Trace statistics.
+ */
 struct trace_stats {
-	__u64 socket_map_count;     // 对socket 链接表进行统计
-	__u64 trace_map_count;     // 对同一进程/线程的多次转发表进行统计
+	__u64 socket_map_count;     /**< Count of socket connection entries */
+	__u64 trace_map_count;      /**< Count of multiple forwarding entries within the same process/thread */
+	__u64 push_conflict_count; /**< When periodic data push is attempted and the push_buffer_refcnt is non-zero,
+					it will result in a data push conflict, and the data push action will not be executed.
+					This counter is used to record the number of conflicts. */
+	__u64 period_event_max_delay; /**< The maximum latency for periodic data push. */
+	__u64 period_event_total_time; /**< The total elapsed time for periodic event. */
+	__u64 period_event_count; /**< The number of occurrences of periodic events. */
 };
 
-struct socket_info_t {
-	__u64 l7_proto;
+struct socket_info_s {
+	__u16 l7_proto;
+
+	/*
+	 * Indicate whether this socket is allowed for reassembly,
+	 * determined by the configuration of protocol reassembly.
+	 */
+	__u16 allow_reassembly: 1;
+	__u16 finish_reasm: 1; // Has the reassembly been completed?
+	__u16 udp_pre_set_addr: 1; // Is the socket address pre-set during the system call phase in the UDP protocol?
+	/*
+	 * Indicate that the current and next data must be pushed in
+	 * the form of data reorganization.
+	 * Currently only protocol inference is available on sofarpc.
+	 */
+	__u16 force_reasm: 1;
+	/*
+	 * Indicates whether this socket participates in tracing.
+	 * If set to 1 (or true), it means the socket does not
+	 * participate in tracing.
+	 */
+	__u16 no_trace: 1;
+	__u16 unused_bits: 11;
+ 	__u32 reasm_bytes; // The amount of data bytes that have been reassembled.
+
 	/*
 	 * The serial number of the socket read and write data, used to
 	 * correct out-of-sequence.
@@ -117,16 +156,20 @@ struct socket_info_t {
 	 * involves reading 4 bytes followed by reading the remaining data.
 	 * Here, the pre-read data is stored for subsequent protocol analysis.
 	 */
-	__u8 prev_data[EBPF_CACHE_SIZE];
+	union {
+		__u8 prev_data[EBPF_CACHE_SIZE];
+		__u8 ipaddr[EBPF_CACHE_SIZE]; // IP address for UDP sendto()
+	};
 	__u8 direction: 1;
 	__u8 pre_direction: 1;
-	__u8 msg_type: 2;	// Store data type, values are MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
+	__u8 unused: 2;
 	__u8 role: 3;           // Socket role identifier: ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
 	__u8 tls_end: 1;	// Use the Identity TLS protocol to infer whether it has been completed
 	bool need_reconfirm;    // L7 protocol inference requiring confirmation.
 	union {
 		__u8  encoding_type;    // Currently used for OpenWire encoding inference.
 		__s32 correlation_id;   // Currently used for Kafka protocol inference.
+		__u16 port;		// Port for UDP sendto()
 	};
 
 	__u32 peer_fd;		// Used to record the peer fd for data transfer between sockets.
@@ -237,7 +280,8 @@ struct event_meta {
 // Process execution or exit event data 
 struct process_event_t {
 	struct event_meta meta;
-	__u32 pid; // process ID
+	__u32 pid: 31; // process ID
+	__u32 maybe_thread: 1;
 	__u8 name[TASK_COMM_LEN]; // process name
 };
 

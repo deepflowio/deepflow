@@ -62,7 +62,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 			} else {
 				if oldV != v {
 					updateKey = OSAPPTagKey{PID: sourceID, Key: k}
-					updateInfo[k] = v
+					updateInfo["value"] = v
 					db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
 					if chItem.PID == 0 {
 						keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
@@ -102,11 +102,12 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysql.Process)
 	for k, v := range osAppTagsMap {
 		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
 		targets = append(targets, mysql.ChOSAppTag{
-			PID:      source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			PID:         source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return

@@ -179,35 +179,6 @@ type FloatingIP struct {
 	RegionLcuuid  string `json:"region_lcuuid" binding:"required"`
 }
 
-type SecurityGroup struct {
-	Lcuuid       string `json:"lcuuid" binding:"required"`
-	Name         string `json:"name" binding:"required"`
-	Label        string `json:"label"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
-	RegionLcuuid string `json:"region_lcuuid" binding:"required"`
-}
-
-type SecurityGroupRule struct {
-	Lcuuid              string `json:"lcuuid" binding:"required"`
-	SecurityGroupLcuuid string `json:"security_group_lcuuid" binding:"required"`
-	Direction           int    `json:"direction" binding:"required"`
-	EtherType           int    `json:"ether_type" binding:"required"`
-	Protocol            string `json:"protocol"`
-	LocalPortRange      string `json:"local_port_range"`
-	RemotePortRange     string `json:"remote_port_range"`
-	Local               string `json:"local"`
-	Remote              string `json:"remote"`
-	Action              int    `json:"action" binding:"required"`
-	Priority            int    `json:"priority"`
-}
-
-type VMSecurityGroup struct {
-	Lcuuid              string `json:"lcuuid" binding:"required"`
-	VMLcuuid            string `json:"vm_lcuuid" binding:"required"`
-	SecurityGroupLcuuid string `json:"security_group_lcuuid" binding:"required"`
-	Priority            int    `json:"priority" binding:"required"`
-}
-
 type LB struct {
 	Lcuuid       string `json:"lcuuid" binding:"required"`
 	Name         string `json:"name" binding:"required"`
@@ -319,6 +290,7 @@ type RDSInstance struct {
 }
 
 type SubDomain struct {
+	TeamID        int    `json:"team_id" binding:"required"`
 	Lcuuid        string `json:"lcuuid" binding:"required"`
 	Name          string `json:"name" binding:"required"`
 	DisplayName   string `json:"display_name" binding:"required"`
@@ -495,18 +467,6 @@ type Process struct {
 	SubDomainLcuuid string    `json:"sub_domain_lcuuid"`
 }
 
-type PrometheusTarget struct {
-	Lcuuid            string `json:"lcuuid,omitempty" binding:"required"`
-	ScrapeURL         string `json:"scrape_url" binding:"required"`
-	Instance          string `json:"instance" binding:"required"`
-	Job               string `json:"job" binding:"required"`
-	OtherLabels       string `json:"other_labels" binding:"required"`
-	SubDomainLcuuid   string `json:"sub_domain_lcuuid,omitempty"`
-	PodClusterLcuuid  string `json:"pod_cluster_lcuuid" binding:"required"`
-	VPCLcuuid         string `json:"vpc_lcuuid,omitempty"`
-	HonorLabelsConfig bool   `json:"honor_labels_config" binding:"required"`
-}
-
 type SubDomainResource struct {
 	Verified               bool `json:"verified"`
 	ErrorState             int
@@ -530,7 +490,6 @@ type SubDomainResource struct {
 	PodReplicaSets         []PodReplicaSet
 	Pods                   []Pod
 	Processes              []Process
-	PrometheusTargets      []PrometheusTarget
 }
 
 type Resource struct {
@@ -549,9 +508,6 @@ type Resource struct {
 	VRouters               []VRouter
 	RoutingTables          []RoutingTable
 	DHCPPorts              []DHCPPort
-	SecurityGroups         []SecurityGroup
-	SecurityGroupRules     []SecurityGroupRule
-	VMSecurityGroups       []VMSecurityGroup
 	NATGateways            []NATGateway
 	NATRules               []NATRule
 	NATVMConnections       []NATVMConnection
@@ -582,7 +538,6 @@ type Resource struct {
 	PodIngressRules        []PodIngressRule
 	PodIngressRuleBackends []PodIngressRuleBackend
 	Processes              []Process
-	PrometheusTargets      []PrometheusTarget
 	SubDomainResources     map[string]SubDomainResource
 }
 

@@ -62,19 +62,10 @@ func RegisterGenesisCommand() *cobra.Command {
 	}
 	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type: '*version.Info | *v1.Pod | *v1.ConfigMap | *v1.Namespace | \n*v1.Service | *v1.Deployment | *v1.DaemonSet | *v1.ReplicaSet | *v1beta1.Ingress | \n*v1.CloneSet | *v1.StatefulSet'")
 
-	prometheusInfo := &cobra.Command{
-		Use:     "prometheus",
-		Short:   "genesis prometheus info",
-		Example: "deepflow-ctl genesis prometheus cluster_id",
-		Run: func(cmd *cobra.Command, args []string) {
-			prometheusInfo(cmd, args)
-		},
-	}
-
 	agentInfo := &cobra.Command{
 		Use:     "agent",
 		Short:   "genesis agent info",
-		Example: "deepflow-ctl genesis agent -i node_ip [host_ip or agent_id]",
+		Example: "deepflow-ctl genesis agent -i node_ip [agent_id]",
 		Run: func(cmd *cobra.Command, args []string) {
 			agentInfo(cmd, args)
 		},
@@ -92,7 +83,6 @@ func RegisterGenesisCommand() *cobra.Command {
 	genesis.AddCommand(syncInfo)
 	genesis.AddCommand(k8sInfo)
 	genesis.AddCommand(agentInfo)
-	genesis.AddCommand(prometheusInfo)
 	genesis.AddCommand(storageInfo)
 	return genesis
 }
@@ -101,7 +91,7 @@ func syncInfo(cmd *cobra.Command, resType string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/sync/%s/", server.IP, server.Port, resType)
 
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -153,7 +143,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/kubernetes-info/%s/", server.IP, server.Port, args[0])
 
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -325,7 +315,7 @@ func tableVip(response *simplejson.Json, table *tablewriter.Table) {
 }
 
 func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "IF_TYPE", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "AGENT_ID", "CLUSTER_ID", "NETNS_ID", "IP"})
+	table.SetHeader([]string{"MAC", "NAME", "TAP_MAC", "TAP_NAME", "IF_TYPE", "DEVICE_TYPE", "DEVICE_NAME", "HOST_IP", "AGENT_ID", "CLUSTER_ID", "NETNS_ID", "TEAM_ID", "IP"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -351,6 +341,7 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 			tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 			tableItem = append(tableItem, data.Get("KUBERNETES_CLUSTER_ID").MustString())
 			tableItem = append(tableItem, strconv.Itoa(data.Get("NETNS_ID").MustInt()))
+			tableItem = append(tableItem, strconv.Itoa(data.Get("TEAM_ID").MustInt()))
 			tableItem = append(tableItem, ip)
 			tableItems = append(tableItems, tableItem)
 		}
@@ -394,7 +385,7 @@ func agentInfo(cmd *cobra.Command, args []string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", podIP, server.SvcPort, args[0])
-	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	response, err := common.CURLPerform("GET", url, nil, "", []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -423,7 +414,7 @@ func prometheusInfo(cmd *cobra.Command, args []string) {
 	}
 
 	path := fmt.Sprintf("/v1/prometheus-info/%s/", args[0])
-	common.GetURLInfo(cmd, path, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	common.GetURLInfo(cmd, path, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 }
 
 func storageInfo(cmd *cobra.Command, args []string) {
@@ -433,5 +424,5 @@ func storageInfo(cmd *cobra.Command, args []string) {
 	}
 
 	path := fmt.Sprintf("/v1/genesis-storage/%s/", args[0])
-	common.GetURLInfo(cmd, path, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd))}...)
+	common.GetURLInfo(cmd, path, []common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 }

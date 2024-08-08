@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -86,7 +86,7 @@ func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTargetRequest
 
 	err := addBatch(mt.org.DB, dbToAdd, mt.resourceType)
 	if err != nil {
-		log.Error(mt.org.Logf("add %s error: %s", mt.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", mt.resourceType, err.Error(), mt.org.LogPrefix)
 		return resp, err
 	}
 	for _, item := range dbToAdd {

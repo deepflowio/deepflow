@@ -23,6 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 type UpdaterManager struct {
@@ -45,11 +46,19 @@ func (u *UpdaterManager) Init(ctx context.Context, cfg config.ControllerConfig) 
 	u.tCtx, u.tCancel = context.WithCancel(ctx)
 }
 
-func (c *UpdaterManager) Start() {
+func (c *UpdaterManager) Start(sCtx context.Context) {
 	log.Info("tagrecorder updater manager started")
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
-			c.run()
+		ticker := time.NewTicker(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				c.run()
+			case <-sCtx.Done():
+				break LOOP
+			}
 		}
 	}()
 }
@@ -78,8 +87,8 @@ func (c *UpdaterManager) refresh() {
 		NewChIntEnum(),
 		NewChNodeType(),
 		NewChAPPLabel(),
-		NewChTargetLabel(),
-		NewChPrometheusTargetLabelLayout(),
+		// NewChTargetLabel(),
+		// NewChPrometheusTargetLabelLayout(),
 		NewChPrometheusLabelName(),
 		NewChPrometheusMetricNames(),
 		NewChPrometheusMetricAPPLabelLayout(),
@@ -93,6 +102,9 @@ func (c *UpdaterManager) refresh() {
 	}
 	if c.cfg.RedisCfg.Enabled {
 		updaters = append(updaters, NewChIPResource(c.tCtx))
+	}
+	if c.cfg.FPermit.Enabled {
+		updaters = append(updaters, NewChUser())
 	}
 	for _, updater := range updaters {
 		updater.SetConfig(c.cfg)
@@ -156,7 +168,7 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 	for _, orgID := range orgIDs {
 		db, err := mysql.GetDB(orgID)
 		if err != nil {
-			log.Errorf("get org dbinfo fail : %d", orgID)
+			log.Error("get org dbinfo fail", logger.NewORGPrefix(orgID))
 			continue
 		}
 		GetTeamInfo(db)
@@ -225,7 +237,7 @@ func (b *UpdaterComponent[MT, KT]) generateOldData(db *mysql.DB) (map[KT]MT, boo
 		err = db.Unscoped().Find(&items).Error
 	}
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	idToItem := make(map[KT]MT)
@@ -239,7 +251,7 @@ func (b *UpdaterComponent[MT, KT]) generateOneData(db *mysql.DB) (map[KT]MT, boo
 	var items []MT
 	err := db.Unscoped().First(&items).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	idToItem := make(map[KT]MT)

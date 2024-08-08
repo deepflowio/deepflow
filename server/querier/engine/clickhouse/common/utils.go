@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
+	"golang.org/x/exp/slices"
 )
 
 var log = logging.MustGetLogger("common")
@@ -168,7 +169,7 @@ func GetDatasourceInterval(db string, table string, name string, orgID string) (
 		} else if table == TABLE_NAME_VTAP_ACL {
 			tsdbType = TABLE_NAME_VTAP_ACL
 		}
-	case DB_NAME_DEEPFLOW_SYSTEM, DB_NAME_EXT_METRICS, DB_NAME_PROMETHEUS:
+	case DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT, DB_NAME_EXT_METRICS, DB_NAME_PROMETHEUS:
 		tsdbType = db
 	default:
 		return 1, nil
@@ -201,7 +202,7 @@ func GetDatasourceInterval(db string, table string, name string, orgID string) (
 	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
 }
 
-func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (values []interface{}) {
+func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -211,19 +212,21 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 		Context:  ctx,
 	}
 	sql := ""
-	if db == "ext_metrics" {
-		sql = "SELECT table FROM flow_tag.ext_metrics_custom_field GROUP BY table"
-		chClient.DB = "flow_tag"
-	} else if db == "deepflow_system" {
-		sql = "SELECT table FROM flow_tag.deepflow_system_custom_field GROUP BY table"
+	if slices.Contains([]string{DB_NAME_EXT_METRICS, DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT}, db) {
+		sql = fmt.Sprintf("SELECT table FROM flow_tag.%s_custom_field GROUP BY table", db)
 		chClient.DB = "flow_tag"
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}
+	// for debug
+	chClient.Debug = client.NewDebug(sql)
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		log.Error(err)
 		return nil
+	}
+	if DebugInfo != nil {
+		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
 	}
 	for _, _table := range rst.Values {
 		table := _table.([]interface{})[0].(string)
@@ -235,7 +238,7 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 	return values
 }
 
-func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (values []interface{}) {
+func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -251,10 +254,14 @@ func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ct
 	} else {
 		sql = "SHOW TABLES FROM " + db
 	}
+	chClient.Debug = client.NewDebug(sql)
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
 		log.Error(err)
 		return nil
+	}
+	if DebugInfo != nil {
+		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
 	}
 	for _, _table := range rst.Values {
 		table := _table.([]interface{})[0].(string)

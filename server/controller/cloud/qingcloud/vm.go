@@ -27,18 +27,18 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subnet, error) {
+func (q *QingCloud) GetVMs() ([]model.VM, []model.Subnet, error) {
 	var retVMs []model.VM
-	var retVMSecurityGroups []model.VMSecurityGroup
 	var retDefaultVxnetSubnets []model.Subnet
 	var defaultVxnetIDs []string
 	var vxnetIdToSubnetLcuuid map[string]string
 	var vxnetIdToVPCLcuuid map[string]string
 	var vmIdToVPCLcuuid map[string]string
 
-	log.Info("get vms starting")
+	log.Info("get vms starting", logger.NewORGPrefix(q.orgID))
 
 	vmIdToVPCLcuuid = make(map[string]string)
 	vxnetIdToSubnetLcuuid = make(map[string]string)
@@ -51,8 +51,8 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 		}
 		response, err := q.GetResponse("DescribeInstances", "instance_set", kwargs)
 		if err != nil {
-			log.Error(err)
-			return nil, nil, nil, err
+			log.Error(err, logger.NewORGPrefix(q.orgID))
+			return nil, nil, err
 		}
 
 		for _, r := range response {
@@ -70,7 +70,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				vpcLcuuid, tmpDefaultVxnetSubnets, tmpDefaultVxnetIDs,
 					tmpVxnetIdToSubnetLcuuid, err := q.getVMVPCLcuuid(regionId, regionLcuuid, vm)
 				if err != nil {
-					log.Infof("get vm (%s) vpc faild", vm.Get("instance_id").MustString())
+					log.Infof("get vm (%s) vpc faild", vm.Get("instance_id").MustString(), logger.NewORGPrefix(q.orgID))
 					continue
 				}
 				retDefaultVxnetSubnets = append(retDefaultVxnetSubnets, tmpDefaultVxnetSubnets...)
@@ -93,7 +93,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				if !q.isPublicCloud {
 					hostIP, ok := q.HostNameToIP[hostName]
 					if !ok {
-						log.Infof("vm (%s) host ip not found", vmId)
+						log.Infof("vm (%s) host ip not found", vmId, logger.NewORGPrefix(q.orgID))
 						continue
 					}
 					launchServer = hostIP
@@ -122,21 +122,6 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				vmIdToVPCLcuuid[vmId] = vpcLcuuid
 				q.azLcuuidToResourceNum[azLcuuid]++
 				q.regionLcuuidToResourceNum[regionLcuuid]++
-
-				// 虚拟机与安全组关联关系
-				securityGroupId := vm.Get("security_group").Get("security_group_id").MustString()
-				if securityGroupId == "" {
-					continue
-				}
-				retVMSecurityGroups = append(
-					retVMSecurityGroups,
-					model.VMSecurityGroup{
-						Lcuuid:              common.GenerateUUIDByOrgID(q.orgID, vmId+securityGroupId),
-						SecurityGroupLcuuid: common.GenerateUUIDByOrgID(q.orgID, securityGroupId),
-						VMLcuuid:            vmLcuuid,
-						Priority:            1,
-					},
-				)
 			}
 		}
 	}
@@ -150,8 +135,8 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 	for vxnetId, vpcLcuuid := range vxnetIdToVPCLcuuid {
 		q.VxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
 	}
-	log.Info("get vms complete")
-	return retVMs, retVMSecurityGroups, retDefaultVxnetSubnets, nil
+	log.Info("get vms complete", logger.NewORGPrefix(q.orgID))
+	return retVMs, retDefaultVxnetSubnets, nil
 }
 
 func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson.Json) (
@@ -165,7 +150,7 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 	retVPCLcuuid, ok := q.regionIdToDefaultVPCLcuuid[regionId]
 	if !ok {
 		err := errors.New(fmt.Sprintf("(%s) default vpc not found", regionId))
-		log.Info(err)
+		log.Info(err, logger.NewORGPrefix(q.orgID))
 		return retVPCLcuuid, nil, nil, nil, err
 	}
 
@@ -202,7 +187,7 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 			if !ok {
 				log.Debugf(
 					"vm (%s) vxnetId (%s) vpc not found",
-					vm.Get("instance_id").MustString(), vxnetId,
+					vm.Get("instance_id").MustString(), vxnetId, logger.NewORGPrefix(q.orgID),
 				)
 			} else {
 				retVPCLcuuid = vpcLcuuid
@@ -217,7 +202,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Info("get vm nics starting")
+	log.Info("get vm nics starting", logger.NewORGPrefix(q.orgID))
 
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
@@ -226,7 +211,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 		}
 		response, err := q.GetResponse("DescribeNics", "nic_set", kwargs)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(q.orgID))
 			return nil, nil, err
 		}
 
@@ -237,18 +222,18 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				nicId := nic.Get("nic_id").MustString()
 				instanceId := nic.Get("instance_id").MustString()
 				if instanceId == "" {
-					log.Debugf("nic (%s) instance_id is null", nicId)
+					log.Debugf("nic (%s) instance_id is null", nicId, logger.NewORGPrefix(q.orgID))
 					continue
 				}
 				vpcLcuuid, ok := q.vmIdToVPCLcuuid[instanceId]
 				if !ok {
-					log.Debugf("nic (%s) instance_id (%s) vpc not found", nicId, instanceId)
+					log.Debugf("nic (%s) instance_id (%s) vpc not found", nicId, instanceId, logger.NewORGPrefix(q.orgID))
 					continue
 				}
 				// 如果接口属于基础网络，则生成基础网络对应的NetworkLcuuid
 				vxnetId := nic.Get("vxnet_id").MustString()
 				if vxnetId == "" {
-					log.Infof("nic (%s) vxnet_id is null", nicId)
+					log.Infof("nic (%s) vxnet_id is null", nicId, logger.NewORGPrefix(q.orgID))
 					continue
 				}
 				networkLcuuid := common.GenerateUUIDByOrgID(q.orgID, vxnetId)
@@ -313,6 +298,6 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 			}
 		}
 	}
-	log.Info("get vm nics complete")
+	log.Info("get vm nics complete", logger.NewORGPrefix(q.orgID))
 	return retVInterfaces, retIPs, nil
 }

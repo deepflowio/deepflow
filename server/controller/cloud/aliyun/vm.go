@@ -24,24 +24,24 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getVMs(region model.Region) (
-	[]model.VM, []model.VMSecurityGroup, []model.VInterface, []model.IP, []model.FloatingIP, map[string]string, error,
+	[]model.VM, []model.VInterface, []model.IP, []model.FloatingIP, map[string]string, error,
 ) {
 	var retVMs []model.VM
-	var retVMSecurityGroups []model.VMSecurityGroup
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 	var retFloatingIPs []model.FloatingIP
 	var vmLcuuidToVPCLcuuid = make(map[string]string)
 
-	log.Debug("get vms starting")
+	log.Debug("get vms starting", logger.NewORGPrefix(a.orgID))
 	request := ecs.CreateDescribeInstancesRequest()
 	response, err := a.getVMResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
-		return retVMs, retVMSecurityGroups, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, err
+		log.Error(err, logger.NewORGPrefix(a.orgID))
+		return retVMs, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, err
 	}
 
 	for _, r := range response {
@@ -69,7 +69,7 @@ func (a *Aliyun) getVMs(region model.Region) (
 			createdTime := vm.Get("CreationTime").MustString()
 			vpcId := vm.Get("VpcAttributes").Get("VpcId").MustString()
 			if vpcId == "" {
-				log.Infof("no vpcId in vm (%s) data", vmId)
+				log.Infof("no vpcId in vm (%s) data", vmId, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 
@@ -94,6 +94,13 @@ func (a *Aliyun) getVMs(region model.Region) (
 				}
 			}
 
+			cloudTags := map[string]string{}
+			vmTags := vm.GetPath("Tags", "Tag")
+			for t := range vmTags.MustArray() {
+				tag := vmTags.GetIndex(t)
+				cloudTags[tag.Get("TagKey").MustString()] = tag.Get("TagValue").MustString()
+			}
+
 			retVM := model.VM{
 				Lcuuid:       vmLcuuid,
 				Name:         vmName,
@@ -102,6 +109,7 @@ func (a *Aliyun) getVMs(region model.Region) (
 				VPCLcuuid:    VPCLcuuid,
 				State:        vmState,
 				IP:           pIP,
+				CloudTags:    cloudTags,
 				CreatedAt:    createdAt,
 				AZLcuuid:     common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+zoneId),
 				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
@@ -109,19 +117,6 @@ func (a *Aliyun) getVMs(region model.Region) (
 			retVMs = append(retVMs, retVM)
 			a.azLcuuidToResourceNum[retVM.AZLcuuid]++
 			a.regionLcuuidToResourceNum[retVM.RegionLcuuid]++
-
-			// VM与安全组关联关系
-			securityGroupIds := vm.Get("SecurityGroupIds").Get("SecurityGroupId").MustStringArray()
-			priority := 0
-			for _, securityGroupId := range securityGroupIds {
-				retSecurityGroup := model.VMSecurityGroup{
-					Lcuuid:              common.GenerateUUIDByOrgID(a.orgID, vmLcuuid+securityGroupId),
-					VMLcuuid:            vmLcuuid,
-					SecurityGroupLcuuid: common.GenerateUUIDByOrgID(a.orgID, securityGroupId),
-					Priority:            priority,
-				}
-				retVMSecurityGroups = append(retVMSecurityGroups, retSecurityGroup)
-			}
 
 			// VM PublicIPs
 			publicIPs := vm.Get("PublicIpAddress").Get("IpAddress").MustStringArray()
@@ -161,8 +156,8 @@ func (a *Aliyun) getVMs(region model.Region) (
 			}
 		}
 	}
-	log.Debug("get vms complete")
-	return retVMs, retVMSecurityGroups, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, nil
+	log.Debug("get vms complete", logger.NewORGPrefix(a.orgID))
+	return retVMs, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, nil
 }
 
 func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP, []model.FloatingIP, []model.NATRule, error) {
@@ -171,11 +166,11 @@ func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP
 	var retFloatingIPs []model.FloatingIP
 	var retNATRules []model.NATRule
 
-	log.Debug("get ports starting")
+	log.Debug("get ports starting", logger.NewORGPrefix(a.orgID))
 	request := ecs.CreateDescribeNetworkInterfacesRequest()
 	response, err := a.getVMInterfaceResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retVInterfaces, retIPs, retFloatingIPs, retNATRules, nil
 	}
 
@@ -189,7 +184,7 @@ func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP
 				[]string{"NetworkInterfaceId", "MacAddress", "InstanceId", "VSwitchId", "VpcId"},
 			)
 			if err != nil {
-				log.Info(err)
+				log.Info(err, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 
@@ -287,6 +282,6 @@ func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP
 			}
 		}
 	}
-	log.Debug("get ports complete")
+	log.Debug("get ports complete", logger.NewORGPrefix(a.orgID))
 	return retVInterfaces, retIPs, retFloatingIPs, retNATRules, nil
 }

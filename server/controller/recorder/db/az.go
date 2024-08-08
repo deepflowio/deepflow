@@ -22,21 +22,16 @@ import (
 )
 
 type AZ struct {
-	OperatorBase[mysql.AZ]
+	OperatorBase[*mysql.AZ, mysql.AZ]
 }
 
 func NewAZ() *AZ {
 	operater := &AZ{
-		OperatorBase[mysql.AZ]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_AZ_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.AZ](
+			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *AZ) setDBItemID(dbItem *mysql.AZ, id int) {
-	dbItem.ID = id
 }

@@ -76,11 +76,11 @@
 |__socket_data|BPF_MAP_TYPE_PERF_EVENT_ARRAY|int|__u32|利用perf event output buffer传递数据到用户层|
 |__data_buf|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct __socket_data_buffer|数据是通过burst方式来发送给用户层的，这个map用于积压缓存数据|
 |__members_offset|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct member_fields_offset|eBPF会不断尝试推断几个关键结构体的成员偏移来完成内核适配，如果成功将会把这些偏移值写到此map中。如果BTF内核信息的文件，初始化话阶段会自动从BTF Raw文件或btf vmlinux文件中直接获取偏移填写到此map中|
-|__trace_conf_map|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct trace_conf_t|用于记录tracer的配置信息，例如：记录各种UID（traceID，CapSeq等）初始值。|
+|__tracer_ctx_map|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct tracer_ctx_s|用于记录tracer的配置信息，例如：记录各种UID（traceID，CapSeq等）初始值。|
 |__trace_stats_map|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct trace_stats|用于统计`trace_map` `__socket_info_map` 的当前容量，用于老化处理（资源回收）|
 |__active_write_args_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct data_args_t|write() syscall's input argument.|
 |__active_read_args_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct data_args_t|read() syscall's input argument.|
-|__socket_info_map|BPF_MAP_TYPE_HASH|__u64 {pid + fd}|struct socket_info_t|用于记录socket信息|
+|__socket_info_map|BPF_MAP_TYPE_HASH|__u64 {pid + fd}|struct socket_info_s|用于记录socket信息|
 |__trace_map|BPF_MAP_TYPE_HASH|__u64 {tgid, pid}|struct trace_info_t|用于记录追踪信息|
 |__progs_jmp_kp_map|BPF_MAP_TYPE_PROG_ARRAY|__u32|__u32|Tail Calls jmp table for [k/u]probe|
 |__progs_jmp_tp_map|BPF_MAP_TYPE_PROG_ARRAY|__u32|__u32|Tail Calls jmp table for tracepoint|
@@ -96,3 +96,4 @@
 |go_ancerstor_map|BPF_MAP_TYPE_LRU_HASH|struct go_key|ancerstor goid|保存父子协程的映射关系|
 |__proto_infer_cache_map|BPF_MAP_TYPE_ARRAY|__u32|struct proto_infer_cache_t|Fast matching cache, used to speed up protocol inference. Suitable for Linux5.2+|
 |__io_event_buffer|BPF_MAP_TYPE_PERCPU_ARRAY|__u32|struct __io_event_buffer|IO 事件内容通过 struct __socket_data_buffer 格式上报, data 部分保存在这个 map 中,并复制到 __data_buf map|
+|__allow_reasm_protos_map|BPF_MAP_TYPE_ARRAY|int|bool|Record which protocols allow data segmentation reassembly processing.|

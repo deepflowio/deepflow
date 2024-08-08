@@ -59,7 +59,7 @@ func NewServer(logFile string, cfg *config.ControllerConfig) *Server {
 	g.Use(gin.Recovery())
 	g.Use(gin.LoggerWithFormatter(logger.GinLogFormat))
 	// set custom middleware
-	g.Use(HandleOrgIDMiddleware())
+	g.Use(HandleORGIDMiddleware())
 	s.engine = g
 	return s
 }
@@ -109,12 +109,12 @@ func (s *Server) appendRegistrant() []registrant.Registrant {
 		router.NewVtapGroup(s.controllerConfig),
 		router.NewDataSource(s.controllerConfig),
 		router.NewVTapGroupConfig(s.controllerConfig),
-		router.NewVTapInterface(),
+		router.NewVTapInterface(s.controllerConfig.FPermit),
 		router.NewVtapRepo(),
 		router.NewPlugin(),
 		router.NewMail(),
-		router.NewPrometheus(),
 		router.NewDatabase(s.controllerConfig),
+		router.NewAgentCMD(s.controllerConfig),
 		// icon
 		router.NewIcon(s.controllerConfig),
 

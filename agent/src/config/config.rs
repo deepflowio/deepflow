@@ -33,7 +33,7 @@ use thiserror::Error;
 use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::L7ProtocolParser;
-use crate::flow_generator::{DnsLog, TlsLog};
+use crate::flow_generator::{DnsLog, OracleLog, TlsLog};
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -344,6 +344,7 @@ impl Default for OnCpuProfile {
 pub struct OffCpuProfile {
     pub disabled: bool,
     pub regex: String,
+    pub cpu: u16,
     #[serde(rename = "minblock", with = "humantime_serde")]
     pub min_block: Duration,
 }
@@ -353,7 +354,24 @@ impl Default for OffCpuProfile {
         OffCpuProfile {
             disabled: false,
             regex: "^deepflow-.*".to_string(),
+            cpu: 0,
             min_block: Duration::from_micros(50),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct MemoryProfile {
+    pub disabled: bool,
+    pub regex: String,
+}
+
+impl Default for MemoryProfile {
+    fn default() -> Self {
+        MemoryProfile {
+            disabled: true,
+            regex: "^java".to_string(),
         }
     }
 }
@@ -378,11 +396,15 @@ pub struct EbpfYamlConfig {
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
-    pub java_symbol_file_max_space_limit: u8,
     #[serde(with = "humantime_serde")]
     pub java_symbol_file_refresh_defer_interval: Duration,
     pub on_cpu_profile: OnCpuProfile,
     pub off_cpu_profile: OffCpuProfile,
+    pub memory_profile: MemoryProfile,
+    pub syscall_out_of_order_cache_size: usize,
+    pub syscall_out_of_order_reassembly: Vec<String>,
+    pub syscall_segmentation_reassembly: Vec<String>,
+    pub syscall_trace_id_disabled: bool,
 }
 
 impl Default for EbpfYamlConfig {
@@ -394,19 +416,23 @@ impl Default for EbpfYamlConfig {
             thread_num: 1,
             perf_pages_count: 128,
             ring_size: 65536,
-            max_socket_entries: 524288,
-            max_trace_entries: 524288,
-            socket_map_max_reclaim: 520000,
+            max_socket_entries: 131072,
+            max_trace_entries: 131072,
+            socket_map_max_reclaim: 120000,
             kprobe_whitelist: EbpfKprobePortlist::default(),
             kprobe_blacklist: EbpfKprobePortlist::default(),
             uprobe_proc_regexp: UprobeProcRegExp::default(),
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
-            java_symbol_file_max_space_limit: 10,
-            java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
+            java_symbol_file_refresh_defer_interval: Duration::from_secs(60),
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),
+            memory_profile: MemoryProfile::default(),
+            syscall_out_of_order_reassembly: vec![],
+            syscall_segmentation_reassembly: vec![],
+            syscall_out_of_order_cache_size: 16,
+            syscall_trace_id_disabled: false,
         }
     }
 }
@@ -438,6 +464,7 @@ pub struct KubernetesResourceConfig {
     pub group: String,
     pub version: String,
     pub disabled: bool,
+    pub field_selector: String,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -482,12 +509,26 @@ impl ExtraLogFields {
     }
 }
 
+fn default_obfuscate_enabled_protocols() -> Vec<String> {
+    vec!["Redis".to_string()]
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
+    #[serde(default = "default_obfuscate_enabled_protocols")]
     pub obfuscate_enabled_protocols: Vec<String>,
     pub extra_log_fields: ExtraLogFields,
+    pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct L7LogBlacklist {
+    pub field_name: String,
+    pub operator: String,
+    pub value: String,
 }
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -496,6 +537,12 @@ pub struct OracleParseConfig {
     pub is_be: bool,
     pub int_compress: bool,
     pub resp_0x04_extra_byte: bool,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct BondGroup {
+    pub tap_interfaces: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -513,10 +560,13 @@ pub struct YamlConfig {
     pub default_tap_type: u32,
     pub debug_listen_port: u16,
     pub enable_qos_bypass: bool,
+    pub multiple_sockets_to_ingester: bool,
     pub fast_path_map_size: usize,
     pub first_path_level: u32,
     pub local_dispatcher_count: usize,
+    pub packet_fanout_mode: u32,
     pub src_interfaces: Vec<String>,
+    pub tap_interface_bond_groups: Vec<BondGroup>,
     pub mirror_traffic_pcp: u16,
     pub vtap_group_id_request: String,
     pub pcap: PcapConfig,
@@ -529,6 +579,7 @@ pub struct YamlConfig {
     pub dpdk_enabled: bool,
     pub dispatcher_queue: bool,
     pub libpcap_enabled: bool,
+    pub vhost_socket_path: String,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_flags: u8,
     pub ignore_overlay_vlan: bool,
@@ -544,7 +595,7 @@ pub struct YamlConfig {
     pub packet_delay: Duration,
     pub triple: TripleMapConfig,
     pub kubernetes_poller_type: KubernetesPollerType,
-    pub decap_erspan: bool,
+    pub trim_tunnel_types: Vec<String>,
     pub analyzer_ip: String,
     pub grpc_buffer_size: usize,
     #[serde(with = "humantime_serde")]
@@ -575,6 +626,7 @@ pub struct YamlConfig {
     #[serde(rename = "l7-protocol-ports")]
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
+    pub l7_log_blacklist: HashMap<String, Vec<L7LogBlacklist>>,
     pub npb_port: u16,
     // process and socket scan config
     pub os_proc_root: String,
@@ -612,11 +664,15 @@ pub struct YamlConfig {
     pub ntp_min_interval: Duration,
     pub l7_protocol_advanced_features: L7ProtocolAdvancedFeatures,
     pub oracle_parse_config: OracleParseConfig,
+    pub server_ports: Vec<u16>,
+    pub consistent_timestamp_in_l7_metrics: bool,
 }
 
 impl YamlConfig {
     const DEFAULT_DNS_PORTS: &'static str = "53,5353";
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
+    const DEFAULT_ORACLE_PORTS: &'static str = "1521";
+    const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
     pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
@@ -761,28 +817,27 @@ impl YamlConfig {
             c.ebpf.ring_size = 65536;
         }
         if c.ebpf.max_socket_entries < 100000 || c.ebpf.max_socket_entries > 2000000 {
-            c.ebpf.max_socket_entries = 524288;
+            c.ebpf.max_socket_entries = 131072;
         }
         if c.ebpf.socket_map_max_reclaim < 100000 || c.ebpf.socket_map_max_reclaim > 2000000 {
-            c.ebpf.socket_map_max_reclaim = 520000;
+            c.ebpf.socket_map_max_reclaim = 120000;
         }
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
-            c.ebpf.max_trace_entries = 524288;
-        }
-        if c.ebpf.java_symbol_file_max_space_limit < 2
-            || c.ebpf.java_symbol_file_max_space_limit > 100
-        {
-            c.ebpf.java_symbol_file_max_space_limit = 10
+            c.ebpf.max_trace_entries = 131072;
         }
         if c.ebpf.java_symbol_file_refresh_defer_interval < Duration::from_secs(5)
             || c.ebpf.java_symbol_file_refresh_defer_interval > Duration::from_secs(3600)
         {
-            c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
+            c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(60)
         }
-        c.ebpf.off_cpu_profile.min_block = c.ebpf.off_cpu_profile.min_block.clamp(
-            Duration::from_micros(1),
-            Duration::from_micros(u32::MAX as u64 - 2),
-        );
+        c.ebpf.off_cpu_profile.min_block = c
+            .ebpf
+            .off_cpu_profile
+            .min_block
+            .clamp(Duration::from_micros(0), Duration::from_micros(3600000000));
+        if !(8..=1024).contains(&c.ebpf.syscall_out_of_order_cache_size) {
+            c.ebpf.syscall_out_of_order_cache_size = 16;
+        }
 
         if c.guard_interval < Duration::from_secs(1) || c.guard_interval > Duration::from_secs(3600)
         {
@@ -840,8 +895,17 @@ impl YamlConfig {
         if c.process_scheduling_priority < -20 || c.process_scheduling_priority > 19 {
             c.process_scheduling_priority = 0;
         }
+
         if c.local_dispatcher_count == 0 {
             c.local_dispatcher_count = 1;
+        }
+
+        if c.packet_fanout_mode > Self::PACKET_FANOUT_MODE_MAX {
+            c.packet_fanout_mode = 0;
+        }
+
+        if c.mirror_traffic_pcp > 9 {
+            c.mirror_traffic_pcp = 0;
         }
 
         Ok(c)
@@ -863,6 +927,14 @@ impl YamlConfig {
         // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
         if !self.l7_protocol_ports.contains_key(tls_str) {
             new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
+        }
+        let oracle_str = L7ProtocolParser::Oracle(OracleLog::default()).as_str();
+        // oracle default only parse 1521 port. when l7_protocol_ports config without ORACLE, need to reserve the oracle default config.
+        if !self.l7_protocol_ports.contains_key(oracle_str) {
+            new.insert(
+                oracle_str.to_string(),
+                Self::DEFAULT_ORACLE_PORTS.to_string(),
+            );
         }
 
         new
@@ -902,9 +974,11 @@ impl Default for YamlConfig {
             default_tap_type: 3,
             debug_listen_port: 0,
             enable_qos_bypass: false,
+            multiple_sockets_to_ingester: false,
             fast_path_map_size: 1 << 14,
             first_path_level: 0,
             src_interfaces: vec![],
+            tap_interface_bond_groups: vec![],
             mirror_traffic_pcp: 0,
             vtap_group_id_request: "".into(),
             pcap: Default::default(),
@@ -920,6 +994,7 @@ impl Default for YamlConfig {
             libpcap_enabled: false,
             #[cfg(target_os = "windows")]
             libpcap_enabled: true,
+            vhost_socket_path: "".into(),
             xflow_collector: Default::default(),
             vxlan_flags: 0xff,
             ignore_overlay_vlan: false,
@@ -935,7 +1010,7 @@ impl Default for YamlConfig {
             packet_delay: Duration::from_secs(1),
             triple: Default::default(),
             kubernetes_poller_type: KubernetesPollerType::Adaptive,
-            decap_erspan: false,
+            trim_tunnel_types: vec![],
             analyzer_ip: "".into(),
             grpc_buffer_size: 5,
             l7_log_session_aggr_timeout: Duration::from_secs(120),
@@ -977,6 +1052,7 @@ impl Default for YamlConfig {
                 (String::from("DNS"), String::from(Self::DEFAULT_DNS_PORTS)),
                 (String::from("TLS"), String::from(Self::DEFAULT_TLS_PORTS)),
             ]),
+            l7_log_blacklist: HashMap::new(),
             ebpf: EbpfYamlConfig::default(),
             npb_port: NPB_DEFAULT_PORT,
             os_proc_root: "/proc".into(),
@@ -1010,12 +1086,15 @@ impl Default for YamlConfig {
             ntp_min_interval: Duration::from_secs(10),
             l7_protocol_advanced_features: L7ProtocolAdvancedFeatures::default(),
             local_dispatcher_count: 1,
+            packet_fanout_mode: 0,
             oracle_parse_config: OracleParseConfig {
                 is_be: true,
                 int_compress: true,
                 resp_0x04_extra_byte: false,
             },
             ebpf_collector_queue_size: 65535,
+            server_ports: vec![],
+            consistent_timestamp_in_l7_metrics: false,
         }
     }
 }
@@ -1244,6 +1323,10 @@ pub struct RuntimeConfig {
     pub epc_id: u32,
     #[serde(skip)]
     pub vtap_id: u16,
+    #[serde(skip)]
+    pub team_id: u32,
+    #[serde(skip)]
+    pub organize_id: u32,
     #[serde(deserialize_with = "to_socket_type")]
     pub collector_socket_type: trident::SocketType,
     #[serde(deserialize_with = "to_socket_type")]
@@ -1291,7 +1374,6 @@ pub struct RuntimeConfig {
     pub external_agent_http_proxy_port: u16,
     #[serde(deserialize_with = "to_tap_mode")]
     pub tap_mode: TapMode,
-    pub prometheus_http_api_addresses: Vec<String>,
     #[serde(skip)]
     pub plugins: Option<trident::PluginConfig>,
     // TODO: expand and remove
@@ -1316,7 +1398,7 @@ impl RuntimeConfig {
         // c.collector_socket_type = trident::SocketType::File;
         c.max_memory <<= 20;
         c.server_tx_bandwidth_threshold <<= 20;
-
+        c.modify_decap_types();
         c.validate()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         Ok(c)
@@ -1334,8 +1416,7 @@ impl RuntimeConfig {
             global_pps_threshold: 2000000,
             #[cfg(target_os = "linux")]
             extra_netns_regex: Default::default(),
-            tap_interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
-                .into(),
+            tap_interface_regex: "".into(),
             host: Default::default(),
             rsyslog_enabled: false,
             output_vlan: 0,
@@ -1363,6 +1444,8 @@ impl RuntimeConfig {
             proxy_controller_port: 30035,
             epc_id: 3302,
             vtap_id: 3302,
+            team_id: 0,
+            organize_id: 0,
             collector_socket_type: trident::SocketType::File,
             npb_socket_type: trident::SocketType::RawUdp,
             trident_type: common::TridentType::TtProcess,
@@ -1399,8 +1482,14 @@ impl RuntimeConfig {
             external_agent_http_proxy_port: 38086,
             tap_mode: TapMode::Local,
             yaml_config: YamlConfig::load("", TapMode::Local).unwrap(), // Default configuration that needs to be corrected to be available
-            prometheus_http_api_addresses: vec![],
             plugins: Default::default(),
+        }
+    }
+
+    fn modify_decap_types(&mut self) {
+        for tunnel_type in &self.yaml_config.trim_tunnel_types {
+            self.decap_types
+                .push(TunnelType::from(tunnel_type.as_str()));
         }
     }
 
@@ -1454,7 +1543,9 @@ impl RuntimeConfig {
             )));
         }
 
-        if regex::Regex::new(&self.tap_interface_regex).is_err() {
+        if !self.tap_interface_regex.is_empty()
+            && regex::Regex::new(&self.tap_interface_regex).is_err()
+        {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "malformed tap-interface-regex({})",
                 self.tap_interface_regex
@@ -1503,7 +1594,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
     type Error = io::Error;
 
     fn try_from(conf: trident::Config) -> Result<Self, io::Error> {
-        let rc = Self {
+        let mut rc = Self {
             vtap_group_id: Default::default(),
             enabled: conf.enabled(),
             max_millicpus: {
@@ -1569,6 +1660,8 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             proxy_controller_port: conf.proxy_controller_port() as u16,
             epc_id: conf.epc_id(),
             vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
+            team_id: conf.team_id(),
+            organize_id: conf.organize_id(),
             collector_socket_type: conf.collector_socket_type(),
             npb_socket_type: conf.npb_socket_type(),
             trident_type: conf.trident_type(),
@@ -1645,10 +1738,10 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             external_agent_http_proxy_enabled: conf.external_agent_http_proxy_enabled(),
             external_agent_http_proxy_port: conf.external_agent_http_proxy_port() as u16,
             tap_mode: conf.tap_mode(),
-            prometheus_http_api_addresses: conf.prometheus_http_api_addresses.to_owned(),
             yaml_config: YamlConfig::load(conf.local_config(), conf.tap_mode())?,
             plugins: conf.plugins,
         };
+        rc.modify_decap_types();
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
         Ok(rc)

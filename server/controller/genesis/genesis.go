@@ -18,7 +18,6 @@ package genesis
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -27,22 +26,21 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
 	api "github.com/deepflowio/deepflow/message/controller"
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	gconfig "github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
-var log = logging.MustGetLogger("genesis")
+var log = logger.MustGetLogger("genesis")
 var GenesisService *Genesis
 var Synchronizer *SynchronizerServer
 
@@ -56,7 +54,6 @@ type Genesis struct {
 	cfg              gconfig.GenesisConfig
 	genesisSyncData  atomic.Value
 	kubernetesData   sync.Map
-	prometheusData   sync.Map
 	genesisStatsd    statsd.GenesisStatsd
 }
 
@@ -72,7 +69,6 @@ func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 		cfg:              cfg.GenesisCfg,
 		genesisSyncData:  sData,
 		kubernetesData:   sync.Map{},
-		prometheusData:   sync.Map{},
 		genesisStatsd: statsd.GenesisStatsd{
 			K8SInfoDelay: make(map[string][]float64),
 		},
@@ -83,19 +79,16 @@ func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 func (g *Genesis) Start() {
 	ctx := context.Context(context.Background())
 	genesisSyncDataChan := make(chan GenesisSyncData)
-	kubernetesDataChan := make(chan map[int]map[string]KubernetesInfo)
-	prometheusDataChan := make(chan map[int]map[string]PrometheusInfo)
+	kubernetesDataChan := make(chan KubernetesInfo)
 	sQueue := queue.NewOverwriteQueue("genesis-sync-data", g.cfg.QueueLengths)
 	kQueue := queue.NewOverwriteQueue("genesis-k8s-data", g.cfg.QueueLengths)
-	pQueue := queue.NewOverwriteQueue("genesis-prometheus-data", g.cfg.QueueLengths)
 
 	// 由于可能需要从数据库恢复数据，这里先启动监听
 	go g.receiveGenesisSyncData(genesisSyncDataChan)
 	go g.receiveKubernetesData(kubernetesDataChan)
-	go g.receivePrometheusData(prometheusDataChan)
 
 	go func() {
-		Synchronizer = NewGenesisSynchronizerServer(g.cfg, sQueue, kQueue, pQueue)
+		Synchronizer = NewGenesisSynchronizerServer(g.cfg, sQueue, kQueue)
 
 		vStorage := NewSyncStorage(g.cfg, genesisSyncDataChan, ctx)
 		vStorage.Start()
@@ -106,11 +99,6 @@ func (g *Genesis) Start() {
 		kStorage.Start()
 		kUpdater := NewKubernetesRpcUpdater(kStorage, kQueue, ctx)
 		kUpdater.Start()
-
-		pStorage := NewPrometheusStorage(g.cfg, prometheusDataChan, ctx)
-		pStorage.Start()
-		pUpdater := NewPrometheuspInfoRpcUpdater(pStorage, pQueue, ctx)
-		pUpdater.Start()
 	}()
 }
 
@@ -151,7 +139,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get org id (%d) mysql session failed", orgID)
+		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return retGenesisSyncData, err
 	}
 
@@ -203,7 +191,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 		if err != nil {
 			msg := "create grpc connection faild:" + err.Error()
-			log.Error(msg)
+			log.Error(msg, logger.NewORGPrefix(orgID))
 			return retGenesisSyncData, errors.New(msg)
 		}
 		defer conn.Close()
@@ -216,7 +204,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 		ret, err := client.GenesisSharingSync(context.Background(), req)
 		if err != nil {
 			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
-			log.Warning(msg)
+			log.Warning(msg, logger.NewORGPrefix(orgID))
 			return retGenesisSyncData, errors.New(msg)
 		}
 
@@ -417,6 +405,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 				HostIP:              v.GetHostIp(),
 				KubernetesClusterID: v.GetKubernetesClusterId(),
 				NodeIP:              v.GetNodeIp(),
+				TeamID:              v.GetTeamId(),
 				LastSeen:            vpLastSeen,
 			})
 		}
@@ -455,7 +444,7 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get org id (%d) mysql session failed", orgID)
+		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 
@@ -467,12 +456,12 @@ func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 	nodeIP := os.Getenv(common.NODE_IP_KEY)
 	err = db.Find(&azControllerConns).Error
 	if err != nil {
-		log.Warningf("query az_controller_connection failed (%s)", err.Error())
+		log.Warningf("query az_controller_connection failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 	err = db.Where("ip <> ? AND state <> ?", nodeIP, common.CONTROLLER_STATE_EXCEPTION).Find(&controllers).Error
 	if err != nil {
-		log.Warningf("query controller failed (%s)", err.Error())
+		log.Warningf("query controller failed (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		return []string{}, err
 	}
 
@@ -500,34 +489,27 @@ func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 	return serverIPs, nil
 }
 
-func (g *Genesis) receiveKubernetesData(kChan chan map[int]map[string]KubernetesInfo) {
+func (g *Genesis) receiveKubernetesData(kChan chan KubernetesInfo) {
 	for {
 		select {
 		case k := <-kChan:
-			for key, value := range k {
-				g.kubernetesData.Store(key, value)
-			}
+			g.kubernetesData.Store(fmt.Sprintf("%d-%s", k.ORGID, k.ClusterID), k)
 		}
 	}
 }
 
 func (g *Genesis) GetKubernetesData(orgID int, clusterID string) (KubernetesInfo, bool) {
-	k8sDataInterface, ok := g.kubernetesData.Load(orgID)
+	k8sDataInterface, ok := g.kubernetesData.Load(fmt.Sprintf("%d-%s", orgID, clusterID))
 	if !ok {
-		log.Warningf("kubernetes data not found org_id (%d)", orgID)
+		log.Warningf("kubernetes data not found org_id (%d) cluster id (%s)", orgID, clusterID, logger.NewORGPrefix(orgID))
 		return KubernetesInfo{}, false
 	}
-	k8sData, ok := k8sDataInterface.(map[string]KubernetesInfo)
+	k8sData, ok := k8sDataInterface.(KubernetesInfo)
 	if !ok {
-		log.Error("kubernetes data interface assert failed")
+		log.Error("kubernetes data interface assert failed", logger.NewORGPrefix(orgID))
 		return KubernetesInfo{}, false
 	}
-	k8sInfo, ok := k8sData[clusterID]
-	if !ok {
-		log.Warningf("kubernetes data not found org_id %d cluster id (%s)", orgID, clusterID)
-		return KubernetesInfo{}, false
-	}
-	return k8sInfo, true
+	return k8sData, true
 }
 
 func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string][]string, error) {
@@ -545,7 +527,7 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 		if err != nil {
 			msg := "create grpc connection faild:" + err.Error()
-			log.Error(msg)
+			log.Error(msg, logger.NewORGPrefix(orgID))
 			return k8sResp, errors.New(msg)
 		}
 		defer conn.Close()
@@ -559,18 +541,18 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		ret, err := client.GenesisSharingK8S(context.Background(), req)
 		if err != nil {
 			msg := fmt.Sprintf("get (%s) genesis sharing k8s failed (%s) ", serverIP, err.Error())
-			log.Error(msg)
+			log.Error(msg, logger.NewORGPrefix(orgID), logger.NewORGPrefix(orgID))
 			return k8sResp, errors.New(msg)
 		}
 		entries := ret.GetEntries()
 		if len(entries) == 0 {
-			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP)
+			log.Debugf("genesis sharing k8s node (%s) entries length is 0", serverIP, logger.NewORGPrefix(orgID))
 			continue
 		}
 		epochStr := ret.GetEpoch()
 		epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
 		if err != nil {
-			log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
+			log.Error("genesis api sharing k8s format timestr faild:"+err.Error(), logger.NewORGPrefix(orgID))
 			return k8sResp, err
 		}
 		if !epoch.After(k8sInfo.Epoch) {
@@ -588,7 +570,7 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
 	}
 	if k8sInfo.ErrorMSG != "" {
-		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG)
+		log.Errorf("cluster id (%s) k8s info grpc Error: %s", clusterID, k8sInfo.ErrorMSG, logger.NewORGPrefix(orgID))
 		return k8sResp, errors.New(k8sInfo.ErrorMSG)
 	}
 	if len(k8sInfo.Entries) == 0 {
@@ -606,110 +588,10 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 		eType := e.GetType()
 		out, err := genesiscommon.ParseCompressedInfo(e.GetCompressedInfo())
 		if err != nil {
-			log.Warningf("decode decompress error: %s", err.Error())
+			log.Warningf("decode decompress error: %s", err.Error(), logger.NewORGPrefix(orgID))
 			return map[string][]string{}, err
 		}
 		k8sResp[eType] = append(k8sResp[eType], string(out.Bytes()))
 	}
 	return k8sResp, nil
-}
-
-func (g *Genesis) receivePrometheusData(pChan chan map[int]map[string]PrometheusInfo) {
-	for {
-		select {
-		case p := <-pChan:
-			for k, v := range p {
-				g.prometheusData.Store(k, v)
-			}
-		}
-	}
-}
-
-func (g *Genesis) GetPrometheusData(orgID int, clusterID string) (PrometheusInfo, bool) {
-	prometheusDataInterface, ok := g.prometheusData.Load(orgID)
-	if !ok {
-		log.Warningf("prometheus data not found org_id (%d)", orgID)
-		return PrometheusInfo{}, false
-	}
-	prometheusData, ok := prometheusDataInterface.(map[string]PrometheusInfo)
-	if !ok {
-		log.Error("prometheus data interface assert failed")
-		return PrometheusInfo{}, false
-	}
-	prometheusInfo, ok := prometheusData[clusterID]
-	if !ok {
-		log.Warningf("prometheus data not found cluster id (%s)", clusterID)
-		return PrometheusInfo{}, false
-	}
-	return prometheusInfo, true
-}
-
-func (g *Genesis) GetPrometheusResponse(orgID int, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
-	prometheusEntries := []cloudmodel.PrometheusTarget{}
-
-	prometheusInfo, _ := g.GetPrometheusData(orgID, clusterID)
-
-	serverIPs, err := g.getServerIPs(orgID)
-	if err != nil {
-		return []cloudmodel.PrometheusTarget{}, err
-	}
-	for _, serverIP := range serverIPs {
-		grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
-		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
-		if err != nil {
-			msg := "create grpc connection faild:" + err.Error()
-			log.Error(msg)
-			return []cloudmodel.PrometheusTarget{}, errors.New(msg)
-		}
-		defer conn.Close()
-
-		client := api.NewControllerClient(conn)
-		reqOrgID := uint32(orgID)
-		req := &api.GenesisSharingPrometheusRequest{
-			OrgId:     &reqOrgID,
-			ClusterId: &clusterID,
-		}
-		ret, err := client.GenesisSharingPrometheus(context.Background(), req)
-		if err != nil {
-			msg := fmt.Sprintf("get (%s) genesis sharing prometheus failed (%s) ", serverIP, err.Error())
-			log.Error(msg)
-			return []cloudmodel.PrometheusTarget{}, errors.New(msg)
-		}
-		entriesByte := ret.GetEntries()
-		if entriesByte == nil {
-			log.Debugf("genesis sharing prometheus node (%s) entries is nil", serverIP)
-			continue
-		}
-		epochStr := ret.GetEpoch()
-		epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
-		if err != nil {
-			log.Error("genesis api sharing prometheus format timestr faild:" + err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-		errorMsg := ret.GetErrorMsg()
-		if errorMsg != "" {
-			log.Warningf("cluster id (%s) prometheus info grpc Error: %s", clusterID, errorMsg)
-		}
-		if !epoch.After(prometheusInfo.Epoch) {
-			continue
-		}
-
-		err = json.Unmarshal(entriesByte, &prometheusEntries)
-		if err != nil {
-			log.Error("genesis api sharing prometheus unmarshal json faild:" + err.Error())
-			return []cloudmodel.PrometheusTarget{}, err
-		}
-
-		prometheusInfo = PrometheusInfo{
-			Epoch:    epoch,
-			ErrorMSG: errorMsg,
-			Entries:  prometheusEntries,
-		}
-	}
-
-	if prometheusInfo.ErrorMSG != "" {
-		return []cloudmodel.PrometheusTarget{}, errors.New(prometheusInfo.ErrorMSG)
-	}
-
-	return prometheusInfo.Entries, nil
 }

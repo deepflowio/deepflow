@@ -23,6 +23,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, error) {
@@ -42,10 +43,10 @@ func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, 
 			jv := jvpcs[i]
 			name := jv.Get("name").MustString()
 			if !cloudcommon.CheckJsonAttributes(jv, []string{"id", "name"}) {
-				log.Infof("exclude vpc: %s, missing attr", name)
+				log.Infof("exclude vpc: %s, missing attr", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
-			id := jv.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jv.Get("id").MustString())
 			vpc := model.VPC{
 				Lcuuid:       id,
 				Name:         name,
@@ -127,21 +128,21 @@ func (h *HuaWei) getPartialRoutingTables(projectName, token string) (routingTabl
 	requiredAttrs := []string{"id", "vpc_id", "destination", "type", "nexthop"}
 	for i := range jRoutes {
 		jR := jRoutes[i]
-		id := jR.Get("id").MustString()
+		id := common.IDGenerateUUID(h.orgID, jR.Get("id").MustString())
 		if !cloudcommon.CheckJsonAttributes(jR, requiredAttrs) {
-			log.Infof("exclude routing_table: %s, missing attr", id)
+			log.Infof("exclude routing_table: %s, missing attr", id, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 		rType := jR.Get("type").MustString()
 		if rType != "peering" {
-			log.Infof("exclude routing_table: %s, missing support type: %s", id, rType)
+			log.Infof("exclude routing_table: %s, missing support type: %s", id, rType, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 		routingTables = append(
 			routingTables,
 			model.RoutingTable{
 				Lcuuid:        id,
-				VRouterLcuuid: h.toolDataSet.vpcLcuuidToVRouterLcuuid[jR.Get("vpc_id").MustString()],
+				VRouterLcuuid: h.toolDataSet.vpcLcuuidToVRouterLcuuid[common.IDGenerateUUID(h.orgID, jR.Get("vpc_id").MustString())],
 				Destination:   jR.Get("destination").MustString(),
 				NexthopType:   common.ROUTING_TABLE_TYPE_PEER_CONNECTION,
 				Nexthop:       jR.Get("nexthop").MustString(),

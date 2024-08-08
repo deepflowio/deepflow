@@ -181,43 +181,43 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "runtime.execute",
-		.probe_func = "runtime_execute",
+		.probe_func = UPROBE_FUNC_NAME(runtime_execute),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "runtime.newproc1",
-		.probe_func = "enter_runtime_newproc1",
+		.probe_func = UPROBE_FUNC_NAME(enter_runtime_newproc1),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "runtime.newproc1",
-		.probe_func = "exit_runtime_newproc1",
+		.probe_func = UPROBE_FUNC_NAME(exit_runtime_newproc1),
 		.is_probe_ret = true,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "crypto/tls.(*Conn).Write",
-		.probe_func = "uprobe_go_tls_write_enter",
+		.probe_func = UPROBE_FUNC_NAME(go_tls_write_enter),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "crypto/tls.(*Conn).Write",
-		.probe_func = "uprobe_go_tls_write_exit",
+		.probe_func = UPROBE_FUNC_NAME(go_tls_write_exit),
 		.is_probe_ret = true,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "crypto/tls.(*Conn).Read",
-		.probe_func = "uprobe_go_tls_read_enter",
+		.probe_func = UPROBE_FUNC_NAME(go_tls_read_enter),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "crypto/tls.(*Conn).Read",
-		.probe_func = "uprobe_go_tls_read_exit",
+		.probe_func = UPROBE_FUNC_NAME(go_tls_read_exit),
 		.is_probe_ret = true,
 	},
 	// HTTP2，symbols select an interface based on the GO version.
@@ -226,13 +226,13 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2serverConn).writeHeaders",
-		.probe_func = "uprobe_go_http2serverConn_writeHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2serverConn_writeHeaders),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "golang.org/x/net/http2.(*serverConn).writeHeaders",
-		.probe_func = "uprobe_go_http2serverConn_writeHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2serverConn_writeHeaders),
 		.is_probe_ret = false,
 	},
 	// http2 server, fetch request headers
@@ -240,13 +240,13 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2serverConn).processHeaders",
-		.probe_func = "uprobe_go_http2serverConn_processHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2serverConn_processHeaders),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "golang.org/x/net/http2.(*serverConn).processHeaders",
-		.probe_func = "uprobe_go_http2serverConn_processHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2serverConn_processHeaders),
 		.is_probe_ret = false,
 	},
 	// http2 client, fetch response headers
@@ -254,13 +254,13 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2clientConnReadLoop).handleResponse",
-		.probe_func = "uprobe_go_http2clientConnReadLoop_handleResponse",
+		.probe_func = UPROBE_FUNC_NAME(go_http2clientConnReadLoop_handleResponse),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "golang.org/x/net/http2.(*clientConnReadLoop).handleResponse",
-		.probe_func = "uprobe_go_http2clientConnReadLoop_handleResponse",
+		.probe_func = UPROBE_FUNC_NAME(go_http2clientConnReadLoop_handleResponse),
 		.is_probe_ret = false,
 	},
 	// http2 client, fetch request headers
@@ -268,13 +268,13 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2ClientConn).writeHeader",
-		.probe_func = "uprobe_go_http2ClientConn_writeHeader",
+		.probe_func = UPROBE_FUNC_NAME(go_http2ClientConn_writeHeader),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "golang.org/x/net/http2.(*ClientConn).writeHeader",
-		.probe_func = "uprobe_go_http2ClientConn_writeHeader",
+		.probe_func = UPROBE_FUNC_NAME(go_http2ClientConn_writeHeader),
 		.is_probe_ret = false,
 	},
 	// http2 client, fetch request headers
@@ -282,13 +282,13 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2ClientConn).writeHeaders",
-		.probe_func = "uprobe_go_http2ClientConn_writeHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2ClientConn_writeHeaders),
 		.is_probe_ret = false,
 	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "golang.org/x/net/http2.(*ClientConn).writeHeaders",
-		.probe_func = "uprobe_go_http2ClientConn_writeHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2ClientConn_writeHeaders),
 		.is_probe_ret = false,
 	},
 	// gRPC
@@ -297,7 +297,7 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader",
-		.probe_func = "uprobe_go_loopyWriter_writeHeader",
+		.probe_func = UPROBE_FUNC_NAME(go_loopyWriter_writeHeader),
 		.is_probe_ret = false,
 	},
 	// grpc client fetch response headers
@@ -305,7 +305,7 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders",
-		.probe_func = "uprobe_go_http2Client_operateHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2Client_operateHeaders),
 		.is_probe_ret = false,
 	},
 	// grpc server fetch request headers
@@ -313,21 +313,21 @@ static struct symbol syms[] = {
 	{
 		.type = GO_UPROBE,
 		.symbol = "google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders",
-		.probe_func = "uprobe_go_http2Server_operateHeaders",
+		.probe_func = UPROBE_FUNC_NAME(go_http2Server_operateHeaders),
 		.is_probe_ret = false,
 	},
 	// grpc datafram read
 	{
 		.type = GO_UPROBE,
 		.symbol = "golang.org/x/net/http2.(*Framer).checkFrameOrder",
-		.probe_func = "uprobe_golang_org_x_net_http2_Framer_checkFrameOrder",
+		.probe_func = UPROBE_FUNC_NAME(golang_org_x_net_http2_Framer_checkFrameOrder),
 		.is_probe_ret = false,
 	},
 	// grpc datafram write
 	{
 		.type = GO_UPROBE,
 		.symbol = "golang.org/x/net/http2.(*Framer).WriteDataPadded",
-		.probe_func = "uprobe_golang_org_x_net_http2_Framer_WriteDataPadded",
+		.probe_func = UPROBE_FUNC_NAME(golang_org_x_net_http2_Framer_WriteDataPadded),
 		.is_probe_ret = false,
 	},
 };
@@ -997,10 +997,6 @@ static void process_exit_handle(int pid, struct bpf_tracer *tracer)
 static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
 				     uint8_t type)
 {
-	// Uprobe's hook points are only for user processes
-	if (!is_user_process(pid))
-		return;
-
 	char *path = get_elf_path_by_pid(pid);
 	if (path == NULL) {
 		return;

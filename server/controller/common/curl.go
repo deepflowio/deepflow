@@ -21,14 +21,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
+)
 
-	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+var (
+	SUCCESS = "SUCCESS"
+
+	ErrorFail    = errors.New("FAIL")
+	ErrorPending = errors.New("PENDING")
+
+	errResponse, _ = simplejson.NewJson([]byte("{}"))
 )
 
 // 功能：获取用于API调用的IP地址
@@ -54,38 +62,48 @@ func WithORGHeader(value string) HeaderOption {
 	}
 }
 
-// 功能：调用其他模块API并获取返回结果
+func fillHeader(req *http.Request) {
+	if req.Header.Get(HEADER_KEY_X_USER_ID) == "" {
+		req.Header.Set(HEADER_KEY_X_USER_ID, fmt.Sprintf("%d", USER_ID_SUPER_ADMIN))
+	}
+	if req.Header.Get(HEADER_KEY_X_USER_TYPE) == "" {
+		req.Header.Set(HEADER_KEY_X_USER_TYPE, fmt.Sprintf("%d", USER_TYPE_SUPER_ADMIN))
+	}
+	if req.Header.Get(HEADER_KEY_ACCEPT) == "" {
+		req.Header.Set(HEADER_KEY_ACCEPT, ACCEPT_JSON)
+	}
+}
+
+// CURLPerform 调用 deepflow 其他服务 API 并获取返回结果，Content-Type 为 application/json
 func CURLPerform(method string, url string, body map[string]interface{}, options ...HeaderOption) (*simplejson.Json, error) {
 	log.Debugf("curl perform: %s %s %+v", method, url, body)
-	errResponse, _ := simplejson.NewJson([]byte("{}"))
-
-	// TODO: 通过配置文件获取API超时时间
-	client := &http.Client{Timeout: time.Second * 30}
-
 	bodyStr, _ := json.Marshal(&body)
 	req, err := http.NewRequest(method, url, bytes.NewReader(bodyStr))
 	if err != nil {
 		log.Error(err)
 		return errResponse, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json, text/plain")
-	req.Header.Set("X-User-Id", "1")
-	req.Header.Set("X-User-Type", "1")
+	req.Header.Set(HEADER_KEY_CONTENT_TYPE, CONTENT_TYPE_JSON)
+	return doRequest(req, url, options...)
+}
+
+func doRequest(req *http.Request, url string, options ...HeaderOption) (*simplejson.Json, error) {
 	for _, option := range options {
 		option(req)
 	}
+	fillHeader(req)
 
+	// TODO: 通过配置文件获取API超时时间
+	client := &http.Client{Timeout: time.Second * 30}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("curl: %s failed, (%v)", url, err)
 		return errResponse, err
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("curl: %s failed, response detail: %+v", url, resp)
-		if respBytes, err := ioutil.ReadAll(resp.Body); err == nil {
+		if respBytes, err := io.ReadAll(resp.Body); err == nil {
 			if response, err := simplejson.NewJson(respBytes); err == nil {
 				description := response.Get("DESCRIPTION").MustString()
 				if description != "" {
@@ -97,7 +115,7 @@ func CURLPerform(method string, url string, body map[string]interface{}, options
 		return errResponse, errors.New(errMsg)
 	}
 
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("read (%s) body failed, (%v)", url, err)
 		return errResponse, err
@@ -110,16 +128,29 @@ func CURLPerform(method string, url string, body map[string]interface{}, options
 	}
 
 	optStatus := response.Get("OPT_STATUS").MustString()
-	if optStatus != "" && optStatus != httpcommon.SUCCESS {
+	if optStatus != "" && optStatus != SUCCESS {
 		description := response.Get("DESCRIPTION").MustString()
 		log.Errorf("curl: %s failed, (%s)", url, description)
-		e := httpcommon.ErrorFail
+		e := ErrorFail
 		// PENDING used for api /v1/rpmod/
 		if optStatus == "PENDING" {
-			e = httpcommon.ErrorPending
+			e = ErrorPending
 		}
 		return errResponse, fmt.Errorf("%w, %s", e, description)
 	}
 
 	return response, nil
+}
+
+// TODO optimize
+// CURLForm 调用 deepflow 其他服务 API 并获取返回结果，Content-Type 为 application/x-www-form-urlencoded
+func CURLForm(method string, url string, values url.Values, options ...HeaderOption) (*simplejson.Json, error) {
+	log.Debugf("curl form: %s %s %+v", method, url, values)
+	req, err := http.NewRequest(method, url, strings.NewReader(values.Encode()))
+	if err != nil {
+		log.Error(err)
+		return errResponse, err
+	}
+	req.Header.Set(HEADER_KEY_CONTENT_TYPE, CONTEXT_TYPE_FORM)
+	return doRequest(req, url, options...)
 }

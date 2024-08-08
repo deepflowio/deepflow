@@ -133,7 +133,7 @@ func EncodeTo(e app.Document, protocol config.ExportProtocol, utags *utag.Univer
 	switch protocol {
 	case config.PROTOCOL_KAFKA:
 		tags0, tags1 := QueryUniversalTags0(e, utags), QueryUniversalTags1(e, utags)
-		k8sLabels0, k8sLabels1 := utags.QueryCustomK8sLabels(e.Tags().PodID), utags.QueryCustomK8sLabels(e.Tags().PodID1)
+		k8sLabels0, k8sLabels1 := utags.QueryCustomK8sLabels(e.OrgID(), e.Tags().PodID), utags.QueryCustomK8sLabels(e.OrgID(), e.Tags().PodID1)
 		return exportercommon.EncodeToJson(e, int(e.DataSource()), cfg, tags0, tags1, k8sLabels0, k8sLabels1), nil
 	case config.PROTOCOL_PROMETHEUS:
 		return EncodeToPrometheus(e, utags, cfg)
@@ -144,7 +144,7 @@ func EncodeTo(e app.Document, protocol config.ExportProtocol, utags *utag.Univer
 
 func QueryUniversalTags0(e app.Document, utags *utag.UniversalTagsManager) *utag.UniversalTags {
 	t := e.Tags()
-	return utags.QueryUniversalTags(
+	return utags.QueryUniversalTags(t.OrgId,
 		t.RegionID, t.AZID, t.HostID, t.PodNSID, t.PodClusterID, t.SubnetID, t.VTAPID,
 		uint8(t.L3DeviceType), t.AutoServiceType, t.AutoInstanceType,
 		t.L3DeviceID, t.AutoServiceID, t.AutoInstanceID, t.PodNodeID, t.PodGroupID, t.PodID, uint32(t.L3EpcID), t.GPID, t.ServiceID,
@@ -154,7 +154,7 @@ func QueryUniversalTags0(e app.Document, utags *utag.UniversalTagsManager) *utag
 
 func QueryUniversalTags1(e app.Document, utags *utag.UniversalTagsManager) *utag.UniversalTags {
 	t := e.Tags()
-	return utags.QueryUniversalTags(
+	return utags.QueryUniversalTags(t.OrgId,
 		t.RegionID1, t.AZID1, t.HostID1, t.PodNSID1, t.PodClusterID1, t.SubnetID1, t.VTAPID,
 		uint8(t.L3DeviceType1), t.AutoServiceType1, t.AutoInstanceType1,
 		t.L3DeviceID1, t.AutoServiceID1, t.AutoInstanceID1, t.PodNodeID1, t.PodGroupID1, t.PodID1, uint32(t.L3EpcID1), t.GPID1, t.ServiceID1,
@@ -179,6 +179,11 @@ func getPrometheusLabels(e app.Document, uTags0, uTags1 *utag.UniversalTags, cfg
 		value := e.GetFieldValueByOffsetAndKind(structTags.Offset, structTags.DataKind, structTags.DataType)
 		if utils.IsNil(value) {
 			log.Debug("is nil ", structTags.FieldName)
+			continue
+		}
+
+		//  TimeSeries.Samples have exported `time`, no need to export anymore
+		if structTags.Name == "time" {
 			continue
 		}
 

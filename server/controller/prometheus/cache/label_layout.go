@@ -19,10 +19,9 @@ package cache
 import (
 	"sync"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
-
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type LayoutKey struct {
@@ -43,26 +42,24 @@ func NewLayoutKey(metricName, labelName string) LayoutKey {
 
 type appLabelNameToValue map[string]string
 type metricAndAPPLabelLayout struct {
+	org *common.ORG
+
 	layoutKeyToIndex sync.Map
-	layoutKeyToID    cmap.ConcurrentMap[LayoutKey, int]
 }
 
-func newMetricAndAPPLabelLayout() *metricAndAPPLabelLayout {
+func newMetricAndAPPLabelLayout(org *common.ORG) *metricAndAPPLabelLayout {
 	return &metricAndAPPLabelLayout{
-		layoutKeyToID: cmap.NewStringer[LayoutKey, int](),
+		org: org,
 	}
+}
+
+func (mll *metricAndAPPLabelLayout) Get() *sync.Map {
+	return &mll.layoutKeyToIndex
 }
 
 func (mll *metricAndAPPLabelLayout) GetIndexByKey(key LayoutKey) (uint8, bool) {
 	if index, ok := mll.layoutKeyToIndex.Load(key); ok {
 		return index.(uint8), true
-	}
-	return 0, false
-}
-
-func (mll *metricAndAPPLabelLayout) GetIDByKey(key LayoutKey) (int, bool) {
-	if id, ok := mll.layoutKeyToID.Get(key); ok {
-		return id, true
 	}
 	return 0, false
 }
@@ -80,13 +77,12 @@ func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 	}
 	for _, l := range metricAPPLabelLayouts {
 		mll.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
-		mll.layoutKeyToID.Set(NewLayoutKey(l.MetricName, l.APPLabelName), l.ID)
 	}
 	return nil
 }
 
 func (mml *metricAndAPPLabelLayout) load() ([]*mysql.PrometheusMetricAPPLabelLayout, error) {
 	var metricAPPLabelLayouts []*mysql.PrometheusMetricAPPLabelLayout
-	err := mysql.Db.Find(&metricAPPLabelLayouts).Error
+	err := mml.org.DB.Find(&metricAPPLabelLayouts).Error
 	return metricAPPLabelLayouts, err
 }

@@ -67,7 +67,7 @@ func (b *UpdaterBase[MT, KT]) generateOldData() ([]MT, bool) {
 		err = b.db.Unscoped().Find(&items).Error
 	}
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), b.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -78,7 +78,7 @@ func (b *UpdaterBase[MT, KT]) generateOneData() (map[KT]MT, bool) {
 	var items []MT
 	err := mysql.Db.Unscoped().First(&items).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err), b.db.LogPrefixORGID)
 		return nil, false
 	}
 	idToItem := make(map[KT]MT)
@@ -110,14 +110,10 @@ func (b *UpdaterBase[MT, KT]) operateBatch(keys []KT, items []MT, operateFunc fu
 func (b *UpdaterBase[MT, KT]) add(keys []KT, dbItems []MT) {
 	err := mysql.Db.Create(&dbItems).Error
 	if err != nil {
-		for i := range keys {
-			log.Errorf("add %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
-		}
+		log.Errorf("add %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error())
 		return
 	}
-	for i := range keys {
-		log.Infof("add %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
+	log.Infof("add %s (keys: %+v values: %+v) success", b.resourceTypeName, keys, dbItems)
 }
 
 func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT) {
@@ -132,12 +128,8 @@ func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interfa
 func (b *UpdaterBase[MT, KT]) delete(keys []KT, dbItems []MT) {
 	err := mysql.Db.Delete(&dbItems).Error
 	if err != nil {
-		for i := range keys {
-			log.Errorf("delete %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
-		}
+		log.Errorf("delete %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error())
 		return
 	}
-	for i := range keys {
-		log.Infof("delete %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
+	log.Infof("delete %s (keys: %+v values: %+v) success", b.resourceTypeName, keys, dbItems)
 }

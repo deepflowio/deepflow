@@ -22,6 +22,7 @@ import (
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 // This project is not an actual project that is visible to the console, so ignore its exceptions when learning
@@ -96,7 +97,7 @@ func (h *HuaWei) createToken(projectName, projectID string) (*Token, error) {
 }
 
 func (h *HuaWei) refreshTokenMap() error {
-	log.Infof("refresh cloud (%s) token map", h.name)
+	log.Infof("refresh cloud (%s) token map", h.name, logger.NewORGPrefix(h.orgID))
 	var err error
 	token, err := h.getToken(h.config.ProjectName, h.config.ProjectID)
 	if err != nil {
@@ -116,11 +117,11 @@ func (h *HuaWei) refreshTokenMap() error {
 		}
 		name := jp.Get("name").MustString()
 		if len(h.config.IncludeRegions) > 0 && !common.Contains(h.config.IncludeRegions, name) {
-			log.Infof("exclude project: %s, not included", name)
+			log.Infof("exclude project: %s, not included", name, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 		if common.Contains(h.config.ExcludeRegions, name) {
-			log.Infof("exclude project: %s", name)
+			log.Infof("exclude project: %s", name, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 
@@ -129,9 +130,9 @@ func (h *HuaWei) refreshTokenMap() error {
 		if err != nil {
 			msg := fmt.Sprintf("get token failed, pass this project (%s, %s)", name, id)
 			if name == ignoredProjectName {
-				log.Info(msg)
+				log.Info(msg, logger.NewORGPrefix(h.orgID))
 			} else {
-				log.Error(msg)
+				log.Error(msg, logger.NewORGPrefix(h.orgID))
 			}
 			continue
 		}
@@ -141,7 +142,7 @@ func (h *HuaWei) refreshTokenMap() error {
 
 	for p, t := range h.projectTokenMap {
 		if !common.Contains(projectIDs, p.id) {
-			log.Infof("project (%+v) lose", p)
+			log.Infof("project (%+v) lose", p, logger.NewORGPrefix(h.orgID))
 			delete(h.projectTokenMap, p)
 			continue
 		}
@@ -152,12 +153,12 @@ func (h *HuaWei) refreshTokenMap() error {
 			delete(h.projectTokenMap, p)
 			continue
 		} else if len(jvpcs) == 0 {
-			log.Infof("exclude project (%+v), has no vpc", p)
+			log.Infof("exclude project (%+v), has no vpc", p, logger.NewORGPrefix(h.orgID))
 			delete(h.projectTokenMap, p)
 			continue
 		}
-		log.Infof("project info (%+v)", p)
-		log.Debugf("token info (%+v)", t)
+		log.Infof("project info (%+v)", p, logger.NewORGPrefix(h.orgID))
+		log.Debugf("token info (%+v)", t, logger.NewORGPrefix(h.orgID))
 	}
 	return nil
 }

@@ -26,7 +26,10 @@ import (
 )
 
 func (b *DataSet) AddPod(dbItem *mysql.Pod, seq int, toolDataSet *tool.DataSet) {
-	podNodeLcuuid, _ := toolDataSet.GetPodNodeLcuuidByID(dbItem.PodNodeID)
+	var podNodeLcuuid string
+	if dbItem.PodNodeID != 0 {
+		podNodeLcuuid, _ = toolDataSet.GetPodNodeLcuuidByID(dbItem.PodNodeID)
+	}
 	var podReplicaSetLcuuid string
 	if dbItem.PodReplicaSetID != 0 {
 		podReplicaSetLcuuid, _ = toolDataSet.GetPodReplicaSetLcuuidByID(dbItem.PodReplicaSetID)
@@ -61,12 +64,12 @@ func (b *DataSet) AddPod(dbItem *mysql.Pod, seq int, toolDataSet *tool.DataSet) 
 		AZLcuuid:            dbItem.AZ,
 		SubDomainLcuuid:     dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePod(lcuuid string) {
 	delete(b.Pods, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type Pod struct {

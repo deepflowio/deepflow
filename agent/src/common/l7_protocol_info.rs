@@ -139,10 +139,17 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
             None => {
                 ((param.flow_id as u128) << 64)
                     | (if param.ebpf_type != EbpfType::None {
+                        // NOTE:
+                        //   In the request-log session aggregation process, for eBPF data, we require that requests and
+                        // responses have consecutive cap_seq to ensure the correctness of session aggregation. However,
+                        // when SR (Segmentation-Reassembly) is enabled, we combine multiple eBPF socket event events
+                        // before parsing the protocol. Therefore, in order to ensure that session aggregation can still
+                        // be performed correctly, we need to retain the cap_seq of the last request and the cap_seq of
+                        // the first response, so that the cap_seq of the request and response can still be consecutive.
                         if param.direction == PacketDirection::ClientToServer {
-                            param.packet_seq + 1
+                            param.packet_end_seq + 1
                         } else {
-                            param.packet_seq
+                            param.packet_start_seq
                         }
                     } else {
                         0
@@ -420,6 +427,10 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
 
     fn get_request_resource_length(&self) -> usize {
         0
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        false
     }
 }
 

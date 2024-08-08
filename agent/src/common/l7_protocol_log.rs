@@ -48,7 +48,7 @@ use crate::plugin::c_ffi::SoPluginFunc;
 use crate::plugin::wasm::WasmVm;
 
 use public::enums::IpProtocol;
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolChecker, L7ProtocolEnum};
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.
@@ -346,7 +346,8 @@ pub struct ParseParam<'a> {
     // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam<'a>>,
     // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
-    pub packet_seq: u64,
+    pub packet_start_seq: u64,
+    pub packet_end_seq: u64,
     pub time: u64, // micro second
     pub parse_perf: bool,
     pub parse_log: bool,
@@ -397,7 +398,8 @@ impl<'a> ParseParam<'a> {
 
             direction: packet.lookup_key.direction,
             ebpf_type: packet.ebpf_type,
-            packet_seq: packet.cap_seq,
+            packet_start_seq: packet.cap_start_seq,
+            packet_end_seq: packet.cap_end_seq,
             ebpf_param: None,
             time: packet.lookup_key.timestamp.as_micros() as u64,
             parse_perf,
@@ -514,12 +516,14 @@ impl L7ProtocolBitmap {
     pub fn set_disabled(&mut self, p: L7Protocol) {
         self.0 &= !(1 << (p as u128));
     }
+}
 
-    pub fn is_disabled(&self, p: L7Protocol) -> bool {
+impl L7ProtocolChecker for L7ProtocolBitmap {
+    fn is_disabled(&self, p: L7Protocol) -> bool {
         self.0 & (1 << (p as u128)) == 0
     }
 
-    pub fn is_enabled(&self, p: L7Protocol) -> bool {
+    fn is_enabled(&self, p: L7Protocol) -> bool {
         !self.is_disabled(p)
     }
 }

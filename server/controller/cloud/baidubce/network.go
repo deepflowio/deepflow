@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getNetworks(
@@ -32,7 +33,7 @@ func (b *BaiduBce) getNetworks(
 	var retSubnets []model.Subnet
 	var networkIdToLcuuid map[string]string
 
-	log.Debug("get networks starting")
+	log.Debug("get networks starting", logger.NewORGPrefix(b.orgID))
 
 	vpcClient, _ := vpc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	vpcClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -44,7 +45,7 @@ func (b *BaiduBce) getNetworks(
 		startTime := time.Now()
 		result, err := vpcClient.ListSubnets(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListSubnets", len(result.Subnets), startTime)
@@ -61,12 +62,12 @@ func (b *BaiduBce) getNetworks(
 		for _, subnet := range r.Subnets {
 			azLcuuid, ok := zoneNameToAZLcuuid[subnet.ZoneName]
 			if !ok {
-				log.Infof("network (%s) az (%s) not found", subnet.SubnetId, subnet.ZoneName)
+				log.Infof("network (%s) az (%s) not found", subnet.SubnetId, subnet.ZoneName, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			vpcLcuuid, ok := vpcIdToLcuuid[subnet.VPCId]
 			if !ok {
-				log.Infof("network (%s) vpc (%s) not found", subnet.SubnetId, subnet.VPCId)
+				log.Infof("network (%s) vpc (%s) not found", subnet.SubnetId, subnet.VPCId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 
@@ -96,6 +97,6 @@ func (b *BaiduBce) getNetworks(
 			retSubnets = append(retSubnets, retSubnet)
 		}
 	}
-	log.Debug("Get networks complete")
+	log.Debug("Get networks complete", logger.NewORGPrefix(b.orgID))
 	return retNetworks, retSubnets, networkIdToLcuuid, nil
 }

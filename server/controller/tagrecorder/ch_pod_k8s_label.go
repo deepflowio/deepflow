@@ -62,7 +62,7 @@ func (c *ChPodK8sLabel) onResourceUpdated(sourceID int, fieldsUpdate *message.Po
 			} else {
 				if oldV != v {
 					updateKey = K8sLabelKey{ID: sourceID, Key: k}
-					updateInfo[k] = v
+					updateInfo["value"] = v
 					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, K8sLabelKey{ID: sourceID, Key: k})
@@ -101,11 +101,12 @@ func (c *ChPodK8sLabel) sourceToTarget(md *message.Metadata, source *mysql.Pod) 
 	for k, v := range labelMap {
 		keys = append(keys, K8sLabelKey{ID: source.ID, Key: k})
 		targets = append(targets, mysql.ChPodK8sLabel{
-			ID:       source.ID,
-			Key:      k,
-			Value:    v,
-			TeamID:   md.TeamID,
-			DomainID: md.DomainID,
+			ID:          source.ID,
+			Key:         k,
+			Value:       v,
+			TeamID:      md.TeamID,
+			DomainID:    md.DomainID,
+			SubDomainID: md.SubDomainID,
 		})
 	}
 	return

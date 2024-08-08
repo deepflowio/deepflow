@@ -19,16 +19,17 @@ package kubernetes_gather
 import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (k *KubernetesGather) getAZ() (model.AZ, error) {
-	log.Debug("get az starting")
+	log.Debug("get az starting", logger.NewORGPrefix(k.orgID))
 	k.azLcuuid = cloudcommon.GetAZLcuuidFromUUIDGenerate(k.orgID, k.UuidGenerate)
 	az := model.AZ{
 		Lcuuid:       k.azLcuuid,
 		Name:         k.Name,
 		RegionLcuuid: k.RegionUUID,
 	}
-	log.Debug("get az complete")
+	log.Debug("get az complete", logger.NewORGPrefix(k.orgID))
 	return az, nil
 }

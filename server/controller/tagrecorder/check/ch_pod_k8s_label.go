@@ -43,17 +43,17 @@ func (k *ChPodK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodK8sLabel, 
 	var podClusters []mysql.PodCluster
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 	err = k.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 	err = k.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -63,22 +63,28 @@ func (k *ChPodK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodK8sLabel, 
 	}
 	keyToItem := make(map[K8sLabelKey]mysql.ChPodK8sLabel)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod, k.db.LogPrefixORGID)
+		}
+
 		splitLabel := strings.Split(pod.Label, ", ")
 		for _, singleLabel := range splitLabel {
-			splitSingleLabel := strings.Split(singleLabel, ":")
+			splitSingleLabel := strings.SplitN(singleLabel, ":", 2)
 			if len(splitSingleLabel) == 2 {
 				key := K8sLabelKey{
 					ID:  pod.ID,
 					Key: splitSingleLabel[0],
 				}
 				keyToItem[key] = mysql.ChPodK8sLabel{
-					ID:       pod.ID,
-					Key:      splitSingleLabel[0],
-					Value:    splitSingleLabel[1],
-					L3EPCID:  pod.VPCID,
-					PodNsID:  pod.PodNamespaceID,
-					TeamID:   tagrecorder.DomainToTeamID[pod.Domain],
-					DomainID: tagrecorder.DomainToDomainID[pod.Domain],
+					ID:          pod.ID,
+					Key:         splitSingleLabel[0],
+					Value:       splitSingleLabel[1],
+					L3EPCID:     pod.VPCID,
+					PodNsID:     pod.PodNamespaceID,
+					TeamID:      teamID,
+					DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+					SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 				}
 			}
 		}

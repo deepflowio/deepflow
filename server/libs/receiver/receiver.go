@@ -33,6 +33,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/libs/app"
 	"github.com/deepflowio/deepflow/server/libs/cache"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/pool"
@@ -66,6 +67,8 @@ type RecvBuffer struct {
 	Buffer     []byte
 	IP         net.IP // 保存消息的发送方IP
 	VtapID     uint16
+	TeamID     uint32
+	OrgID      uint16
 	SocketType ServerType
 }
 
@@ -172,6 +175,7 @@ func (s ServerType) String() string {
 type Status struct {
 	msgType              datatype.MessageType
 	VTAPID               uint16
+	orgId                uint16
 	serverType           ServerType
 	ip                   net.IP
 	lastSeq              uint64
@@ -182,11 +186,12 @@ type Status struct {
 	firstLocalTimestamp  uint32 // 第一次收到数据时的本地时间
 }
 
-func NewStatus(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) *Status {
+func NewStatus(now uint32, msgType datatype.MessageType, vtapID, orgId uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) *Status {
 	return &Status{
 		msgType:              msgType,
 		serverType:           serverType,
 		VTAPID:               vtapID,
+		orgId:                orgId,
 		ip:                   ip,
 		lastSeq:              seq,
 		lastRemoteTimestamp:  timestamp,
@@ -197,9 +202,10 @@ func NewStatus(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.I
 	}
 }
 
-func (s *Status) update(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+func (s *Status) update(now uint32, msgType datatype.MessageType, vtapID, orgId uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
 	s.msgType = msgType
 	s.VTAPID = vtapID
+	s.orgId = orgId
 	s.ip = ip
 	s.lastSeq = seq
 	s.lastRemoteTimestamp = timestamp
@@ -229,22 +235,22 @@ func (s *AdapterStatus) init() {
 	}
 }
 
-func (s *AdapterStatus) Update(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+func (s *AdapterStatus) Update(now uint32, msgType datatype.MessageType, vtapID, orgId uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
 	if serverType == UDP { // UDP大部分时间无锁，只有在更新map时加锁, 防止调试命令读取时可能导致异常
 		if vtapID != 0 {
 			if status, ok := s.UDPStatusFlow[msgType][vtapID]; ok {
-				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				status.update(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 			} else {
 				s.UDPStatusLocks[msgType].Lock()
-				s.UDPStatusFlow[msgType][vtapID] = NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				s.UDPStatusFlow[msgType][vtapID] = NewStatus(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 				s.UDPStatusLocks[msgType].Unlock()
 			}
 		} else {
 			if status, ok := s.UDPStatusOthers[msgType][ip.String()]; ok {
-				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				status.update(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 			} else {
 				s.UDPStatusLocks[msgType].Lock()
-				s.UDPStatusOthers[msgType][ip.String()] = NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				s.UDPStatusOthers[msgType][ip.String()] = NewStatus(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 				s.UDPStatusLocks[msgType].Unlock()
 			}
 		}
@@ -264,9 +270,9 @@ func (s *AdapterStatus) Update(now uint32, msgType datatype.MessageType, vtapID 
 			status, ok := s.TCPStatusFlow[msgType][vtapID]
 			s.TCPStatusLocks[msgType].RUnlock()
 			if ok {
-				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				status.update(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 			} else {
-				newStatus := NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				newStatus := NewStatus(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 				s.TCPStatusLocks[msgType].Lock()
 				s.TCPStatusFlow[msgType][vtapID] = newStatus
 				s.TCPStatusLocks[msgType].Unlock()
@@ -277,9 +283,9 @@ func (s *AdapterStatus) Update(now uint32, msgType datatype.MessageType, vtapID 
 			status, ok := s.TCPStatusOthers[msgType][ip.String()]
 			s.TCPStatusLocks[msgType].RUnlock()
 			if ok {
-				status.update(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				status.update(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 			} else {
-				newStatus := NewStatus(now, msgType, vtapID, ip, seq, timestamp, serverType)
+				newStatus := NewStatus(now, msgType, vtapID, orgId, ip, seq, timestamp, serverType)
 				s.TCPStatusLocks[msgType].Lock()
 				s.TCPStatusOthers[msgType][ip.String()] = newStatus
 				s.TCPStatusLocks[msgType].Unlock()
@@ -317,14 +323,14 @@ func (s *AdapterStatus) GetStatus(msgType datatype.MessageType) string {
 		sort.Slice(allStatus, func(i, j int) bool {
 			return allStatus[i].ip.String() < allStatus[j].ip.String()
 		})
-		status := fmt.Sprintf("MsgType VTAPID TridentIP                                Type LastSeq  LastRemoteTimestamp LastLocalTimestamp  LastDelay LastRecvFromNow FirstSeq FirstRemoteTimestamp FirstLocalTimestamp\n")
-		status += fmt.Sprintf("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
+		status := fmt.Sprintf("MsgType VTAPID TridentIP                                Type LastSeq  LastRemoteTimestamp LastLocalTimestamp  LastDelay LastRecvFromNow FirstSeq FirstRemoteTimestamp FirstLocalTimestamp    OrgID\n")
+		status += fmt.Sprintf("-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
 		for _, instance := range allStatus {
-			status += fmt.Sprintf("%-7s %-6d %-40s %-4s %-8d %-19.19s %-19.19s %-9d %-15d %-8d %-19.19s  %-19.19s\n",
+			status += fmt.Sprintf("%-7s %-6d %-40s %-4s %-8d %-19.19s %-19.19s %-9d %-15d %-8d %-19.19s  %-19.19s org-%d\n",
 				datatype.MessageTypeString[int(instance.msgType)], instance.VTAPID, instance.ip, instance.serverType,
 				instance.lastSeq, time.Unix(int64(instance.lastRemoteTimestamp), 0), time.Unix(int64(instance.LastLocalTimestamp), 0),
 				instance.LastLocalTimestamp-instance.lastRemoteTimestamp, uint32(time.Now().Unix())-instance.LastLocalTimestamp,
-				instance.firstSeq, time.Unix(int64(instance.firstRemoteTimestamp), 0), time.Unix(int64(instance.firstLocalTimestamp), 0))
+				instance.firstSeq, time.Unix(int64(instance.firstRemoteTimestamp), 0), time.Unix(int64(instance.firstLocalTimestamp), 0), instance.orgId)
 		}
 		return status
 	}
@@ -571,11 +577,14 @@ func (r *Receiver) flushPutTCPQueues() {
 	r.lastTCPFlushTime = r.timeNow
 }
 
-// 用来上报trisolaris, trident最后的活跃时间
-func (r *Receiver) GetTridentStatus() []*Status {
+// 用来上报trisolaris, agent最后的活跃时间
+func (r *Receiver) GetTridentStatus(orgId uint16) []*Status {
 	UDPStatus, TCPStatus := r.status.UDPMetrisStatus, r.status.TCPMetrisStatus
 	status := make([]*Status, 0, len(UDPStatus)+len(TCPStatus))
 	for _, us := range UDPStatus {
+		if us.orgId != orgId {
+			continue
+		}
 		find := false
 		for _, ts := range TCPStatus {
 			if us.VTAPID == ts.VTAPID {
@@ -594,6 +603,9 @@ func (r *Receiver) GetTridentStatus() []*Status {
 	}
 
 	for _, ts := range TCPStatus {
+		if ts.orgId != orgId {
+			continue
+		}
 		find := false
 		for _, us := range UDPStatus {
 			if ts.VTAPID == us.VTAPID {
@@ -663,6 +675,24 @@ func (r *Receiver) logTCPReceiveInvalidData(str string) {
 	log.Warningf("%s, already drop log count %d", str, r.dropLogCount)
 }
 
+func (r *Receiver) parseOrgIdTeamId(flowHeader *datatype.FlowHeader) (uint16, uint32) {
+	orgID, teamID := flowHeader.OrgID, flowHeader.TeamID
+	if teamID == ckdb.INVALID_TEAM_ID {
+		teamID = ckdb.DEFAULT_TEAM_ID
+	}
+
+	if orgID == ckdb.INVALID_ORG_ID {
+		orgID = ckdb.DEFAULT_ORG_ID
+	} else if orgID > ckdb.MAX_ORG_ID {
+		if r.counter.Invalid == 0 {
+			log.Warningf("the org id (%d) in the header of the received agent message is illegal", orgID)
+		}
+		atomic.AddUint64(&r.counter.Invalid, 1)
+		orgID = ckdb.DEFAULT_ORG_ID
+	}
+	return orgID, teamID
+}
+
 func (r *Receiver) ProcessUDPServer() {
 	defer r.UDPConn.Close()
 	baseHeader := &datatype.BaseHeader{}
@@ -701,29 +731,21 @@ func (r *Receiver) ProcessUDPServer() {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint16(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
 			headerLen += datatype.FLOW_HEADER_LEN
 
-			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
-				r.logReceiveError(size, remoteAddr, fmt.Errorf("%s msgType: %s ", err, datatype.MessageTypeString[baseHeader.Type]))
-				// 但版本不匹配，且版本小于app.LAST_SIMPLE_CODEC_VERSION时，才会拒绝连接
-				if flowHeader.Version <= app.LAST_SIMPLE_CODEC_VERSION {
-					ReleaseRecvBuffer(recvBuffer)
-					continue
-				}
-			}
+			vtapID = flowHeader.AgentID
+			orgID, teamID = r.parseOrgIdTeamId(flowHeader)
 
-			vtapID = flowHeader.VTAPID
-			sequence = flowHeader.Sequence
 			if baseHeader.Type == datatype.MESSAGE_TYPE_METRICS {
 				metricsTimestamp = r.getMetricsTimestamp(recvBuffer.Buffer[headerLen:])
 				r.updateCounter(metricsTimestamp)
-				r.DropDetection.Detect(getIpHash(remoteAddr.IP), flowHeader.Sequence, metricsTimestamp)
+				r.DropDetection.Detect(getIpHash(remoteAddr.IP), 0, metricsTimestamp)
 			}
 		}
-		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, remoteAddr.IP, sequence, metricsTimestamp, UDP)
+		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, uint16(orgID), remoteAddr.IP, 0, metricsTimestamp, UDP)
 
 		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
 		if r.handlers[baseHeader.Type] == nil {
@@ -737,6 +759,8 @@ func (r *Receiver) ProcessUDPServer() {
 			}
 			recvBuffer.IP = remoteAddr.IP
 			recvBuffer.VtapID = vtapID
+			recvBuffer.TeamID = teamID
+			recvBuffer.OrgID = orgID
 			r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}
@@ -855,7 +879,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
-		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
+		metricsTimestamp, vtapID, teamID, orgID := uint32(0), uint16(0), uint32(0), uint16(0)
 		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			if err := ReadN(reader, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
@@ -865,21 +889,8 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			flowHeader.Decode(flowHeaderBuffer)
 			headerLen += datatype.FLOW_HEADER_LEN
 
-			if err := ValidateFlowVersion(baseHeader.Type, flowHeader.Version); err != nil {
-				atomic.AddUint64(&r.counter.Invalid, 1)
-				// 但版本不匹配，且版本小于app.LAST_SIMPLE_CODEC_VERSION时，才会拒绝连接
-				if flowHeader.Version <= app.LAST_SIMPLE_CODEC_VERSION {
-					log.Warningf("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
-					time.Sleep(10 * time.Second) // 等待10秒，防止日志刷屏
-					return
-				}
-				if r.timeNow-r.lastLogTime > LOG_INTERVAL {
-					log.Infof("recv from %s, %s", conn.RemoteAddr().String(), fmt.Errorf("error: %s msgType: %s", err, datatype.MessageTypeString[baseHeader.Type]))
-					r.lastLogTime = r.timeNow
-				}
-			}
-			vtapID = flowHeader.VTAPID
-			sequence = flowHeader.Sequence
+			vtapID = flowHeader.AgentID
+			orgID, teamID = r.parseOrgIdTeamId(flowHeader)
 		}
 
 		dataLen := int(baseHeader.FrameSize) - headerLen
@@ -902,7 +913,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			metricsTimestamp = r.getMetricsTimestamp(recvBuffer.Buffer)
 			r.updateCounter(metricsTimestamp)
 		}
-		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, ip, sequence, metricsTimestamp, TCP)
+		r.status.Update(uint32(r.timeNow), baseHeader.Type, vtapID, uint16(orgID), ip, 0, metricsTimestamp, TCP)
 		atomic.AddUint64(&r.counter.RxPackets, 1)
 
 		// Unregistered messages are discarded directly after receiving them, but the connection is not disconnected to prevent the Agent from printing exception logs
@@ -914,6 +925,8 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			recvBuffer.End = int(baseHeader.FrameSize) - headerLen
 			recvBuffer.IP = ip
 			recvBuffer.VtapID = vtapID
+			recvBuffer.TeamID = teamID
+			recvBuffer.OrgID = orgID
 			r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 		}
 	}

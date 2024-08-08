@@ -16,9 +16,15 @@
 
 package diffbase
 
+import (
+	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
+)
+
 // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
 // 应保持字段定义与cloud字段定义一致，用于在比较资源时可以抽象方法
 type DataSet struct {
+	metadata *rcommon.Metadata
+
 	LogController
 
 	Regions                map[string]*Region
@@ -36,9 +42,6 @@ type DataSet struct {
 	WANIPs                 map[string]*WANIP
 	LANIPs                 map[string]*LANIP
 	FloatingIPs            map[string]*FloatingIP
-	SecurityGroups         map[string]*SecurityGroup
-	SecurityGroupRules     map[string]*SecurityGroupRule
-	VMSecurityGroups       map[string]*VMSecurityGroup
 	NATGateways            map[string]*NATGateway
 	NATVMConnections       map[string]*NATVMConnection
 	NATRules               map[string]*NATRule
@@ -64,12 +67,13 @@ type DataSet struct {
 	PodReplicaSets         map[string]*PodReplicaSet
 	Pods                   map[string]*Pod
 	Process                map[string]*Process
-	PrometheusTarget       map[string]*PrometheusTarget
 	VIP                    map[string]*VIP
 }
 
-func NewDataSet() *DataSet {
+func NewDataSet(md *rcommon.Metadata) *DataSet {
 	return &DataSet{
+		metadata: md,
+
 		Regions:                make(map[string]*Region),
 		AZs:                    make(map[string]*AZ),
 		SubDomains:             make(map[string]*SubDomain),
@@ -85,9 +89,6 @@ func NewDataSet() *DataSet {
 		WANIPs:                 make(map[string]*WANIP),
 		LANIPs:                 make(map[string]*LANIP),
 		FloatingIPs:            make(map[string]*FloatingIP),
-		SecurityGroups:         make(map[string]*SecurityGroup),
-		SecurityGroupRules:     make(map[string]*SecurityGroupRule),
-		VMSecurityGroups:       make(map[string]*VMSecurityGroup),
 		NATGateways:            make(map[string]*NATGateway),
 		NATVMConnections:       make(map[string]*NATVMConnection),
 		NATRules:               make(map[string]*NATRule),
@@ -113,7 +114,6 @@ func NewDataSet() *DataSet {
 		PodReplicaSets:         make(map[string]*PodReplicaSet),
 		Pods:                   make(map[string]*Pod),
 		Process:                make(map[string]*Process),
-		PrometheusTarget:       make(map[string]*PrometheusTarget),
 		VIP:                    make(map[string]*VIP),
 	}
 }

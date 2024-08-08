@@ -28,12 +28,12 @@ func (b *DataSet) AddNATVMConnection(dbItem *mysql.NATVMConnection, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteNATVMConnection(lcuuid string) {
 	delete(b.NATVMConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type NATVMConnection struct {

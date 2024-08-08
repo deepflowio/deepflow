@@ -21,6 +21,8 @@
 #include <sys/prctl.h>
 #include <linux/version.h>
 #include <sys/epoll.h>
+#include <bcc/bcc_proc.h>
+#include <bcc/bcc_elf.h>
 #include <bcc/libbpf.h>
 #include <bcc/perf_reader.h>
 #include "config.h"
@@ -42,13 +44,24 @@ int major, minor, revision, rev_num;
 char linux_release[128];	// Record the contents of 'uname -r'
 
 volatile uint32_t *tracers_lock;
-volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
-volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
+extern volatile uint64_t sys_boot_time_ns;	// System boot time in nanoseconds
+volatile uint64_t prev_sys_boot_time_ns;	// The last updated system boot time, in nanoseconds
 
 struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 
 // eBPF protocol filter.
 int ebpf_config_protocol_filter[PROTO_NUM];
+
+/**
+ * @brief Store the protocols that can perform segmentation reassembly
+ *
+ * In scenarios where reading and writing of Header and Payload are completed by
+ * two system calls, we can rely on the out-of-order reassembly mechanism to
+ * aggregate eBPF data in user space, improving the analysis effect. This array
+ * is used to store which protocols allow data aggregation, and the set content
+ * will notify the eBPF program to handle it."
+ */
+bool allow_seg_reasm_protos[PROTO_NUM];
 
 struct kprobe_port_bitmap allow_port_bitmap;
 struct kprobe_port_bitmap bypass_port_bitmap;
@@ -231,14 +244,13 @@ int release_bpf_tracer(const char *name)
 }
 
 /**
- * Activate a tracer reader to start working.
+ * @brief Activate a tracer reader to start working.
  *
- * @prefix_name Thread name prefix.
- * @idx The index within the thread array.
- * @tracer Activated tracer
- * @fn callback for reader read ebpf ring-buffer data.
- *
- * @returns 0(ETR_OK) on success, < 0 on error
+ * @param prefix_name Thread name prefix.
+ * @param idx The index within the thread array.
+ * @param tracer Activated tracer
+ * @param fn callback for reader read ebpf ring-buffer data.
+ * @return 0(ETR_OK) on success, < 0 on error
  */
 int enable_tracer_reader_work(const char *prefix_name, int idx,
 			      struct bpf_tracer *tracer, void *fn)
@@ -275,22 +287,20 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 }
 
 /**
- * setup_bpf_tracer - create a eBPF tracer
+ * @brief setup_bpf_tracer - create a eBPF tracer
  *
- * @name Tracer name
- * @load_name eBPF load buffer name
- * @bpf_bin_buffer load eBPF buffer address
- * @buffer_sz eBPF buffer size
- * @tps Tracer configuration information
- * @workers_nr How many threads process the queues
- * @free_cb The callback interface for releasing tracer resources.
- * @create_cb The callback interface for create tracer.
- * @handle The upper callback function address
- * @sample_freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- *    only type is TRACER_TYPE_PERF_EVENT.
- *
- * @returns
- *      Return struct bpf_tracer pointer on success, NULL otherwise.
+ * @param name Tracer name
+ * @param load_name eBPF load buffer name
+ * @param bpf_bin_buffer load eBPF buffer address
+ * @param buffer_sz eBPF buffer size
+ * @param tps Tracer configuration information
+ * @param workers_nr How many threads process the queues
+ * @param free_cb The callback interface for releasing tracer resources.
+ * @param create_cb The callback interface for create tracer.
+ * @param handle The upper callback function address
+ * @param sample_freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
+ * only type is TRACER_TYPE_PERF_EVENT.
+ * @return struct bpf_tracer pointer on success, NULL otherwise.
  */
 struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    char *load_name,
@@ -340,6 +350,7 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 	bt->create_cb = create_cb;
 	bt->sample_freq = sample_freq;
 	bt->enable_sample = false;
+	bt->ev_state = PERF_EV_INIT;
 
 	bt->dispatch_workers_nr = workers_nr;
 	bt->process_fn = handle;
@@ -418,17 +429,16 @@ void free_all_readers(struct bpf_tracer *t)
 }
 
 /**
- * create a perf buffer reader.
- * @t tracer
- * @map_name perf buffer map name
- * @raw_cb perf reader raw data callback
- * @lost_cb perf reader data lost callback
- * @pages_cnt How many memory pages are used for ring-buffer
+ * @brief create a perf buffer reader.
+ * @param t Tracer address
+ * @param The map_name Perf buffer map name
+ * @param The raw_cb Perf reader raw data callback
+ * @param Lost_cb perf reader data lost callback
+ * @param Pages_cnt How many memory pages are used for ring-buffer
  *            (system page size * pages_cnt)
- * @thread_nr The number of threads required for the reader's work
- * @epoll_timeout perf epoll timeout
- *
- * @returns perf_reader address on success, NULL on error
+ * @param Thread_nr The number of threads required for the reader's work
+ * @param Epoll_timeout perf epoll timeout
+ * @return Perf_reader address on success, NULL on error
  */
 struct bpf_perf_reader *create_perf_buffer_reader(struct bpf_tracer *t,
 						  const char *map_name,
@@ -613,11 +623,22 @@ static struct probe *create_probe(struct bpf_tracer *tracer,
 {
 	struct probe *pb;
 	struct ebpf_prog *prog;
-	int fd = bpf_get_program_fd(tracer->obj, func_name, (void **)&prog);
+	char find_name[PROBE_NAME_SZ], *isra_p;
+	snprintf(find_name, sizeof(find_name), "%s", func_name);
+	/*
+	 * If the kernel compilation optimizes hook point names to forms
+	 * like 'xxx.isra.0', while our eBPF program defines interface names
+	 * without the 'isra.0' suffix, the following handling is required
+	 * during the query process.
+	 */
+	if ((isra_p = strstr(find_name, ".isra")))
+		*isra_p = '\0';
+
+	int fd = bpf_get_program_fd(tracer->obj, find_name, (void **)&prog);
 	if (fd < 0) {
 		ebpf_warning
-		    ("fun: %s, bpf_get_program_fd failed, func_name:%s.\n",
-		     __func__, func_name);
+		    ("fun: %s, bpf_get_program_fd failed, find_name:%s.\n",
+		     __func__, find_name);
 		return NULL;
 	}
 
@@ -717,7 +738,7 @@ static struct ebpf_link *exec_attach_kprobe(struct ebpf_prog *prog, char *name,
 	else
 		fn_name = name + strlen("kprobe/");
 
-	snprintf(ev_name, sizeof(ev_name), "%s_%s", isret ? "r" : "p", fn_name);
+	snprintf(ev_name, sizeof(ev_name), "%s_deepflow_%s", isret ? "r" : "p", fn_name);
 	ret =
 	    program__attach_kprobe(prog, isret, pid, fn_name, ev_name,
 				   (void **)&link);
@@ -865,8 +886,8 @@ static int tracepoint_detach(struct tracepoint *tp)
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_fun)(struct probe * p) = NULL;
-	int (*tracepoint_fun)(struct tracepoint * p) = NULL;
+	int (*probe_fun) (struct probe * p) = NULL;
+	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
 	if (type == HOOK_ATTACH) {
 		probe_fun = probe_attach;
 		tracepoint_fun = tracepoint_attach;
@@ -961,26 +982,25 @@ perf_event:
 	 * perf event
 	 */
 	if (type == HOOK_ATTACH) {
+		if (tracer->ev_state == PERF_EV_ATTACH)
+			return ETR_OK;
 		struct ebpf_object *obj = tracer->obj;
 		for (i = 0; i < obj->progs_cnt; i++) {
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
 				errno = 0;
 				int ret =
-				    program__attach_perf_event(obj->progs[i].
-							       prog_fd,
+				    program__attach_perf_event(obj->
+							       progs[i].prog_fd,
 							       PERF_TYPE_SOFTWARE,
 							       PERF_COUNT_SW_CPU_CLOCK,
 							       0,	/* sample_period */
-							       tracer->
-							       sample_freq,
+							       tracer->sample_freq,
 							       -1,	/* pid, current process */
 							       -1,	/* cpu, no binding */
 							       -1,	/* new event group is created */
-							       tracer->
-							       per_cpu_fds,
+							       tracer->per_cpu_fds,
 							       ARRAY_SIZE
-							       (tracer->
-								per_cpu_fds));
+							       (tracer->per_cpu_fds));
 				if (!ret) {
 					ebpf_info
 					    ("tracer \"%s\" attach perf event prog successful.\n",
@@ -992,10 +1012,13 @@ perf_event:
 
 				}
 
+				tracer->ev_state = PERF_EV_ATTACH;
 				return ret;
 			}
 		}
 	} else {
+		if (tracer->ev_state == PERF_EV_DETACH)
+			return ETR_OK;
 		bool has_perf_event = false;
 		for (i = 0; i < ARRAY_SIZE(tracer->per_cpu_fds); i++) {
 			if (tracer->per_cpu_fds[i] > 0) {
@@ -1021,6 +1044,7 @@ perf_event:
 
 			}
 
+			tracer->ev_state = PERF_EV_DETACH;
 			return ret;
 		}
 	}
@@ -1070,13 +1094,13 @@ int tracer_uprobes_update(struct bpf_tracer *tracer)
 	struct symbol_uprobe *usym;
 
 	if (!tracer) {
-		ebpf_warning("tracer_probes_init failed, tracer is NULL\n");
+		ebpf_warning("tracer_probes_update failed, tracer is NULL\n");
 		return ETR_INVAL;
 	}
 
 	tps = tracer->tps;
 	if (!tps) {
-		ebpf_warning("tracer_probes_init failed, tps is NULL\n");
+		ebpf_warning("tracer_probes_update failed, tps is NULL\n");
 		return ETR_INVAL;
 	}
 
@@ -1201,7 +1225,6 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 		reader_idx = perf_reader->readers_count++;
 		perf_reader->reader_fds[reader_idx] = perf_fd;
 		perf_reader->readers[reader_idx] = reader;
-		event.data.fd = perf_fd;
 		event.data.ptr = reader;
 		event.events = EPOLLIN;
 
@@ -1264,15 +1287,7 @@ static void ctrl_main(__unused void *arg)
 	/* return NULL; */
 }
 
-/*
- * ============================================================
- * 周期性事件处理：
- *
- * 1、周期性kick内核，实现kernel burst方式发送数据的超时检查。
- * 2、周期性检查BPF MAP
- *
- * ===========================================================
- */
+// Periodic event handling
 static void period_events_process(void)
 {
 	period_event_ticks++;
@@ -1339,10 +1354,6 @@ int set_period_event_invalid(const char *name)
 	return ETR_OK;
 }
 
-/*
- * kernel采用捆绑burst发送数据到用户的形式，
- * 下面的方法实现所有CPU触发超时检查把驻留在eBPF buffer中数据发送上来。
- */
 static inline void cpu_ebpf_data_timeout_check(int cpu_id)
 {
 	cpu_set_t cpuset;
@@ -1353,14 +1364,12 @@ static inline void cpu_ebpf_data_timeout_check(int cpu_id)
 		return;
 	}
 
-	syscall(__NR_getppid);
-
 	if (all_probes_ready)
 		RUN_ONCE(ready_flag_cpus[cpu_id], extra_waiting_process,
 			 EXTRA_TYPE_CLIENT);
 }
 
-static int cpus_kick_kern(void)
+static int trigger_kern_adapt(void)
 {
 	int i;
 	for (i = 0; i < sys_cpus_count; i++) {
@@ -1393,11 +1402,11 @@ static void period_process_main(__unused void *arg)
 	adapt_kern_uid =
 	    (uint64_t) getpid() << 32 | (uint32_t) syscall(__NR_gettid);
 
-	// 确保所有tracer都运行了，之后触发kick内核操作
+	// Ensure all tracers have run, then trigger the kernel adaptation operation
 	while (all_probes_ready == 0)
 		usleep(LOOP_DELAY_US);
 
-	// 确保server类型的extra_waiting_process先执行
+	// Ensure the extra_waiting_process of the server type executes first.
 	sleep(1);
 
 	ebpf_info("cpus_kick begin !!!\n");
@@ -1432,7 +1441,7 @@ static int tracer_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			      void **out, size_t *outsize)
+			      void **out, size_t * outsize)
 {
 	*outsize = sizeof(struct bpf_tracer_param_array) +
 	    sizeof(struct bpf_tracer_param) * tracers_count;
@@ -1510,6 +1519,15 @@ int enable_ebpf_protocol(int protocol)
 {
 	if (protocol < PROTO_NUM) {
 		ebpf_config_protocol_filter[protocol] = true;
+		return 0;
+	}
+	return ETR_INVAL;
+}
+
+int enable_ebpf_seg_reasm_protocol(int protocol)
+{
+	if (protocol < PROTO_NUM) {
+		allow_seg_reasm_protos[protocol] = true;
 		return 0;
 	}
 	return ETR_INVAL;
@@ -1672,8 +1690,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		return ETR_INVAL;
 	}
 
-	if (register_period_event_op("kick_kern", cpus_kick_kern,
-				     KICK_KERN_PERIOD))
+	if (register_period_event_op("trigger_kern_adapt",
+				     trigger_kern_adapt,
+				     TRIG_KERN_ADAPT_PERIOD))
 		return ETR_INVAL;
 
 	/*

@@ -19,7 +19,7 @@ package encoder
 import (
 	"sync"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -98,7 +98,7 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 
 	err := addBatch(l.org.DB, dbToAdd, l.resourceType)
 	if err != nil {
-		log.Error(l.org.Logf("add %s error: %s", l.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", l.resourceType, err.Error(), l.org.LogPrefix)
 		return nil, err
 	}
 	for _, item := range dbToAdd {

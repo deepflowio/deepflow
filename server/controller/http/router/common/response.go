@@ -17,6 +17,7 @@
 package common
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -70,11 +71,20 @@ func StatusPartialContentResponse(c *gin.Context, data interface{}, optStatus st
 	})
 }
 
+func StatusForbiddenResponse(c *gin.Context, description string) {
+	c.JSON(http.StatusForbidden, Response{
+		OptStatus:   httpcommon.NO_PERMISSIONS,
+		Description: description,
+	})
+}
+
 func JsonResponse(c *gin.Context, data interface{}, err error) {
 	if err != nil {
 		switch t := err.(type) {
 		case *servicecommon.ServiceError:
 			switch t.Status {
+			case httpcommon.NO_PERMISSIONS:
+				StatusForbiddenResponse(c, t.Message)
 			case httpcommon.RESOURCE_NOT_FOUND, httpcommon.INVALID_POST_DATA, httpcommon.RESOURCE_NUM_EXCEEDED,
 				httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED, httpcommon.RESOURCE_ALREADY_EXIST,
 				httpcommon.PARAMETER_ILLEGAL, httpcommon.INVALID_PARAMETERS:
@@ -87,6 +97,10 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 				StatusPartialContentResponse(c, data, t.Status, t.Message)
 			}
 		default:
+			if errors.Is(err, httpcommon.ERR_NO_PERMISSIONS) {
+				StatusForbiddenResponse(c, err.Error())
+				return
+			}
 			InternalErrorResponse(c, data, httpcommon.FAIL, err.Error())
 		}
 	} else {

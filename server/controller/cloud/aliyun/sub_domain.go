@@ -22,16 +22,17 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cs"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aliyun) getSubDomains(region model.Region) ([]model.SubDomain, error) {
 	var retSubDomains []model.SubDomain
 
-	log.Debug("get sub_domains starting")
+	log.Debug("get sub_domains starting", logger.NewORGPrefix(a.orgID))
 	request := cs.CreateDescribeClustersV1Request()
 	response, err := a.getSubDomainResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retSubDomains, err
 	}
 
@@ -42,7 +43,7 @@ func (a *Aliyun) getSubDomains(region model.Region) ([]model.SubDomain, error) {
 			vpcID := cluster.Get("vpc_id").MustString()
 			vpcLcuuid, ok := a.vpcIDToLcuuids[vpcID]
 			if vpcID == "" || !ok {
-				log.Debugf("cluster (%s) vpc (%s) not found", clusterID, vpcID)
+				log.Debugf("cluster (%s) vpc (%s) not found", clusterID, vpcID, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			config := map[string]interface{}{
@@ -55,6 +56,7 @@ func (a *Aliyun) getSubDomains(region model.Region) ([]model.SubDomain, error) {
 			}
 			configJson, _ := json.Marshal(config)
 			retSubDomains = append(retSubDomains, model.SubDomain{
+				TeamID:      a.teamID,
 				Lcuuid:      common.GenerateUUIDByOrgID(a.orgID, clusterID),
 				Name:        cluster.Get("name").MustString(),
 				DisplayName: clusterID,
@@ -64,6 +66,6 @@ func (a *Aliyun) getSubDomains(region model.Region) ([]model.SubDomain, error) {
 			})
 		}
 	}
-	log.Debug("get sub_domains complete")
+	log.Debug("get sub_domains complete", logger.NewORGPrefix(a.orgID))
 	return retSubDomains, nil
 }

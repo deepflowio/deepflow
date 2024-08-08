@@ -205,6 +205,14 @@ func (VTap) TableName() string {
 	return "vtap"
 }
 
+func (v VTap) GetID() int {
+	return v.ID
+}
+
+func (v VTap) GetLcuuid() string {
+	return v.Lcuuid
+}
+
 type VTapGroup struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string    `gorm:"column:name;type:varchar(64);not null" json:"NAME"`
@@ -213,6 +221,7 @@ type VTapGroup struct {
 	Lcuuid    string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 	ShortUUID string    `gorm:"column:short_uuid;type:char(32);default:null" json:"SHORT_UUID"`
 	TeamID    int       `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID"`
+	UserID    int       `gorm:"column:user_id;type:int;default:null" json:"USER_ID"`
 }
 
 func (VTapGroup) TableName() string {
@@ -453,7 +462,8 @@ func (VTapRepo) TableName() string {
 type Plugin struct {
 	ID        int             `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string          `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	Type      int             `gorm:"column:type;type:int" json:"TYPE"` // 1: wasm
+	Type      int             `gorm:"column:type;type:int" json:"TYPE"`           // 1: wasm 2: so 3: lua
+	User      int             `gorm:"column:user;type:int;default:1" json:"USER"` // 1: agent 2: server
 	Image     compressedBytes `gorm:"column:image;type:logblob;not null" json:"IMAGE"`
 	CreatedAt time.Time       `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt time.Time       `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
@@ -504,4 +514,17 @@ type Team struct {
 	TeamID      int    `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID"`
 	ShortLcuuid string `gorm:"column:short_lcuuid;type:char(64);default:''" json:"SHORT_LCUUID"`
 	ORGID       int    `gorm:"column:org_id;type:int;default:0" json:"ORG_ID"`
+}
+
+type User struct {
+	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	UserName string `gorm:"column:username;type:char(128)" json:"USERNAME"`
+}
+
+type ResourceVersion struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name      string    `gorm:"column:name;type:varchar(255)" json:"RESOURCE"`
+	Version   uint32    `gorm:"column:version;type:int unsigned" json:"VERSION"`
+	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
 }

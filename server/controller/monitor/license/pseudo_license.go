@@ -22,14 +22,13 @@ import (
 	"strings"
 	"time"
 
-	logging "github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 )
 
-var log = logging.MustGetLogger("monitor.license")
+var log = logger.MustGetLogger("monitor.license")
 
 var VTAP_LICENSE_TYPE_DEFAULT = common.VTAP_LICENSE_TYPE_A
 var VTAP_LICENSE_FUNCTIONS = []string{
@@ -38,6 +37,7 @@ var VTAP_LICENSE_FUNCTIONS = []string{
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_FUNCTION_MONITORING),
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING),
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_INDICATOR_MONITORING),
+	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_LOG_MONITORING),
 }
 
 type VTapLicenseAllocation struct {
@@ -55,15 +55,25 @@ func NewVTapLicenseAllocation(cfg config.MonitorConfig, ctx context.Context) *VT
 	}
 }
 
-func (v *VTapLicenseAllocation) Start() {
+func (v *VTapLicenseAllocation) Start(sCtx context.Context) {
 	log.Info("vtap license allocation and check start")
 	go func() {
-		for range time.Tick(time.Duration(v.cfg.LicenseCheckInterval) * time.Second) {
-			if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
-				v.allocLicense(db)
-				return nil
-			}); err != nil {
-				log.Error(err)
+		ticker := time.NewTicker(time.Duration(v.cfg.LicenseCheckInterval) * time.Second)
+		defer ticker.Stop()
+	LOOP:
+		for {
+			select {
+			case <-ticker.C:
+				if err := mysql.GetDBs().DoOnAllDBs(func(db *mysql.DB) error {
+					v.allocLicense(db)
+					return nil
+				}); err != nil {
+					log.Error(err)
+				}
+			case <-sCtx.Done():
+				break LOOP
+			case <-v.vCtx.Done():
+				break LOOP
 			}
 		}
 	}()
@@ -77,7 +87,7 @@ func (v *VTapLicenseAllocation) Stop() {
 }
 
 func (v *VTapLicenseAllocation) allocLicense(orgDB *mysql.DB) {
-	log.Info("ORG(id=%d database=%s) alloc license starting", orgDB.ORGID, orgDB.Name)
+	log.Info("alloc license starting", orgDB.LogPrefixORGID)
 
 	whereSQL := "license_type IS NULL OR license_functions != ?"
 	licenseFunctions := strings.Join(VTAP_LICENSE_FUNCTIONS, ",")
@@ -87,7 +97,7 @@ func (v *VTapLicenseAllocation) allocLicense(orgDB *mysql.DB) {
 			"license_functions": licenseFunctions,
 		},
 	)
-	log.Info("ORG(id=%d database=%s) alloc license complete", orgDB.ORGID, orgDB.Name)
+	log.Info("alloc license complete", orgDB.LogPrefixORGID)
 }
 
 func GetSupportedLicenseType(vtapType int) []int {

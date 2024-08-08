@@ -22,6 +22,8 @@
  */
 #ifndef AARCH64_MUSL
 #include <sys/stat.h>
+#include <math.h>
+#include <signal.h>		/* kill() */
 #include <bcc/perf_reader.h>
 #include "../config.h"
 #include "../utils.h"
@@ -32,7 +34,7 @@
 #include "../vec.h"
 #include "../tracer.h"
 #include "../socket.h"
-#include "java/gen_syms_file.h"
+#include "java/collect_symbol_files.h"
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
@@ -43,21 +45,21 @@
 #include "../table.h"
 #include <regex.h>
 #include "java/config.h"
-#include "java/df_jattach.h"
+#include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
+#include "../proc.h"
 
 #include "../perf_profiler_bpf_common.c"
 
 #define LOG_CP_TAG	"[CP] "
-#define CP_TRACER_NAME	"continuous_profiler"
 #define CP_PERF_PG_NUM	16
+#define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
+#define DEEPFLOW_AGENT_NAME "deepflow-agent"
 
+extern int sys_cpus_count;
 struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 static struct profiler_context oncpu_ctx;
-
-/* The maximum bytes limit for writing the df_perf-PID.map file by agent.so */
-int g_java_syms_write_bytes_max;
 
 static bool g_enable_oncpu = true;
 
@@ -183,7 +185,7 @@ static void print_cp_data(stack_trace_msg_t * msg)
 	snprintf(buff, sizeof(buff),
 		 "%s [cpdbg] type %d netns_id %lu container_id %s pid %u tid %u "
 		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
-		 " %u cpu %u count %u tiemstamp %lu datalen %u data %s\n",
+		 " %u cpu %u count %lu tiemstamp %lu datalen %u data %s\n",
 		 timestamp, msg->profiler_type, msg->netns_id,
 		 cid, msg->pid, msg->tid, msg->process_name, msg->comm,
 		 msg->stime, msg->u_stack_id,
@@ -282,19 +284,62 @@ exit:
 	pthread_exit(NULL);
 }
 
+static int stack_trace_map_capacity(struct bpf_tracer *tracer)
+{
+	/*
+	 * Calculation method for stack map capacity:
+	 * 
+	 *  `scaling_factor * (ncpus * expected_stack_count_per_cpu)`
+	 *
+	 * scaling_factor:
+	 *   To ensure the integrity and accuracy of data, especially during stack
+	 *   tracing in performance analysis or debugging tools, it's crucial to
+	 *   include a margin. Stack tracing involves recording the state of program
+	 *   call stacks to analyze program behavior and performance.
+	 * ncpus:
+	 *   This needs to calculate the total expected number of stack traces
+	 *   because sampling is done per CPU.
+	 * expected_stack_count_per_cpu:
+	 *   Represents the expected number of stack traces on each CPU.
+	 *   Here we set it as the number of samples per second.
+	 *
+	 * In kernel, round the given value(capacity) up to nearest power of two.
+	 * ref: https://elixir.bootlin.com/linux/v4.19.313/source/kernel/bpf/stackmap.c#L122
+	 */
+
+	double scaling_factor = STACKMAP_SCALING_FACTOR;
+	int ncpus = sys_cpus_count;
+	int expected_stack_count_per_cpu = tracer->sample_freq;
+	int capacity =
+	    (int)round(scaling_factor * (ncpus * expected_stack_count_per_cpu));
+	capacity = 1 << max_log2(capacity);
+	if (capacity > STACKMAP_CAPACITY_THRESHOLD)
+		capacity = STACKMAP_CAPACITY_THRESHOLD;
+
+	return capacity;
+}
+
 static int create_profiler(struct bpf_tracer *tracer)
 {
 	int ret;
 
 	profiler_tracer = tracer;
+	int cap = stack_trace_map_capacity(tracer);
+	if ((ret = maps_config(tracer, MAP_STACK_A_NAME, cap)))
+		return ret;
+
+	if ((ret = maps_config(tracer, MAP_STACK_B_NAME, cap)))
+		return ret;
+
+	extended_maps_set(tracer);
 
 	/* load ebpf perf profiler */
 	if (tracer_bpf_load(tracer))
 		return ETR_LOAD;
 
 	/* clear old perf files */
-	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "");
-	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "");
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.map", "", NULL, 0);
+	exec_command("/usr/bin/rm -rf /tmp/perf-*.log", "", NULL, 0);
 
 	ret = create_work_thread("java_update",
 				 &java_syms_update_thread,
@@ -391,7 +436,7 @@ int stop_continuous_profiler(void)
 			continue;
 		g_ctx_array[i]->profiler_stop = 1;
 	}
-	
+
 	if (profiler_tracer == NULL)
 		return (0);
 
@@ -480,7 +525,7 @@ static void print_cp_tracer_status(struct bpf_tracer *t,
 }
 
 static int cpdbg_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			     void **out, size_t *outsize)
+			     void **out, size_t * outsize)
 {
 	return 0;
 }
@@ -521,11 +566,94 @@ static struct tracer_sockopts cpdbg_sockopts = {
 	.get = cpdbg_sockopt_get,
 };
 
+// Function to check if the recorded PID and its start time are correct
+int check_profiler_running_pid(int pid)
+{
+	char path[MAX_PATH_LENGTH];
+	snprintf(path, sizeof(path), "/proc/%d/root%s", pid,
+		 DEEPFLOW_RUNNING_PID_PATH);
+	FILE *file = fopen(path, "r");
+	if (!file) {
+		if (errno == ENOENT) {
+			return ETR_NOTEXIST;
+		}
+		ebpf_warning("fopen() failed, with %s(%d)\n", strerror(errno),
+			     errno);
+		return ETR_IO;
+	}
+
+	pid_t recorded_pid;
+	u64 recorded_start_time;
+	if (fscanf(file, "%d,%lu", &recorded_pid, &recorded_start_time) != 2) {
+		ebpf_warning("fscanf() failed, with %s(%d)\n", strerror(errno),
+			     errno);
+		fclose(file);
+		return ETR_INVAL;
+	}
+	fclose(file);
+
+	// Check if the process exists
+	if (kill(recorded_pid, 0) == -1 && errno == ESRCH) {
+		return ETR_NOTEXIST;
+	}
+	// Get the actual start time of the process
+	u64 actual_start_time =
+	    get_process_starttime_and_comm(recorded_pid, NULL, 0);
+	if (actual_start_time == 0) {
+		return ETR_NOTEXIST;
+	}
+	// Compare the recorded and actual start times
+	if (recorded_start_time == actual_start_time) {
+		ebpf_warning("The deepflow-agent with process ID %d is already "
+			     "running. You can disable the continuous profiling "
+			     "feature of the deepflow-agent to skip this check.\n",
+			     recorded_pid);
+		return ETR_EXIST;
+	} else {
+		ebpf_info("Recorded PID(%d) and its startup time(%lu) do not"
+			  " match(actual start time: %lu); this is an outdated"
+			  " process.\n", recorded_pid, recorded_start_time,
+			  actual_start_time);
+	}
+
+	return ETR_NOTEXIST;
+}
+
+int check_profiler_is_running(void)
+{
+	int pid = find_pid_by_name(DEEPFLOW_AGENT_NAME, getpid());
+	if (pid > 0) {
+		return check_profiler_running_pid(pid);
+	}
+
+	return ETR_NOTEXIST;
+}
+
+int write_profiler_running_pid(void)
+{
+	FILE *file = fopen(DEEPFLOW_RUNNING_PID_PATH, "w");
+	if (!file) {
+		ebpf_warning("fopen failed, with %s(%d)",
+			     strerror(errno), errno);
+		return ETR_IO;
+	}
+
+	pid_t pid = getpid();
+	u64 start_time = get_process_starttime_and_comm(pid, NULL, 0);
+	if (start_time == 0) {
+		ebpf_warning("get_process_starttime_and_comm() failed.");
+		fclose(file);
+		return ETR_INVAL;
+	}
+
+	fprintf(file, "%d,%lu", pid, start_time);
+	fclose(file);
+	return ETR_OK;
+}
+
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
- * @java_syms_space_limit The maximum space occupied by the Java symbol files
- *                        in the target POD. 
  * @java_syms_update_delay To allow Java to run for an extended period and gather
  *                    more symbol information, we delay symbol retrieval when
  *                    encountering unknown symbols. The default value is
@@ -535,33 +663,31 @@ static struct tracer_sockopts cpdbg_sockopts = {
  * @returns 0 on success, < 0 on error
  */
 
-int start_continuous_profiler(int freq, int java_syms_space_limit,
-			      int java_syms_update_delay,
+int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      tracer_callback_t callback)
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
 	uword buffer_sz;
 
+	/*
+	 * To determine if the profiler is already running, at any given time, only
+	 * one profiler can be active due to the persistence required for Java symbol
+	 * generation, which is incompatible with multiple agents.
+	 */
+	if (check_profiler_is_running() != ETR_NOTEXIST)
+		exit(EXIT_FAILURE);
+
 	if (!run_conditions_check())
-		return (-1);
+		exit(EXIT_FAILURE);
 
 	memset(g_ctx_array, 0, sizeof(g_ctx_array));
-	profiler_context_init(&oncpu_ctx, LOG_CP_TAG,
+	profiler_context_init(&oncpu_ctx, ONCPU_PROFILER_NAME, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
 			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
 			      MAP_STACK_B_NAME, false, true,
 			      NANOSEC_PER_SEC / freq);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
-
-	int java_space_bytes = java_syms_space_limit * 1024 * 1024;
-	if ((java_space_bytes < JAVA_POD_WRITE_FILES_SPACE_MIN) ||
-	    (java_space_bytes > JAVA_POD_WRITE_FILES_SPACE_MAX))
-		java_space_bytes = JAVA_POD_WRITE_FILES_SPACE_DEF;
-	g_java_syms_write_bytes_max =
-	    java_space_bytes - JAVA_POD_EXTRA_SPACE_MMA;
-	ebpf_info("set java_syms_write_bytes_max : %d\n",
-		  g_java_syms_write_bytes_max);
 
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
 	    (java_syms_update_delay > JAVA_SYMS_UPDATE_DELAY_MAX))
@@ -597,6 +723,7 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 	memset(tps, 0, sizeof(*tps));
 	init_list_head(&tps->uprobe_syms_head);
 	CP_PROFILE_SET_PROBES(tps);
+	collect_extended_uprobe_syms_from_procfs(tps);
 
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
@@ -610,6 +737,10 @@ int start_continuous_profiler(int freq, int java_syms_space_limit,
 		return (-1);
 
 	tracer->state = TRACER_RUNNING;
+
+	if (write_profiler_running_pid() != ETR_OK)
+		return (-1);
+
 	return (0);
 }
 
@@ -631,10 +762,10 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * msg)
 	char str[len];
 	/* profile regex match ? */
 	if (msg->stime > 0)
-		snprintf(str, len, "%s (%d);%s %u\n", msg->process_name,
+		snprintf(str, len, "%s (%d);%s %lu\n", msg->process_name,
 			 msg->pid, msg->data, msg->count);
 	else
-		snprintf(str, len, "%s;%s %u\n", msg->process_name,	/*msg->pid, */
+		snprintf(str, len, "%s;%s %lu\n", msg->process_name,	/*msg->pid, */
 			 msg->data, msg->count);
 
 	os_puts(folded_file, str, strlen(str), false);
@@ -782,7 +913,6 @@ int disable_oncpu_profiler(void)
 #include "perf_profiler.h"
 
 int start_continuous_profiler(int freq,
-			      int java_syms_space_limit,
 			      int java_syms_update_delay,
 			      tracer_callback_t callback)
 {

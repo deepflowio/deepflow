@@ -129,14 +129,6 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 	return genesis.Synchronizer.KubernetesAPISync(ctx, in)
 }
 
-func (s *service) PrometheusAPISync(ctx context.Context, in *api.PrometheusAPISyncRequest) (*api.PrometheusAPISyncResponse, error) {
-	startTime := time.Now()
-	defer func() {
-		statsd.AddGrpcCostStatsd(statsd.PrometheusAPISync, int(time.Now().Sub(startTime).Milliseconds()))
-	}()
-	return genesis.Synchronizer.PrometheusAPISync(ctx, in)
-}
-
 func (s *service) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*api.GPIDSyncResponse, error) {
 	startTime := time.Now()
 	defer func() {
@@ -159,12 +151,13 @@ func (s *service) GetPrometheusLabelIDs(ctx context.Context, in *api.PrometheusL
 }
 
 func (s *service) GetPrometheusTargets(ctx context.Context, in *api.PrometheusTargetRequest) (*api.PrometheusTargetResponse, error) {
-	startTime := time.Now()
-	defer func() {
-		statsd.AddGrpcCostStatsd(statsd.GetPrometheusTargets, int(time.Now().Sub(startTime).Milliseconds()))
-	}()
-	resp, err := s.prometheusEvent.GetPrometheusTargets(ctx, in)
-	return resp, err
+	return &api.PrometheusTargetResponse{}, nil
+	// startTime := time.Now()
+	// defer func() {
+	// 	statsd.AddGrpcCostStatsd(statsd.GetPrometheusTargets, int(time.Now().Sub(startTime).Milliseconds()))
+	// }()
+	// resp, err := s.prometheusEvent.GetPrometheusTargets(ctx, in)
+	// return resp, err
 }
 
 func (s *service) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginServer) error {
@@ -176,5 +169,9 @@ func (s *service) GetUniversalTagNameMaps(ctx context.Context, in *api.Universal
 }
 
 func (s *service) RemoteExecute(in api.Synchronizer_RemoteExecuteServer) error {
-	return nil
+	return s.vTapEvent.RemoteExecute(in)
+}
+
+func (s *service) GetOrgIDs(ctx context.Context, in *api.OrgIDsRequest) (*api.OrgIDsResponse, error) {
+	return s.tsdbEvent.GetOrgIDs(ctx, in)
 }

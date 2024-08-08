@@ -73,7 +73,6 @@ use public::sender::{SendMessageType, Sendable};
 use public::utils::net::MacAddr;
 
 const NANOS_PER_MICRO: u64 = 1000;
-const FLOW_LOG_VERSION: u32 = 20220128;
 
 #[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
 #[repr(u8)]
@@ -363,14 +362,12 @@ impl AppProtoLogsBaseInfo {
 
         self.start_time = log.start_time.min(self.start_time);
         self.end_time = log.end_time.max(self.end_time);
-        match log.head.msg_type {
-            LogMessageType::Request if self.req_tcp_seq == 0 && log.req_tcp_seq != 0 => {
-                self.req_tcp_seq = log.req_tcp_seq;
-            }
-            LogMessageType::Response if self.resp_tcp_seq == 0 && log.resp_tcp_seq != 0 => {
-                self.resp_tcp_seq = log.resp_tcp_seq;
-            }
-            _ => {}
+
+        if self.req_tcp_seq == 0 {
+            self.req_tcp_seq = log.req_tcp_seq;
+        }
+        if self.resp_tcp_seq == 0 {
+            self.resp_tcp_seq = log.resp_tcp_seq;
         }
 
         // go http2 uprobe  may merge multi times, if not req and resp merge can not set to session
@@ -416,10 +413,6 @@ impl Sendable for BoxAppProtoLogsData {
         let json = serde_json::to_string(&(*self.0)).unwrap();
         kv_string.push_str(&json);
         kv_string.push('\n');
-    }
-
-    fn version(&self) -> u32 {
-        FLOW_LOG_VERSION
     }
 }
 

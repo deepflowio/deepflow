@@ -22,15 +22,15 @@ import (
 )
 
 type LBVMConnection struct {
-	OperatorBase[mysql.LBVMConnection]
+	OperatorBase[*mysql.LBVMConnection, mysql.LBVMConnection]
 }
 
 func NewLBVMConnection() *LBVMConnection {
 	return &LBVMConnection{
-		OperatorBase[mysql.LBVMConnection]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.LBVMConnection](
+			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
+			false,
+			false,
+		),
 	}
 }

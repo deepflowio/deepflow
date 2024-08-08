@@ -22,21 +22,16 @@ import (
 )
 
 type CEN struct {
-	OperatorBase[mysql.CEN]
+	OperatorBase[*mysql.CEN, mysql.CEN]
 }
 
 func NewCEN() *CEN {
 	operater := &CEN{
-		OperatorBase[mysql.CEN]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_CEN_EN,
-			softDelete:       true,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.CEN](
+			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
+			true,
+			false,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *CEN) setDBItemID(dbItem *mysql.CEN, id int) {
-	dbItem.ID = id
 }

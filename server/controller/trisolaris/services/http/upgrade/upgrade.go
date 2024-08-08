@@ -20,17 +20,17 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 )
 
-var log = logging.MustGetLogger("trisolaris/upgrade")
+var log = logger.MustGetLogger("trisolaris.upgrade")
 
 func init() {
 	http.Register(NewUpgradeService())
@@ -47,24 +47,32 @@ type UpgradeInfo struct {
 }
 
 func Upgrade(c *gin.Context) {
+	var err error
 	lcuuid := c.Param("lcuuid")
 	if lcuuid == "" {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, "not find lcuuid param"))
 		return
 	}
+	orgID, _ := c.Get(HEADER_KEY_X_ORG_ID)
+	orgIDInt := orgID.(int)
+	db, err := models.GetDB(orgIDInt)
+	if err != nil {
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, err.Error()))
+		return
+	}
 	upgradeInfo := UpgradeInfo{}
-	err := c.BindJSON(&upgradeInfo)
+	err = c.BindJSON(&upgradeInfo)
 	if err != nil {
 		log.Error(err)
-		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, %s", orgIDInt, err)))
 		return
 	}
 
-	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](trisolaris.GetDB()).GetFieldsFromName(
+	vtapRrepo, err := dbmgr.DBMgr[models.VTapRepo](db.DB).GetFieldsFromName(
 		[]string{"rev_count", "commit_id"}, upgradeInfo.ImageName)
 	if err != nil {
 		log.Error(err)
-		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, %s", orgIDInt, err)))
 		return
 	}
 	var expectedRevision string
@@ -72,27 +80,27 @@ func Upgrade(c *gin.Context) {
 		expectedRevision = vtapRrepo.RevCount + "-" + vtapRrepo.CommitID
 	}
 	if len(expectedRevision) == 0 {
-		errLog := fmt.Sprintf("get vtapRepo(%s) failed RevCount=%s CommitID=%s",
-			upgradeInfo.ImageName, vtapRrepo.RevCount, vtapRrepo.CommitID)
+		errLog := fmt.Sprintf("orgID=%d get vtapRepo(%s) failed RevCount=%s CommitID=%s",
+			orgIDInt, upgradeInfo.ImageName, vtapRrepo.RevCount, vtapRrepo.CommitID)
 		log.Error(errLog)
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, errLog))
 		return
 	}
 
-	vtap, err := dbmgr.DBMgr[models.VTap](trisolaris.GetDB()).GetFromLcuuid(lcuuid)
+	vtap, err := dbmgr.DBMgr[models.VTap](db.DB).GetFromLcuuid(lcuuid)
 	if err != nil {
 		log.Error(err)
-		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, %s", orgIDInt, err)))
 		return
 	}
 	key := vtap.CtrlIP + "-" + vtap.CtrlMac
-	vTapCache := trisolaris.GetGVTapInfo(DEFAULT_ORG_ID).GetVTapCache(key)
+	vTapCache := trisolaris.GetORGVTapInfo(orgIDInt).GetVTapCache(key)
 	if vTapCache == nil {
-		common.Response(c, nil, common.NewReponse("FAILED", "", nil, "not found vtap cache"))
+		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("orgID=%d, not found vtap cache", orgIDInt)))
 		return
 	}
 	vTapCache.UpdateUpgradeInfo(expectedRevision, upgradeInfo.ImageName)
-	log.Infof("vtap(%s, %s) upgrade:(%s, %s)", vtap.Name, key, expectedRevision, upgradeInfo.ImageName)
+	log.Infof("vtap(%s, %s) upgrade:(%s, %s)", orgIDInt, vtap.Name, key, expectedRevision, upgradeInfo.ImageName, logger.NewORGPrefix(orgIDInt))
 	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
 }
 

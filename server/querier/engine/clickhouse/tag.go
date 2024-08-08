@@ -17,7 +17,6 @@
 package clickhouse
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -34,7 +33,9 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
 
-func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error) {
+func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, error) {
+	db := e.DB
+	table := e.Table
 	var stmts []Statement
 	selectTag := name
 	if alias != "" {
@@ -42,72 +43,27 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 	}
 	labelType := ""
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
+	if table == "alert_event" {
+		if ok {
+			tagTranslator := tagItem.TagTranslator
+			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
+		} else {
+			stmts = append(stmts, &SelectTag{Value: name, Alias: alias})
+		}
+		return stmts, labelType, nil
+	}
 	if !ok {
 		name := strings.Trim(name, "`")
-		if strings.HasPrefix(name, "k8s.label.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+		// map item tag
+		nameNoPreffix, _, transKey := common.TransMapItem(name, table)
+		if transKey != "" {
+			tagItem, _ = tag.GetTag(transKey, db, table, "default")
+			TagTranslatorStr := name
+			if strings.HasPrefix(name, "os.app.") || strings.HasPrefix(name, "k8s.env.") {
+				TagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			} else {
-				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+				TagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
 			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "k8s.annotation.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "k8s.env.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "cloud.tag.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
-		} else if strings.HasPrefix(name, "os.app.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("os_app", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, name) {
 			autoTagMap := tagItem.TagTranslatorMap
@@ -128,7 +84,7 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == chCommon.DB_NAME_PROMETHEUS {
-					TagTranslatorStr, labelType, err := GetPrometheusSingleTagTranslator(name, table)
+					TagTranslatorStr, labelType, err := GetPrometheusSingleTagTranslator(name, e)
 					if err != nil {
 						return nil, "", err
 					}
@@ -150,14 +106,14 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 			stmts = append(stmts, &SelectTag{Value: selectTag})
 		} else if name == "metrics" {
 			tagTranslator := ""
-			if db == "flow_log" {
+			if db == "flow_log" || db == chCommon.DB_NAME_APPLICATION_LOG {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
 			} else {
 				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
 			}
 			stmts = append(stmts, &SelectTag{Value: tagTranslator, Alias: selectTag})
 		} else if name == "tag" && db == chCommon.DB_NAME_PROMETHEUS {
-			tagTranslator, _, err := GetPrometheusAllTagTranslator(table)
+			tagTranslator, _, err := GetPrometheusAllTagTranslator(e)
 			if err != nil {
 				return nil, "", err
 			}
@@ -191,23 +147,24 @@ func GetTagTranslator(name, alias, db, table string) ([]Statement, string, error
 	return stmts, labelType, nil
 }
 
-func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error) {
+func GetPrometheusSingleTagTranslator(tag string, e *CHEngine) (string, string, error) {
+	table := e.Table
 	labelType := ""
 	TagTranslatorStr := ""
 	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
 		return "", "", errors.New(errorMessage)
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -224,15 +181,16 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	return TagTranslatorStr, labelType, nil
 }
 
-func GetPrometheusAllTagTranslator(table string) (string, string, error) {
+func GetPrometheusAllTagTranslator(e *CHEngine) (string, string, error) {
+	table := e.Table
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
 	labelFastTranslatorSlice := []string{}
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
-			if labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+			if labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[appLabel.AppLabelName]; ok {
 				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 				labelFastTranslatorSlice = append(labelFastTranslatorSlice, fmt.Sprintf("app_label_value_id_%d", appLabel.AppLabelColumnIndex))
@@ -253,8 +211,8 @@ func GetPrometheusAllTagTranslator(table string) (string, string, error) {
 	return tagTranslatorStr, labelFastTranslatorStr, nil
 }
 
-func GetMetricsTag(name string, alias string, db string, table string, ctx context.Context) (Statement, error) {
-	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), db, table, ctx)
+func GetMetricsTag(name string, alias string, e *CHEngine) (Statement, error) {
+	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), e.DB, e.Table, e.ORGID)
 	if !ok {
 		return nil, nil
 	}

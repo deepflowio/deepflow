@@ -215,10 +215,10 @@ impl MetaAppProto {
             }
         }
 
-        if flow.flow.tap_side == TapSide::Local || base_info.is_vip_interface_src {
+        if base_info.is_vip_interface_src {
             base_info.mac_src = flow.flow.flow_key.mac_src;
         }
-        if flow.flow.tap_side == TapSide::Local || base_info.is_vip_interface_dst {
+        if base_info.is_vip_interface_dst {
             base_info.mac_dst = flow.flow.flow_key.mac_dst;
         }
 
@@ -233,14 +233,14 @@ impl MetaAppProto {
             // ebpf info
             base_info.syscall_trace_id_request = meta_packet.syscall_trace_id;
             base_info.syscall_trace_id_thread_0 = meta_packet.thread_id;
-            base_info.syscall_cap_seq_0 = meta_packet.cap_seq as u32;
+            base_info.syscall_cap_seq_0 = meta_packet.cap_end_seq as u32;
         } else {
             base_info.resp_tcp_seq = seq + l7_info.tcp_seq_offset();
 
             // ebpf info
             base_info.syscall_trace_id_response = meta_packet.syscall_trace_id;
             base_info.syscall_trace_id_thread_1 = meta_packet.thread_id;
-            base_info.syscall_cap_seq_1 = meta_packet.cap_seq as u32;
+            base_info.syscall_cap_seq_1 = meta_packet.cap_start_seq as u32;
         }
 
         Some(Self {
@@ -653,6 +653,7 @@ impl SessionQueue {
                 _ => {
                     if v.base_info.start_time > item.base_info.start_time {
                         self.send(item);
+                        slot.put(key, v);
                     } else {
                         // swap out old item and send
                         self.counter.cached_request_resource.fetch_sub(
@@ -778,7 +779,7 @@ impl SessionQueue {
     }
 
     fn send(&mut self, item: Box<MetaAppProto>) {
-        if item.l7_info.skip_send() {
+        if item.l7_info.skip_send() || item.l7_info.is_on_blacklist() {
             return;
         }
 

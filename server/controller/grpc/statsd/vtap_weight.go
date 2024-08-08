@@ -19,9 +19,12 @@ package statsd
 import (
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/libs/stats"
+	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/controller/statsd"
+	"github.com/deepflowio/deepflow/server/libs/stats/pb"
 )
 
 var (
@@ -32,26 +35,40 @@ var (
 func GetVTapCounter() *VTapCounter {
 	vtapCounterOnce.Do(func() {
 		vtapCounter = &VTapCounter{
-			VTapNameCounter: make(map[string]*GetVTapWeightCounter),
+			ORGIDToVTapNameCounter: make(map[int]VTapNameCounter),
 		}
 	})
 	return vtapCounter
 }
 
 type VTapCounter struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
-	VTapNameCounter map[string]*GetVTapWeightCounter
+	ORGIDToVTapNameCounter map[int]VTapNameCounter
 }
 
-func (c *VTapCounter) SetNull(vtapName string) {
+type VTapNameCounter map[string]*VTapWeightCounter
+
+func (c *VTapCounter) GetVtapNameCounter(orgID int) VTapNameCounter {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	counter, ok := c.VTapNameCounter[vtapName]
+	if c.ORGIDToVTapNameCounter[orgID] == nil {
+		c.ORGIDToVTapNameCounter[orgID] = make(VTapNameCounter)
+		log.Infof("init vtap name counter", logger.NewORGPrefix(orgID))
+	}
+	return c.ORGIDToVTapNameCounter[orgID]
+}
+
+func (c *VTapCounter) SetNull(orgID int, vtapName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	vtapNameCounter, ok := c.ORGIDToVTapNameCounter[orgID]
 	if !ok {
 		return
 	}
+	counter, ok := vtapNameCounter[vtapName]
 	counter.IsAnalyzerChanged = 0
 	counter.Weight = 0
 }
@@ -59,56 +76,65 @@ func (c *VTapCounter) SetNull(vtapName string) {
 func (c *VTapCounter) SetCounter(db *mysql.DB, teamID int, vtapName string, weight float64, isChanged uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if counter, ok := c.VTapNameCounter[vtapName]; ok {
+
+	vtapNameCounter, ok := c.ORGIDToVTapNameCounter[db.ORGID]
+	if !ok {
+		log.Warningf("failed to find agent counter to set counter", db.LogPrefixORGID)
+		c.ORGIDToVTapNameCounter[db.ORGID] = make(VTapNameCounter)
+	}
+
+	if counter, ok := vtapNameCounter[vtapName]; ok {
 		if counter.Weight != weight || counter.IsAnalyzerChanged != isChanged {
-			log.Infof("ORG(id=%d database=%s) agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
-				db.ORGID, db.Name, vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged)
+			log.Infof("agent(%v) update weight: %v -> %v, is_analyzer_changed: %v -> %v",
+				vtapName, counter.Weight, weight, counter.IsAnalyzerChanged, isChanged, db.LogPrefixORGID)
 		}
-		counter.Weight = weight
-		counter.IsAnalyzerChanged = isChanged
-		counter.ORGID = uint16(db.ORGID)
-		counter.TeamID = uint16(teamID)
+		c.ORGIDToVTapNameCounter[db.ORGID][vtapName].Weight = weight
+		c.ORGIDToVTapNameCounter[db.ORGID][vtapName].IsAnalyzerChanged = isChanged
+		c.ORGIDToVTapNameCounter[db.ORGID][vtapName].ORGID = uint16(db.ORGID)
+		c.ORGIDToVTapNameCounter[db.ORGID][vtapName].TeamID = uint16(teamID)
+		c.ORGIDToVTapNameCounter[db.ORGID][vtapName].SendStats(vtapName)
 		return
 	}
 
-	newCounter := &GetVTapWeightCounter{
+	newCounter := &VTapWeightCounter{
 		Name: vtapName,
-		VTapWeightCounter: &VTapWeightCounter{
-			ORGID:             uint16(db.ORGID),
-			TeamID:            uint16(teamID),
-			Weight:            weight,
-			IsAnalyzerChanged: isChanged,
-		},
+
+		ORGID:             uint16(db.ORGID),
+		TeamID:            uint16(teamID),
+		Weight:            weight,
+		IsAnalyzerChanged: isChanged,
 	}
-	c.VTapNameCounter[vtapName] = newCounter
-	b, _ := json.Marshal(newCounter.VTapWeightCounter)
-	log.Infof("ORG(id=%d database=%s) agent(%v) register counter: %v", db.ORGID, db.Name, vtapName, string(b))
-	err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer_alloc", newCounter, stats.OptionStatTags{"host": vtapName})
-	if err != nil {
-		log.Errorf("ORG(id=%d database=%s) %s", db.ORGID, db.Name, err.Error())
-	}
+	b, _ := json.Marshal(newCounter)
+	log.Infof("new agent traffic counter: %s", string(b))
+	c.ORGIDToVTapNameCounter[db.ORGID][vtapName] = newCounter
+	newCounter.SendStats(vtapName)
 }
 
 type VTapWeightCounter struct {
-	ORGID             uint16  `statsd:"org_id"`
-	TeamID            uint16  `statsd:"team_id"`
-	Weight            float64 `statsd:"weight"`
-	IsAnalyzerChanged uint64  `statsd:"is_analyzer_changed"`
+	ORGID             uint16
+	TeamID            uint16
+	Name              string
+	Weight            float64
+	IsAnalyzerChanged uint64
 }
 
 func NewVTapWeightCounter() *VTapWeightCounter {
 	return &VTapWeightCounter{}
 }
 
-type GetVTapWeightCounter struct {
-	*VTapWeightCounter
-	Name string
-}
-
-func (g *GetVTapWeightCounter) GetCounter() interface{} {
-	return g.VTapWeightCounter
-}
-
-func (g *GetVTapWeightCounter) Closed() bool {
-	return false
+func (v *VTapWeightCounter) SendStats(vtapName string) {
+	data := &pb.Stats{
+		OrgId:              uint32(v.ORGID),
+		TeamId:             uint32(v.TeamID),
+		Timestamp:          uint64(time.Now().Unix()),
+		Name:               "deepflow_server_agent_analyzer_alloc",
+		TagNames:           []string{"host"},
+		TagValues:          []string{vtapName},
+		MetricsFloatNames:  []string{"is_analyzer_changed", "weight"},
+		MetricsFloatValues: []float64{float64(v.IsAnalyzerChanged), v.Weight},
+	}
+	log.Debugf("send agent(name: %s) traffic counter: %s", vtapName, data.String(), logger.NewORGPrefix(int(v.ORGID)))
+	if err := statsd.MetaStatsd.Send(data); err != nil {
+		log.Error(err)
+	}
 }

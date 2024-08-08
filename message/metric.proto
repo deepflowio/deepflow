@@ -195,6 +195,8 @@ enum ProfileEventType {
     External = 0;
     EbpfOnCpu = 1;
     EbpfOffCpu = 2;
+    EbpfMemAlloc = 3;
+    EbpfMemInUse = 4;
 }
 
 message Profile {
@@ -224,6 +226,7 @@ message Profile {
     // Deprecated in v6.4.1: uint64 netns_id = 31;
     // Deprecated in v6.4.1: string container_id = 32;
     uint32 pod_id = 33;
+    uint64 wide_count = 34;
 }
 
 enum IoOperation {

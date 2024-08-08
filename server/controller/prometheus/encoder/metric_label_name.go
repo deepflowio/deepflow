@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -89,7 +89,7 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 		mn := rML.GetMetricName()
 		mni, ok := ml.metricNameEncoder.getID(mn)
 		if !ok {
-			log.Warningf("%s metric_name: %s id not found", ml.resourceType, mn)
+			log.Warningf("%s metric_name: %s id not found", ml.resourceType, mn, ml.org.LogPrefix)
 			continue
 		}
 		lis := make([]uint32, 0)
@@ -97,7 +97,7 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 		for _, ln := range rML.GetLabelNames() {
 			lni, ok := ml.labelNameEncoder.getID(ln)
 			if !ok {
-				log.Warningf("%s label (name: %s) id not found", ml.resourceType, ln)
+				log.Warningf("%s label (name: %s) id not found", ml.resourceType, ln, ml.org.LogPrefix)
 				continue
 			}
 			if ok := ml.keys.Contains(newMetricLabelNameKey(mni, lni)); ok {
@@ -125,7 +125,7 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 	}
 	err := addBatch(ml.org.DB, dbToAdd, ml.resourceType)
 	if err != nil {
-		log.Error(ml.org.Logf("add %s error: %s", ml.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", ml.resourceType, err.Error(), ml.org.LogPrefix)
 		return resp, err
 	}
 	for _, item := range dbToAdd {

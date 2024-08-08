@@ -27,6 +27,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/stats/pb"
@@ -208,7 +209,9 @@ func (m *Monitor) isDisksNeedClean(diskInfo *DiskInfo) bool {
 
 func (m *Monitor) isPriorityDrop(database, table string) bool {
 	for _, priorityDrop := range m.cfg.CKDiskMonitor.PriorityDrops {
-		if database == priorityDrop.Database {
+		if database == priorityDrop.Database ||
+			// this database under all organizations needs to be cleaned
+			(len(database) > ckdb.ORG_ID_PREFIX_LEN && (database[ckdb.ORG_ID_PREFIX_LEN:] == priorityDrop.Database)) {
 			if priorityDrop.TablesContain == "" {
 				return true
 			}

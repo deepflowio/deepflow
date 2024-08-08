@@ -32,8 +32,10 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 	struct ebpf_prog *prog;
 
 	/*
-	 * tracepoint: prog->name:bpf_func_sys_exit_recvfrom
-	 * kprobe: prog->name:kprobe____sys_sendmsg
+	 * tracepoint(syscall): prog->name:df_T_exit_recvfrom
+	 * tracepoint(sched): prog->name:df_T_process_exec
+	 * kprobe: prog->name:df_K_sys_sendmsg
+	 * kretprobe: prog->name:df_KR_sys_sendmsg
 	 */
 	char prog_name[PROBE_NAME_SZ];
 	int res;
@@ -42,7 +44,7 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 	if (strstr(__name, "kprobe/")) {
 		__name += (sizeof("kprobe/") - 1);
 		res =
-		    snprintf((char *)prog_name, sizeof(prog_name), "kprobe__%s",
+		    snprintf((char *)prog_name, sizeof(prog_name), "df_K_%s",
 			     __name);
 		if (res < 0 || res >= sizeof(prog_name)) {
 			ebpf_warning("name (%s) snprintf() failed.\n", __name);
@@ -52,7 +54,7 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 		__name += (sizeof("kretprobe/") - 1);
 		res =
 		    snprintf((char *)prog_name, sizeof(prog_name),
-			     "kretprobe__%s", __name);
+			     "df_KR_%s", __name);
 		if (res < 0 || res >= sizeof(prog_name)) {
 			ebpf_warning("name (%s) snprintf() failed.\n", __name);
 			return -1;
@@ -62,9 +64,16 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 		while (*p != '\0')
 			if (*p++ == '/')
 				__name = p;
+
+		if (strncmp(__name, "sys_", 4) == 0) {
+			__name += 4;
+		} else if (strncmp(__name, "sched_", 6) == 0) {
+			__name += 6;
+		}
+
 		res =
 		    snprintf((char *)prog_name, sizeof(prog_name),
-			     "bpf_func_%s", __name);
+			     "df_T_%s", __name);
 		if (res < 0 || res >= sizeof(prog_name)) {
 			ebpf_warning("name (%s) snprintf() failed.\n", __name);
 			return -1;
@@ -189,9 +198,17 @@ int program__attach_kprobe(void *prog,
 			   char *ev_name, void **ret_link)
 {
 	int maxactive = 0;
-	if (retprobe) {
-		maxactive = KRETPROBE_MAXACTIVE_MAX;
-	}
+
+	/*
+	 * Setting the maxactive value (maxactive > 0) means attaching kretprobe-type
+	 * eBPF programs using the ftrace method. However, this method fails on the
+	 * 3.10.0-957 version of the kernel. Therefore, we use the perf_event_open()
+	 * system call to perform attach/detach operations.
+	 */
+	//if (retprobe) {
+	//	maxactive = KRETPROBE_MAXACTIVE_MAX;
+	//}
+
 	return program__attach_probe((const struct ebpf_prog *)prog,
 				     retprobe, (const char *)ev_name, func_name,
 				     "kprobe", 0, pid, maxactive, ret_link);
@@ -201,7 +218,7 @@ struct ebpf_link *program__attach_tracepoint(void *prog)
 {
 	// e.g.:
 	// sec_name:  "tracepoint/syscalls/sys_enter_write"
-	// prog name: "bpf_func_sys_enter_write"
+	// prog name: "df_T_enter_write"
 
 	char *sec_name, *category, *name;
 	int len, pfd;

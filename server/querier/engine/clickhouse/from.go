@@ -19,7 +19,10 @@ package clickhouse
 import (
 	"fmt"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
+	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/trans_prometheus"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/view"
 )
@@ -33,15 +36,16 @@ func (t *Table) Format(m *view.Model) {
 }
 
 func GetVirtualTableFilter(db, table string) (view.Node, bool) {
-	if db == "ext_metrics" || db == "deepflow_system" {
+	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_EXT_METRICS, chCommon.DB_NAME_DEEPFLOW_TENANT}, db) {
 		filter := fmt.Sprintf("virtual_table_name='%s'", table)
 		return &view.Expr{Value: "(" + filter + ")"}, true
 	}
 	return nil, false
 }
 
-func GetMetricIDFilter(db, table string) (view.Node, error) {
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+func GetMetricIDFilter(e *CHEngine) (view.Node, error) {
+	table := e.Table
+	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return nil, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)

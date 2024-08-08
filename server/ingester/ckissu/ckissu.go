@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	logging "github.com/op/go-logging"
+	"time"
 
 	"database/sql"
+
+	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
@@ -38,6 +39,7 @@ const (
 	INTERVAL_HOUR = 60
 	INTERVAL_DAY  = 1440
 	DEFAULT_TTL   = 168
+	RETRY_COUNT   = 3
 )
 
 type Issu struct {
@@ -51,6 +53,7 @@ type Issu struct {
 	modTTLs            []*TableModTTL
 	datasourceInfo     map[string]*DatasourceInfo
 	Connections        common.DBs
+	VersionMaps        []map[string]string
 	Addrs              []string
 	username, password string
 	exit               bool
@@ -105,6 +108,8 @@ type ColumnAdd struct {
 	ColumnName   string
 	ColumnType   ckdb.ColumnType
 	DefaultValue string
+	IsMetrics    bool
+	AggrFunc     string
 }
 
 type ColumnAdds struct {
@@ -142,25 +147,29 @@ type IndexAdd struct {
 }
 
 type ColumnDatasourceAdds struct {
-	ColumnNames                []string
-	OldColumnNames             []string
-	ColumnTypes                []ckdb.ColumnType
-	OnlyMapTable, OnlyAppTable bool
-	DefaultValue               string
+	ColumnNames                                  []string
+	OldColumnNames                               []string
+	ColumnTypes                                  []ckdb.ColumnType
+	OnlyMapTable, OnlyAppTable, OnlyNetworkTable bool
+	DefaultValue                                 string
+	IsMetrics                                    bool
+	IsSummable                                   bool
 }
 
 type ColumnDatasourceAdd struct {
-	ColumnName                 string
-	OldColumnName              string
-	ColumnType                 ckdb.ColumnType
-	OnlyMapTable, OnlyAppTable bool
-	DefaultValue               string
+	ColumnName                                   string
+	OldColumnName                                string
+	ColumnType                                   ckdb.ColumnType
+	OnlyMapTable, OnlyAppTable, OnlyNetworkTable bool
+	DefaultValue                                 string
+	IsMetrics                                    bool
+	IsSummable                                   bool
 }
 
-func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
+func getTables(connect *sql.DB, db, tablePrefix string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	log.Infof("exec sql: %s", sql)
-	rows, err := connect.Query(sql)
+	rows, err := Query(connect, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -171,16 +180,16 @@ func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if strings.HasPrefix(table, tableName) ||
-			len(tableName) == 0 {
+		if strings.HasPrefix(table, tablePrefix) ||
+			len(tablePrefix) == 0 {
 			tables = append(tables, table)
 		}
 	}
 	return tables, nil
 }
 
-func getMvTables(connect *sql.DB, db, tableName string) ([]string, error) {
-	tables, err := getTables(connect, db, tableName)
+func getMvTables(connect *sql.DB, db, tablePrefix string) ([]string, error) {
+	tables, err := getTables(connect, db, tablePrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +216,7 @@ func (i *Issu) getDatasourceInfo(connect *sql.DB, db, mvTableName string) (*Data
 		return info, nil
 	}
 	sql := fmt.Sprintf("SHOW CREATE TABLE %s.`%s`", db, mvTableName)
-	rows, err := connect.Query(sql)
+	rows, err := Query(connect, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -271,11 +280,12 @@ func (i *Issu) getDatasourceInfo(connect *sql.DB, db, mvTableName string) (*Data
 
 // 找出自定义数据源和参数
 func (i *Issu) getUserDefinedDatasourceInfos(connect *sql.DB, db, tableName string) ([]*DatasourceInfo, error) {
-	tables, err := getTables(connect, db, tableName)
+	tables, err := getTables(connect, db, tableName+".")
 	if err != nil {
 		log.Info(err)
 		return nil, nil
 	}
+	log.Infof("get db %s prefix %s tables: %v", db, tableName, tables)
 
 	aggTables := []string{}
 	aggSuffix := "_agg"
@@ -285,6 +295,7 @@ func (i *Issu) getUserDefinedDatasourceInfos(connect *sql.DB, db, tableName stri
 		}
 	}
 
+	log.Infof("get agg tables: %v", aggTables)
 	dSInfos := []*DatasourceInfo{}
 	for _, name := range aggTables {
 		ds, err := i.getDatasourceInfo(connect, db, name+"_mv")
@@ -297,7 +308,8 @@ func (i *Issu) getUserDefinedDatasourceInfos(connect *sql.DB, db, tableName stri
 	return dSInfos, nil
 }
 
-func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTable bool, isAppTable bool) ([]*ColumnAdd, error) {
+func (i *Issu) addColumnDatasource(index int, d *DatasourceInfo, isMapTable, isAppTable, isNetworkTable bool) ([]*ColumnAdd, error) {
+	connect := i.Connections[index]
 	// mod table agg, global
 	dones := []*ColumnAdd{}
 
@@ -308,23 +320,28 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	}
 
 	for _, add := range columnDatasourceAdds {
-		version, err := i.getTableVersion(connect, d.db, d.name)
-		if err != nil {
-			return dones, err
-		}
+		aggTable := d.name + "_agg"
+		version, _ := i.getTableRawVersion(index, d.db, aggTable)
 		if version == common.CK_VERSION {
 			continue
 		}
-		if (add.OnlyMapTable && !isMapTable) || (add.OnlyAppTable && !isAppTable) {
+		if (add.OnlyMapTable && !isMapTable) || (add.OnlyAppTable && !isAppTable) || (add.OnlyNetworkTable && !isNetworkTable) {
 			continue
 		}
-		aggTable := d.name + "_agg"
+		aggrFunc := ""
+		if add.IsMetrics && add.IsSummable {
+			aggrFunc = d.summable
+		} else if add.IsMetrics {
+			aggrFunc = d.unsummable
+		}
 		addColumn := &ColumnAdd{
 			Db:           d.db,
 			Table:        aggTable,
 			ColumnName:   add.ColumnName,
 			ColumnType:   add.ColumnType,
 			DefaultValue: add.DefaultValue,
+			IsMetrics:    add.IsMetrics,
+			AggrFunc:     aggrFunc,
 		}
 		if err := i.addColumn(connect, addColumn); err != nil {
 			return dones, err
@@ -333,7 +350,9 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 			sql := fmt.Sprintf("ALTER TABLE %s.`%s` update %s=%s WHERE 1",
 				d.db, aggTable, addColumn.ColumnName, add.OldColumnName)
 			log.Info("datasource copy column: ", sql)
-			_, err = connect.Exec(sql)
+			if _, err := Exec(connect, sql); err != nil {
+				log.Warningf("exec sql %s failed: %s", err)
+			}
 		}
 		dones = append(dones, addColumn)
 	}
@@ -346,7 +365,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	// drop table mv
 	sql := fmt.Sprintf("DROP TABLE IF EXISTS %s.`%s`", d.db, d.name+"_mv")
 	log.Info(sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +381,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 		rawTable, d.db, dstTableName,
 		d.summable, d.unsummable, d.interval)
 	log.Info(createMvSql)
-	_, err = connect.Exec(createMvSql)
+	_, err = Exec(connect, createMvSql)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +389,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	// drop table local
 	sql = fmt.Sprintf("DROP TABLE IF EXISTS %s.`%s`", d.db, d.name+"_local")
 	log.Info(sql)
-	_, err = connect.Exec(sql)
+	_, err = Exec(connect, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +399,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 		rawTable, d.db, dstTableName,
 		d.summable, d.unsummable)
 	log.Info(createLocalSql)
-	_, err = connect.Exec(createLocalSql)
+	_, err = Exec(connect, createLocalSql)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +407,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo, isMapTabl
 	// create table global
 	createGlobalSql := datasource.MakeGlobalTableCreateSQL(rawTable, d.db, dstTableName)
 	log.Info(createGlobalSql)
-	_, err = connect.Exec(createGlobalSql)
+	_, err = Exec(connect, createGlobalSql)
 	if err != nil {
 		return nil, err
 	}
@@ -437,6 +456,14 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 	if err != nil {
 		return nil, err
 	}
+	i.VersionMaps = make([]map[string]string, len(i.Connections))
+	for idx, connect := range i.Connections {
+		m, err := i.getAllTableVersions(connect)
+		if err != nil {
+			return nil, err
+		}
+		i.VersionMaps[idx] = m
+	}
 
 	return i, nil
 }
@@ -447,12 +474,12 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 	if err != nil {
 		log.Warningf("renameTablesV65 err: %s", err)
 	}
+	if len(AllTableRenames) == 0 {
+		return nil
+	}
 	i.tableRenames = AllTableRenames
-	for _, connection := range i.Connections {
-		oldVersion, err := i.getTableVersion(connection, "flow_log", "l4_flow_log_local")
-		if err != nil {
-			return err
-		}
+	for idx, connection := range i.Connections {
+		oldVersion, _ := i.getTableVersion(idx, "flow_log", "l4_flow_log_local")
 		if strings.Compare(oldVersion, "v6.5") >= 0 || oldVersion == "" {
 			continue
 		}
@@ -461,7 +488,7 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 				return err
 			}
 		}
-		if err := i.renameUserDefineDatasource(connection, ds); err != nil {
+		if err := i.renameUserDefineDatasource(connection, ckdb.DEFAULT_ORG_ID, ds); err != nil {
 			log.Warning(err)
 		}
 	}
@@ -469,11 +496,8 @@ func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 }
 
 func (i *Issu) renameTablesV65(ds *datasource.DatasourceManager) error {
-	for _, connection := range i.Connections {
-		oldVersion, err := i.getTableVersion(connection, "flow_log", "l7_flow_log_local")
-		if err != nil {
-			return err
-		}
+	for index, connection := range i.Connections {
+		oldVersion, _ := i.getTableVersion(index, "flow_log", "l7_flow_log_local")
 		if strings.Compare(oldVersion, "v6.5.1") >= 0 {
 			continue
 		}
@@ -511,7 +535,7 @@ func (i *Issu) renameTablesV65(ds *datasource.DatasourceManager) error {
 func (i *Issu) renameTable(connect *sql.DB, c *TableRename) error {
 	for i := range c.OldTables {
 		createDb := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", c.NewDb)
-		_, err := connect.Exec(createDb)
+		_, err := Exec(connect, createDb)
 		if err != nil {
 			log.Error(err)
 			return err
@@ -521,7 +545,7 @@ func (i *Issu) renameTable(connect *sql.DB, c *TableRename) error {
 		sql := fmt.Sprintf("RENAME TABLE %s.\"%s\" to %s.\"%s\"",
 			c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i])
 		log.Info("rename table: ", sql)
-		_, err = connect.Exec(sql)
+		_, err = Exec(connect, sql)
 		if err != nil {
 			if strings.Contains(err.Error(), "doesn't exist") {
 				log.Infof("table: %s.%s rename to table: %s.\"%s\" error: %s", c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i], err)
@@ -542,10 +566,18 @@ func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
 	if len(c.DefaultValue) > 0 {
 		defaultValue = fmt.Sprintf("default %s", c.DefaultValue)
 	}
+
+	columnName := c.ColumnName
+	columnType := c.ColumnType.String()
+	if c.IsMetrics && c.AggrFunc != "" {
+		columnName = c.ColumnName + "__agg"
+		columnType = fmt.Sprintf("AggregateFunction(%s, %s)", c.AggrFunc, c.ColumnType)
+	}
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN %s %s %s",
-		c.Db, c.Table, c.ColumnName, c.ColumnType, defaultValue)
+		c.Db, c.Table, columnName, columnType, defaultValue)
+
 	log.Info(sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		// 如果已经增加，需要跳过该错误
 		if strings.Contains(err.Error(), "column with this name already exists") {
@@ -567,7 +599,7 @@ func (i *Issu) addIndex(connect *sql.DB, c *IndexAdd) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` ADD INDEX %s %s TYPE %s GRANULARITY 3",
 		c.Db, c.Table, indexName, c.ColumnName, c.IndexType)
 	log.Info(sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		// if it already exists, you need to skip it
 		if strings.Contains(err.Error(), "index with this name already exists") {
@@ -584,7 +616,7 @@ func (i *Issu) addIndex(connect *sql.DB, c *IndexAdd) error {
 		sql := fmt.Sprintf("ALTER TABLE %s.`%s` MATERIALIZE INDEX %s",
 			c.Db, c.Table, indexName)
 		log.Info(sql)
-		connect.Exec(sql)
+		Exec(connect, sql)
 	}
 	return nil
 }
@@ -592,7 +624,7 @@ func (i *Issu) addIndex(connect *sql.DB, c *IndexAdd) error {
 func (i *Issu) getColumnType(connect *sql.DB, db, table, columnName string) (string, error) {
 	sql := fmt.Sprintf("SELECT type FROM system.columns WHERE database='%s' AND table='%s' AND name='%s'",
 		db, table, columnName)
-	rows, err := connect.Query(sql)
+	rows, err := Query(connect, sql)
 	if err != nil {
 		return "", err
 	}
@@ -619,7 +651,7 @@ func (i *Issu) renameColumnWithAddNewColumn(connect *sql.DB, cr *ColumnRename) e
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN %s %s",
 		cr.Db, cr.Table, cr.NewColumnName, cr.OldColumnType)
 	log.Infof("rename add column: %s", sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		// 如果已经增加，需要跳过该错误
 		if strings.Contains(err.Error(), "column with this name already exists") {
@@ -638,7 +670,7 @@ func (i *Issu) renameColumnWithAddNewColumn(connect *sql.DB, cr *ColumnRename) e
 	sql = fmt.Sprintf("ALTER TABLE %s.`%s` update %s=%s WHERE 1",
 		cr.Db, cr.Table, cr.NewColumnName, cr.OldColumnName)
 	log.Info("rename copy column: ", sql)
-	_, err = connect.Exec(sql)
+	_, err = Exec(connect, sql)
 
 	return err
 }
@@ -664,7 +696,7 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 		log.Infof("rename column failed, will retry rename column later. err: %s", err)
 
 		if cr.DropMvTable {
-			mvTables, err := getMvTables(connect, cr.Db, strings.Split(cr.Table, ".")[0])
+			mvTables, err := getMvTables(connect, cr.Db, strings.Split(cr.Table, ".")[0]+".")
 			if err != nil {
 				log.Error(err)
 				return err
@@ -674,7 +706,7 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 				sql := fmt.Sprintf("DROP TABLE IF EXISTS %s.`%s`",
 					cr.Db, mvTable)
 				log.Info("drop mv talbe: ", sql)
-				_, err := connect.Exec(sql)
+				_, err := Exec(connect, sql)
 				if err != nil {
 					log.Error(err)
 					return err
@@ -686,7 +718,7 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 			sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
 				cr.Db, cr.Table, cr.OldColumnName)
 			log.Info("drop index: ", sql)
-			_, err := connect.Exec(sql)
+			_, err := Exec(connect, sql)
 			if err != nil {
 				if strings.Contains(err.Error(), "Cannot find index") {
 					log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
@@ -707,7 +739,7 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` RENAME COLUMN IF EXISTS %s to %s",
 		cr.Db, cr.Table, cr.OldColumnName, cr.NewColumnName)
 	log.Info("rename column: ", sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		// 如果已经修改过，就会报错不存在column，需要跳过该错误
 		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `retan_tx` to rename.
@@ -730,7 +762,7 @@ func (i *Issu) modColumn(connect *sql.DB, cm *ColumnMod) error {
 		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
 			cm.Db, cm.Table, cm.ColumnName)
 		log.Info("drop index: ", sql)
-		_, err := connect.Exec(sql)
+		_, err := Exec(connect, sql)
 		if err != nil {
 			if strings.Contains(err.Error(), "Cannot find index") {
 				log.Infof("db: %s, table: %s error: %s", cm.Db, cm.Table, err)
@@ -746,7 +778,7 @@ func (i *Issu) modColumn(connect *sql.DB, cm *ColumnMod) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` MODIFY COLUMN %s %s",
 		cm.Db, cm.Table, cm.ColumnName, cm.NewColumnType)
 	log.Info("modify column: ", sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		//If cannot find column, you need to skip the error
 		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `span_kind` to modify.
@@ -764,7 +796,7 @@ func (i *Issu) dropColumn(connect *sql.DB, cm *ColumnDrop) error {
 	// drop index first
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx", cm.Db, cm.Table, cm.ColumnName)
 	log.Info("drop index: ", sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		if strings.Contains(err.Error(), "Cannot find index") {
 			log.Infof("db: %s, table: %s error: %s", cm.Db, cm.Table, err)
@@ -779,7 +811,7 @@ func (i *Issu) dropColumn(connect *sql.DB, cm *ColumnDrop) error {
 	// then drop column
 	sql = fmt.Sprintf("ALTER TABLE %s.`%s` DROP COLUMN %s", cm.Db, cm.Table, cm.ColumnName)
 	log.Info("drop column: ", sql)
-	_, err = connect.Exec(sql)
+	_, err = Exec(connect, sql)
 	if err != nil {
 		//If cannot find column, you need to skip the error
 		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `span_kind` to modify.
@@ -811,31 +843,41 @@ func getColumnDrops(columnDrops []*ColumnDrops) []*ColumnDrop {
 	return drops
 }
 
-func (i *Issu) getTableVersion(connect *sql.DB, db, table string) (string, error) {
-	sql := fmt.Sprintf("SELECT comment FROM system.columns WHERE database='%s' AND table='%s' AND name='time'",
-		db, table)
-	rows, err := connect.Query(sql)
+func (i *Issu) getAllTableVersions(connect *sql.DB) (map[string]string, error) {
+	sql := "SELECT database,table,comment FROM system.columns WHERE name='time'"
+	rows, err := Query(connect, sql)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	var version string
+	versions := make(map[string]string)
 	for rows.Next() {
-		err := rows.Scan(&version)
+		var database, table, version string
+		err := rows.Scan(&database, &table, &version)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return version, nil
+		versions[genKey(database, table)] = version
 	}
-	if version == "" {
+	return versions, nil
+}
+
+func (i *Issu) getTableVersion(idx int, db, table string) (string, bool) {
+	version, exist := i.getTableRawVersion(idx, db, table)
+	if !exist {
 		version = common.CK_VERSION
 	}
-	return version, nil
+	return version, exist
+}
+
+func (i *Issu) getTableRawVersion(idx int, db, table string) (string, bool) {
+	version, exist := i.VersionMaps[idx][genKey(db, table)]
+	return version, exist
 }
 
 func (i *Issu) setTableVersion(connect *sql.DB, db, table string) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` COMMENT COLUMN time '%s'",
 		db, table, common.CK_VERSION)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		if strings.Contains(err.Error(), "doesn't exist") {
 			log.Infof("db: %s, table: %s info: %s", db, table, err)
@@ -843,6 +885,38 @@ func (i *Issu) setTableVersion(connect *sql.DB, db, table string) error {
 		}
 	}
 	return err
+}
+
+func Query(connect *sql.DB, sql string) (*sql.Rows, error) {
+	rows, err := connect.Query(sql)
+	retryTimes := RETRY_COUNT
+	for err != nil && retryTimes > 0 {
+		log.Warningf("Query SQL (%s) failed: %s, will retry", sql, err)
+		time.Sleep(time.Second)
+		rows, err = connect.Query(sql)
+		if err == nil {
+			log.Infof("Retry query SQL (%s) success", sql)
+			return rows, err
+		}
+		retryTimes--
+	}
+	return rows, err
+}
+
+func Exec(connect *sql.DB, sql string) (sql.Result, error) {
+	result, err := connect.Exec(sql)
+	retryTimes := RETRY_COUNT
+	for err != nil && retryTimes > 0 {
+		log.Warningf("Exec SQL (%s) failed: %s, will retry", sql, err)
+		time.Sleep(time.Second)
+		result, err = connect.Exec(sql)
+		if err == nil {
+			log.Infof("Retry exec SQL (%s) success", sql)
+			return result, err
+		}
+		retryTimes--
+	}
+	return result, err
 }
 
 func getColumnRenames(columnRenamess []*ColumnRenames) []*ColumnRename {
@@ -866,23 +940,16 @@ func getColumnRenames(columnRenamess []*ColumnRenames) []*ColumnRename {
 	return renames
 }
 
-func (i *Issu) renameColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnRename, error) {
+func (i *Issu) renameColumns(index int, orgIDPrefix string) ([]*ColumnRename, error) {
 	dones := []*ColumnRename{}
 	for _, renameColumn := range i.columnRenames {
 		renameColumn.Db = getOrgDatabase(renameColumn.Db, orgIDPrefix)
-		version, err := i.getTableVersion(connect, renameColumn.Db, renameColumn.Table)
-		if err != nil {
-			if strings.Contains(err.Error(), "doesn't exist") {
-				log.Infof("db: %s, table: %s info: %s", renameColumn.Db, renameColumn.Table, err)
-				continue
-			}
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, renameColumn.Db, renameColumn.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
 
-		if err := i.renameColumn(connect, renameColumn); err != nil {
+		if err := i.renameColumn(i.Connections[index], renameColumn); err != nil {
 			return dones, err
 		}
 		dones = append(dones, renameColumn)
@@ -891,18 +958,15 @@ func (i *Issu) renameColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnRena
 	return dones, nil
 }
 
-func (i *Issu) modColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnMod, error) {
+func (i *Issu) modColumns(index int, orgIDPrefix string) ([]*ColumnMod, error) {
 	dones := []*ColumnMod{}
 	for _, modColumn := range i.columnMods {
 		modColumn.Db = getOrgDatabase(modColumn.Db, orgIDPrefix)
-		version, err := i.getTableVersion(connect, modColumn.Db, modColumn.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, modColumn.Db, modColumn.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
-		if err := i.modColumn(connect, modColumn); err != nil {
+		if err := i.modColumn(i.Connections[index], modColumn); err != nil {
 			return dones, err
 		}
 		dones = append(dones, modColumn)
@@ -911,18 +975,15 @@ func (i *Issu) modColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnMod, er
 	return dones, nil
 }
 
-func (i *Issu) dropColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnDrop, error) {
+func (i *Issu) dropColumns(index int, orgIDPrefix string) ([]*ColumnDrop, error) {
 	dones := []*ColumnDrop{}
 	for _, dropColumn := range i.columnDrops {
 		dropColumn.Db = getOrgDatabase(dropColumn.Db, orgIDPrefix)
-		version, err := i.getTableVersion(connect, dropColumn.Db, dropColumn.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, dropColumn.Db, dropColumn.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
-		if err := i.dropColumn(connect, dropColumn); err != nil {
+		if err := i.dropColumn(i.Connections[index], dropColumn); err != nil {
 			return dones, err
 		}
 		dones = append(dones, dropColumn)
@@ -930,22 +991,18 @@ func (i *Issu) dropColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnDrop, 
 	return dones, nil
 }
 
-func (i *Issu) modTableTTLs(connect *sql.DB, orgIDPrefix string) error {
+func (i *Issu) modTableTTLs(index int, orgIDPrefix string) error {
 	for _, modTTL := range i.modTTLs {
 		modTTL.Db = getOrgDatabase(modTTL.Db, orgIDPrefix)
-		version, err := i.getTableVersion(connect, modTTL.Db, modTTL.Table)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
+		version, _ := i.getTableVersion(index, modTTL.Db, modTTL.Table)
 		if version == common.CK_VERSION {
 			continue
 		}
-		if err := i.modTTL(connect, modTTL); err != nil {
+		if err := i.modTTL(i.Connections[index], modTTL); err != nil {
 			log.Error(err)
 			return err
 		} else {
-			if err := i.setTableVersion(connect, modTTL.Db, modTTL.Table); err != nil {
+			if err := i.setTableVersion(i.Connections[index], modTTL.Db, modTTL.Table); err != nil {
 				log.Error(err)
 				return err
 			}
@@ -959,7 +1016,7 @@ func (i *Issu) modTTL(connect *sql.DB, mt *TableModTTL) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` MODIFY TTL time + toIntervalHour(%d)",
 		mt.Db, mt.Table, mt.NewTTL)
 	log.Info("modify TTL: ", sql)
-	_, err := connect.Exec(sql)
+	_, err := Exec(connect, sql)
 	if err != nil {
 		return err
 	}
@@ -1012,26 +1069,27 @@ func getColumnDatasourceAdds(columnDatasourceAddss []*ColumnDatasourceAdds) []*C
 				OldColumnName = columnAdds.OldColumnNames[i]
 			}
 			adds = append(adds, &ColumnDatasourceAdd{
-				ColumnName:    name,
-				OldColumnName: OldColumnName,
-				ColumnType:    columnAdds.ColumnTypes[i],
-				OnlyMapTable:  columnAdds.OnlyMapTable,
-				OnlyAppTable:  columnAdds.OnlyAppTable,
-				DefaultValue:  columnAdds.DefaultValue,
+				ColumnName:       name,
+				OldColumnName:    OldColumnName,
+				ColumnType:       columnAdds.ColumnTypes[i],
+				OnlyMapTable:     columnAdds.OnlyMapTable,
+				OnlyAppTable:     columnAdds.OnlyAppTable,
+				OnlyNetworkTable: columnAdds.OnlyNetworkTable,
+				DefaultValue:     columnAdds.DefaultValue,
+				IsMetrics:        columnAdds.IsMetrics,
+				IsSummable:       columnAdds.IsSummable,
 			})
 		}
 	}
 	return adds
 }
 
-func (i *Issu) addColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnAdd, error) {
+func (i *Issu) addColumns(index int, orgIDPrefix string) ([]*ColumnAdd, error) {
+	connect := i.Connections[index]
 	dones := []*ColumnAdd{}
 	for _, add := range i.columnAdds {
 		add.Db = getOrgDatabase(add.Db, orgIDPrefix)
-		version, err := i.getTableVersion(connect, add.Db, add.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, add.Db, add.Table)
 		if version == common.CK_VERSION {
 			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
@@ -1051,8 +1109,9 @@ func (i *Issu) addColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnAdd, er
 			continue
 		}
 		for _, dsInfo := range datasourceInfos {
-			adds, err := i.addColumnDatasource(connect, dsInfo, strings.Contains(tableName, "_map"), strings.Contains(tableName, "application"))
+			adds, err := i.addColumnDatasource(index, dsInfo, strings.Contains(tableName, "_map"), strings.Contains(tableName, "application"), strings.Contains(tableName, "network"))
 			if err != nil {
+				log.Warningf("add column datasource failed: %s", err)
 				return nil, nil
 			}
 			dones = append(dones, adds...)
@@ -1062,19 +1121,16 @@ func (i *Issu) addColumns(connect *sql.DB, orgIDPrefix string) ([]*ColumnAdd, er
 	return dones, nil
 }
 
-func (i *Issu) addIndexs(connect *sql.DB, orgIDPrefix string) ([]*IndexAdd, error) {
+func (i *Issu) addIndexs(index int, orgIDPrefix string) ([]*IndexAdd, error) {
 	dones := []*IndexAdd{}
 	for _, add := range i.indexAdds {
 		add.Db = getOrgDatabase(add.Db, orgIDPrefix)
-		version, err := i.getTableVersion(connect, add.Db, add.Table)
-		if err != nil {
-			return dones, err
-		}
+		version, _ := i.getTableVersion(index, add.Db, add.Table)
 		if version == common.CK_VERSION {
 			log.Infof("db (%s) table (%s) already updated", add.Db, add.Table)
 			continue
 		}
-		if err := i.addIndex(connect, add); err != nil {
+		if err := i.addIndex(i.Connections[index], add); err != nil {
 			log.Warningf("db (%s) table (%s) add index failed.err: %s", add.Db, add.Table, err)
 			continue
 		}
@@ -1105,64 +1161,90 @@ func getOrgDatabase(db string, orgIDPrefix string) string {
 	return orgIDPrefix + rawDb
 }
 
-func (i *Issu) startOrg(connect *sql.DB, orgIDPrefix string) error {
-	renames, errRenames := i.renameColumns(connect, orgIDPrefix)
+func genKey(db, table string) string {
+	return db + "-" + table
+}
+
+func (i *Issu) startOrg(index int, orgIDPrefix string) error {
+	connect := i.Connections[index]
+	renames, errRenames := i.renameColumns(index, orgIDPrefix)
 	if errRenames != nil {
 		return errRenames
 	}
-	mods, errMods := i.modColumns(connect, orgIDPrefix)
+	mods, errMods := i.modColumns(index, orgIDPrefix)
 	if errMods != nil {
 		return errMods
 	}
 
-	adds, errAdds := i.addColumns(connect, orgIDPrefix)
+	adds, errAdds := i.addColumns(index, orgIDPrefix)
 	if errAdds != nil {
 		return errAdds
 	}
 
-	addIndexs, errAddIndexs := i.addIndexs(connect, orgIDPrefix)
+	addIndexs, errAddIndexs := i.addIndexs(index, orgIDPrefix)
 	if errAddIndexs != nil {
 		log.Warning(errAddIndexs)
 	}
 
-	drops, errDrops := i.dropColumns(connect, orgIDPrefix)
+	drops, errDrops := i.dropColumns(index, orgIDPrefix)
 	if errDrops != nil {
 		return errDrops
 	}
 
+	versionSetted := make(map[string]struct{})
 	for _, cr := range renames {
+		if _, exist := versionSetted[genKey(cr.Db, cr.Table)]; exist {
+			continue
+		}
 		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 			return err
 		}
+		versionSetted[genKey(cr.Db, cr.Table)] = struct{}{}
 	}
 	for _, cr := range mods {
+		if _, exist := versionSetted[genKey(cr.Db, cr.Table)]; exist {
+			continue
+		}
 		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 			return err
 		}
+		versionSetted[genKey(cr.Db, cr.Table)] = struct{}{}
 	}
 	for _, cr := range adds {
+		if _, exist := versionSetted[genKey(cr.Db, cr.Table)]; exist {
+			continue
+		}
 		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 			return err
 		}
+		versionSetted[genKey(cr.Db, cr.Table)] = struct{}{}
 	}
 	for _, cr := range addIndexs {
+		if _, exist := versionSetted[genKey(cr.Db, cr.Table)]; exist {
+			continue
+		}
 		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 			return err
 		}
+		versionSetted[genKey(cr.Db, cr.Table)] = struct{}{}
 	}
 	for _, cr := range drops {
+		if _, exist := versionSetted[genKey(cr.Db, cr.Table)]; exist {
+			continue
+		}
 		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 			return err
 		}
+		versionSetted[genKey(cr.Db, cr.Table)] = struct{}{}
 	}
-	go i.modTableTTLs(connect, orgIDPrefix)
+	go i.modTableTTLs(index, orgIDPrefix)
 	return nil
 }
 
 func (i *Issu) getOrgIDPrefixs(connect *sql.DB) ([]string, error) {
-	checkOrgDatabase := "flow_log"
+	checkOrgDatabase := "event"
 	sql := fmt.Sprintf("SELECT name FROM system.databases WHERE name like '%%%s%%'", checkOrgDatabase)
-	rows, err := connect.Query(sql)
+	rows, err := Query(connect, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -1188,15 +1270,32 @@ func (i *Issu) Start() error {
 		return fmt.Errorf("connections is nil")
 	}
 
-	for _, connect := range connects {
+	// update versionMaps
+	for idx, connect := range i.Connections {
+		m, err := i.getAllTableVersions(connect)
+		if err != nil {
+			return err
+		}
+		i.VersionMaps[idx] = m
+	}
+
+	errCount := 0
+	for index, connect := range i.Connections {
 		orgIDPrefixs, err := i.getOrgIDPrefixs(connect)
 		if err != nil {
 			return fmt.Errorf("get orgIDs failed, err: %s", err)
 		}
 		for _, orgIDPrefix := range orgIDPrefixs {
-			err := i.startOrg(connect, orgIDPrefix)
+			err := i.startOrg(index, orgIDPrefix)
 			if err != nil {
-				log.Errorf("orgIDPrefix %s run issu failed, err: %s", orgIDPrefix, err)
+				errCount++
+				err = fmt.Errorf("orgIDPrefix %s run issu failed, err: %s", orgIDPrefix, err)
+				log.Error(err)
+				// if more than 1 Org upgrade fails, or the Default Org upgrade fails, an error will be returned and restarted.
+				if errCount > 1 || orgIDPrefix == "" {
+					log.Error(err)
+					return err
+				}
 			}
 		}
 	}
@@ -1211,28 +1310,33 @@ func (i *Issu) Close() error {
 	return i.Connections.Close()
 }
 
-func (i *Issu) renameUserDefineDatasource(connect *sql.DB, ds *datasource.DatasourceManager) error {
+func (i *Issu) renameUserDefineDatasource(connect *sql.DB, orgId uint16, ds *datasource.DatasourceManager) error {
 	for _, tableGroup := range []string{"application", "network"} {
 		datasourceInfos, err := i.getUserDefinedDatasourceInfos(connect, "flow_metrics", tableGroup)
 		if err != nil {
 			return err
 		}
 		for _, dsInfo := range datasourceInfos {
-			if err := i.renameTable(connect,
-				&TableRename{
-					OldDb:     dsInfo.db,
-					OldTables: []string{dsInfo.name + "_agg"},
-					NewDb:     ckdb.METRICS_DB,
-					NewTables: []string{fmt.Sprintf("%s.%s", dsInfo.db, dsInfo.name+"_agg")},
-				}); err != nil {
-				return err
-			}
+			log.Infof("get datasource info: %+v", dsInfo)
 			interval := INTERVAL_HOUR
 			if dsInfo.interval == ckdb.TimeFuncDay {
 				interval = INTERVAL_DAY
 			}
+			// drop table mv
+			sql := fmt.Sprintf("DROP TABLE IF EXISTS %s.`%s`", ckdb.OrgDatabasePrefix(orgId)+dsInfo.db, dsInfo.name+"_mv")
+			log.Info(sql)
+			_, err := Exec(connect, sql)
+			if err != nil {
+				return err
+			}
+			// dsInfo.name like 'application.1d' should convert to '1d'
+			name := dsInfo.name
+			names := strings.Split(dsInfo.name, ".")
+			if len(names) == 2 {
+				name = names[1]
+			}
 			//readd mvTable,localTable,gobalTable
-			if err := ds.Handle(ckdb.DEFAULT_ORG_ID, datasource.ADD, tableGroup, dsInfo.baseTable, dsInfo.name, dsInfo.summable, dsInfo.unsummable, interval, DEFAULT_TTL); err != nil {
+			if err := ds.Handle(int(orgId), datasource.ADD, tableGroup, dsInfo.baseTable, name, dsInfo.summable, dsInfo.unsummable, interval, DEFAULT_TTL); err != nil {
 				return err
 			}
 		}

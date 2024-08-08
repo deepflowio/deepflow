@@ -17,25 +17,23 @@
 package common
 
 import (
+	// "fmt"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 type ORG struct {
-	ID     int       // org id
-	DB     *mysql.DB // org database connection
-	Logger *Logger   // log controller
+	ID        int       // org id
+	DB        *mysql.DB // org database connection
+	LogPrefix logger.Prefix
 }
 
 func NewORG(id int) (*ORG, error) {
 	db, err := mysql.GetDB(id)
 	return &ORG{
-		ID:     id,
-		DB:     db,
-		Logger: NewLogger(id),
+		ID:        id,
+		DB:        db,
+		LogPrefix: logger.NewORGPrefix(id),
 	}, err
-}
-
-// LogPre adds org id, domain info, sub_domain info to logs
-func (o *ORG) LogPre(format string, a ...any) string {
-	return o.Logger.AddPre(format, a...)
 }

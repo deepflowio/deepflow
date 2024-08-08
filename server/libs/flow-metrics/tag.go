@@ -188,6 +188,11 @@ const (
 	Rest                    = 0
 )
 
+const (
+	ROLE_CLIENT = 0
+	ROLE_SERVER = 1
+)
+
 var TAPSideEnumsString = []string{
 	Rest:                    "rest",
 	Client:                  "c",
@@ -240,8 +245,9 @@ const (
 	PodId                       // use vtapId + podId to match first
 	Mac                         // if vtapId + podId cannot be matched, finally use Mac/EpcIP to match resources
 	EpcIP
-	Peer           // Multicast, filled with peer information
-	None TagSource = 0
+	Peer            // Multicast, filled with peer information
+	Agent           // traffic on the 'lo' port uses the Agent's IP and Epc to match resource information.
+	None  TagSource = 0
 )
 
 type Field struct {
@@ -298,7 +304,7 @@ type Field struct {
 	GPID1             uint32     `json:"gprocess_id_1" category:"$tag" sub:"universal_tag" datasource:"nm|am"`
 
 	ACLGID     uint16
-	Direction  DirectionEnum     `json:"role" category:"$tag" sub:"capture_info" datasource:"n|a"`
+	Role       uint8             `json:"role" category:"$tag" sub:"capture_info" enumfile:"role" datasource:"n|a"`
 	Protocol   layers.IPProtocol `json:"protocol" category:"$tag" sub:"network_layer" enumfile:"protocol"`
 	ServerPort uint16            `json:"server_port" category:"$tag" sub:"transport_layer"`
 	VTAPID     uint16            `json:"agent_id" category:"$tag" sub:"capture_info"`
@@ -316,7 +322,7 @@ type Field struct {
 	TAPSide TAPSideEnum
 	// only for exporters
 	TAPSideStr   string      `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point" datasource:"nm|am"`
-	TAPType      TAPTypeEnum `json:"capture_network_type" category:"$tag" sub:"capture_info"`
+	TAPType      TAPTypeEnum `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
 	IsIPv4       uint8       `json:"is_ipv4" category:"$tag" sub:"network_layer"` // (8B) 与IP/IP6是共生字段
 	IsKeyService uint8
 	L7Protocol   datatype.L7Protocol `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol" datasource:"a|am"`
@@ -591,10 +597,10 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 
 	if t.Code&Direction != 0 {
-		if t.Direction.IsClientToServer() {
-			offset += copy(b[offset:], ",direction=c2s")
-		} else if t.Direction.IsServerToClient() {
-			offset += copy(b[offset:], ",direction=s2c")
+		if t.Role == ROLE_CLIENT {
+			offset += copy(b[offset:], ",role=c2s")
+		} else if t.Role == ROLE_SERVER {
+			offset += copy(b[offset:], ",role=s2c")
 		}
 	}
 	if t.Code&GPID != 0 {
@@ -975,7 +981,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 	if code&L7Protocol != 0 {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_service", ckdb.LowCardinalityString))
-		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.String))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.LowCardinalityString))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("endpoint", ckdb.String))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("biz_type", ckdb.UInt8).SetComment("Business Type"))
 	}
@@ -1129,12 +1135,7 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) {
 	}
 
 	if code&Direction != 0 {
-		if t.Direction.IsClientToServer() {
-			// 0: client, 1: server
-			block.Write(uint8(0))
-		} else {
-			block.Write(uint8(1))
-		}
+		block.Write(t.Role)
 	}
 
 	if code&GPID != 0 {
@@ -1364,7 +1365,12 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	// The range of EPC ID is [-2,65533], if EPC ID < -2 needs to be transformed into the range.
 	t.L3EpcID = MarshalInt32WithSpecialID(p.Field.L3EpcId)
 	t.L3EpcID1 = MarshalInt32WithSpecialID(p.Field.L3EpcId1)
-	t.Direction = DirectionEnum(p.Field.Direction)
+	direction := DirectionEnum(p.Field.Direction)
+	if direction.IsClientToServer() {
+		t.Role = ROLE_CLIENT
+	} else {
+		t.Role = ROLE_SERVER
+	}
 	t.TAPSide = TAPSideEnum(p.Field.TapSide)
 	t.TAPSideStr = TAPSideEnum(p.Field.TapSide).String()
 	t.Protocol = layers.IPProtocol(p.Field.Protocol)
@@ -1391,7 +1397,7 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.GPID1 = p.Field.Gpid1
 
 	if p.Field.PodId != 0 {
-		if t.Code&IPPath != 0 && t.Direction.IsServerToClient() {
+		if t.Code&IPPath != 0 && t.Role == ROLE_SERVER {
 			t.PodID1 = p.Field.PodId
 		} else {
 			t.PodID = p.Field.PodId

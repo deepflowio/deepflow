@@ -24,12 +24,18 @@ import (
 )
 
 func GetSessionWithoutName(cfg config.MySqlConfig) (*gorm.DB, error) {
-	dsn := common.GenerateDSN(cfg, false, cfg.TimeOut, false)
-	return common.InitSession(dsn)
+	connector, err := common.GetConnector(cfg, false, cfg.TimeOut, false)
+	if err != nil {
+		return nil, err
+	}
+	return common.InitSession(cfg, connector)
 }
 
 func GetSessionWithName(cfg config.MySqlConfig) (*gorm.DB, error) {
 	// set multiStatements=true in dsn only when migrating MySQL
-	dsn := common.GenerateDSN(cfg, true, cfg.TimeOut*2, true)
-	return common.InitSession(dsn)
+	connector, err := common.GetConnector(cfg, true, cfg.TimeOut*2, true)
+	if err != nil {
+		return nil, err
+	}
+	return common.InitSession(cfg, connector)
 }

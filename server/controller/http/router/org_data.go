@@ -32,17 +32,20 @@ import (
 
 type ORGData struct {
 	mysqlCfg mysqlcfg.MySqlConfig
+	cfg      *config.ControllerConfig
 }
 
 func NewDatabase(cfg *config.ControllerConfig) *ORGData {
 	return &ORGData{
 		mysqlCfg: cfg.MySqlCfg,
+		cfg:      cfg,
 	}
 }
 
 func (d *ORGData) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/org/", d.Create)
 	e.DELETE("/v1/org/:id/", d.Delete)
+	e.GET("/v1/orgs/", d.Get)
 }
 
 func (d *ORGData) Create(c *gin.Context) {
@@ -66,4 +69,9 @@ func (d *ORGData) Delete(c *gin.Context) {
 	}
 	err = service.DeleteORGData(orgID, d.mysqlCfg)
 	common.JsonResponse(c, nil, err)
+}
+
+func (d *ORGData) Get(c *gin.Context) {
+	data, err := service.GetORGData(d.cfg)
+	common.JsonResponse(c, data, err)
 }

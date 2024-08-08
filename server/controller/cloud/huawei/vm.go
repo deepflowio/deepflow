@@ -25,6 +25,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 var STATE_CONVERTION = map[string]int{
@@ -32,9 +33,8 @@ var STATE_CONVERTION = map[string]int{
 	"SHUTOFF": common.VM_STATE_STOPPED,
 }
 
-func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterface, []model.IP, error) {
+func (h *HuaWei) getVMs() ([]model.VM, []model.VInterface, []model.IP, error) {
 	var vms []model.VM
-	var vmSGs []model.VMSecurityGroup
 	var vifs []model.VInterface
 	var ips []model.IP
 	for project, token := range h.projectTokenMap {
@@ -44,7 +44,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 			fmt.Sprintf("https://ecs.%s.%s/v2.1/%s/servers/detail", project.name, h.config.Domain, project.id), token.token, "servers", pageQueryMethodMarker,
 		).addHeader("X-OpenStack-Nova-API-Version", "2.26"))
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
@@ -53,17 +53,18 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 			if !cloudcommon.CheckJsonAttributes(jVM, []string{"id", "name", "addresses", "status", "OS-EXT-AZ:availability_zone"}) {
 				continue
 			}
-			id := jVM.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jVM.Get("id").MustString())
 			addrs := jVM.Get("addresses").MustMap()
 			var vpcLcuuid string
 			for key := range addrs {
-				if common.Contains(h.toolDataSet.vpcLcuuids, key) {
-					vpcLcuuid = key
+				keyLcuuid := common.IDGenerateUUID(h.orgID, key)
+				if common.Contains(h.toolDataSet.vpcLcuuids, keyLcuuid) {
+					vpcLcuuid = keyLcuuid
 					break
 				}
 			}
 			if vpcLcuuid == "" {
-				log.Infof("exclude vm: %s, missing vpc info", id) // vpc info is in addresses
+				log.Infof("exclude vm: %s, missing vpc info", id) // vpc info is in addresse, logger.NewORGPrefix(h.orgID)s
 				continue
 			}
 			name := jVM.Get("name").MustString()
@@ -86,7 +87,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 				if created != "" {
 					createdAt, err := time.Parse(time.RFC3339, created)
 					if err != nil {
-						log.Errorf("parse created failed: %s", created)
+						log.Errorf("parse created failed: %s", created, logger.NewORGPrefix(h.orgID))
 					} else {
 						vm.CreatedAt = createdAt
 					}
@@ -99,14 +100,9 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 			vs, is := h.formatVInterfacesAndIPs(jVM.Get("addresses"), regionLcuuid, id)
 			vifs = append(vifs, vs...)
 			ips = append(ips, is...)
-
-			jSGs, ok := jVM.CheckGet("security_groups")
-			if ok {
-				vmSGs = append(vmSGs, h.formatVMSecurityGroups(jSGs, project.id, id)...)
-			}
 		}
 	}
-	return vms, vmSGs, vifs, ips, nil
+	return vms, vifs, ips, nil
 }
 
 // 华为云官方文档：
@@ -128,33 +124,6 @@ func (h *HuaWei) formatVMCloudTags(tags *simplejson.Json) map[string]string {
 	return resp
 }
 
-func (h *HuaWei) formatVMSecurityGroups(jSGs *simplejson.Json, projectID, vmLcuuid string) (vmSGs []model.VMSecurityGroup) {
-	set := make(map[string]bool)
-	for i := range jSGs.MustArray() {
-		jSG := jSGs.GetIndex(i)
-		name := jSG.Get("name").MustString()
-		exists := set[name]
-		if exists {
-			continue
-		} else {
-			set[name] = true
-		}
-
-		sgLcuuid, ok := h.toolDataSet.keyToSecurityGroupLcuuid[ProjectSecurityGroupKey{projectID, name}]
-		if !ok {
-			continue
-		}
-		vmSG := model.VMSecurityGroup{
-			Lcuuid:              common.GenerateUUIDByOrgID(h.orgID, vmLcuuid+sgLcuuid),
-			VMLcuuid:            vmLcuuid,
-			SecurityGroupLcuuid: sgLcuuid,
-			Priority:            i,
-		}
-		vmSGs = append(vmSGs, vmSG)
-	}
-	return
-}
-
 func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, vmLcuuid string) (vifs []model.VInterface, ips []model.IP) {
 	requiredAttrs := []string{"addr", "OS-EXT-IPS-MAC:mac_addr", "OS-EXT-IPS:type"}
 	for vpcLcuuid, jVIFs := range addrs.MustMap() {
@@ -164,12 +133,12 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 				continue
 			}
 			if jV["OS-EXT-IPS:type"].(string) != "floating" {
-				log.Infof("exclude vinterface, not floating type: %s", jV["OS-EXT-IPS:type"].(string))
+				log.Infof("exclude vinterface, not floating type: %s", jV["OS-EXT-IPS:type"].(string), logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			mac := jV["OS-EXT-IPS-MAC:mac_addr"].(string)
 			if len(mac) < 2 {
-				log.Infof("exclude vinterface, mac: %s", mac)
+				log.Infof("exclude vinterface, mac: %s", mac, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			vif := model.VInterface{

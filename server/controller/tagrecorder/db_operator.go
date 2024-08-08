@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"gorm.io/gorm/clause"
+
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
@@ -64,36 +66,30 @@ func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc
 }
 
 func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) {
-	err := db.Create(&dbItems).Error
+	err := db.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&dbItems).Error
 	if err != nil {
-		for i := range keys {
-			log.Errorf("add %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error()) // TODO is key needed?
-		}
+		log.Errorf("add %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error(), db.LogPrefixORGID) // TODO is key needed?
 		return
 	}
-	for i := range keys {
-		log.Infof("add %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
+	log.Infof("add %s (keys: %+v values: %+v) success", b.resourceTypeName, keys, dbItems, db.LogPrefixORGID)
 }
 
 func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB) {
 	err := db.Model(&oldDBItem).Updates(updateInfo).Error
 	if err != nil {
-		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error())
+		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error(), db.LogPrefixORGID)
 		return
 	}
-	log.Infof("update %s (key: %+v value: %+v, update info: %v) success", b.resourceTypeName, key, oldDBItem, updateInfo)
+	log.Infof("update %s (key: %+v value: %+v, update info: %v) success", b.resourceTypeName, key, oldDBItem, updateInfo, db.LogPrefixORGID)
 }
 
 func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT, db *mysql.DB) {
 	err := db.Delete(&dbItems).Error
 	if err != nil {
-		for i := range keys {
-			log.Errorf("delete %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, keys[i], dbItems[i], err.Error())
-		}
+		log.Errorf("delete %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error(), db.LogPrefixORGID)
 		return
 	}
-	for i := range keys {
-		log.Infof("delete %s (key: %+v value: %+v) success", b.resourceTypeName, keys[i], dbItems[i])
-	}
+	log.Infof("delete %s (keys: %+v values: %+v) success", b.resourceTypeName, keys, dbItems, db.LogPrefixORGID)
 }

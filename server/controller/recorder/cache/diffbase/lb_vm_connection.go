@@ -28,12 +28,12 @@ func (b *DataSet) AddLBVMConnection(dbItem *mysql.LBVMConnection, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteLBVMConnection(lcuuid string) {
 	delete(b.LBVMConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type LBVMConnection struct {

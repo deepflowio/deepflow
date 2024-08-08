@@ -32,6 +32,9 @@
 #define PORT_NUM_MAX	65536
 #define NS_IN_SEC       1000000000ULL
 #define NS_IN_MSEC      1000000ULL
+#define NS_IN_USEC      1000ULL
+#define US_IN_SEC	1000000ULL
+#define MS_IN_SEC       1000ULL
 #define TIME_TYPE_NAN   1
 #define TIME_TYPE_SEC   0
 
@@ -241,13 +244,21 @@ static inline uint32_t align32pow2(uint32_t x)
 	return x + 1;
 }
 
+uint64_t gettime(clockid_t clk_id, int flag);
+static inline int64_t get_sysboot_time_ns(void)
+{
+	int64_t real_time, monotonic_time;
+	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
+	monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+	return (real_time - monotonic_time);
+}
+
 bool is_core_kernel(void);
 int get_cpus_count(bool **mask);
 void clear_residual_probes();
 int max_locked_memory_set_unlimited(void);
 int sysfs_write(const char *file_name, char *v);
 int sysfs_read_num(const char *file_name);
-uint64_t gettime(clockid_t clk_id, int flag);
 uint32_t get_sys_uptime(void);
 u64 get_sys_btime_msecs(void);
 u64 get_process_starttime(pid_t pid);
@@ -276,7 +287,7 @@ int copy_file(const char *src_file, const char *dest_file);
 int df_enter_ns(int pid, const char *type, int *self_fd);
 void df_exit_ns(int fd);
 int gen_file_from_mem(const char *mem_ptr, int write_bytes, const char *path);
-int exec_command(const char *cmd, const char *args);
+int exec_command(const char *cmd, const char *args, char *ret_buf, int ret_buf_size);
 u64 current_sys_time_secs(void);
 int fetch_container_id_from_str(char *buff, char *id, int copy_bytes);
 int fetch_container_id(pid_t pid, char *id, int copy_bytes);
@@ -285,6 +296,21 @@ int parse_num_range(const char *config_str, int bytes_count,
 int parse_num_range_disorder(const char *config_str,
 			     int bytes_count, bool ** mask);
 int generate_random_integer(int max_value);
+bool is_same_netns(int pid);
+bool is_same_mntns(int pid);
+int is_file_opened_by_other_processes(const char *filename);
+/**
+ * @brief Find the address through kernel symbols.
+ *
+ * @param[in] name Kernel symbol name
+ * @return 0 indicates that the kernel symbol name was not found, while
+ * a non-zero value represents the address of the kernel symbol.
+ */
+u64 kallsyms_lookup_name(const char *name);
+bool substring_starts_with(const char *haystack, const char *needle);
+char *get_timestamp_from_us(u64 microseconds);
+int find_pid_by_name(const char *process_name, int exclude_pid);
+u32 djb2_32bit(const char *str);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */

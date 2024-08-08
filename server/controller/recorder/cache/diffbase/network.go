@@ -40,12 +40,12 @@ func (b *DataSet) AddNetwork(dbItem *mysql.Network, seq int, toolDataSet *tool.D
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteNetwork(lcuuid string) {
 	delete(b.Networks, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type Network struct {

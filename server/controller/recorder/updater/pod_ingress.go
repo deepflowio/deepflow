@@ -29,8 +29,9 @@ import (
 type PodIngress struct {
 	UpdaterBase[
 		cloudmodel.PodIngress,
-		mysql.PodIngress,
 		*diffbase.PodIngress,
+		*mysql.PodIngress,
+		mysql.PodIngress,
 		*message.PodIngressAdd,
 		message.PodIngressAdd,
 		*message.PodIngressUpdate,
@@ -45,8 +46,9 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 	updater := &PodIngress{
 		newUpdaterBase[
 			cloudmodel.PodIngress,
-			mysql.PodIngress,
 			*diffbase.PodIngress,
+			*mysql.PodIngress,
+			mysql.PodIngress,
 			*message.PodIngressAdd,
 			message.PodIngressAdd,
 			*message.PodIngressUpdate,
@@ -74,18 +76,18 @@ func (i *PodIngress) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngress) (d
 func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*mysql.PodIngress, bool) {
 	podNamespaceID, exists := i.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
-		log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.Lcuuid,
-		)))
+		), i.metadata.LogPrefixes)
 		return nil, false
 	}
 	podClusterID, exists := i.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
-		log.Error(i.metadata.LogPre(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.Lcuuid,
-		)))
+		), i.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.PodIngress{
@@ -112,10 +114,10 @@ func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	}
+	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	// 	mapInfo["az"] = cloudItem.AZLcuuid
+	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

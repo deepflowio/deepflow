@@ -40,7 +40,7 @@ func NewChDevice(resourceTypeToIconID map[IconKey]int) *ChDevice {
 }
 
 func (d *ChDevice) generateNewData() (map[DeviceKey]mysql.ChDevice, bool) {
-	log.Infof("generate data for %s", d.resourceTypeName)
+	log.Infof("generate data for %s", d.resourceTypeName, d.db.LogPrefixORGID)
 	keyToItem := make(map[DeviceKey]mysql.ChDevice)
 	ok := d.generateHostData(keyToItem)
 	if !ok {
@@ -90,6 +90,10 @@ func (d *ChDevice) generateNewData() (map[DeviceKey]mysql.ChDevice, bool) {
 	if !ok {
 		return nil, false
 	}
+	ok = d.generatePodClusterData(keyToItem)
+	if !ok {
+		return nil, false
+	}
 	ok = d.generateProcessData(keyToItem)
 	if !ok {
 		return nil, false
@@ -127,7 +131,7 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 	var hosts []mysql.Host
 	err := d.db.Unscoped().Find(&hosts).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -168,7 +172,7 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var vms []mysql.VM
 	err := d.db.Unscoped().Find(&vms).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -211,7 +215,7 @@ func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysql.ChDevice) b
 	var vrouters []mysql.VRouter
 	err := d.db.Unscoped().Find(&vrouters).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -240,7 +244,7 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) 
 	var dhcpPorts []mysql.DHCPPort
 	err := d.db.Unscoped().Find(&dhcpPorts).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -277,7 +281,7 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice
 	var natGateways []mysql.NATGateway
 	err := d.db.Unscoped().Find(&natGateways).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -316,7 +320,7 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var lbs []mysql.LB
 	err := d.db.Unscoped().Find(&lbs).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -355,7 +359,7 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevic
 	var rdsInstances []mysql.RDSInstance
 	err := d.db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -394,7 +398,7 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDev
 	var redisInstances []mysql.RedisInstance
 	err := d.db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -433,24 +437,28 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 	var podServices []mysql.PodService
 	err := d.db.Unscoped().Find(&podServices).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
 	for _, podService := range podServices {
-
+		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", d.resourceTypeName, err.Error(), podService, d.db.LogPrefixORGID)
+		}
 		if podService.DeletedAt.Valid {
 			podServiceKey := DeviceKey{
 				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
 				DeviceID:   podService.ID,
 			}
 			keyToItem[podServiceKey] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      teamID,
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 
 			// service
@@ -459,12 +467,13 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 			}
 			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  CH_DEVICE_TYPE_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      teamID,
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		} else {
 			// pod_service
@@ -473,12 +482,13 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 			}
 			keyToItem[podServiceKey] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 
 			// service
@@ -487,12 +497,13 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				DeviceID:   podService.ID,
 			}
 			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-				Name:       podService.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:     tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podService.Domain],
+				DeviceType:  CH_DEVICE_TYPE_SERVICE,
+				DeviceID:    podService.ID,
+				Name:        podService.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		}
 	}
@@ -503,7 +514,7 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 	var pods []mysql.Pod
 	err := d.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -514,21 +525,23 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 		}
 		if pod.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD,
-				DeviceID:   pod.ID,
-				Name:       pod.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-				TeamID:     tagrecorder.DomainToTeamID[pod.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[pod.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD,
+				DeviceID:    pod.ID,
+				Name:        pod.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD,
-				DeviceID:   pod.ID,
-				Name:       pod.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
-				TeamID:     tagrecorder.DomainToTeamID[pod.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[pod.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD,
+				DeviceID:    pod.ID,
+				Name:        pod.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}
 		}
 	}
@@ -539,7 +552,7 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 	var podGroups []mysql.PodGroup
 	err := d.db.Unscoped().Find(&podGroups).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -550,21 +563,23 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 		}
 		if podGroup.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				DeviceID:   podGroup.ID,
-				Name:       podGroup.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-				TeamID:     tagrecorder.DomainToTeamID[podGroup.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podGroup.Domain],
+				DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
+				DeviceID:    podGroup.ID,
+				Name:        podGroup.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				TeamID:      tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podGroup.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podGroup.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
-				DeviceID:   podGroup.ID,
-				Name:       podGroup.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
-				TeamID:     tagrecorder.DomainToTeamID[podGroup.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podGroup.Domain],
+				DeviceType:  RESOURCE_POD_GROUP_TYPE_MAP[podGroup.Type],
+				DeviceID:    podGroup.ID,
+				Name:        podGroup.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+				TeamID:      tagrecorder.DomainToTeamID[podGroup.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podGroup.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podGroup.SubDomain],
 			}
 		}
 	}
@@ -575,7 +590,7 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 	var podNodes []mysql.PodNode
 	err := d.db.Unscoped().Find(&podNodes).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 
@@ -586,25 +601,65 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 		}
 		if podNode.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-				DeviceID:   podNode.ID,
-				Name:       podNode.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				Hostname:   podNode.Hostname,
-				IP:         podNode.IP,
-				TeamID:     tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podNode.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_NODE,
+				DeviceID:    podNode.ID,
+				Name:        podNode.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				Hostname:    podNode.Hostname,
+				IP:          podNode.IP,
+				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-				DeviceID:   podNode.ID,
-				Name:       podNode.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				Hostname:   podNode.Hostname,
-				IP:         podNode.IP,
-				TeamID:     tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[podNode.Domain],
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_NODE,
+				DeviceID:    podNode.ID,
+				Name:        podNode.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				Hostname:    podNode.Hostname,
+				IP:          podNode.IP,
+				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
+			}
+		}
+	}
+	return true
+}
+
+func (d *ChDevice) generatePodClusterData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
+	var podClusters []mysql.PodCluster
+	err := d.db.Unscoped().Find(&podClusters).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
+		return false
+	}
+
+	for _, podCluster := range podClusters {
+		key := DeviceKey{
+			DeviceType: common.VIF_DEVICE_TYPE_POD_CLUSTER,
+			DeviceID:   podCluster.ID,
+		}
+		if podCluster.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
+				DeviceID:    podCluster.ID,
+				Name:        podCluster.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:      tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podCluster.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType:  common.VIF_DEVICE_TYPE_POD_CLUSTER,
+				DeviceID:    podCluster.ID,
+				Name:        podCluster.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
+				TeamID:      tagrecorder.DomainToTeamID[podCluster.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[podCluster.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
 			}
 		}
 	}
@@ -639,7 +694,7 @@ func (d *ChDevice) generateInternetData(keyToItem map[DeviceKey]mysql.ChDevice) 
 func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	processes, err := query.FindInBatches[mysql.Process](d.db.Unscoped())
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err), d.db.LogPrefixORGID)
 		return false
 	}
 	for _, process := range processes {
@@ -649,21 +704,23 @@ func (d *ChDevice) generateProcessData(keyToItem map[DeviceKey]mysql.ChDevice) b
 		}
 		if process.DeletedAt.Valid {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_GPROCESS,
-				DeviceID:   process.ID,
-				Name:       process.Name + " (deleted)",
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				TeamID:     tagrecorder.DomainToTeamID[process.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[process.Domain],
+				DeviceType:  CH_DEVICE_TYPE_GPROCESS,
+				DeviceID:    process.ID,
+				Name:        process.Name + " (deleted)",
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		} else {
 			keyToItem[key] = mysql.ChDevice{
-				DeviceType: CH_DEVICE_TYPE_GPROCESS,
-				DeviceID:   process.ID,
-				Name:       process.Name,
-				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
-				TeamID:     tagrecorder.DomainToTeamID[process.Domain],
-				DomainID:   tagrecorder.DomainToDomainID[process.Domain],
+				DeviceType:  CH_DEVICE_TYPE_GPROCESS,
+				DeviceID:    process.ID,
+				Name:        process.Name,
+				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_GPROCESS}],
+				TeamID:      tagrecorder.DomainToTeamID[process.Domain],
+				DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+				SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 			}
 		}
 	}

@@ -18,7 +18,7 @@ package model
 
 import "context"
 
-type ProfileTracing struct {
+type Profile struct {
 	AppService          string `json:"app_service" binding:"required"`
 	ProfileEventType    string `json:"profile_event_type" binding:"required"`
 	ProfileLanguageType string `json:"profile_language_type" binding:"required"`
@@ -28,14 +28,21 @@ type ProfileTracing struct {
 	TimeEnd             int    `json:"time_end" binding:"required"`
 	Debug               bool   `json:"debug"`
 	Context             context.Context
+	OrgID               string
+	MaxKernelStackDepth *int `json:"max_kernel_stack_depth"` // default: -1
+}
+
+type ProfileGrafana struct {
+	Sql              string `json:"sql" binding:"required"` // profile filter
+	ProfileEventType string `json:"profile_event_type" binding:"required"`
+	Debug            bool   `json:"debug"`
 }
 
 type ProfileTreeNode struct {
-	ProfileLocationStr string `json:"profile_location_str"`
-	NodeID             string `json:"node_id"`
-	ParentNodeID       string `json:"parent_node_id"`
-	SelfValue          int    `json:"self_value"`
-	TotalValue         int    `json:"total_value"`
+	LocationID   int
+	ParentNodeID int
+	SelfValue    int
+	TotalValue   int
 }
 
 type Debug struct {
@@ -50,4 +57,20 @@ type Debug struct {
 type ProfileDebug struct {
 	QuerierDebug []Debug `json:"querier_debug"`
 	FormatTime   string  `json:"format_time"`
+}
+
+type ProfileTree struct {
+	Functions      []string `json:"functions"`
+	FunctionValues Value    `json:"function_values"`
+	NodeValues     Value    `json:"node_values"`
+}
+
+type Value struct {
+	Columns []string `json:"columns"`
+	Values  [][]int  `json:"values"`
+}
+
+type GrafanaProfileValue struct {
+	Columns []string        `json:"columns"`
+	Values  [][]interface{} `json:"values"`
 }

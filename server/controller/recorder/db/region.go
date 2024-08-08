@@ -22,21 +22,16 @@ import (
 )
 
 type Region struct {
-	OperatorBase[mysql.Region]
+	OperatorBase[*mysql.Region, mysql.Region]
 }
 
 func NewRegion() *Region {
 	operater := &Region{
-		OperatorBase[mysql.Region]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_REGION_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.Region](
+			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *Region) setDBItemID(dbItem *mysql.Region, id int) {
-	dbItem.ID = id
 }

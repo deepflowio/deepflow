@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 var (
@@ -53,8 +54,10 @@ func InitDefaultDB(cfg config.MySqlConfig) error {
 
 type DB struct {
 	*gorm.DB
-	ORGID int
-	Name  string
+	ORGID          int
+	Name           string
+	LogPrefixORGID logger.Prefix
+	LogPrefixName  logger.Prefix
 }
 
 func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
@@ -68,14 +71,34 @@ func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
 		db, err = common.GetSession(copiedCfg)
 	}
 	if err != nil {
-		log.Errorf("failed to create db session: %s, config: %v", err.Error(), copiedCfg)
+		logConfig := copiedCfg
+		logConfig.UserPassword = "******"
+		log.Errorf("failed to create db session: %s, config: %#v", err.Error(), logConfig)
 		return nil, err
 	}
-	return &DB{db, orgID, copiedCfg.Database}, nil
+	return &DB{
+		db,
+		orgID,
+		copiedCfg.Database,
+		logger.NewORGPrefix(orgID),
+		NewDBNameLogPrefix(copiedCfg.Database),
+	}, nil
 }
 
-func (d *DB) PreORGID(format string, a ...any) string { // TODO optimize
-	return fmt.Sprintf("[OID-%d] %s", d.ORGID, fmt.Sprintf(format, a...))
+func (d *DB) GetGORMDB() *gorm.DB {
+	return d.DB
+}
+
+func (d *DB) Logf(format string, a ...any) string { // TODO remove
+	return d.addLogPre(fmt.Sprintf(format, a...))
+}
+
+func (d *DB) Log(format string) string {
+	return d.addLogPre(format)
+}
+
+func (d *DB) addLogPre(msg string) string {
+	return fmt.Sprintf("[OID-%d] ", d.ORGID) + msg
 }
 
 func (d *DB) GetORGID() int {
@@ -109,16 +132,16 @@ func (c *DBs) Init(cfg config.MySqlConfig) error {
 	if err != nil {
 		return err
 	}
-	orgIDs, err := GetORGIDs()
+	orgIDs, err := CheckORGNumberAndLog()
 	if err != nil {
 		return err
 	}
 	for _, id := range orgIDs {
 		if _, err := c.NewDBIfNotExists(id); err != nil {
-			return err
+			log.Errorf("[OID-%d] failed to create db: %s, please check org status", id, err.Error())
 		}
 	}
-	return err
+	return nil
 }
 
 func (c *DBs) GetConfig() config.MySqlConfig {
@@ -180,7 +203,7 @@ func (c *DBs) check(db *DB) error {
 		return nil
 	}
 	var version string
-	err := db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
+	err := db.Raw("SELECT version FROM db_version").Scan(&version).Error
 	if err != nil {
 		log.Errorf("db: %s, failed to check db version: %s", db.Name, err.Error())
 		return err
@@ -199,4 +222,16 @@ func (c *DBs) DoOnAllDBs(execFunc func(db *DB) error) error {
 		}
 	}
 	return nil
+}
+
+type DBNameLogPrefix struct {
+	Name string
+}
+
+func NewDBNameLogPrefix(name string) *DBNameLogPrefix {
+	return &DBNameLogPrefix{Name: name}
+}
+
+func (n *DBNameLogPrefix) Prefix() string {
+	return fmt.Sprintf("[DB-%s] ", n.Name)
 }

@@ -35,12 +35,12 @@ func (b *DataSet) AddVRouter(dbItem *mysql.VRouter, seq int, toolDataSet *tool.D
 		VPCLcuuid:    vpcLcuuid,
 		RegionLcuuid: dbItem.Region,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteVRouter(lcuuid string) {
 	delete(b.VRouters, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type VRouter struct {

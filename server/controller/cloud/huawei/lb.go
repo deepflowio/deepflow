@@ -23,6 +23,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (h *HuaWei) getLBs() (
@@ -42,15 +43,15 @@ func (h *HuaWei) getLBs() (
 			jLB := jLBs[i]
 			name := jLB.Get("name").MustString()
 			if !cloudcommon.CheckJsonAttributes(jLB, requiredAttrs) {
-				log.Infof("exclude lb: %s, missing attr", name)
+				log.Infof("exclude lb: %s, missing attr", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			network, ok := h.toolDataSet.neutronSubnetIDToNetwork[jLB.Get("vip_subnet_id").MustString()]
 			if !ok {
-				log.Infof("exclude lb: %s, missing network info", name)
+				log.Infof("exclude lb: %s, missing network info", name, logger.NewORGPrefix(h.orgID))
 				continue
 			}
-			id := jLB.Get("id").MustString()
+			id := common.IDGenerateUUID(h.orgID, jLB.Get("id").MustString())
 			var lbModel int
 			var vifType int
 			var networkLcuuid string
@@ -138,7 +139,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 		jL := jLs[i]
 		name := jL.Get("name").MustString()
 		if !cloudcommon.CheckJsonAttributes(jL, listenerRequiredAttrs) {
-			log.Infof("exclude lb_listener: %s, missing attr", name)
+			log.Infof("exclude lb_listener: %s, missing attr", name, logger.NewORGPrefix(h.orgID))
 			continue
 		}
 
@@ -148,16 +149,16 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 			jLB := jLBs.GetIndex(i)
 			id, ok := jLB.CheckGet("id")
 			if ok {
-				lbLcuuid = id.MustString()
+				lbLcuuid = common.IDGenerateUUID(h.orgID, id.MustString())
 			} else {
-				log.Infof("pass, missing id")
+				log.Infof("pass, missing id", logger.NewORGPrefix(h.orgID))
 			}
 		}
 		if lbLcuuid == "" {
-			log.Infof("exclude lb_listener: %s, missing lb info", name)
+			log.Infof("exclude lb_listener: %s, missing lb info", name, logger.NewORGPrefix(h.orgID))
 			continue
 		}
-		listenerID := jL.Get("id").MustString()
+		listenerID := common.IDGenerateUUID(h.orgID, jL.Get("id").MustString())
 		protocol := jL.Get("protocol").MustString()
 		if strings.Contains(protocol, "HTTPS") {
 			protocol = "HTTPS"
@@ -185,16 +186,16 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 			}
 			for i := range jTSs {
 				jTS := jTSs[i]
-				tsID := jTS.Get("id").MustString()
+				tsID := common.IDGenerateUUID(h.orgID, jTS.Get("id").MustString())
 				if !cloudcommon.CheckJsonAttributes(jTS, tsRequiredAttrs) {
-					log.Infof("exclude lb_target_server: %s, missing attr", tsID)
+					log.Infof("exclude lb_target_server: %s, missing attr", tsID, logger.NewORGPrefix(h.orgID))
 					continue
 				}
-				subnetID := jTS.Get("subnet_id").MustString()
+				subnetID := common.IDGenerateUUID(h.orgID, jTS.Get("subnet_id").MustString())
 				ip := jTS.Get("address").MustString()
 				vmLcuuid, ok := h.toolDataSet.keyToVMLcuuid[SubnetIPKey{subnetID, ip}]
 				if !ok {
-					log.Infof("exclude lb_target_server: %s, missing vm info", tsID)
+					log.Infof("exclude lb_target_server: %s, missing vm info", tsID, logger.NewORGPrefix(h.orgID))
 					continue
 				}
 				lbTargetSevers = append(

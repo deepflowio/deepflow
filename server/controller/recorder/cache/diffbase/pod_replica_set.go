@@ -35,12 +35,12 @@ func (b *DataSet) AddPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, b.PodReplicaSets[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, b.PodReplicaSets[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodReplicaSet(lcuuid string) {
 	delete(b.PodReplicaSets, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodReplicaSet struct {

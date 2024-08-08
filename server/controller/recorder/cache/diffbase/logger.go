@@ -20,20 +20,23 @@ import (
 	"fmt"
 
 	"github.com/op/go-logging"
+
+	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
-var log = logging.MustGetLogger("recorder.cache.diffbase")
+var log = logger.MustGetLogger("recorder.cache.diffbase")
 
 func addDiffBase(resource string, detail interface{}) string {
-	return fmt.Sprintf("cache diff base add %s (detail: %+v) success", resource, detail)
+	return fmt.Sprintf("%s (detail: %+v) success", common.LogAdd(resource), detail)
 }
 
 func updateDiffBase(resource string, detail interface{}) string {
-	return fmt.Sprintf("cache diff base update %s (detail: %+v) success", resource, detail)
+	return fmt.Sprintf("%s (detail: %+v) success", common.LogUpdate(resource), detail)
 }
 
 func deleteDiffBase(resource, lcuuid string) string {
-	return fmt.Sprintf("cache diff base delete %s (lcuuid: %s) success", resource, lcuuid)
+	return fmt.Sprintf("%s (lcuuid: %s) success", common.LogDelete(resource), lcuuid)
 }
 
 type LogController struct {

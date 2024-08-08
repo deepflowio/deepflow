@@ -31,15 +31,17 @@ const (
 	NETWORK         = "network"
 	APPLICATION     = "application"
 	TRAFFIC_POLICY  = "traffic_policy"
+	FLOW_TAG_DB     = "flow_tag"
 
 	ERR_IS_MODIFYING = "Modifying the retention time (%s), please try again later"
 )
 
 type DatasourceModifiedOnly string
 type DatasourceInfo struct {
-	ID     int
-	DB     string
-	Tables []string
+	ID            int
+	DB            string
+	Tables        []string
+	FlowTagTables []string
 }
 
 const (
@@ -52,22 +54,30 @@ const (
 	PROMETHEUS                               = "prometheus"
 	EVENT_EVENT                              = "event.event"
 	EVENT_PERF_EVENT                         = "event.perf_event"
-	EVENT_ALARM_EVENT                        = "event.alarm_event"
+	EVENT_ALERT_EVENT                        = "event.alert_event"
 	PROFILE                                  = "profile.in_process"
+	APPLOG                                   = "application_log.log"
+	DEEPFLOW_TENANT                          = "deepflow_tenant"
+	DEEPFLOW_ADMIN                           = "deepflow_admin"
 )
 
+// to modify the datasource TTL, you need to also modify the 'flow_tag' database tables.
+// FIXME: only the 'prometheus' database is supported now, and the remaining databases will be completed in the future.
 var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
-	DEEPFLOW_SYSTEM:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{"deepflow_system"}},
-	L4_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}},
-	L7_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}},
-	L4_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}},
-	L7_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}},
-	EXT_METRICS:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}},
-	PROMETHEUS:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}},
-	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}},
-	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}},
-	EVENT_ALARM_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}},
-	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}},
+	DEEPFLOW_SYSTEM:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 1, "deepflow_system", []string{"deepflow_system"}, []string{}},
+	L4_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 2, "flow_log", []string{"l4_flow_log"}, []string{}},
+	L7_FLOW_LOG:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 3, "flow_log", []string{"l7_flow_log"}, []string{}},
+	L4_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 4, "flow_log", []string{"l4_packet"}, []string{}},
+	L7_PACKET:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 5, "flow_log", []string{"l7_packet"}, []string{}},
+	EXT_METRICS:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 6, "ext_metrics", []string{"metrics"}, []string{}},
+	PROMETHEUS:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}, []string{"prometheus_custom_field", "prometheus_custom_field_value"}},
+	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
+	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}, []string{}},
+	EVENT_ALERT_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
+	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
+	APPLOG:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
+	DEEPFLOW_TENANT:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 13, "deepflow_tenant", []string{"deepflow_collector"}, []string{}},
+	DEEPFLOW_ADMIN:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 14, "deepflow_admin", []string{"deepflow_server"}, []string{}},
 }
 
 func (ds DatasourceModifiedOnly) DatasourceInfo() DatasourceInfo {
@@ -301,6 +311,10 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, db, dstTable, a
 			codec = fmt.Sprintf("codec(%s)", p.Codec.String())
 		}
 
+		if p.Name == t.TimeKey {
+			p.Comment = t.Version
+		}
+
 		if p.GroupBy {
 			if !stringSliceHas(orderKeys, p.Name) {
 				orderKeys = append(orderKeys, p.Name)
@@ -494,8 +508,8 @@ func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, du
 }
 
 func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
-	if len(m.ckAddrs) == 0 {
-		return fmt.Errorf("ck addrs is empty")
+	if len(m.cks) == 0 {
+		return fmt.Errorf("ck connections is empty")
 	}
 
 	if IsModifiedOnlyDatasource(dbGroup) && action == MOD {
@@ -503,35 +517,29 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 		datasourceId := datasoureInfo.ID
 		db := ckdb.OrgDatabasePrefix(uint16(orgID)) + datasoureInfo.DB
 		tables := datasoureInfo.Tables
+		flowTagDb := ckdb.OrgDatabasePrefix(uint16(orgID)) + FLOW_TAG_DB
+		flowTagTables := datasoureInfo.FlowTagTables
 
-		cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-		if err != nil {
-			log.Error(err)
-			return err
-		}
-		if m.isModifyingFlags[datasourceId] {
+		if m.isModifyingFlags[orgID][datasourceId] {
 			return fmt.Errorf(ERR_IS_MODIFYING, dbGroup)
 		}
-		go func(tableNames []string, id int) {
-			m.isModifyingFlags[id] = true
+		go func(tableNames, flowTagTableNames []string, id int) {
+			m.isModifyingFlags[orgID][id] = true
 			for _, tableName := range tableNames {
-				if err := m.modTableTTL(cks, db, tableName, duration); err != nil {
+				if err := m.modTableTTL(m.cks, db, tableName, duration); err != nil {
 					log.Info(err)
 				}
 			}
-			m.isModifyingFlags[id] = false
-			cks.Close()
-		}(tables, datasourceId)
+			for _, tableName := range flowTagTableNames {
+				if err := m.modTableTTL(m.cks, flowTagDb, tableName, duration); err != nil {
+					log.Info(err)
+				}
+			}
+			m.isModifyingFlags[orgID][id] = false
+		}(tables, flowTagTables, datasourceId)
 
 		return nil
 	}
-
-	cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	defer cks.Close()
 
 	table := baseTable
 	if table == "" {
@@ -575,29 +583,23 @@ func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTa
 			if interval == 1440 {
 				aggInterval = IntervalDay
 			}
-			if err := m.createTableMV(cks, db, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
+			if err := m.createTableMV(m.cks, db, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
 				return err
 			}
 		case MOD:
-			if m.isModifyingFlags[tableId] {
+			if m.isModifyingFlags[orgID][tableId] {
 				return fmt.Errorf(ERR_IS_MODIFYING, tableId.TableName())
 			}
 			log.Infof("mod rp tableId %d %s, dstTable %s", tableId, tableId.TableName(), dstTable)
 			go func(id flow_metrics.MetricsTableID) {
-				cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				defer cks.Close()
-				m.isModifyingFlags[id] = true
-				if err := m.modTableMV(cks, id, db, dstTable, duration); err != nil {
+				m.isModifyingFlags[orgID][id] = true
+				if err := m.modTableMV(m.cks, id, db, dstTable, duration); err != nil {
 					log.Warning(err)
 				}
-				m.isModifyingFlags[id] = false
+				m.isModifyingFlags[orgID][id] = false
 			}(tableId)
 		case DEL:
-			if err := delTableMV(cks, tableId, db, dstTable); err != nil {
+			if err := delTableMV(m.cks, tableId, db, dstTable); err != nil {
 				return err
 			}
 		default:

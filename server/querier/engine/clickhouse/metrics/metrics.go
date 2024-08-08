@@ -100,7 +100,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func GetAggMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
+func GetAggMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	field = strings.Trim(field, "`")
 	if field == COUNT_METRICS_NAME {
 		return &Metrics{
@@ -113,13 +113,105 @@ func GetAggMetrics(field string, db string, table string, ctx context.Context) (
 			Table:       table,
 		}, true
 	}
-	return GetMetrics(field, db, table, ctx)
+	return GetMetrics(field, db, table, orgID)
 }
 
-func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
+func GetTagTypeMetrics(tagDescriptions *common.Result, newAllMetrics map[string]*Metrics, db, table, orgID string) error {
+	for _, tagValue := range tagDescriptions.Values {
+		tagSlice := tagValue.([]interface{})
+		name := tagSlice[0].(string)
+		clientName := tagSlice[1].(string)
+		serverName := tagSlice[2].(string)
+		displayName := tagSlice[3].(string)
+		tagType := tagSlice[4].(string)
+		permissions := tagSlice[7].([]bool)
+
+		if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
+			continue
+		}
+		if db == ckcommon.DB_NAME_FLOW_TAG {
+			continue
+		}
+		if name == "lb_listener" || name == "pod_ingress" {
+			continue
+		}
+		if len(tagSlice) >= 12 {
+			notSupportedOperators := tagSlice[11].([]string)
+			// not support select
+			if slices.Contains(notSupportedOperators, "select") {
+				continue
+			}
+		}
+
+		nameDBField, err := GetTagDBField(name, db, table, orgID)
+		if err != nil {
+			return err
+		}
+		clientNameDBField, err := GetTagDBField(clientName, db, table, orgID)
+		if err != nil {
+			return err
+		}
+		serverNameDBField, err := GetTagDBField(serverName, db, table, orgID)
+		if err != nil {
+			return err
+		}
+		if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map", "vtap_flow_edge_port", "vtap_app_edge_port"}, table) {
+			if serverName == clientName {
+				clientNameMetric := NewMetrics(
+					0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", tagType,
+				)
+				newAllMetrics[clientName] = clientNameMetric
+			} else {
+				var (
+					serverDisplayName = displayName
+					clientDisplayName = displayName
+				)
+				if config.Cfg.Language == "en" {
+					serverDisplayName = ckcommon.TagServerEnPrefix + " " + displayName
+					clientDisplayName = ckcommon.TagClientEnPrefix + " " + displayName
+				} else if config.Cfg.Language == "ch" {
+					if letterRegexp.MatchString(serverName) {
+						serverDisplayName = ckcommon.TagServerChPrefix + " " + displayName
+						clientDisplayName = ckcommon.TagClientChPrefix + " " + displayName
+					} else {
+						serverDisplayName = ckcommon.TagServerChPrefix + displayName
+						clientDisplayName = ckcommon.TagClientChPrefix + displayName
+					}
+				}
+				serverNameMetric := NewMetrics(
+					0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", tagType,
+				)
+				clientNameMetric := NewMetrics(
+					0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", permissions, "", table, "", tagType,
+				)
+				newAllMetrics[serverName] = serverNameMetric
+				newAllMetrics[clientName] = clientNameMetric
+			}
+		} else {
+			nameMetric := NewMetrics(
+				0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
+				"Tag", permissions, "", table, "", tagType,
+			)
+			newAllMetrics[name] = nameMetric
+		}
+	}
+	return nil
+}
+
+func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	newAllMetrics := map[string]*Metrics{}
 	field = strings.Trim(field, "`")
-	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
+	// time is not a metric
+	// flow_tag database has no metrics
+	// trace_tree table has no metrics
+	// span_with_trace_id table has no metrics
+	if field == "time" || db == ckcommon.DB_NAME_FLOW_TAG || slices.Contains([]string{ckcommon.TABLE_NAME_TRACE_TREE, ckcommon.TABLE_NAME_SPAN_WITH_TRACE_ID}, table) {
+		return nil, false
+	}
+	if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_APPLICATION_LOG}, db) || table == "l7_flow_log" {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
@@ -131,9 +223,17 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 					"metrics", []bool{true, true, true}, "", table, "", "",
 				)
 				newAllMetrics[field] = metric
+			} else if fieldSplit[0] == "tag" {
+				fieldName := strings.Replace(field, "tag.", "", 1)
+				metric := NewMetrics(
+					0, fmt.Sprintf("if(indexOf(tag_names, '%s')=0,null,tag_values[indexOf(tag_names, '%s')])", fieldName, fieldName),
+					field, "", METRICS_TYPE_NAME_MAP["tag"],
+					"Tag", []bool{true, true, true}, "", table, "", "",
+				)
+				newAllMetrics[field] = metric
 			}
 		}
-	} else if db == ckcommon.DB_NAME_PROMETHEUS {
+	} else if db == ckcommon.DB_NAME_PROMETHEUS && field == "value" {
 		metric := NewMetrics(
 			0, field,
 			field, "", METRICS_TYPE_COUNTER,
@@ -154,113 +254,35 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 	}
 
 	// tag metrics
-	dbData, ok := DB_DESCRIPTIONS["clickhouse"]
-	if !ok {
+	// Static tag metrics
+	staticTagDescriptions, err := tag.GetStaticTagDescriptions(db, table)
+	if err != nil {
+		log.Error("Failed to get tag type static metrics")
 		return nil, false
 	}
-	dbDataMap := dbData.(map[string]interface{})
-	if tagData, ok := dbDataMap["tag"]; ok {
-		dbTagMap := tagData.(map[string]interface{})
-		if dbTag, ok := dbTagMap[db]; ok {
-			tableTagMap := dbTag.(map[string]interface{})
-			newTable := table
-			if db == ckcommon.DB_NAME_PROMETHEUS {
-				newTable = "samples"
-			} else if db == ckcommon.DB_NAME_EXT_METRICS {
-				newTable = "ext_common"
-			} else if db == ckcommon.DB_NAME_DEEPFLOW_SYSTEM {
-				newTable = "deepflow_system_common"
-			}
-			if tableTag, ok := tableTagMap[newTable]; ok {
-				tabletagSlice := tableTag.([][]interface{})
-				for i, tagSlice := range tabletagSlice {
-					tagType := tagSlice[3].(string)
-					if slices.Contains([]string{"auto_custom_tag", "time", "id"}, tagType) {
-						continue
-					}
-					if db == ckcommon.DB_NAME_FLOW_TAG {
-						continue
-					}
-					name := tagSlice[0].(string)
-					if name == "lb_listener" || name == "pod_ingress" {
-						continue
-					}
-					notSupportedOperators := []string{}
-					if len(tagSlice) >= 9 {
-						notSupportedOperators = ckcommon.ParseNotSupportedOperator(tagSlice[8])
-						// not support select
-						if slices.Contains(notSupportedOperators, "select") {
-							continue
-						}
-					}
-					clientName := tagSlice[1].(string)
-					serverName := tagSlice[2].(string)
-					tagLanguage := tableTagMap[newTable+"."+config.Cfg.Language].([][]interface{})[i]
-					displayName := tagLanguage[1].(string)
-					permissions, err := ckcommon.ParsePermission("111")
-					if err != nil {
-						return nil, false
-					}
-					nameDBField, err := GetTagDBField(name, db, table)
-					if err != nil {
-						return nil, false
-					}
-					clientNameDBField, err := GetTagDBField(clientName, db, table)
-					if err != nil {
-						return nil, false
-					}
-					serverNameDBField, err := GetTagDBField(serverName, db, table)
-					if err != nil {
-						return nil, false
-					}
-					if slices.Contains([]string{"l4_flow_log", "l7_flow_log", "application_map", "network_map"}, table) {
-						if serverName == clientName {
-							clientNameMetric := NewMetrics(
-								0, clientNameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "", tagType,
-							)
-							newAllMetrics[clientName] = clientNameMetric
-						} else {
-							var (
-								serverDisplayName = displayName
-								clientDisplayName = displayName
-							)
-							if config.Cfg.Language == "en" {
-								serverDisplayName = ckcommon.TagServerEnPrefix + " " + displayName
-								clientDisplayName = ckcommon.TagClientEnPrefix + " " + displayName
-							} else if config.Cfg.Language == "ch" {
-								if letterRegexp.MatchString(serverName) {
-									serverDisplayName = ckcommon.TagServerChPrefix + " " + displayName
-									clientDisplayName = ckcommon.TagClientChPrefix + " " + displayName
-								} else {
-									serverDisplayName = ckcommon.TagServerChPrefix + displayName
-									clientDisplayName = ckcommon.TagClientChPrefix + displayName
-								}
-							}
-							serverNameMetric := NewMetrics(
-								0, serverNameDBField, serverDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "", tagType,
-							)
-							clientNameMetric := NewMetrics(
-								0, clientNameDBField, clientDisplayName, "", METRICS_TYPE_NAME_MAP["tag"],
-								"Tag", permissions, "", table, "", tagType,
-							)
-							newAllMetrics[serverName] = serverNameMetric
-							newAllMetrics[clientName] = clientNameMetric
-						}
-					} else {
-						nameMetric := NewMetrics(
-							0, nameDBField, displayName, "", METRICS_TYPE_NAME_MAP["tag"],
-							"Tag", permissions, "", table, "", tagType,
-						)
-						newAllMetrics[name] = nameMetric
-					}
-				}
+	GetTagTypeMetrics(staticTagDescriptions, newAllMetrics, db, table, orgID)
+	metric, ok := newAllMetrics[field]
+	if ok {
+		return metric, ok
+	} else {
+		// xx_id is not a metric
+		if strings.Contains(field, "_id") {
+			noIDField := strings.ReplaceAll(field, "_id", "")
+			_, ok = newAllMetrics[noIDField]
+			if ok {
+				return nil, false
 			}
 		}
+		// Dynamic tag metrics
+		dynamicTagDescriptions, err := tag.GetDynamicTagDescriptions(db, table, "", "", orgID, true, context.Background(), nil)
+		if err != nil {
+			log.Error("Failed to get tag type dynamic metrics")
+			return nil, false
+		}
+		GetTagTypeMetrics(dynamicTagDescriptions, newAllMetrics, db, table, orgID)
+		metric, ok := newAllMetrics[field]
+		return metric, ok
 	}
-	metric, ok := newAllMetrics[field]
-	return metric, ok
 }
 
 func GetMetricsByDBTableStatic(db string, table string, where string) (map[string]*Metrics, error) {
@@ -296,13 +318,18 @@ func GetMetricsByDBTableStatic(db string, table string, where string) (map[strin
 			return GetResourceEventMetrics(), err
 		case "perf_event":
 			return GetResourcePerfEventMetrics(), err
-		case "alarm_event":
+		case "alert_event":
 			return GetAlarmEventMetrics(), err
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
 		case "in_process":
 			return GetInProcessMetrics(), err
+		}
+	case ckcommon.DB_NAME_APPLICATION_LOG:
+		switch table {
+		case "log":
+			return GetLogMetrics(), err
 		}
 	}
 	return map[string]*Metrics{}, err
@@ -361,7 +388,7 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQuery
 			return GetResourceEventMetrics(), err
 		case "perf_event":
 			return GetResourcePerfEventMetrics(), err
-		case "alarm_event":
+		case "alert_event":
 			return GetAlarmEventMetrics(), err
 		}
 	case ckcommon.DB_NAME_PROFILE:
@@ -369,7 +396,32 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQuery
 		case "in_process":
 			return GetInProcessMetrics(), err
 		}
-	case "ext_metrics", "deepflow_system":
+	case ckcommon.DB_NAME_APPLICATION_LOG:
+		switch table {
+		case "log":
+			metrics := make(map[string]*Metrics)
+			loads := GetLogMetrics()
+			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
+			for k, v := range loads {
+				if _, ok := metrics[k]; !ok {
+					metrics[k] = v
+				}
+			}
+			loadsLen := len(loads)
+			for k, v := range exts {
+				if _, ok := metrics[k]; !ok {
+					v.Index += loadsLen
+					metrics[k] = v
+				}
+			}
+			metrics["metrics"] = NewMetrics(
+				len(metrics), "metrics",
+				"metrics", "", METRICS_TYPE_ARRAY,
+				"metrics", []bool{true, true, true}, "", table, "", "",
+			)
+			return metrics, err
+		}
+	case ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT:
 		return GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	case ckcommon.DB_NAME_PROMETHEUS:
 		return GetPrometheusMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
@@ -385,11 +437,12 @@ func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID stri
 		return nil, err
 	}
 	/* columns := []interface{}{
-		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table"
-	} */
+		 "name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table"
+	 } */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
-		if db == "ext_metrics" || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
+
+		if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
 			field = metrics.DisplayName
 		} else if db == ckcommon.DB_NAME_PROMETHEUS {
 			index := strings.LastIndex(field, "-")
@@ -412,8 +465,8 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 		var tables []interface{}
 		if db == "ext_metrics" {
 			tables = append(tables, table)
-		} else if db == "deepflow_system" {
-			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx) {
+		} else if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) {
+			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, nil) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
@@ -448,23 +501,23 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 	}, nil
 }
 
-func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error) {
+func GetPrometheusSingleTagTranslator(tag, table, orgID string) (string, string, error) {
 	labelType := ""
 	TagTranslatorStr := ""
 	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
-	metricID, ok := trans_prometheus.Prometheus.MetricNameToID[table]
+	metricID, ok := trans_prometheus.ORGPrometheus[orgID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[nameNoPreffix]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
 		return "", "", errors.New(errorMessage)
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[orgID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
@@ -481,14 +534,14 @@ func GetPrometheusSingleTagTranslator(tag, table string) (string, string, error)
 	return TagTranslatorStr, labelType, nil
 }
 
-func GetPrometheusAllTagTranslator(table string) (string, error) {
+func GetPrometheusAllTagTranslator(table, orgID string) (string, error) {
 	tagTranslatorStr := ""
 	appLabelTranslatorStr := ""
-	if appLabels, ok := trans_prometheus.Prometheus.MetricAppLabelLayout[table]; ok {
+	if appLabels, ok := trans_prometheus.ORGPrometheus[orgID].MetricAppLabelLayout[table]; ok {
 		// appLabel
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
-			if labelNameID, ok := trans_prometheus.Prometheus.LabelNameToID[appLabel.AppLabelName]; ok {
+			if labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[appLabel.AppLabelName]; ok {
 				appLabelTranslator := fmt.Sprintf("'%s',dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 			}
@@ -506,79 +559,26 @@ func GetPrometheusAllTagTranslator(table string) (string, error) {
 	return tagTranslatorStr, nil
 }
 
-func GetTagDBField(name, db, table string) (string, error) {
+func GetTagDBField(name, db, table, orgID string) (string, error) {
 	selectTag := name
 	tagTranslatorStr := name
 	tagItem, ok := tag.GetTag(strings.Trim(name, "`"), db, table, "default")
 	if !ok {
 		name := strings.Trim(name, "`")
-		if strings.HasPrefix(name, "k8s.label.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+		// map item tag
+		nameNoPreffix, _, transKey := common.TransMapItem(name, table)
+		if transKey != "" {
+			tagItem, _ = tag.GetTag(transKey, db, table, "default")
+			if strings.HasPrefix(name, "os.app.") || strings.HasPrefix(name, "k8s.env.") {
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			} else {
-				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
 			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.label.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-		} else if strings.HasPrefix(name, "k8s.annotation.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_annotation_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_annotation_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_annotation", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.annotation.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-		} else if strings.HasPrefix(name, "k8s.env.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("k8s_env_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("k8s_env_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("k8s_env", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "k8s.env.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
-		} else if strings.HasPrefix(name, "cloud.tag.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("cloud_tag_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("cloud_tag_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("cloud_tag", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "cloud.tag.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
-		} else if strings.HasPrefix(name, "os.app.") {
-			if strings.HasSuffix(name, "_0") {
-				tagItem, ok = tag.GetTag("os_app_0", db, table, "default")
-			} else if strings.HasSuffix(name, "_1") {
-				tagItem, ok = tag.GetTag("os_app_1", db, table, "default")
-			} else {
-				tagItem, ok = tag.GetTag("os_app", db, table, "default")
-			}
-			nameNoSuffix := strings.TrimSuffix(name, "_0")
-			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
-			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "os.app.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
 				if db == ckcommon.DB_NAME_PROMETHEUS {
-					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table)
-					if err != nil {
-						return tagTranslatorStr, err
-					}
+					tagTranslatorStr, _, err := GetPrometheusSingleTagTranslator(name, table, orgID)
+					return tagTranslatorStr, err
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
 			} else {
@@ -590,13 +590,13 @@ func GetTagDBField(name, db, table string) (string, error) {
 		}
 	} else {
 		if name == "metrics" {
-			if db == "flow_log" {
+			if db == "flow_log" || db == ckcommon.DB_NAME_APPLICATION_LOG {
 				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
 			} else {
 				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
 			}
 		} else if name == "tag" && db == ckcommon.DB_NAME_PROMETHEUS {
-			tagTranslatorStr, err := GetPrometheusAllTagTranslator(table)
+			tagTranslatorStr, err := GetPrometheusAllTagTranslator(table, orgID)
 			if err != nil {
 				return tagTranslatorStr, err
 			}
@@ -696,7 +696,7 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "perf_event":
 			metrics = RESOURCE_PERF_EVENT_METRICS
 			replaceMetrics = RESOURCE_PERF_EVENT_METRICS_REPLACE
-		case "alarm_event":
+		case "alert_event":
 			metrics = ALARM_EVENT_METRICS
 			replaceMetrics = ALARM_EVENT_METRICS_REPLACE
 		}
@@ -706,11 +706,17 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 			metrics = IN_PROCESS_METRICS
 			replaceMetrics = IN_PROCESS_METRICS_REPLACE
 		}
+	case ckcommon.DB_NAME_APPLICATION_LOG:
+		switch table {
+		case "log":
+			metrics = LOG_METRICS
+			replaceMetrics = LOG_METRICS_REPLACE
+		}
 	case ckcommon.DB_NAME_PROMETHEUS:
 		metrics = PROMETHEUS_METRICS
 		replaceMetrics = PROMETHEUS_METRICS_REPLACE
 
-	case "ext_metrics", "deepflow_system":
+	case ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT:
 		metrics = EXT_METRICS
 	}
 	if metrics == nil {

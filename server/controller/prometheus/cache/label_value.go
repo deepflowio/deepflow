@@ -21,14 +21,18 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type labelValue struct {
+	org *common.ORG
+
 	valueToID *hashmap.Map[string, int]
 }
 
-func newLabelValue() *labelValue {
+func newLabelValue(org *common.ORG) *labelValue {
 	return &labelValue{
+		org:       org,
 		valueToID: hashmap.New[string, int](),
 	}
 }
@@ -63,6 +67,6 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 
 func (lv *labelValue) load() ([]*mysql.PrometheusLabelValue, error) {
 	var labelValues []*mysql.PrometheusLabelValue
-	err := mysql.Db.Find(&labelValues).Error
+	err := lv.org.DB.Find(&labelValues).Error
 	return labelValues, err
 }

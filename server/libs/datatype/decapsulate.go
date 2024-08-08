@@ -36,7 +36,7 @@ const (
 	TUNNEL_TYPE_TENCENT_GRE   = TunnelType(pb.DecapType_DECAP_TYPE_TENCENT) // GRE.ver=0/1 GRE.protoType=IPv4/IPv6
 	TUNNEL_TYPE_ERSPAN_OR_TEB = TUNNEL_TYPE_TENCENT_GRE + 1
 
-	LE_IPV4_PROTO_TYPE_I      = 0x0008 // 0x0008's LittleEndian
+	LE_IPV4_PROTO_TYPE_I      = 0x0008 // 0x0800's LittleEndian
 	LE_IPV6_PROTO_TYPE_I      = 0xDD86 // 0x86dd's LittleEndian
 	LE_ERSPAN_PROTO_TYPE_II   = 0xBE88 // 0x88BE's LittleEndian
 	LE_ERSPAN_PROTO_TYPE_III  = 0xEB22 // 0x22EB's LittleEndian

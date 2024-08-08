@@ -24,19 +24,22 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/deepflowio/deepflow/server/ingester/droplet/adapter"
-	"github.com/deepflowio/deepflow/server/ingester/droplet/labeler"
+	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/profiler"
 	"github.com/deepflowio/deepflow/server/ingester/droplet/queue"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
-	"github.com/deepflowio/deepflow/server/ingester/ingesterctl/rpc"
 	"github.com/deepflowio/deepflow/server/ingester/prometheus/decoder"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
+	"github.com/deepflowio/deepflow/server/libs/tracetree"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 func RegisterIngesterCommand(root *cobra.Command) {
 	ip, _ := root.Flags().GetString("ip")
+	orgId, _ := root.Flags().GetUint32("org-id")
 	debug.SetIpAndPort(ip, ingesterctl.DEBUG_LISTEN_PORT)
 	ingesterCmd := &cobra.Command{
 		Use:   "ingester",
@@ -73,17 +76,28 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
 	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
 	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
+	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
+		ingesterctl.CMD_CONTINUOUS_PROFILER,
+		debug.CmdHelper{Cmd: "continuous-profiler", Helper: "continuous profiler commands"},
+		[]debug.CmdHelper{
+			{Cmd: "on", Helper: "start continuous profiler"},
+			{Cmd: "off", Helper: "stop continuous profiler"},
+			{Cmd: "status", Helper: "get continuous profiler status"},
+			{Cmd: "set-server-address [url]", Helper: "set continuous profiler server address, default: http://deepflow-agent/api/v1/profile. need to restart continuous profiler to take effect"},
+			{Cmd: "set-profile-types [cpu][,inuse_objects][,alloc_objects][,inuse_space][,alloc_space][,goroutines][,mutex_count][,mutex_duration][,block_count][,block_duration]", Helper: "default continuous profiler profile types: cpu,inuse_objects,alloc_objects,inuse_space,alloc_space. need to restart continuous profiler to take effect"},
+		},
+	))
+	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
+		ingesterctl.CMD_ORG_SWITCH,
+		debug.CmdHelper{Cmd: "switch-to-debug-org [org-id]", Helper: "the debugging command switches to the specified organization"},
+		nil,
+	))
+	ingesterCmd.AddCommand(RegisterDecodeTraceCommand(ip, uint16(orgId)))
 
 	dropletCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_QUEUE, []string{
 		"1-receiver-to-statsd",
 		"1-receiver-to-syslog",
-		"1-receiver-to-meta-packet",
-		"2-meta-packet-block-to-labeler",
-		"3-meta-packet-block-to-pcap-app",
 	}))
-	dropletCmd.AddCommand(adapter.RegisterCommand(ingesterctl.INGESTERCTL_ADAPTER))
-	dropletCmd.AddCommand(labeler.RegisterCommand(ingesterctl.INGESTERCTL_LABELER))
-	dropletCmd.AddCommand(rpc.RegisterRpcCommand())
 
 	flowMetricsCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_FLOW_METRICS_QUEUE, []string{"1-recv-unmarshall"}))
 	flowMetricsCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_METRIC, debug.CmdHelper{"platformData [filter]", "show flow metrics platform data statistics"}, nil))
@@ -181,6 +195,126 @@ func RegisterTimeConvertCommand() *cobra.Command {
 			fmt.Printf("'%s' is convert to:\n  Unix: %d\n  UnixNano: %d\n  String: %s\n", timeToConvert, ts.Unix(), ts.UnixNano(), ts)
 		},
 	}
+
+	return cmd
+}
+
+func getColumnName(table string) string {
+	if table == "trace_tree" {
+		return "encoded_span_list"
+	}
+	return "encoded_span"
+}
+
+func decodeTrace(ip, username, password, table, traceId string, port, orgId uint16) error {
+	connect, err := common.NewCKConnection(fmt.Sprintf("%s:%d", ip, port), username, password)
+	if err != nil {
+		return fmt.Errorf("connect to ck(%s:%d) failed. %s", ip, port, err)
+	}
+	defer connect.Close()
+	var sql string
+
+	database := ckdb.OrgDatabasePrefix(orgId) + "flow_log"
+	encodedColumn := getColumnName(table)
+	if traceId != "" {
+		sql = fmt.Sprintf("SELECT time,search_index,%s FROM %s.%s WHERE trace_id='%s' limit 10", encodedColumn, database, table, traceId)
+	} else {
+		sql = fmt.Sprintf("SELECT time,search_index,%s FROM %s.%s WHERE time>now()-1000 limit 10", database, encodedColumn, table)
+	}
+	rows, err := connect.Query(sql)
+	if err != nil {
+		return fmt.Errorf("query SQL: %s failed: %s", sql, err)
+	}
+	fmt.Printf("query SQL: %s\n", sql)
+	decoder := &codec.SimpleDecoder{}
+	for rows.Next() {
+		var t time.Time
+		var searchIndex uint64
+		var data string
+
+		err := rows.Scan(&t, &searchIndex, &data)
+		if err != nil {
+			return err
+		}
+		decoder.Init([]byte(data))
+		fmt.Printf("time: %s\n", t)
+		fmt.Printf("search_index: %d\n", searchIndex)
+
+		if table == "trace_tree" {
+			dst := &tracetree.TraceTree{}
+			err = dst.Decode(decoder)
+			if err != nil {
+				return fmt.Errorf("decode TraceTree failed. %s", err)
+			}
+			fmt.Printf("trace_id: %s\n", dst.TraceId)
+			fmt.Printf("span_list:\n")
+			for _, span := range dst.SpanInfos {
+				fmt.Printf("  ip4_0: %s, ip4_1: %s\n", utils.IpFromUint32(span.IP40), utils.IpFromUint32(span.IP41))
+				fmt.Printf("  span: %+v\n", span)
+				fmt.Println("  -----")
+			}
+		} else {
+			dst := &tracetree.SpanTrace{}
+			err = dst.Decode(decoder)
+			if err != nil {
+				return fmt.Errorf("decode TraceTree failed. %s", err)
+			}
+			fmt.Printf("ip4_0: %s, ip4_1: %s\n", utils.IpFromUint32(dst.IP40), utils.IpFromUint32(dst.IP41))
+			fmt.Printf("encoded_span: %+v\n", dst)
+		}
+		fmt.Println("------------------------------------------------")
+	}
+	return nil
+}
+
+func RegisterDecodeTraceCommand(ip string, orgId uint16) *cobra.Command {
+	usage := "decode-trace <trace_tree|span_with_trace_id> <trace_id> [ck-password]"
+	cmd := &cobra.Command{
+		Use:   "decode-trace",
+		Short: usage,
+	}
+	subUsage := "<trace-id> [ck-passwork]"
+	subCmd0 := &cobra.Command{
+		Use:   "trace_tree",
+		Short: subUsage,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 || len(args) > 2 {
+				fmt.Println(subUsage)
+				return
+			}
+			password := ""
+			if len(args) == 2 {
+				password = args[1]
+			}
+			err := decodeTrace(ip, "default", password, "trace_tree", args[0], 9000, orgId)
+			if err != nil {
+				fmt.Println(err)
+			}
+			return
+		},
+	}
+
+	subCmd1 := &cobra.Command{
+		Use:   "span_with_trace_id",
+		Short: subUsage,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 || len(args) > 2 {
+				fmt.Println(subUsage)
+				return
+			}
+			password := ""
+			if len(args) == 2 {
+				password = args[1]
+			}
+			err := decodeTrace(ip, "default", password, "span_with_trace_id", args[0], 9000, orgId)
+			if err != nil {
+				fmt.Println(err)
+			}
+			return
+		},
+	}
+
+	cmd.AddCommand(subCmd0, subCmd1)
 
 	return cmd
 }

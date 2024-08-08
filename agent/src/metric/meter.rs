@@ -16,13 +16,15 @@
 
 use std::mem::swap;
 
+use serde::Serialize;
+
 use public::proto::metric;
 
 const FLOW_ID: u32 = 1;
 const USAGE_ID: u32 = 4;
 const APP_ID: u32 = 5;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Debug, Clone, Copy)]
 pub enum Meter {
     Flow(FlowMeter),
     App(AppMeter),
@@ -82,7 +84,7 @@ impl From<Meter> for metric::Meter {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, Copy, PartialEq)]
 pub struct FlowMeter {
     pub traffic: Traffic,
     pub latency: Latency,
@@ -125,7 +127,7 @@ impl From<FlowMeter> for metric::FlowMeter {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, Copy, PartialEq)]
 pub struct Traffic {
     pub packet_tx: u64,
     pub packet_rx: u64,
@@ -196,7 +198,7 @@ impl From<Traffic> for metric::Traffic {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, Copy, PartialEq)]
 pub struct Latency {
     pub rtt_max: u32,
     pub rtt_client_max: u32,
@@ -303,7 +305,7 @@ impl From<Latency> for metric::Latency {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, Copy, PartialEq)]
 pub struct Performance {
     pub retrans_tx: u64,
     pub retrans_rx: u64,
@@ -337,7 +339,7 @@ impl From<Performance> for metric::Performance {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, Copy, PartialEq)]
 pub struct Anomaly {
     pub client_rst_flow: u64,
     pub server_rst_flow: u64,
@@ -404,7 +406,7 @@ impl From<Anomaly> for metric::Anomaly {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Serialize, Debug, Default, Clone, Copy, PartialEq)]
 pub struct FlowLoad {
     pub load: u64,
     pub flow_count: u64,
@@ -427,7 +429,7 @@ impl From<FlowLoad> for metric::FlowLoad {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Serialize, Debug, Default, Clone, Copy)]
 pub struct AppMeter {
     pub traffic: AppTraffic,
     pub latency: AppLatency,
@@ -455,7 +457,7 @@ impl From<AppMeter> for metric::AppMeter {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Serialize, Debug, Default, Clone, Copy)]
 pub struct AppTraffic {
     pub request: u32,
     pub response: u32,
@@ -484,7 +486,7 @@ impl From<AppTraffic> for metric::AppTraffic {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Serialize, Debug, Default, Clone, Copy)]
 pub struct AppLatency {
     pub rrt_max: u32,
     pub rrt_sum: u64,
@@ -511,7 +513,7 @@ impl From<AppLatency> for metric::AppLatency {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Serialize, Debug, Default, Clone, Copy)]
 pub struct AppAnomaly {
     pub client_error: u32,
     pub server_error: u32,
@@ -536,7 +538,7 @@ impl From<AppAnomaly> for metric::AppAnomaly {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Serialize, Debug, Default, Clone, Copy)]
 pub struct UsageMeter {
     pub packet_tx: u64,
     pub packet_rx: u64,

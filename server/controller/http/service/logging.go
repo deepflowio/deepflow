@@ -17,7 +17,13 @@
 package service
 
 import (
-	logging "github.com/op/go-logging"
+	"fmt"
+
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("service")
+var log = logger.MustGetLogger("http.service")
+
+func dbQueryResourceFailed(resource string, err error) string {
+	return fmt.Sprintf("db query %s failed: %v", resource, err)
+}

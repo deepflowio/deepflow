@@ -23,9 +23,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/op/go-logging"
-	"gopkg.in/yaml.v2"
+	logging "github.com/op/go-logging"
+	yaml "gopkg.in/yaml.v2"
 
+	tracemap "github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/config"
 	prometheus "github.com/deepflowio/deepflow/server/querier/app/prometheus/config"
 	tracing_adapter "github.com/deepflowio/deepflow/server/querier/app/tracing-adapter/config"
 	profile "github.com/deepflowio/deepflow/server/querier/profile/config"
@@ -34,10 +35,12 @@ import (
 var log = logging.MustGetLogger("clickhouse")
 var Cfg *QuerierConfig
 var TraceConfig *TraceIdWithIndex
+var ControllerCfg *ControllerConfig
 
 type Config struct {
 	QuerierConfig    QuerierConfig    `yaml:"querier"`
 	TraceIdWithIndex TraceIdWithIndex `yaml:"trace-id-with-index"`
+	ControllerConfig ControllerConfig `yaml:"controller"`
 }
 
 type QuerierConfig struct {
@@ -46,6 +49,7 @@ type QuerierConfig struct {
 	ListenPort                      int                           `default:"20416" yaml:"listen-port"`
 	Clickhouse                      Clickhouse                    `yaml:clickhouse`
 	Profile                         profile.ProfileConfig         `yaml:profile`
+	Tracemap                        tracemap.TraceMapConfig       `yaml:tracemap`
 	DeepflowApp                     DeepflowApp                   `yaml:"deepflow-app"`
 	Prometheus                      prometheus.Prometheus         `yaml:"prometheus"`
 	ExternalAPM                     []tracing_adapter.ExternalAPM `yaml:"external-apm"`
@@ -72,7 +76,7 @@ type Location struct {
 }
 
 type TraceIdWithIndex struct {
-	Enabled               bool     `yaml:"enabled"`
+	Disabled              bool     `yaml:"disabled"`
 	Type                  string   `yaml:"type"`
 	IncrementalIdLocation Location `yaml:"incremental-id-location"`
 }
@@ -91,6 +95,10 @@ type AutoCustomTags struct {
 	TagFields   []string `yaml:"tag-fields" binding:"omitempty,dive"`
 	DisplayName string   `default:"" yaml:"display_name"`
 	Description string   `default:"" yaml:"description"`
+}
+
+type ControllerConfig struct {
+	ListenPort int `default:"20417" yaml:"listen-port"`
 }
 
 func (c *Config) expendEnv() {
@@ -113,6 +121,9 @@ func (c *Config) expendEnv() {
 }
 
 func (c *Config) Validate() error {
+	if c.TraceIdWithIndex.Type == "" {
+		c.TraceIdWithIndex.Type = "hash"
+	}
 	return nil
 }
 

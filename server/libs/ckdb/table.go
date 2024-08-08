@@ -28,6 +28,7 @@ const (
 	INVALID_TEAM_ID   = 0
 	ORG_ID_LEN        = 4 // length of 'xxxx'
 	ORG_ID_PREFIX_LEN = 5 // length of 'xxxx_'
+	MAX_ORG_ID        = 1024
 )
 
 func IsDefaultOrgID(orgID uint16) bool {
@@ -35,6 +36,13 @@ func IsDefaultOrgID(orgID uint16) bool {
 		return true
 	}
 	return false
+}
+
+func IsValidOrgID(orgID uint16) bool {
+	if orgID == INVALID_ORG_ID || orgID > MAX_ORG_ID {
+		return false
+	}
+	return true
 }
 
 func OrgDatabasePrefix(orgID uint16) string {
@@ -106,10 +114,15 @@ func (t *Table) makeLocalTableCreateSQL(database string) string {
 		if c.Codec != CodecDefault {
 			codec = fmt.Sprintf("CODEC(%s)", c.Codec.String())
 		}
-		columns = append(columns, fmt.Sprintf("`%s` %s %s %s", c.Name, c.Type.String(), comment, codec))
+
+		columnType := c.Type.String()
+		if c.TypeArgs != "" {
+			columnType = fmt.Sprintf(c.Type.String(), c.TypeArgs)
+		}
+		columns = append(columns, fmt.Sprintf("`%s` %s %s %s", c.Name, columnType, comment, codec))
 
 		if c.Index != IndexNone {
-			columns = append(columns, fmt.Sprintf("INDEX %s_idx (%s) TYPE %s GRANULARITY 3", c.Name, c.Name, c.Index.String()))
+			columns = append(columns, fmt.Sprintf("INDEX %s_idx (%s) TYPE %s GRANULARITY 2", c.Name, c.Name, c.Index.String()))
 		}
 	}
 
@@ -142,7 +155,7 @@ PRIMARY KEY (%s)
 ORDER BY (%s)
 %s
 %s
-SETTINGS storage_policy = '%s'`,
+SETTINGS storage_policy = '%s', ttl_only_drop_parts = 1`,
 		database, fmt.Sprintf("`%s`", t.LocalName),
 		strings.Join(columns, ",\n"),
 		engine,

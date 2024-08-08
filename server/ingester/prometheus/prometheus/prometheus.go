@@ -42,6 +42,7 @@ type PrometheusHandler struct {
 	Decoders             []*decoder.Decoder
 	SlowDecoders         []*decoder.SlowDecoder
 	PlatformDatas        []*grpc.PlatformInfoTable
+	SlowPlatformDatas    []*grpc.PlatformInfoTable
 	prometheusLabelTable *decoder.PrometheusLabelTable
 }
 
@@ -68,7 +69,7 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 
 	prometheusLabelTable := decoder.NewPrometheusLabelTable(config.Base.ControllerIPs, int(config.Base.ControllerPort), config.LabelMsgMaxSize, config.LabelCacheExpiration)
 
-	prometheusLabelTable.RequestAllLabelIDs()
+	prometheusLabelTable.RequestAllLabelIDs(0)
 	currentColumnIndexMax := prometheusLabelTable.GetMaxAppLabelColumnIndex()
 	initAppLabelColumnCount := config.AppLabelColumnMinCount
 	if initAppLabelColumnCount < currentColumnIndexMax {
@@ -119,14 +120,16 @@ func NewPrometheusHandler(config *config.Config, recv *receiver.Receiver, platfo
 		Config:               config,
 		Decoders:             decoders,
 		PlatformDatas:        platformDatas,
+		SlowPlatformDatas:    slowPlatformDatas,
 		prometheusLabelTable: prometheusLabelTable,
 		SlowDecoders:         slowDecoders,
 	}, nil
 }
 
 func (m *PrometheusHandler) Start() {
-	for _, platformData := range m.PlatformDatas {
+	for i, platformData := range m.PlatformDatas {
 		platformData.Start()
+		m.SlowPlatformDatas[i].Start()
 	}
 
 	for i, decoder := range m.Decoders {
@@ -136,8 +139,13 @@ func (m *PrometheusHandler) Start() {
 }
 
 func (m *PrometheusHandler) Close() error {
-	for _, platformData := range m.PlatformDatas {
+	for i, platformData := range m.PlatformDatas {
 		platformData.ClosePlatformInfoTable()
+		m.SlowPlatformDatas[i].ClosePlatformInfoTable()
 	}
 	return nil
+}
+
+func (m *PrometheusHandler) DropOrg(orgId uint16) {
+	m.prometheusLabelTable.DropOrg(orgId)
 }

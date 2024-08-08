@@ -128,14 +128,14 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		return
 	}
 	log.Debug(v.Logf("%d %s", vtapConfig.PodClusterInternalIP, vtapConfig.ConvertedDomains))
-	if vtapConfig.PodClusterInternalIP == ALL_CLUSTERS &&
+	if *vtapConfig.PodClusterInternalIP == ALL_CLUSTERS &&
 		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=所有集群
 		// 所有云平台所有数据
 
 		log.Debug(v.Logf("all: %s", p.GetAllSimplePlatformData()))
 		c.setVTapPlatformData(p.GetAllSimplePlatformData())
-	} else if vtapConfig.PodClusterInternalIP == ALL_CLUSTERS {
+	} else if *vtapConfig.PodClusterInternalIP == ALL_CLUSTERS {
 		// 下发的云平台列表=xxx，容器集群内部IP下发=所有集群
 		// 云平台列表=xxx的所有数据
 
@@ -160,7 +160,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		v.platformDataType1.setPlatformDataCache(vTapGroupLcuuid, domainAllData)
 		c.setVTapPlatformData(domainAllData)
 		log.Debug(v.Logf("%s", domainAllData))
-	} else if vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP &&
+	} else if *vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP &&
 		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
 		// 下发的云平台列表=全部，容器集群内部IP下发=采集器所在集群
 		// 所有云平台中devicetype != POD/容器服务的所有接口，采集器所在集群devicetype=POD/容器服务的所有接口
@@ -195,7 +195,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		c.setVTapPlatformData(domainAllData)
 		v.platformDataType2.setPlatformDataCache(key, domainAllData)
 		log.Debug(v.Logf("%s", domainAllData))
-	} else if vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP {
+	} else if *vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP {
 		// 下发的云平台列表=xxx，容器集群内部IP下发=采集器所在集群
 		// 云平台列表=xxx中devicetype != POD/容器服务所有接口，集器所在集群devicetype=POD/容器服务的所有接口
 

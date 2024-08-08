@@ -41,26 +41,32 @@ func NewChOSAppTag() *ChOSAppTag {
 func (o *ChOSAppTag) generateNewData() (map[OSAPPTagKey]mysql.ChOSAppTag, bool) {
 	processes, err := query.FindInBatches[mysql.Process](o.db.Unscoped())
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err), o.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[OSAPPTagKey]mysql.ChOSAppTag)
 	for _, process := range processes {
+		teamID, err := tagrecorder.GetTeamID(process.Domain, process.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", o.resourceTypeName, err.Error(), process, o.db.LogPrefixORGID)
+		}
+
 		splitTags := strings.Split(process.OSAPPTags, ", ")
 		for _, singleTag := range splitTags {
-			splitSingleTag := strings.Split(singleTag, ":")
+			splitSingleTag := strings.SplitN(singleTag, ":", 2)
 			if len(splitSingleTag) == 2 {
 				key := OSAPPTagKey{
 					PID: process.ID,
 					Key: strings.Trim(splitSingleTag[0], " "),
 				}
 				keyToItem[key] = mysql.ChOSAppTag{
-					PID:      process.ID,
-					Key:      strings.Trim(splitSingleTag[0], " "),
-					Value:    strings.Trim(splitSingleTag[1], " "),
-					TeamID:   tagrecorder.DomainToTeamID[process.Domain],
-					DomainID: tagrecorder.DomainToDomainID[process.Domain],
+					PID:         process.ID,
+					Key:         strings.Trim(splitSingleTag[0], " "),
+					Value:       strings.Trim(splitSingleTag[1], " "),
+					TeamID:      teamID,
+					DomainID:    tagrecorder.DomainToDomainID[process.Domain],
+					SubDomainID: tagrecorder.SubDomainToSubDomainID[process.SubDomain],
 				}
 			}
 		}

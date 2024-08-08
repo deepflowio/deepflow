@@ -22,15 +22,15 @@ import (
 )
 
 type WANIP struct {
-	OperatorBase[mysql.WANIP]
+	OperatorBase[*mysql.WANIP, mysql.WANIP]
 }
 
 func NewWANIP() *WANIP {
 	return &WANIP{
-		OperatorBase[mysql.WANIP]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.WANIP](
+			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
+			false,
+			false,
+		),
 	}
 }

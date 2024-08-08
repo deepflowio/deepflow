@@ -23,6 +23,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	//"github.com/k0kubun/pp"
@@ -37,6 +38,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
@@ -50,8 +52,8 @@ import (
 //    - demo_cpu_usage_seconds_total
 // - DeepFlow metrics: Return all metrics by ${db_name}__${table_name}__${time_granularity}__${metrics_name}, where you need to replace . in metrics_name with _ to return, for example
 //    - flow_log__l7_flow_log__rrt
-//    - flow_metrics__vtap_flow_port__1m__rtt
-//    - ext_metrics__metrics__prometheus_demo_cpu_usage_seconds_total
+//    - flow_metrics__network__rtt__1m
+//    - prometheus__samples__demo_cpu_usage_seconds_total
 //    - ext_metrics__metrics__influxdb_cpu
 
 // Note that as can be seen from the above description, Prometheus native metrics actually return twice.
@@ -74,23 +76,25 @@ const _SUCCESS = "success"
 
 // executors for prometheus query
 type prometheusExecutor struct {
-	extraLabelCache *lru.Cache[string, string]
+	extraLabelCache map[string]*lru.Cache[string, string]
 	ticker          *time.Ticker
 	lookbackDelta   time.Duration
 
 	cacher            *cache.Cacher
 	queryKeyGenerator *cache.WeakKeyGenerator
 	cacheKeyGenerator *cache.CacheKeyGenerator
+	locker            sync.Locker
 }
 
 func NewPrometheusExecutor(delta time.Duration) *prometheusExecutor {
 	executor := &prometheusExecutor{
-		extraLabelCache: lru.NewCache[string, string](config.Cfg.Prometheus.ExternalTagCacheSize),
+		extraLabelCache: map[string]*lru.Cache[string, string]{},
 		lookbackDelta:   delta,
 
 		cacher:            cache.NewCacher(),
 		queryKeyGenerator: &cache.WeakKeyGenerator{},
 		cacheKeyGenerator: &cache.CacheKeyGenerator{},
+		locker:            &sync.Mutex{},
 	}
 	go executor.triggerLoadExternalTag()
 	return executor
@@ -105,7 +109,10 @@ func (p *prometheusExecutor) triggerLoadExternalTag() {
 		}
 	}()
 	for range p.ticker.C {
-		p.loadExtraLabelsCache()
+		all_orgs := p.getAllOrganizations()
+		for _, v := range all_orgs {
+			p.loadExtraLabelsCache(v)
+		}
 	}
 }
 
@@ -128,7 +135,9 @@ func (p *prometheusExecutor) promQueryExecute(ctx context.Context, args *model.P
 		defer span.End()
 	}
 	reader := &prometheusReader{
+		orgID:                   args.OrgID,
 		slimit:                  args.Slimit,
+		blockTeamID:             args.BlockTeamID,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -190,6 +199,8 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 	}
 	reader := &prometheusReader{
 		slimit:                  args.Slimit,
+		orgID:                   args.OrgID,
+		blockTeamID:             args.BlockTeamID,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -253,16 +264,20 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 	keyGenerator := &cache.WeakKeyGenerator{}
 	reader := &prometheusReader{
 		slimit:                  args.Slimit,
+		orgID:                   args.OrgID,
+		blockTeamID:             args.BlockTeamID,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
 	queryRequests := analyzer.parsePromQL(args.Promql, start, end, step)
 	promRequest := &model.DeepFlowPromRequest{
-		Slimit: args.Slimit,
-		Start:  start.UnixMilli(),
-		End:    end.UnixMilli(),
-		Step:   step,
-		Query:  args.Promql,
+		Slimit:      args.Slimit,
+		Start:       start.UnixMilli(),
+		End:         end.UnixMilli(),
+		Step:        step,
+		Query:       args.Promql,
+		OrgID:       args.OrgID,
+		BlockTeamID: args.BlockTeamID,
 	}
 
 	var cached promql.Result
@@ -381,6 +396,8 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	keyGenerator := &cache.WeakKeyGenerator{}
 	reader := &prometheusReader{
 		slimit:                  args.Slimit,
+		orgID:                   args.OrgID,
+		blockTeamID:             args.BlockTeamID,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -398,11 +415,13 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	}
 
 	promRequest := &model.DeepFlowPromRequest{
-		Slimit: args.Slimit,
-		Start:  minStart,
-		End:    maxEnd,
-		Step:   1 * time.Second,
-		Query:  args.Promql,
+		Slimit:      args.Slimit,
+		Start:       minStart,
+		End:         maxEnd,
+		Step:        1 * time.Second,
+		Query:       args.Promql,
+		OrgID:       args.OrgID,
+		BlockTeamID: args.BlockTeamID,
 	}
 
 	var cached promql.Result
@@ -495,7 +514,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	return result, err
 }
 
-func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context, req *prompb.ReadRequest, orgID string) (resp *prompb.ReadResponse, err error) {
 	var query *prompb.Query
 	var queryType model.QueryType
 	if len(req.Queries) > 0 {
@@ -525,12 +544,13 @@ func (p *prometheusExecutor) promRemoteReadOffloadingExecute(ctx context.Context
 	}
 	reader := &prometheusReader{
 		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		orgID:                   orgID,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
 	querierSql := reader.parseQueryRequestToSQL(ctx, queryReq, queryType)
 	if querierSql != "" {
-		result, _, _, err := queryDataExecute(ctx, querierSql, chCommon.DB_NAME_PROMETHEUS, "", false)
+		result, _, _, err := queryDataExecute(ctx, querierSql, chCommon.DB_NAME_PROMETHEUS, "", orgID, false)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -570,9 +590,10 @@ func promMatchersToMatchers(matchers *[]*prompb.LabelMatcher) []*labels.Matcher 
 	return lm
 }
 
-func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+func (p *prometheusExecutor) promRemoteReadExecute(ctx context.Context, req *prompb.ReadRequest, orgID string) (resp *prompb.ReadResponse, err error) {
 	reader := &prometheusReader{
 		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		orgID:                   orgID,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -667,6 +688,8 @@ func (p *prometheusExecutor) series(ctx context.Context, args *model.PromQueryPa
 	}
 	reader := &prometheusReader{
 		slimit:                  config.Cfg.Prometheus.SeriesLimit,
+		orgID:                   args.OrgID,
+		blockTeamID:             args.BlockTeamID,
 		getExternalTagFromCache: p.convertExternalTagToQuerierAllowTag,
 		addExternalTagToCache:   p.addExtraLabelsToCache,
 	}
@@ -817,10 +840,26 @@ func (p *prometheusExecutor) beforePrometheusCalculate(q promql.Query, f func(e 
 	return nil
 }
 
-func (p *prometheusExecutor) loadExtraLabelsCache() {
+func (p *prometheusExecutor) getAllOrganizations() []string {
+	getOrgUrl := fmt.Sprintf("http://localhost:%d/v1/orgs/", config.ControllerCfg.ListenPort)
+	resp, err := common.CURLPerform("GET", getOrgUrl, nil)
+	if err != nil {
+		log.Errorf("request controller failed: %s, URL: %s", resp, getOrgUrl)
+		return nil
+	}
+	resultArray := resp.Get("DATA").MustArray()
+	result := make([]string, 0, len(resultArray))
+	for i := range resultArray {
+		orgIDInt := resp.Get("DATA").GetIndex(i).Get("ORG_ID").MustInt()
+		result = append(result, strconv.Itoa(orgIDInt))
+	}
+	return result
+}
+
+func (p *prometheusExecutor) loadExtraLabelsCache(orgID string) {
 	// DeepFlow Source have same tag collections, so just try query 1 table to add all external tags
-	showTags := fmt.Sprintf("show tags from %s", VTAP_FLOW_PORT_TABLE)
-	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, VTAP_FLOW_PORT_TABLE, showTags, "", "", false, context.Background())
+	showTags := fmt.Sprintf("show tags from %s", NETWORK_TABLE)
+	data, err := tagdescription.GetTagDescriptions(chCommon.DB_NAME_FLOW_METRICS, NETWORK_TABLE, showTags, "", orgID, false, context.Background(), nil)
 	if err != nil {
 		log.Errorf("load external tag error when start up prometheus executor: %s", err)
 		return
@@ -838,14 +877,14 @@ func (p *prometheusExecutor) loadExtraLabelsCache() {
 				continue
 			}
 			tag := values[0].(string)
-			p.addExtraLabelsToCache(formatTagName(tag), tag)
+			p.addExtraLabelsToCache(orgID, formatTagName(tag), tag)
 		}
 	}
 }
 
 // convert external tag to querier tag
 // e.g.: k8s_label_helm_sh_chart_0 to 'k8s.label/helm.sh-chart'
-func (p *prometheusExecutor) convertExternalTagToQuerierAllowTag(displayTag string) string {
+func (p *prometheusExecutor) convertExternalTagToQuerierAllowTag(orgID string, displayTag string) string {
 	var suffix string
 	if strings.HasSuffix(displayTag, "_0") {
 		suffix = "_0"
@@ -853,15 +892,34 @@ func (p *prometheusExecutor) convertExternalTagToQuerierAllowTag(displayTag stri
 		suffix = "_1"
 	}
 	cacheTag := strings.TrimSuffix(displayTag, suffix)
-	querierTag, ok := p.extraLabelCache.Get(cacheTag)
-	if ok {
-		return fmt.Sprintf("%s%s", querierTag, suffix)
+	if orgID == "" {
+		return ""
+	}
+	orgExternalLabelCache := p.extraLabelCache[orgID]
+	if orgExternalLabelCache != nil {
+		querierTag, ok := orgExternalLabelCache.Get(cacheTag)
+		if ok {
+			return fmt.Sprintf("%s%s", querierTag, suffix)
+		}
 	}
 	return ""
 }
 
-func (p *prometheusExecutor) addExtraLabelsToCache(displayTag string, querierTag string) {
-	p.extraLabelCache.Add(displayTag, querierTag)
+func (p *prometheusExecutor) addExtraLabelsToCache(orgID string, displayTag string, querierTag string) {
+	if orgID == "" {
+		return
+	}
+	orgExternalLabelCache := p.extraLabelCache[orgID]
+	if orgExternalLabelCache == nil {
+		// avoid concurrency write in p.extraLabelCache map
+		// only when an org query first time
+		p.locker.Lock()
+		p.extraLabelCache[orgID] = lru.NewCache[string, string](config.Cfg.Prometheus.ExternalTagCacheSize)
+		p.locker.Unlock()
+
+		orgExternalLabelCache = p.extraLabelCache[orgID]
+	}
+	orgExternalLabelCache.Add(displayTag, querierTag)
 }
 
 func ignoreSlimit(f string) bool {

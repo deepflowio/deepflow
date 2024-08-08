@@ -22,16 +22,16 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logging.MustGetLogger("trisolaris/metadata")
+var log = logger.MustGetLogger("trisolaris.metadata")
 
 type MetaData struct {
 	dbDataCache    *atomic.Value // *DBDataCache 数据库缓存

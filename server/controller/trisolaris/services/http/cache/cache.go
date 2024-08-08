@@ -21,16 +21,16 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logging.MustGetLogger("trisolaris/cache")
+var log = logger.MustGetLogger("trisolaris.cache")
 
 func init() {
 	http.Register(NewCacheService())
@@ -46,11 +46,16 @@ func PutCache(c *gin.Context) {
 	log.Debug(c.GetQueryArray("type"))
 	var err error
 	orgID := 0
-	if orgIDStr, ok := c.GetQuery("org_id"); ok {
+	orgIDStr, ok := c.GetQuery("org_id")
+	if ok {
 		orgID, err = strconv.Atoi(orgIDStr)
 		if err != nil {
 			common.Response(c, nil, common.NewReponse("FAILED", "", nil, err.Error()))
 			return
+		}
+	} else {
+		if headerOrgID, ok := c.Get(HEADER_KEY_X_ORG_ID); ok {
+			orgID = headerOrgID.(int)
 		}
 	}
 	if utils.CheckOrgID(orgID) == false {

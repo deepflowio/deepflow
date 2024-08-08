@@ -56,9 +56,10 @@
 #include "../table.h"
 #include "../bihash_8_8.h"
 #include "../bihash_16_8.h"
-#include "java/gen_syms_file.h"
+#include "java/collect_symbol_files.h"
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
+#include "../proc.h"
 
 static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
@@ -158,53 +159,187 @@ static inline char *create_symbol_str(int len, char *src, const char *tag)
 	return dst;
 }
 
+static char *kern_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
+{
+	ASSERT(pid >= 0);
+
+	int len = 0;
+	char *ptr = NULL;
+	len = strlen(sym->name) + strlen(k_sym_prefix);
+	ptr = (char *)sym->name;
+	ptr = create_symbol_str(len, ptr, k_sym_prefix);
+
+	return ptr;
+}
+
+static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
+{
+	ASSERT(pid >= 0);
+
+	int len = 0;
+	char *ptr = NULL;
+	len = strlen(sym->demangle_name) + strlen(u_sym_prefix);
+	ptr = (char *)sym->demangle_name;
+	char *u_prefix = (char *)u_sym_prefix;
+	if (sym->module != NULL && strlen(sym->module) > 0) {
+		if (strstr(sym->module, ".so")) {
+			len += strlen(lib_sym_prefix);
+			u_prefix = (char *)lib_sym_prefix;
+		}
+	}
+
+	ptr = create_symbol_str(len, ptr, (char *)u_prefix);
+	bcc_symbol_free_demangle_name(sym);
+
+	return ptr;
+}
+
+// Demangle with
+// https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3
+char *rewrite_java_symbol(char *sym) {
+	int len = strlen(sym);
+	if (len == 0) {
+		return NULL;
+	}
+
+	int i = 0, j = 0;
+	for (i = 0; i < len && sym[i] == '['; i++) {}
+	int array_dims = i;
+
+	// make room for array ']'s and base type name expension
+	int new_len = len + array_dims + 16;
+	char *dst = clib_mem_alloc_aligned("symbol_str", new_len, 0, NULL);
+	if (dst == NULL) {
+		return dst;
+	}
+	memset(dst, 0, new_len);
+	int offset = 0;
+
+	switch (sym[i]) {
+	case 'B':
+		offset += snprintf(dst + offset, new_len - offset, "byte");
+		i++;
+		break;
+	case 'C':
+		offset += snprintf(dst + offset, new_len - offset, "char");
+		i++;
+		break;
+	case 'D':
+		offset += snprintf(dst + offset, new_len - offset, "double");
+		i++;
+		break;
+	case 'F':
+		offset += snprintf(dst + offset, new_len - offset, "float");
+		i++;
+		break;
+	case 'I':
+		offset += snprintf(dst + offset, new_len - offset, "int");
+		i++;
+		break;
+	case 'J':
+		offset += snprintf(dst + offset, new_len - offset, "long");
+		i++;
+		break;
+	case 'S':
+		offset += snprintf(dst + offset, new_len - offset, "short");
+		i++;
+		break;
+	case 'Z':
+		offset += snprintf(dst + offset, new_len - offset, "boolean");
+		i++;
+		break;
+	case 'L':
+		// LClassName;::methodName
+		for (j = i + 1; j < len; j++) {
+			if (sym[j] == ';') {
+				break;
+			}
+		}
+		if (j == len) {
+			goto failed;
+		}
+		memcpy(dst + offset, sym + i + 1, j - (i + 1));
+		offset += j - (i + 1);
+		i = j + 1;
+		break;
+	default:
+		goto failed;
+	}
+
+	for (j = 0; j < array_dims; j++) {
+		offset += snprintf(dst + offset, new_len - offset, "[]");
+	}
+
+	// rest
+	snprintf(dst + offset, new_len - offset, sym + i);
+
+	return dst;
+
+failed:
+	clib_mem_free(dst);
+	return NULL;
+}
+
 static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
-				   struct bcc_symbol *sym, void *info_p)
+				   struct bcc_symbol *sym, void *info_p,
+				   char **sym_ptr)
 {
 	ASSERT(pid >= 0);
 
 	int ret = -1;
 	if (pid == 0) {
 		ret = bcc_symcache_resolve_no_demangle(resolver, address, sym);
+		if (ret == 0)
+			*sym_ptr = kern_symbol_name_fetch(pid, sym);
 	} else {
 		struct symbolizer_proc_info *p = info_p;
 		if (p) {
-			if (p->is_exit || ((u64) resolver != (u64) p->syms_cache))
+			if (p->is_exit
+			    || ((u64) resolver != (u64) p->syms_cache))
 				return (-1);
 			pthread_mutex_lock(&p->mutex);
 			ret = bcc_symcache_resolve(resolver, address, sym);
+			if (ret == 0) {
+				*sym_ptr = proc_symbol_name_fetch(pid, sym);
+				if (p->is_java) {
+					// handle java encoded symbols
+					char *new_sym = rewrite_java_symbol(*sym_ptr);
+					if (new_sym != NULL) {
+						clib_mem_free(*sym_ptr);
+						*sym_ptr = new_sym;
+					}
+				}
+				pthread_mutex_unlock(&p->mutex);
+				return ret;
+			}
+			if (sym->module != NULL && strlen(sym->module) > 0) {
+				/*
+				 * Module is known (from /proc/<pid>/maps), but
+				 * symbol is not known.
+				 * build a string:
+				 * [/lib64/xxx.so]
+				 */
+				char format_str[4096];
+				snprintf(format_str, sizeof(format_str),
+					 "[%s]", sym->module);
+				int len = strlen(format_str);
+				*sym_ptr =
+				    create_symbol_str(len, format_str, "");
+				if (info_p) {
+					struct symbolizer_proc_info *p = info_p;
+					symbolizer_proc_lock(p);
+					if (p->is_java
+					    && strstr(format_str, "perf-")) {
+						p->unknown_syms_found = true;
+					}
+					symbolizer_proc_unlock(p);
+				}
+			}
 			pthread_mutex_unlock(&p->mutex);
 		}
 	}
 
 	return ret;
-}
-
-static char *symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
-{
-	ASSERT(pid >= 0);
-
-	int len = 0;
-	char *ptr = NULL;
-	if (pid > 0) {
-		len = strlen(sym->demangle_name) + strlen(u_sym_prefix);
-		ptr = (char *)sym->demangle_name;
-		char *u_prefix = (char *)u_sym_prefix;
-		if (sym->module != NULL && strlen(sym->module) > 0) {
-			if (strstr(sym->module, ".so")) {
-				len += strlen(lib_sym_prefix);
-				u_prefix = (char *)lib_sym_prefix;
-			}
-		}
-		ptr = create_symbol_str(len, ptr, (char *)u_prefix);
-		bcc_symbol_free_demangle_name(sym);
-	} else if (pid == 0) {
-		len = strlen(sym->name) + strlen(k_sym_prefix);
-		ptr = (char *)sym->name;
-		ptr = create_symbol_str(len, ptr, k_sym_prefix);
-	}
-
-	return ptr;
 }
 
 static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
@@ -221,46 +356,23 @@ static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
 	if (resolver == NULL)
 		goto resolver_err;
 
-	int ret = symcache_resolve(pid, resolver, address, &sym, info_p);
-	if (ret == 0) {
-		ptr = symbol_name_fetch(pid, &sym);
-		if (ptr) {
-			char *p = ptr;
-			/*
-			 * If the parsed string contains a semicolon (';'), replace
-			 * it with ':', as the semicolon is a specific delimiter
-			 * we use to separate symbolic strings.
-			 * e.g.: "NioEventLoop;::run" -> "NioEventLoop:::run"
-			 */
-			for (p = ptr; *p != '\0'; p++) {
-				if (*p == ';')
-					*p = ':';
-			}
-
-			goto finish;
-		}
-	}
-
-	if (sym.module != NULL && strlen(sym.module) > 0) {
+	int ret = symcache_resolve(pid, resolver, address, &sym, info_p, &ptr);
+	if (ret == 0 && ptr) {
+		char *p = ptr;
 		/*
-		 * Module is known (from /proc/<pid>/maps), but symbol is not known.
-		 * build a string:
-		 * [/lib64/xxx.so]
+		 * If the parsed string contains a semicolon (';'), replace
+		 * it with ':', as the semicolon is a specific delimiter
+		 * we use to separate symbolic strings.
+		 * e.g.: "NioEventLoop;::run" -> "NioEventLoop:::run"
 		 */
-		char format_str[4096];
-		snprintf(format_str, sizeof(format_str), "[%s]", sym.module);
-		len = strlen(format_str);
-		ptr = create_symbol_str(len, format_str, "");
-		if (info_p) {
-			struct symbolizer_proc_info *p = info_p;
-			symbolizer_proc_lock(p);
-			if (p->is_java && strstr(format_str, "perf-")) {
-				p->unknown_syms_found = true;
-			}
-			symbolizer_proc_unlock(p);
+		for (p = ptr; *p != '\0'; p++) {
+			if (*p == ';')
+				*p = ':';
 		}
-		goto finish;
 	}
+
+	if (ptr)
+		goto finish;
 
 	/*
 	 * If we have reached this point, it means that we have truly obtained
@@ -303,7 +415,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      int stack_id,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      int *ret_val, void *info_p, u64 ts)
+				      int *ret_val, void *info_p, u64 ts, bool ignore_libs)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -344,6 +456,11 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		    resolve_addr(t, pid, (i == start_idx), ips[i], new_cache,
 				 info_p);
 		if (str) {
+			// ignore frames in library for memory profiling
+			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix) && strncmp(str, lib_sym_prefix, strlen(lib_sym_prefix)) == 0) {
+				clib_mem_free(str);
+				continue;
+			}
 			symbol_array[i] = pointer_to_uword(str);
 			folded_size += strlen(str);
 		}
@@ -388,7 +505,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       pid_t pid,
 				       const char *stack_map_name,
 				       stack_str_hash_t * h,
-				       bool new_cache, void *info_p, u64 ts)
+				       bool new_cache, void *info_p, u64 ts, bool ignore_libs)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -407,7 +524,7 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	char *str = NULL;
 	int ret_val = 0;
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val, info_p, ts);
+				       h, new_cache, &ret_val, info_p, ts, ignore_libs);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
@@ -456,7 +573,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      const char *stack_map_name,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      char *process_name, void *info_p)
+				      char *process_name, void *info_p, bool ignore_libs)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -512,7 +629,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp);
+							v->timestamp, ignore_libs);
 		if (k_trace_str == NULL)
 			return NULL;
 	}
@@ -522,7 +639,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							v->tgid,
 							stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp);
+							v->timestamp, ignore_libs);
 		if (u_trace_str == NULL)
 			return NULL;
 	}

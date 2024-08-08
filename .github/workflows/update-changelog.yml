@@ -1,0 +1,147 @@
+name: Update Changelog
+
+on:
+  schedule:
+    - cron: '0 16 * * *' # Runs every day at 0:00 Beijing Time (16:00 UTC)
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
+
+permissions: write-all
+
+jobs:
+  update_changelog:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch:
+          - main
+          - v6.5
+          - v6.6
+          - v6.7
+          - v6.8
+          - v6.9
+          - v7.1
+          - v7.2
+          - v7.3
+          - v7.4
+          - v7.5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ matrix.branch }}
+        continue-on-error: true
+
+      - name: Check if branch exists
+        id: check_branch
+        run: |
+          if git show-ref --quiet refs/heads/${{ matrix.branch }}; then
+            echo "::set-output name=branch_exists::true"
+          else
+            echo "::set-output name=branch_exists::false"
+          fi
+        continue-on-error: true
+
+      - name: Set up Python
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Download update_changelog.py if not main branch
+        if: steps.check_branch.outputs.branch_exists == 'true' && matrix.branch != 'main'
+        run: |
+          echo "Downloading update_changelog.py from the main branch..."
+          rm -rf update_changelog.py || true
+          curl -O https://raw.githubusercontent.com/deepflowio/deepflow/main/update_changelog.py
+
+      - name: Run changelog update script
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          cat CHANGELOG.md
+          git fetch --all
+          echo ${{ matrix.branch }}
+          if [[ "${{ matrix.branch }}" == "main" ]]; then
+            python update_changelog.py -B ${{ matrix.branch }} CHANGELOG.md
+            # List branches that match the pattern and process each branch
+            for BRANCH in $(git branch -r | grep -E 'origin/v[6-9]+\.[5-9]+|origin/v[7-9]+\.[0-9]+' | sed 's|origin/||'); do
+              echo "Processing branch $BRANCH..."
+              python update_changelog.py -B $BRANCH docs/CHANGELOG-`echo $BRANCH|sed 's|\.|-|' | sed 's|v||'`.md
+            done
+          else 
+            python update_changelog.py -B ${{ matrix.branch }} docs/CHANGELOG-`echo ${{ matrix.branch }}|sed 's|\.|-|' | sed 's|v||'`.md
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download update_changelog.py if not main branch
+        if: steps.check_branch.outputs.branch_exists == 'true' && matrix.branch != 'main'
+        run: |
+          echo "Downloading update_changelog.py from the main branch..."
+          rm -rf update_changelog.py
+
+      - name: Commit changes
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "jianchang@yunshan.net"
+
+          git checkout -b update-changelog-${{ matrix.branch }}
+          git add .
+          git commit -m "Update changelog for ${{ matrix.branch }}"
+
+      - name: Pull latest changes from remote branch
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          git pull origin ${{ matrix.branch }} --rebase
+
+      - name: Delete remote branch
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          git push origin --delete update-changelog-${{ matrix.branch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Push changes
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          git push --set-upstream origin ${{ matrix.branch }}:update-changelog-${{ matrix.branch }} -f
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        id: create_pr
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update changelog for ${{ matrix.branch }}
+          branch: update-changelog-${{ matrix.branch }}
+          base: ${{ matrix.branch }}
+          title: Update changelog for ${{ matrix.branch }}
+          body: This PR updates the changelog with the latest changes.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Output PR ID
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          echo "Pull Request ID: ${{ steps.create_pr.outputs.pull-request-number }}"
+
+      # - name: Merge Pull Request
+      #   if: success() && steps.check_branch.outputs.branch_exists == 'true'
+      #   run: |
+      #     gh pr merge ${{ steps.create_pr.outputs.pull-request-number }} --merge --admin
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

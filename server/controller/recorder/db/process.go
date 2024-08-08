@@ -22,21 +22,16 @@ import (
 )
 
 type Process struct {
-	OperatorBase[mysql.Process]
+	OperatorBase[*mysql.Process, mysql.Process]
 }
 
 func NewProcess() *Process {
 	operator := &Process{
-		OperatorBase[mysql.Process]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.Process](
+			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
+			true,
+			true,
+		),
 	}
-	operator.setter = operator
 	return operator
-}
-
-func (p *Process) setDBItemID(dbItem *mysql.Process, id int) {
-	dbItem.ID = id
 }

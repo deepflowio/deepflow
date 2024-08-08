@@ -31,6 +31,7 @@ const (
 	VIF_DEVICE_TYPE_NAT_GATEWAY                     = 16
 	VIF_DEVICE_TYPE_POD_GROUP                       = 101
 	VIF_DEVICE_TYPE_SERVICE                         = 102
+	VIF_DEVICE_TYPE_POD_CLUSTER                     = 103
 	VIF_DEVICE_TYPE_GPROCESS                        = 120
 	VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT            = 130
 	VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET           = 131
@@ -76,6 +77,7 @@ var AutoPodGroupMap = map[string]int{
 }
 
 var AutoServiceMap = map[string]int{
+	"pod_cluster":            VIF_DEVICE_TYPE_POD_CLUSTER,
 	"pod_group":              VIF_DEVICE_TYPE_POD_GROUP,
 	"deployment":             VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT,
 	"stateful_set":           VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET,
@@ -89,10 +91,4 @@ var AutoServiceMap = map[string]int{
 var PodGroupTypeSlice = []string{
 	"deployment", "stateful_set", "replication_controller", "daemon_set",
 	"replica_set_controller", "clone_set",
-}
-
-var NoLanguageTag = []string{
-	"ip_type", "l7_ip_protocol", "server_port", "span_kind", "tcp_flags_bit",
-	"tunnel_tier", "l7_protocol", "eth_type", "protocol", "tunnel_type", "nat_source",
-	"profile_language_type",
 }
