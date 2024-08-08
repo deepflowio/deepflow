@@ -94,8 +94,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"dictGet('flow_tag."+resourceStr+"_map', 'name', (toUInt64("+resourceIDSuffix+")))",
 					groupNotNullFilter,
-					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE name %s %s)",
-					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE %s(name,%s))",
+					"toUInt64("+resourceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE name %s %s)",
+					"toUInt64("+resourceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE %s(name,%s))",
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
@@ -131,8 +131,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.l3_epc_map', 'name', (toUInt64("+l3EPCIDSuffix+")))",
 				l3EPCIDSuffix+"!=-2",
-				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
-				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
+				"toUInt64("+l3EPCIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
+				"toUInt64("+l3EPCIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
 				"'vpc'",
@@ -162,8 +162,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.l3_epc_map', 'name', (toUInt64("+l2EPCIDSuffix+")))",
 				l2EPCIDSuffix+"!=0",
-				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
-				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
+				"toUInt64("+l2EPCIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
+				"toUInt64("+l2EPCIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
 				"'l2_vpc'",
@@ -196,8 +196,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.device_map', 'name', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
 				hostIDSuffix+"!=0",
-				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=6)",
-				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=6)",
+				"toUInt64("+hostIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=6)",
+				"toUInt64("+hostIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=6)",
 			),
 			"node_type": NewTag(
 				"'host'",
@@ -228,8 +228,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.device_map', 'name', (toUInt64(11),toUInt64("+"service_id"+suffix+")))",
 				"service_id"+suffix+"!=0",
-				"toUInt64("+"service_id"+suffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
-				"toUInt64("+"service_id"+suffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
+				"toUInt64("+"service_id"+suffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
+				"toUInt64("+"service_id"+suffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
 			),
 			"node_type": NewTag(
 				"'pod_service'",
@@ -264,8 +264,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.device_map', 'name', (toUInt64(11),toUInt64("+serviceIDSuffix+")))",
 				serviceIDSuffix+"!=0",
-				"toUInt64("+serviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
-				"toUInt64("+serviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
+				"toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
+				"toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
 			),
 			"node_type": NewTag(
 				"'service'",
@@ -305,8 +305,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if("+deviceTypeSuffix+"="+deviceTypeValueStr+", dictGet('flow_tag.device_map', 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+"))), '')",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
@@ -329,16 +329,16 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.vtap_map', 'name', toUInt64(agent_id))",
 			"",
-			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE name %s %s)",
-			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE %s(name,%s))",
+			"toUInt64(agent_id) GLOBAL IN (SELECT id FROM flow_tag.vtap_map WHERE name %s %s)",
+			"toUInt64(agent_id) GLOBAL IN (SELECT id FROM flow_tag.vtap_map WHERE %s(name,%s))",
 		),
 	}
 	tagResourceMap["agent"] = map[string]*Tag{
 		"default": NewTag(
 			"dictGet('flow_tag.vtap_map', 'name', toUInt64(agent_id))",
 			"",
-			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE name %s %s)",
-			"toUInt64(agent_id) IN (SELECT id FROM flow_tag.vtap_map WHERE %s(name,%s))",
+			"toUInt64(agent_id) GLOBAL IN (SELECT id FROM flow_tag.vtap_map WHERE name %s %s)",
+			"toUInt64(agent_id) GLOBAL IN (SELECT id FROM flow_tag.vtap_map WHERE %s(name,%s))",
 		),
 	}
 	// 采集器名称ID
@@ -382,8 +382,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),dictGet('flow_tag.device_map', 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+"))))",
 					"",
-					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+"))",
-					"if("+autoTypeSuffix+" in (0,255),%s(if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),%s),(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
+					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+"))",
+					"if("+autoTypeSuffix+" in (0,255),%s(if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),%s),(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
 				),
 				"node_type": NewTag(
 					nodeTypeStrSuffix,
@@ -548,15 +548,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						nameTagTranslator,
 						notNullFilter,
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
 					),
 				}
 				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
 					"default": NewTag(
 						idTagTranslator,
 						notNullFilter,
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
 						"",
 					),
 				}
@@ -567,7 +567,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR (toUInt64(service_id"+suffix+") GLOBAL IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s))",
 						"",
 					),
 				}
@@ -575,8 +575,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") GLOBAL IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") GLOBAL IN (SELECT pod_service_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
 					),
 				}
 			} else {
@@ -584,7 +584,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
 						"",
 					),
 				}
@@ -592,8 +592,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) GLOBAL IN (SELECT ip,l3_epc_id FROM flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
 					),
 				}
 			}
@@ -621,9 +621,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"if(dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64("+serviceIDSuffix+"),'%s'))!='', dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64("+serviceIDSuffix+"),'%s')), dictGet('flow_tag.pod_k8s_label_map', 'value', (toUInt64("+podIDSuffix+"),'%s')) )",
-				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))",
-				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE value %s %s and key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE value %s %s and key='%s')))",
-				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE %s(value,%s) and key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE %s(value,%s) and key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='%s')) OR (toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE value %s %s and key='%s')) OR (toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE value %s %s and key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE %s(value,%s) and key='%s')) OR (toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE %s(value,%s) and key='%s')))",
 			),
 		}
 	}
@@ -650,9 +650,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[k8sAnnotationSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"if(dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64("+serviceIDSuffix+"),'%s'))!='', dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64("+serviceIDSuffix+"),'%s')), dictGet('flow_tag.pod_k8s_annotation_map', 'value', (toUInt64("+podIDSuffix+"),'%s')) )",
-				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='%s')))",
-				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE value %s %s and key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE value %s %s and key='%s')))",
-				"((toUInt64("+serviceIDSuffix+") IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE %s(value,%s) and key='%s')) OR (toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE %s(value,%s) and key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE key='%s')) OR (toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE value %s %s and key='%s')) OR (toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE value %s %s and key='%s')))",
+				"((toUInt64("+serviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_service_k8s_annotation_map WHERE %s(value,%s) and key='%s')) OR (toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_annotation_map WHERE %s(value,%s) and key='%s')))",
 			),
 		}
 	}
@@ -678,9 +678,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[k8senvSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet('flow_tag.pod_k8s_env_map', 'value', (toUInt64("+podIDSuffix+"),'%s'))",
-				"toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='%s')",
-				"toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE value %s %s and key='%s')",
-				"toUInt64("+podIDSuffix+") IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE %s(value,%s) and key='%s')",
+				"toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE key='%s')",
+				"toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE value %s %s and key='%s')",
+				"toUInt64("+podIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_k8s_env_map WHERE %s(value,%s) and key='%s')",
 			),
 		}
 	}
@@ -707,9 +707,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[cloudTagSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"if(if("+deviceTypeIDSuffix+"=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64("+deviceIDSuffix+"),'%s')), '')!='',if("+deviceTypeIDSuffix+"=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64("+deviceIDSuffix+"),'%s')), ''), dictGet('flow_tag.pod_ns_cloud_tag_map', 'value', (toUInt64("+podNSIDSuffix+"),'%s')) )",
-				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='%s')))",
-				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE value %s %s and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE value %s %s and key='%s'))) ",
-				"((toUInt64("+deviceIDSuffix+") IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE %s(value,%s) and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE %s(value,%s) and key='%s'))) ",
+				"((toUInt64("+deviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='%s')))",
+				"((toUInt64("+deviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE value %s %s and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE value %s %s and key='%s'))) ",
+				"((toUInt64("+deviceIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE %s(value,%s) and key='%s') AND "+deviceTypeIDSuffix+"=1) OR (toUInt64("+podNSIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE %s(value,%s) and key='%s'))) ",
 			),
 		}
 	}
@@ -736,9 +736,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[osAPPSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet('flow_tag.os_app_tag_map', 'value', (toUInt64("+processIDSuffix+"),'%s'))",
-				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')",
-				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE value %s %s and key='%s')",
-				"toUInt64("+processIDSuffix+") IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE %s(value,%s) and key='%s')",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE value %s %s and key='%s')",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE %s(value,%s) and key='%s')",
 			),
 		}
 	}
@@ -823,8 +823,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.tap_type_map', 'name', toUInt64(capture_network_type_id))",
 			"",
-			"toUInt64(capture_network_type_id) IN (SELECT value FROM flow_tag.tap_type_map WHERE name %s %s)",
-			"toUInt64(capture_network_type_id) IN (SELECT value FROM flow_tag.tap_type_map WHERE %s(name,%s))",
+			"toUInt64(capture_network_type_id) GLOBAL IN (SELECT value FROM flow_tag.tap_type_map WHERE name %s %s)",
+			"toUInt64(capture_network_type_id) GLOBAL IN (SELECT value FROM flow_tag.tap_type_map WHERE %s(name,%s))",
 		)}
 
 	// 采集网络类型
@@ -832,8 +832,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.tap_type_map', 'name', toUInt64(capture_network_type_id))",
 			"",
-			"toUInt64(capture_network_type_id) IN (SELECT value FROM flow_tag.tap_type_map WHERE name %s %s)",
-			"toUInt64(capture_network_type_id) IN (SELECT value FROM flow_tag.tap_type_map WHERE %s(name,%s))",
+			"toUInt64(capture_network_type_id) GLOBAL IN (SELECT value FROM flow_tag.tap_type_map WHERE name %s %s)",
+			"toUInt64(capture_network_type_id) GLOBAL IN (SELECT value FROM flow_tag.tap_type_map WHERE %s(name,%s))",
 		)}
 
 	// 响应码
@@ -873,16 +873,16 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"if(capture_nic_type in (0,1,2),dictGet('flow_tag.vtap_port_map', 'name', (toUInt64(agent_id),toUInt64(capture_nic))),'')",
 			"",
-			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE name %s %s),1=1)",
-			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s)),1=1)",
+			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE name %s %s),1=1)",
+			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s)),1=1)",
 		)}
 	// 采集网卡名称
 	tagResourceMap["capture_nic_name"] = map[string]*Tag{
 		"default": NewTag(
 			"if(capture_nic_type in (0,1,2),dictGet('flow_tag.vtap_port_map', 'name', (toUInt64(agent_id),toUInt64(capture_nic))),'')",
 			"",
-			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE name %s %s),1=1)",
-			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s)),1=1)",
+			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE name %s %s),1=1)",
+			"if(capture_nic_type in (0,1,2),(toUInt64(agent_id), toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id, tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s)),1=1)",
 		)}
 	// Nat Real IP
 	for _, suffix := range []string{"", "_0", "_1"} {
@@ -963,14 +963,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))",
 				podGroupIDSuffix+"!=0",
-				"toUInt64("+podGroupIDSuffix+") IN (SELECT id FROM flow_tag.pod_group_map WHERE pod_group_type %s %s) AND "+podGroupIDSuffix+"!=0",
+				"toUInt64("+podGroupIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.pod_group_map WHERE pod_group_type %s %s) AND "+podGroupIDSuffix+"!=0",
 				"",
 			),
 			"enum": NewTag(
 				"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))), dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))",
 				"",
-				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
-				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
+				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
+				"toUInt64(dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s') AND "+podGroupIDSuffix+"!=0",
 			),
 		}
 	}
@@ -980,8 +980,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"enum": NewTag(
 				"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64("+enumName+")), "+enumName+")",
 				"",
-				"toUInt64("+enumName+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-				"toUInt64("+enumName+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+				"toUInt64("+enumName+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+				"toUInt64("+enumName+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 			),
 		}
 	}
@@ -999,16 +999,16 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				tagResourceMap[tagEnumNameSuffix]["enum"] = NewTag(
 					"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
 					"",
-					"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-					"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+					"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+					"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 				)
 			} else {
 				tagResourceMap[tagEnumNameSuffix] = map[string]*Tag{
 					"enum": NewTag(
 						"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
 						"",
-						"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-						"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+						"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+						"toUInt64("+enumNameSuffix+") GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 					),
 				}
 			}
@@ -1020,16 +1020,16 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"enum": NewTag(
 			"if(isNull(span_kind), '', dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(span_kind)), span_kind))",
 			"",
-			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(span_kind) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(span_kind) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		)}
 	for _, enumName := range STRING_ENUM_TAG {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
 				"dictGetOrDefault('flow_tag.string_enum_map', 'name', ('%s',"+enumName+"), "+enumName+")",
 				"",
-				enumName+" IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
-				enumName+" IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
+				enumName+" GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
+				enumName+" GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
 			),
 		}
 	}
@@ -1038,8 +1038,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"enum": NewTag(
 			"dictGetOrDefault('flow_tag.string_enum_map', 'name', ('%s',observation_point), observation_point)",
 			"",
-			"observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
-			"observation_point IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='%s')",
+			"observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		),
 		"default": NewTag(
 			"observation_point",
@@ -1053,8 +1053,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"enum": NewTag(
 			"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(capture_nic_type)), capture_nic_type)",
 			"",
-			"toUInt64(capture_nic_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(capture_nic_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(capture_nic_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(capture_nic_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		),
 		"default": NewTag(
 			"capture_nic_type",
@@ -1113,15 +1113,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[tapPortResource] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet('flow_tag.vtap_port_map', 'device_name', (toUInt64(agent_id),toUInt64(capture_nic)))",
-				"(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+")",
-				"(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_name %s %s)",
-				"(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND %s(device_name,%s))",
+				"(toUInt64(agent_id),toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+")",
+				"(toUInt64(agent_id),toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_name %s %s)",
+				"(toUInt64(agent_id),toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND %s(device_name,%s))",
 			)}
 		tagResourceMap[tapPortResourceID] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet('flow_tag.vtap_port_map', 'device_id', (toUInt64(agent_id),toUInt64(capture_nic)))",
-				"(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+")",
-				"(toUInt64(agent_id),toUInt64(capture_nic)) IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_id %s %s)",
+				"(toUInt64(agent_id),toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+")",
+				"(toUInt64(agent_id),toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type="+deviceTypeValueStr+" AND device_id %s %s)",
 				"",
 			)}
 	}
@@ -1138,8 +1138,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"if(tunnel_ip_id=0,dictGet('flow_tag.policy_map', 'name', (toUInt64(0),toUInt64(acl_gid))),dictGet('flow_tag.policy_map', 'name', (toUInt64(1),toUInt64(acl_gid))))",
 			"",
-			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE name %s %s)",
-			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE %s(name,%s))",
+			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) GLOBAL IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE name %s %s)",
+			"(if(tunnel_ip_id=0,toUInt64(0),toUInt64(1)),toUInt64(acl_gid)) GLOBAL IN (SELECT tunnel_type,acl_gid FROM flow_tag.policy_map WHERE %s(name,%s))",
 		),
 	}
 	// Npb Tunnel
@@ -1155,8 +1155,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.npb_tunnel_map', 'name', toUInt64(tunnel_ip_id))",
 			"",
-			"toUInt64(tunnel_ip_id) IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE name %s %s)",
-			"toUInt64(tunnel_ip_id) IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE %s(name,%s))",
+			"toUInt64(tunnel_ip_id) GLOBAL IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE name %s %s)",
+			"toUInt64(tunnel_ip_id) GLOBAL IN (SELECT id FROM flow_tag.npb_tunnel_map WHERE %s(name,%s))",
 		),
 	}
 
@@ -1186,10 +1186,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 							"dictGet('flow_tag.device_map', '"+fieldName+"', "+
 							"(toUInt64("+deviceTypeValueStr+"),toUInt64("+idNameSuffix+"))), '')",
 						idNameSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-						"toUInt64("+idNameSuffix+") IN (SELECT deviceid FROM flow_tag.device_map "+
+						"toUInt64("+idNameSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map "+
 							"WHERE "+fieldName+" %s %s AND devicetype="+deviceTypeValueStr+") "+
 							"AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-						"toUInt64("+idNameSuffix+") IN (SELECT deviceid FROM flow_tag.device_map "+
+						"toUInt64("+idNameSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map "+
 							"WHERE %s("+fieldName+",%s) AND devicetype="+deviceTypeValueStr+") "+
 							"AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 					),
@@ -1225,8 +1225,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"dictGet('flow_tag.device_map', '"+fieldName+"', (toUInt64("+deviceTypeValueStr+"),toUInt64("+idNameSuffix+")))",
 						idNameSuffix+"!=0",
-						"toUInt64("+idNameSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE "+fieldName+" %s %s AND devicetype="+deviceTypeValueStr+")",
-						"toUInt64("+idNameSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s("+fieldName+",%s) AND devicetype="+deviceTypeValueStr+")",
+						"toUInt64("+idNameSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE "+fieldName+" %s %s AND devicetype="+deviceTypeValueStr+")",
+						"toUInt64("+idNameSuffix+") GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s("+fieldName+",%s) AND devicetype="+deviceTypeValueStr+")",
 					),
 					"node_type": NewTag(
 						"'"+resourceStr+"'",
@@ -1298,8 +1298,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.user_map', 'name', (toUInt64(user_id)))",
 			"",
-			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE name %s %s)",
-			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE %s(name,%s))",
+			"toUInt64(user_id) GLOBAL IN (SELECT id FROM flow_tag.user_map WHERE name %s %s)",
+			"toUInt64(user_id) GLOBAL IN (SELECT id FROM flow_tag.user_map WHERE %s(name,%s))",
 		),
 		"icon_id": NewTag(
 			"0",
@@ -1342,8 +1342,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"dictGet('flow_tag."+resourceStr+"_map', 'name', (toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')])))",
 					groupNotNullFilter,
-					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE name %s %s)",
-					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE %s(name,%s))",
+					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) GLOBAL IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE name %s %s)",
+					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) GLOBAL IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE %s(name,%s))",
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
@@ -1378,8 +1378,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.l3_epc_map', 'name', (toUInt64(tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')])))",
 				"tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]!=-2",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]) IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]) IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]) GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]) GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
 				"'vpc'",
@@ -1408,8 +1408,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.l3_epc_map', 'name', (toUInt64(tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')])))",
 				"tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]!=0",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]) IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]) IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]) GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]) GLOBAL IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
 				"'l2_vpc'",
@@ -1442,8 +1442,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.device_map', 'name', (toUInt64(6),toUInt64(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')])))",
 				"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]!=0",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=6)",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=6)",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=6)",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=6)",
 			),
 			"node_type": NewTag(
 				"'host'",
@@ -1478,8 +1478,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.device_map', 'name', (toUInt64(11),toUInt64(tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')])))",
 				"tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]!=0",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]) IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
-				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]) IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
+				"toUInt64(tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
 			),
 			"node_type": NewTag(
 				"'service'",
@@ -1514,8 +1514,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"dictGet('flow_tag.device_map', 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')])))",
 					"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]!=0",
-					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype="+deviceTypeValueStr+") AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
@@ -1561,8 +1561,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"if(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')] in (0,255),tag_string_values[indexOf(tag_string_names,'"+autoNameSuffix+"')],dictGet('flow_tag.device_map', 'name', (toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')]),toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]))))",
 					"",
-					"if(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')] in (0,255),tag_string_values[indexOf(tag_string_names,'"+autoNameSuffix+"')] %s %s,(toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]),toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')])) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+"))",
-					"if(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')] in (0,255),%s(tag_string_values[indexOf(tag_string_names,'"+autoNameSuffix+"')],%s),(toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]),toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')])) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
+					"if(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')] in (0,255),tag_string_values[indexOf(tag_string_names,'"+autoNameSuffix+"')] %s %s,(toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]),toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')])) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+"))",
+					"if(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')] in (0,255),%s(tag_string_values[indexOf(tag_string_names,'"+autoNameSuffix+"')],%s),(toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]),toUInt64(tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')])) GLOBAL IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
 				),
 				"node_type": NewTag(
 					nodeTypeStrSuffix,
@@ -1604,8 +1604,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.pod_ingress_map', 'name', (toUInt64(tag_int_values[indexOf(tag_int_names,'pod_ingress_id')])))",
 			"",
-			"toUInt64(tag_int_values[indexOf(tag_int_names,'pod_ingress_id')]) IN (SELECT id FROM flow_tag.pod_ingress_map WHERE name %s %s)",
-			"toUInt64(tag_int_values[indexOf(tag_int_names,'pod_ingress_id')]) IN (SELECT id FROM flow_tag.pod_ingress_map WHERE %s(name,%s))",
+			"toUInt64(tag_int_values[indexOf(tag_int_names,'pod_ingress_id')]) GLOBAL IN (SELECT id FROM flow_tag.pod_ingress_map WHERE name %s %s)",
+			"toUInt64(tag_int_values[indexOf(tag_int_names,'pod_ingress_id')]) GLOBAL IN (SELECT id FROM flow_tag.pod_ingress_map WHERE %s(name,%s))",
 		),
 	}
 	tagResourceMap["pod_ingress_id"] = map[string]*Tag{
@@ -1622,8 +1622,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.lb_listener_map', 'name', (toUInt64(tag_int_values[indexOf(tag_int_names,'lb_listener_id')])))",
 			"",
-			"toUInt64(tag_int_values[indexOf(tag_int_names,'lb_listener_id')]) IN (SELECT id FROM flow_tag.lb_listener_map WHERE name %s %s)",
-			"toUInt64(tag_int_values[indexOf(tag_int_names,'lb_listener_id')]) IN (SELECT id FROM flow_tag.lb_listener_map WHERE %s(name,%s))",
+			"toUInt64(tag_int_values[indexOf(tag_int_names,'lb_listener_id')]) GLOBAL IN (SELECT id FROM flow_tag.lb_listener_map WHERE name %s %s)",
+			"toUInt64(tag_int_values[indexOf(tag_int_names,'lb_listener_id')]) GLOBAL IN (SELECT id FROM flow_tag.lb_listener_map WHERE %s(name,%s))",
 		),
 	}
 	tagResourceMap["lb_listener_id"] = map[string]*Tag{
@@ -1641,8 +1641,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.alarm_policy_map', 'name', (toUInt64(policy_id)))",
 			"",
-			"toUInt64(policy_id) IN (SELECT id FROM flow_tag.alarm_policy_map WHERE name %s %s)",
-			"toUInt64(policy_id) IN (SELECT id FROM flow_tag.alarm_policy_map WHERE %s(name,%s))",
+			"toUInt64(policy_id) GLOBAL IN (SELECT id FROM flow_tag.alarm_policy_map WHERE name %s %s)",
+			"toUInt64(policy_id) GLOBAL IN (SELECT id FROM flow_tag.alarm_policy_map WHERE %s(name,%s))",
 		),
 		"icon_id": NewTag(
 			"0",
@@ -1670,8 +1670,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"dictGet('flow_tag.user_map', 'name', (toUInt64(user_id)))",
 			"",
-			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE name %s %s)",
-			"toUInt64(user_id) IN (SELECT id FROM flow_tag.user_map WHERE %s(name,%s))",
+			"toUInt64(user_id) GLOBAL IN (SELECT id FROM flow_tag.user_map WHERE name %s %s)",
+			"toUInt64(user_id) GLOBAL IN (SELECT id FROM flow_tag.user_map WHERE %s(name,%s))",
 		),
 		"icon_id": NewTag(
 			"0",
@@ -1712,8 +1712,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"enum": NewTag(
 			"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(event_level)), event_level)",
 			"",
-			"toUInt64(event_level) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(event_level) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		),
 	}
 
@@ -1722,8 +1722,8 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"enum": NewTag(
 			"dictGetOrDefault('flow_tag.int_enum_map', 'name', ('%s',toUInt64(policy_type)), policy_type)",
 			"",
-			"toUInt64(policy_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
-			"toUInt64(policy_type) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			"toUInt64(policy_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+			"toUInt64(policy_type) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
 		),
 	}
 
@@ -1780,16 +1780,16 @@ func GenerateFlowTagTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"",
 			"",
-			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s WHERE name %s %s)",
-			"toUInt64(%s_id) IN (SELECT id FROM flow_tag.%s WHERE %s(name,%s))",
+			"toUInt64(%s_id) GLOBAL IN (SELECT id FROM flow_tag.%s WHERE name %s %s)",
+			"toUInt64(%s_id) GLOBAL IN (SELECT id FROM flow_tag.%s WHERE %s(name,%s))",
 		),
 	}
 	tagResourceMap["device_name"] = map[string]*Tag{
 		"default": NewTag(
 			"",
 			"",
-			"toUInt64(%s_id) IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=%d)",
-			"toUInt64(%s_id) IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=%d )",
+			"toUInt64(%s_id) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=%d)",
+			"toUInt64(%s_id) GLOBAL IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=%d )",
 		),
 	}
 
