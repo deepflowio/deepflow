@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: traffic.go log [#7738](https://github.com/deepflowio/deepflow/pull/7738) by [roryye](https://github.com/roryye)
+* fix: server fixes the problem that TapInterfaceRegex cannot be set to empty [#7735](https://github.com/deepflowio/deepflow/pull/7735) by [TomatoMr](https://github.com/TomatoMr)
+* fix: Fix enum filter error [#7724](https://github.com/deepflowio/deepflow/pull/7724) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: Modify alert_event tag category #26069 [#7676](https://github.com/deepflowio/deepflow/pull/7676) by [Ericsssss](https://github.com/Ericsssss)
 * fix: ntp support profile data [#7704](https://github.com/deepflowio/deepflow/pull/7704) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent fixes empty endpoint when setting http-endpoint-extraction.match-rules.prefix: "" [#7698](https://github.com/deepflowio/deepflow/pull/7698) by [TomatoMr](https://github.com/TomatoMr)
 * fix: modify log format [#7690](https://github.com/deepflowio/deepflow/pull/7690) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
@@ -113,6 +117,14 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add trace query delta for tracemap [#7747](https://github.com/deepflowio/deepflow/pull/7747) by [taloric](https://github.com/taloric)
+* Revert "feat: agent - eBPF Modify the version number of the Java agent" [#7740](https://github.com/deepflowio/deepflow/pull/7740) by [yinjiping](https://github.com/yinjiping)
+* feat: add auto_instace/auto_service field for profile [#7737](https://github.com/deepflowio/deepflow/pull/7737) by [lzf575](https://github.com/lzf575)
+* feat: Support k8s opengauss cluster [#7736](https://github.com/deepflowio/deepflow/pull/7736) by [rvql](https://github.com/rvql)
+* feat: agent - eBPF Modify the version number of the Java agent [#7733](https://github.com/deepflowio/deepflow/pull/7733) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Java agent uses caching to reduce send frequency [#7730](https://github.com/deepflowio/deepflow/pull/7730) by [yinjiping](https://github.com/yinjiping)
+* feat: Tars protocol parsing is supported [#7709](https://github.com/deepflowio/deepflow/pull/7709) by [incoffeemonster](https://github.com/incoffeemonster)
+* feat: add pod_cluster_id in ch_pod_ingress and ch_pod_node table [#7683](https://github.com/deepflowio/deepflow/pull/7683) by [duandaa](https://github.com/duandaa)
 * feat: change lua function name [#7723](https://github.com/deepflowio/deepflow/pull/7723) by [duandaa](https://github.com/duandaa)
 * feat: kubernetes support OpenGaussCluster [#7722](https://github.com/deepflowio/deepflow/pull/7722) by [askyrie](https://github.com/askyrie)
 * feat: agent - eBPF Adjust method for checking if agent is running [#7718](https://github.com/deepflowio/deepflow/pull/7718) by [yinjiping](https://github.com/yinjiping)
@@ -265,6 +277,8 @@
 * refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
+* perf: speed up the update of ClickHouse table structure [#7748](https://github.com/deepflowio/deepflow/pull/7748) by [lzf575](https://github.com/lzf575)
+* perf: speed up the update of ClickHouse table structure [#7746](https://github.com/deepflowio/deepflow/pull/7746) by [lzf575](https://github.com/lzf575)
 * perf: optimize trace_tree slice assignment [#7414](https://github.com/deepflowio/deepflow/pull/7414) by [lzf575](https://github.com/lzf575)
 * perf: improve trace_tree search index [#7413](https://github.com/deepflowio/deepflow/pull/7413) by [lzf575](https://github.com/lzf575)
 * perf: add setting ttl_only_drop_parts to the CK table to make TTL more efficient [#7265](https://github.com/deepflowio/deepflow/pull/7265) by [lzf575](https://github.com/lzf575)
@@ -280,5 +294,6 @@
 
 
 #### OTHER
+* use .env to config docker-compose.yaml [#7729](https://github.com/deepflowio/deepflow/pull/7729) by [asdfsx](https://github.com/asdfsx)
 * refector: add agent.proto [#7695](https://github.com/deepflowio/deepflow/pull/7695) by [yuanchaoa](https://github.com/yuanchaoa)
 * Update changelog [#7660](https://github.com/deepflowio/deepflow/pull/7660) by [lzf575](https://github.com/lzf575)
