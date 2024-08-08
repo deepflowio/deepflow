@@ -518,9 +518,12 @@ func delTableMV(cks basecommon.DBs, dbId flow_metrics.MetricsTableID, db, table 
 }
 
 func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, duration int) error {
-	tableLocal := fmt.Sprintf("%s.%s_%s", db, table, LOCAL)
+	ttlTable := fmt.Sprintf("%s.%s_%s", db, table, LOCAL)
+	if m.ckdbType == ckdb.CKDBTypeByconity {
+		ttlTable = fmt.Sprintf("%s.%s", db, table)
+	}
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
-		tableLocal, m.makeTTLString("time", db, table, duration))
+		ttlTable, m.makeTTLString("time", db, table, duration))
 	_, err := cks.ExecParallel(modTable)
 	return err
 }

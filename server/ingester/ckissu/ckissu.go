@@ -478,7 +478,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 func (i *Issu) updateTablesForByConity() {
 	byconityAdds := []*ColumnAdd{}
 	for _, k := range i.columnAdds {
-		if strings.HasSuffix(k.Table, "_local") {
+		if !strings.HasSuffix(k.Table, "_local") {
 			byconityAdds = append(byconityAdds, k)
 		}
 	}
@@ -486,7 +486,7 @@ func (i *Issu) updateTablesForByConity() {
 
 	byconityMods := []*ColumnMod{}
 	for _, k := range i.columnMods {
-		if strings.HasSuffix(k.Table, "_local") {
+		if !strings.HasSuffix(k.Table, "_local") {
 			byconityMods = append(byconityMods, k)
 		}
 	}
@@ -494,7 +494,7 @@ func (i *Issu) updateTablesForByConity() {
 
 	byconityRenames := []*ColumnRename{}
 	for _, k := range i.columnRenames {
-		if strings.HasSuffix(k.Table, "_local") {
+		if !strings.HasSuffix(k.Table, "_local") {
 			byconityRenames = append(byconityRenames, k)
 		}
 	}

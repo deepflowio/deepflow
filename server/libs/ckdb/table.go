@@ -178,16 +178,23 @@ SETTINGS storage_policy = '%s', ttl_only_drop_parts = 1%s`,
 }
 
 func (t *Table) MakeLocalTableCreateSQL() string {
+	if t.DBType == CKDBTypeByconity {
+		return "SELECT VERSION()"
+	}
 	return t.makeLocalTableCreateSQL(t.Database)
 }
 
 func (t *Table) MakeOrgLocalTableCreateSQL(orgID uint16) string {
+	if t.DBType == CKDBTypeByconity {
+		return "SELECT VERSION()"
+	}
 	return t.makeLocalTableCreateSQL(t.OrgDatabase(orgID))
 }
 
 func (t *Table) makeGlobalTableCreateSQL(database string) string {
 	if t.DBType == CKDBTypeByconity {
-		return fmt.Sprintf("CREATE OR REPLACE VIEW %s.`%s` as SELECT * FROM %s.`%s`", database, t.GlobalName, database, t.LocalName)
+		t.LocalName = t.GlobalName
+		return t.makeLocalTableCreateSQL(t.Database)
 	}
 	engine := fmt.Sprintf(Distributed.String(), t.Cluster, database, t.LocalName)
 	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`%s` AS %s.`%s` ENGINE=%s",
@@ -246,6 +253,9 @@ func (t *Table) MakeViewsCreateSQLForDeepflowSystem(orgID uint16) []string {
 }
 
 func (t *Table) makePrepareTableInsertSQL(database string) string {
+	if t.DBType == CKDBTypeByconity {
+		t.LocalName = t.GlobalName
+	}
 	columns := []string{}
 	values := []string{}
 	for _, c := range t.Columns {
