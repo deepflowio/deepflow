@@ -61,6 +61,7 @@ type ProfileDebug struct {
 
 type ProfileTree struct {
 	Functions      []string `json:"functions"`
+	FunctionTypes  []string `json:"function_types"`
 	FunctionValues Value    `json:"function_values"`
 	NodeValues     Value    `json:"node_values"`
 }
