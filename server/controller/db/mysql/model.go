@@ -501,10 +501,22 @@ func (AlarmPolicy) TableName() string {
 	return "alarm_policy"
 }
 
-type Org struct {
-	ID    int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name  string `gorm:"column:name;type:char(128);default:''" json:"NAME"`
-	ORGID int    `gorm:"column:org_id;type:int;default:0" json:"ORG_ID"`
+type ORG struct {
+	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name        string `gorm:"column:name;type:char(128);default:''" json:"NAME"`
+	ORGID       int    `gorm:"column:org_id;type:int;default:0" json:"ORG_ID"`
+	Lcuuid      string `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+	OwnerUserID int    `gorm:"column:owner_user_id;type:int;default:0" json:"OWNER_USER_ID"`
+}
+
+type DeletedORG struct {
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name        string    `gorm:"column:name;type:char(128);default:''" json:"NAME"`
+	ORGID       int       `gorm:"column:org_id;type:int;default:0" json:"ORG_ID"`
+	Lcuuid      string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+	OwnerUserID int       `gorm:"column:owner_user_id;type:int;default:0" json:"OWNER_USER_ID"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT" mapstructure:"CREATED_AT"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
 }
 
 type Team struct {
