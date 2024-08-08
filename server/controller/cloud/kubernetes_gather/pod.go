@@ -37,6 +37,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		"InPlaceSet":            false,
 		"ReplicaSet":            false,
 		"StatefulSet":           false,
+		"OpenGaussCluster":      false,
 		"ReplicationController": false,
 	}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
@@ -100,8 +101,8 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			// 适配 serverless pod
 			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s"}]`, uid, abstractPGType)))
 		}
-		ID := podGroups.GetIndex(0).Get("uid").MustString()
-		if ID == "" {
+		podGroupUID := podGroups.GetIndex(0).Get("uid").MustString()
+		if podGroupUID == "" {
 			log.Infof("pod (%s) pod group not found", name)
 			continue
 		}
@@ -115,21 +116,20 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		podRSLcuuid := ""
 		podGroupLcuuid := ""
 		podLcuuid := ""
-		ID = common.IDGenerateUUID(k.orgID, ID)
-		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[ID]; ok {
-			podRSLcuuid = ID
+		pgLcuuid := common.IDGenerateUUID(k.orgID, podGroupUID)
+		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[podGroupUID]; ok {
+			podRSLcuuid = pgLcuuid
 			podGroupLcuuid = gLcuuid
 		} else {
-			if !k.podGroupLcuuids.Contains(ID) {
+			if !k.podGroupLcuuids.Contains(pgLcuuid) {
 				log.Debugf("pod (%s) pod group not found", name)
 				continue
 			}
-			podGroupLcuuid = ID
+			podGroupLcuuid = pgLcuuid
 		}
-		if kind == "StatefulSet" {
-			generate_name := metaData.Get("generate_name").MustString()
-			serialNumber := strings.TrimLeft(name, generate_name)
-			podLcuuid = common.GetUUIDByOrgID(k.orgID, ID+serialNumber)
+		if generateName, ok := metaData.CheckGet("generateName"); ok {
+			serialNumber := strings.TrimLeft(name, generateName.MustString())
+			podLcuuid = common.GetUUIDByOrgID(k.orgID, pgLcuuid+serialNumber)
 		} else {
 			podLcuuid = common.IDGenerateUUID(k.orgID, uID)
 		}
