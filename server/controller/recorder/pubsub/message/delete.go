@@ -249,8 +249,3 @@ type ProcessDelete struct {
 	Lcuuids
 	MySQLItems[mysql.Process]
 }
-
-type PrometheusTargetDelete struct {
-	Lcuuids
-	MySQLItems[mysql.PrometheusTarget]
-}

@@ -17,10 +17,13 @@
 package tagrecorder
 
 import (
+	"fmt"
+
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 var DomainToTeamID map[string]int
+var SubDomainToTeamID map[string]int
 var DomainToDomainID map[string]int
 var SubDomainToSubDomainID map[string]int
 var VTapIDToTeamID map[int]int
@@ -31,20 +34,21 @@ func GetTeamInfo(db *mysql.DB) {
 	var vTaps []mysql.VTap
 	err := db.Unscoped().Find(&domains).Error
 	if err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 		return
 	}
 	err = db.Unscoped().Find(&subDomains).Error
 	if err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 		return
 	}
 	err = db.Unscoped().Find(&vTaps).Error
 	if err != nil {
-		log.Error(err)
+		log.Error(err, db.LogPrefixORGID)
 		return
 	}
 	domainToTeamID := map[string]int{}
+	subDomainToTeamID := map[string]int{}
 	domainToDomainID := map[string]int{}
 	subDomainToSubDomainID := map[string]int{}
 	vTapIDToTeamID := map[int]int{}
@@ -55,6 +59,7 @@ func GetTeamInfo(db *mysql.DB) {
 	}
 	// sub_domain
 	for _, subDomain := range subDomains {
+		subDomainToTeamID[subDomain.Lcuuid] = subDomain.TeamID
 		subDomainToSubDomainID[subDomain.Lcuuid] = subDomain.ID
 	}
 	// vtap
@@ -62,7 +67,18 @@ func GetTeamInfo(db *mysql.DB) {
 		vTapIDToTeamID[vTap.ID] = vTap.TeamID
 	}
 	DomainToTeamID = domainToTeamID
+	SubDomainToTeamID = subDomainToTeamID
 	DomainToDomainID = domainToDomainID
 	SubDomainToSubDomainID = subDomainToSubDomainID
 	VTapIDToTeamID = vTapIDToTeamID
+}
+
+func GetTeamID(domainUUID, subDomainUUID string) (int, error) {
+	if v, ok := SubDomainToTeamID[subDomainUUID]; ok {
+		return v, nil
+	}
+	if v, ok := DomainToTeamID[domainUUID]; ok {
+		return v, nil
+	}
+	return 0, fmt.Errorf("can not get team id domain(%s) subdomain(%s)", domainUUID, subDomainUUID)
 }

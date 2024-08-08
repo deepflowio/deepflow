@@ -31,5 +31,5 @@ type ResourceUpdatedSubscriber interface {
 }
 
 type ResourceBatchDeletedSubscriber interface {
-	OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool)
+	OnResourceBatchDeleted(md *message.Metadata, msg interface{})
 }

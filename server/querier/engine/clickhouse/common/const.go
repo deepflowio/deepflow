@@ -29,6 +29,8 @@ const DB_NAME_PROMETHEUS = "prometheus"
 const DB_NAME_FLOW_TAG = "flow_tag"
 const DB_NAME_APPLICATION_LOG = "application_log"
 const TABLE_NAME_VTAP_ACL = "traffic_policy"
+const TABLE_NAME_TRACE_TREE = "trace_tree"
+const TABLE_NAME_SPAN_WITH_TRACE_ID = "span_with_trace_id"
 const IndexTypeIncremetalId = "incremental-id"
 const FormatHex = "hex"
 const TagServerChPrefix = "服务端"
@@ -42,7 +44,7 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_ADMIN:  []string{"deepflow_server"},
 	DB_NAME_DEEPFLOW_TENANT: []string{"deepflow_collector"},
-	DB_NAME_EVENT:           []string{"event", "perf_event", "alarm_event"},
+	DB_NAME_EVENT:           []string{"event", "perf_event", "alert_event"},
 	DB_NAME_PROFILE:         []string{"in_process"},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
 	DB_NAME_APPLICATION_LOG: []string{"log"},
@@ -56,4 +58,6 @@ var SHOW_TAG_VALUE_MAP = map[string][]string{
 	"pod_map":         []string{"pod", "pod_cluster", "pod_ns", "pod_node", "pod_service", "pod_group"},
 	"chost_map":       []string{"chost", "host", "l3_epc", "chost_ip", "chost_hostname"},
 	"gprocess_map":    []string{"gprocess", "chost", "l3_epc"},
+	"pod_ingress_map": []string{"pod_cluster", "pod_ns"},
+	"pod_node_map":    []string{"pod_cluster"},
 }

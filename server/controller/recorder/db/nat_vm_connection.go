@@ -22,15 +22,15 @@ import (
 )
 
 type NATVMConnection struct {
-	OperatorBase[mysql.NATVMConnection]
+	OperatorBase[*mysql.NATVMConnection, mysql.NATVMConnection]
 }
 
 func NewNATVMConnection() *NATVMConnection {
 	return &NATVMConnection{
-		OperatorBase[mysql.NATVMConnection]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.NATVMConnection](
+			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
+			false,
+			false,
+		),
 	}
 }

@@ -30,6 +30,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	prometheuscommon "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
@@ -118,7 +119,7 @@ func (c *Cleaner) deleteAndRefresh() error {
 				return err
 			}
 			if err := newDeleter(org, c.cfg).tryDelete(); err != nil {
-				log.Errorf("failed to delete: %v", err)
+				log.Errorf("failed to delete: %v", err, logger.NewORGPrefix(orgID))
 				return err
 			}
 		}
@@ -157,7 +158,7 @@ func (d *deleter) tryDelete() error {
 func (d *deleter) refreshRelatedData() error {
 	en, err := encoder.GetEncoder(d.org.GetID())
 	if err != nil {
-		log.Error(d.org.Logf("failed to get encoder: %v", err))
+		log.Errorf("failed to get encoder: %v", err, d.org.LogPrefix)
 	} else {
 		en.Refresh()
 	}
@@ -167,42 +168,42 @@ func (d *deleter) refreshRelatedData() error {
 func (d *deleter) prepareData() error {
 	querier, err := newQuerier(d.org, d.cfg.QuerierQueryLimit)
 	if err != nil {
-		log.Error(d.org.Logf("failed to new querier: %v", err))
+		log.Errorf("failed to new querier: %v", err, d.org.LogPrefix)
 		return err
 	}
 	if d.activeData, err = querier.query(); err != nil {
-		log.Error(d.org.Logf("failed to get active data: %v", err))
+		log.Errorf("failed to get active data: %v", err, d.org.LogPrefix)
 		return err
 	}
 
 	d.dataToCheck = newDataToCheck()
 	if err := d.dataToCheck.load(d.org.DB); err != nil {
-		log.Error(d.org.Logf("failed to load data to check: %v", err))
+		log.Errorf("failed to load data to check: %v", err, d.org.LogPrefix)
 		return err
 	}
 	return nil
 }
 
-func (c *deleter) delete() error {
+func (d *deleter) delete() error {
 	var e error
-	if err := c.deleteExpiredMetricAPPLabelLayout(); err != nil {
-		log.Error(c.org.Logf("mysql delete failed: %v", err))
+	if err := d.deleteExpiredMetricAPPLabelLayout(); err != nil {
+		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
-	if err := c.deleteExpiredMetricName(); err != nil {
-		log.Error(c.org.Logf("mysql delete failed: %v", err))
+	if err := d.deleteExpiredMetricName(); err != nil {
+		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
-	if err := c.deleteExpiredLabel(); err != nil {
-		log.Error(c.org.Logf("mysql delete failed: %v", err))
+	if err := d.deleteExpiredLabel(); err != nil {
+		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
-	if err := c.deleteExpiredLabelName(); err != nil {
-		log.Error(c.org.Logf("mysql delete failed: %v", err))
+	if err := d.deleteExpiredLabelName(); err != nil {
+		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
-	if err := c.deleteExpiredLabelValue(); err != nil {
-		log.Error(c.org.Logf("mysql delete failed: %v", err))
+	if err := d.deleteExpiredLabelValue(); err != nil {
+		log.Errorf("mysql delete failed: %v", err, d.org.LogPrefix)
 		e = err
 	}
 	return e
@@ -295,11 +296,11 @@ func DeleteBatch[MT any](resourceType string, db *mysql.DB, items []MT) error {
 		}
 		toDel := items[start:end]
 		if err := db.Delete(&toDel).Error; err != nil {
-			log.Error(db.Logf("mysql delete %s failed: %v", resourceType, err))
+			log.Errorf("mysql delete %s failed: %v", resourceType, err, db.LogPrefixORGID)
 			return err
 		}
-		log.Info(db.Logf("clear %s data count: %d", resourceType, len(toDel)))
-		log.Debugf(db.Logf("clear %s data: %#v", resourceType, toDel))
+		log.Infof("clear %s data count: %d", resourceType, len(toDel), db.LogPrefixORGID)
+		log.Debugf("clear %s data: %#v", resourceType, toDel, db.LogPrefixORGID)
 	}
 
 	return nil
@@ -320,7 +321,7 @@ type querier struct {
 func newQuerier(org *prometheuscommon.ORG, queryLimit int) (*querier, error) {
 	c, err := cache.GetCache(org.GetID())
 	if err != nil {
-		log.Error(org.Logf("failed to get cache: %v", err))
+		log.Errorf("failed to get cache: %v", err, org.LogPrefix)
 		return nil, err
 	}
 	queryBody := map[string]url.Values{
@@ -350,7 +351,7 @@ func (q *querier) query() (*activeData, error) {
 		return nil, err
 	}
 	for region, domainNamePrefix := range regionToDomainNamePrefix {
-		log.Info(q.org.Logf("get active data by region: %s", region))
+		log.Infof("get active data by region: %s", region, q.org.LogPrefix)
 		if err := q.getMetricLabelAndFillActiveData(domainNamePrefix); err != nil {
 			return nil, err
 		}
@@ -358,7 +359,7 @@ func (q *querier) query() (*activeData, error) {
 			return nil, err
 		}
 	}
-	log.Infof(q.org.Logf("active data cardinality: %s", q.activeData.getCardinalityInfo()))
+	log.Infof("active data cardinality: %s", q.activeData.getCardinalityInfo(), q.org.LogPrefix)
 	return q.activeData, nil
 }
 
@@ -378,7 +379,7 @@ func (q *querier) getMetricLabelAndFillActiveData(domainNamePrefix string) error
 		}
 	}
 
-	log.Infof(q.org.Logf("active metric label count: %d", len(result.Get("values").MustArray())))
+	log.Infof("active metric label count: %d", len(result.Get("values").MustArray()), q.org.LogPrefix)
 	for i := range result.Get("values").MustArray() {
 		value := result.Get("values").GetIndex(i)
 		metricName := value.GetIndex(metricNameIdx).MustString()
@@ -410,7 +411,7 @@ func (q *querier) getLabelAndFillActiveData(domainNamePrefix string) error {
 		}
 	}
 
-	log.Infof(q.org.Logf("active label count: %d", len(result.Get("values").MustArray())))
+	log.Infof("active label count: %d", len(result.Get("values").MustArray()), q.org.LogPrefix)
 	for i := range result.Get("values").MustArray() {
 		value := result.Get("values").GetIndex(i)
 		labelName := value.GetIndex(labelNameIdx).MustString()
@@ -424,7 +425,7 @@ func (q *querier) getLabelAndFillActiveData(domainNamePrefix string) error {
 
 func (q *querier) getByRegion(domainNamePrefix string, resourceType string) (*simplejson.Json, error) {
 	url := fmt.Sprintf("http://%sdeepflow-server:%d/v1/query", domainNamePrefix, queriercfg.Cfg.ListenPort)
-	log.Infof(q.org.Logf("get active data: %s, body: %v", url, q.reqBody[resourceType]))
+	log.Infof("get active data: %s, body: %v", url, q.reqBody[resourceType], q.org.LogPrefix)
 	resp, err := common.CURLForm(
 		http.MethodPost,
 		url,
@@ -432,7 +433,7 @@ func (q *querier) getByRegion(domainNamePrefix string, resourceType string) (*si
 		common.WithORGHeader(strconv.Itoa(q.org.GetID())),
 	)
 	if err != nil {
-		log.Error(q.org.Logf("failed to get raw data: %s, %s", err.Error(), url))
+		log.Errorf("failed to get raw data: %s, %s", err.Error(), url, q.org.LogPrefix)
 		return nil, err
 	}
 	// FIXME better exceed handling
@@ -445,7 +446,7 @@ func (q *querier) getByRegion(domainNamePrefix string, resourceType string) (*si
 func (q *querier) getRegionToDomainNamePrefix() (map[string]string, error) {
 	var controllers []*mysql.Controller
 	if err := q.org.DB.Find(&controllers).Error; err != nil {
-		log.Error(q.org.Logf("failed to query %s: %v", "controller", err))
+		log.Errorf("failed to query %s: %v", "controller", err, q.org.LogPrefix)
 		return nil, err
 	}
 	ipToControllerDomainPrefix := make(map[string]string)
@@ -459,7 +460,7 @@ func (q *querier) getRegionToDomainNamePrefix() (map[string]string, error) {
 
 	var azControllerConns []*mysql.AZControllerConnection
 	if err := q.org.DB.Find(&azControllerConns).Error; err != nil {
-		log.Error(q.org.Logf("failed to query %s: %v", "az_controller_connection", err))
+		log.Errorf("failed to query %s: %v", "az_controller_connection", err, q.org.LogPrefix)
 		return nil, err
 	}
 

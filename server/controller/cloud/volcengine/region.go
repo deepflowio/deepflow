@@ -19,6 +19,7 @@ package volcengine
 import (
 	"sort"
 
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/ecs"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/credentials"
@@ -26,7 +27,7 @@ import (
 )
 
 func (v *VolcEngine) getRegions() ([]string, error) {
-	log.Debug("get regions starting")
+	log.Debug("get regions starting", logger.NewORGPrefix(v.orgID))
 	var regionIDs []string
 
 	config := volcengine.NewConfig().
@@ -36,12 +37,12 @@ func (v *VolcEngine) getRegions() ([]string, error) {
 
 	sess, err := session.NewSession(config)
 	if err != nil {
-		log.Errorf("get volcengine session error: (%s)", err.Error())
+		log.Errorf("get volcengine session error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 		return []string{}, err
 	}
 	resp, err := ecs.New(sess).DescribeRegions(&ecs.DescribeRegionsInput{})
 	if err != nil {
-		log.Errorf("request volcengine (ecs.DescribeRegions) api error: (%s)", err.Error())
+		log.Errorf("request volcengine (ecs.DescribeRegions) api error: (%s)", err.Error(), logger.NewORGPrefix(v.orgID))
 		return []string{}, err
 	}
 	for _, region := range resp.Regions {
@@ -53,7 +54,7 @@ func (v *VolcEngine) getRegions() ([]string, error) {
 		if len(v.includeRegions) > 0 {
 			regionIndex := sort.SearchStrings(v.includeRegions, regionID)
 			if regionIndex == len(v.includeRegions) || v.includeRegions[regionIndex] != regionID {
-				log.Infof("region (%s) not in include_regions", regionID)
+				log.Infof("region (%s) not in include_regions", regionID, logger.NewORGPrefix(v.orgID))
 				continue
 			}
 		}
@@ -61,12 +62,12 @@ func (v *VolcEngine) getRegions() ([]string, error) {
 		if len(v.excludeRegions) > 0 {
 			regionIndex := sort.SearchStrings(v.excludeRegions, regionID)
 			if regionIndex < len(v.excludeRegions) && v.excludeRegions[regionIndex] == regionID {
-				log.Infof("region (%s) in exclude_regions", regionID)
+				log.Infof("region (%s) in exclude_regions", regionID, logger.NewORGPrefix(v.orgID))
 				continue
 			}
 		}
 		regionIDs = append(regionIDs, regionID)
 	}
-	log.Debug("get regions complete")
+	log.Debug("get regions complete", logger.NewORGPrefix(v.orgID))
 	return regionIDs, nil
 }

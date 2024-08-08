@@ -61,6 +61,10 @@ type OperatedTime struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
 }
 
+func (t *OperatedTime) SetUpdatedAt(updatedAt time.Time) {
+	t.UpdatedAt = updatedAt
+}
+
 type SoftDeleteBase struct {
 	OperatedTime `mapstructure:",squash"`
 	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at;type:datetime;default:null" json:"DELETED_AT" mapstructure:"DELETED_AT"`
@@ -72,13 +76,13 @@ type Process struct {
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	VTapID         uint32    `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID" mapstructure:"VTAP_ID"`
 	PID            uint64    `gorm:"column:pid;type:int;not null;default:0" json:"PID" mapstructure:"PID"`
-	DeviceType     int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICE_TYPE" mapstructure:"DEVICE_TYPE"`
-	DeviceID       int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"DEVICE_ID"`
+	DeviceType     int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICE_TYPE" mapstructure:"RESOURCE_TYPE"`
+	DeviceID       int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"RESOURCE_ID"`
 	PodNodeID      int       `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
 	VMID           int       `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
 	VPCID          int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID" mapstructure:"EPC_ID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME" mapstructure:"PROCESS_NAME"`
-	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE" mapstructure:"COMMAND_LINE"`
+	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE" mapstructure:"CMD_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME" mapstructure:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME" mapstructure:"START_TIME"`
 	OSAPPTags      string    `gorm:"column:os_app_tags;type:text" json:"OS_APP_TAGS" mapstructure:"OS_APP_TAGS"`
@@ -242,38 +246,12 @@ func (v VM) GetSubDomainLcuuid() string {
 }
 
 type VMPodNodeConnection struct {
-	Base      `gorm:"embedded" mapstructure:",squash"`
-	VMID      int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
-	PodNodeID int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
-	Domain    string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	SubDomain string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-}
-
-type Contact struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
-	Name         string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
-	Mobile       string    `gorm:"column:mobile;type:char(13);default:''" json:"MOBILE" mapstructure:"MOBILE"`
-	Email        string    `gorm:"column:email;type:varchar(128);default:''" json:"EMAIL" mapstructure:"EMAIL"`
-	Company      string    `gorm:"column:company;type:varchar(128);default:''" json:"COMPANY" mapstructure:"COMPANY"`
-	PushEmail    string    `gorm:"column:push_email;type:text;default:null" json:"PUSH_EMAIL" mapstructure:"PUSH_EMAIL"`
-	Domain       string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
-	AlarmPush    int       `gorm:"column:alarm_push;type:int;default:0" json:"ALARM_PUSH" mapstructure:"ALARM_PUSH"`
-	ReportPush   int       `gorm:"column:report_push;type:int;default:0" json:"REPORT_PUSH" mapstructure:"REPORT_PUSH"`
-	Deleted      int       `gorm:"column:deleted;type:int;default:0" json:"DELETED" mapstructure:"DELETED"`
-	CreatedAt    time.Time `gorm:"column:created_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT" mapstructure:"CREATED_AT"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;type:datetime;default:null" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
-}
-
-type VPCContact struct { // TODO delete
-	Base         `gorm:"embedded" mapstructure:",squash"`
-	CreateMethod int `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
-	VPCID        int `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"VPC_ID"`
-	ContactID    int `gorm:"column:contact_id;type:int;default:0" json:"CONTACT_ID" mapstructure:"CONTACT_ID"`
-}
-
-func (VPCContact) TableName() string {
-	return "epc_contact"
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	VMID         int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
+	PodNodeID    int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID" mapstructure:"POD_NODE_ID"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 }
 
 type VPC struct {
@@ -340,15 +318,16 @@ func (n Network) GetSubDomainLcuuid() string {
 }
 
 type Subnet struct {
-	Base      `gorm:"embedded" mapstructure:",squash"`
-	Prefix    string `gorm:"column:prefix;type:char(64);default:''" json:"PREFIX" mapstructure:"PREFIX"`
-	Netmask   string `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK" mapstructure:"NETMASK"`
-	NetworkID int    `gorm:"column:vl2id;type:int;default:null" json:"VL2ID" mapstructure:"VL2ID"`
-	NetIndex  int    `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX" mapstructure:"NET_INDEX"`
-	Name      string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Label     string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL" mapstructure:"LABEL"`
-	SubDomain string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-	Domain    string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	Prefix       string `gorm:"column:prefix;type:char(64);default:''" json:"PREFIX" mapstructure:"PREFIX"`
+	Netmask      string `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK" mapstructure:"NETMASK"`
+	NetworkID    int    `gorm:"column:vl2id;type:int;default:null" json:"VL2ID" mapstructure:"VL2ID"`
+	NetIndex     int    `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX" mapstructure:"NET_INDEX"`
+	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
+	Label        string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL" mapstructure:"LABEL"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 func (Subnet) TableName() string {
@@ -382,12 +361,13 @@ func (v VRouter) GetSubDomainLcuuid() string {
 }
 
 type RoutingTable struct {
-	Base        `gorm:"embedded" mapstructure:",squash"`
-	VRouterID   int    `gorm:"column:vnet_id;type:int;default:null" json:"VNET_ID" mapstructure:"VNET_ID"`
-	Destination string `gorm:"column:destination;type:text;default:''" json:"DESTINATION" mapstructure:"DESTINATION"`
-	NexthopType string `gorm:"column:nexthop_type;type:text;default:''" json:"NEXTHOP_TYPE" mapstructure:"NEXTHOP_TYPE"`
-	Nexthop     string `gorm:"column:nexthop;type:text;default:''" json:"NEXTHOP" mapstructure:"NEXTHOP"`
-	Domain      string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	VRouterID    int    `gorm:"column:vnet_id;type:int;default:null" json:"VNET_ID" mapstructure:"VNET_ID"`
+	Destination  string `gorm:"column:destination;type:text;default:''" json:"DESTINATION" mapstructure:"DESTINATION"`
+	NexthopType  string `gorm:"column:nexthop_type;type:text;default:''" json:"NEXTHOP_TYPE" mapstructure:"NEXTHOP_TYPE"`
+	Nexthop      string `gorm:"column:nexthop;type:text;default:''" json:"NEXTHOP" mapstructure:"NEXTHOP"`
+	Domain       string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 type DHCPPort struct {
@@ -414,25 +394,24 @@ func (d DHCPPort) GetSubDomainLcuuid() string {
 
 type VInterface struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
-	Name         string    `gorm:"column:name;type:char(64);default:''" json:"NAME" mapstructure:"NAME"`
-	Index        int       `gorm:"column:ifindex;type:int;not null" json:"IFINDEX" mapstructure:"IFINDEX"`
-	State        int       `gorm:"column:state;type:int;not null" json:"STATE" mapstructure:"STATE"`                          // 1. Attached 2.Detached 3.Exception
-	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
-	Type         int       `gorm:"column:iftype;type:int;default:0" json:"IFTYPE" mapstructure:"IFTYPE"`                      // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
-	Mac          string    `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC" mapstructure:"MAC"`
-	VMac         string    `gorm:"column:vmac;type:char(32);default:''" json:"VMAC" mapstructure:"VMAC"`
-	TapMac       string    `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC" mapstructure:"TAP_MAC"`
-	NetworkID    int       `gorm:"column:subnetid;type:int;default:0" json:"SUBNET_ID" mapstructure:"SUBNET_ID"` // vl2 id
-	VlanTag      int       `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG" mapstructure:"VLANTAG"`
-	DeviceType   int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICE_TYPE" mapstructure:"DEVICE_TYPE"` // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
-	DeviceID     int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"DEVICE_ID"`       // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
-	NetnsID      uint32    `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID" mapstructure:"NETNS_ID"`   // used to associate processes with cloud and container resources
-	VtapID       uint32    `gorm:"column:vtap_id;type:int;default:0" json:"VTAP_ID" mapstructure:"VTAP_ID"`
-	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
-	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT" mapstructure:"CREATED_AT"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	Name         string `gorm:"column:name;type:char(64);default:''" json:"NAME" mapstructure:"NAME"`
+	Index        int    `gorm:"column:ifindex;type:int;not null" json:"IFINDEX" mapstructure:"IFINDEX"`
+	State        int    `gorm:"column:state;type:int;not null" json:"STATE" mapstructure:"STATE"`                          // 1. Attached 2.Detached 3.Exception
+	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
+	Type         int    `gorm:"column:iftype;type:int;default:0" json:"IFTYPE" mapstructure:"IFTYPE"`                      // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
+	Mac          string `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC" mapstructure:"MAC"`
+	VMac         string `gorm:"column:vmac;type:char(32);default:''" json:"VMAC" mapstructure:"VMAC"`
+	TapMac       string `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC" mapstructure:"TAP_MAC"`
+	NetworkID    int    `gorm:"column:subnetid;type:int;default:0" json:"SUBNET_ID" mapstructure:"SUBNET_ID"` // vl2 id
+	VlanTag      int    `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG" mapstructure:"VLANTAG"`
+	DeviceType   int    `gorm:"column:devicetype;type:int;default:null" json:"DEVICE_TYPE" mapstructure:"DEVICE_TYPE"` // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
+	DeviceID     int    `gorm:"column:deviceid;type:int;default:null" json:"DEVICE_ID" mapstructure:"DEVICE_ID"`       // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
+	NetnsID      uint32 `gorm:"column:netns_id;type:int unsigned;default:0" json:"NETNS_ID" mapstructure:"NETNS_ID"`   // used to associate processes with cloud and container resources
+	VtapID       uint32 `gorm:"column:vtap_id;type:int;default:0" json:"VTAP_ID" mapstructure:"VTAP_ID"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Region       string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 }
 
 func (VInterface) TableName() string {
@@ -441,19 +420,18 @@ func (VInterface) TableName() string {
 
 type LANIP struct { // TODO 添加region字段
 	Base         `gorm:"embedded" mapstructure:",squash"`
-	IP           string    `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
-	Netmask      string    `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK" mapstructure:"NETMASK"`
-	Gateway      string    `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY" mapstructure:"GATEWAY"`
-	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
-	NetworkID    int       `gorm:"column:vl2id;type:int;default:null" json:"VL2ID" mapstructure:"VL2ID"`
-	NetIndex     int       `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX" mapstructure:"NET_INDEX"`
-	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	VInterfaceID int       `gorm:"column:vifid;type:int;default:null" json:"VINTERFACE_ID" mapstructure:"VINTERFACE_ID"`
-	SubnetID     int       `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID" mapstructure:"SUBNET_ID"`
-	ISP          int       `gorm:"column:isp;type:int;default:0" json:"ISP" mapstructure:"ISP"` // Used for multi-ISP access
-	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT" mapstructure:"CREATED_AT"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
+	Netmask      string `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK" mapstructure:"NETMASK"`
+	Gateway      string `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY" mapstructure:"GATEWAY"`
+	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
+	NetworkID    int    `gorm:"column:vl2id;type:int;default:null" json:"VL2ID" mapstructure:"VL2ID"`
+	NetIndex     int    `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX" mapstructure:"NET_INDEX"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	VInterfaceID int    `gorm:"column:vifid;type:int;default:null" json:"VINTERFACE_ID" mapstructure:"VINTERFACE_ID"`
+	SubnetID     int    `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID" mapstructure:"SUBNET_ID"`
+	ISP          int    `gorm:"column:isp;type:int;default:0" json:"ISP" mapstructure:"ISP"` // Used for multi-ISP access
 }
 
 func (LANIP) TableName() string {
@@ -462,19 +440,18 @@ func (LANIP) TableName() string {
 
 type WANIP struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
-	IP           string    `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
-	Alias        string    `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
-	Netmask      int       `gorm:"column:netmask;type:int;default:null" json:"NETMASK" mapstructure:"NETMASK"`
-	Gateway      string    `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY" mapstructure:"GATEWAY"`
-	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
-	ISP          int       `gorm:"column:isp;type:int;default:null" json:"ISP" mapstructure:"ISP"`
-	VInterfaceID int       `gorm:"column:vifid;type:int;default:0" json:"VINTERFACE_ID" mapstructure:"VINTERFACE_ID"`
-	SubnetID     int       `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID" mapstructure:"SUBNET_ID"`
-	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
-	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
-	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT" mapstructure:"CREATED_AT"`
-	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
+	Alias        string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
+	Netmask      int    `gorm:"column:netmask;type:int;default:null" json:"NETMASK" mapstructure:"NETMASK"`
+	Gateway      string `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY" mapstructure:"GATEWAY"`
+	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
+	ISP          int    `gorm:"column:isp;type:int;default:null" json:"ISP" mapstructure:"ISP"`
+	VInterfaceID int    `gorm:"column:vifid;type:int;default:0" json:"VINTERFACE_ID" mapstructure:"VINTERFACE_ID"`
+	SubnetID     int    `gorm:"column:vl2_net_id;type:int;default:0" json:"SUBNET_ID" mapstructure:"SUBNET_ID"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Region       string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 }
 
 func (WANIP) TableName() string {
@@ -482,13 +459,14 @@ func (WANIP) TableName() string {
 }
 
 type FloatingIP struct {
-	Base      `gorm:"embedded" mapstructure:",squash"`
-	Domain    string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	Region    string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
-	VPCID     int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"VPC_ID"`
-	NetworkID int    `gorm:"column:vl2_id;type:int;default:null" json:"VL2_ID" mapstructure:"VL2_ID"` // TODO json字段是否能修改，需返回给前端？
-	VMID      int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
-	IP        string `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Region       string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
+	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID" mapstructure:"VPC_ID"`
+	NetworkID    int    `gorm:"column:vl2_id;type:int;default:null" json:"VL2_ID" mapstructure:"VL2_ID"` // TODO json字段是否能修改，需返回给前端？
+	VMID         int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
+	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
 }
 
 func (FloatingIP) TableName() string {
@@ -522,6 +500,7 @@ func (n NATGateway) GetSubDomainLcuuid() string {
 
 type NATRule struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime   `gorm:"embedded" mapstructure:",squash"`
 	NATGatewayID   int    `gorm:"column:nat_id;type:int;default:0" json:"NAT_ID" mapstructure:"NAT_ID"`
 	Type           string `gorm:"column:type;type:char(16);default:''" json:"TYPE" mapstructure:"TYPE"`
 	Protocol       string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL" mapstructure:"PROTOCOL"`
@@ -539,6 +518,7 @@ func (NATRule) TableName() string {
 
 type NATVMConnection struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	NATGatewayID int    `gorm:"column:nat_id;type:int;default:null" json:"NAT_ID" mapstructure:"NAT_ID"`
 	VMID         int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
 	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
@@ -601,6 +581,7 @@ func (l LBListener) GetSubDomainLcuuid() string {
 
 type LBTargetServer struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	LBID         int    `gorm:"column:lb_id;type:int;default:0" json:"LB_ID" mapstructure:"LB_ID"`
 	LBListenerID int    `gorm:"column:lb_listener_id;type:int;default:0" json:"LB_LISTENER_ID" mapstructure:"LB_LISTENER_ID"`
 	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
@@ -617,10 +598,11 @@ func (LBTargetServer) TableName() string {
 }
 
 type LBVMConnection struct {
-	Base   `gorm:"embedded" mapstructure:",squash"`
-	LBID   int    `gorm:"column:lb_id;type:int;default:null" json:"LB_ID" mapstructure:"LB_ID"`
-	VMID   int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
-	Domain string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	LBID         int    `gorm:"column:lb_id;type:int;default:null" json:"LB_ID" mapstructure:"LB_ID"`
+	VMID         int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 func (LBVMConnection) TableName() string {
@@ -724,10 +706,11 @@ func (r RedisInstance) GetSubDomainLcuuid() string {
 }
 
 type VIP struct {
-	Base   `gorm:"embedded" mapstructure:",squash"`
-	IP     string `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
-	Domain string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
-	VTapID uint32 `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID" mapstructure:"VTAP_ID"`
+	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
+	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP" mapstructure:"IP"`
+	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	VTapID       uint32 `gorm:"column:vtap_id;type:int;not null;default:0" json:"VTAP_ID" mapstructure:"VTAP_ID"`
 }
 
 func (VIP) TableName() string {
@@ -827,6 +810,7 @@ func (p PodIngress) GetSubDomainLcuuid() string {
 
 type PodIngressRule struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Protocol     string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL" mapstructure:"PROTOCOL"`
 	Host         string `gorm:"column:host;type:text;default:''" json:"HOST" mapstructure:"HOST"`
@@ -837,6 +821,7 @@ type PodIngressRule struct {
 
 type PodIngressRuleBackend struct {
 	Base             `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime     `gorm:"embedded" mapstructure:",squash"`
 	Path             string `gorm:"column:path;type:text;default:''" json:"PATH" mapstructure:"PATH"`
 	Port             int    `gorm:"column:port;type:int;default:null" json:"PORT" mapstructure:"PORT"`
 	PodServiceID     int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID" mapstructure:"POD_SERVICE_ID"`
@@ -876,6 +861,7 @@ func (p PodService) GetSubDomainLcuuid() string {
 
 type PodServicePort struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Protocol     string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL" mapstructure:"PROTOCOL"`
 	Port         int    `gorm:"column:port;type:int;default:null" json:"PORT" mapstructure:"PORT"`
@@ -912,6 +898,7 @@ func (p PodGroup) GetSubDomainLcuuid() string {
 
 type PodGroupPort struct {
 	Base         `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime `gorm:"embedded" mapstructure:",squash"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Protocol     string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL" mapstructure:"PROTOCOL"`
 	Port         int    `gorm:"column:port;type:int;default:null" json:"PORT" mapstructure:"PORT"`

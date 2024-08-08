@@ -45,7 +45,7 @@ func (e *ChStringEnum) generateNewData() (map[StringEnumTagKey]mysql.ChStringEnu
 	keyToItem := make(map[StringEnumTagKey]mysql.ChStringEnum)
 	respMap, err := tag.GetEnumTagValues(db, table, sql)
 	if err != nil {
-		log.Errorf("read failed: %v", err)
+		log.Errorf("read failed: %v", err, e.db.LogPrefixORGID)
 	}
 
 	for name, tagValues := range respMap {

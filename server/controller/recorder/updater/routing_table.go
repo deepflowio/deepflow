@@ -29,8 +29,9 @@ import (
 type RoutingTable struct {
 	UpdaterBase[
 		cloudmodel.RoutingTable,
-		mysql.RoutingTable,
 		*diffbase.RoutingTable,
+		*mysql.RoutingTable,
+		mysql.RoutingTable,
 		*message.RoutingTableAdd,
 		message.RoutingTableAdd,
 		*message.RoutingTableUpdate,
@@ -45,8 +46,9 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 	updater := &RoutingTable{
 		newUpdaterBase[
 			cloudmodel.RoutingTable,
-			mysql.RoutingTable,
 			*diffbase.RoutingTable,
+			*mysql.RoutingTable,
+			mysql.RoutingTable,
 			*message.RoutingTableAdd,
 			message.RoutingTableAdd,
 			*message.RoutingTableUpdate,
@@ -74,10 +76,10 @@ func (t *RoutingTable) getDiffBaseByCloudItem(cloudItem *cloudmodel.RoutingTable
 func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*mysql.RoutingTable, bool) {
 	vrouterID, exists := t.cache.ToolDataSet.GetVRouterIDByLcuuid(cloudItem.VRouterLcuuid)
 	if !exists {
-		log.Error(t.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.VRouterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, cloudItem.Lcuuid,
-		)))
+		), t.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.RoutingTable{

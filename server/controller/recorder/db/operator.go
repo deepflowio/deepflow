@@ -17,18 +17,19 @@
 package db
 
 import (
-	"github.com/op/go-logging"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 )
 
-var log = logging.MustGetLogger("recorder.db")
+var log = logger.MustGetLogger("recorder.db")
 
-type Operator[MT constraint.MySQLModel] interface {
+type Operator[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] interface {
 	// 批量插入数据
 	AddBatch(dbItems []*MT) ([]*MT, bool)
 	// 更新数据
@@ -39,36 +40,37 @@ type Operator[MT constraint.MySQLModel] interface {
 	GetSoftDelete() bool
 }
 
-// TODO 使用结构体而非结构体指针作为泛型类型，在需要对结构体value修改时十分不便，
-// 使用指针时，初始化空结构体不便，reflect性能较差，不可高频使用；后续需要寻找方法解决
-type DBItemSetter[MT constraint.MySQLModel] interface {
-	setDBItemID(dbItem *MT, id int)
-}
-
-type OperatorBase[MT constraint.MySQLModel] struct {
+type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] struct {
 	metadata *rcommon.Metadata
 
 	resourceTypeName        string
 	softDelete              bool
 	allocateID              bool
 	fieldsNeededAfterCreate []string // fields needed to be used after create
-	setter                  DBItemSetter[MT]
 }
 
-func (o *OperatorBase[MT]) SetMetadata(md *rcommon.Metadata) Operator[MT] {
+func newOperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
+	return OperatorBase[MPT, MT]{
+		resourceTypeName: resourceTypeName,
+		softDelete:       softDelete,
+		allocateID:       allocateID,
+	}
+}
+
+func (o *OperatorBase[MPT, MT]) SetMetadata(md *rcommon.Metadata) Operator[MPT, MT] {
 	o.metadata = md
 	return o
 }
 
-func (o *OperatorBase[MT]) GetSoftDelete() bool {
+func (o *OperatorBase[MPT, MT]) GetSoftDelete() bool {
 	return o.softDelete
 }
 
-func (o *OperatorBase[MT]) setFieldsNeededAfterCreate(fs []string) {
+func (o *OperatorBase[MPT, MT]) setFieldsNeededAfterCreate(fs []string) {
 	o.fieldsNeededAfterCreate = fs
 }
 
-func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
+func (o *OperatorBase[MPT, MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	itemsToAdd, lcuuidsToAdd, allocatedIDs, ok := o.formatItemsToAdd(items)
 	if !ok || len(itemsToAdd) == 0 {
 		return nil, false
@@ -76,8 +78,8 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 
 	err := o.metadata.DB.Create(&itemsToAdd).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("%s batch failed: %v", rcommon.LogAdd(o.resourceTypeName), err))
-		log.Error(o.metadata.Logf("%s (lcuuids: %v) failed", rcommon.LogAdd(o.resourceTypeName), lcuuidsToAdd))
+		log.Errorf("%s batch failed: %v", rcommon.LogAdd(o.resourceTypeName), err.Error(), o.metadata.LogPrefixes)
+		log.Errorf("%s (lcuuids: %v) failed", rcommon.LogAdd(o.resourceTypeName), lcuuidsToAdd, o.metadata.LogPrefixes)
 
 		if o.allocateID && len(allocatedIDs) > 0 {
 			idmng.ReleaseIDs(o.metadata.GetORGID(), o.resourceTypeName, allocatedIDs)
@@ -97,47 +99,47 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 	}
 
 	for _, item := range itemsToAdd {
-		log.Info(o.metadata.Logf("%s (detail: %+v) success", rcommon.LogAdd(o.resourceTypeName), item))
+		log.Infof("%s (detail: %+v) success", rcommon.LogAdd(o.resourceTypeName), item, o.metadata.LogPrefixes)
 	}
 
 	return itemsToAdd, true
 }
 
-func (o *OperatorBase[MT]) Update(lcuuid string, updateInfo map[string]interface{}) (*MT, bool) {
+func (o *OperatorBase[MPT, MT]) Update(lcuuid string, updateInfo map[string]interface{}) (*MT, bool) {
 	dbItem := new(MT)
 	err := o.metadata.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Updates(updateInfo).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("%s (lcuuid: %s, detail: %+v) failed: %s", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, err.Error()))
+		log.Errorf("%s (lcuuid: %s, detail: %+v) failed: %s", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, err.Error(), o.metadata.LogPrefixes)
 		return dbItem, false
 	}
-	log.Info(o.metadata.Logf("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo))
+	log.Infof("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, o.metadata.LogPrefixes)
 	o.metadata.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	return dbItem, true
 }
 
-func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {
+func (o *OperatorBase[MPT, MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {
 	var deletedItems []*MT
 	err := o.metadata.DB.Where("lcuuid IN ?", lcuuids).Find(&deletedItems).Error
 	if err != nil {
-		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err)
+		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err.Error(), o.metadata.LogPrefixes)
 		return nil, false
 	}
 	err = o.metadata.DB.Delete(&deletedItems).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err))
+		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err.Error(), o.metadata.LogPrefixes)
 		return nil, false
 	}
 	if o.softDelete {
-		log.Info(o.metadata.Logf("%s (lcuuids: %v) deleted_at success", rcommon.LogUpdate(o.resourceTypeName), lcuuids))
+		log.Infof("%s (lcuuids: %v) deleted_at success", rcommon.LogUpdate(o.resourceTypeName), lcuuids, o.metadata.LogPrefixes)
 	} else {
-		log.Info(o.metadata.Logf("%s (lcuuids: %v) success", rcommon.LogDelete(o.resourceTypeName), lcuuids))
+		log.Infof("%s (lcuuids: %v) success", rcommon.LogDelete(o.resourceTypeName), lcuuids, o.metadata.LogPrefixes)
 	}
 
 	o.returnUsedIDs(deletedItems)
 	return deletedItems, true
 }
 
-func (o *OperatorBase[MT]) formatItemsToAdd(items []*MT) ([]*MT, []string, []int, bool) {
+func (o *OperatorBase[MPT, MT]) formatItemsToAdd(items []*MT) ([]*MT, []string, []int, bool) {
 	// 待入库数据本身有lcuuid重复：仅取1条数据入库。
 	items, lcuuids, lcuuidToDBItem := o.dedupInSelf(items)
 	// 与DB已存数据lcuuid重复：
@@ -152,14 +154,14 @@ func (o *OperatorBase[MT]) formatItemsToAdd(items []*MT) ([]*MT, []string, []int
 	return items, lcuuids, allocatedIDs, ok
 }
 
-func (o OperatorBase[MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[string]*MT) {
+func (o OperatorBase[MPT, MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[string]*MT) {
 	dedupItems := []*MT{}
 	lcuuids := []string{}
 	lcuuidToItem := make(map[string]*MT)
 	for _, item := range items {
-		lcuuid := (*item).GetLcuuid()
+		lcuuid := MPT(item).GetLcuuid()
 		if common.Contains(lcuuids, lcuuid) {
-			log.Info(o.metadata.Logf("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid))
+			log.Infof("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid, o.metadata.LogPrefixes)
 		} else {
 			dedupItems = append(dedupItems, item)
 			lcuuids = append(lcuuids, lcuuid)
@@ -169,11 +171,11 @@ func (o OperatorBase[MT]) dedupInSelf(items []*MT) ([]*MT, []string, map[string]
 	return dedupItems, lcuuids, lcuuidToItem
 }
 
-func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem map[string]*MT) ([]*MT, []string, bool) {
+func (o OperatorBase[MPT, MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem map[string]*MT) ([]*MT, []string, bool) {
 	var dupItems []*MT
 	err := o.metadata.DB.Unscoped().Where("lcuuid IN ?", lcuuids).Find(&dupItems).Error
 	if err != nil {
-		log.Error(o.metadata.Logf("get %s duplicate data failed: %v", o.resourceTypeName, err))
+		log.Errorf("get %s duplicate data failed: %v", o.resourceTypeName, err.Error(), o.metadata.LogPrefixes)
 		return nil, nil, false
 	}
 
@@ -182,8 +184,8 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 			dupLcuuids := []string{}
 			dupItemIDs := []int{}
 			for _, dupItem := range dupItems {
-				lcuuid := (*dupItem).GetLcuuid()
-				id := (*dupItem).GetID()
+				lcuuid := MPT(dupItem).GetLcuuid()
+				id := MPT(dupItem).GetID()
 				item, exists := lcuuidToItem[lcuuid]
 				if !exists {
 					continue
@@ -192,23 +194,24 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 					dupLcuuids = append(dupLcuuids, lcuuid)
 					dupItemIDs = append(dupItemIDs, id)
 				}
-				o.setter.setDBItemID(item, id)
+				MPT(item).SetID(id)
+				MPT(item).SetUpdatedAt(time.Now())
 			}
-			log.Info(o.metadata.Logf("%s data is duplicated with db data (lcuuids: %v, ids: %v, one detail: %+v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs, dupItems[0]))
+			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v, one detail: %+v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs, dupItems[0], o.metadata.LogPrefixes)
 			err = o.metadata.DB.Unscoped().Delete(&dupItems).Error
 			if err != nil {
-				log.Error(o.metadata.Logf("%s duplicated data failed: %+v", rcommon.LogDelete(o.resourceTypeName), err))
+				log.Errorf("%s duplicated data failed: %+v", rcommon.LogDelete(o.resourceTypeName), err.Error(), o.metadata.LogPrefixes)
 				return items, lcuuids, false
 			}
 		} else {
 			dupLcuuids := []string{}
 			for _, dupItem := range dupItems {
-				lcuuid := (*dupItem).GetLcuuid()
+				lcuuid := MPT(dupItem).GetLcuuid()
 				if !common.Contains(dupLcuuids, lcuuid) {
 					dupLcuuids = append(dupLcuuids, lcuuid)
 				}
 			}
-			log.Error(o.metadata.Logf("%s data is duplicated with db data (lcuuids: %v, one detail: %+v)", o.resourceTypeName, dupLcuuids, dupItems[0]))
+			log.Errorf("%s data is duplicated with db data (lcuuids: %v, one detail: %+v)", o.resourceTypeName, dupLcuuids, dupItems[0], o.metadata.LogPrefixes)
 
 			count := len(lcuuids) - len(dupLcuuids)
 			dedupItems := make([]*MT, 0, count)
@@ -225,13 +228,13 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 	return items, lcuuids, true
 }
 
-func (o *OperatorBase[MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
+func (o *OperatorBase[MPT, MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 	if o.allocateID {
 		var count int
 		itemsHasID := []*MT{}
 		itemsHasNoID := []*MT{}
 		for _, item := range items {
-			if (*item).GetID() == 0 {
+			if MPT(item).GetID() == 0 {
 				count++
 				itemsHasNoID = append(itemsHasNoID, item)
 			} else {
@@ -241,34 +244,34 @@ func (o *OperatorBase[MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 		if count > 0 {
 			ids, err := idmng.GetIDs(o.metadata.GetORGID(), o.resourceTypeName, count)
 			if err != nil {
-				log.Error(o.metadata.Logf("%s request ids failed", o.resourceTypeName))
+				log.Errorf("%s request ids failed", o.resourceTypeName, o.metadata.LogPrefixes)
 				return itemsHasID, []int{}, false
 			}
 			for i, id := range ids {
-				o.setter.setDBItemID(itemsHasNoID[i], id)
+				MPT(itemsHasNoID[i]).SetID(id)
 				itemsHasID = append(itemsHasID, itemsHasNoID[i])
 			}
-			log.Info(o.metadata.Logf("%s use ids: %v", o.resourceTypeName, ids))
+			log.Infof("%s use ids: %v", o.resourceTypeName, ids, o.metadata.LogPrefixes)
 			return itemsHasID, ids, true
 		} else {
-			log.Info(o.metadata.Logf("%s not use any id", o.resourceTypeName))
+			log.Infof("%s not use any id", o.resourceTypeName, o.metadata.LogPrefixes)
 			return itemsHasID, []int{}, true
 		}
 	}
 	return items, []int{}, true
 }
 
-func (o *OperatorBase[MT]) returnUsedIDs(deletedItems []*MT) {
+func (o *OperatorBase[MPT, MT]) returnUsedIDs(deletedItems []*MT) {
 	// 非软删除资源，删除成功后，检查归还所分配的资源ID
 	if !o.softDelete && o.allocateID {
 		var ids []int
 		for _, dbItem := range deletedItems {
-			ids = append(ids, (*dbItem).GetID())
+			ids = append(ids, MPT(dbItem).GetID())
 		}
 		err := idmng.ReleaseIDs(o.metadata.GetORGID(), o.resourceTypeName, ids)
 		if err != nil {
-			log.Error(o.metadata.Logf("%s release ids: %v failed", o.resourceTypeName, ids))
+			log.Errorf("%s release ids: %v failed", o.resourceTypeName, ids, o.metadata.LogPrefixes)
 		}
-		log.Info(o.metadata.Logf("%s return used ids: %v", o.resourceTypeName, ids))
+		log.Infof("%s return used ids: %v", o.resourceTypeName, ids, o.metadata.LogPrefixes)
 	}
 }

@@ -18,15 +18,15 @@ package synchronize
 
 import (
 	api "github.com/deepflowio/deepflow/message/trident"
-	"github.com/op/go-logging"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	grpcserver "github.com/deepflowio/deepflow/server/controller/grpc"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 )
 
-var log = logging.MustGetLogger("trisolaris/debug")
+var log = logger.MustGetLogger("trisolaris.debug")
 
 type service struct{}
 

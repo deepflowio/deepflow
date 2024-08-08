@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	"github.com/deepflowio/deepflow/server/libs/queue"
@@ -38,10 +39,11 @@ type Task struct {
 	tCancel context.CancelFunc
 	cfg     config.TaskConfig
 
-	Cloud        *cloud.Cloud
-	Recorder     *recorder.Recorder
-	DomainName   string // 云平台名称
-	DomainConfig string // 云平台配置字段config
+	LogPrefixORGID logger.Prefix
+	Cloud          *cloud.Cloud
+	Recorder       *recorder.Recorder
+	DomainName     string // 云平台名称
+	DomainConfig   string // 云平台配置字段config
 	// 云平台刷新控制，初始化时本信号自动启动一个 goroutine 定时输入信号，用于定时刷新；
 	// kubernetes 类型云平台的 kubernetes_gather，也通过输入到此信号，触发实时刷新。
 	domainRefreshSignal *queue.OverwriteQueue
@@ -53,27 +55,29 @@ type Task struct {
 
 func NewTask(orgID int, domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
 	tCtx, tCancel := context.WithCancel(ctx)
+	t := &Task{
+		tCtx:           tCtx,
+		tCancel:        tCancel,
+		cfg:            cfg,
+		LogPrefixORGID: logger.NewORGPrefix(orgID),
+		DomainName:     domain.Name,
+		DomainConfig:   domain.Config,
+	}
 	cloudTask := cloud.NewCloud(orgID, domain, cfg.CloudCfg, tCtx)
 	if cloudTask == nil {
-		log.Error(common.FmtLog(orgID, "domain: %s %s, failed to create cloud task", domain.Name, domain.Lcuuid))
+		log.Errorf("domain: %s %s, failed to create cloud task", domain.Name, domain.Lcuuid, t.LogPrefixORGID)
 		return nil
 	}
 	rcd := recorder.NewRecorder(tCtx, cfg.RecorderCfg, resourceEventQueue, orgID, domain.Lcuuid)
 	if rcd == nil {
-		log.Error(common.FmtLog(orgID, "domain: %s %s, failed to create recorder", domain.Name, domain.Lcuuid))
+		log.Errorf("domain: %s %s, failed to create recorder", domain.Name, domain.Lcuuid, t.LogPrefixORGID)
 		return nil
 	}
-	return &Task{
-		tCtx:                    tCtx,
-		tCancel:                 tCancel,
-		cfg:                     cfg,
-		Cloud:                   cloudTask,
-		Recorder:                rcd,
-		DomainName:              domain.Name,
-		DomainConfig:            domain.Config,
-		domainRefreshSignal:     cloudTask.GetDomainRefreshSignal(),
-		subDomainRefreshSignals: cloudTask.GetSubDomainRefreshSignals(),
-	}
+	t.Cloud = cloudTask
+	t.Recorder = rcd
+	t.domainRefreshSignal = cloudTask.GetDomainRefreshSignal()
+	t.subDomainRefreshSignals = cloudTask.GetSubDomainRefreshSignals()
+	return t
 }
 
 func (t *Task) Start() {
@@ -89,16 +93,16 @@ func (t *Task) startDomainRefreshMonitor() {
 	go func() {
 	LOOP:
 		for {
-			log.Infof("task (%s) wait for next refresh", t.DomainName)
+			log.Infof("task (%s) wait for next refresh", t.DomainName, t.LogPrefixORGID)
 			t.domainRefreshSignal.Get()
-			log.Infof("task (%s) call recorder refresh", t.DomainName)
+			log.Infof("task (%s) call recorder refresh", t.DomainName, t.LogPrefixORGID)
 			if err := t.Recorder.Refresh(recorder.RefreshTargetDomain, t.Cloud.GetResource()); err != nil {
 				if errors.Is(err, recorder.RefreshConflictError) {
-					log.Warningf("task (%s) refresh conflict, retry after 5 seconds", t.DomainName)
+					log.Warningf("task (%s) refresh conflict, retry after 5 seconds", t.DomainName, t.LogPrefixORGID)
 					t.domainRefreshSignal.Put(struct{}{})
 					time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 				} else {
-					log.Warningf("task (%s) refresh failed: %s", t.DomainName, err.Error())
+					log.Warningf("task (%s) refresh failed: %s", t.DomainName, err.Error(), t.LogPrefixORGID)
 				}
 			}
 
@@ -108,7 +112,7 @@ func (t *Task) startDomainRefreshMonitor() {
 			default:
 			}
 
-			log.Infof("task (%s) one loop over", t.DomainName)
+			log.Infof("task (%s) one loop over", t.DomainName, t.LogPrefixORGID)
 		}
 	}()
 }
@@ -129,15 +133,15 @@ func (t *Task) startSubDomainRefreshMonitor() {
 					// TODO 考虑改为并发
 					if signal.Len() != 0 {
 						signal.Get()
-						log.Infof("task (%s) sub_domain (%s) call recorder refresh", t.DomainName, lcuuid)
+						log.Infof("task (%s) sub_domain (%s) call recorder refresh", t.DomainName, lcuuid, t.LogPrefixORGID)
 
 						if err := t.Recorder.Refresh(recorder.RefreshTargetSubDomain, t.Cloud.GetSubDomainResource(lcuuid)); err != nil {
 							if errors.Is(err, recorder.RefreshConflictError) {
-								log.Warningf("task (%s) sub_domain (%s) refresh conflict, retry after 5 seconds", t.DomainName, lcuuid)
+								log.Warningf("task (%s) sub_domain (%s) refresh conflict, retry after 5 seconds", t.DomainName, lcuuid, t.LogPrefixORGID)
 								signal.Put(struct{}{})
 								time.Sleep(time.Duration(recorderRefreshTryInterval) * time.Second)
 							} else {
-								log.Warningf("task (%s) sub_domain (%s) refresh failed: %s", t.DomainName, lcuuid, err.Error())
+								log.Warningf("task (%s) sub_domain (%s) refresh failed: %s", t.DomainName, lcuuid, err.Error(), t.LogPrefixORGID)
 							}
 						}
 					}
@@ -155,7 +159,7 @@ func (t *Task) Stop() {
 	if t.tCancel != nil {
 		t.tCancel()
 	}
-	log.Infof("task (%s) stopped", t.DomainName)
+	log.Infof("task (%s) stopped", t.DomainName, t.LogPrefixORGID)
 }
 
 func (t *Task) UpdateDomainName(name string) {

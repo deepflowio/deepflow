@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (q *QingCloud) GetNATGateways() (
@@ -31,13 +32,13 @@ func (q *QingCloud) GetNATGateways() (
 	var retIPs []model.IP
 	var retNATVMConns []model.NATVMConnection
 
-	log.Info("get nat_gateways starting")
+	log.Info("get nat_gateways starting", logger.NewORGPrefix(q.orgID))
 
 	natIdToLcuuid := make(map[string]string)
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		vxnetIds, ok := q.regionIdToVxnetIds[regionId]
 		if !ok {
-			log.Debugf("no vxnetIds in region (%s)", regionId)
+			log.Debugf("no vxnetIds in region (%s)", regionId, logger.NewORGPrefix(q.orgID))
 			continue
 		}
 
@@ -51,13 +52,13 @@ func (q *QingCloud) GetNATGateways() (
 			}
 			response, err := q.GetResponse("DescribeNFVs", "nfv_set", kwargs)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(q.orgID))
 				return nil, nil, nil, nil, err
 			}
 
 			vpcLcuuid, ok := q.VxnetIdToVPCLcuuid[vxnetId]
 			if !ok {
-				log.Infof("vxnet (%s) not in any vpc", vxnetId)
+				log.Infof("vxnet (%s) not in any vpc", vxnetId, logger.NewORGPrefix(q.orgID))
 				continue
 			}
 
@@ -147,6 +148,6 @@ func (q *QingCloud) GetNATGateways() (
 		}
 	}
 
-	log.Info("get nat_gateways complete")
+	log.Info("get nat_gateways complete", logger.NewORGPrefix(q.orgID))
 	return retNATGateways, retVInterfaces, retIPs, retNATVMConns, nil
 }

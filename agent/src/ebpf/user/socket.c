@@ -37,6 +37,7 @@
 #include "btf_vmlinux.h"
 #include "config.h"
 #include "perf_reader.h"
+#include "extended/extended.h"
 
 #include "socket_trace_bpf_common.c"
 #include "socket_trace_bpf_3_10_0.c"
@@ -45,6 +46,12 @@
 
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
+/*
+ * Control whether to disable the tracing feature.
+ * 'true' disables the tracing feature, and 'false' enables it.
+ * The default is 'false'.
+ */
+static bool g_disable_syscall_tracing;
 
 /*
  * tracer_hooks_detach() and tracer_hooks_attach() will become terrible
@@ -59,6 +66,7 @@ static pthread_t proc_events_pthread;	// Process exec/exit thread
  */
 static volatile uint64_t probes_act;
 
+extern __thread uword thread_index;	// for symbol pid caches hash
 extern int sys_cpus_count;
 extern bool *cpu_online;
 extern uint32_t attach_failed_count;
@@ -184,7 +192,17 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
 
 	// exit tracepoints
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
+	/*
+	 * `tracepoint/syscalls/sys_exit_socket` This is currently added only to
+	 * implement the NGINX tracing feature. If the tracing feature is disabled,
+	 * the syscall socket() interface will not be hooked.
+	 */
+	if (!g_disable_syscall_tracing)
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
+	else
+		ebpf_info("Due to the tracing feature being disabled, the"
+			  " syscall socket() will not be attached.\n");
+
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_read");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_write");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendto");
@@ -628,16 +646,18 @@ static void process_event(struct process_event_t *e)
 {
 	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC) {
 		if (e->maybe_thread && !is_user_process(e->pid))
-			return;	
+			return;
 		update_proc_info_cache(e->pid, PROC_EXEC);
 		go_process_exec(e->pid);
 		ssl_process_exec(e->pid);
+		extended_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		/* Cache for updating process information used in
 		 * symbol resolution. */
 		update_proc_info_cache(e->pid, PROC_EXIT);
 		go_process_exit(e->pid);
 		ssl_process_exit(e->pid);
+		extended_process_exit(e->pid);
 	}
 }
 
@@ -1213,6 +1233,7 @@ static void check_datadump_timeout(void)
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
+	thread_index = THREAD_PROC_EVENTS_HANDLE_IDX;
 	struct bpf_tracer *t = arg;
 	for (;;) {
 		/*
@@ -1231,6 +1252,7 @@ static void process_events_handle_main(__unused void *arg)
 
 		go_process_events_handle();
 		ssl_events_handle();
+		extended_events_handle();
 		check_datadump_timeout();
 		/* check and clean symbol cache */
 		exec_proc_info_cache_update();
@@ -1795,7 +1817,6 @@ static_always_inline uint64_t clib_cpu_time_now(void)
 }
 #endif
 
-extern __thread uword thread_index;	// for symbol pid caches hash
 static void perf_buffer_read(void *arg)
 {
 	/*
@@ -1803,7 +1824,7 @@ static void perf_buffer_read(void *arg)
 	 * to monitor the perf buffer belonging to its jurisdiction.
 	 */
 	uint64_t epoll_id = (uint64_t) arg;
-	thread_index = THREAD_PROC_ACT_IDX_BASE + epoll_id;	// for bihash
+	thread_index = THREAD_SOCK_READER_IDX_BASE + epoll_id;	// for bihash
 	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL) {
 		ebpf_warning("find_bpf_tracer() error\n");
@@ -1925,6 +1946,33 @@ static int dispatch_workers_setup(struct bpf_tracer *tracer,
 	return ETR_OK;
 }
 
+static int check_dependencies(void)
+{
+	if (check_kernel_version(4, 14) != 0) {
+		return -1;
+	}
+
+	if (access(FTRACE_SYSCALLS_PATH, F_OK) != 0) {
+		ebpf_warning("Directory %s does not exist. deepflow-agent "
+			     "relies on the kernel compilation option "
+			     "'CONFIG_FTRACE_SYSCALLS'. Please ensure that "
+			     "this kernel compilation option is enabled (when "
+			     "enabled, it will display CONFIG_FTRACE_SYSCALLS=y). "
+			     "Generally, you can check the Linux kernel compilation"
+			     " options through the file `/boot/config-<current running"
+			     " Linux kernel version>`. If the compilation option is "
+			     "enabled but the `%s`"
+			     " directory is still missing, it may be due to a missing "
+			     "mount. Please manually execute the command `mount -t tracefs"
+			     " nodev /sys/kernel/debug/tracing` on the node to attempt to "
+			     "resolve the issue.\n", FTRACE_SYSCALLS_PATH,
+			     FTRACE_SYSCALLS_PATH);
+		return -1;
+	}
+
+	return 0;
+}
+
 /**
  * Start socket tracer
  *
@@ -1979,7 +2027,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (thread_nr > sys_cpus_count)
 		thread_nr = sys_cpus_count;
 
-	if (check_kernel_version(4, 14) != 0) {
+	if (check_dependencies() != 0) {
 		return -EINVAL;
 	}
 
@@ -2118,10 +2166,12 @@ int running_socket_tracer(tracer_callback_t handle,
 		t_conf[cpu].coroutine_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].thread_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].data_limit_max = socket_data_limit_max;
-		t_conf[cpu].go_tracing_timeout = go_tracing_timeout;
 		t_conf[cpu].io_event_collect_mode = io_event_collect_mode;
 		t_conf[cpu].io_event_minimal_duration =
 		    io_event_minimal_duration;
+		t_conf[cpu].disable_tracing = g_disable_syscall_tracing;
+		if (!g_disable_syscall_tracing)
+			t_conf[cpu].go_tracing_timeout = go_tracing_timeout;
 	}
 
 	if (!bpf_table_set_value
@@ -2956,3 +3006,11 @@ failed:
 	     proto_type, ports, err);
 	return -1;
 }
+
+int disable_syscall_trace_id(void)
+{
+	g_disable_syscall_tracing = true;
+	ebpf_info("Disable tracing feature.\n");
+	return 0;
+}
+

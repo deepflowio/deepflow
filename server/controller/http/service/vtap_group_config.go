@@ -177,6 +177,7 @@ var tapSideIDToName = map[int]string{
 var DeprecatedTapSideID = []int{48, 49, 50}
 
 func convertDBToJson(
+	orgDB *mysql.DB,
 	sData *agent_config.AgentGroupConfigModel,
 	tData *agent_config.AgentGroupConfigResponse,
 	idToTapTypeName map[int]string,
@@ -194,13 +195,13 @@ func convertDBToJson(
 					getTypeInfo(tapTypeValue, idToTapTypeName))
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.L4LogIgnoreTapSides != nil {
 		tapSides, err := ConvertStrToIntListWithIgnore(*sData.L4LogIgnoreTapSides, DeprecatedTapSideID)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		} else {
 			for _, tapSideValue := range tapSides {
 				if name, ok := tapSideIDToName[tapSideValue]; ok {
@@ -227,7 +228,7 @@ func convertDBToJson(
 
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.L7LogStoreTapTypes != nil {
@@ -238,7 +239,7 @@ func convertDBToJson(
 					getTypeInfo(tapTypeValue, idToTapTypeName))
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.DecapType != nil {
@@ -253,7 +254,7 @@ func convertDBToJson(
 				tData.DecapType = append(tData.DecapType, typeInfo)
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.Domains != nil {
@@ -304,7 +305,7 @@ func convertDBToJson(
 	}
 }
 
-func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_config.AgentGroupConfig) {
+func convertDBToYaml(orgDB *mysql.DB, sData *agent_config.AgentGroupConfigModel, tData *agent_config.AgentGroupConfig) {
 	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig",
 		"L4LogTapTypes", "L4LogIgnoreTapSides", "L7LogIgnoreTapSides",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth",
@@ -316,7 +317,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 		if err := yaml.Unmarshal([]byte(*sData.YamlConfig), yamlConfig); err == nil {
 			tData.YamlConfig = yamlConfig
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 
@@ -327,7 +328,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 				tData.L4LogTapTypes = append(tData.L4LogTapTypes, tapTypeValue)
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.L4LogIgnoreTapSides != nil {
@@ -337,7 +338,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 				tData.L4LogIgnoreTapSides = append(tData.L4LogIgnoreTapSides, tapSide)
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.L7LogIgnoreTapSides != nil {
@@ -347,7 +348,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 				tData.L7LogIgnoreTapSides = append(tData.L7LogIgnoreTapSides, tapSide)
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.L7LogStoreTapTypes != nil {
@@ -357,7 +358,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 				tData.L7LogStoreTapTypes = append(tData.L7LogStoreTapTypes, tapTypeValue)
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.DecapType != nil {
@@ -367,7 +368,7 @@ func convertDBToYaml(sData *agent_config.AgentGroupConfigModel, tData *agent_con
 				tData.DecapType = append(tData.DecapType, decapType)
 			}
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	}
 	if sData.Domains != nil {
@@ -413,14 +414,14 @@ func convertJsonToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.A
 	convertToDb(sData, tData)
 }
 
-func convertYamlToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.AgentGroupConfigModel) {
+func convertYamlToDb(orgDB *mysql.DB, sData *agent_config.AgentGroupConfig, tData *agent_config.AgentGroupConfigModel) {
 	if sData.YamlConfig != nil {
 		b, err := yaml.Marshal(sData.YamlConfig)
 		if err == nil {
 			dbYamlConfig := string(b)
 			tData.YamlConfig = &dbYamlConfig
 		} else {
-			log.Error(err)
+			log.Error(err, orgDB.LogPrefixORGID)
 		}
 	} else {
 		tData.YamlConfig = nil
@@ -675,7 +676,7 @@ func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPerm
 	} else {
 		db.Find(&allVTapGroups)
 	}
-	vtapGroups, err := getAgentGroupByUser(userInfo, fpermitCfg, allVTapGroups)
+	vtapGroups, err := GetAgentGroupByUser(userInfo, fpermitCfg, allVTapGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -702,7 +703,7 @@ func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPerm
 		mData := &agent_config.AgentGroupConfigResponse{}
 		mData.VTapGroupID = &vtapGroup.ShortUUID
 		mData.VTapGroupName = &vtapGroup.Name
-		convertDBToJson(realConfig, mData, idToTapTypeName, lcuuidToDomain)
+		convertDBToJson(dbInfo, realConfig, mData, idToTapTypeName, lcuuidToDomain)
 		mData.TeamID = vtapGroup.TeamID
 		mData.UserID = vtapGroup.UserID
 		result = append(result, mData)
@@ -726,7 +727,7 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 	if ret.Error != nil {
 		ret = db.Where("vtap_group_lcuuid = ?", lcuuid).First(realConfig)
 		if ret.Error != nil {
-			log.Errorf("vtap group configuration(%s) not found", lcuuid)
+			log.Errorf("vtap group configuration(%s) not found", lcuuid, dbInfo.LogPrefixORGID, dbInfo.LogPrefixORGID)
 			realConfig = &agent_config.AgentGroupConfigModel{}
 		}
 	}
@@ -743,9 +744,9 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 		lcuuidToDomain[domain.Lcuuid] = domain.Name
 	}
 	realData := &agent_config.AgentGroupConfigResponse{}
-	convertDBToJson(realConfig, realData, idToTapTypeName, lcuuidToDomain)
+	convertDBToJson(dbInfo, realConfig, realData, idToTapTypeName, lcuuidToDomain)
 	defaultData := &agent_config.AgentGroupConfigResponse{}
-	convertDBToJson(common.DefaultVTapGroupConfig, defaultData, idToTapTypeName, lcuuidToDomain)
+	convertDBToJson(dbInfo, common.DefaultVTapGroupConfig, defaultData, idToTapTypeName, lcuuidToDomain)
 
 	realData.TeamID = common.DEFAULT_TEAM_ID
 	if realConfig.VTapGroupLcuuid != nil {
@@ -782,10 +783,10 @@ func GetVTapGroupAdvancedConfig(orgID int, lcuuid string) (string, error) {
 		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
 	response := &agent_config.AgentGroupConfig{}
-	convertDBToYaml(dbConfig, response)
+	convertDBToYaml(dbInfo, dbConfig, response)
 	b, err := yaml.Marshal(response)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, dbInfo.LogPrefixORGID)
 	}
 	if string(b) == string(emptyData) {
 		b = nil
@@ -814,12 +815,12 @@ func GetVTapGroupAdvancedConfigs(orgID int) ([]string, error) {
 			continue
 		}
 		response := &agent_config.AgentGroupConfig{}
-		convertDBToYaml(&dbConfig, response)
+		convertDBToYaml(dbInfo, &dbConfig, response)
 		shortUUID := lcuuidToShortUUID[*dbConfig.VTapGroupLcuuid]
 		response.VTapGroupID = &shortUUID
 		b, err := yaml.Marshal(response)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, dbInfo.LogPrefixORGID)
 			continue
 		}
 		result = append(result, string(b))
@@ -839,16 +840,16 @@ func UpdateVTapGroupAdvancedConfig(orgID int, lcuuid string, updateData *agent_c
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	convertYamlToDb(updateData, dbConfig)
+	convertYamlToDb(dbInfo, updateData, dbConfig)
 	ret = db.Save(dbConfig)
 	if ret.Error != nil {
 		return "", fmt.Errorf("save config failed, %s", ret.Error)
 	}
 	response := &agent_config.AgentGroupConfig{}
-	convertDBToYaml(dbConfig, response)
+	convertDBToYaml(dbInfo, dbConfig, response)
 	b, err := yaml.Marshal(response)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, dbInfo.LogPrefixORGID)
 	}
 	if string(b) == string(emptyData) {
 		b = nil
@@ -878,7 +879,7 @@ func CreateVTapGroupAdvancedConfig(orgID int, createData *agent_config.AgentGrou
 	if ret.Error == nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration already exist", *shortUUID)
 	}
-	convertYamlToDb(createData, dbConfig)
+	convertYamlToDb(dbInfo, createData, dbConfig)
 	dbConfig.VTapGroupLcuuid = &vtapGroup.Lcuuid
 	lcuuid := uuid.New().String()
 	dbConfig.Lcuuid = &lcuuid
@@ -887,11 +888,11 @@ func CreateVTapGroupAdvancedConfig(orgID int, createData *agent_config.AgentGrou
 		return "", fmt.Errorf("save config failed, %s", ret.Error)
 	}
 	response := &agent_config.AgentGroupConfig{}
-	convertDBToYaml(dbConfig, response)
+	convertDBToYaml(dbInfo, dbConfig, response)
 	response.VTapGroupID = shortUUID
 	b, err := yaml.Marshal(response)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, dbInfo.LogPrefixORGID)
 	}
 	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil
@@ -919,11 +920,11 @@ func GetVTapGroupConfigByFilter(orgID int, args map[string]string) (string, erro
 		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration not found", shortUUID)
 	}
 	response := &agent_config.AgentGroupConfig{}
-	convertDBToYaml(dbConfig, response)
+	convertDBToYaml(dbInfo, dbConfig, response)
 	response.VTapGroupID = &shortUUID
 	b, err := yaml.Marshal(response)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, dbInfo.LogPrefixORGID)
 	}
 	return string(b), nil
 }
@@ -952,11 +953,11 @@ func DeleteVTapGroupConfigByFilter(orgID int, args map[string]string) (string, e
 	}
 	db.Delete(dbConfig)
 	response := &agent_config.AgentGroupConfig{}
-	convertDBToYaml(dbConfig, response)
+	convertDBToYaml(dbInfo, dbConfig, response)
 	response.VTapGroupID = &shortUUID
 	b, err := yaml.Marshal(response)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, dbInfo.LogPrefixORGID)
 	}
 	refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	return string(b), nil

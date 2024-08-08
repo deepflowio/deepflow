@@ -23,48 +23,43 @@ import (
 )
 
 type PodNode struct {
-	OperatorBase[mysql.PodNode]
+	OperatorBase[*mysql.PodNode, mysql.PodNode]
 }
 
 func NewPodNode() *PodNode {
 	operater := &PodNode{
-		OperatorBase[mysql.PodNode]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PodNode](
+			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *PodNode) setDBItemID(dbItem *mysql.PodNode, id int) {
-	dbItem.ID = id
 }
 
 func (n *PodNode) DeleteBatch(lcuuids []string) ([]*mysql.PodNode, bool) {
 	var vmPodNodeConns []*mysql.VMPodNodeConnection
 	err := n.metadata.DB.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN pod_node On vm_pod_node_connection.pod_node_id = pod_node.id").Where("pod_node.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
 	if err != nil {
-		log.Error(n.metadata.Logf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err))
+		log.Errorf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err.Error(), n.metadata.LogPrefixes)
 		return nil, false
 	} else {
 		for _, con := range vmPodNodeConns {
 			err = n.metadata.DB.Delete(con).Error
 			if err != nil {
-				log.Error(n.metadata.Logf("%s (info: %+v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con, err))
+				log.Errorf("%s (info: %+v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con, err.Error(), n.metadata.LogPrefixes)
 				continue
 			}
-			log.Info(n.metadata.Logf("%s (info: %+v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con))
+			log.Infof("%s (info: %+v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), con, n.metadata.LogPrefixes)
 		}
 	}
 
 	var dbItems []*mysql.PodNode
 	err = n.metadata.DB.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
-		log.Error(n.metadata.Logf("%s (lcuuids: %v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN), lcuuids, err))
+		log.Errorf("%s (lcuuids: %v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN), lcuuids, err.Error(), n.metadata.LogPrefixes)
 		return nil, false
 	}
-	log.Info(n.metadata.Logf("%s (lcuuids: %v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN), lcuuids))
+	log.Infof("%s (lcuuids: %v) success", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN), lcuuids, n.metadata.LogPrefixes)
 	return dbItems, true
 }

@@ -22,10 +22,11 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
-	log.Debug("get vms starting")
+	log.Debug("get vms starting", logger.NewORGPrefix(t.orgID))
 	var vms []model.VM
 	states := map[string]int{
 		"RUNNING": common.VM_STATE_RUNNING,
@@ -35,7 +36,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
 	attrs := []string{"InstanceId", "InstanceName", "InstanceState", "SecurityGroupIds", "VirtualPrivateCloud", "CreatedTime"}
 	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeInstances", region.name, "InstanceSet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("vm request tencent api error: (%s)", err.Error())
+		log.Errorf("vm request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.VM{}, err
 	}
 	for _, vData := range resp {
@@ -45,7 +46,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
 		vmName := vData.Get("InstanceName").MustString()
 		vpcID := vData.Get("VirtualPrivateCloud").Get("VpcId").MustString()
 		if vpcID == "" {
-			log.Infof("vm (%s) vpc not found", vmName)
+			log.Infof("vm (%s) vpc not found", vmName, logger.NewORGPrefix(t.orgID))
 			continue
 		}
 
@@ -61,7 +62,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
 		vmCteateAt := vData.Get("CreatedTime").MustString()
 		createAt, err := time.ParseInLocation(time.RFC3339, vmCteateAt, time.Local)
 		if err != nil {
-			log.Warningf("vm (%s) created time format error: %s", vmName, err.Error())
+			log.Warningf("vm (%s) created time format error: %s", vmName, err.Error(), logger.NewORGPrefix(t.orgID))
 		}
 
 		azID := vData.Get("Placement").Get("Zone").MustString()
@@ -80,6 +81,6 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
 		})
 		t.azLcuuidMap[azLcuuid] = 0
 	}
-	log.Debug("get vms complete")
+	log.Debug("get vms complete", logger.NewORGPrefix(t.orgID))
 	return vms, nil
 }

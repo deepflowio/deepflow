@@ -42,12 +42,17 @@ func (k *ChPodK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChP
 	var pods []mysql.Pod
 	err := k.db.Unscoped().Find(&pods).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[K8sAnnotationsKey]mysql.ChPodK8sAnnotations)
 	for _, pod := range pods {
+		teamID, err := tagrecorder.GetTeamID(pod.Domain, pod.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", k.resourceTypeName, err.Error(), pod, k.db.LogPrefixORGID)
+		}
+
 		annotationsMap := map[string]string{}
 		annotations := strings.Split(pod.Annotation, ", ")
 		for _, singleAnnotation := range annotations {
@@ -59,7 +64,7 @@ func (k *ChPodK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChP
 		if len(annotationsMap) > 0 {
 			annotationStr, err := json.Marshal(annotationsMap)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, k.db.LogPrefixORGID)
 				return nil, false
 			}
 			key := K8sAnnotationsKey{
@@ -70,7 +75,7 @@ func (k *ChPodK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChP
 				Annotations: string(annotationStr),
 				L3EPCID:     pod.VPCID,
 				PodNsID:     pod.PodNamespaceID,
-				TeamID:      tagrecorder.DomainToTeamID[pod.Domain],
+				TeamID:      teamID,
 				DomainID:    tagrecorder.DomainToDomainID[pod.Domain],
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[pod.SubDomain],
 			}

@@ -19,63 +19,10 @@ package common
 import (
 	"fmt"
 
-	"github.com/op/go-logging"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("recorder.common")
-
-type Logger struct {
-	orgID         int
-	DomainName    string
-	SubDomainName string
-	MsgPre        string
-}
-
-func NewLogger(orgID int) *Logger {
-	return &Logger{
-		orgID:  orgID,
-		MsgPre: fmt.Sprintf("[OID-%d] ", orgID),
-	}
-}
-
-func (l *Logger) InitMsgPre() {
-	if l.orgID != 0 {
-		l.MsgPre = fmt.Sprintf("[OID-%d] ", l.orgID)
-	}
-	if l.DomainName != "" {
-		l.MsgPre += fmt.Sprintf("[DN-%s] ", l.DomainName)
-	}
-	if l.SubDomainName != "" {
-		l.MsgPre += fmt.Sprintf("[SDN-%s] ", l.SubDomainName)
-	}
-}
-
-func (l *Logger) SetDomainName(n string) {
-	l.DomainName = n
-	l.InitMsgPre()
-}
-
-func (l *Logger) SetSubDomainName(n string) {
-	l.SubDomainName = n
-	l.InitMsgPre()
-}
-
-func (l *Logger) GetMsgPre() string {
-	return l.MsgPre
-}
-
-func (l *Logger) AddPre(format string, a ...any) string {
-	return l.MsgPre + fmt.Sprintf(format, a...)
-}
-
-func (l *Logger) Copy() *Logger {
-	return &Logger{
-		orgID:         l.orgID,
-		DomainName:    l.DomainName,
-		SubDomainName: l.SubDomainName,
-		MsgPre:        l.MsgPre,
-	}
-}
+var log = logger.MustGetLogger("recorder.common")
 
 func LogAdd(resourceType string) string {
 	return fmt.Sprintf("add %s", resourceType)
@@ -87,4 +34,28 @@ func LogUpdate(resourceType string) string {
 
 func LogDelete(resourceType string) string {
 	return fmt.Sprintf("delete %s", resourceType)
+}
+
+type DomainNameLogPrefix struct {
+	Name string
+}
+
+func NewDomainPrefix(name string) logger.Prefix {
+	return &DomainNameLogPrefix{name}
+}
+
+func (p *DomainNameLogPrefix) Prefix() string {
+	return fmt.Sprintf("[DomainName-%s]", p.Name)
+}
+
+type SubDomainNameLogPrefix struct {
+	Name string
+}
+
+func NewSubDomainPrefix(name string) logger.Prefix {
+	return &SubDomainNameLogPrefix{name}
+}
+
+func (p *SubDomainNameLogPrefix) Prefix() string {
+	return fmt.Sprintf("[SubDomainName-%s]", p.Name)
 }

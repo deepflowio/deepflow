@@ -48,12 +48,12 @@ func (b *DataSet) AddVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteVInterface(lcuuid string) {
 	delete(b.VInterfaces, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type VInterface struct {

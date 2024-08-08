@@ -24,6 +24,7 @@
 
 #define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
+#define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
 
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
@@ -377,4 +378,5 @@ int socket_tracer_stop(void);
 int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
+int disable_syscall_trace_id(void);
 #endif /* DF_USER_SOCKET_H */

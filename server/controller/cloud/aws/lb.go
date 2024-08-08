@@ -29,10 +29,11 @@ import (
 	v2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener, []model.LBTargetServer, error) {
-	log.Debug("get load balances starting")
+	log.Debug("get load balances starting", logger.NewORGPrefix(a.orgID))
 	var lbs []model.LB
 	var lbListeners []model.LBListener
 	var lbTargetServers []model.LBTargetServer
@@ -51,7 +52,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 		}
 		result, err := elasticloadbalancing.NewFromConfig(v2ClientConfig).DescribeLoadBalancers(context.TODO(), input)
 		if err != nil {
-			log.Errorf("load balance request aws api error: (%s)", err.Error())
+			log.Errorf("load balance request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, err
 		}
 		retLBs = append(retLBs, result.LoadBalancerDescriptions...)
@@ -79,7 +80,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 
 		for _, listener := range lData.ListenerDescriptions {
 			if listener.Listener == nil {
-				log.Debug("listener is nil")
+				log.Debug("listener is nil", logger.NewORGPrefix(a.orgID))
 				continue
 			}
 			protocol := a.getStringPointerValue(listener.Listener.Protocol)
@@ -99,7 +100,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 				serverInstanceID := a.getStringPointerValue(server.InstanceId)
 				ip, ok := a.vmIDToPrivateIP[serverInstanceID]
 				if !ok {
-					log.Info("lb target server (%s) ip not found", serverInstanceID)
+					log.Info("lb target server (%s) ip not found", serverInstanceID, logger.NewORGPrefix(a.orgID))
 					continue
 				}
 				lbTargetServers = append(lbTargetServers, model.LBTargetServer{
@@ -130,7 +131,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 		}
 		result, err := v2Client.DescribeLoadBalancers(context.TODO(), input)
 		if err != nil {
-			log.Errorf("load balance v2 request aws api error: (%s)", err.Error())
+			log.Errorf("load balance v2 request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, err
 		}
 		v2RetLBs = append(v2RetLBs, result.LoadBalancers...)
@@ -148,7 +149,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 		v2LBName := a.getStringPointerValue(v2LData.LoadBalancerName)
 		v2LBArn := a.getStringPointerValue(v2LData.LoadBalancerArn)
 		if v2LBArn == "" {
-			log.Infof("load balance v2 lb (%s) LoadBalancerArn not found", v2LBName)
+			log.Infof("load balance v2 lb (%s) LoadBalancerArn not found", v2LBName, logger.NewORGPrefix(a.orgID))
 			continue
 		}
 		v2LBLcuuid := common.GetUUIDByOrgID(a.orgID, v2LBArn)
@@ -163,7 +164,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 
 		v2RetListeners, err := v2Client.DescribeListeners(context.TODO(), &elasticloadbalancingv2.DescribeListenersInput{LoadBalancerArn: v2LData.LoadBalancerArn})
 		if err != nil {
-			log.Errorf("load balance listener v2 request aws api error: (%s)", err.Error())
+			log.Errorf("load balance listener v2 request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, err
 		}
 		for _, v2Listener := range v2RetListeners.Listeners {
@@ -186,7 +187,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 				}
 				v2RetServers, err := v2Client.DescribeTargetHealth(context.TODO(), &elasticloadbalancingv2.DescribeTargetHealthInput{TargetGroupArn: targetGrop.TargetGroupArn})
 				if err != nil {
-					log.Errorf("load balance target server v2 request aws api error: (%s)", err.Error())
+					log.Errorf("load balance target server v2 request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 					return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, err
 				}
 				for _, v2TargetServer := range v2RetServers.TargetHealthDescriptions {
@@ -194,7 +195,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 					var v2TargetVMLcuuid string
 					var v2TargetType int
 					if v2TargetServer.Target == nil {
-						log.Debug("target is nil")
+						log.Debug("target is nil", logger.NewORGPrefix(a.orgID))
 						continue
 					}
 					v2TargetID := a.getStringPointerValue(v2TargetServer.Target.Id)
@@ -206,7 +207,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 					} else {
 						v2TargetIP = a.vmIDToPrivateIP[v2TargetID]
 						if v2TargetIP == "" {
-							log.Info("lb target server v2 (%s) ip not found", v2TargetID)
+							log.Info("lb target server v2 (%s) ip not found", v2TargetID, logger.NewORGPrefix(a.orgID))
 							continue
 						}
 						v2TargetType = common.LB_SERVER_TYPE_VM
@@ -227,6 +228,6 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			}
 		}
 	}
-	log.Debug("get load balances complete")
+	log.Debug("get load balances complete", logger.NewORGPrefix(a.orgID))
 	return lbs, lbListeners, lbTargetServers, nil
 }

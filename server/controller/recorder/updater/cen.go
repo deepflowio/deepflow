@@ -30,8 +30,9 @@ import (
 type CEN struct {
 	UpdaterBase[
 		cloudmodel.CEN,
-		mysql.CEN,
 		*diffbase.CEN,
+		*mysql.CEN,
+		mysql.CEN,
 		*message.CENAdd,
 		message.CENAdd,
 		*message.CENUpdate,
@@ -46,8 +47,9 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	updater := &CEN{
 		newUpdaterBase[
 			cloudmodel.CEN,
-			mysql.CEN,
 			*diffbase.CEN,
+			*mysql.CEN,
+			mysql.CEN,
 			*message.CENAdd,
 			message.CENAdd,
 			*message.CENUpdate,
@@ -77,10 +79,10 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*mysql.CEN, bool) 
 	for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 		vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 		if !exists {
-			log.Error(c.metadata.Logf(resourceAForResourceBNotFound(
+			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
-			)))
+			), c.metadata.LogPrefixes)
 			continue
 		}
 		vpcIDs = append(vpcIDs, vpcID)
@@ -107,10 +109,10 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.C
 		for _, vpcLcuuid := range cloudItem.VPCLcuuids {
 			vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
 			if !exists {
-				log.Error(c.metadata.Logf(resourceAForResourceBNotFound(
+				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_CEN_EN, cloudItem.Lcuuid,
-				)))
+				), c.metadata.LogPrefixes)
 				continue
 			}
 			vpcIDs = append(vpcIDs, vpcID)

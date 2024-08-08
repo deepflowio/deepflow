@@ -30,8 +30,9 @@ import (
 type Process struct {
 	UpdaterBase[
 		cloudmodel.Process,
-		mysql.Process,
 		*diffbase.Process,
+		*mysql.Process,
+		mysql.Process,
 		*message.ProcessAdd,
 		message.ProcessAdd,
 		*message.ProcessUpdate,
@@ -46,8 +47,9 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 	updater := &Process{
 		newUpdaterBase[
 			cloudmodel.Process,
-			mysql.Process,
 			*diffbase.Process,
+			*mysql.Process,
+			mysql.Process,
 			*message.ProcessAdd,
 			message.ProcessAdd,
 			*message.ProcessUpdate,

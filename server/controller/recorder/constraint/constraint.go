@@ -18,10 +18,22 @@
 package constraint
 
 import (
+	"time"
+
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
+
+type MySQLModelPtr[T MySQLModel] interface {
+	*T
+
+	GetLcuuid() string
+	GetID() int
+
+	SetID(int)
+	SetUpdatedAt(time.Time)
+}
 
 // 资源的MySQL orm对象
 type MySQLModel interface {
@@ -34,9 +46,8 @@ type MySQLModel interface {
 		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
 		mysql.PodIngressRule | mysql.PodIngressRuleBackend | mysql.PodService |
 		mysql.PodServicePort | mysql.PodGroup | mysql.PodGroupPort | mysql.PodReplicaSet |
-		mysql.Pod | mysql.Process | mysql.PrometheusTarget | mysql.VIP | mysql.VTap
+		mysql.Pod | mysql.Process | mysql.VIP
 
-	GetLcuuid() string
 	GetID() int
 }
 
@@ -51,7 +62,7 @@ type CloudModel interface {
 		cloudmodel.PodNode | cloudmodel.VMPodNodeConnection | cloudmodel.PodNamespace | cloudmodel.PodIngress |
 		cloudmodel.PodIngressRule | cloudmodel.PodIngressRuleBackend | cloudmodel.PodService |
 		cloudmodel.PodServicePort | cloudmodel.PodGroup | cloudmodel.PodGroupPort | cloudmodel.PodReplicaSet |
-		cloudmodel.Pod | cloudmodel.Process | cloudmodel.PrometheusTarget | cloudmodel.VIP
+		cloudmodel.Pod | cloudmodel.Process | cloudmodel.VIP
 }
 
 // 资源用于比对的缓存对象
@@ -65,7 +76,7 @@ type DiffBase interface {
 		*diffbase.PodNode | *diffbase.VMPodNodeConnection | *diffbase.PodNamespace | *diffbase.PodIngress |
 		*diffbase.PodIngressRule | *diffbase.PodIngressRuleBackend | *diffbase.PodService |
 		*diffbase.PodServicePort | *diffbase.PodGroup | *diffbase.PodGroupPort | *diffbase.PodReplicaSet |
-		*diffbase.Pod | *diffbase.Process | *diffbase.PrometheusTarget | *diffbase.VIP
+		*diffbase.Pod | *diffbase.Process | *diffbase.VIP
 
 	GetSequence() int
 	SetSequence(sequence int)
@@ -79,7 +90,7 @@ type MySQLSoftDeleteModel interface {
 		mysql.LB | mysql.LBListener | mysql.CEN | mysql.PeerConnection | mysql.RDSInstance |
 		mysql.RedisInstance | mysql.PodCluster | mysql.PodNode | mysql.PodNamespace |
 		mysql.PodIngress | mysql.PodService | mysql.PodGroup | mysql.PodReplicaSet | mysql.Pod |
-		mysql.Process | mysql.PrometheusTarget
+		mysql.Process
 
 	GetDomainLcuuid() string
 	GetSubDomainLcuuid() string

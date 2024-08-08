@@ -22,21 +22,16 @@ import (
 )
 
 type PodNamespace struct {
-	OperatorBase[mysql.PodNamespace]
+	OperatorBase[*mysql.PodNamespace, mysql.PodNamespace]
 }
 
 func NewPodNamespace() *PodNamespace {
 	operater := &PodNamespace{
-		OperatorBase[mysql.PodNamespace]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PodNamespace](
+			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *PodNamespace) setDBItemID(dbItem *mysql.PodNamespace, id int) {
-	dbItem.ID = id
 }

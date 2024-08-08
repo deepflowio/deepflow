@@ -29,8 +29,9 @@ import (
 type LBTargetServer struct {
 	UpdaterBase[
 		cloudmodel.LBTargetServer,
-		mysql.LBTargetServer,
 		*diffbase.LBTargetServer,
+		*mysql.LBTargetServer,
+		mysql.LBTargetServer,
 		*message.LBTargetServerAdd,
 		message.LBTargetServerAdd,
 		*message.LBTargetServerUpdate,
@@ -45,8 +46,9 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 	updater := &LBTargetServer{
 		newUpdaterBase[
 			cloudmodel.LBTargetServer,
-			mysql.LBTargetServer,
 			*diffbase.LBTargetServer,
+			*mysql.LBTargetServer,
+			mysql.LBTargetServer,
 			*message.LBTargetServerAdd,
 			message.LBTargetServerAdd,
 			*message.LBTargetServerUpdate,
@@ -74,37 +76,37 @@ func (s *LBTargetServer) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBTargetSe
 func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServer) (*mysql.LBTargetServer, bool) {
 	lbID, exists := s.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
-		log.Error(s.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
-		)))
+		), s.metadata.LogPrefixes)
 		return nil, false
 	}
 	lbListenerID, exists := s.cache.ToolDataSet.GetLBListenerIDByLcuuid(cloudItem.LBListenerLcuuid)
 	if !exists {
-		log.Error(s.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.LBListenerLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
-		)))
+		), s.metadata.LogPrefixes)
 		return nil, false
 	}
 	var vmID int
 	if cloudItem.VMLcuuid != "" {
 		vmID, exists = s.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 		if !exists {
-			log.Error(s.metadata.Logf(resourceAForResourceBNotFound(
+			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
-			)))
+			), s.metadata.LogPrefixes)
 			return nil, false
 		}
 	}
 	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(s.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
-		)))
+		), s.metadata.LogPrefixes)
 	}
 
 	dbItem := &mysql.LBTargetServer{

@@ -22,21 +22,16 @@ import (
 )
 
 type VRouter struct {
-	OperatorBase[mysql.VRouter]
+	OperatorBase[*mysql.VRouter, mysql.VRouter]
 }
 
 func NewVRouter() *VRouter {
 	operater := &VRouter{
-		OperatorBase[mysql.VRouter]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.VRouter](
+			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *VRouter) setDBItemID(dbItem *mysql.VRouter, id int) {
-	dbItem.ID = id
 }

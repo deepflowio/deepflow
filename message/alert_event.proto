@@ -1,0 +1,24 @@
+syntax = "proto2";
+
+package alert_event;
+option go_package = "alert_event";
+
+message AlertEvent {
+    optional uint32 time = 1;
+    optional uint32 policy_id = 2;
+    optional uint32 policy_type = 3;
+    optional string alert_policy = 4;
+    optional double metric_value = 5;
+    optional uint32 event_level = 6;
+    optional string target_tags = 7;
+    repeated  string tag_str_keys = 8;
+    repeated  string tag_str_values = 9;
+    repeated  string tag_int_keys = 10;
+    repeated  int64 tag_int_values = 11;
+    optional uint32 org_id = 12;
+    optional uint32 user_id = 13;
+    optional uint32 team_id = 14;
+
+    optional string _target_uid = 21;
+    optional string _query_region = 22;
+}

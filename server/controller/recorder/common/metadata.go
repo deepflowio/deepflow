@@ -18,34 +18,35 @@ package common
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 type Metadata struct {
-	ORGID     int       // org id
-	DB        *mysql.DB // org database connection
-	Logger    *Logger   // log controller
-	Domain    *DomainInfo
-	SubDomain *SubDomainInfo
+	ORGID       int       // org id
+	DB          *mysql.DB // org database connection
+	Domain      *DomainInfo
+	SubDomain   *SubDomainInfo
+	LogPrefixes []logger.Prefix
 }
 
 func NewMetadata(orgID int) (*Metadata, error) {
 	db, err := mysql.GetDB(orgID)
 	return &Metadata{
-		ORGID:     orgID,
-		DB:        db,
-		Logger:    NewLogger(orgID),
-		Domain:    new(DomainInfo),
-		SubDomain: new(SubDomainInfo),
+		ORGID:       orgID,
+		DB:          db,
+		Domain:      new(DomainInfo),
+		SubDomain:   new(SubDomainInfo),
+		LogPrefixes: []logger.Prefix{logger.NewORGPrefix(orgID)},
 	}, err
 }
 
 func (m *Metadata) Copy() *Metadata {
 	return &Metadata{
-		ORGID:     m.ORGID,
-		DB:        m.DB,
-		Logger:    m.Logger,
-		Domain:    m.Domain,
-		SubDomain: m.SubDomain,
+		ORGID:       m.ORGID,
+		DB:          m.DB,
+		Domain:      m.Domain,
+		SubDomain:   m.SubDomain,
+		LogPrefixes: m.LogPrefixes[:],
 	}
 }
 
@@ -53,23 +54,26 @@ func (m *Metadata) GetORGID() int {
 	return m.ORGID
 }
 
+func (m *Metadata) GetTeamID() int {
+	if m.SubDomain.TeamID != 0 {
+		return m.SubDomain.TeamID
+	} else {
+		return m.Domain.TeamID
+	}
+}
+
 func (m *Metadata) SetDomain(domain mysql.Domain) {
 	m.Domain = &DomainInfo{domain}
-	m.Logger.SetDomainName(domain.Name)
+	m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(domain.TeamID))
+	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name))
 }
 
 func (m *Metadata) SetSubDomain(subDomain mysql.SubDomain) {
 	m.SubDomain = &SubDomainInfo{subDomain}
-	m.Logger.SetSubDomainName(subDomain.Name)
-}
-
-// Logf adds org id, domain info, sub_domain info to logs
-func (m *Metadata) Logf(format string, a ...any) string {
-	return m.Logger.AddPre(format, a...)
-}
-
-func (m *Metadata) Log(format string) string {
-	return m.Logger.AddPre(format)
+	if subDomain.TeamID != 0 {
+		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(subDomain.TeamID))
+	}
+	m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(subDomain.Name))
 }
 
 type DomainInfo struct {

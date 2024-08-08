@@ -26,9 +26,6 @@
 #include <math.h>
 #include "utils.h"
 
-#define NSEC_PER_SEC	1000000000L
-#define USER_HZ		100
-
 static __inline void *get_socket_file_addr_with_check(struct task_struct *task,
 						      int fd_num,
 						      int files_off,

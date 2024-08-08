@@ -69,7 +69,10 @@ enum {
 //thread index for bihash
 enum {
 	THREAD_PROFILER_READER_IDX = 0,
-	THREAD_PROC_ACT_IDX_BASE = 2,
+	THREAD_OFFCPU_READER_IDX = 1,
+	THREAD_MEMORY_READER_IDX = 2,
+	THREAD_PROC_EVENTS_HANDLE_IDX = 3,
+	THREAD_SOCK_READER_IDX_BASE = 4,
 };
 
 /*
@@ -100,6 +103,7 @@ enum {
 #define GO_TRACING_TIMEOUT_DEFAULT      120
 
 #define SK_TRACER_NAME			"socket-trace"
+#define CP_TRACER_NAME	                "continuous_profiler"
 
 #define DATADUMP_FILE_PATH_SIZE		1024
 #define DATADUMP_FILE_PATH_PREFIX	"/var/log"
@@ -148,6 +152,12 @@ enum {
 
 // The queue size for managing process execution/exit events.
 #define PROC_RING_SZ 16384
+
+/*
+ * During stack trace string aggregation and statistics, thread names
+ * are hashed using the DJB2 algorithm.
+ */
+#define USE_DJB2_HASH
 
 /*
  * Process information recalibration time, this time is the number of seconds
@@ -279,5 +289,23 @@ enum {
  */
 #define STACKMAP_SCALING_FACTOR 3.0
 #define STACKMAP_CAPACITY_THRESHOLD 32768 // The capacity limit of the Stack trace map, power of two. 
+
+/*
+ * eBPF utilizes perf event's periodic events to push all data residing in the kernel
+ * cache. We have set this to push data from the kernel buffer every 10 milliseconds.
+ * This periodic event is implemented using the kernel's high-resolution timer (hrtimer),
+ * which triggers a timer interrupt when the specified time elapses. However, in practice,
+ * this timer does not always trigger interrupts precisely every 10 milliseconds to execute
+ * the eBPF program. This discrepancy occurs because timer interrupts may be masked off
+ * during certain operations, such as when interrupts are disabled during locking operations.
+ * Therefore, the timer may trigger interrupts after the expected time, resulting in latency
+ * for periodic events.
+ *
+ * The system call phase will check the time delay of the push period, and if it exceeds this
+ * threshold, the data will be pushed immediately. From the tests, the maximum delay is
+ * approximately in the range of 30 to 60 milliseconds. Therefore, it is appropriate to set the
+ * threshold for the system call phase check to 60 milliseconds.
+ */
+#define PERIODIC_PUSH_DELAY_THRESHOLD_NS 60000000ULL // 60 milliseconds 
 
 #endif /* DF_EBPF_CONFIG_H */

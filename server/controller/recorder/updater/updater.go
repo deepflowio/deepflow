@@ -57,8 +57,9 @@ type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constr
 
 type UpdaterBase[
 	CT constraint.CloudModel,
-	MT constraint.MySQLModel,
 	BT constraint.DiffBase,
+	MPT constraint.MySQLModelPtr[MT],
+	MT constraint.MySQLModel,
 	MAPT msg.AddPtr[MAT],
 	MAT msg.Add,
 	MUPT msg.UpdatePtr[MUT],
@@ -75,7 +76,7 @@ type UpdaterBase[
 
 	cache             *cache.Cache                           // 基于 Domain 或者 SubDomain 范围构造
 	domainToolDataSet *tool.DataSet                          // 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
-	dbOperator        db.Operator[MT]                        // 数据库操作对象
+	dbOperator        db.Operator[MPT, MT]                   // 数据库操作对象
 	diffBaseData      map[string]BT                          // 用于比对的旧资源数据
 	cloudData         []CT                                   // 定时获取的新资源数据
 	dataGenerator     DataGenerator[CT, MT, BT, MFUPT, MFUT] // 提供各类数据生成的方法
@@ -90,8 +91,9 @@ type UpdaterBase[
 
 func newUpdaterBase[
 	CT constraint.CloudModel,
-	MT constraint.MySQLModel,
 	BT constraint.DiffBase,
+	MPT constraint.MySQLModelPtr[MT],
+	MT constraint.MySQLModel,
 	MAPT msg.AddPtr[MAT],
 	MAT msg.Add,
 	MUPT msg.UpdatePtr[MUT],
@@ -101,9 +103,9 @@ func newUpdaterBase[
 	MDPT msg.DeletePtr[MDT],
 	MDT msg.Delete,
 ](
-	resourceType string, cache *cache.Cache, dbOperator db.Operator[MT], diffBaseData map[string]BT, cloudData []CT,
-) UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT] {
-	u := UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]{
+	resourceType string, cache *cache.Cache, dbOperator db.Operator[MPT, MT], diffBaseData map[string]BT, cloudData []CT,
+) UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT] {
+	u := UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]{
 		metadata: cache.GetMetadata(),
 
 		resourceType: resourceType,
@@ -113,54 +115,51 @@ func newUpdaterBase[
 		cloudData:    cloudData,
 	}
 	// use teamID from subDomain if updater is for subDomain
-	teamID := u.metadata.SubDomain.TeamID
-	if teamID == 0 {
-		teamID = u.metadata.Domain.TeamID
-	}
 	u.msgMetadata = message.NewMetadata(
 		u.metadata.GetORGID(),
-		message.MetadataTeamID(teamID),
+		message.MetadataTeamID(u.metadata.GetTeamID()),
 		message.MetadataDomainID(u.metadata.Domain.ID),
 		message.MetadataSubDomainID(u.metadata.SubDomain.ID),
+		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
 	)
 
-	log.Infof(u.metadata.Logf("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata)) // TODO debug
+	log.Infof("new updater for resource type: %s, message metadata: %#v", resourceType, u.msgMetadata, u.metadata.LogPrefixes)
 	u.initPubSub()
 	return u
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) initPubSub() {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) initPubSub() {
 	ps := pubsub.GetPubSub(u.resourceType)
 	if ps == nil {
-		log.Error(u.metadata.Logf("pubsub not found for resource type: %s", u.resourceType))
+		log.Errorf("pubsub not found for resource type: %s", u.resourceType, u.metadata.LogPrefixes)
 		return
 	}
 	u.pubsub = ps.(pubsub.ResourcePubSub[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT])
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) setDataGenerator(dataGenerator DataGenerator[CT, MT, BT, MFUPT, MFUT]) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) setDataGenerator(dataGenerator DataGenerator[CT, MT, BT, MFUPT, MFUT]) {
 	u.dataGenerator = dataGenerator
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) setDomainToolDataSet(domainToolDataSet *tool.DataSet) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) setDomainToolDataSet(domainToolDataSet *tool.DataSet) {
 	u.domainToolDataSet = domainToolDataSet
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) RegisterListener(listener listener.Listener[CT, MT, BT]) ResourceUpdater {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) RegisterListener(listener listener.Listener[CT, MT, BT]) ResourceUpdater {
 	u.listeners = append(u.listeners, listener)
 	return u
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) HandleAddAndUpdate() {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) HandleAddAndUpdate() {
 	dbItemsToAdd := []*MT{}
 	logDebug := logDebugResourceTypeEnabled(u.resourceType)
 	for _, cloudItem := range u.cloudData {
 		if logDebug {
-			log.Info(u.metadata.Logf(debugCloudItem(u.resourceType, cloudItem)))
+			log.Info(debugCloudItem(u.resourceType, cloudItem), u.metadata.LogPrefixes)
 		}
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
-			log.Info(u.metadata.Logf("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), cloudItem))
+			log.Infof("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), cloudItem, u.metadata.LogPrefixes)
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)
 			if ok {
 				dbItemsToAdd = append(dbItemsToAdd, dbItem)
@@ -169,7 +168,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 			diffBase.SetSequence(u.cache.GetSequence())
 			structInfo, mapInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
-				log.Info(u.metadata.Logf("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase))
+				log.Infof("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase, u.metadata.LogPrefixes)
 				u.update(&cloudItem, diffBase, mapInfo, structInfo)
 			}
 		}
@@ -179,11 +178,11 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) HandleDelete() {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) HandleDelete() {
 	lcuuidsOfBatchToDelete := []string{}
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
-			log.Info(u.metadata.Logf("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase))
+			log.Infof("to %s (diff base item: %#v)", common.LogDelete(u.resourceType), diffBase, u.metadata.LogPrefixes)
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}
@@ -192,15 +191,15 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) GetResourceType() string {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) GetResourceType() string {
 	return u.resourceType
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) GetChanged() bool {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) GetChanged() bool {
 	return u.Changed
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) add(dbItemsToAdd []*MT) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) add(dbItemsToAdd []*MT) {
 	count := len(dbItemsToAdd)
 	offset := 1000
 	pages := count/offset + 1
@@ -217,7 +216,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) addPage(dbItemsToAdd []*MT) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) addPage(dbItemsToAdd []*MT) {
 	if dbItems, ok := u.dbOperator.AddBatch(dbItemsToAdd); ok {
 		u.notifyOnAdded(dbItems)
 
@@ -228,11 +227,11 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) update(cloudItem *CT, diffBase BT, mapInfo map[string]interface{}, structInfo MFUPT) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) update(cloudItem *CT, diffBase BT, mapInfo map[string]interface{}, structInfo MFUPT) {
 	if dbItem, ok := u.dbOperator.Update(diffBase.GetLcuuid(), mapInfo); ok {
 		u.notifyOnUpdated(cloudItem, diffBase)
 
-		structInfo.SetID((*dbItem).GetID())
+		structInfo.SetID(MPT(dbItem).GetID())
 		structInfo.SetLcuuid(diffBase.GetLcuuid())
 		msgData := MUPT(new(MUT))
 		msgData.SetFields(structInfo)
@@ -243,7 +242,7 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) delete(lcuuids []string) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) delete(lcuuids []string) {
 	count := len(lcuuids)
 	offset := 1000
 	pages := count/offset + 1
@@ -260,31 +259,31 @@ func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) deletePage(lcuuids []string) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) deletePage(lcuuids []string) {
 	if dbItems, ok := u.dbOperator.DeleteBatch(lcuuids); ok {
 		u.notifyOnDeleted(lcuuids)
 
 		msgData := MDPT(new(MDT))
 		msgData.SetLcuuids(lcuuids)
 		msgData.SetMySQLItems(dbItems)
-		u.pubsub.PublishBatchDeleted(u.msgMetadata, msgData, u.dbOperator.GetSoftDelete())
+		u.pubsub.PublishBatchDeleted(u.msgMetadata, msgData)
 		u.Changed = true
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) notifyOnAdded(addedDBItems []*MT) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) notifyOnAdded(addedDBItems []*MT) {
 	for _, l := range u.listeners {
 		l.OnUpdaterAdded(addedDBItems)
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) notifyOnUpdated(cloudItem *CT, diffBaseItem BT) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) notifyOnUpdated(cloudItem *CT, diffBaseItem BT) {
 	for _, l := range u.listeners {
 		l.OnUpdaterUpdated(cloudItem, diffBaseItem)
 	}
 }
 
-func (u *UpdaterBase[CT, MT, BT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) notifyOnDeleted(lcuuids []string) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) notifyOnDeleted(lcuuids []string) {
 	for _, l := range u.listeners {
 		l.OnUpdaterDeleted(lcuuids)
 	}

@@ -228,12 +228,12 @@ func newCleaner(orgID int) (*Cleaner, error) {
 
 func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	if err := c.toolData.load(c.org.DB); err != nil {
-		log.Error(c.org.Logf("failed to load tool data"))
+		log.Error("failed to load tool data", c.org.LogPrefix)
 		return
 	}
 
 	expiredAt := time.Now().Add(time.Duration(-retentionInterval) * time.Hour)
-	log.Info(c.org.Logf("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(ctrlrcommon.GO_BIRTHDAY)))
+	log.Infof("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(ctrlrcommon.GO_BIRTHDAY), c.org.LogPrefix)
 	deleteAndPublish[mysql.Region](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_REGION_EN, c.toolData)
 	deleteAndPublish[mysql.AZ](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_AZ_EN, c.toolData)
 	deleteAndPublish[mysql.Host](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_HOST_EN, c.toolData)
@@ -258,17 +258,16 @@ func (c *Cleaner) cleanDeletedData(retentionInterval int) {
 	deleteAndPublish[mysql.PodReplicaSet](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, c.toolData)
 	deleteAndPublish[mysql.Pod](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 	deleteAndPublish[mysql.Process](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, c.toolData)
-	// deleteAndPublish[mysql.PrometheusTarget](c.org.DB, expiredAt, ctrlrcommon.RESOURCE_TYPE_PROMETHEUS_TARGET_EN, c.toolData)
-	log.Info(c.org.Logf("clean soft deleted resources completed"))
+	log.Info("clean soft deleted resources completed", c.org.LogPrefix)
 }
 
 func (c *Cleaner) cleanDirtyData() {
 	if err := c.toolData.load(c.org.DB); err != nil {
-		log.Error(c.org.Logf("failed to load tool data"))
+		log.Error("failed to load tool data", c.org.LogPrefix)
 		return
 	}
 
-	log.Info(c.org.Logf("clean dirty data started"))
+	log.Info("clean dirty data started", c.org.LogPrefix)
 	c.cleanVMDirty()
 	c.cleanNetworkDirty()
 	c.cleanVRouterDirty()
@@ -278,7 +277,7 @@ func (c *Cleaner) cleanDirtyData() {
 	c.cleanPodGroupDirty()
 	c.cleanPodDirty()
 	c.cleanVInterfaceDirty()
-	log.Info(c.org.Logf("clean dirty data completed"))
+	log.Info("clean dirty data completed", c.org.LogPrefix)
 }
 
 func (c *Cleaner) cleanVMDirty() {
@@ -288,7 +287,7 @@ func (c *Cleaner) cleanVMDirty() {
 		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_VM, vmIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, vifs)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_VM_EN, vifs), c.org.LogPrefix)
 		}
 	}
 }
@@ -300,7 +299,7 @@ func (c *Cleaner) cleanNetworkDirty() {
 		c.org.DB.Where("vl2id NOT IN ?", networkIDs).Find(&subnets)
 		if len(subnets) != 0 {
 			c.org.DB.Delete(&subnets)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, subnets)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, subnets), c.org.LogPrefix)
 		}
 	}
 }
@@ -312,7 +311,7 @@ func (c *Cleaner) cleanVRouterDirty() {
 		c.org.DB.Where("vnet_id NOT IN ?", vrouterIDs).Find(&rts)
 		if len(rts) != 0 {
 			c.org.DB.Delete(&rts)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, rts)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, rts), c.org.LogPrefix)
 		}
 	}
 }
@@ -324,14 +323,14 @@ func (c *Cleaner) cleanPodIngressDirty() {
 		c.org.DB.Where("pod_ingress_id NOT IN ?", podIngressIDs).Find(&podIngressRules)
 		if len(podIngressRules) != 0 {
 			c.org.DB.Delete(&podIngressRules)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRules)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRules), c.org.LogPrefix)
 		}
 
 		var podIngressRuleBkds []*mysql.PodIngressRuleBackend
 		c.org.DB.Where("pod_ingress_id NOT IN ?", podIngressIDs).Find(&podIngressRuleBkds)
 		if len(podIngressRuleBkds) != 0 {
 			c.org.DB.Delete(&podIngressRuleBkds)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, podIngressRuleBkds), c.org.LogPrefix)
 		}
 	}
 }
@@ -343,21 +342,21 @@ func (c *Cleaner) cleanPodServiceDirty() {
 		c.org.DB.Where("pod_service_id NOT IN ?", podServiceIDs).Find(&podServicePorts)
 		if len(podServicePorts) != 0 {
 			c.org.DB.Delete(&podServicePorts)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts), c.org.LogPrefix)
 		}
 
 		var podGroupPorts []*mysql.PodGroupPort
 		c.org.DB.Where("pod_service_id NOT IN ?", podServiceIDs).Find(&podGroupPorts)
 		if len(podGroupPorts) != 0 {
 			c.org.DB.Delete(&podGroupPorts)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts), c.org.LogPrefix)
 		}
 
 		var vifs []*mysql.VInterface
 		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, vifs)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, vifs), c.org.LogPrefix)
 		}
 	}
 }
@@ -369,7 +368,7 @@ func (c *Cleaner) cleanPodGroupDirty() {
 		c.org.DB.Where("pod_group_id NOT IN ?", podGroupIDs).Find(&podGroupPorts)
 		if len(podGroupPorts) != 0 {
 			c.org.DB.Delete(&podGroupPorts)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, podGroupPorts)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, podGroupPorts), c.org.LogPrefix)
 		}
 
 		var pods []*mysql.Pod
@@ -377,7 +376,7 @@ func (c *Cleaner) cleanPodGroupDirty() {
 		if len(pods) != 0 {
 			c.org.DB.Delete(&pods)
 			publishTagrecorder(c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, pods)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, pods), c.org.LogPrefix)
 		}
 	}
 }
@@ -389,14 +388,14 @@ func (c *Cleaner) cleanPodNodeDirty() {
 		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE, podNodeIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vifs)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vifs), c.org.LogPrefix)
 		}
 
 		var vmPodNodeConns []*mysql.VMPodNodeConnection
 		c.org.DB.Where("pod_node_id NOT IN ?", podNodeIDs).Find(&vmPodNodeConns)
 		if len(vmPodNodeConns) != 0 {
 			c.org.DB.Delete(&vmPodNodeConns)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vmPodNodeConns)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, vmPodNodeConns), c.org.LogPrefix)
 		}
 
 		var pods []*mysql.Pod
@@ -404,7 +403,7 @@ func (c *Cleaner) cleanPodNodeDirty() {
 		if len(pods) != 0 {
 			c.org.DB.Delete(&pods)
 			publishTagrecorder(c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, pods), c.org.LogPrefix)
 		}
 	}
 }
@@ -416,7 +415,7 @@ func (c *Cleaner) cleanPodDirty() {
 		c.org.DB.Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD, podIDs).Find(&vifs)
 		if len(vifs) != 0 {
 			c.org.DB.Delete(&vifs)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs), c.org.LogPrefix)
 		}
 	}
 }
@@ -428,13 +427,13 @@ func (c *Cleaner) cleanVInterfaceDirty() {
 		c.org.DB.Where("vifid NOT IN ?", vifIDs).Find(&lanIPs)
 		if len(lanIPs) != 0 {
 			c.org.DB.Delete(&lanIPs)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lanIPs)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lanIPs), c.org.LogPrefix)
 		}
 		var wanIPs []*mysql.WANIP
 		c.org.DB.Where("vifid NOT IN ?", vifIDs).Find(&wanIPs)
 		if len(wanIPs) != 0 {
 			c.org.DB.Delete(&wanIPs)
-			log.Error(c.org.Logf(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, wanIPs)))
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, wanIPs), c.org.LogPrefix)
 		}
 	}
 }
@@ -451,14 +450,14 @@ func deleteExpired[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt t
 	var dbItems []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&dbItems).Error
 	if err != nil {
-		log.Error(db.Logf("mysql delete resource failed: %s", err.Error()))
+		log.Errorf("mysql delete resource failed: %s", err.Error(), db.LogPrefixORGID)
 		return nil
 	}
 	if len(dbItems) == 0 {
 		return nil
 	}
 	if err := db.Unscoped().Delete(&dbItems).Error; err != nil {
-		log.Error(db.Logf("mysql delete resource failed: %s", err.Error()))
+		log.Errorf("mysql delete resource failed: %s", err.Error(), db.LogPrefixORGID)
 		return nil
 	}
 	return dbItems
@@ -476,7 +475,7 @@ func getIDs[MT constraint.MySQLModel](db *mysql.DB) (ids []int) {
 func deleteAndPublish[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData) {
 	dbItems := deleteExpired[MT](db, expiredAt)
 	publishTagrecorder(db, dbItems, resourceType, toolData)
-	log.Info(db.Logf("clean %s completed: %d", resourceType, len(dbItems)))
+	log.Infof("clean %s completed: %d", resourceType, len(dbItems), db.LogPrefixORGID)
 }
 
 func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItems []*MT, resourceType string, toolData *toolData) {
@@ -489,7 +488,7 @@ func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItem
 			msgMetadata = toolData.domainLcuuidToMsgMetadata[(*item).GetDomainLcuuid()]
 		}
 		if msgMetadata == nil {
-			log.Error(db.Logf("failed to get metadata for %s: %#v", resourceType, item))
+			log.Errorf("failed to get metadata for %s: %#v", resourceType, item, db.LogPrefixORGID)
 			continue
 		}
 		msgMetadataToDBItems[msgMetadata] = append(msgMetadataToDBItems[msgMetadata], item)
@@ -499,7 +498,7 @@ func publishTagrecorder[MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItem
 	}
 	for _, sub := range tagrecorder.GetSubscriberManager().GetSubscribers(resourceType) {
 		for msgMetadata, dbItems := range msgMetadataToDBItems {
-			sub.OnResourceBatchDeleted(msgMetadata, dbItems, false)
+			sub.OnResourceBatchDeleted(msgMetadata, dbItems)
 		}
 	}
 }
@@ -531,7 +530,7 @@ func (t *toolData) load(db *mysql.DB) error {
 
 	var domains []*mysql.Domain
 	if err := db.Find(&domains).Error; err != nil {
-		log.Error(db.Logf("failed to get domain: %s", err.Error()))
+		log.Errorf("failed to get domain: %s", err.Error(), db.LogPrefixORGID)
 		return err
 	}
 	domainLcuuidToID := make(map[string]int)
@@ -541,7 +540,7 @@ func (t *toolData) load(db *mysql.DB) error {
 	}
 	var subDomains []*mysql.SubDomain
 	if err := db.Find(&subDomains).Error; err != nil {
-		log.Error(db.Logf("failed to get sub_domain: %s", err.Error()))
+		log.Errorf("failed to get sub_domain: %s", err.Error(), db.LogPrefixORGID)
 		return err
 	}
 	for _, subDomain := range subDomains {

@@ -25,6 +25,7 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 )
@@ -46,12 +47,12 @@ func NewPluginEvent() *PluginEvent {
 
 func (p *PluginEvent) GetPluginData(r *api.PluginRequest, orgID int) (*PluginData, error) {
 	if r.GetPluginType() == 0 || r.GetPluginName() == "" {
-		return nil, fmt.Errorf("ORGID-%d: the plugin request data type(%d) or name(%s) is empty",
-			orgID, r.GetPluginType(), r.GetPluginName())
+		return nil, fmt.Errorf("the plugin request data type(%d) or name(%s) is empty",
+			r.GetPluginType(), r.GetPluginName())
 	}
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		return nil, fmt.Errorf("ORGID-%d: get db failed", orgID)
+		return nil, fmt.Errorf("get db failed")
 	}
 	pluginDbMgr := dbmgr.DBMgr[mysql.Plugin](db.DB)
 	plugin, err := pluginDbMgr.GetByOption(
@@ -59,8 +60,8 @@ func (p *PluginEvent) GetPluginData(r *api.PluginRequest, orgID int) (*PluginDat
 		pluginDbMgr.WithType(int(r.GetPluginType())),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ORGID-%d: get plugin(type=%s, name=%s) from db failed, %s",
-			orgID, r.GetPluginType(), r.GetPluginName(), err)
+		return nil, fmt.Errorf("get plugin(type=%s, name=%s) from db failed, %s",
+			r.GetPluginType(), r.GetPluginName(), err)
 	}
 	content := plugin.Image
 	totalLen := uint64(len(content))
@@ -93,14 +94,14 @@ func (p *PluginEvent) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginSer
 	orgID := trisolaris.GetOrgIDByTeamID(teamID)
 	vtapCache := trisolaris.GetORGVTapInfo(orgID).GetVTapCache(vtapCacheKey)
 	if vtapCache == nil {
-		log.Errorf("agent(%s team_id=%s org_id=%d) cache not found", vtapCacheKey, teamID, orgID)
+		log.Errorf("agent(%s team_id=%s ) cache not found", vtapCacheKey, teamID, logger.NewORGPrefix(orgID))
 		return sendPluginFailed(in)
 	}
-	log.Infof("receive agent(%s team_id=%s org_id=%d) plugin request", vtapCacheKey, teamID, orgID)
+	log.Infof("receive agent(%s team_id=%s) plugin request", vtapCacheKey, teamID, logger.NewORGPrefix(orgID))
 
 	pluginData, err := p.GetPluginData(r, orgID)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(orgID))
 		return sendPluginFailed(in)
 	}
 	for start := uint64(0); start < pluginData.totalLen; start += pluginData.step {
@@ -118,10 +119,10 @@ func (p *PluginEvent) Plugin(r *api.PluginRequest, in api.Synchronizer_PluginSer
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Errorf("send agent(%s team_id=%s org_id=%d) plugin data faild, err:%s", vtapCacheKey, teamID, orgID, err)
+			log.Errorf("send agent(%s team_id=%s) plugin data faild, err:%s", vtapCacheKey, teamID, err, logger.NewORGPrefix(orgID))
 			break
 		}
 	}
-	log.Infof("sending plugin data to agent(%s team_id=%s org_id=%d) completed", vtapCacheKey, teamID, orgID)
+	log.Infof("sending plugin data to agent(%s team_id=%s) completed", vtapCacheKey, teamID, logger.NewORGPrefix(orgID))
 	return err
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/codec"
+	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/tracetree"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
@@ -40,7 +41,7 @@ func (t *SpanWithTraceID) WriteBlock(block *ckdb.Block) {
 	block.WriteDateTime(t.Time)
 	block.Write(
 		t.TraceId,
-		tracetree.HashSearchIndex(t.TraceId),
+		t.TraceIdIndex,
 		utils.String(t.EncodedSpan),
 	)
 }
@@ -91,6 +92,14 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.WriteString255(t.SpanId)
 	encoder.WriteString255(t.ParentSpanId)
 	encoder.WriteString255(t.AppService)
+	// topic: currently only taken from Kafka's RequestDomain
+	if t.L7Protocol == uint8(datatype.L7_PROTOCOL_KAFKA) {
+		encoder.WriteString255(t.RequestDomain)
+		encoder.WriteString255(t.RequestType)
+	} else {
+		encoder.WriteString255("")
+		encoder.WriteString255("")
+	}
 	encoder.WriteVarintU64(t.SyscallTraceIDRequest)
 	encoder.WriteVarintU64(t.SyscallTraceIDResponse)
 	encoder.WriteVarintU64(t.ResponseDuration)
@@ -102,7 +111,7 @@ func GenSpanWithTraceIDCKTable(cluster, storagePolicy string, ttl int, coldStora
 	table := SPAN_WITH_TRACE_ID_TABLE
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{"trace_id", "time", "search_index"}
+	orderKeys := []string{"search_index", "time"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,

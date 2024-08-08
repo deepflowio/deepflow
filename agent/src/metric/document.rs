@@ -34,7 +34,7 @@ use public::{
     utils::net::MacAddr,
 };
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 pub struct Document {
     pub timestamp: u32,
     pub tagger: Tagger,
@@ -68,8 +68,14 @@ impl Document {
 
 impl From<Document> for metric::Document {
     fn from(d: Document) -> Self {
+        let timestamp = if d.flags.contains(DocumentFlag::PER_SECOND_METRICS) {
+            d.timestamp - d.tagger.time_span
+        } else {
+            d.timestamp - d.tagger.time_span * 60
+        };
+
         metric::Document {
-            timestamp: d.timestamp,
+            timestamp,
             tag: Some(d.tagger.into()),
             meter: Some(d.meter.into()),
             flags: d.flags.bits(),
@@ -89,9 +95,20 @@ impl Sendable for BoxedDocument {
     fn message_type(&self) -> SendMessageType {
         SendMessageType::Metrics
     }
+
+    fn to_kv_string(&self, dst: &mut String) {
+        let json = serde_json::to_string(&(*self.0)).unwrap();
+        dst.push_str(&json);
+        dst.push('\n');
+    }
+
+    fn file_name(&self) -> &str {
+        "flow_metrics"
+    }
 }
 
 bitflags! {
+    #[derive(Serialize)]
     pub struct DocumentFlag: u32 {
         const NONE = 0; // PER_MINUTE_METRICS
         const PER_SECOND_METRICS = 1<<0;
@@ -105,6 +122,7 @@ impl Default for DocumentFlag {
 }
 
 bitflags! {
+    #[derive(Serialize)]
     pub struct Code:u64 {
         const NONE = 0;
 
@@ -144,7 +162,7 @@ impl Default for Code {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Direction {
     None,
@@ -265,7 +283,7 @@ impl From<SpanKind> for TapSide {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Tagger {
     pub code: Code,
 
@@ -301,6 +319,8 @@ pub struct Tagger {
     pub biz_type: u8,
     pub signal_source: SignalSource,
     pub pod_id: u32,
+    // request-reponse time span
+    pub time_span: u32,
 }
 
 impl Default for Tagger {
@@ -335,6 +355,7 @@ impl Default for Tagger {
             signal_source: SignalSource::default(),
             pod_id: 0,
             biz_type: 0,
+            time_span: 0,
         }
     }
 }

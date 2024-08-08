@@ -296,6 +296,9 @@ int parse_num_range(const char *config_str, int bytes_count,
 int parse_num_range_disorder(const char *config_str,
 			     int bytes_count, bool ** mask);
 int generate_random_integer(int max_value);
+bool is_same_netns(int pid);
+bool is_same_mntns(int pid);
+int is_file_opened_by_other_processes(const char *filename);
 /**
  * @brief Find the address through kernel symbols.
  *
@@ -304,7 +307,10 @@ int generate_random_integer(int max_value);
  * a non-zero value represents the address of the kernel symbol.
  */
 u64 kallsyms_lookup_name(const char *name);
+bool substring_starts_with(const char *haystack, const char *needle);
 char *get_timestamp_from_us(u64 microseconds);
+int find_pid_by_name(const char *process_name, int exclude_pid);
+u32 djb2_32bit(const char *str);
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
 #endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */

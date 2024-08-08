@@ -21,6 +21,8 @@
 #include <sys/prctl.h>
 #include <linux/version.h>
 #include <sys/epoll.h>
+#include <bcc/bcc_proc.h>
+#include <bcc/bcc_elf.h>
 #include <bcc/libbpf.h>
 #include <bcc/perf_reader.h>
 #include "config.h"
@@ -1092,13 +1094,13 @@ int tracer_uprobes_update(struct bpf_tracer *tracer)
 	struct symbol_uprobe *usym;
 
 	if (!tracer) {
-		ebpf_warning("tracer_probes_init failed, tracer is NULL\n");
+		ebpf_warning("tracer_probes_update failed, tracer is NULL\n");
 		return ETR_INVAL;
 	}
 
 	tps = tracer->tps;
 	if (!tps) {
-		ebpf_warning("tracer_probes_init failed, tps is NULL\n");
+		ebpf_warning("tracer_probes_update failed, tps is NULL\n");
 		return ETR_INVAL;
 	}
 
@@ -1223,7 +1225,6 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 		reader_idx = perf_reader->readers_count++;
 		perf_reader->reader_fds[reader_idx] = perf_fd;
 		perf_reader->readers[reader_idx] = reader;
-		event.data.fd = perf_fd;
 		event.data.ptr = reader;
 		event.events = EPOLLIN;
 

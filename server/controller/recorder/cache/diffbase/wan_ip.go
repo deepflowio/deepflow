@@ -39,12 +39,12 @@ func (b *DataSet) AddWANIP(dbItem *mysql.WANIP, seq int, toolDataSet *tool.DataS
 		SubDomainLcuuid: dbItem.SubDomain,
 		// SubnetLcuuid:    subnetLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteWANIP(lcuuid string) {
 	delete(b.WANIPs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type WANIP struct {

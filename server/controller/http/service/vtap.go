@@ -176,8 +176,8 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			if upgradeRevision, ok := vtapRepoNameToRevision[vtap.UpgradePackage]; ok {
 				vtapResp.UpgradeRevision = upgradeRevision
 			} else {
-				log.Errorf("ORG(id=%d database=%s) vtap upgrade package(%v) cannot assoicated with vtap repo",
-					dbInfo.ORGID, dbInfo.Name, vtap.UpgradePackage)
+				log.Errorf("vtap upgrade package(%v) cannot assoicated with vtap repo",
+					vtap.UpgradePackage, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 			}
 		}
 		// exceptions
@@ -322,7 +322,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 		return model.Vtap{}, fmt.Errorf("%w agent(name: %s) has no permission to operate.", err, vtap.Name)
 	}
 
-	log.Infof("ORG(id=%d database=%s) update vtap (%s) config %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
+	log.Infof("update vtap (%s) config %v", vtap.Name, vtapUpdate, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 
 	// enable/state/vtap_group_lcuuid
 	for _, key := range []string{"ENABLE", "STATE", "VTAP_GROUP_LCUUID", "LICENSE_TYPE"} {
@@ -344,7 +344,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
 		key := vtap.CtrlIP + "-" + vtap.CtrlMac
 		if err := db.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
-			log.Errorf("ORG(id=%d database=%s) error: %v", dbInfo.ORGID, dbInfo.Name, err)
+			log.Errorf("error: %v", err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 		}
 	}
 
@@ -421,7 +421,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 		return model.Vtap{}, err
 	}
 
-	log.Infof("ORG(id=%d database=%s) update vtap (%s) license %v", dbInfo.ORGID, dbInfo.Name, vtap.Name, vtapUpdate)
+	log.Infof("update vtap (%s) license %v", vtap.Name, vtapUpdate, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 
 	if _, ok := vtapUpdate["LICENSE_TYPE"]; ok {
 		dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
@@ -525,7 +525,7 @@ func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
 		return nil, err
 	}
 
-	log.Infof("ORG(id=%d database=%s) delete vtap (%s)", dbInfo.ORGID, dbInfo.Name, vtap.Name)
+	log.Infof("delete vtap (%s)", vtap.Name, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 
 	db.Delete(&vtap)
 	return map[string]string{"LCUUID": lcuuid}, nil
@@ -628,7 +628,7 @@ func execAZRebalance(
 			if hostType == "controller" {
 				log.Infof(
 					"rebalance vtap (%s) controller_ip from (%s) to (%s)",
-					vtap.Name, vtap.ControllerIP, reallocHostIP,
+					vtap.Name, vtap.ControllerIP, reallocHostIP, db.LogPrefixORGID,
 				)
 				if vtap.ControllerIP == reallocHostIP {
 					continue
@@ -639,7 +639,7 @@ func execAZRebalance(
 			} else {
 				log.Infof(
 					"rebalance vtap (%s) analyzer_ip from (%s) to (%s)",
-					vtap.Name, vtap.AnalyzerIP, reallocHostIP,
+					vtap.Name, vtap.AnalyzerIP, reallocHostIP, db.LogPrefixORGID,
 				)
 				if vtap.AnalyzerIP == reallocHostIP {
 					continue

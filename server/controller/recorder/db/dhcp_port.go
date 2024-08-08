@@ -22,21 +22,16 @@ import (
 )
 
 type DHCPPort struct {
-	OperatorBase[mysql.DHCPPort]
+	OperatorBase[*mysql.DHCPPort, mysql.DHCPPort]
 }
 
 func NewDHCPPort() *DHCPPort {
 	operater := &DHCPPort{
-		OperatorBase[mysql.DHCPPort]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.DHCPPort](
+			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *DHCPPort) setDBItemID(dbItem *mysql.DHCPPort, id int) {
-	dbItem.ID = id
 }

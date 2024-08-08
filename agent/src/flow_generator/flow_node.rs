@@ -16,12 +16,14 @@
 
 use std::{net::IpAddr, sync::Arc};
 
+use ahash::AHashMap;
+
 use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
     decapsulate::TunnelType,
     endpoint::EndpointDataPov,
     enums::{EthernetType, TapType, TcpFlags},
-    flow::{FlowMetricsPeer, L7PerfStats, PacketDirection, SignalSource, TcpPerfStats},
+    flow::{FlowMetricsPeer, PacketDirection, SignalSource, TcpPerfStats},
     lookup_key::LookupKey,
     meta_packet::MetaPacket,
     tagged_flow::TaggedFlow,
@@ -167,7 +169,7 @@ impl FlowNode {
 
         if let Some(ref mut flow_perf_stats) = &mut flow.flow_perf_stats {
             flow_perf_stats.tcp = TcpPerfStats::default();
-            flow_perf_stats.l7 = L7PerfStats::default();
+            flow_perf_stats.l7 = AHashMap::new();
         }
     }
 
@@ -384,6 +386,18 @@ impl FlowNode {
                 lookup_key.l2_end_0 == peers[1].is_l2_end
                     && lookup_key.l2_end_1 == peers[0].is_l2_end
             }
+        }
+    }
+
+    pub fn contain_pcap_policy(&self) -> bool {
+        match (
+            self.policy_data_cache[0].as_ref(),
+            self.policy_data_cache[1].as_ref(),
+        ) {
+            (Some(i), Some(j)) => i.contain_pcap() || j.contain_pcap(),
+            (None, Some(j)) => j.contain_pcap(),
+            (Some(i), None) => i.contain_pcap(),
+            _ => false,
         }
     }
 }

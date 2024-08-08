@@ -1,0 +1,775 @@
+syntax = "proto2";
+
+package agent;
+option go_package = "agent";
+
+import "common.proto";
+
+service Synchronizer {
+    rpc Sync(SyncRequest) returns (SyncResponse) {}
+    rpc Push(SyncRequest) returns (stream SyncResponse) {}
+    rpc Upgrade(UpgradeRequest) returns (stream UpgradeResponse) {}
+    rpc Query(NtpRequest) returns (NtpResponse) {}
+    rpc GenesisSync(GenesisSyncRequest) returns (GenesisSyncResponse) {}
+    rpc KubernetesAPISync(KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
+    rpc GetKubernetesClusterID(KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
+    rpc GPIDSync(GPIDSyncRequest) returns (GPIDSyncResponse) {}
+    rpc Plugin(PluginRequest) returns (stream PluginResponse) {}
+    // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
+    rpc RemoteExecute(stream RemoteExecResponse) returns (stream RemoteExecRequest) {}
+}
+
+// debug service
+service Debug {
+    rpc DebugGPIDGlobalData(GPIDSyncRequest) returns (GPIDGlobalData) {}
+    rpc DebugGPIDAgentData(GPIDSyncRequest) returns (GPIDAgentData) {}
+    rpc DebugRealGlobalData(GPIDSyncRequest) returns (RealGlobalData) {}
+    rpc DebugRIPToVIP(GPIDSyncRequest) returns (RVData) {}
+    rpc DebugAgentCache(AgentCacheRequest) returns (AgentCacheResponse) {}
+}
+
+enum AgentType {
+    TT_UNKNOWN = 0;
+    TT_PROCESS = 1;                        // Agent in KVM
+    TT_VM = 2;                             // Agent in a dedicated VM on ESXi
+    TT_PUBLIC_CLOUD = 3;                   // Agent in Cloud host (VM)
+    // _ = 4;                              // --deprecated--
+    TT_PHYSICAL_MACHINE = 5;               // Agent in Cloud host (BM), or legacy host
+    TT_DEDICATED_PHYSICAL_MACHINE = 6;     // Agent in a dedicated host to receive mirror traffic
+    TT_HOST_POD = 7;                       // Agent in K8s Node (Cloud BM, or legacy host)
+    TT_VM_POD = 8;                         // Agent in K8s Node (Cloud VM)
+    TT_TUNNEL_DECAPSULATION = 9;           // Agent in a dedicated host to decap tunnel traffic
+    TT_HYPER_V_COMPUTE = 10;               // Agent in Hyper-V Compute Node
+    TT_HYPER_V_NETWORK = 11;               // Agent in Hyper-V Network Node
+    TT_K8S_SIDECAR = 12;                   // Agent in K8s POD
+}
+
+enum State {
+    ENVIRONMENT_CHECK = 0;  // 检查运行环境
+    DISABLED = 1;           // 禁用
+    RUNNING = 2;            // 正常运行
+    REBOOTING = 3;          // 因配置变更等缘故触发重启
+    STRESSED = 4;           // 负载太大产生丢包
+    RESTRICTED = 5;         // 占用过多系统资源
+}
+
+enum Exception {
+    NORMAL = 0;
+    DISK_NOT_ENOUGH = 1;
+    MEM_NOT_ENOUGH = 2;
+    COREFILE_TOO_MANY = 4;
+    NPB_FUSE = 8;
+    NPB_BPS_THRESHOLD_EXCEEDED = 16;
+    NPB_NO_GW_ARP = 32;
+    RX_PPS_THRESHOLD_EXCEEDED = 64;
+    ANALYZER_NO_GW_ARP = 128;
+    INVALID_CONFIGURATION = 256;
+    THREAD_THRESHOLD_EXCEEDED = 512;
+    PROCESS_THRESHOLD_EXCEEDED = 1024;
+    // _  = 2048; // deprecate
+    TOO_MANY_POLICIES = 4096;
+    FREE_MEM_EXCEEDED = 8192;
+    LOG_FILE_EXCEEDED = 16384;
+    CONTROLLER_SOCKET_ERROR = 32768;
+    ANALYZER_SOCKET_ERROR = 65536;
+    NPB_SOCKET_ERROR = 131072;
+    INTEGRATION_SOCKET_ERROR = 262144;
+    CGROUPS_CONFIG_ERROR = 524288;
+    SYSTEM_LOAD_CIRCUIT_BREAKER = 1048576;
+    // 2^31及以下由 agent ，agent 最大可用异常是2^31，顺序从前往后
+    // 2^32及以上由控制器使用，顺序从后往前
+}
+
+message SyncRequest {
+    optional uint32 boot_time = 1;
+    optional bool config_accepted = 2 [default = true];
+    optional State state = 4;
+    optional string revision = 5;                 // agent用于self-update
+    optional uint64 exception = 6 [default = 0];  // agent exception status
+    optional string process_name = 7;
+    optional PacketCaptureType packet_capture_type = 8 [default = LOCAL];
+
+    optional uint64 version_platform_data = 9 [default = 0]; /* only platform data */
+    optional uint64 version_acls = 10 [default = 0];
+    optional uint64 version_groups = 11 [default = 0];
+    optional string current_k8s_image = 12;
+
+    optional string ctrl_ip = 21;
+    optional string host = 22;      // 表示hostname，操作系统的原始主机名，注册和信息同步使用
+    repeated string host_ips = 23;  // 仅作为注册使用
+    optional string ctrl_mac = 25;
+    optional string agent_group_id_request = 26;  // 支持 agent 自动加入组
+    optional bool kubernetes_force_watch = 27 [default = false];
+    optional AgentIdentifier agent_unique_identifier = 28 [default = IP_AND_MAC];
+    optional string team_id = 29;   // agent team identity
+
+    // 运行环境基本信息
+    optional uint32 cpu_num = 32;
+    optional uint64 memory_size = 33;  // 单位：Bytes
+    optional string arch = 34;
+    optional string os = 35;
+    optional string kernel_version = 36;
+
+    optional string kubernetes_cluster_id = 45;    // 仅对容器类型的 agent 有意义
+    optional string kubernetes_cluster_name = 46;  // 仅对容器类型的 agent 有意义
+}
+
+enum Status {
+    SUCCESS = 0;
+    FAILED = 1;
+    HEARTBEAT = 2;
+    CLUSTER_ID_NOT_FOUND = 10;
+}
+
+enum PacketCaptureType {
+    LOCAL = 0;     // 部署在宿主机之上，抓取本地虚拟接口流量
+    MIRROR = 1;    // 部署在虚拟机之上，抓取镜像而来的流量
+    ANALYZER = 2;  // 部署在专属服务器 agent 之上
+    DECAP = 3;     // 隧道解封装 agent
+}
+
+enum AgentIdentifier {
+    IP_AND_MAC = 1;
+    IP = 2;
+}
+
+enum IfMacSource {
+    IF_MAC = 0;
+    IF_NAME = 1;
+    IF_LIBVIRT_XML = 2;  // 从libvirt的xml文件中获取
+}
+
+enum SocketType {
+    RAW_UDP = 0;
+    TCP = 1;
+    UDP = 2;
+    FILE = 3;
+}
+
+enum PacketType {
+    PACKET = 1;
+    SFLOW = 2;
+    NETFLOW_V5 = 3;
+    NETSTREAM_V5 = 4;
+    NETFLOW_V9 = 5;
+    NETSTREAM_V9 = 6;
+}
+
+enum CaptureSocketType {
+    AUTO = 0;
+    AF_PACKET_V1 = 1;
+    AF_PACKET_V2 = 2;
+    AF_PACKET_V3 = 3;
+}
+
+message CaptureNetworkType {
+    optional uint32 capture_network_type = 1;
+    optional PacketType packet_type = 2;
+    optional uint32 vlan = 3;
+    optional string source_ip = 4;
+    optional uint32 capture_network_port = 5;
+}
+
+enum VlanMode {
+    NONE = 0;
+    VLAN = 1;
+    QINQ = 2;
+}
+
+enum DecapType {
+    DECAP_TYPE_NONE = 0;
+    DECAP_TYPE_VXLAN = 1;
+    DECAP_TYPE_IPIP = 2;
+    DECAP_TYPE_TENCENT = 3;
+    DECAP_TYPE_GENEVE = 4;
+}
+
+enum SystemLoadMetric {
+    Load1 = 0;
+    Load5 = 1;
+    Load15 = 2;
+}
+
+message Segment {  // e.g. single LAN area
+    optional uint32 id = 1;
+    repeated string mac = 2;
+    repeated uint32 interface_id = 3;  // mac对应的Interface id
+    repeated string vmac = 4;          // if interface vmac is not null, vmac = interface vmac; else vmac = interface mac
+}
+
+message IpResource {
+    optional string ip = 1;
+    optional uint32 masklen = 2 [default = 32];
+    optional uint32 subnet_id = 3 [default = 0];
+}
+
+enum DeviceType {
+    DEVICE_TYPE_UNKNOWN = 0;
+    DEVICE_TYPE_VM = 1;
+    DEVICE_TYPE_VGW = 2;
+    DEVICE_TYPE_THIRD_PARTY_DEVICE = 3;
+    DEVICE_TYPE_VMWAF = 4;
+    DEVICE_TYPE_NSP_VGATEWAY = 5;
+    DEVICE_TYPE_HOST_DEVICE = 6;
+    DEVICE_TYPE_NETWORK_DEVICE = 7;
+    DEVICE_TYPE_DHCP_PORT = 9;
+    DEVICE_TYPE_POD = 10;
+    DEVICE_TYPE_POD_SERVICE = 11;
+    DEVICE_TYPE_REDIS_INSTANCE = 12;
+    DEVICE_TYPE_RDS_INSTANCE = 13;
+    DEVICE_TYPE_POD_NODE = 14;
+    DEVICE_TYPE_LOAD_BALANCE = 15;
+    DEVICE_TYPE_NAT_GATEWAY = 16;
+}
+
+message Interface {
+    optional uint32 id = 1;
+    optional DeviceType device_type = 2;
+    optional uint32 if_type = 3;
+    optional uint32 epc_id = 4;
+    repeated IpResource ip_resources = 5;
+    optional uint32 region_id = 6;
+    optional uint64 mac = 7;  // 0x0123456789ab = 01:23:45:67:89:ab, 为0时if_type为WAN的数据
+    optional uint32 pod_node_id = 8;
+    optional uint32 pod_cluster_id = 9;
+    optional bool is_vip_interface = 10 [default = false];  // 目前仅微软MUX设配为true
+}
+
+enum GroupType {
+    NAMED = 0;
+    ANONYMOUS = 1;
+}
+
+// 字段含义查看README
+message Group {
+    optional uint32 id = 1;
+    optional uint32 epc_id = 2 [default = 0];
+    optional GroupType type = 3;
+    repeated string ips = 5;
+    repeated string ip_ranges = 6;
+}
+
+message Groups {
+    repeated Group groups = 1;
+}
+
+message PeerConnection {
+    optional uint32 id = 1;
+    optional uint32 local_epc_id = 2;
+    optional uint32 remote_epc_id = 3;
+}
+
+enum CidrType {
+    WAN = 1;
+    LAN = 2;
+}
+
+message Cidr {
+    optional string prefix = 1;
+    optional CidrType type = 2;
+    optional int32 epc_id = 3;
+    optional uint32 region_id = 4;
+    optional uint32 tunnel_id = 5;
+
+    optional bool is_vip = 20 [default = false];
+}
+
+message Container {
+    optional uint32 pod_id = 1;
+    optional string container_id = 2;
+}
+
+message PlatformData {
+    repeated Interface interfaces = 1;
+    repeated PeerConnection peer_connections = 3;
+    repeated Cidr cidrs = 4;
+}
+
+enum Action {
+    PACKET_CAPTURING = 1;  // 包存储（pcap）
+}
+
+enum PacketCaptureSide {
+    SRC = 1;
+    DST = 2;
+    BOTH = 3;
+}
+
+enum TunnelType {
+    VXLAN = 0;
+    GRE_ERSPAN = 1;
+    PCAP = 2;
+    NPB_DROP = 3;
+}
+
+enum Direction {
+    ALL = 1;
+    FORWARD = 2;
+    BACKWARD = 3;
+}
+
+message NpbAction {
+    optional TunnelType tunnel_type = 1 [default = VXLAN];
+    optional uint32 tunnel_id = 2;
+    optional string tunnel_ip = 3;
+    optional PacketCaptureSide packet_capture_side = 4;
+    optional uint32 payload_slice = 5 [default = 65535];
+    optional uint32 npb_acl_group_id = 6;
+    optional uint32 tunnel_ip_id = 7;  // 分发点id, 限制在64000
+    optional Direction direction = 8 [default = ALL];
+}
+
+// 字段含义查看README
+message FlowAcl {
+    optional uint32 id = 1;
+    repeated uint32 capture_network_type = 2;
+    optional uint32 protocol = 3 [default = 256];
+    optional string src_ports = 4;
+    optional string dst_ports = 5;
+    repeated NpbAction npb_actions = 6;
+    repeated int32 src_group_ids = 7;
+    repeated int32 dst_group_ids = 8;
+}
+
+message FlowAcls {
+    repeated FlowAcl flow_acl = 1;
+}
+
+message SkipInterface {
+    // 若该接口对应的虚拟机内已经部署 agent,
+    // 发送此接口给虚拟机所在宿主机 agent
+    optional uint64 mac = 1;
+}
+
+message SyncResponse {
+    optional Status status = 1;
+    optional string config = 2;
+    optional string revision = 3;         // 指定升级的目标revision
+    optional string self_update_url = 4;  // 指定升级的URL路径
+
+    optional uint64 version_platform_data = 5 [default = 0]; /* only platform data */
+    optional uint64 version_acls = 6 [default = 0];
+    optional uint64 version_groups = 7 [default = 0];
+
+    // The controller sends a container list to each agent, which contains a list of
+    // containers in the operating system that the agent is running on (Note that only
+    // the local container will be issued, not other machines)
+    // =================================================================================
+    // 控制器向每个 Agent 下发一个 container list，其内容为该 Agent 运行操作
+    // 系统中的 container 列表（注意仅会下发本机的 container，不会包含其他机器的）
+    repeated Container containers = 8;
+    repeated Segment local_segments = 9;
+    repeated Segment remote_segments = 10;
+    optional bytes platform_data = 11;  // serialized result of `message PlatformData`, transmitted only when the content changes
+    optional bytes flow_acls = 12;      // serialized result of `message FlowAcls`, transmitted only when the content changes
+    optional bytes groups = 13;         // serialized result of `message Groups`, transmitted only when the content changes
+    repeated CaptureNetworkType capture_network_types = 14;
+    repeated SkipInterface skip_interface = 15;
+}
+
+message UpgradeRequest {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+    optional string team_id = 3;    // agent team identity
+}
+message UpgradeResponse {
+    optional Status status = 1;     // 调用是否成功
+    optional bytes content = 2;     // 数据
+    optional string md5 = 3;        // 文件MD5
+    optional uint64 total_len = 4;  // 数据总长
+    optional uint32 pkt_count = 5;  // 包总个数
+    optional string k8s_image = 6;  // When k8s_image is not empty, ignore content
+}
+
+message NtpRequest {
+    optional string ctrl_ip = 1;  // 请求端的控制口IP
+    optional bytes request = 10;  // 数据
+}
+
+message NtpResponse {
+    optional bytes response = 1;  // 数据
+}
+
+message PluginConfig {
+    optional uint32 update_time = 1 [default = 0];  // latest epoch of all configured plugins
+    repeated string wasm_plugins = 2;
+    repeated string so_plugins = 3;
+}
+
+enum PluginType {
+    WASM = 1;
+    SO = 2;
+}
+
+message PluginRequest {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+    optional PluginType plugin_type = 3;
+    optional string plugin_name = 4;
+    optional string team_id = 5;  // agent team identity
+}
+
+message PluginResponse {
+    optional Status status = 1;                     // 调用是否成功
+    optional bytes content = 2;                     // 数据
+    optional string md5 = 3;                        // 文件MD5
+    optional uint64 total_len = 4;                  // 数据总长
+    optional uint32 pkt_count = 5;                  // 包总个数
+    optional uint32 update_time = 6 [default = 0];  // plugin update epoch
+}
+
+message GenesisPlatformData {
+    repeated Ip ips = 7;
+
+    optional bool platform_enabled = 10;
+    optional string raw_hostname = 11;
+    optional string raw_all_vm_xml = 12;
+    optional string raw_vm_states = 13;
+    optional string raw_ovs_interfaces = 14;
+    optional string raw_ovs_ports = 15;
+    optional string raw_brctl_show = 16;
+    optional string raw_vlan_config = 17;
+
+    repeated Lldp lldp_info = 20;
+
+    repeated string raw_ip_netns = 30;
+    repeated string raw_ip_addrs = 31;
+    repeated InterfaceInfo interfaces = 32;
+}
+
+message Ip {
+    optional uint32 last_seen = 2;
+    optional uint64 mac = 3;
+    optional bytes ip = 4;
+
+    optional string port_uuid = 9;
+}
+
+message Lldp {
+    optional string interface = 1;
+    optional string system_name = 2;
+    optional string management_address = 5;
+    optional string port_id = 10;
+    optional string port_description = 11;
+}
+
+message InterfaceInfo {
+    optional uint64 mac = 1;
+    // ip/masklen
+    repeated string ip = 2;
+    optional string name = 3;
+    optional string device_id = 4;
+
+    optional uint32 tap_index = 5;
+
+    optional string device_name = 6;
+
+    optional string netns = 7 [default = ""];
+    optional uint32 netns_id = 8 [default = 0];
+
+    optional string if_type = 9 [default = ""];
+}
+
+message Tag {
+    optional string key = 1;
+    optional string value = 2;
+}
+
+message ProcessInfo {
+    optional string name = 1;
+    optional uint64 pid = 2;
+    optional string process_name = 3;
+    optional string cmdline = 4;
+    optional string user = 5;
+    optional uint32 start_time = 6;
+    optional uint32 netns_id = 7 [default = 0];
+    optional string container_id = 8 [default = ""];
+    repeated Tag os_app_tags = 11;
+}
+
+message GenesisProcessData {
+    repeated ProcessInfo process_entries = 5;
+}
+
+message GenesisSyncRequest {
+    optional uint64 version = 1 [default = 0];
+
+    optional AgentType agent_type = 2;
+
+    optional string source_ip = 3;
+    optional uint32 agent_id = 4;
+    optional string kubernetes_cluster_id = 5;  // 仅对容器类型的 agent 有意义
+
+    optional string nat_ip = 6;
+    optional string team_id = 7;  // agent team identity
+
+    optional GenesisPlatformData platform_data = 9;
+    optional GenesisProcessData process_data = 10;
+}
+
+message GenesisSyncResponse {
+    optional uint64 version = 1 [default = 0];
+}
+
+message KubernetesAPISyncRequest {
+    optional string cluster_id = 1;
+    optional uint64 version = 2;
+    optional string error_msg = 3;
+    optional uint32 agent_id = 4;
+    optional string source_ip = 5;
+    optional string team_id = 6;  // agent team identity
+    repeated common.KubernetesAPIInfo entries = 10;
+}
+
+message KubernetesAPISyncResponse {
+    optional uint64 version = 1;
+}
+
+message KubernetesClusterIDRequest {
+    optional string ca_md5 = 1;                    // md5 of /run/secrets/[kubernetes.io/serviceaccount/ca.crt
+    optional string team_id = 2;                   // agent team identity
+    optional string kubernetes_cluster_name = 46;  // get that from deepflow-agent.yaml
+}
+
+message KubernetesClusterIDResponse {
+    optional string error_msg = 1;
+    optional string cluster_id = 2;
+}
+
+message Pcap {
+    optional uint64 flow_id = 1;
+    optional uint64 start_time = 2;  // ns
+    optional uint64 end_time = 3;    // ns
+    optional uint32 packet_count = 4;
+    optional bytes packet_records = 5;
+    repeated uint32 acl_gids = 6;
+}
+
+message PcapBatch {
+    optional uint32 magic = 1;
+    repeated Pcap batches = 2;
+}
+
+enum RoleType {
+    ROLE_NONE = 0;
+    ROLE_CLIENT = 1;
+    ROLE_SERVER = 2;
+}
+
+message GPIDSyncEntry {
+    optional ServiceProtocol protocol = 1 [default = ANY];  // ANY means compressed
+    // server side
+    optional uint32 epc_id_1 = 2 [default = 0];  // u16
+    optional uint32 ipv4_1 = 3 [default = 0];
+    optional uint32 port_1 = 4 [default = 0];  // u16
+    optional uint32 pid_1 = 5 [default = 0];   // pid or gpid
+    // client side
+    optional uint32 epc_id_0 = 6 [default = 0];  // u16
+    optional uint32 ipv4_0 = 7 [default = 0];
+    optional uint32 port_0 = 8 [default = 0];  // u16
+    optional uint32 pid_0 = 9 [default = 0];   // pid or gpid
+    // real ip (before or after NAT)
+    optional uint32 epc_id_real = 10 [default = 0];  // u16
+    optional uint32 ipv4_real = 11 [default = 0];
+    optional uint32 port_real = 12 [default = 0];            // u16
+    optional uint32 pid_real = 13 [default = 0];             // pid or gpid
+    optional RoleType role_real = 14 [default = ROLE_NONE];  // role of real ip, ROLE_NONE means compressed
+
+    // the net namespace index,  neither netns id nor netns inode
+    optional uint32 netns_idx = 15 [default = 0];  // u16
+}
+
+enum GPIDSyncCompressAlgorithm {
+    COMPRESS_ALRO_NONE = 0;
+    // Before assigning a value to an array, we use the following algorithm to
+    // compress the original data:
+    // 1) Data is sorted by the order of fields in the entry of the array. The
+    //    order of the fields is carefully designed. The more likely a field is
+    //    repeated, the higher its order will be.
+    // 2) For each entry, if one of its fields is equal to the corresponding
+    //    field of the previous entry, then its field is assigned a value of 0.
+    //    When a field in Protobuf have a default value of 0, this allows us
+    //    to achieve very efficient compression.
+    COMPRESS_ALGO_IGNORE_IF_EQUAL_TO_PREVIOUS = 1;
+}
+
+message GPIDSyncRequest {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+    optional uint32 agent_id = 3;
+    optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 4 [default = COMPRESS_ALRO_NONE];
+    optional string team_id = 5;  // agent team identity
+    repeated GPIDSyncEntry entries = 10;
+}
+
+message GPIDSyncResponse {
+    optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 1 [default = COMPRESS_ALRO_NONE];
+    repeated GPIDSyncEntry entries = 2;
+}
+
+message GlobalGPIDEntry {
+    optional ServiceProtocol protocol = 1 [default = ANY];  // ANY means compressed
+    // server side
+    optional uint32 agent_id_1 = 2 [default = 0];
+    optional uint32 epc_id_1 = 3 [default = 0];
+    optional uint32 ipv4_1 = 4 [default = 0];
+    optional uint32 port_1 = 5 [default = 0];
+    optional uint32 pid_1 = 6 [default = 0];
+    optional uint32 gpid_1 = 7 [default = 0];
+    // client side
+    optional uint32 agent_id_0 = 8 [default = 0];
+    optional uint32 epc_id_0 = 9 [default = 0];
+    optional uint32 ipv4_0 = 10 [default = 0];
+    optional uint32 port_0 = 11 [default = 0];
+    optional uint32 pid_0 = 12 [default = 0];
+    optional uint32 gpid_0 = 13 [default = 0];
+
+    optional uint32 netns_idx = 14 [default = 0];
+}
+
+message GPIDGlobalData {
+    repeated GlobalGPIDEntry entries = 1;
+}
+
+message RealClientToRealServer {
+    optional uint32 epc_id_0 = 1 [default = 0];
+    optional uint32 ipv4_0 = 2 [default = 0];
+    optional uint32 port_0 = 3 [default = 0];
+
+    optional uint32 epc_id_1 = 4 [default = 0];
+    optional uint32 ipv4_1 = 5 [default = 0];
+    optional uint32 port_1 = 6 [default = 0];
+
+    optional uint32 epc_id_real = 7 [default = 0];
+    optional uint32 ipv4_real = 8 [default = 0];
+    optional uint32 port_real = 9 [default = 0];
+    optional uint32 pid_real = 10 [default = 0];
+    optional uint32 agent_id_real = 11 [default = 0];
+}
+
+message RealGlobalData {
+    repeated RealClientToRealServer entries = 1;
+}
+
+message RipToVip {
+    optional ServiceProtocol protocol = 1 [default = ANY];  // ANY means compressed
+    optional uint32 epc_id = 2 [default = 0];
+    optional uint32 r_ipv4 = 3 [default = 0];
+    optional uint32 r_port = 4 [default = 0];
+    optional uint32 v_ipv4 = 5 [default = 0];
+    optional uint32 v_port = 6 [default = 0];
+}
+
+message RVData {
+    repeated RipToVip entries = 1;
+}
+
+message GPIDAgentData {
+    optional uint32 update_time = 1 [default = 0];
+    optional GPIDSyncRequest sync_request = 2;
+}
+
+message AgentCacheRequest {
+    optional string ctrl_ip = 1;
+    optional string ctrl_mac = 2;
+    optional string team_id = 3; // agent team identity
+}
+
+message AgentCacheResponse {
+    optional bytes content = 1;  // json数据
+}
+
+message AgentId {
+    optional string ip = 1;
+    optional string mac = 2;
+    optional string team_id = 3;
+}
+
+enum OutputFormat {
+    TEXT = 0;
+    BINARY = 1;
+}
+
+enum CommandType {
+    LINUX = 0;
+    KUBERNETES = 1;
+}
+
+enum ParamType {
+    PF_TEXT = 0;
+    PF_BOOLEAN = 1;
+}
+
+message CommandParam {
+    optional string name = 1;
+    optional string regex = 2;
+    optional bool required = 3;
+    optional ParamType param_type = 4;
+    optional string description = 5;
+}
+
+message RemoteCommand {
+    optional string cmd = 2;
+    optional OutputFormat output_format = 4;
+    optional string ident = 6;
+    repeated CommandParam params = 7;
+    optional string type_name = 8;
+
+    optional uint32 id = 1; // deprecated, use `ident` instead
+    repeated string param_names = 3; // deprecated, use `params` instead
+    optional CommandType cmd_type = 5; // deprecated, use `type_name` instead
+}
+
+message LinuxNamespace {
+    optional uint64 id = 1;
+    optional string ns_type = 2;
+    optional string user = 3;
+    optional uint32 pid = 4;
+    optional string cmd = 5;
+}
+
+message CommandResult {
+    optional int32 errno = 1;
+    optional bytes content = 2;
+    // will only be populated in the last segment
+    // also used as end of result
+    optional string md5 = 3;
+    optional uint64 total_len = 4;
+    optional uint32 pkt_count = 5;
+}
+
+enum ExecutionType {
+    LIST_COMMAND = 0;
+    LIST_NAMESPACE = 1;
+    RUN_COMMAND = 2;
+}
+
+message Parameter {
+    optional string key = 1;
+    optional string value = 2; // accepts [A-Za-z0-9-_]
+}
+
+// message from server to agent
+message RemoteExecRequest {
+    optional uint64 request_id = 1;
+
+    optional ExecutionType exec_type = 2;
+    repeated Parameter params = 4; // parameters to use in commands
+    optional uint32 linux_ns_pid = 5; // execute command in agent namespace if null
+    optional uint32 batch_len = 6 [default = 1048576]; // batch len of command execution results, min 1024
+    optional string command_ident = 7;
+
+    optional uint32 command_id = 3; // deprecated, use `command_ident` instead
+}
+
+// message from agent to server
+message RemoteExecResponse {
+    optional AgentId agent_id = 1;
+    optional uint64 request_id = 2;
+
+    optional string errmsg = 3;
+
+    repeated RemoteCommand commands = 4;
+    repeated LinuxNamespace linux_namespaces = 5;
+    optional CommandResult command_result = 6;
+}

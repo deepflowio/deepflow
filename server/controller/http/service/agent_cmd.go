@@ -30,13 +30,19 @@ import (
 )
 
 var (
-	agentCommandTimeout = time.Minute
-
 	agentCMDMutex   sync.RWMutex
 	agentCMDManager = make(AgentCMDManager)
 )
 
 type AgentCMDManager map[string]*CMDManager
+
+func AgentCommandLock() {
+	agentCMDMutex.Lock()
+}
+
+func AgentCommandUnlock() {
+	agentCMDMutex.Unlock()
+}
 
 func GetAgentCMDManager(key string) *CMDManager {
 	agentCMDMutex.RLock()
@@ -47,50 +53,112 @@ func GetAgentCMDManager(key string) *CMDManager {
 	return nil
 }
 
-func AddToCMDManager(key string, requestID uint64) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
-	m := initCMDManager(requestID)
-	agentCMDManager[key] = m
+func GetAgentCMDManagerWithoutLock(key string) *CMDManager {
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager
+	}
+	return nil
 }
 
-func RemoveFromCMDManager(key string) {
+func AddToCMDManagerIfNotExist(key string, requestID uint64) (exist bool) {
 	agentCMDMutex.Lock()
 	defer agentCMDMutex.Unlock()
 	if _, ok := agentCMDManager[key]; ok {
-		delete(agentCMDManager, key)
-		log.Infof("delete agent(key:%s) in manager", key)
+		return true
+	}
+
+	agentCMDManager[key] = &CMDManager{
+		requestID: requestID,
+		ExecCH:    make(chan *trident.RemoteExecRequest, 1),
+
+		requestIDToResp: make(map[uint64]*CMDResp),
+	}
+	return false
+}
+
+func RemoveFromCMDManager(key string, requestID uint64) {
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		delete(manager.requestIDToResp, requestID)
+		log.Infof("delete agent(key: %s, request id: %v) in manager", key, requestID)
 	}
 }
 
-func initCMDManager(requestID uint64) *CMDManager {
-	m := &CMDManager{
-		ExecCH:               make(chan *trident.RemoteExecRequest, 1),
-		ExecDoneCH:           make(chan struct{}, 1),
-		RemoteCMDDoneCH:      make(chan struct{}, 1),
-		LinuxNamespaceDoneCH: make(chan struct{}, 1),
-
-		requestID: requestID,
-		resp:      &model.RemoteExecResp{},
+func RemoveAllFromCMDManager(key string) {
+	log.Infof("preparing to remove all agent(key: %s) from cmd manager", key)
+	agentCMDMutex.Lock()
+	defer agentCMDMutex.Unlock()
+	manager, ok := agentCMDManager[key]
+	if !ok {
+		log.Error("can not find agent command manager(key: %s)", key)
 	}
-	return m
+
+	for requestID, cmdResp := range manager.requestIDToResp {
+		errMessage := fmt.Sprintf("agent(key: %s) disconnected from the server", key)
+		AppendErrorMessage(key, requestID, &errMessage)
+		log.Error(errMessage)
+		close(cmdResp.ExecDoneCH)
+		close(cmdResp.RemoteCMDDoneCH)
+		close(cmdResp.LinuxNamespaceDoneCH)
+	}
+	close(manager.ExecCH)
+	delete(agentCMDManager, key)
+	log.Infof("delete agent(key: %s) in manager", key)
 }
 
 type CMDManager struct {
-	ExecCH               chan *trident.RemoteExecRequest
+	requestID       uint64
+	ExecCH          chan *trident.RemoteExecRequest
+	requestIDToResp map[uint64]*CMDResp
+}
+
+type CMDResp struct {
 	ExecDoneCH           chan struct{}
 	RemoteCMDDoneCH      chan struct{}
 	LinuxNamespaceDoneCH chan struct{}
 
-	requestID uint64
-	resp      *model.RemoteExecResp
+	data *model.RemoteExecResp
 }
 
-func resetResp(key string) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+func NewAgentCMDResp(key string) (uint64, *CMDResp) {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
 	if manager, ok := agentCMDManager[key]; ok {
-		manager.resp = &model.RemoteExecResp{}
+		manager.requestID += 1
+		resp := &CMDResp{
+			ExecDoneCH:           make(chan struct{}, 1),
+			RemoteCMDDoneCH:      make(chan struct{}, 1),
+			LinuxNamespaceDoneCH: make(chan struct{}, 1),
+			data:                 &model.RemoteExecResp{},
+		}
+		manager.requestIDToResp[manager.requestID] = resp
+		return manager.requestID, resp
+	}
+	return 0, nil
+}
+
+func GetAgentCMDResp(key string, requestID uint64) *CMDResp {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager.requestIDToResp[requestID]
+	}
+	return nil
+}
+
+func GetAgentCMDRespWithoutLock(key string, requestID uint64) *CMDResp {
+	if manager, ok := agentCMDManager[key]; ok {
+		return manager.requestIDToResp[requestID]
+	}
+	return nil
+}
+
+func RemoveAgentCMDResp(key string, requestID uint64) {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		delete(manager.requestIDToResp, requestID)
 	}
 }
 
@@ -103,99 +171,118 @@ func GetRequestID(key string) uint64 {
 	return 0
 }
 
-func SetRequestID(key string, requestID uint64) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+func AppendCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
 	if manager, ok := agentCMDManager[key]; ok {
-		manager.requestID = requestID
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			resp.data.RemoteCommand = append(resp.data.RemoteCommand, data...)
+		}
 	}
 }
 
-func AppendCommands(key string, data []*trident.RemoteCommand) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+func InitCommands(key string, requestID uint64, data []*trident.RemoteCommand) {
 	if manager, ok := agentCMDManager[key]; ok {
-		manager.resp.RemoteCommand = append(manager.resp.RemoteCommand, data...)
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			resp.data.RemoteCommand = data
+		}
 	}
 }
 
-func InitCommands(key string, data []*trident.RemoteCommand) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+func AppendNamespaces(key string, requestID uint64, data []*trident.LinuxNamespace) {
 	if manager, ok := agentCMDManager[key]; ok {
-		manager.resp.RemoteCommand = data
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			resp.data.LinuxNamespace = append(resp.data.LinuxNamespace, data...)
+		}
 	}
 }
 
-func AppendNamespaces(key string, data []*trident.LinuxNamespace) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+func InitNamespaces(key string, requestID uint64, data []*trident.LinuxNamespace) {
 	if manager, ok := agentCMDManager[key]; ok {
-		manager.resp.LinuxNamespace = append(manager.resp.LinuxNamespace, data...)
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			resp.data.LinuxNamespace = data
+		}
 	}
 }
 
-func InitNamespaces(key string, data []*trident.LinuxNamespace) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+func AppendContent(key string, requestID uint64, data []byte) {
 	if manager, ok := agentCMDManager[key]; ok {
-		manager.resp.LinuxNamespace = data
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			resp.data.Content += string(data)
+		}
 	}
 }
 
-func AppendContent(key string, data []byte) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
+func AppendErrorMessage(key string, requestID uint64, data *string) {
 	if manager, ok := agentCMDManager[key]; ok {
-		manager.resp.Content += string(data)
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			resp.data.ErrorMessage = *data
+		}
 	}
 }
 
-func AppendErrorMessage(key string, data *string) {
-	agentCMDMutex.Lock()
-	defer agentCMDMutex.Unlock()
-	if manager, ok := agentCMDManager[key]; ok {
-		manager.resp.ErrorMessage = *data
-	}
-}
-
-func GetErrormessage(key string) string {
+func GetErrormessage(key string, requestID uint64) string {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
 	if manager, ok := agentCMDManager[key]; ok {
-		return manager.resp.ErrorMessage
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.ErrorMessage
+		}
 	}
 	return ""
 }
 
-func GetContent(key string) string {
+func GetContent(key string, requestID uint64) string {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
 	if manager, ok := agentCMDManager[key]; ok {
-		return manager.resp.Content
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.Content
+		}
 	}
 	return ""
 }
 
-func GetCommands(key string) []*trident.RemoteCommand {
+func GetCommands(key string, requestID uint64) []*trident.RemoteCommand {
 	agentCMDMutex.RLock()
 	defer agentCMDMutex.RUnlock()
 	if manager, ok := agentCMDManager[key]; ok {
-		return manager.resp.RemoteCommand
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.RemoteCommand
+		}
 	}
 	return nil
 }
 
-func GetNamespaces(key string) []*trident.LinuxNamespace {
-	agentCMDMutex.RLock()
-	defer agentCMDMutex.RUnlock()
+func GetCommandsWithoutLock(key string, requestID uint64) []*trident.RemoteCommand {
 	if manager, ok := agentCMDManager[key]; ok {
-		return manager.resp.LinuxNamespace
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.RemoteCommand
+		}
 	}
 	return nil
 }
 
-func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
+func GetNamespaces(key string, requestID uint64) []*trident.LinuxNamespace {
+	agentCMDMutex.RLock()
+	defer agentCMDMutex.RUnlock()
+	if manager, ok := agentCMDManager[key]; ok {
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.LinuxNamespace
+		}
+	}
+	return nil
+}
+
+func GetNamespacesWithoutLock(key string, requestID uint64) []*trident.LinuxNamespace {
+	if manager, ok := agentCMDManager[key]; ok {
+		if resp, ok := manager.requestIDToResp[requestID]; ok {
+			return resp.data.LinuxNamespace
+		}
+	}
+	return nil
+}
+
+func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, error) {
+	log.Infof("current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -205,48 +292,64 @@ func GetCMDAndNamespace(orgID, agentID int) (*model.RemoteExecResp, error) {
 		return nil, err
 	}
 	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) get remote commands and linux namespaces",
-		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name)
+		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, dbInfo.LogPrefixORGID)
 
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
-	if manager == nil {
+	requestID, cmdResp := NewAgentCMDResp(key)
+	if manager == nil || cmdResp == nil {
 		return nil, fmt.Errorf("agent(name: %s, key: %s) remote exec map not found", agent.Name, key)
 	}
-	resetResp(key)
-	cmdReq := &trident.RemoteExecRequest{ExecType: trident.ExecutionType_LIST_COMMAND.Enum()}
+	defer RemoveAgentCMDResp(key, requestID)
+
+	cmdReq := &trident.RemoteExecRequest{
+		RequestId: &requestID,
+		ExecType:  trident.ExecutionType_LIST_COMMAND.Enum(),
+	}
 	manager.ExecCH <- cmdReq
 
-	timeout := time.After(agentCommandTimeout)
+	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
 	resp := &model.RemoteExecResp{}
 	for {
 		select {
-		case <-timeout:
-			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", agentCommandTimeout.Seconds())
-		case <-manager.RemoteCMDDoneCH:
-			resp.RemoteCommand = GetCommands(key)
-			namespaceReq := &trident.RemoteExecRequest{ExecType: trident.ExecutionType_LIST_NAMESPACE.Enum()}
-			manager.ExecCH <- namespaceReq
-		case <-manager.LinuxNamespaceDoneCH:
-			resp.LinuxNamespace = GetNamespaces(key)
-		case <-manager.ExecDoneCH: // error occurred
-			if len(GetCommands(key)) != 0 {
-				return &model.RemoteExecResp{RemoteCommand: GetCommands(key)}, nil
+		case <-cmdTimeout:
+			// RemoveAllFromCMDManager(key)
+			return nil, fmt.Errorf("timeout(%vs) to get remote commands and linux namespace", timeout)
+		case _, ok := <-cmdResp.RemoteCMDDoneCH:
+			if !ok {
+				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
 			}
-			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key))
+			resp.RemoteCommand = GetCommands(key, requestID)
+			namespaceReq := &trident.RemoteExecRequest{RequestId: &requestID, ExecType: trident.ExecutionType_LIST_NAMESPACE.Enum()}
+			manager.ExecCH <- namespaceReq
+		case _, ok := <-cmdResp.LinuxNamespaceDoneCH:
+			if !ok {
+				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+			}
+			resp.LinuxNamespace = GetNamespaces(key, requestID)
+		case _, ok := <-cmdResp.ExecDoneCH: // error occurred
+			if !ok {
+				return nil, fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+			}
+			if len(GetCommands(key, requestID)) != 0 {
+				return &model.RemoteExecResp{RemoteCommand: GetCommands(key, requestID)}, nil
+			}
+			log.Errorf("get agent(key: %s) remote commands error: %s", key, GetContent(key, requestID), dbInfo.LogPrefixORGID)
 			return nil, errors.New(key)
 		default:
-			if len(GetCommands(key)) != 0 && len(GetNamespaces(key)) != 0 {
-				log.Infof("len(commands)=%d, len(namespaces)=%d", len(GetCommands(key)), len(GetNamespaces(key)))
+			if len(GetCommands(key, requestID)) != 0 && len(GetNamespaces(key, requestID)) != 0 {
+				log.Infof("len(commands)=%d, len(namespaces)=%d",
+					len(GetCommands(key, requestID)), len(GetNamespaces(key, requestID)), dbInfo.LogPrefixORGID)
 				return &model.RemoteExecResp{
-					RemoteCommand:  GetCommands(key),
-					LinuxNamespace: GetNamespaces(key),
+					RemoteCommand:  GetCommands(key, requestID),
+					LinuxNamespace: GetNamespaces(key, requestID),
 				}, nil
 			}
 		}
 	}
 }
 
-func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string) (string, error) {
+func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CMD string) (string, error) {
 	serverLog := fmt.Sprintf("The deepflow-server is unable to execute the `%s` command."+
 		" Detailed error information is as follows:\n\n", CMD)
 	dbInfo, err := mysql.GetDB(orgID)
@@ -259,27 +362,35 @@ func RunAgentCMD(orgID, agentID int, req *trident.RemoteExecRequest, CMD string)
 	}
 	b, _ := json.Marshal(req)
 	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) run remote command, request: %s",
-		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b))
+		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b), dbInfo.LogPrefixORGID)
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
-	if manager == nil {
-		return "", fmt.Errorf("%sagent(name: %s, key: %s) remote exec map not found", serverLog, agent.Name, key)
+	requestID, cmdResp := NewAgentCMDResp(key)
+	if manager == nil || cmdResp == nil {
+		return "", fmt.Errorf("agent(name: %s, key: %s) remote exec map not found", agent.Name, key)
 	}
-	resetResp(key)
+	defer RemoveAgentCMDResp(key, requestID)
+	req.RequestId = &requestID
 	manager.ExecCH <- req
 
+	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
 	content := ""
 	for {
 		select {
-		case <-time.After(agentCommandTimeout):
-			return "", fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, agentCommandTimeout.Seconds())
-		case <-manager.ExecDoneCH:
-			if msg := GetErrormessage(key); msg != "" {
-				return GetContent(key), fmt.Errorf("The deepflow-agent is unable to execute the `%s` command."+
+		case <-cmdTimeout:
+			err = fmt.Errorf("%stimeout(%vs) to run agent command", serverLog, timeout)
+			log.Error(err, dbInfo.LogPrefixORGID)
+			return "", err
+		case _, ok := <-cmdResp.ExecDoneCH:
+			if !ok {
+				return "", fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", key, agent.Name)
+			}
+			if msg := GetErrormessage(key, requestID); msg != "" {
+				return GetContent(key, requestID), fmt.Errorf("The deepflow-agent is unable to execute the `%s` command."+
 					" Detailed error information is as follows:\n\n%s", CMD, msg)
 			}
-			content = GetContent(key)
-			log.Infof("command run content len: %d", len(content))
+			content = GetContent(key, requestID)
+			log.Infof("command run content len: %d", len(content), dbInfo.LogPrefixORGID)
 			return content, nil
 		}
 	}

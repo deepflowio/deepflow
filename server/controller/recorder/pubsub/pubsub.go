@@ -17,13 +17,12 @@
 package pubsub
 
 import (
-	"github.com/op/go-logging"
-
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 )
 
-var log = logging.MustGetLogger("recorder.pubsub")
+var log = logger.MustGetLogger("recorder.pubsub")
 
 type PubSub interface {
 	Subscribe(topic int, subscriber interface{})
@@ -89,10 +88,10 @@ type ResourcePubSub[
 	MDT constraint.Delete,
 ] interface {
 	PubSub
-	PublishChange(*message.Metadata)                   // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
-	PublishBatchAdded(*message.Metadata, MAPT)         // publish resource batch added notification, including specific data
-	PublishUpdated(*message.Metadata, MUPT)            // publish resource updated notification, including specific data
-	PublishBatchDeleted(*message.Metadata, MDPT, bool) // publish resource batch deleted notification, including specific data
+	PublishChange(*message.Metadata)             // publish any change of the resource, only notify the fact that some of the whole resource has been changed, without specific changed data
+	PublishBatchAdded(*message.Metadata, MAPT)   // publish resource batch added notification, including specific data
+	PublishUpdated(*message.Metadata, MUPT)      // publish resource updated notification, including specific data
+	PublishBatchDeleted(*message.Metadata, MDPT) // publish resource batch deleted notification, including specific data
 }
 
 type ResourcePubSubComponent[
@@ -147,17 +146,17 @@ func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) 
 	}
 }
 
-func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchDeleted(md *message.Metadata, msg MDPT, softDelete bool) {
+func (p *ResourcePubSubComponent[MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) PublishBatchDeleted(md *message.Metadata, msg MDPT) {
 	log.Debugf("publish delete %#v, %#v", md, msg)
 	for topic, subs := range p.subscribers {
 		if topic == TopicResourceBatchDeletedLcuuid {
 			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetLcuuids(), softDelete)
+				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetLcuuids())
 			}
 		}
 		if topic == TopicResourceBatchDeletedMySQL {
 			for _, sub := range subs {
-				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems(), softDelete)
+				sub.(ResourceBatchDeletedSubscriber).OnResourceBatchDeleted(md, msg.GetMySQLItems())
 			}
 		}
 	}

@@ -21,6 +21,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <ctype.h>		/* isdigit() */
 #include <linux/types.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -30,6 +32,8 @@
 #include <linux/perf_event.h>
 #include <linux/unistd.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <ctype.h>		/* isdigit() */
 #include <time.h>
 #include <sys/time.h>
 #include <string.h>
@@ -671,7 +675,7 @@ unsigned int fetch_kernel_version_code(void)
 	int major, minor, rev, num;
 	ret = fetch_kernel_version(&major, &minor, &rev, &num);
 	if (ret != ETR_OK) {
-		printf("fetch_kernel_version error\n");
+		ebpf_warning("fetch_kernel_version error\n");
 		return 0;
 	}
 
@@ -889,6 +893,101 @@ u64 get_netns_id_from_pid(pid_t pid)
 	return strtoull(netns_id_str, NULL, 10);
 }
 
+// Function to retrieve the host PID from the first line of /proc/pid/sched
+// The expected format is "java (1234, #threads: 12)"
+// where 1234 is the host PID (before Linux 4.1)
+static int get_host_pid_from_sched(const char *path)
+{
+	static char *line = NULL;
+	size_t size = 0;
+	int host_pid = -1;
+
+	FILE *sched_file = fopen(path, "r");
+	if (sched_file == NULL) {
+		ebpf_warning("Error opening file %s: %s (errno: %d)\n", path,
+			     strerror(errno), errno);
+		return -1;
+	}
+	// Read the first line of the file
+	if (getline(&line, &size, sched_file) != -1) {
+		// Locate the last '(' character in the line
+		char *pid_start = strrchr(line, '(');
+		if (pid_start != NULL) {
+			// Convert the PID string to an integer
+			host_pid = atoi(pid_start + 1);
+		} else {
+			ebpf_warning("Error parsing PID from line: %s\n", line);
+		}
+	} else {
+		ebpf_warning("Error reading from file %s: %s (errno: %d)\n",
+			     path, strerror(errno), errno);
+	}
+
+	fclose(sched_file);
+	free(line);		// Free the allocated memory for line
+	return host_pid;
+}
+
+// Linux kernels < 4.1 do not export NStgid field in /proc/pid/status.
+// Resolve by traversing /proc/pid/sched in the container.
+static int find_nspid_in_container(int host_pid)
+{
+	char path[300];
+
+	// Check if we are already in the same PID namespace
+	struct stat self_ns_stat, target_ns_stat;
+	if (stat("/proc/self/ns/pid", &self_ns_stat) == -1) {
+		ebpf_warning("stat /proc/self/ns/pid failed: %s (errno: %d)\n",
+			     strerror(errno), errno);
+		return -1;
+	}
+	snprintf(path, sizeof(path), "/proc/%d/ns/pid", host_pid);
+	if (stat(path, &target_ns_stat) == -1) {
+		ebpf_warning("stat %s failed: %s (errno: %d)\n", path,
+			     strerror(errno), errno);
+		return -1;
+	}
+	if (self_ns_stat.st_ino == target_ns_stat.st_ino) {
+		return host_pid;
+	}
+	// Browse all PIDs in the namespace of the target process to find the matching PID
+	snprintf(path, sizeof(path), "/proc/%d/root/proc", host_pid);
+	DIR *dir = opendir(path);
+	if (dir == NULL) {
+		ebpf_warning("opendir %s failed: %s (errno: %d)\n", path,
+			     strerror(errno), errno);
+		return -1;
+	}
+
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL) {
+		if (isdigit(entry->d_name[0])) {
+			// Check if /proc/<container-pid>/sched points back to <host_pid>
+			snprintf(path, sizeof(path),
+				 "/proc/%d/root/proc/%s/sched", host_pid,
+				 entry->d_name);
+			if (get_host_pid_from_sched(path) == host_pid) {
+				int nspid = atoi(entry->d_name);
+				if (closedir(dir) == -1) {
+					ebpf_warning
+					    ("closedir failed: %s (errno: %d)\n",
+					     strerror(errno), errno);
+				}
+				return nspid;
+			}
+		}
+	}
+
+	if (closedir(dir) == -1) {
+		ebpf_warning("closedir failed: %s (errno: %d)\n",
+			     strerror(errno), errno);
+	}
+
+	ebpf_warning("No matching PID found in container for host PID %d\n",
+		     host_pid);
+	return -1;		// Return -1 if no matching PID is found
+}
+
 int get_nspid(int pid)
 {
 	int ns_pid_1, ns_pid_2;
@@ -920,8 +1019,7 @@ int get_nspid(int pid)
 	}
 
 	fclose(file);
-	ebpf_info("Not find NSpid\n", status_path);
-	return ETR_NOTEXIST;
+	return find_nspid_in_container(pid);
 }
 
 int get_target_uid_and_gid(int target_pid, int *uid, int *gid)
@@ -1020,17 +1118,23 @@ int df_enter_ns(int pid, const char *type, int *self_fd)
 			int newns;
 			newns = open(path, O_RDONLY);
 			if (newns < 0) {
+				ebpf_warning("open() failed with %s(%d)\n",
+					     strerror(errno), errno);
 				return -1;
 			}
 
 			*self_fd = open(selfpath, O_RDONLY);
 			if (*self_fd < 0) {
+				ebpf_warning("open() failed with %s(%d)\n",
+					     strerror(errno), errno);
 				return -1;
 			}
 			// Some ancient Linux distributions do not have setns() function
 			int result = syscall(__NR_setns, newns, 0);
 			close(newns);
 			if (result < 0) {
+				ebpf_warning("setns(%s) failed with %s(%d)\n",
+					     type, strerror(errno), errno);
 				close(*self_fd);
 				*self_fd = -1;
 			}
@@ -1207,6 +1311,297 @@ u64 kallsyms_lookup_name(const char *name)
 
 	fclose(f);
 	return 0;
+}
+
+static inline bool __is_same_ns(int target_pid, const char *tag)
+{
+	struct stat self_st, target_st;
+	char path[64];
+	snprintf(path, sizeof(path), "/proc/self/ns/%s", tag);
+	if (stat(path, &self_st) != 0)
+		return false;
+
+	snprintf(path, sizeof(path), "/proc/%d/ns/%s", target_pid, tag);
+	if (stat(path, &target_st) != 0)
+		return false;
+
+	if (self_st.st_ino == target_st.st_ino) {
+		return true;
+	}
+
+	return false;
+}
+
+bool is_same_netns(int pid)
+{
+	return __is_same_ns(pid, "net");
+}
+
+bool is_same_mntns(int pid)
+{
+	return __is_same_ns(pid, "mnt");
+}
+
+// Function to get the inode number of a Unix socket from /proc/net/unix
+static ino_t get_unix_socket_inode(const char *socket_path)
+{
+	FILE *fp = fopen("/proc/net/unix", "r");
+	if (!fp) {
+		perror("fopen /proc/net/unix");
+		return (ino_t) - 1;
+	}
+
+	char line[PATH_MAX + 100];
+	while (fgets(line, sizeof(line), fp)) {
+		if (strstr(line, socket_path)) {
+			ino_t inode;
+			sscanf(line, "%*p: %*s %*s %*s %*s %*s %lu", &inode);
+			fclose(fp);
+			return inode;
+		}
+	}
+
+	fclose(fp);
+	return (ino_t) - 1;
+}
+
+// Function to check if a process has the specified Unix socket open
+static int is_process_using_unix_socket(const char *file_path, const char *pid)
+{
+	char fd_dir_path[PATH_MAX];
+	char target_path[PATH_MAX];
+	snprintf(fd_dir_path, sizeof(fd_dir_path), "/proc/%s/fd", pid);
+
+	DIR *dir = opendir(fd_dir_path);
+	if (!dir) {
+		return 0;
+	}
+
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL) {
+		if (entry->d_type == DT_LNK) {
+			char link_path[PATH_MAX];
+			ssize_t len;
+			snprintf(link_path, sizeof(link_path), "%s/%s",
+				 fd_dir_path, entry->d_name);
+			if ((len =
+			     readlink(link_path, target_path,
+				      sizeof(target_path) - 1)) == -1) {
+				continue;
+			}
+			target_path[len] = '\0';
+
+			char *inode_start = strstr(target_path, "socket:[");
+			if (inode_start) {
+				inode_start += strlen("socket:[");
+				char *inode_end = strchr(inode_start, ']');
+				if (inode_end) {
+					*inode_end = '\0';
+					ino_t inode_number =
+					    strtoul(inode_start, NULL, 10);
+					ino_t target_inode =
+					    get_unix_socket_inode(file_path);
+					if (target_inode != (ino_t) - 1
+					    && inode_number == target_inode) {
+						closedir(dir);
+						ebpf_info
+						    ("File '%s' is opened by another process (PID: %s).\n",
+						     file_path, pid);
+						return 1;
+					}
+				}
+			}
+		}
+	}
+
+	closedir(dir);
+	return 0;
+}
+
+// Function to check if a regular file is opened by other processes
+int is_file_opened_by_other_processes(const char *filepath)
+{
+	struct stat file_stat;
+	if (stat(filepath, &file_stat) == -1) {
+		return -1;
+	}
+
+	if (!S_ISREG(file_stat.st_mode) && !S_ISSOCK(file_stat.st_mode)) {
+		fprintf(stderr,
+			"The specified file is neither a regular file nor a Unix socket.\n");
+		return -1;
+	}
+
+	DIR *proc_dir = opendir("/proc");
+	if (!proc_dir) {
+		perror("opendir /proc");
+		return -1;
+	}
+
+	struct dirent *proc_entry;
+	while ((proc_entry = readdir(proc_dir)) != NULL) {
+		if (!isdigit(proc_entry->d_name[0]))
+			continue;	// Skip non-numeric entries
+
+		if (S_ISSOCK(file_stat.st_mode)) {
+			if (is_process_using_unix_socket
+			    (filepath, proc_entry->d_name) == 1) {
+				closedir(proc_dir);
+				return 1;
+			}
+			continue;
+		}
+
+		char fd_dir_path[PATH_MAX];
+		snprintf(fd_dir_path, sizeof(fd_dir_path), "/proc/%s/fd",
+			 proc_entry->d_name);
+
+		DIR *fd_dir = opendir(fd_dir_path);
+		if (!fd_dir)
+			continue;	// Skip if unable to open fd directory
+
+		struct dirent *fd_entry;
+		while ((fd_entry = readdir(fd_dir)) != NULL) {
+			if (fd_entry->d_type != DT_LNK)
+				continue;	// Skip non-symlink entries
+
+			char link_path[PATH_MAX], resolved_path[PATH_MAX];
+			snprintf(link_path, sizeof(link_path), "%s/%s",
+				 fd_dir_path, fd_entry->d_name);
+
+			ssize_t len = readlink(link_path, resolved_path,
+					       sizeof(resolved_path) - 1);
+			if (len == -1)
+				continue;
+
+			resolved_path[len] = '\0';
+
+			struct stat link_stat;
+			if (stat(resolved_path, &link_stat) == -1)
+				continue;	// Skip if unable to stat the resolved path
+
+			// Compare device and inode numbers
+			if (file_stat.st_dev == link_stat.st_dev
+			    && file_stat.st_ino == link_stat.st_ino) {
+				if (atoi(proc_entry->d_name) != getpid()) {
+					closedir(fd_dir);
+					closedir(proc_dir);
+					ebpf_info
+					    ("File '%s' is opened by another process (PID: %s).\n",
+					     filepath, proc_entry->d_name);
+					return 1;	// File is opened by another process
+				}
+			}
+		}
+
+		closedir(fd_dir);
+	}
+
+	closedir(proc_dir);
+	return 0;		// File is not opened by any other process
+}
+
+// Check if the substring starts with the main string
+bool substring_starts_with(const char *haystack, const char *needle)
+{
+	int needle_len = strlen(needle);	// Length of the substring
+	int haystack_len = strlen(haystack);	// Length of the main string
+
+	// If the substring length is greater than the main string length, return false
+	if (needle_len > haystack_len) {
+		return false;
+	}
+	// Compare the first needle_len characters
+	if (strncmp(haystack, needle, needle_len) == 0) {
+		return true;	// Substring starts with the main string
+	}
+
+	return false;		// Substring does not start with the main string
+}
+
+static int find_proc_form_status_file(const char *status_path,
+				      const char *process_name)
+{
+#define LINE_SIZE 256
+#define NAME_SIZE 16
+#define STATUS_PATH_SIZE 256
+
+	FILE *status_file = fopen(status_path, "r");
+	if (status_file == NULL) {
+		ebpf_warning
+		    ("Failed to open status file:%s, with %s(%d)\n",
+		     status_file, strerror(errno), errno);
+		return -1;
+	}
+
+	char line[LINE_SIZE];
+	while (fgets(line, sizeof(line), status_file)) {
+		if (strncmp(line, "Name:", 5) == 0) {
+			char name[NAME_SIZE];
+			if (sscanf(line, "Name:\t%15s", name) == 1) {
+				if (strcmp(name, process_name)
+				    == 0) {
+					return 0;
+				}
+			}
+			break;
+		}
+	}
+
+	fclose(status_file);
+	return -1;
+}
+
+int find_pid_by_name(const char *process_name, int exclude_pid)
+{
+	struct dirent *entry;
+	DIR *proc = opendir("/proc");
+	if (proc == NULL) {
+		ebpf_warning("Failed to open /proc directory, with %s(%d)\n",
+			     strerror(errno), errno);
+		return -1;
+	}
+
+	while ((entry = readdir(proc)) != NULL) {
+		if (entry->d_type == DT_DIR) {
+			// Check if the directory name is a number (process ID)
+			char *endptr;
+			int pid = (int)strtol(entry->d_name, &endptr, 10);
+			if (exclude_pid > 0 && pid == exclude_pid)
+				continue;
+
+			if (*endptr == '\0' && pid > 0) {
+				char status_path[STATUS_PATH_SIZE];
+				snprintf(status_path, sizeof(status_path),
+					 "/proc/%d/status", pid);
+				if (find_proc_form_status_file
+				    (status_path, process_name) == 0)
+					return pid;
+			}
+		}
+	}
+
+	if (closedir(proc) == -1) {
+		ebpf_warning("Failed to close /proc directory, with %s(%d)\n",
+			     strerror(errno), errno);
+	}
+
+	return -1;
+
+#undef STATUS_PATH_SIZE
+#undef LINE_SIZE
+#undef NAME_SIZE
+}
+
+// DJB2 hash function with 32-bit output
+u32 djb2_32bit(const char *str)
+{
+	u32 hash = 5381;
+	int c;
+	while ((c = *str++)) {
+		hash = ((hash << 5) + hash) + c; // hash * 33 + c
+	}
+	return hash; // 32-bit output
 }
 
 #if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)

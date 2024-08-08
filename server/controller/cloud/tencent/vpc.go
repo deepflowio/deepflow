@@ -19,16 +19,17 @@ package tencent
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (t *Tencent) getVPCs(region tencentRegion) ([]model.VPC, error) {
-	log.Debug("get vpcs starting")
+	log.Debug("get vpcs starting", logger.NewORGPrefix(t.orgID))
 	var vpcs []model.VPC
 
 	attrs := []string{"VpcId", "VpcName", "CidrBlock"}
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeVpcs", region.name, "VpcSet", true, map[string]interface{}{})
 	if err != nil {
-		log.Errorf("vpc request tencent api error: (%s)", err.Error())
+		log.Errorf("vpc request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.VPC{}, err
 	}
 	for _, vData := range resp {
@@ -45,6 +46,6 @@ func (t *Tencent) getVPCs(region tencentRegion) ([]model.VPC, error) {
 		})
 		t.vpcIDToRegionLcuuid[vpcID] = t.getRegionLcuuid(region.lcuuid)
 	}
-	log.Debug("get vpcs complete")
+	log.Debug("get vpcs complete", logger.NewORGPrefix(t.orgID))
 	return vpcs, nil
 }

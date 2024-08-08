@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 
 	vpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
 )
@@ -34,11 +35,11 @@ func (a *Aliyun) getNatGateways(region model.Region) (
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get nat_gateways starting")
+	log.Debug("get nat_gateways starting", logger.NewORGPrefix(a.orgID))
 	request := vpc.CreateDescribeNatGatewaysRequest()
 	response, err := a.getNatGatewayResponse(region.Label, request)
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(a.orgID))
 		return retNATGateways, retNATRules, retVInterfaces, retIPs, err
 	}
 
@@ -48,7 +49,7 @@ func (a *Aliyun) getNatGateways(region model.Region) (
 
 			err := a.checkRequiredAttributes(natGateway, []string{"NatGatewayId", "Name", "VpcId"})
 			if err != nil {
-				log.Info(err)
+				log.Info(err, logger.NewORGPrefix(a.orgID))
 				continue
 			}
 
@@ -124,7 +125,7 @@ func (a *Aliyun) getNatGateways(region model.Region) (
 			retNATRules = append(retNATRules, tmpRules...)
 		}
 	}
-	log.Debug("get nat_gateways complete")
+	log.Debug("get nat_gateways complete", logger.NewORGPrefix(a.orgID))
 	return retNATGateways, retNATRules, retVInterfaces, retIPs, nil
 }
 
@@ -136,7 +137,7 @@ func (a *Aliyun) getSNATRules(region model.Region, natGatewayId string, snatTabl
 		request.SnatTableId = snatTableId
 		response, err := a.getSNatRuleResponse(region.Label, request)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(a.orgID))
 			return []model.NATRule{}, err
 		}
 		for _, s := range response {
@@ -172,7 +173,7 @@ func (a *Aliyun) getDNATRules(region model.Region, natGatewayId string, dnatTabl
 		request.ForwardTableId = dnatTableId
 		response, err := a.getDNatRuleResponse(region.Label, request)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(a.orgID))
 			return []model.NATRule{}, err
 		}
 		for _, f := range response {

@@ -332,7 +332,7 @@ type DomainCreate struct {
 	Name                string                 `json:"NAME" binding:"required"`
 	Type                int                    `json:"TYPE" binding:"required"`
 	TeamID              int                    `json:"TEAM_ID"`
-	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
+	KubernetesClusterID string                 `json:"CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required
 	Config              map[string]interface{} `json:"CONFIG"`
@@ -367,13 +367,15 @@ type SubDomain struct {
 }
 
 type SubDomainCreate struct {
-	Name   string                 `json:"NAME" binding:"required"`
-	TeamID int                    `json:"TEAM_ID"`
-	Config map[string]interface{} `json:"CONFIG" binding:"required"`
-	Domain string                 `json:"DOMAIN" binding:"required"`
+	Domain    string                 `json:"DOMAIN" binding:"required"`
+	Name      string                 `json:"NAME" binding:"required"`
+	ClusterID string                 `json:"CLUSTER_ID"`
+	TeamID    int                    `json:"TEAM_ID"`
+	Config    map[string]interface{} `json:"CONFIG" binding:"required"`
 }
 
 type SubDomainUpdate struct {
+	TeamID int                    `json:"TEAM_ID"`
 	UserID int                    `json:"USER_ID"`
 	Config map[string]interface{} `json:"CONFIG"`
 }
@@ -511,6 +513,10 @@ type VTapInterface struct {
 	HostIP             string `json:"HOST_IP"`
 	NodeIP             string `json:"NODE_IP"`
 	LastSeen           string `json:"LAST_SEEN"`
+	DeviceCHostID      int    `json:"DEVICE_CHOST_ID"`
+	DeviceCHostName    string `json:"DEVICE_CHOST_NAME"`
+	DevicePodNodeID    int    `json:"DEVICE_POD_NODE_ID"`
+	DevicePodNodeName  string `json:"DEVICE_POD_NODE_NAME"`
 }
 
 type GenesisHost struct {
@@ -707,6 +713,7 @@ type CSVHeader struct {
 type Plugin struct {
 	Name      string `json:"NAME" binding:"required"`
 	Type      int    `json:"TYPE" binding:"required"`
+	User      int    `json:"USER" binding:"required"`
 	Image     []byte `json:"IMAGE,omitempty" binding:"required"`
 	UpdatedAt string `json:"UPDATED_AT"`
 }
@@ -754,7 +761,7 @@ type RemoteExecReq struct {
 
 	OutputFormat   *trident.OutputFormat `json:"output_format"` // 0: "TEXT", 1: "BINARY"
 	OutputFilename string                `json:"output_filename"`
-	CMD            string                `json:"cmd"`
+	CMD            string                `json:"cmd" binding:"required"`
 }
 
 type RemoteExecResp struct {

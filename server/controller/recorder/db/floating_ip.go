@@ -22,15 +22,15 @@ import (
 )
 
 type FloatingIP struct {
-	OperatorBase[mysql.FloatingIP]
+	OperatorBase[*mysql.FloatingIP, mysql.FloatingIP]
 }
 
 func NewFloatingIP() *FloatingIP {
 	return &FloatingIP{
-		OperatorBase[mysql.FloatingIP]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.FloatingIP](
+			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
+			false,
+			false,
+		),
 	}
 }

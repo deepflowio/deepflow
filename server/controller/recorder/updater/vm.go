@@ -32,8 +32,9 @@ import (
 type VM struct {
 	UpdaterBase[
 		cloudmodel.VM,
-		mysql.VM,
 		*diffbase.VM,
+		*mysql.VM,
+		mysql.VM,
 		*message.VMAdd,
 		message.VMAdd,
 		*message.VMUpdate,
@@ -48,8 +49,9 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 	updater := &VM{
 		newUpdaterBase[
 			cloudmodel.VM,
-			mysql.VM,
 			*diffbase.VM,
+			*mysql.VM,
+			mysql.VM,
 			*message.VMAdd,
 			message.VMAdd,
 			*message.VMUpdate,
@@ -77,10 +79,10 @@ func (m *VM) getDiffBaseByCloudItem(cloudItem *cloudmodel.VM) (diffBase *diffbas
 func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysql.VM, bool) {
 	vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(m.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
-		)))
+		), m.metadata.LogPrefixes)
 		return nil, false
 	}
 	var hostID int
@@ -120,10 +122,10 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 		if !exists {
-			log.Error(m.metadata.Logf(resourceAForResourceBNotFound(
+			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
-			)))
+			), m.metadata.LogPrefixes)
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID

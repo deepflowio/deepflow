@@ -29,8 +29,9 @@ import (
 type Region struct {
 	UpdaterBase[
 		cloudmodel.Region,
-		mysql.Region,
 		*diffbase.Region,
+		*mysql.Region,
+		mysql.Region,
 		*message.RegionAdd,
 		message.RegionAdd,
 		*message.RegionUpdate,
@@ -45,8 +46,9 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 	updater := &Region{
 		newUpdaterBase[
 			cloudmodel.Region,
-			mysql.Region,
 			*diffbase.Region,
+			*mysql.Region,
+			mysql.Region,
 			*message.RegionAdd,
 			message.RegionAdd,
 			*message.RegionUpdate,

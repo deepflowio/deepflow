@@ -230,7 +230,7 @@ func UpdateController(
 		return nil, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
-	log.Infof("update controller (%s) config %v", controller.Name, controllerUpdate)
+	log.Infof("update controller (%s) config %v", controller.Name, controllerUpdate, dbInfo.LogPrefixORGID)
 
 	tx := db.Begin()
 	defer func() {
@@ -381,8 +381,8 @@ func UpdateController(
 			delVTapAzs = oldVTapAzs.Difference(newVTapAzs)
 		}
 
-		log.Infof("oldConnAzs: %v, newConnAzs: %v, oldVTapAzs: %v, newVTapAzs: %v", oldConnAzs, newConnAzs, oldVTapAzs, newVTapAzs)
-		log.Infof("addConnAzs: %v, delConnAzs: %v, delVTapAzs: %v", addConnAzs, delConnAzs, delVTapAzs)
+		log.Infof("oldConnAzs: %v, newConnAzs: %v, oldVTapAzs: %v, newVTapAzs: %v", oldConnAzs, newConnAzs, oldVTapAzs, newVTapAzs, dbInfo.LogPrefixORGID)
+		log.Infof("addConnAzs: %v, delConnAzs: %v, delVTapAzs: %v", addConnAzs, delConnAzs, delVTapAzs, dbInfo.LogPrefixORGID)
 
 		if len(delConnAzs.ToSlice()) > 0 {
 			var azCondition []string
@@ -473,7 +473,7 @@ func DeleteController(orgID int, lcuuid string, m *monitor.ControllerCheck) (res
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("controller (%s) not found", lcuuid))
 	}
 
-	log.Infof("delete controller (%s)", controller.Name)
+	log.Infof("delete controller (%s)", controller.Name, dbInfo.LogPrefixORGID)
 
 	db.Where("controller_ip = ?", controller.IP).Count(&vtapCount)
 	if vtapCount > 0 {

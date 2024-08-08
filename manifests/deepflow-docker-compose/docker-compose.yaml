@@ -19,7 +19,7 @@ services:
     networks:
       - deepflow
   clickhouse:
-    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/clickhouse-server:22.8.6.71
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/clickhouse-server:23.8.7.24
     container_name: deepflow-clickhouse
     restart: always
     environment:
@@ -38,13 +38,13 @@ services:
     networks:
       - deepflow
   deepflow-server:
-    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-server:latest
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-server:${DEEPFLOW_VERSION}
     container_name: deepflow-server
     restart: always
     environment:
       DEEPFLOW_SERVER_RUNNING_MODE: STANDALONE
       K8S_POD_IP_FOR_DEEPFLOW: 127.0.0.1
-      K8S_NODE_IP_FOR_DEEPFLOW: FIX_ME_ALLINONE_HOST_IP
+      K8S_NODE_IP_FOR_DEEPFLOW: ${NODE_IP_FOR_DEEPFLOW}
       K8S_NAMESPACE_FOR_DEEPFLOW: deepflow
       K8S_NODE_NAME_FOR_DEEPFLOW: deepflow-host
       K8S_POD_NAME_FOR_DEEPFLOW: deepflow-container
@@ -66,7 +66,7 @@ services:
       - 30035:20035  # controller module, control plane, grpc port
       - 30033:20033  # ingester module, data plane, port
   deepflow-app:
-    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-app:latest
+    image: registry.cn-hongkong.aliyuncs.com/deepflow-ce/deepflow-app:${DEEPFLOW_VERSION}
     container_name: deepflow-app
     restart: always
     environment:

@@ -125,7 +125,7 @@ func (i *ChIPRelation) newToolDataSet(db *mysql.DB) (*toolDataSet, bool) {
 
 	var vms []*mysql.VM
 	if err := db.Unscoped().Find(&vms).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	for _, vm := range vms {
@@ -143,7 +143,7 @@ func (i *ChIPRelation) newToolDataSet(db *mysql.DB) (*toolDataSet, bool) {
 			common.VIF_DEVICE_TYPE_POD,
 		},
 	).Unscoped().Find(&vifs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VINTERFACE, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VINTERFACE, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -163,12 +163,12 @@ func (i *ChIPRelation) newToolDataSet(db *mysql.DB) (*toolDataSet, bool) {
 
 	var wanIPs []*mysql.WANIP
 	if err := db.Unscoped().Find(&wanIPs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_WANIP, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_WANIP, err), db.LogPrefixORGID)
 		return nil, false
 	}
 	var lanIPs []*mysql.LANIP
 	if err := db.Unscoped().Find(&lanIPs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LANIP, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LANIP, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -184,12 +184,12 @@ func (i *ChIPRelation) newToolDataSet(db *mysql.DB) (*toolDataSet, bool) {
 func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet, db *mysql.DB) bool {
 	var natGateways []*mysql.NATGateway
 	if err := db.Unscoped().Find(&natGateways).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err), db.LogPrefixORGID)
 		return false
 	}
 	var natRules []*mysql.NATRule
 	if err := db.Unscoped().Find(&natRules).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_RULE, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_RULE, err), db.LogPrefixORGID)
 		return false
 	}
 	natGatewayIDToNatRules := make(map[int][]*mysql.NATRule)
@@ -198,7 +198,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 	}
 	var natVMConns []*mysql.NATVMConnection
 	if err := db.Unscoped().Find(&natVMConns).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_VM_CONNECTION, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_VM_CONNECTION, err), db.LogPrefixORGID)
 		return false
 	}
 	for _, natGateway := range natGateways {
@@ -255,12 +255,12 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet, db *mysql.DB) bool {
 	var lbs []*mysql.LB
 	if err := db.Unscoped().Find(&lbs).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB, err), db.LogPrefixORGID)
 		return false
 	}
 	var lbListeners []*mysql.LBListener
 	if err := db.Unscoped().Find(&lbListeners).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_LISTENER, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_LISTENER, err), db.LogPrefixORGID)
 		return false
 	}
 	lbIDToLBListeners := make(map[int][]*mysql.LBListener)
@@ -269,7 +269,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 	}
 	var lbTargetServers []*mysql.LBTargetServer
 	if err := db.Unscoped().Find(&lbTargetServers).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_TARGET_SERVER, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_TARGET_SERVER, err), db.LogPrefixORGID)
 		return false
 	}
 	lbIDToLBTargetServers := make(map[int][]*mysql.LBTargetServer)
@@ -280,7 +280,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 	}
 	var lbVMConns []*mysql.LBVMConnection
 	if err := db.Unscoped().Find(&lbVMConns).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_VM_CONNECTION, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_VM_CONNECTION, err), db.LogPrefixORGID)
 		return false
 	}
 	for _, lb := range lbs {
@@ -367,7 +367,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet, db *mysql.DB) bool {
 	var pods []*mysql.Pod
 	if err := db.Unscoped().Find(&pods).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD, err), db.LogPrefixORGID)
 		return false
 	}
 	podGroupIDToPodIDs := make(map[int][]int)
@@ -376,7 +376,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	}
 	var podGroupPorts []*mysql.PodGroupPort
 	if err := db.Unscoped().Find(&podGroupPorts).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_PORT, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_PORT, err), db.LogPrefixORGID)
 		return false
 	}
 	podServiceIDToPodIDs := make(map[int][]int)
@@ -387,7 +387,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	}
 	var podIngresses []*mysql.PodIngress
 	if err := db.Unscoped().Find(&podIngresses).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS, err), db.LogPrefixORGID)
 		return false
 	}
 	podIngressIDToName := make(map[int]string)
@@ -396,10 +396,15 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	}
 	var podServices []*mysql.PodService
 	if err := db.Unscoped().Find(&podServices).Error; err != nil {
-		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE, err))
+		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE, err), db.LogPrefixORGID)
 		return false
 	}
 	for _, podService := range podServices {
+		teamID, err := GetTeamID(podService.Domain, podService.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", i.resourceTypeName, err.Error(), podService, db.LogPrefixORGID)
+		}
+
 		// VPCID：容器服务VPC
 		// IP：容器服务自身IP
 		for _, vifID := range toolDS.podServiceIDToVIFIDs[podService.ID] {
@@ -409,7 +414,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 					IP:             ip,
 					PodServiceID:   podService.ID,
 					PodServiceName: podService.Name,
-					TeamID:         DomainToTeamID[podService.Domain],
+					TeamID:         teamID,
 				}
 				if podService.PodIngressID != 0 {
 					dbItem.PodIngressID = podService.PodIngressID

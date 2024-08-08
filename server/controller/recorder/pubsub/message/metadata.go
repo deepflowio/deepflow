@@ -21,6 +21,8 @@ type Metadata struct {
 	TeamID      int
 	DomainID    int
 	SubDomainID int
+
+	AdditionalMetadata // Additional metadata for specific message types
 }
 
 func NewMetadata(orgID int, options ...func(*Metadata)) *Metadata {
@@ -49,4 +51,14 @@ func MetadataDomainID(id int) func(*Metadata) {
 	return func(m *Metadata) {
 		m.DomainID = id
 	}
+}
+
+func MetadataSoftDelete(flag bool) func(*Metadata) {
+	return func(m *Metadata) {
+		m.AdditionalMetadata.SoftDelete = flag
+	}
+}
+
+type AdditionalMetadata struct {
+	SoftDelete bool // for message type of delete action
 }

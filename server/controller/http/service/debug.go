@@ -145,10 +145,6 @@ func GetGenesisKubernetesData(g *genesis.Genesis, orgID int, clusterID string) (
 	return g.GetKubernetesResponse(orgID, clusterID)
 }
 
-func GetGenesisPrometheusData(g *genesis.Genesis, orgID int, clusterID string) ([]cloudmodel.PrometheusTarget, error) {
-	return g.GetPrometheusResponse(orgID, clusterID)
-}
-
 func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (genesis.TridentStats, error) {
 	return genesis.Synchronizer.GetAgentStats(orgID, vtapID)
 }

@@ -23,10 +23,10 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	logging "github.com/op/go-logging"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("monitor")
+var log = logger.MustGetLogger("monitor")
 
 type dfHostCheck struct {
 	lastTimeUnix int64

@@ -18,11 +18,13 @@ package tagrecorder
 
 import (
 	"sync"
+	"time"
 
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -146,6 +148,8 @@ type Subscriber interface {
 	pubsub.ResourceBatchDeletedSubscriber
 	OnDomainDeleted(md *message.Metadata)
 	OnSubDomainDeleted(md *message.Metadata)
+	OnSubDomainTeamIDUpdated(md *message.Metadata)
+	ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB)
 }
 
 type SubscriberDataGenerator[MUPT msgconstraint.FieldsUpdatePtr[MUT], MUT msgconstraint.FieldsUpdate, MT constraint.MySQLModel, CT MySQLChModel, KT ChModelKey] interface {
@@ -213,7 +217,7 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchAdded(md *me
 	items := msg.([]*MT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	keys, chItems := s.generateKeyTargets(md, items)
 	s.dbOperator.batchPage(keys, chItems, s.dbOperator.add, db)
@@ -224,24 +228,26 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceUpdated(md *messa
 	updateFields := msg.(MUPT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	s.subscriberDG.onResourceUpdated(updateFields.GetID(), updateFields, db)
 }
 
 // OnResourceBatchDeleted implements interface Subscriber in recorder/pubsub/subscriber.go
-func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}, softDelete bool) {
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	items := msg.([]*MT)
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	keys, chItems := s.generateKeyTargets(md, items)
-	if softDelete {
+	if md.SoftDelete {
 		s.subscriberDG.softDeletedTargetsUpdated(chItems, db)
 	} else {
 		s.dbOperator.batchPage(keys, chItems, s.dbOperator.delete, db)
+		s.ResourceUpdateAtInfoUpdated(md, db)
 	}
+
 }
 
 // Delete resource by domain
@@ -249,11 +255,12 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnDomainDeleted(md *message
 	var chModel CT
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	if err := db.Where("domain_id = ?", md.DomainID).Delete(&chModel).Error; err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(md.ORGID))
 	}
+	s.ResourceUpdateAtInfoUpdated(md, db)
 }
 
 // Delete resource by sub domain
@@ -261,9 +268,41 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainDeleted(md *mess
 	var chModel CT
 	db, err := mysql.GetDB(md.ORGID)
 	if err != nil {
-		log.Errorf("get org dbinfo fail : %d", md.ORGID)
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
 	}
 	if err := db.Where("sub_domain_id = ?", md.SubDomainID).Delete(&chModel).Error; err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(md.ORGID))
+	}
+	s.ResourceUpdateAtInfoUpdated(md, db)
+}
+
+// Update team_id of resource by sub domain
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) OnSubDomainTeamIDUpdated(md *message.Metadata) {
+	var chModel CT
+	db, err := mysql.GetDB(md.ORGID)
+	if err != nil {
+		log.Error("get org dbinfo fail", logger.NewORGPrefix(md.ORGID))
+	}
+	if err := db.Model(&chModel).Where("sub_domain_id = ?", md.SubDomainID).Update("team_id", md.TeamID).Error; err != nil {
+		log.Error(err, db.LogPrefixORGID)
+	}
+}
+
+// Update updated_at when resource is deleted
+func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) ResourceUpdateAtInfoUpdated(md *message.Metadata, db *mysql.DB) {
+	var updateItems []MT
+	err := db.Unscoped().First(&updateItems).Error
+	if err == nil {
+		var testItems []*MT
+		for _, item := range updateItems {
+			testItems = append(testItems, &item)
+		}
+		updateKeys, updateDBItem := s.generateKeyTargets(md, testItems)
+		if len(updateDBItem) > 0 && len(updateKeys) > 0 {
+			updateTimeInfo := make(map[string]interface{})
+			now := time.Now()
+			updateTimeInfo["updated_at"] = now.Format("2006-01-02 15:04:05")
+			s.dbOperator.update(updateDBItem[0], updateTimeInfo, updateKeys[0], db)
+		}
 	}
 }

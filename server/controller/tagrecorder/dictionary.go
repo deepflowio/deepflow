@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +38,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 var (
@@ -152,7 +152,15 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 	var ckDatabaseName string
 	// 在本区域所有数据节点更新字典
 	// Update the dictionary at all data nodes in the region
-	replicaSQL := fmt.Sprintf("REPLICA (HOST '%s' PRIORITY %s)", c.cfg.MySqlCfg.Host, "1")
+	var replicaSQL string
+	var mysqlPort uint32
+	if c.cfg.MySqlCfg.ProxyHost != "" {
+		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.ProxyHost)
+		mysqlPort = c.cfg.MySqlCfg.ProxyPort
+	} else {
+		replicaSQL = fmt.Sprintf(SQL_REPLICA, c.cfg.MySqlCfg.Host)
+		mysqlPort = c.cfg.MySqlCfg.Port
+	}
 
 	ckDb, err := clickhouse.Connect(*clickHouseCfg)
 	if err != nil {
@@ -241,7 +249,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		// 检查并创建数据库
 		// Check and create the database
 		if err = ckDb.Select(&databases, "SHOW DATABASES"); err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(orgID))
 			return
 		}
 		// 删除deepflow数据库
@@ -250,7 +258,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			dropSql := "DROP DATABASE IF EXISTS deepflow"
 			_, err = ckDb.Exec(dropSql)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				return
 			}
 		}
@@ -258,11 +266,11 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		sort.Strings(databases)
 		databaseIndex := sort.SearchStrings(databases, strings.Trim(ckDatabaseName, "`"))
 		if len(databases) == 0 || databaseIndex == len(databases) || databases[databaseIndex] != strings.Trim(ckDatabaseName, "`") {
-			log.Infof("create database %s", ckDatabaseName)
+			log.Infof("create database %s", ckDatabaseName, logger.NewORGPrefix(orgID))
 			sql := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", ckDatabaseName)
 			_, err = ckDb.Exec(sql)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				return
 			}
 		}
@@ -271,7 +279,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		// Get the current dictionary in the database
 		dictionaries := []string{}
 		if err := ckDb.Select(&dictionaries, fmt.Sprintf("SHOW DICTIONARIES IN %s", ckDatabaseName)); err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(orgID))
 			return
 		}
 
@@ -289,7 +297,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			_, err = ckDb.Exec(dropSQL)
 			if err != nil {
 				delDictError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 		}
@@ -305,14 +313,13 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			dictName := dict.(string)
 			chTable := "ch_" + strings.TrimSuffix(dictName, "_map")
 			createSQL := CREATE_SQL_MAP[dictName]
-			mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
-			log.Infof("create dictionary %s", dictName)
-			log.Info(createSQL)
+			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			log.Infof("create dictionary %s", dictName, logger.NewORGPrefix(orgID))
+			log.Info(createSQL, logger.NewORGPrefix(orgID))
 			_, err = ckDb.Exec(createSQL)
 			if err != nil {
 				addDictError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 		}
@@ -330,34 +337,33 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			dictSQL := make([]string, 0)
 			if err := ckDb.Select(&dictSQL, showSQL); err != nil {
 				updateDictError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 			if len(dictSQL) <= 0 {
 				break
 			}
 			createSQL := CREATE_SQL_MAP[dictName]
-			mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
-			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPortStr, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
+			createSQL = fmt.Sprintf(createSQL, ckDatabaseName, dictName, mysqlPort, c.cfg.MySqlCfg.UserName, c.cfg.MySqlCfg.UserPassword, replicaSQL, mysqlDatabaseName, chTable, chTable, c.cfg.TagRecorderCfg.DictionaryRefreshInterval)
 			// In the new version of CK (version after 23.8), when ‘SHOW CREATE DICTIONARY’ does not display plain text password information, the password is fixedly displayed as ‘[HIDDEN]’, and password comparison needs to be repair.
 			checkDictSQL := strings.Replace(dictSQL[0], "[HIDDEN]", c.cfg.MySqlCfg.UserPassword, 1)
 			if createSQL == checkDictSQL {
 				continue
 			}
-			log.Infof("update dictionary %s", dictName)
-			log.Infof("exist dictionary %s", checkDictSQL)
-			log.Infof("wanted dictionary %s", createSQL)
+			log.Infof("update dictionary %s", dictName, logger.NewORGPrefix(orgID))
+			log.Infof("exist dictionary %s", checkDictSQL, logger.NewORGPrefix(orgID))
+			log.Infof("wanted dictionary %s", createSQL, logger.NewORGPrefix(orgID))
 			dropSQL := fmt.Sprintf("DROP DICTIONARY %s.%s", ckDatabaseName, dictName)
 			_, err = ckDb.Exec(dropSQL)
 			if err != nil {
 				updateDictError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 			_, err = ckDb.Exec(createSQL)
 			if err != nil {
 				updateDictError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 		}
@@ -368,7 +374,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		// Get the current view in the database
 		views := []string{}
 		if err := ckDb.Select(&views, fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", ckDatabaseName)); err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(orgID))
 			return
 		}
 
@@ -387,7 +393,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			_, err = ckDb.Exec(createSQL)
 			if err != nil {
 				addViewError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 		}
@@ -404,7 +410,7 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			viewSQL := make([]string, 0)
 			if err := ckDb.Select(&viewSQL, showSQL); err != nil {
 				updateViewError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 			if len(viewSQL) <= 0 {
@@ -415,20 +421,20 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 			if createSQL == viewSQL[0] {
 				continue
 			}
-			log.Infof("update view %s", viewName)
-			log.Infof("exist view %s", viewSQL[0])
-			log.Infof("wanted view %s", createSQL)
+			log.Infof("update view %s", viewName, logger.NewORGPrefix(orgID))
+			log.Infof("exist view %s", viewSQL[0], logger.NewORGPrefix(orgID))
+			log.Infof("wanted view %s", createSQL, logger.NewORGPrefix(orgID))
 			dropSQL := fmt.Sprintf("DROP TABLE %s.%s", ckDatabaseName, viewName)
 			_, err = ckDb.Exec(dropSQL)
 			if err != nil {
 				updateViewError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 			_, err = ckDb.Exec(createSQL)
 			if err != nil {
 				updateViewError = err
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(orgID))
 				break
 			}
 		}

@@ -11,6 +11,36 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: ntp support profile data [#7706](https://github.com/deepflowio/deepflow/pull/7706) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: Modify show tags API error #26063 [#7703](https://github.com/deepflowio/deepflow/pull/7703) by [Ericsssss](https://github.com/Ericsssss)
+* fix: agent fixes empty endpoint when setting http-endpoint-extraction.match-rules.prefix: "" [#7699](https://github.com/deepflowio/deepflow/pull/7699) by [TomatoMr](https://github.com/TomatoMr)
+* fix: agent remote exec panic [#7694](https://github.com/deepflowio/deepflow/pull/7694) by [roryye](https://github.com/roryye)
+* fix: Translate metrics by table [#7678](https://github.com/deepflowio/deepflow/pull/7678) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: abstract pod group association error [#7673](https://github.com/deepflowio/deepflow/pull/7673) by [askyrie](https://github.com/askyrie)
+* fix: restart agent after enabling ntp [#7657](https://github.com/deepflowio/deepflow/pull/7657) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: need to drop deepflow_tenant/admin database when drop an organization [#7649](https://github.com/deepflowio/deepflow/pull/7649) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Fix Kafka protocol inference [#7644](https://github.com/deepflowio/deepflow/pull/7644) by [yinjiping](https://github.com/yinjiping)
+* fix: agent cmd panic [#7638](https://github.com/deepflowio/deepflow/pull/7638) by [roryye](https://github.com/roryye)
+* fix: Translate fields by table [#7635](https://github.com/deepflowio/deepflow/pull/7635) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: Modify custom tag show tags error #25979 [#7632](https://github.com/deepflowio/deepflow/pull/7632) by [Ericsssss](https://github.com/Ericsssss)
+* fix: modify resource delete error #25844 [#7608](https://github.com/deepflowio/deepflow/pull/7608) by [Ericsssss](https://github.com/Ericsssss)
+* fix: Remove useless output from CL [#7593](https://github.com/deepflowio/deepflow/pull/7593) by [roryye](https://github.com/roryye)
+* fix: agent - windows compile error [#7589](https://github.com/deepflowio/deepflow/pull/7589) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - missing cbpf l7 log [#7586](https://github.com/deepflowio/deepflow/pull/7586) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - eBPF Modify the whitelist restructuring format [#7580](https://github.com/deepflowio/deepflow/pull/7580) by [yinjiping](https://github.com/yinjiping)
+* fix: data under all organizations should be cleared when disk is full [#7566](https://github.com/deepflowio/deepflow/pull/7566) by [lzf575](https://github.com/lzf575)
+* fix: do not pub to tagrecorder [#7562](https://github.com/deepflowio/deepflow/pull/7562) by [askyrie](https://github.com/askyrie)
+* fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
+* fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
+* fix: update agent commands permission [#7481](https://github.com/deepflowio/deepflow/pull/7481) by [roryye](https://github.com/roryye)
+* fix: process resource api does not response sub_domain field [#7448](https://github.com/deepflowio/deepflow/pull/7448) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Fix the problem of duplicate fields in select [#7436](https://github.com/deepflowio/deepflow/pull/7436) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: recorder reports wrong sub_domain infomation in domain logs [#7435](https://github.com/deepflowio/deepflow/pull/7435) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Fix concurrent request command for the same agent [#7431](https://github.com/deepflowio/deepflow/pull/7431) by [roryye](https://github.com/roryye)
+* fix: Uniq operator error [#7402](https://github.com/deepflowio/deepflow/pull/7402) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: deepflow-server may panic when updating platform information [#7399](https://github.com/deepflowio/deepflow/pull/7399) by [lzf575](https://github.com/lzf575)
+* fix: Add return processing to agent command [#7397](https://github.com/deepflowio/deepflow/pull/7397) by [roryye](https://github.com/roryye)
 * fix: Fix windows compilation [#7390](https://github.com/deepflowio/deepflow/pull/7390) by [rvql](https://github.com/rvql)
 * fix: Add filter to agent remote command and handle content when error… [#7382](https://github.com/deepflowio/deepflow/pull/7382) by [roryye](https://github.com/roryye)
 * fix: Community Edition does not support multi-organization and multi-team features [#7375](https://github.com/deepflowio/deepflow/pull/7375) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
@@ -64,6 +94,33 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: kubernetes support OpenGaussCluster [#7721](https://github.com/deepflowio/deepflow/pull/7721) by [askyrie](https://github.com/askyrie)
+* feat: agent - eBPF Adjust method for checking if agent is running [#7717](https://github.com/deepflowio/deepflow/pull/7717) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - flow&app log collected by lo nic do not report ctrl_mac [#7713](https://github.com/deepflowio/deepflow/pull/7713) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent - eBPF Improve aggregation efficiency of stack-trace string  [#7663](https://github.com/deepflowio/deepflow/pull/7663) by [yinjiping](https://github.com/yinjiping)
+* feat: add request type from Kafka trace map [#7642](https://github.com/deepflowio/deepflow/pull/7642) by [lzf575](https://github.com/lzf575)
+* feat: server - Add configuration items to server [#7630](https://github.com/deepflowio/deepflow/pull/7630) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: update trace_tree struct [#7604](https://github.com/deepflowio/deepflow/pull/7604) by [taloric](https://github.com/taloric)
+* feat: agent - eBPF Add delay threshold check for push period [#7598](https://github.com/deepflowio/deepflow/pull/7598) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Add kernel dependency check [#7596](https://github.com/deepflowio/deepflow/pull/7596) by [yinjiping](https://github.com/yinjiping)
+*  feat: add cloud common for h3c [#7551](https://github.com/deepflowio/deepflow/pull/7551) by [askyrie](https://github.com/askyrie)
+* feat: agent - support parallel protocols [#7585](https://github.com/deepflowio/deepflow/pull/7585) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: add agent cmd timeout to config [#7548](https://github.com/deepflowio/deepflow/pull/7548) by [roryye](https://github.com/roryye)
+* feat: Tagrecorder support update team_id [#7544](https://github.com/deepflowio/deepflow/pull/7544) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: sub domain support update team [#7537](https://github.com/deepflowio/deepflow/pull/7537) by [askyrie](https://github.com/askyrie)
+* feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
+* feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
+* feat: prevents dirty data from increasing MySQL IO [#7499](https://github.com/deepflowio/deepflow/pull/7499) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: Server exporters support tag-filter-condition config (#7492) [#7493](https://github.com/deepflowio/deepflow/pull/7493) by [ZhuoZhuoCrayon](https://github.com/ZhuoZhuoCrayon)
+* feat: agent - eBPF Remove tracing for HEAD type requests in NGINX [#7489](https://github.com/deepflowio/deepflow/pull/7489) by [yinjiping](https://github.com/yinjiping)
+* feat: Querier support no limit [#7479](https://github.com/deepflowio/deepflow/pull/7479) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat:  Ingester support trace_tree [#7443](https://github.com/deepflowio/deepflow/pull/7443) by [lzf575](https://github.com/lzf575)
+* feat: agent - dispatcher support set cpu affinity [#7423](https://github.com/deepflowio/deepflow/pull/7423) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: create sub domian set default team id [#7421](https://github.com/deepflowio/deepflow/pull/7421) by [askyrie](https://github.com/askyrie)
+* feat: sub domain support filter user id [#7408](https://github.com/deepflowio/deepflow/pull/7408) by [askyrie](https://github.com/askyrie)
+* feat: sub domain support team [#7394](https://github.com/deepflowio/deepflow/pull/7394) by [askyrie](https://github.com/askyrie)
+* feat: server uses sub_domain team id first when publishing message to tagrecorder [#7384](https://github.com/deepflowio/deepflow/pull/7384) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Allow overriding remote exec cmdline with async function [#7385](https://github.com/deepflowio/deepflow/pull/7385) by [rvql](https://github.com/rvql)
 * feat: agent - add inner queue to mirror dispatcher [#7345](https://github.com/deepflowio/deepflow/pull/7345) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: Agent remote exec returns specific errors [#7334](https://github.com/deepflowio/deepflow/pull/7334) by [roryye](https://github.com/roryye)
@@ -83,8 +140,8 @@
 * feat: add change log [#7095](https://github.com/deepflowio/deepflow/pull/7095) by [Nick-0314](https://github.com/Nick-0314)
 
 #### Refactoring
+* refactor: agent remove prometheus api sync [#7577](https://github.com/deepflowio/deepflow/pull/7577) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: Change crate name [#7158](https://github.com/deepflowio/deepflow/pull/7158) by [rvql](https://github.com/rvql)
-
 
 #### Documentation
 * docs: rename opentemetry to opentelemetry [#7246](https://github.com/deepflowio/deepflow/pull/7246) by [lzf575](https://github.com/lzf575)
@@ -95,8 +152,10 @@
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* Cp 66 lo to v65 [#7716](https://github.com/deepflowio/deepflow/pull/7716) by [lzf575](https://github.com/lzf575)
+* support consistent timestamp in l7metrics [#7626](https://github.com/deepflowio/deepflow/pull/7626) by [yuanchaoa](https://github.com/yuanchaoa)
+* V65 trace map [#7445](https://github.com/deepflowio/deepflow/pull/7445) by [taloric](https://github.com/taloric)
 * bump golang.org/x/net to v0.26.0 [#7234](https://github.com/deepflowio/deepflow/pull/7234) by [zhangzujian](https://github.com/zhangzujian)
-
 
 #### Performance
 * perf: add setting ttl_only_drop_parts to the CK table to make TTL more efficient [#7266](https://github.com/deepflowio/deepflow/pull/7266) by [lzf575](https://github.com/lzf575)

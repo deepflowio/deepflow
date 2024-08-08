@@ -25,6 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getVMs(
@@ -36,7 +37,7 @@ func (b *BaiduBce) getVMs(
 	var retIPs []model.IP
 	var vmIdToLcuuid map[string]string
 
-	log.Debug("get vms starting")
+	log.Debug("get vms starting", logger.NewORGPrefix(b.orgID))
 
 	bccClient, _ := bcc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	bccClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -48,7 +49,7 @@ func (b *BaiduBce) getVMs(
 		startTime := time.Now()
 		result, err := bccClient.ListInstances(args)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, logger.NewORGPrefix(b.orgID))
 			return nil, nil, nil, err
 		}
 		b.cloudStatsd.RefreshAPIMoniter("ListInstances", len(result.Instances), startTime)
@@ -65,17 +66,17 @@ func (b *BaiduBce) getVMs(
 		for _, vm := range r.Instances {
 			azLcuuid, ok := zoneNameToAZLcuuid[vm.ZoneName]
 			if !ok {
-				log.Debugf("vm (%s) az (%s) not found", vm.InstanceId, vm.ZoneName)
+				log.Debugf("vm (%s) az (%s) not found", vm.InstanceId, vm.ZoneName, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			vpcLcuuid, ok := vpcIdToLcuuid[vm.VpcId]
 			if !ok {
-				log.Debugf("vm (%s) vpc (%s) not found", vm.InstanceId, vm.VpcId)
+				log.Debugf("vm (%s) vpc (%s) not found", vm.InstanceId, vm.VpcId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 			networkLcuuid, ok := networkIdToLcuuid[vm.SubnetId]
 			if !ok {
-				log.Debugf("vm (%s) network (%s) not found", vm.InstanceId, vm.SubnetId)
+				log.Debugf("vm (%s) network (%s) not found", vm.InstanceId, vm.SubnetId, logger.NewORGPrefix(b.orgID))
 				continue
 			}
 
@@ -183,7 +184,7 @@ func (b *BaiduBce) getVMs(
 	retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
 	retIPs = append(retIPs, tmpIPs...)
 
-	log.Debug("get vms complete")
+	log.Debug("get vms complete", logger.NewORGPrefix(b.orgID))
 	return retVMs, retVInterfaces, retIPs, nil
 }
 
@@ -193,7 +194,7 @@ func (b *BaiduBce) getVMEnis(
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get vm enis starting")
+	log.Debug("get vm enis starting", logger.NewORGPrefix(b.orgID))
 
 	eniClient, _ := eni.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	eniClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
@@ -206,7 +207,7 @@ func (b *BaiduBce) getVMEnis(
 			startTime := time.Now()
 			result, err := eniClient.ListEni(args)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, logger.NewORGPrefix(b.orgID))
 				return nil, nil, err
 			}
 			b.cloudStatsd.RefreshAPIMoniter("ListEni", len(result.Eni), startTime)
@@ -227,12 +228,12 @@ func (b *BaiduBce) getVMEnis(
 
 				vmLcuuid, ok := vmIdToLcuuid[eni.InstanceId]
 				if !ok {
-					log.Infof("eni (%s) vm (%s) not found", eni.EniId, eni.InstanceId)
+					log.Infof("eni (%s) vm (%s) not found", eni.EniId, eni.InstanceId, logger.NewORGPrefix(b.orgID))
 					continue
 				}
 				networkLcuuid, ok := networkIdToLcuuid[eni.SubnetId]
 				if !ok {
-					log.Infof("eni (%s) network (%s) not found", eni.EniId, eni.SubnetId)
+					log.Infof("eni (%s) network (%s) not found", eni.EniId, eni.SubnetId, logger.NewORGPrefix(b.orgID))
 					continue
 				}
 
@@ -291,6 +292,6 @@ func (b *BaiduBce) getVMEnis(
 			}
 		}
 	}
-	log.Debug("Get vm enis complete")
+	log.Debug("Get vm enis complete", logger.NewORGPrefix(b.orgID))
 	return retVInterfaces, retIPs, nil
 }

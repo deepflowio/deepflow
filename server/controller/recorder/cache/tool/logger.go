@@ -21,10 +21,11 @@ import (
 
 	"github.com/op/go-logging"
 
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
-var log = logging.MustGetLogger("recorder.cache.tool")
+var log = logger.MustGetLogger("recorder.cache.tool")
 
 func dbQueryResourceFailed(resource string, err error) string {
 	return fmt.Sprintf("db query %s failed: %v", resource, err)

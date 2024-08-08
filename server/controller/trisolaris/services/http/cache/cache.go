@@ -21,16 +21,16 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logging.MustGetLogger("trisolaris/cache")
+var log = logger.MustGetLogger("trisolaris.cache")
 
 func init() {
 	http.Register(NewCacheService())

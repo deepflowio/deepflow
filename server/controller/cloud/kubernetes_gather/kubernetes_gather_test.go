@@ -27,7 +27,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
-	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
@@ -91,12 +90,6 @@ func TestKubernetes(t *testing.T) {
 			return vData, nil
 		})
 		defer vinterfacesInfoPatch.Reset()
-
-		pData := []model.PrometheusTarget{}
-		prometheusTargetInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetPrometheusResponse", func(_ *genesis.Genesis) ([]model.PrometheusTarget, error) {
-			return pData, nil
-		})
-		defer prometheusTargetInfoPatch.Reset()
 
 		k8sGatherData, _ := k8s.GetKubernetesGatherData()
 		Convey("k8sGatherResource number should be equal", func() {

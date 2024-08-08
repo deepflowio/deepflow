@@ -23,10 +23,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
-	log.Debug("get vpcs starting")
+	log.Debug("get vpcs starting", logger.NewORGPrefix(a.orgID))
 	var vpcs []model.VPC
 
 	var retVPCs []types.Vpc
@@ -41,7 +42,7 @@ func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
 		}
 		result, err := a.ec2Client.DescribeVpcs(context.TODO(), input)
 		if err != nil {
-			log.Errorf("vpc request aws api error: (%s)", err.Error())
+			log.Errorf("vpc request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VPC{}, err
 		}
 		retVPCs = append(retVPCs, result.Vpcs...)
@@ -67,6 +68,6 @@ func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
 		})
 		a.vpcIDToLcuuid[vpcID] = vpcLcuuid
 	}
-	log.Debug("get vpcs complete")
+	log.Debug("get vpcs complete", logger.NewORGPrefix(a.orgID))
 	return vpcs, nil
 }

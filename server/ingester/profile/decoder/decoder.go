@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	profile_common "github.com/deepflowio/deepflow/server/ingester/profile/common"
 	"github.com/deepflowio/deepflow/server/ingester/profile/dbwriter"
 	"github.com/deepflowio/deepflow/server/libs/codec"
@@ -91,12 +92,13 @@ var eBPFEventType = []string{
 }
 
 type Decoder struct {
-	index           int
-	msgType         datatype.MessageType
-	platformData    *grpc.PlatformInfoTable
-	inQueue         queue.QueueReader
-	profileWriter   *dbwriter.ProfileWriter
-	compressionAlgo string
+	index               int
+	msgType             datatype.MessageType
+	platformData        *grpc.PlatformInfoTable
+	inQueue             queue.QueueReader
+	profileWriter       *dbwriter.ProfileWriter
+	appServiceTagWriter *flow_tag.AppServiceTagWriter
+	compressionAlgo     string
 
 	offCpuSplittingGranularity int
 
@@ -110,13 +112,15 @@ func NewDecoder(index int, msgType datatype.MessageType, compressionAlgo string,
 	offCpuSplittingGranularity int,
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
-	profileWriter *dbwriter.ProfileWriter) *Decoder {
+	profileWriter *dbwriter.ProfileWriter,
+	appServiceTagWriter *flow_tag.AppServiceTagWriter) *Decoder {
 	return &Decoder{
 		index:                      index,
 		msgType:                    msgType,
 		platformData:               platformData,
 		inQueue:                    inQueue,
 		profileWriter:              profileWriter,
+		appServiceTagWriter:        appServiceTagWriter,
 		compressionAlgo:            compressionAlgo,
 		offCpuSplittingGranularity: offCpuSplittingGranularity,
 		counter:                    &Counter{},
@@ -162,6 +166,18 @@ func (d *Decoder) Run() {
 	}
 }
 
+func (d *Decoder) appServiceTagWrite(p *dbwriter.InProcessProfile) {
+	if d.appServiceTagWriter == nil {
+		return
+	}
+
+	if p.AppService == "" && p.AppInstance == "" {
+		return
+	}
+
+	d.appServiceTagWriter.Write(p.Time, dbwriter.PROFILE_TABLE, p.AppService, p.AppInstance, p.OrgId, p.TeamID)
+}
+
 func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		profile := &pb.Profile{}
@@ -172,18 +188,19 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 		}
 
 		parser := &Parser{
-			vtapID:                     vtapID,
-			orgId:                      d.orgId,
-			teamId:                     d.teamId,
-			inTimestamp:                time.Now(),
-			callBack:                   d.profileWriter.Write,
-			platformData:               d.platformData,
-			IP:                         make([]byte, len(profile.Ip)),
-			podID:                      profile.PodId,
-			compressionAlgo:            d.compressionAlgo,
-			observer:                   &observer{},
-			offCpuSplittingGranularity: d.offCpuSplittingGranularity,
-			Counter:                    d.counter,
+			vtapID:                      vtapID,
+			orgId:                       d.orgId,
+			teamId:                      d.teamId,
+			inTimestamp:                 time.Now(),
+			profileWriterCallback:       d.profileWriter.Write,
+			appServiceTagWriterCallback: d.appServiceTagWrite,
+			platformData:                d.platformData,
+			IP:                          make([]byte, len(profile.Ip)),
+			podID:                       profile.PodId,
+			compressionAlgo:             d.compressionAlgo,
+			observer:                    &observer{},
+			offCpuSplittingGranularity:  d.offCpuSplittingGranularity,
+			Counter:                     d.counter,
 		}
 		copy(parser.IP, profile.Ip[:len(profile.Ip)])
 
@@ -240,7 +257,11 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 				profile = d.filleBPFData(profile)
 				metadata := d.buildMetaData(profile)
 				parser.profileName = metadata.Key.AppName()
-				parser.processTracer = &processTracer{value: profile.Count, pid: profile.Pid, stime: int64(profile.Stime), eventType: eBPFEventType[profile.EventType]}
+				parser.processTracer = &processTracer{value: profile.WideCount, pid: profile.Pid, stime: int64(profile.Stime), eventType: eBPFEventType[profile.EventType]}
+				if profile.WideCount == 0 {
+					// adapt agent version before v6.6
+					parser.processTracer.value = uint64(profile.Count)
+				}
 				err := d.sendProfileData(&pprofile.RawProfile{
 					Format:  ingestion.FormatLines,
 					RawData: profile.Data,

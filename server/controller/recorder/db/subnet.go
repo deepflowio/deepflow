@@ -22,16 +22,16 @@ import (
 )
 
 type Subnet struct {
-	OperatorBase[mysql.Subnet]
+	OperatorBase[*mysql.Subnet, mysql.Subnet]
 }
 
 func NewSubnet() *Subnet {
 	o := &Subnet{
-		OperatorBase[mysql.Subnet]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.Subnet](
+			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
+			false,
+			false,
+		),
 	}
 	o.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "name", "label", "sub_domain"})
 	return o

@@ -20,8 +20,8 @@ log-level: info
 
 ## extract an integer (generally used timestamp) from traceId as an additional index to speed up traceId queries.
 #trace-id-with-index:
-#  enabled: false
-#  type: hash           # hash/incremental-id
+#  disabled: false
+#  type: hash           # hash/incremental-id, default: hash
 #  #eg. traceId: 'abcdef1234',  if want to match index '1234', 'format' must set 'decimal', `start` can be set as 6 or -4 , and `length` must set: 4
 #  incremental-id-location:      # it is valid when 'type' is 'incremental-id'
 #    start: 0           # >= 0 means counting from the beginning, < 0 means counting from the end.
@@ -61,6 +61,8 @@ controller:
   #all-agent-connect-to-nat-ip: false
   ## If no-ip-overlapping is set to true, All IP and cidr issued by the controller to agent are wan
   #no-ip-overlapping: false
+  ## exec agent command timeout
+  # agent-cmd-timeout: 30
 
   # ingester plaform data, default: 0
   # 0 (All K8s Cluster)
@@ -95,6 +97,8 @@ controller:
     user-password: deepflow
     host: mysql
     port: 30130
+    proxy-host:
+    proxy-port:
     timeout: 30
     # whether drop database when init failed
     drop-database-enabled: false
@@ -346,6 +350,18 @@ querier:
   # profile相关配置
   profile:
     flame_query_limit: 1000000
+  
+  # trace-map 相关配置
+  trace-map:
+    # 每次迭代查询上限
+    max_trace_per_iteration: 100000
+    # 每次流返回的上限
+    batch_traces_count_max: 1000
+    # 迭代的次数，会自动向上取整为2的次方数
+    trace_id_query_iterations: 8
+    write_interval: 60
+    write_batch_size: 1000
+    debug_sql_len_max: 1000
 
   # deepflow-app相关配置
   deepflow-app:
@@ -501,9 +517,9 @@ ingester:
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #event-ttl-hour: 720
 
-  ## alarm event table data retention time(unit: hour)
+  ## alert event table data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
-  #alarm-event-ttl-hour: 720
+  #alert-event-ttl-hour: 720
 
   ## perf event data write config
   #perf-event-ck-writer:
@@ -610,7 +626,7 @@ ingester:
   #    free-space: 300          #  uint: GB, disk minimum free threshold
   #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
   #  priority-drops:     # set which database and table data will be deleted first when disk is full
-  #  - database: flow_log
+  #  - database: flow_log   # databases under all organizations
   #    tables-contain:      # tables name containing the string will be priority-dropped. If it is empty, it means all the tables under the database
   #  - database: flow_metrics
   #    tables-contain: 1s_local
@@ -715,6 +731,10 @@ ingester:
   #  enum-translate-to-name-disabled: false
   #  # whether the id value of universal-tag is not converted into a resource name for output
   #  universal-tag-translate-to-name-disabled: false
+  #  tag-filter-condition:
+  #    # Condition type, default is "and"
+  #    # and: Logical AND between tag-filters / or: Logical OR between tag-filters
+  #    type: "and"
   #  tag-filters:
   #  #- field-name: signal_source # database column name
   #  #  operator: "="             # can be '=', '!=', 'in', 'not in', ':', '!:', "~", "!~"

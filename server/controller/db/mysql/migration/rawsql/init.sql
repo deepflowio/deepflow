@@ -8,7 +8,8 @@ TRUNCATE TABLE db_version;
 CREATE TABLE IF NOT EXISTS plugin (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
-    type                INTEGER NOT NULL COMMENT '1: wasm',
+    type                INTEGER NOT NULL COMMENT '1: wasm 2: so 3: lua',
+    user                INTEGER NOT NULL DEFAULT 1 COMMENT '1: agent 2: server',
     image               LONGBLOB NOT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -75,24 +76,6 @@ CREATE TABLE IF NOT EXISTS process (
     deleted_at          DATETIME DEFAULT NULL
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
-
-CREATE TABLE IF NOT EXISTS prometheus_target (
-    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    lcuuid              CHAR(64) DEFAULT '',
-    instance            VARCHAR(255) DEFAULT '',
-    job                 VARCHAR(255) DEFAULT '',
-    scrape_url          VARCHAR(2083) DEFAULT '',
-    other_labels        TEXT COMMENT 'separated by ,',
-    epc_id              INTEGER NOT NULL DEFAULT 0,
-    domain              CHAR(64) DEFAULT '',
-    sub_domain          CHAR(64) DEFAULT '',
-    pod_cluster_id      INTEGER,
-    create_method       TINYINT(1) DEFAULT 1 COMMENT '1.recorder learning 2.prometheus learning',
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at          DATETIME DEFAULT NULL
-) ENGINE = innodb DEFAULT CHARSET = utf8mb4 AUTO_INCREMENT = 1;
-TRUNCATE TABLE prometheus_target;
 
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
@@ -1387,14 +1370,6 @@ INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_condition
 set @lcuuid = (select uuid());
 INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
     app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
-    threshold_warning, monitoring_interval, lcuuid)
-    values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_monitor\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.sys_free_memory_limit_ratio\",\"METRIC_NAME\":\"metrics.sys_free_memory_limit_ratio\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"checked\":true,\"operatorLv2\":[{\"operateLabel\":\"Math\",\"mathOperator\":\"*\",\"operatorValue\":100}],\"_key\":\"38813299-6cca-9b7f-4a08-5861fa7d6ee3\",\"perOperator\":\"\",\"operatorLv1\":\"Min\",\"percentile\":null,\"markLine\":null,\"METRIC_LABEL\":\"used_bytes\",\"ORIGIN_METRIC_LABEL\":\"Math(Min(metrics.sys_free_memory_limit_ratio)*100)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_monitor\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
-    "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_monitor\",\"interval\":60,\"fill\": \"none\",\"window_size\":5,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Min(`metrics.sys_free_memory_limit_ratio`)*100 AS `used_bytes`\",\"WHERE\":\"`metrics.sys_free_memory_limit_ratio`!=0\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Min(`metrics.sys_free_memory_limit_ratio`)*100 AS `used_bytes`\"]}]}",
-    "[{\"METRIC_LABEL\":\"used_bytes\",\"return_field_description\":\"持续 5 分钟 (系统空闲内存百分比/阈值)\",\"unit\":\"%\"}]", "采集器所在系统空闲内存低",  0, 1, 1, 21, 1, "", "", "{\"displayName\":\"used_bytes\", \"unit\": \"%\"}", "{\"OP\":\"<=\",\"VALUE\":150}", "5m", @lcuuid);
-
-set @lcuuid = (select uuid());
-INSERT INTO alarm_policy(user_id, sub_view_type, tag_conditions, query_conditions, query_url, query_params, sub_view_metrics, name, level, state,
-    app_type, sub_type, contrast_type, target_line_uid, target_line_name, target_field,
     threshold_warning, lcuuid)
     values(1, 1, "过滤项: N/A | 分组项: tag.host", "[{\"type\":\"deepflow\",\"tableName\":\"deepflow_agent_log_counter\",\"dbName\":\"deepflow_tenant\",\"metrics\":[{\"description\":\"\",\"typeName\":\"counter\",\"METRIC_CATEGORY\":\"metrics\",\"METRIC\":\"metrics.warning\",\"METRIC_NAME\":\"metrics.warning\",\"isTimeUnit\":false,\"type\":1,\"unit\":\"\",\"cascaderLabel\":\"metrics.error\",\"display_name\":\"\-\-\",\"hasDerivative\":false,\"isPrometheus\":false,\"operatorLv2\":[],\"operatorLv1\":\"Sum\",\"perOperator\":\"\",\"METRIC_LABEL\":\"log_counter_warning\",\"checked\":true,\"percentile\":null,\"_key\":\"50d7a2a2-a14d-d202-1f3d-85fe7b9efac3\",\"markLine\":null,\"ORIGIN_METRIC_LABEL\":\"Sum(metrics.warning)\"}],\"dataSource\":\"\",\"condition\":{\"dbName\":\"deepflow_tenant\",\"tableName\":\"deepflow_agent_log_counter\",\"type\":\"simplified\",\"RESOURCE_SETS\":[{\"id\":\"R1\",\"condition\":[],\"groupBy\":[\"_\",\"tag.host\"],\"groupInfo\":{\"mainGroupInfo\":[\"_\"],\"otherGroupInfo\":[\"tag.host\"]},\"inputMode\":\"free\"}]}}]",
     "/v1/stats/querier/UniversalHistory", "{\"DATABASE\":\"deepflow_tenant\",\"TABLE\":\"deepflow_agent_log_counter\",\"interval\":60,\"fill\": \"none\",\"window_size\":1,\"QUERIES\":[{\"QUERY_ID\":\"R1\",\"SELECT\":\"Sum(`metrics.warning`) AS `log_counter_warning`\",\"WHERE\":\"1=1\",\"GROUP_BY\":\"`tag.host`\",\"METRICS\":[\"Sum(`metrics.warning`) AS `log_counter_warning`\"]}]}",
@@ -1963,6 +1938,7 @@ TRUNCATE TABLE ch_pod_cluster;
 CREATE TABLE IF NOT EXISTS ch_pod_node (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
+    pod_cluster_id          INTEGER,
     icon_id                 INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
@@ -2038,6 +2014,10 @@ CREATE TABLE IF NOT EXISTS ch_vtap_port (
     mac_type                INTEGER DEFAULT 1 COMMENT '1:tap_mac,2:mac',
     host_id                 INTEGER,
     host_name               VARCHAR(256),
+    chost_id                INTEGER,
+    chost_name              VARCHAR(256),
+    pod_node_id             INTEGER,
+    pod_node_name           VARCHAR(256),
     device_type             INTEGER,
     device_id               INTEGER,
     device_name             VARCHAR(256),
@@ -2252,6 +2232,7 @@ TRUNCATE TABLE ch_lb_listener;
 CREATE TABLE IF NOT EXISTS ch_pod_ingress (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
+    pod_cluster_id          INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
     sub_domain_id           INTEGER,
@@ -2329,7 +2310,7 @@ INSERT INTO data_source (id, display_name, data_table_collection, `interval`, re
                  VALUES (16, '事件-IO 事件', 'event.perf_event', 0, 7*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
-                 VALUES (17, '事件-告警事件', 'event.alarm_event', 0, 30*24, @lcuuid);
+                 VALUES (17, '事件-告警事件', 'event.alert_event', 0, 30*24, @lcuuid);
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, `interval`, retention_time, lcuuid)
                  VALUES (18, '应用-性能剖析', 'profile.in_process', 0, 3*24, @lcuuid);

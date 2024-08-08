@@ -32,12 +32,12 @@ func (b *DataSet) AddRoutingTable(dbItem *mysql.RoutingTable, seq int) {
 		Nexthop:     dbItem.Nexthop,
 		NexthopType: dbItem.NexthopType,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteRoutingTable(lcuuid string) {
 	delete(b.RoutingTables, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type RoutingTable struct {

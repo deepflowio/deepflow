@@ -25,6 +25,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 var STATE_CONVERTION = map[string]int{
@@ -63,7 +64,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VInterface, []model.IP, error) {
 				}
 			}
 			if vpcLcuuid == "" {
-				log.Infof("exclude vm: %s, missing vpc info", id) // vpc info is in addresses
+				log.Infof("exclude vm: %s, missing vpc info", id) // vpc info is in addresse, logger.NewORGPrefix(h.orgID)s
 				continue
 			}
 			name := jVM.Get("name").MustString()
@@ -86,7 +87,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VInterface, []model.IP, error) {
 				if created != "" {
 					createdAt, err := time.Parse(time.RFC3339, created)
 					if err != nil {
-						log.Errorf("parse created failed: %s", created)
+						log.Errorf("parse created failed: %s", created, logger.NewORGPrefix(h.orgID))
 					} else {
 						vm.CreatedAt = createdAt
 					}
@@ -132,12 +133,12 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 				continue
 			}
 			if jV["OS-EXT-IPS:type"].(string) != "floating" {
-				log.Infof("exclude vinterface, not floating type: %s", jV["OS-EXT-IPS:type"].(string))
+				log.Infof("exclude vinterface, not floating type: %s", jV["OS-EXT-IPS:type"].(string), logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			mac := jV["OS-EXT-IPS-MAC:mac_addr"].(string)
 			if len(mac) < 2 {
-				log.Infof("exclude vinterface, mac: %s", mac)
+				log.Infof("exclude vinterface, mac: %s", mac, logger.NewORGPrefix(h.orgID))
 				continue
 			}
 			vif := model.VInterface{

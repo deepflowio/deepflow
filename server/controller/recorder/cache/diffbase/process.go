@@ -35,12 +35,12 @@ func (b *DataSet) AddProcess(dbItem *mysql.Process, seq int) {
 		DeviceType:  dbItem.DeviceType,
 		DeviceID:    dbItem.DeviceID,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteProcess(lcuuid string) {
 	delete(b.Process, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type Process struct {

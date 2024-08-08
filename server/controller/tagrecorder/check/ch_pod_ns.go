@@ -41,19 +41,24 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 	var podNamespaces []mysql.PodNamespace
 	err := p.db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[IDKey]mysql.ChPodNamespace)
 	for _, podNamespace := range podNamespaces {
+		teamID, err := tagrecorder.GetTeamID(podNamespace.Domain, podNamespace.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podNamespace, p.db.LogPrefixORGID)
+		}
+
 		if podNamespace.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
 				ID:           podNamespace.ID,
 				Name:         podNamespace.Name + " (deleted)",
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
 				PodClusterID: podNamespace.PodClusterID,
-				TeamID:       tagrecorder.DomainToTeamID[podNamespace.Domain],
+				TeamID:       teamID,
 				DomainID:     tagrecorder.DomainToDomainID[podNamespace.Domain],
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podNamespace.SubDomain],
 			}
@@ -63,7 +68,7 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 				Name:         podNamespace.Name,
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
 				PodClusterID: podNamespace.PodClusterID,
-				TeamID:       tagrecorder.DomainToTeamID[podNamespace.Domain],
+				TeamID:       teamID,
 				DomainID:     tagrecorder.DomainToDomainID[podNamespace.Domain],
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podNamespace.SubDomain],
 			}

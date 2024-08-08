@@ -28,7 +28,9 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_metrics/unmarshaller"
+	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
@@ -71,17 +73,19 @@ func NewFlowMetrics(cfg *config.Config, recv *receiver.Receiver, platformDataMan
 	flowMetrics.unmarshallers = make([]*unmarshaller.Unmarshaller, unmarshallQueueCount)
 	flowMetrics.platformDatas = make([]*grpc.PlatformInfoTable, unmarshallQueueCount)
 	for i := 0; i < unmarshallQueueCount; i++ {
+		flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable("flowMetrics-" + strconv.Itoa(i))
 		if i == 0 {
-			// 只第一个上报数据节点信息
-			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable("ingester")
 			debug.ServerRegisterSimple(ingesterctl.CMD_PLATFORMDATA_FLOW_METRIC, flowMetrics.platformDatas[i])
-		} else {
-			flowMetrics.platformDatas[i], err = platformDataManager.NewPlatformInfoTable("flowMetrics-" + strconv.Itoa(i))
 		}
 		if err != nil {
 			return nil, err
 		}
-		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriter, exporters)
+		appServiceTagWriter, err := flow_tag.NewAppServiceTagWriter(i, ckdb.METRICS_DB, cfg.FlowMetricsTTL.VtapApp1M, ckdb.TimeFuncTwelveHour, cfg.Base)
+		if err != nil {
+			return nil, err
+		}
+
+		flowMetrics.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, flowMetrics.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), flowMetrics.dbwriter, exporters, appServiceTagWriter)
 	}
 
 	return &flowMetrics, nil

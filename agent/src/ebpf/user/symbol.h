@@ -30,6 +30,7 @@ struct tracer_probes_conf;
 enum uprobe_type {
 	GO_UPROBE = 0,
 	OPENSSL_UPROBE,
+	JAVA_UPROBE,
 	OTHER_UPROBE
 };
 
@@ -41,6 +42,7 @@ enum proc_act_type {
 struct symbol {
 	enum uprobe_type type;
 	const char *symbol;
+	const char *symbol_prefix;
 	const char *probe_func;
 	bool is_probe_ret;
 };

@@ -140,6 +140,15 @@ impl From<u8> for SegmentFlags {
 }
 
 #[derive(Clone, Debug, Default)]
+pub struct SubPacket {
+    timestamp: Timestamp,
+    cap_seq: u64,
+    syscall_trace_id: u64,
+    raw_from_ebpf_offset: usize,
+    tcp_seq: u32,
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
@@ -191,6 +200,9 @@ pub struct MetaPacket<'a> {
     /********** for eBPF (tracepoint/kprobe/uprobe) **********/
     pub ebpf_type: EbpfType,
     pub raw_from_ebpf: Vec<u8>,
+    pub raw_from_ebpf_offset: usize,
+    pub sub_packet_index: usize,
+    pub sub_packets: Vec<SubPacket>,
 
     pub socket_id: u64,
     pub cap_start_seq: u64,
@@ -225,8 +237,14 @@ impl<'a> MetaPacket<'a> {
     pub fn timestamp_adjust(&mut self, time_diff: i64) {
         if time_diff >= 0 {
             self.lookup_key.timestamp += Timestamp::from_nanos(time_diff as u64);
+            if self.ebpf_type != EbpfType::None {
+                self.sub_packets[0].timestamp += Timestamp::from_nanos(time_diff as u64);
+            }
         } else {
             self.lookup_key.timestamp -= Timestamp::from_nanos(-time_diff as u64);
+            if self.ebpf_type != EbpfType::None {
+                self.sub_packets[0].timestamp -= Timestamp::from_nanos(-time_diff as u64);
+            }
         }
     }
 
@@ -473,7 +491,7 @@ impl<'a> MetaPacket<'a> {
             return None;
         }
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
-            return Some(&self.raw_from_ebpf);
+            return Some(&self.raw_from_ebpf[self.raw_from_ebpf_offset..]);
         }
 
         let packet_header_size = self.header_type.min_packet_size()
@@ -521,7 +539,7 @@ impl<'a> MetaPacket<'a> {
         self.packet_len = packet.len() as u32;
         self.ebpf_type = EbpfType::None;
         let mut size_checker = packet.len() as isize;
-
+        self.sub_packets.push(SubPacket::default());
         // eth
         size_checker -= HeaderType::Eth.min_header_size() as isize;
         if size_checker < 0 {
@@ -938,6 +956,17 @@ impl<'a> MetaPacket<'a> {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn merge(&mut self, packet: &mut MetaPacket) {
         self.raw_from_ebpf.append(&mut packet.raw_from_ebpf);
+        self.sub_packets.push(SubPacket {
+            cap_seq: packet.cap_start_seq,
+            syscall_trace_id: packet.syscall_trace_id,
+            raw_from_ebpf_offset: self.l4_payload_len as usize,
+            timestamp: packet.lookup_key.timestamp,
+            tcp_seq: if let ProtocolData::TcpHeader(tcp_data) = &mut packet.protocol_data {
+                tcp_data.seq
+            } else {
+                0
+            },
+        });
         self.packet_len += packet.packet_len - 54;
         self.payload_len += packet.payload_len;
         self.l4_payload_len += packet.l4_payload_len;
@@ -972,9 +1001,10 @@ impl<'a> MetaPacket<'a> {
         };
 
         let mut packet = MetaPacket::default();
+        let timestamp = Timestamp::from_micros(data.timestamp);
 
         packet.lookup_key = LookupKey {
-            timestamp: Timestamp::from_micros(data.timestamp),
+            timestamp,
             src_ip,
             dst_ip,
             src_port,
@@ -1012,6 +1042,13 @@ impl<'a> MetaPacket<'a> {
         packet.coroutine_id = data.coroutine_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
         packet.socket_role = data.socket_role;
+        packet.sub_packets.push(SubPacket {
+            cap_seq: data.cap_seq,
+            syscall_trace_id: data.syscall_trace_id_call,
+            raw_from_ebpf_offset: 0,
+            timestamp,
+            tcp_seq: data.tcp_seq as u32,
+        });
         #[cfg(target_arch = "aarch64")]
         ptr::copy(
             data.process_kname.as_ptr() as *const u8,
@@ -1110,6 +1147,33 @@ impl<'a> MetaPacket<'a> {
                 src
             }
         }
+    }
+}
+
+impl<'a> Iterator for MetaPacket<'a> {
+    type Item = &'a mut MetaPacket<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.sub_packet_index >= self.sub_packets.len() {
+            return None;
+        }
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if self.ebpf_type != EbpfType::None {
+            let sub_packet = &self.sub_packets[self.sub_packet_index];
+            self.cap_start_seq = sub_packet.cap_seq;
+            self.lookup_key.timestamp = sub_packet.timestamp;
+            self.syscall_trace_id = sub_packet.syscall_trace_id;
+            self.raw_from_ebpf_offset = sub_packet.raw_from_ebpf_offset;
+            if let ProtocolData::TcpHeader(tcp_data) = &mut self.protocol_data {
+                tcp_data.seq = sub_packet.tcp_seq;
+            }
+        }
+        self.sub_packet_index += 1;
+
+        let ptr = unsafe { &mut *(self as *mut MetaPacket) };
+
+        Some(ptr)
     }
 }
 

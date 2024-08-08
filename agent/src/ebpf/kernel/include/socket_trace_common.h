@@ -100,6 +100,7 @@ struct tracer_ctx_s {
 	int push_buffer_refcnt; /**< Reference count of the data push buffer */
 	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
 	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
+	bool disable_tracing;  /**< Disable tracing feature. */
 };
 
 /**
@@ -132,7 +133,13 @@ struct socket_info_s {
 	 * Currently only protocol inference is available on sofarpc.
 	 */
 	__u16 force_reasm: 1;
-	__u16 unused_bits: 12; 
+	/*
+	 * Indicates whether this socket participates in tracing.
+	 * If set to 1 (or true), it means the socket does not
+	 * participate in tracing.
+	 */
+	__u16 no_trace: 1;
+	__u16 unused_bits: 11;
  	__u32 reasm_bytes; // The amount of data bytes that have been reassembled.
 
 	/*

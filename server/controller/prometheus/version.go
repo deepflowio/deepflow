@@ -61,7 +61,7 @@ func (v *Version) Refresh() error {
 			var resourceVersion mysql.ResourceVersion
 			err = db.Where("name = ?", versionName).First(&resourceVersion).Error
 			if err != nil {
-				log.Error(db.Logf("failed to get version: %v", err))
+				log.Errorf("failed to get version: %v", err, db.LogPrefixORGID)
 				continue
 			}
 			versions += strconv.Itoa(int(resourceVersion.Version))

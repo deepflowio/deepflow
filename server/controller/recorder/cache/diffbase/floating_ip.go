@@ -33,12 +33,12 @@ func (b *DataSet) AddFloatingIP(dbItem *mysql.FloatingIP, seq int, toolDataSet *
 		RegionLcuuid: dbItem.Region,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteFloatingIP(lcuuid string) {
 	delete(b.FloatingIPs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type FloatingIP struct {

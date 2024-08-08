@@ -35,7 +35,7 @@ use crate::common::l7_protocol_log::{
 };
 use crate::common::meta_packet::{MetaPacket, SegmentFlags};
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
-use crate::common::{FlowAclListener, FlowAclListenerId, TaggedFlow};
+use crate::common::{FlowAclListener, FlowAclListenerId};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
 use crate::ebpf;
@@ -221,28 +221,22 @@ struct EbpfDispatcher {
 
     config: EbpfAccess,
     output: DebugSender<Box<AppProto>>, // Send AppProtos to the AppProtoLogsParser
-    flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>, // Send TaggedFlows to the QuadrupleGenerator
-    l7_stats_output: DebugSender<BatchedBox<L7Stats>>,     // Send L7Stats to the QuadrupleGenerator
+    l7_stats_output: DebugSender<BatchedBox<L7Stats>>, // Send L7Stats to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
 }
 
 impl EbpfDispatcher {
-    const MERGE_COUNT_MAX: usize = 2;
-
     fn segmentation_reassembly<'a>(
         packets: &'a mut Vec<Box<MetaPacket<'a>>>,
     ) -> Vec<Box<MetaPacket<'a>>> {
         let mut merge_packets: Vec<Box<MetaPacket<'a>>> = vec![];
-        let mut count = 0;
         for mut p in packets.drain(..) {
             if p.segment_flags != SegmentFlags::Seg {
-                count = 1;
                 merge_packets.push(p);
                 continue;
             }
 
             let Some(last) = merge_packets.last_mut() else {
-                count = 1;
                 merge_packets.push(p);
                 continue;
             };
@@ -250,12 +244,9 @@ impl EbpfDispatcher {
             if last.generate_ebpf_flow_id() == p.generate_ebpf_flow_id()
                 && last.segment_flags == SegmentFlags::Start
                 && last.cap_end_seq + 1 == p.cap_start_seq
-                && count < Self::MERGE_COUNT_MAX
             {
                 last.merge(&mut p);
-                count += 1;
             } else {
-                count = 1;
                 merge_packets.push(p);
             }
         }
@@ -323,7 +314,7 @@ impl EbpfDispatcher {
         );
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
-            self.flow_output.clone(),
+            None,
             self.l7_stats_output.clone(),
             self.policy_getter,
             self.output.clone(),
@@ -472,20 +463,26 @@ impl EbpfCollector {
         }
     }
 
-    #[cfg(not(feature = "off_cpu"))]
-    fn get_event_type(_: u8) -> i32 {
+    #[cfg(not(feature = "extended_profile"))]
+    fn get_event_type(_: u8, _: u8) -> i32 {
         metric::ProfileEventType::EbpfOnCpu.into()
     }
 
-    #[cfg(feature = "off_cpu")]
-    fn get_event_type(profiler_type: u8) -> i32 {
+    #[cfg(feature = "extended_profile")]
+    fn get_event_type(profiler_type: u8, event_type: u8) -> i32 {
         match profiler_type {
             ebpf::PROFILER_TYPE_ONCPU => metric::ProfileEventType::EbpfOnCpu.into(),
             ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
+            ebpf::PROFILER_TYPE_MEMORY if event_type == ebpf::PROFILE_EVENT_MEM_ALLOC => {
+                metric::ProfileEventType::EbpfMemAlloc.into()
+            }
+            ebpf::PROFILER_TYPE_MEMORY if event_type == ebpf::PROFILE_EVENT_MEM_IN_USE => {
+                metric::ProfileEventType::EbpfMemInUse.into()
+            }
             _ => {
                 warn!(
-                    "ebpf profile data with invalid event type: {}",
-                    profiler_type
+                    "ebpf profile data with invalid profiler type: {}, event type: {}",
+                    profiler_type, event_type
                 );
                 metric::ProfileEventType::EbpfOnCpu.into()
             }
@@ -501,7 +498,15 @@ impl EbpfCollector {
             let data = &mut *data;
             profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
             profile.timestamp = data.timestamp;
-            profile.event_type = Self::get_event_type(data.profiler_type);
+            if let Some(time_diff) = TIME_DIFF.as_ref() {
+                let diff = time_diff.load(Ordering::Relaxed);
+                if diff > 0 {
+                    profile.timestamp += diff as u64;
+                } else {
+                    profile.timestamp -= (-diff) as u64;
+                }
+            }
+            profile.event_type = Self::get_event_type(data.profiler_type, data.event_type);
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
@@ -510,7 +515,8 @@ impl EbpfCollector {
             profile.u_stack_id = data.u_stack_id;
             profile.k_stack_id = data.k_stack_id;
             profile.cpu = data.cpu;
-            profile.count = data.count;
+            profile.count = data.count as u32;
+            profile.wide_count = data.count;
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
@@ -588,6 +594,23 @@ impl EbpfCollector {
                 );
             } else {
                 info!("ebpf golang symbol proc regexp is empty, skip set")
+            }
+
+            // ONLY java memory profile is supported at the moment
+            // configuration structure revision is required to support more languages (maybe one regex for each language)
+            #[cfg(feature = "extended_profile")]
+            if !config.ebpf.memory_profile.disabled {
+                info!(
+                    "ebpf set java symbol uprobe proc regexp: {}",
+                    config.ebpf.memory_profile.regex.as_str()
+                );
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_UPROBE_JAVA,
+                    CString::new(config.ebpf.memory_profile.regex.as_str().as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
             }
 
             for i in get_all_protocol().into_iter() {
@@ -685,6 +708,10 @@ impl EbpfCollector {
                 }
             }
 
+            if config.ebpf.syscall_trace_id_disabled {
+                ebpf::disable_syscall_trace_id();
+            }
+
             if ebpf::running_socket_tracer(
                 Self::ebpf_l7_callback,                    /* 回调接口 rust -> C */
                 config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -701,9 +728,10 @@ impl EbpfCollector {
             let ebpf_conf = &config.ebpf;
             let on_cpu = &ebpf_conf.on_cpu_profile;
             let off_cpu = &ebpf_conf.off_cpu_profile;
+            let memory = &ebpf_conf.memory_profile;
 
-            let profiler_enabled =
-                !on_cpu.disabled || (cfg!(feature = "off_cpu") && !off_cpu.disabled);
+            let profiler_enabled = !on_cpu.disabled
+                || (cfg!(feature = "extended_profile") && (!off_cpu.disabled || !memory.disabled));
             if profiler_enabled {
                 if !on_cpu.disabled {
                     ebpf::enable_oncpu_profiler();
@@ -711,16 +739,23 @@ impl EbpfCollector {
                     ebpf::disable_oncpu_profiler();
                 }
 
-                #[cfg(feature = "off_cpu")]
-                if !off_cpu.disabled {
-                    ebpf::enable_offcpu_profiler();
-                } else {
-                    ebpf::disable_offcpu_profiler();
+                #[cfg(feature = "extended_profile")]
+                {
+                    if !off_cpu.disabled {
+                        ebpf::enable_offcpu_profiler();
+                    } else {
+                        ebpf::disable_offcpu_profiler();
+                    }
+
+                    if !memory.disabled {
+                        ebpf::enable_memory_profiler();
+                    } else {
+                        ebpf::disable_memory_profiler();
+                    }
                 }
 
                 if ebpf::start_continuous_profiler(
                     on_cpu.frequency as i32,
-                    ebpf_conf.java_symbol_file_max_space_limit as i32,
                     ebpf_conf.java_symbol_file_refresh_defer_interval.as_secs() as i32,
                     Self::ebpf_profiler_callback,
                 ) != 0
@@ -741,17 +776,28 @@ impl EbpfCollector {
                     ebpf::set_profiler_cpu_aggregation(on_cpu.cpu as i32);
                 }
 
-                #[cfg(feature = "off_cpu")]
-                if !off_cpu.disabled {
-                    ebpf::set_offcpu_profiler_regex(
-                        CString::new(off_cpu.regex.as_bytes())
-                            .unwrap()
-                            .as_c_str()
-                            .as_ptr(),
-                    );
+                #[cfg(feature = "extended_profile")]
+                {
+                    if !off_cpu.disabled {
+                        ebpf::set_offcpu_profiler_regex(
+                            CString::new(off_cpu.regex.as_bytes())
+                                .unwrap()
+                                .as_c_str()
+                                .as_ptr(),
+                        );
 
-                    ebpf::set_offcpu_cpuid_aggregation(off_cpu.cpu as i32);
-                    ebpf::set_offcpu_minblock_time(off_cpu.min_block.as_micros() as u32);
+                        ebpf::set_offcpu_cpuid_aggregation(off_cpu.cpu as i32);
+                        ebpf::set_offcpu_minblock_time(off_cpu.min_block.as_micros() as u32);
+                    }
+
+                    if !memory.disabled {
+                        ebpf::set_memory_profiler_regex(
+                            CString::new(memory.regex.as_bytes())
+                                .unwrap()
+                                .as_c_str()
+                                .as_ptr(),
+                        );
+                    }
                 }
             }
 
@@ -835,7 +881,6 @@ impl EbpfCollector {
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
         output: DebugSender<Box<AppProto>>,
-        flow_output: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
         proc_event_output: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
@@ -881,7 +926,6 @@ impl EbpfCollector {
                 config,
                 log_parser_config,
                 output,
-                flow_output,
                 l7_stats_output,
                 flow_map_config,
                 stats_collector,

@@ -1,3 +1,0 @@
-# Field              , DBField              , Type       , Category   , Permission 
-log_count            ,                      , counter    , Throughput , 111    
-row                  ,                      , other      , Other      , 111    

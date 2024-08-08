@@ -576,6 +576,8 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	conn_info->sk = sk;
 	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
+	if (conn_info->socket_info_ptr)
+		conn_info->no_trace = conn_info->socket_info_ptr->no_trace;
 }
 
 static __inline bool get_socket_info(struct __socket_data *v, void *sk,
@@ -1061,8 +1063,21 @@ static __inline void trace_process(struct socket_info_s *socket_info_ptr,
 		 */
 		if (conn_info->message_type == MSG_REQUEST &&
 		    !conn_info->is_reasm_seg)
+			/*
+			 * Below is the processing scenario for NGINX:
+			 * Save the fd for requests to the nginx frontend. The
+			 * backend will query this trace information when 'socket()'
+			 * is called and will set its 'sk_info.peer_fd'.
+			 * The backend will not reach this point, as the request
+			 * direction for the backend is outbound rather than inbound.
+			 */
 			trace_info.peer_fd = conn_info->fd;
 		else if (conn_info->message_type == MSG_RESPONSE) {
+			/*
+			 * Currently, only the backend of NGINX sets the 'socket_info_ptr->peer_fd'
+			 * value. This value contains the frontend fd. Essentially, this sets the
+			 * 'peer_fd' to the frontend fd within the trace information.
+			 */
 			if (is_socket_info_valid(socket_info_ptr) &&
 			    socket_info_ptr->peer_fd != 0)
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
@@ -1138,6 +1153,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (tracer_ctx == NULL)
 		return SUBMIT_INVALID;
 
+	if (tracer_ctx->disable_tracing)
+		conn_info->no_trace = true;
+
 	/*
 	 * It is possible that these values were modified during ebpf running,
 	 * so they are saved here.
@@ -1172,6 +1190,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	// AAAA record To ensure that the call chain will not be broken.
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM &&
+	    !conn_info->no_trace &&
 	    (tracer_ctx->go_tracing_timeout != 0
 	     || extra->is_go_process == false)
 	    && !(conn_info->protocol == PROTO_DNS
@@ -1182,11 +1201,20 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			      time_stamp, &trace_key);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
+		/*
+		 * In the context of NGINX, the backend socket information is
+		 * established during the 'socket()' system call, with 'peer_fd' and
+		 * 'trace_id' set accordingly to maintain consistency.
+		 */
+		if (socket_info_ptr &&
+		    conn_info->direction == T_EGRESS &&
+		    !conn_info->no_trace &&
+		    socket_info_ptr->peer_fd > 0) {
 			sk_info.peer_fd = socket_info_ptr->peer_fd;
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
+		sk_info.no_trace = conn_info->no_trace;
 		sk_info.uid = tracer_ctx->socket_id + 1;
 		tracer_ctx->socket_id++;	// Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
@@ -1279,12 +1307,21 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
+		/*
+		 * Currently, only the backend socket of NGINX sets the 'socket_info_ptr->peer_fd'
+		 * value, which is the frontend fd. This handles notifying the frontend socket
+		 * to use the current backend traceID when returning data.
+		 */
 		if (socket_info_ptr->peer_fd != 0
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
 							      socket_info_ptr->
 							      peer_fd);
+			/*
+			 * Query the socket information of the NGINX frontend and modify the
+			 * traceID of the data returned by the frontend.
+			 */
 			struct socket_info_s *peer_socket_info_ptr =
 			    socket_info_map__lookup(&peer_conn_key);
 			if (is_socket_info_valid(peer_socket_info_ptr))
@@ -1292,6 +1329,15 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 				    thread_trace_id;
 		}
 
+		/*
+		 * Below is the processing in the NGINX scenario:
+		 * 1.The backend sets the 'socket_info_ptr->trace_id' during the 'socket()'
+		 *   system call to ensure the traceID carried by the backend request is
+		 *   consistent with the frontend request’s traceID.
+		 * 2.The frontend sets the 'socket_info_ptr->trace_id' when the backend receives
+		 *   a response to ensure the traceID carried by the frontend response data is
+		 *   consistent with the traceID during the backend response.
+		 */
 		if (conn_info->direction == T_EGRESS
 		    && socket_info_ptr->trace_id != 0) {
 			thread_trace_id = socket_info_ptr->trace_id;
@@ -1525,9 +1571,6 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	if (conn_info->protocol == PROTO_CUSTOM) {
 		if (conn_info->enable_reasm) {
-			if (conn_info->socket_info_ptr) {
-				conn_info->socket_info_ptr->finish_reasm = true;
-			}
 			conn_info->is_reasm_seg = true;
 		}
 	}
@@ -2134,7 +2177,7 @@ TP_SYSCALL_PROG(exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	char comm[TASK_COMM_LEN];
 	bpf_get_current_comm(comm, sizeof(comm));
 
-	// 试用于nginx负载均衡场景
+	// Used in NGINX load balancing scenarios.
 	if (!(comm[0] == 'n' && comm[1] == 'g' && comm[2] == 'i' &&
 	      comm[3] == 'n' && comm[4] == 'x' && comm[5] == '\0'))
 		return 0;
@@ -2144,6 +2187,14 @@ TP_SYSCALL_PROG(exit_socket) (struct syscall_comm_exit_ctx * ctx) {
 	struct trace_info_t *trace = trace_map__lookup(&key);
 	if (trace && trace->peer_fd != 0 && trace->peer_fd != (__u32) fd) {
 		struct socket_info_s sk_info = { 0 };
+		/*
+		 * In the NGINX backend socket information, record 'peer_fd' with
+		 * the value of the frontend fd, and 'trace_id' with the value of
+		 * the frontend request’s 'trace_id'. The purpose of this is to
+		 * ensure that the traceID of frontend requests and backend requests,
+		 * as well as the traceID of frontend responses and backend responses,
+		 * remain consistent.
+		 */
 		sk_info.peer_fd = trace->peer_fd;
 		sk_info.trace_id = trace->thread_trace_id;
 		__u64 conn_key = gen_conn_key_id(id >> 32, fd);
@@ -2324,7 +2375,14 @@ skip_copy:
 	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
 
-	if (v_buff->events_num >= EVENT_BURST_NUM ||
+	/*
+	 * If the delay of the periodic push event exceeds the threshold, it
+	 * will be pushed immediately.
+	 */
+	__u64 curr_time = bpf_ktime_get_ns();
+	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
+	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
+	    v_buff->events_num >= EVENT_BURST_NUM ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		__u32 buf_size =
 		    (v_buff->len +
@@ -2351,6 +2409,17 @@ skip_copy:
 
 		v_buff->events_num = 0;
 		v_buff->len = 0;
+		if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS) {
+			struct trace_stats *stats;
+			tracer_ctx->last_period_timestamp =
+				tracer_ctx->period_timestamp;
+			tracer_ctx->period_timestamp = curr_time;
+			stats = trace_stats_map__lookup(&k0);
+			if (stats == NULL)
+				goto clear_args_map_1;
+			if (diff > stats->period_event_max_delay)
+				stats->period_event_max_delay = diff;
+		}
 	}
 
 clear_args_map_1:

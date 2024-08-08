@@ -33,6 +33,7 @@ import (
 	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -147,7 +148,7 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, info VIFRPCMessage) 
 
 		db, err := mysql.GetDB(info.orgID)
 		if err != nil {
-			log.Errorf("get org id (%d) mysql session failed", info.orgID)
+			log.Error("get mysql session failed", logger.NewORGPrefix(info.orgID))
 			return
 		}
 		nodeIP := os.Getenv(common.NODE_IP_KEY)
@@ -258,7 +259,7 @@ func (s *SyncStorage) refreshDatabase() {
 		for _, orgID := range orgIDs {
 			db, err := mysql.GetDB(orgID)
 			if err != nil {
-				log.Errorf("get org id (%d) mysql session failed", orgID)
+				log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 				continue
 			}
 			vTaps := []mysql.VTap{}
@@ -278,9 +279,9 @@ func (s *SyncStorage) refreshDatabase() {
 			if len(invalidStorages) > 0 {
 				err := db.Delete(&invalidStorages).Error
 				if err != nil {
-					log.Errorf("node (%s) clean org (%d) genesis storage invalid data failed: %s", nodeIP, orgID, err)
+					log.Errorf("node (%s) clean genesis storage invalid data failed: %s", nodeIP, err, logger.NewORGPrefix(orgID))
 				} else {
-					log.Infof("node (%s) clean org (%d) genesis storage invalid data success", nodeIP, orgID)
+					log.Infof("node (%s) clean genesis storage invalid data success", nodeIP, logger.NewORGPrefix(orgID))
 				}
 			}
 		}
@@ -385,7 +386,7 @@ func (k *KubernetesStorage) Add(orgID int, newInfo KubernetesInfo) {
 	if !unTriggerFlag {
 		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
 		if err != nil {
-			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()))
+			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()), logger.NewORGPrefix(orgID))
 		}
 	}
 }
@@ -403,7 +404,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get org id (%d) mysql session failed", orgID)
+		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 		return err
 	}
 
@@ -453,7 +454,7 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 		"version":           strconv.Itoa(int(version)),
 	}
 
-	log.Debugf("trigger cloud (%s) org (%d) kubernetes (%s) refresh version (%d)", requestUrl, orgID, clusterID, version)
+	log.Debugf("trigger cloud (%s) kubernetes (%s) refresh version (%d)", requestUrl, clusterID, version, logger.NewORGPrefix(orgID))
 
 	return gcommon.RequestGet(requestUrl, 30, queryStrings)
 }
@@ -483,89 +484,5 @@ func (k *KubernetesStorage) Start() {
 func (k *KubernetesStorage) Stop() {
 	if k.kCancel != nil {
 		k.kCancel()
-	}
-}
-
-type PrometheusStorage struct {
-	cfg            config.GenesisConfig
-	kCtx           context.Context
-	kCancel        context.CancelFunc
-	channel        chan PrometheusInfo
-	prometheusData map[int]map[string]PrometheusInfo
-	mutex          sync.Mutex
-}
-
-func NewPrometheusStorage(cfg config.GenesisConfig, pChan chan PrometheusInfo, ctx context.Context) *PrometheusStorage {
-	pCtx, pCancel := context.WithCancel(ctx)
-	return &PrometheusStorage{
-		cfg:            cfg,
-		kCtx:           pCtx,
-		kCancel:        pCancel,
-		channel:        pChan,
-		prometheusData: map[int]map[string]PrometheusInfo{},
-		mutex:          sync.Mutex{},
-	}
-}
-
-func (p *PrometheusStorage) Clear() {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-
-	p.prometheusData = map[int]map[string]PrometheusInfo{}
-}
-
-func (p *PrometheusStorage) Add(orgID int, isUpdate bool, newInfo PrometheusInfo) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	prometheusData, ok := p.prometheusData[orgID]
-	if ok {
-		if oldInfo, ok := prometheusData[newInfo.ClusterID]; ok && !isUpdate {
-			oldInfo.Epoch = newInfo.Epoch
-			oldInfo.ErrorMSG = newInfo.ErrorMSG
-			prometheusData[newInfo.ClusterID] = oldInfo
-		} else {
-			prometheusData[newInfo.ClusterID] = newInfo
-		}
-	} else {
-		p.prometheusData[orgID] = map[string]PrometheusInfo{
-			newInfo.ClusterID: newInfo,
-		}
-	}
-	p.fetch()
-}
-
-func (p *PrometheusStorage) fetch() {
-	for _, prometheusDatas := range p.prometheusData {
-		for _, pData := range prometheusDatas {
-			p.channel <- pData
-		}
-	}
-}
-
-func (p *PrometheusStorage) run() {
-	for {
-		time.Sleep(time.Duration(p.cfg.DataPersistenceInterval) * time.Second)
-		now := time.Now()
-		p.mutex.Lock()
-		for _, prometheusData := range p.prometheusData {
-			for key, s := range prometheusData {
-				if now.Sub(s.Epoch) <= time.Duration(p.cfg.AgingTime)*time.Second {
-					continue
-				}
-				delete(prometheusData, key)
-			}
-		}
-		p.fetch()
-		p.mutex.Unlock()
-	}
-}
-
-func (p *PrometheusStorage) Start() {
-	go p.run()
-}
-
-func (p *PrometheusStorage) Stop() {
-	if p.kCancel != nil {
-		p.kCancel()
 	}
 }

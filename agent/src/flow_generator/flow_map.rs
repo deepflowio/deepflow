@@ -57,8 +57,8 @@ use crate::{
         endpoint::{EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET},
         enums::{EthernetType, HeaderType, IpProtocol, TapType, TcpFlags},
         flow::{
-            CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7Protocol,
-            L7Stats, PacketDirection, SignalSource, TunnelField,
+            CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7PerfStatsKey,
+            L7Protocol, L7Stats, PacketDirection, SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{
@@ -74,7 +74,7 @@ use crate::{
         handler::{CollectorConfig, LogParserConfig, PluginConfig},
         FlowConfig, ModuleConfig, RuntimeConfig,
     },
-    flow_generator::protocol_logs::PseudoAppProto,
+    flow_generator::{protocol_logs::PseudoAppProto, LogMessageType},
     metric::document::TapSide,
     plugin::wasm::WasmVm,
     policy::{Policy, PolicyGetter},
@@ -175,7 +175,7 @@ pub struct FlowMap {
 
     tagged_flow_allocator: Allocator<TaggedFlow>,
     l7_stats_allocator: Allocator<L7Stats>,
-    output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+    output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
     l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
     out_log_queue: DebugSender<Box<AppProto>>,
     output_buffer: Vec<Arc<BatchedBox<TaggedFlow>>>,
@@ -209,9 +209,10 @@ pub struct FlowMap {
 }
 
 impl FlowMap {
+    const MICROS_IN_SECONDS: u64 = 1_000_000;
     pub fn new(
         id: u32,
-        output_queue: DebugSender<Arc<BatchedBox<TaggedFlow>>>,
+        output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
         policy_getter: PolicyGetter,
         app_proto_log_queue: DebugSender<Box<AppProto>>,
@@ -254,6 +255,7 @@ impl FlowMap {
             service_table: ServiceTable::new(
                 SERVICE_TABLE_IPV4_CAPACITY,
                 SERVICE_TABLE_IPV6_CAPACITY,
+                &config.server_ports,
             ),
             app_table: AppTable::new(
                 config.l7_protocol_inference_max_fail_count,
@@ -872,7 +874,6 @@ impl FlowMap {
             return false;
         }
         let flow_config = config.flow;
-        let collector_config = config.collector;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
         if flow_config.collector_enabled {
             let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
@@ -896,9 +897,7 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled
-            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
-        {
+        if self.packet_sequence_enabled {
             self.append_to_block(flow_config, node, meta_packet);
         }
 
@@ -1262,7 +1261,9 @@ impl FlowMap {
         // tag
         (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
-
+        node.tagged_flow.flow.need_to_store = (self.packet_sequence_enabled
+            && meta_packet.lookup_key.proto == IpProtocol::TCP)
+            || node.contain_pcap_policy();
         // Currently, only virtual traffic's tap_side is counted
         node.tagged_flow
             .flow
@@ -1447,6 +1448,9 @@ impl FlowMap {
             node.tagged_flow
                 .flow
                 .set_tap_side(config.flow.trident_type, config.flow.cloud_gateway_traffic);
+            node.tagged_flow.flow.need_to_store = (self.packet_sequence_enabled
+                && meta_packet.lookup_key.proto == IpProtocol::TCP)
+                || node.contain_pcap_policy();
         } else {
             // copy endpoint and policy data
             meta_packet.policy_data =
@@ -1565,63 +1569,49 @@ impl FlowMap {
     fn collect_l7_stats(
         &mut self,
         node: &mut FlowNode,
-        new_endpoint: Option<String>,
-        new_biz_type: u8,
+        meta_flow_log: &mut Box<FlowLog>,
+        l7_info: &L7ProtocolInfo,
+        consistent_timestamp_in_l7_metrics: bool,
+        time_in_micros: u64,
     ) {
-        let flow_id = &node.tagged_flow.flow.flow_id;
-        let last_biz_type = node.tagged_flow.flow.last_biz_type;
-        // The original endpoint is inconsistent with new_endpoint
         if let Some(flow_perf_stats) = node.tagged_flow.flow.flow_perf_stats.as_mut() {
-            if (node.tagged_flow.flow.last_endpoint.is_some()
-                && new_endpoint.is_some()
-                && node.tagged_flow.flow.last_endpoint.ne(&new_endpoint))
-                || last_biz_type.ne(&new_biz_type)
+            let flow_id = &node.tagged_flow.flow.flow_id;
+            let l7_timeout_count = self
+                .perf_cache
+                .borrow_mut()
+                .pop_timeout_count(flow_id, false); // TODO: flow_end is most likely false, but may also be true
+            let (l7_perf_stats, _l7_protocol) =
+                meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
+            let app_proto_head = l7_info.app_proto_head().unwrap();
+            let time_span = if consistent_timestamp_in_l7_metrics
+                && app_proto_head.msg_type == LogMessageType::Response
+                && app_proto_head.rrt != 0
             {
-                let l7_timeout_count = self
-                    .perf_cache
-                    .borrow_mut()
-                    .pop_timeout_count(flow_id, false); // TODO: flow_end is most likely false, but may also be true
-                let (l7_perf_stats, l7_protocol) = node
-                    .meta_flow_log
-                    .as_mut()
-                    .unwrap()
-                    .copy_and_reset_l7_perf_data(l7_timeout_count as u32);
+                node.tagged_flow.flow.flow_stat_time.as_secs()
+                    - ((time_in_micros - app_proto_head.rrt) / Self::MICROS_IN_SECONDS)
+            } else {
+                0
+            };
+            // FIXME: the endpoint may be None after parsed
+            let endpoint = if let Some(new_endpoint) = l7_info.get_endpoint() {
+                node.tagged_flow.flow.last_endpoint = Some(new_endpoint.clone());
+                Some(new_endpoint)
+            } else {
+                node.tagged_flow.flow.last_endpoint.clone()
+            };
 
-                // FIXME: Because the endpoint changes, the index of the first packet of the current endpoint
-                // will also be counted into the index of the previous endpoint, so there will be a slight error
-                flow_perf_stats.l7.sequential_merge(&l7_perf_stats); // It needs to fill l7 back in flow because flow also needs to present l7 metrics
+            let key = L7PerfStatsKey {
+                endpoint,
+                biz_type: l7_info.get_biz_type(),
+                time_span: time_span as u32,
+            };
 
-                flow_perf_stats.l7_protocol = l7_protocol;
-
-                let l7_stats = L7Stats {
-                    flow: None,
-                    stats: l7_perf_stats,
-                    endpoint: node.tagged_flow.flow.last_endpoint.clone(),
-                    biz_type: last_biz_type,
-                    flow_id: *flow_id,
-                    time_in_second: node.tagged_flow.flow.flow_stat_time.into(),
-                    signal_source: node.tagged_flow.flow.signal_source,
-                    l7_protocol,
-                };
-
-                self.l7_stats_buffer
-                    .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
-                if self.l7_stats_buffer.len() >= QUEUE_BATCH_SIZE {
-                    if let Err(e) = self
-                        .l7_stats_output_queue
-                        .send_all(&mut self.l7_stats_buffer)
-                    {
-                        warn!("flow-map push l7 stats to queue failed, because {:?}", e);
-                        self.l7_stats_buffer.clear();
-                    }
-                }
+            if let Some(l7_perf) = flow_perf_stats.l7.get_mut(&key) {
+                l7_perf.sequential_merge(&l7_perf_stats);
+            } else {
+                flow_perf_stats.l7.insert(key, l7_perf_stats);
             }
         }
-        // FIXME: the endpoint may be None after parsed
-        if new_endpoint.is_some() {
-            node.tagged_flow.flow.last_endpoint = new_endpoint;
-        }
-        node.tagged_flow.flow.last_biz_type = new_biz_type;
     }
 
     fn collect_metric(
@@ -1634,8 +1624,8 @@ impl FlowMap {
     ) {
         let flow_config = &config.flow;
         let log_parser_config = &config.log_parser;
-
-        if let Some(log) = node.meta_flow_log.as_mut() {
+        let consistent_timestamp_in_l7_metrics = config.flow.consistent_timestamp_in_l7_metrics;
+        if let Some(mut log) = node.meta_flow_log.take() {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             let local_epc_id = match config.ebpf.as_ref() {
                 Some(c) => c.epc_id as i32,
@@ -1648,51 +1638,71 @@ impl FlowMap {
             } else {
                 (0, local_epc_id)
             };
-            match log.parse(
-                flow_config,
-                log_parser_config,
-                meta_packet,
-                is_first_packet_direction,
-                Self::l7_metrics_enabled(flow_config),
-                Self::l7_log_parse_enabled(flow_config, &meta_packet.lookup_key),
-                &mut self.app_table,
-                local_epc,
-                remote_epc,
-                &self.l7_protocol_checker,
-            ) {
-                Ok(info) => {
-                    if node.tagged_flow.flow.direction_score != ServiceTable::MAX_SCORE {
-                        // After perf.parse() success, meta_packet's direction is determined.
-                        // Here we determine whether to reverse flow.
-                        self.rectify_flow_direction(node, meta_packet, is_first_packet);
-                    }
-                    match info {
-                        crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
-                            self.collect_l7_stats(node, s.get_endpoint(), s.get_biz_type());
-                            self.write_to_app_proto_log(flow_config, node, &meta_packet, s);
+
+            for packet in meta_packet {
+                match log.parse(
+                    flow_config,
+                    log_parser_config,
+                    packet,
+                    is_first_packet_direction,
+                    Self::l7_metrics_enabled(flow_config),
+                    Self::l7_log_parse_enabled(flow_config, &packet.lookup_key),
+                    &mut self.app_table,
+                    local_epc,
+                    remote_epc,
+                    &self.l7_protocol_checker,
+                ) {
+                    Ok(info) => {
+                        if let Some(perf_stats) = node.tagged_flow.flow.flow_perf_stats.as_mut() {
+                            perf_stats.l7_protocol = log.l7_protocol_enum.get_l7_protocol();
                         }
-                        crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
-                            for i in m.into_iter() {
-                                self.collect_l7_stats(node, i.get_endpoint(), i.get_biz_type());
-                                self.write_to_app_proto_log(flow_config, node, &meta_packet, i);
+                        if node.tagged_flow.flow.direction_score != ServiceTable::MAX_SCORE {
+                            // After perf.parse() success, meta_packet's direction is determined.
+                            // Here we determine whether to reverse flow.
+                            self.rectify_flow_direction(node, packet, is_first_packet);
+                        }
+                        match info {
+                            crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
+                                let timestamp = packet.lookup_key.timestamp.as_micros();
+                                self.collect_l7_stats(
+                                    node,
+                                    &mut log,
+                                    &s,
+                                    consistent_timestamp_in_l7_metrics,
+                                    timestamp,
+                                );
+                                self.write_to_app_proto_log(flow_config, node, &packet, s);
                             }
+                            crate::common::l7_protocol_log::L7ParseResult::Multi(m) => {
+                                let timestamp = packet.lookup_key.timestamp.as_micros();
+                                for i in m.into_iter() {
+                                    self.collect_l7_stats(
+                                        node,
+                                        &mut log,
+                                        &i,
+                                        consistent_timestamp_in_l7_metrics,
+                                        timestamp,
+                                    );
+                                    self.write_to_app_proto_log(flow_config, node, &packet, i);
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
+                    Err(Error::L7ProtocolUnknown) => {
+                        self.flow_perf_counter
+                            .unknown_l7_protocol
+                            .fetch_add(1, Ordering::Relaxed);
+                    }
+                    Err(e) => log::trace!("unhandled log parse error: {}", e),
                 }
-                Err(Error::L7ProtocolUnknown) => {
-                    self.flow_perf_counter
-                        .unknown_l7_protocol
-                        .fetch_add(1, Ordering::Relaxed);
-                }
-                Err(e) => log::trace!("unhandled log parse error: {}", e),
             }
+            node.meta_flow_log = Some(log);
         }
     }
 
     fn new_tcp_node(&mut self, config: &Config, meta_packet: &mut MetaPacket) -> Box<FlowNode> {
         let flow_config = &config.flow;
-        let collector_config = &config.collector;
         let mut node = self.init_flow(config, meta_packet);
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.second_in_minute =
@@ -1745,9 +1755,7 @@ impl FlowMap {
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.packet_sequence_enabled
-            && !collector_config.l4_log_ignore_tap_sides[node.tagged_flow.flow.tap_side as usize]
-        {
+        if self.packet_sequence_enabled {
             self.append_to_block(flow_config, &mut node, meta_packet);
         }
         node
@@ -1837,8 +1845,13 @@ impl FlowMap {
                     self.l7_stats_buffer.clear();
                 }
             }
-            if self.output_buffer.len() > 0 {
-                if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
+            if self.output_queue.is_some() && self.output_buffer.len() > 0 {
+                if let Err(e) = self
+                    .output_queue
+                    .as_ref()
+                    .unwrap()
+                    .send_all(&mut self.output_buffer)
+                {
                     warn!(
                         "flow-map push tagged flows to queue failed, because {:?}",
                         e
@@ -1866,14 +1879,47 @@ impl FlowMap {
             Ordering::Relaxed,
         );
 
-        self.output_buffer.push(tagged_flow);
-        if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            if let Err(e) = self.output_queue.send_all(&mut self.output_buffer) {
-                warn!(
-                    "flow-map push tagged flows to queue failed, because {:?}",
-                    e
-                );
-                self.output_buffer.clear();
+        if let Some(output_queue) = &mut self.output_queue {
+            self.output_buffer.push(tagged_flow);
+            if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
+                if let Err(e) = output_queue.send_all(&mut self.output_buffer) {
+                    warn!(
+                        "flow-map push tagged flows to queue failed, because {:?}",
+                        e
+                    );
+                    self.output_buffer.clear();
+                }
+            }
+        }
+    }
+
+    fn flush_l7_perf_stats(
+        &mut self,
+        collect_stats: bool,
+        tagged_flow: Arc<BatchedBox<TaggedFlow>>,
+    ) {
+        if collect_stats {
+            let flow = &tagged_flow.flow;
+            if let Some(flow_perf) = flow.flow_perf_stats.as_ref() {
+                let l7_protocol = flow_perf.l7_protocol;
+                let count = flow_perf.l7.len();
+                for (index, (l7_perf_stats_key, l7_perf_stats)) in flow_perf.l7.iter().enumerate() {
+                    let mut l7_stats = L7Stats::default();
+                    l7_stats.stats = l7_perf_stats.clone();
+                    l7_stats.endpoint = l7_perf_stats_key.endpoint.clone();
+                    l7_stats.flow_id = flow.flow_id;
+                    l7_stats.signal_source = flow.signal_source;
+                    l7_stats.time_in_second = flow.flow_stat_time.into();
+                    l7_stats.l7_protocol = l7_protocol;
+                    l7_stats.time_span = l7_perf_stats_key.time_span;
+                    if index + 1 == count {
+                        l7_stats.flow = Some(tagged_flow.clone());
+                    } else {
+                        l7_stats.flow = None;
+                    }
+                    self.l7_stats_buffer
+                        .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
+                }
             }
         }
     }
@@ -1911,7 +1957,6 @@ impl FlowMap {
             }
         }
 
-        let mut l7_stats = L7Stats::default();
         let mut collect_stats = false;
         if config.collector_enabled
             && (flow.flow_key.proto == IpProtocol::TCP
@@ -1920,24 +1965,9 @@ impl FlowMap {
                 || flow.flow_key.proto == IpProtocol::ICMPV6)
         {
             if let Some(perf) = node.meta_flow_log.as_mut() {
-                collect_stats = true;
                 perf.copy_and_reset_l4_perf_data(flow.reversed, &mut flow);
-                let l7_timeout_count = self
-                    .perf_cache
-                    .borrow_mut()
-                    .pop_timeout_count(&flow.flow_id, true);
-                let (l7_perf_stats, l7_protocol) =
-                    perf.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
 
-                let flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
-                flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
-                flow_perf_stats.l7_protocol = l7_protocol;
-                l7_stats.stats = l7_perf_stats;
-                l7_stats.endpoint = flow.last_endpoint.clone();
-                l7_stats.flow_id = flow.flow_id;
-                l7_stats.signal_source = flow.signal_source;
-                l7_stats.time_in_second = flow.flow_stat_time.into();
-                l7_stats.l7_protocol = l7_protocol;
+                collect_stats = true;
             }
         }
 
@@ -1951,11 +1981,7 @@ impl FlowMap {
             self.tagged_flow_allocator
                 .allocate_one_with(node.tagged_flow.clone()),
         );
-        if collect_stats {
-            l7_stats.flow = Some(tagged_flow.clone());
-            self.l7_stats_buffer
-                .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
-        }
+        self.flush_l7_perf_stats(collect_stats, tagged_flow.clone());
         self.push_to_flow_stats_queue(tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
@@ -1987,7 +2013,6 @@ impl FlowMap {
             }
             flow.set_tap_side(config.trident_type, config.cloud_gateway_traffic);
 
-            let mut l7_stats = L7Stats::default();
             let mut collect_stats = false;
             if flow.flow_key.proto == IpProtocol::TCP
                 || flow.flow_key.proto == IpProtocol::UDP
@@ -1996,23 +2021,7 @@ impl FlowMap {
             {
                 if let Some(perf) = node.meta_flow_log.as_mut() {
                     perf.copy_and_reset_l4_perf_data(flow.reversed, flow);
-                    let l7_timeout_count = self
-                        .perf_cache
-                        .borrow_mut()
-                        .pop_timeout_count(&flow.flow_id, false);
-                    let (l7_perf_stats, l7_protocol) =
-                        perf.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
-
-                    let flow_perf_stats = flow.flow_perf_stats.as_mut().unwrap();
-                    flow_perf_stats.l7.sequential_merge(&l7_perf_stats);
-                    flow_perf_stats.l7_protocol = l7_protocol;
                     collect_stats = true;
-                    l7_stats.stats = l7_perf_stats;
-                    l7_stats.endpoint = flow.last_endpoint.clone();
-                    l7_stats.flow_id = flow.flow_id;
-                    l7_stats.signal_source = flow.signal_source;
-                    l7_stats.time_in_second = flow.flow_stat_time.into();
-                    l7_stats.l7_protocol = l7_protocol;
                 }
             }
 
@@ -2020,11 +2029,7 @@ impl FlowMap {
                 self.tagged_flow_allocator
                     .allocate_one_with(node.tagged_flow.clone()),
             );
-            if collect_stats {
-                l7_stats.flow = Some(tagged_flow.clone());
-                self.l7_stats_buffer
-                    .push(self.l7_stats_allocator.allocate_one_with(l7_stats));
-            }
+            self.flush_l7_perf_stats(collect_stats, tagged_flow.clone());
             self.push_to_flow_stats_queue(tagged_flow);
             node.reset_flow_stat_info();
         }
@@ -2505,7 +2510,7 @@ pub fn _new_flow_map_and_receiver(
     config.flow.trident_type = trident_type;
     let flow_map = FlowMap::new(
         0,
-        output_queue_sender,
+        Some(output_queue_sender),
         l7_stats_output_queue_sender,
         policy_getter,
         app_proto_log_queue,

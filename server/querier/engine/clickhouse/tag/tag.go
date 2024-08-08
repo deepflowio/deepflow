@@ -42,6 +42,8 @@ func GetTag(name, db, table, function string) (*Tag, bool) {
 	tag, ok := TagResoureMap[name][function]
 	if db == "flow_tag" {
 		tag, ok = FlowTagResourceMap[name][function]
+	} else if table == "alert_event" {
+		tag, ok = AlarmEventResourceMap[name][function]
 	}
 	// Avoid return nil
 	if !ok {

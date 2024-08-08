@@ -57,17 +57,21 @@ type ChDevice struct {
 }
 
 type ChVTapPort struct {
-	VTapID     int    `gorm:"primaryKey;column:vtap_id;type:int;not null" json:"VTAP_ID"`
-	TapPort    int64  `gorm:"primaryKey;column:tap_port;type:bigint;not null" json:"TAP_PORT"`
-	MacType    int    `gorm:"column:mac_type;type:int;default:null" json:"MAC_TYPE"`
-	HostID     int    `gorm:"column:host_id;type:int;default:null" json:"HOST_ID"`
-	Name       string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	HostName   string `gorm:"column:host_name;type:varchar(256);default:null" json:"HOST_NAME"`
-	DeviceType int    `gorm:"column:device_type;type:int;not null" json:"DEVICE_TYPE"`
-	DeviceID   int    `gorm:"column:device_id;type:int;not null" json:"DEVICE_ID"`
-	DeviceName string `gorm:"column:device_name;type:varchar(256);not null" json:"DEVICE_NAME"`
-	IconID     int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID     int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	VTapID      int    `gorm:"primaryKey;column:vtap_id;type:int;not null" json:"VTAP_ID"`
+	TapPort     int64  `gorm:"primaryKey;column:tap_port;type:bigint;not null" json:"TAP_PORT"`
+	MacType     int    `gorm:"column:mac_type;type:int;default:null" json:"MAC_TYPE"`
+	HostID      int    `gorm:"column:host_id;type:int;default:null" json:"HOST_ID"`
+	Name        string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	HostName    string `gorm:"column:host_name;type:varchar(256);default:null" json:"HOST_NAME"`
+	DeviceType  int    `gorm:"column:device_type;type:int;not null" json:"DEVICE_TYPE"`
+	DeviceID    int    `gorm:"column:device_id;type:int;not null" json:"DEVICE_ID"`
+	DeviceName  string `gorm:"column:device_name;type:varchar(256);not null" json:"DEVICE_NAME"`
+	IconID      int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID      int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	CHostID     int    `gorm:"column:chost_id;type:int;default:null" json:"CHOST_ID"`
+	CHostName   string `gorm:"column:chost_name;type:varchar(256);default:null" json:"CHOST_NAME"`
+	PodNodeID   int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID"`
+	PodNodeName string `gorm:"column:pod_node_name;type:varchar(256);default:null" json:"POD_NODE_NAME"`
 }
 
 func (ChVTapPort) TableName() string {
@@ -273,12 +277,13 @@ func (ChPodNamespace) TableName() string {
 }
 
 type ChPodNode struct {
-	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name        string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID      int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
-	TeamID      int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
 }
 
 type ChVTap struct {
@@ -308,11 +313,12 @@ func (ChLBListener) TableName() string {
 }
 
 type ChPodIngress struct {
-	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name        string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	TeamID      int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	DomainID    int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
-	SubDomainID int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	TeamID       int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID     int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+	SubDomainID  int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
+	PodClusterID int    `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
 }
 
 type ChPodK8sLabel struct {

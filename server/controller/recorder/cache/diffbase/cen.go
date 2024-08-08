@@ -40,12 +40,12 @@ func (b *DataSet) AddCEN(dbItem *mysql.CEN, seq int, toolDataSet *tool.DataSet) 
 		Name:       dbItem.Name,
 		VPCLcuuids: vpcLcuuids,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_CEN_EN, b.CENs[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_CEN_EN, b.CENs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteCEN(lcuuid string) {
 	delete(b.CENs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_CEN_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_CEN_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type CEN struct {

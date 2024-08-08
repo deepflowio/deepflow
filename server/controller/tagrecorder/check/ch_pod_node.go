@@ -41,29 +41,36 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 	var podNodes []mysql.PodNode
 	err := p.db.Unscoped().Find(&podNodes).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[IDKey]mysql.ChPodNode)
 	for _, podNode := range podNodes {
+		teamID, err := tagrecorder.GetTeamID(podNode.Domain, podNode.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podNode, p.db.LogPrefixORGID)
+		}
+
 		if podNode.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
-				ID:          podNode.ID,
-				Name:        podNode.Name + " (deleted)",
-				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
-				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
+				ID:           podNode.ID,
+				Name:         podNode.Name + " (deleted)",
+				PodClusterID: podNode.PodClusterID,
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				TeamID:       teamID,
+				DomainID:     tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
-				ID:          podNode.ID,
-				Name:        podNode.Name,
-				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
-				TeamID:      tagrecorder.DomainToTeamID[podNode.Domain],
-				DomainID:    tagrecorder.DomainToDomainID[podNode.Domain],
-				SubDomainID: tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
+				ID:           podNode.ID,
+				Name:         podNode.Name,
+				PodClusterID: podNode.PodClusterID,
+				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+				TeamID:       teamID,
+				DomainID:     tagrecorder.DomainToDomainID[podNode.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		}
 	}

@@ -91,7 +91,7 @@ func (ia *indexAllocator) encode(strs []string) ([]*controller.PrometheusMetricA
 	}
 	err = addBatch(ia.org.DB, dbToAdd, ia.resourceType)
 	if err != nil {
-		log.Error(ia.org.Logf("add %s error: %s", ia.resourceType, err.Error()))
+		log.Errorf("add %s error: %s", ia.resourceType, err.Error(), ia.org.LogPrefix)
 		return nil, err
 	}
 	for i := range dbToAdd {
@@ -107,14 +107,14 @@ func (ia *indexAllocator) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*mysql.PrometheusMetricAPPLabelLayout
 	err = ia.org.DB.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Find(&dbItems).Error
 	if err != nil {
-		log.Error(ia.org.Logf("db query %s failed: %v", ia.resourceType, err))
+		log.Errorf("db query %s failed: %v", ia.resourceType, err, ia.org.LogPrefix)
 		return
 	}
 	if len(dbItems) != 0 {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, int(item.APPLabelColumnIndex))
 		}
-		log.Info(ia.org.Logf("%s ids: %+v are in use.", ia.resourceType, inUseIDs))
+		log.Infof("%s ids: %+v are in use.", ia.resourceType, inUseIDs, ia.org.LogPrefix)
 	}
 	return
 }
@@ -204,7 +204,7 @@ func (ll *labelLayout) getIndexAllocator(metricName string) (*indexAllocator, bo
 }
 
 func (ll *labelLayout) SingleEncode(metricName string, labelNames []string) ([]*controller.PrometheusMetricAPPLabelLayout, error) {
-	log.Info(ll.org.Logf("encode metric: %s app label names: %v", metricName, labelNames))
+	log.Infof("encode metric: %s app label names: %v", metricName, labelNames, ll.org.LogPrefix)
 	ia, _ := ll.createIndexAllocatorIfNotExists(metricName)
 	return ia.encode(labelNames)
 }

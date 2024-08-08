@@ -362,6 +362,22 @@ impl Default for OffCpuProfile {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
+pub struct MemoryProfile {
+    pub disabled: bool,
+    pub regex: String,
+}
+
+impl Default for MemoryProfile {
+    fn default() -> Self {
+        MemoryProfile {
+            disabled: true,
+            regex: "^java".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct EbpfYamlConfig {
     pub disabled: bool,
     pub log_file: String,
@@ -380,14 +396,15 @@ pub struct EbpfYamlConfig {
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
-    pub java_symbol_file_max_space_limit: u8,
     #[serde(with = "humantime_serde")]
     pub java_symbol_file_refresh_defer_interval: Duration,
     pub on_cpu_profile: OnCpuProfile,
     pub off_cpu_profile: OffCpuProfile,
+    pub memory_profile: MemoryProfile,
     pub syscall_out_of_order_cache_size: usize,
     pub syscall_out_of_order_reassembly: Vec<String>,
     pub syscall_segmentation_reassembly: Vec<String>,
+    pub syscall_trace_id_disabled: bool,
 }
 
 impl Default for EbpfYamlConfig {
@@ -408,13 +425,14 @@ impl Default for EbpfYamlConfig {
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
-            java_symbol_file_max_space_limit: 10,
-            java_symbol_file_refresh_defer_interval: Duration::from_secs(600),
+            java_symbol_file_refresh_defer_interval: Duration::from_secs(60),
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),
+            memory_profile: MemoryProfile::default(),
             syscall_out_of_order_reassembly: vec![],
             syscall_segmentation_reassembly: vec![],
             syscall_out_of_order_cache_size: 16,
+            syscall_trace_id_disabled: false,
         }
     }
 }
@@ -491,10 +509,15 @@ impl ExtraLogFields {
     }
 }
 
+fn default_obfuscate_enabled_protocols() -> Vec<String> {
+    vec!["Redis".to_string()]
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
+    #[serde(default = "default_obfuscate_enabled_protocols")]
     pub obfuscate_enabled_protocols: Vec<String>,
     pub extra_log_fields: ExtraLogFields,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
@@ -537,6 +560,7 @@ pub struct YamlConfig {
     pub default_tap_type: u32,
     pub debug_listen_port: u16,
     pub enable_qos_bypass: bool,
+    pub multiple_sockets_to_ingester: bool,
     pub fast_path_map_size: usize,
     pub first_path_level: u32,
     pub local_dispatcher_count: usize,
@@ -553,7 +577,6 @@ pub struct YamlConfig {
     pub analyzer_raw_packet_block_size: usize,
     pub batched_buffer_size_limit: usize,
     pub dpdk_enabled: bool,
-    pub dpdk_core_list: String,
     pub dispatcher_queue: bool,
     pub libpcap_enabled: bool,
     pub vhost_socket_path: String,
@@ -641,6 +664,8 @@ pub struct YamlConfig {
     pub ntp_min_interval: Duration,
     pub l7_protocol_advanced_features: L7ProtocolAdvancedFeatures,
     pub oracle_parse_config: OracleParseConfig,
+    pub server_ports: Vec<u16>,
+    pub consistent_timestamp_in_l7_metrics: bool,
 }
 
 impl YamlConfig {
@@ -792,23 +817,18 @@ impl YamlConfig {
             c.ebpf.ring_size = 65536;
         }
         if c.ebpf.max_socket_entries < 100000 || c.ebpf.max_socket_entries > 2000000 {
-            c.ebpf.max_socket_entries = 524288;
+            c.ebpf.max_socket_entries = 131072;
         }
         if c.ebpf.socket_map_max_reclaim < 100000 || c.ebpf.socket_map_max_reclaim > 2000000 {
-            c.ebpf.socket_map_max_reclaim = 520000;
+            c.ebpf.socket_map_max_reclaim = 120000;
         }
         if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
-            c.ebpf.max_trace_entries = 524288;
-        }
-        if c.ebpf.java_symbol_file_max_space_limit < 2
-            || c.ebpf.java_symbol_file_max_space_limit > 100
-        {
-            c.ebpf.java_symbol_file_max_space_limit = 10
+            c.ebpf.max_trace_entries = 131072;
         }
         if c.ebpf.java_symbol_file_refresh_defer_interval < Duration::from_secs(5)
             || c.ebpf.java_symbol_file_refresh_defer_interval > Duration::from_secs(3600)
         {
-            c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(600)
+            c.ebpf.java_symbol_file_refresh_defer_interval = Duration::from_secs(60)
         }
         c.ebpf.off_cpu_profile.min_block = c
             .ebpf
@@ -884,11 +904,8 @@ impl YamlConfig {
             c.packet_fanout_mode = 0;
         }
 
-        if c.l7_protocol_advanced_features
-            .obfuscate_enabled_protocols
-            .is_empty()
-        {
-            c.l7_protocol_advanced_features.obfuscate_enabled_protocols = vec!["Redis".to_string()];
+        if c.mirror_traffic_pcp > 9 {
+            c.mirror_traffic_pcp = 0;
         }
 
         Ok(c)
@@ -957,6 +974,7 @@ impl Default for YamlConfig {
             default_tap_type: 3,
             debug_listen_port: 0,
             enable_qos_bypass: false,
+            multiple_sockets_to_ingester: false,
             fast_path_map_size: 1 << 14,
             first_path_level: 0,
             src_interfaces: vec![],
@@ -971,7 +989,6 @@ impl Default for YamlConfig {
             analyzer_raw_packet_block_size: 65536,
             batched_buffer_size_limit: 131072,
             dpdk_enabled: false,
-            dpdk_core_list: "".into(),
             dispatcher_queue: false,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             libpcap_enabled: false,
@@ -1076,6 +1093,8 @@ impl Default for YamlConfig {
                 resp_0x04_extra_byte: false,
             },
             ebpf_collector_queue_size: 65535,
+            server_ports: vec![],
+            consistent_timestamp_in_l7_metrics: false,
         }
     }
 }
@@ -1397,8 +1416,7 @@ impl RuntimeConfig {
             global_pps_threshold: 2000000,
             #[cfg(target_os = "linux")]
             extra_netns_regex: Default::default(),
-            tap_interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
-                .into(),
+            tap_interface_regex: "".into(),
             host: Default::default(),
             rsyslog_enabled: false,
             output_vlan: 0,
@@ -1525,7 +1543,9 @@ impl RuntimeConfig {
             )));
         }
 
-        if regex::Regex::new(&self.tap_interface_regex).is_err() {
+        if !self.tap_interface_regex.is_empty()
+            && regex::Regex::new(&self.tap_interface_regex).is_err()
+        {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "malformed tap-interface-regex({})",
                 self.tap_interface_regex

@@ -28,6 +28,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
@@ -40,9 +41,19 @@ import (
 const (
 	ForwardControllerTimes        = "ForwardControllerTimes"
 	DefaultForwardControllerTimes = 3
+
+	AgentCommandTypeProbe   = AgentCommandType("probe")
+	AgentCommandTypeProfile = AgentCommandType("profile")
 )
 
+type AgentCommandType string
+
 var (
+	agentCommandMap = map[AgentCommandType]map[string]struct{}{
+		AgentCommandTypeProbe:   probeCommandMap,
+		AgentCommandTypeProfile: profileCommandMap,
+	}
+
 	profileCommandMap = map[string]struct{}{
 		"ps":              struct{}{},
 		"java-dump-stack": struct{}{},
@@ -50,42 +61,52 @@ var (
 		"java-dump-heap":  struct{}{},
 		"ebpf-dump-stack": struct{}{},
 	}
+	probeCommandMap = map[string]struct{}{
+		"ping":       struct{}{},
+		"tcping":     struct{}{},
+		"curl":       struct{}{},
+		"dig":        struct{}{},
+		"traceroute": struct{}{},
+	}
 )
 
-type AgentCMD struct{}
-
-func NewAgentCMD() *AgentCMD {
-	return new(AgentCMD)
+type AgentCMD struct {
+	cfg *config.ControllerConfig
 }
 
-func (c *AgentCMD) RegisterTo(e *gin.Engine) {
-	agentRoutes := e.Group("/v1/agent/:id")
-	agentRoutes.Use(AdminPermissionVerificationMiddleware())
+func NewAgentCMD(cfg *config.ControllerConfig) *AgentCMD {
+	return &AgentCMD{
+		cfg: cfg,
+	}
+}
 
-	agentRoutes.GET("/cmd", forwardToServerConnectedByAgent(), getCMDAndNamespaceHandler)
-	agentRoutes.POST("/cmd/run", forwardToServerConnectedByAgent(), cmdRunHandler)
+func (a *AgentCMD) RegisterTo(e *gin.Engine) {
+	agentRoutes := e.Group("/v1/agent/:id-or-name")
+
+	agentRoutes.GET("/cmd", forwardToServerConnectedByAgent(), a.getCMDAndNamespaceHandler())
+	agentRoutes.POST("/cmd/run", forwardToServerConnectedByAgent(), a.cmdRunHandler())
 }
 
 func forwardToServerConnectedByAgent() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		agentID, err := getAgentID(c)
-		if err != nil {
-			log.Error(err)
-			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-			c.Abort()
-			return
-		}
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 		db, err := mysql.GetDB(orgID.(int))
 		if err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
+			c.Abort()
+			return
+		}
+		agentID, err := getAgentID(c, db)
+		if err != nil {
+			log.Error(err, db.LogPrefixORGID)
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			c.Abort()
 			return
 		}
 		var agent *mysql.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 			c.Abort()
 			return
@@ -97,19 +118,19 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		if len(timesStr) > 0 {
 			v, err := strconv.Atoi(timesStr)
 			if err != nil {
-				log.Error(err)
+				log.Error(err, db.LogPrefixORGID)
 				BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 				return
 			}
 			forwardTimes = v
 		} else {
-			log.Infof("init %s to 0", ForwardControllerTimes)
+			log.Infof("node ip(%s) init %s to 0", common.NodeIP, ForwardControllerTimes, db.LogPrefixORGID)
 			c.Request.Header.Set(ForwardControllerTimes, "0")
 		}
-		log.Infof("forward times: %d", forwardTimes)
+		log.Infof("node ip(%s) forward times: %d", common.NodeIP, forwardTimes, db.LogPrefixORGID)
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 			c.Abort()
 			return
@@ -119,6 +140,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		newHost := common.NodeIP
 		if common.NodeIP == agent.CurControllerIP {
 			if manager := service.GetAgentCMDManager(key); manager != nil {
+				log.Infof("agent(key: %s) command context next, node ip(%s)", key)
 				c.Next()
 				return
 			} else {
@@ -127,6 +149,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			}
 		} else if common.NodeIP == agent.ControllerIP {
 			if manager := service.GetAgentCMDManager(key); manager != nil {
+				log.Infof("agent(key: %s) command context next, node ip(%s)", key)
 				c.Next()
 				return
 			} else {
@@ -140,11 +163,11 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 
 		reverseProxy := fmt.Sprintf("http://%s:%d", newHost, common.GConfig.HTTPNodePort)
 		log.Infof("node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
-			common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP)
+			common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP, db.LogPrefixORGID)
 
 		proxyURL, err := url.Parse(reverseProxy)
 		if err != nil {
-			log.Error(err)
+			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
 			c.Abort()
 			return
@@ -155,87 +178,127 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 	}
 }
 
-func getCMDAndNamespaceHandler(c *gin.Context) {
-	agentID, err := getAgentID(c)
-	if err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
-	}
-	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-	db, err := mysql.GetDB(orgID.(int))
-	if err != nil {
-		JsonResponse(c, nil, err)
-		return
-	}
-	var agent *mysql.VTap
-	if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
-		JsonResponse(c, nil, err)
-		return
-	}
-
-	data, err := service.GetCMDAndNamespace(orgID.(int), agentID)
-	if err != nil {
-		JsonResponse(c, data, err)
-		return
-	}
-	switch c.Query("type") {
-	case "profile":
-		var cmds []*trident.RemoteCommand
-		for _, item := range data.RemoteCommand {
-			if _, ok := profileCommandMap[*item.Cmd]; ok {
-				cmds = append(cmds, item)
-			}
+func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		db, err := mysql.GetDB(orgID.(int))
+		if err != nil {
+			JsonResponse(c, nil, err)
+			return
 		}
-		data.RemoteCommand = cmds
-		data.LinuxNamespace = nil
-	default:
+		agentID, err := getAgentID(c, db)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		var agent *mysql.VTap
+		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
+			JsonResponse(c, nil, err)
+			return
+		}
+
+		data, err := service.GetCMDAndNamespace(a.cfg.AgentCommandTimeout, orgID.(int), agentID)
+		if err != nil {
+			JsonResponse(c, data, err)
+			return
+		}
+
+		userType, _ := c.Get(common.HEADER_KEY_X_USER_TYPE)
+		if !(userType == common.USER_TYPE_SUPER_ADMIN || userType == common.USER_TYPE_ADMIN) {
+			var cmds []*trident.RemoteCommand
+			for _, item := range data.RemoteCommand {
+				_, ok1 := profileCommandMap[*item.Cmd]
+				_, ok2 := probeCommandMap[*item.Cmd]
+				if ok1 || ok2 {
+					cmds = append(cmds, item)
+				}
+			}
+			data.RemoteCommand = cmds
+		}
+
+		if filterCommandMap, ok := agentCommandMap[AgentCommandType(c.Query("type"))]; ok {
+			var cmds []*trident.RemoteCommand
+			for _, item := range data.RemoteCommand {
+				if item.Cmd == nil {
+					continue
+				}
+				if _, ok := filterCommandMap[*item.Cmd]; ok {
+					cmds = append(cmds, item)
+				}
+			}
+			data.RemoteCommand = cmds
+			data.LinuxNamespace = nil
+
+		}
+		JsonResponse(c, data, nil)
 	}
-	JsonResponse(c, data, nil)
 }
 
-func getAgentID(c *gin.Context) (int, error) {
-	agentIDStr := c.Param("id")
-	if agentIDStr == "" {
-		return 0, errors.New("id can not be empty")
+func getAgentID(c *gin.Context, db *mysql.DB) (int, error) {
+	agentIDentStr := c.Param("id-or-name")
+	if agentIDentStr == "" {
+		return 0, errors.New("ident can not be empty")
 	}
-	agentID, err := strconv.Atoi(agentIDStr)
+	agentID, err := strconv.Atoi(agentIDentStr)
 	if err != nil {
-		return 0, fmt.Errorf("agent id(%s) can not convert to int", agentIDStr)
+		var agent mysql.VTap
+		if err := db.Where("name = ?", agentIDentStr).First(&agent).Error; err != nil {
+			return 0, fmt.Errorf("failed to get agent by name(%s), error: %s", err.Error())
+		}
+		return agent.ID, nil
 	}
 	return agentID, nil
 }
 
-func cmdRunHandler(c *gin.Context) {
-	agentID, err := getAgentID(c)
-	if err != nil {
-		return
-	}
+func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		req := model.RemoteExecReq{}
+		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		// Profile commands and probe commands are available to everyone.
+		userType, _ := c.Get(common.HEADER_KEY_X_USER_TYPE)
+		if !(userType == common.USER_TYPE_SUPER_ADMIN || userType == common.USER_TYPE_ADMIN) {
+			_, ok1 := profileCommandMap[req.CMD]
+			_, ok2 := probeCommandMap[req.CMD]
+			if !(ok1 || ok2) {
+				StatusForbiddenResponse(c, fmt.Sprintf("only super admin and admin can operate command(%s)", req.CMD))
+				return
+			}
+		}
 
-	req := model.RemoteExecReq{}
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
-		return
-	}
-	agentReq := trident.RemoteExecRequest{
-		ExecType: trident.ExecutionType_RUN_COMMAND.Enum(),
-		// CommandId:    req.CommandId, // deprecated
-		CommandIdent: req.CommandIdent,
-		LinuxNsPid:   req.LinuxNsPid,
-		Params:       req.Params,
-	}
+		agentReq := trident.RemoteExecRequest{
+			ExecType: trident.ExecutionType_RUN_COMMAND.Enum(),
+			// CommandId:    req.CommandId, // deprecated
+			CommandIdent: req.CommandIdent,
+			LinuxNsPid:   req.LinuxNsPid,
+			Params:       req.Params,
+		}
 
-	orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-	content, err := service.RunAgentCMD(orgID.(int), agentID, &agentReq, req.CMD)
-	if err != nil {
-		InternalErrorResponse(c, content, httpcommon.SERVER_ERROR, err.Error())
-		return
-	}
+		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		db, err := mysql.GetDB(orgID.(int))
+		if err != nil {
+			JsonResponse(c, nil, err)
+			return
+		}
+		agentID, err := getAgentID(c, db)
+		if err != nil {
+			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
+			return
+		}
+		content, err := service.RunAgentCMD(a.cfg.AgentCommandTimeout, orgID.(int), agentID, &agentReq, req.CMD)
+		if err != nil {
+			InternalErrorResponse(c, content, httpcommon.SERVER_ERROR, err.Error())
+			return
+		}
 
-	if req.OutputFormat.String() == trident.OutputFormat_TEXT.String() {
-		JsonResponse(c, content, nil)
-		return
+		if req.OutputFormat.String() == trident.OutputFormat_TEXT.String() {
+			JsonResponse(c, content, nil)
+			return
+		}
+		sendAsFile(c, req.OutputFilename, bytes.NewBuffer([]byte(content)))
 	}
-	sendAsFile(c, req.OutputFilename, bytes.NewBuffer([]byte(content)))
 }
 
 func sendAsFile(c *gin.Context, fileName string, content *bytes.Buffer) {

@@ -29,8 +29,9 @@ import (
 type PodNode struct {
 	UpdaterBase[
 		cloudmodel.PodNode,
-		mysql.PodNode,
 		*diffbase.PodNode,
+		*mysql.PodNode,
+		mysql.PodNode,
 		*message.PodNodeAdd,
 		message.PodNodeAdd,
 		*message.PodNodeUpdate,
@@ -45,8 +46,9 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 	updater := &PodNode{
 		newUpdaterBase[
 			cloudmodel.PodNode,
-			mysql.PodNode,
 			*diffbase.PodNode,
+			*mysql.PodNode,
+			mysql.PodNode,
 			*message.PodNodeAdd,
 			message.PodNodeAdd,
 			*message.PodNodeUpdate,
@@ -74,18 +76,18 @@ func (n *PodNode) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNode) (diffBas
 func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysql.PodNode, bool) {
 	vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		log.Error(n.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, cloudItem.Lcuuid,
-		)))
+		), n.metadata.LogPrefixes)
 		return nil, false
 	}
 	podClusterID, exists := n.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
-		log.Error(n.metadata.Logf(resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, cloudItem.Lcuuid,
-		)))
+		), n.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &mysql.PodNode{

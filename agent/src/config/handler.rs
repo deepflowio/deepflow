@@ -226,6 +226,7 @@ pub struct SenderConfig {
     pub npb_dedup_enabled: bool,
     pub npb_bps_threshold: u64,
     pub npb_socket_type: trident::SocketType,
+    pub multiple_sockets_to_ingester: bool,
     pub collector_socket_type: trident::SocketType,
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
@@ -341,9 +342,10 @@ pub struct DispatcherConfig {
     pub enabled: bool,
     pub npb_dedup_enabled: bool,
     pub dpdk_enabled: bool,
-    pub dpdk_core_list: String,
     pub dispatcher_queue: bool,
     pub bond_group: Vec<String>,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub cpu_set: CpuSet,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -468,6 +470,8 @@ pub struct FlowConfig {
     pub oracle_parse_conf: OracleParseConfig,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
+    pub server_ports: Vec<u16>,
+    pub consistent_timestamp_in_l7_metrics: bool,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -569,6 +573,8 @@ impl From<&RuntimeConfig> for FlowConfig {
                     .l7_protocol_advanced_features
                     .obfuscate_enabled_protocols,
             ),
+            server_ports: conf.yaml_config.server_ports.clone(),
+            consistent_timestamp_in_l7_metrics: conf.yaml_config.consistent_timestamp_in_l7_metrics,
         }
     }
 }
@@ -617,6 +623,7 @@ impl fmt::Debug for FlowConfig {
             // FIXME: this field is too long to log
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .field("plugins", &self.plugins)
+            .field("server_ports", &self.server_ports)
             .finish()
     }
 }
@@ -662,13 +669,9 @@ impl HttpEndpointTrie {
     pub fn find_matching_rule(&self, input: &str) -> usize {
         const DEFAULT_KEEP_SEGMENTS: usize = 2;
         let mut node = &self.root;
-        let mut keep_segments = if node.keep_segments.is_some() {
-            node.keep_segments.unwrap()
-        } else {
-            DEFAULT_KEEP_SEGMENTS
-        };
-        let has_rules = node.keep_segments.is_some() || !node.children.is_empty();
-        let mut matched = node.keep_segments.is_some() && node.children.is_empty(); // if it has a rule, and the prefix is "", any path is matched
+        let mut keep_segments = node.keep_segments.unwrap_or(DEFAULT_KEEP_SEGMENTS);
+        let has_rules = node.keep_segments.is_some() || !node.children.is_empty(); // if no rules are set, keep_segments defaults to DEFAULT_KEEP_SEGMENTS: 2
+        let mut matched = node.keep_segments.is_some(); // if it has a rule, and the prefix is "", any path is matched
         for c in input.chars() {
             if let Some(child) = node.children.get(&c) {
                 keep_segments = child.keep_segments.unwrap_or(keep_segments);
@@ -1462,7 +1465,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 global_pps_threshold: conf.global_pps_threshold,
                 capture_packet_size: conf.capture_packet_size,
                 dpdk_enabled: conf.yaml_config.dpdk_enabled,
-                dpdk_core_list: conf.yaml_config.dpdk_core_list.clone(),
                 dispatcher_queue: conf.yaml_config.dispatcher_queue,
                 l7_log_packet_size: conf.l7_log_packet_size,
                 tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
@@ -1499,6 +1501,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .tap_interfaces
                         .clone()
                 },
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                cpu_set: CpuSet::new(),
             },
             sender: SenderConfig {
                 mtu: conf.mtu,
@@ -1517,6 +1521,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 npb_socket_type: conf.npb_socket_type,
                 server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold,
                 bandwidth_probe_interval: conf.bandwidth_probe_interval,
+                multiple_sockets_to_ingester: conf.yaml_config.multiple_sockets_to_ingester,
                 collector_socket_type: conf.collector_socket_type,
                 standalone_data_file_size: conf.yaml_config.standalone_data_file_size,
                 standalone_data_file_dir: conf.yaml_config.standalone_data_file_dir.clone(),
@@ -2043,7 +2048,7 @@ impl ConfigHandler {
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity {
+        if yaml_config.cpu_affinity != new_config.yaml_config.cpu_affinity || components.is_none() {
             info!(
                 "CPU Affinity set to {}.",
                 new_config.yaml_config.cpu_affinity
@@ -2089,6 +2094,7 @@ impl ConfigHandler {
                 if let Err(e) = sched_setaffinity(Pid::from_raw(pid), &cpu_set) {
                     warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                 }
+                new_config.dispatcher.cpu_set = cpu_set;
             }
         }
 
@@ -3125,13 +3131,20 @@ mod tests {
             prefix: "/d/e/f".to_string(),
             keep_segments: 3,
         };
+        let rule4 = MatchRule {
+            prefix: "".to_string(),
+            keep_segments: 5,
+        };
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 2); // no rlues, 2 is the default keep_segments
         trie.insert(&rule1);
         trie.insert(&rule2);
         trie.insert(&rule3);
         assert_eq!(trie.find_matching_rule("/a/b/c"), 1);
         assert_eq!(trie.find_matching_rule("/d/e/f"), 3);
         assert_eq!(trie.find_matching_rule("/a/b/c/d"), 3);
-        assert_eq!(trie.find_matching_rule("/x/y/z"), 0);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 0); // there is no matching rule
+        trie.insert(&rule4);
+        assert_eq!(trie.find_matching_rule("/x/y/z"), 5); // the keep_segments for any rule that matches "" is 5
     }
 
     #[test]

@@ -16,6 +16,10 @@
 
 package metadata
 
+import (
+	"github.com/deepflowio/deepflow/server/controller/logger"
+)
+
 type DomainPlatformData map[string]*PlatformData
 
 type DomainToPlatformData struct {
@@ -58,14 +62,14 @@ func (s DomainPlatformData) checkVersion(t DomainPlatformData, orgID int) bool {
 		if ok == false {
 			flag = false
 			newDomainData.initVersion()
-			log.Debugf("ORGID-%d: add domain data. %s", orgID, newDomainData)
+			log.Debugf("add domain data. %s", newDomainData, logger.NewORGPrefix(orgID))
 			continue
 		}
 
 		if !oldDomainData.equal(newDomainData) {
 			flag = false
 			newDomainData.setVersion(oldDomainData.GetVersion() + 1)
-			log.Infof("ORGID-%d: domain data changed, (%s) to (%s)", orgID, oldDomainData, newDomainData)
+			log.Infof("domain data changed, (%s) to (%s)", oldDomainData, newDomainData, logger.NewORGPrefix(orgID))
 		} else {
 			newDomainData.setVersion(oldDomainData.GetVersion())
 		}

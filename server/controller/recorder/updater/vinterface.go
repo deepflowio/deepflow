@@ -33,8 +33,9 @@ import (
 type VInterface struct {
 	UpdaterBase[
 		cloudmodel.VInterface,
-		mysql.VInterface,
 		*diffbase.VInterface,
+		*mysql.VInterface,
+		mysql.VInterface,
 		*message.VInterfaceAdd,
 		message.VInterfaceAdd,
 		*message.VInterfaceUpdate,
@@ -49,8 +50,9 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 	updater := &VInterface{
 		newUpdaterBase[
 			cloudmodel.VInterface,
-			mysql.VInterface,
 			*diffbase.VInterface,
+			*mysql.VInterface,
+			mysql.VInterface,
 			*message.VInterfaceAdd,
 			message.VInterfaceAdd,
 			*message.VInterfaceUpdate,
@@ -86,21 +88,21 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 				networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 			}
 			if !exists {
-				log.Error(i.metadata.Logf(resourceAForResourceBNotFound(
+				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 					ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-				)))
+				), i.metadata.LogPrefixes)
 				return nil, false
 			}
 		}
 	}
 	deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
 	if !exists {
-		log.Error(i.metadata.Logf(
+		log.Errorf(
 			"device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
 			cloudItem.DeviceType, cloudItem.DeviceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-		))
+			i.metadata.LogPrefixes)
 		return nil, false
 	}
 
@@ -137,10 +139,10 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 					networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 				}
 				if !exists {
-					log.Error(i.metadata.Logf(resourceAForResourceBNotFound(
+					log.Error(resourceAForResourceBNotFound(
 						ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 						ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-					)))
+					), i.metadata.LogPrefixes)
 					return nil, nil, false
 				}
 			}

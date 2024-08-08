@@ -22,22 +22,23 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getAZs(region awsRegion) ([]model.AZ, error) {
-	log.Debug("get azs starting")
+	log.Debug("get azs starting", logger.NewORGPrefix(a.orgID))
 	var azs []model.AZ
 
 	result, err := a.ec2Client.DescribeAvailabilityZones(context.TODO(), &ec2.DescribeAvailabilityZonesInput{})
 	if err != nil {
-		log.Errorf("az request aws api error: (%s)", err.Error())
+		log.Errorf("az request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 		return []model.AZ{}, err
 	}
 	for _, aData := range result.AvailabilityZones {
 		zoneName := a.getStringPointerValue(aData.ZoneName)
 		lcuuid := common.GetUUIDByOrgID(a.orgID, zoneName)
 		if _, ok := a.azLcuuidMap[lcuuid]; !ok {
-			log.Debugf("az (%s) has no resource", zoneName)
+			log.Debugf("az (%s) has no resource", zoneName, logger.NewORGPrefix(a.orgID))
 			continue
 		}
 		azs = append(azs, model.AZ{
@@ -47,6 +48,6 @@ func (a *Aws) getAZs(region awsRegion) ([]model.AZ, error) {
 			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
 		})
 	}
-	log.Debug("get azs complete")
+	log.Debug("get azs complete", logger.NewORGPrefix(a.orgID))
 	return azs, nil
 }

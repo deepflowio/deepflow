@@ -20,12 +20,11 @@ import (
 	"net"
 	"os"
 
-	"github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
-var log = logging.MustGetLogger("trisolaris/config")
+var log = logger.MustGetLogger("trisolaris.config")
 
 type Chrony struct {
 	Host    string `default:"chrony" yaml:"host"`

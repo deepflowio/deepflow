@@ -754,9 +754,13 @@ func (k *KnowledgeGraph) fill(
 		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
 		if mac0 != 0 {
 			lookupByMac0 = true
+		} else if isLocalIP(isIPv6, ip40, ip60) {
+			lookupByAgent0 = true
 		}
 		if mac1 != 0 {
 			lookupByMac1 = true
+		} else if isLocalIP(isIPv6, ip41, ip61) {
+			lookupByAgent1 = true
 		}
 	}
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突

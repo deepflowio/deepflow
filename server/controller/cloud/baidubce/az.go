@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]string, error) {
@@ -31,14 +32,14 @@ func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]str
 	var retAZs []model.AZ
 	var zoneNameToAZLcuuid map[string]string
 
-	log.Debug("get regions starting")
+	log.Debug("get regions starting", logger.NewORGPrefix(b.orgID))
 
 	bccClient, _ := bcc.NewClient(b.secretID, b.secretKey, "bcc."+b.endpoint)
 	bccClient.Config.ConnectionTimeoutInMillis = b.httpTimeout * 1000
 	startTime := time.Now()
 	result, err := bccClient.ListZone()
 	if err != nil {
-		log.Error(err)
+		log.Error(err, logger.NewORGPrefix(b.orgID))
 		return nil, nil, nil, err
 	}
 	b.cloudStatsd.RefreshAPIMoniter("ListZone", len(result.Zones), startTime)
@@ -77,6 +78,6 @@ func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]str
 		zoneNameToAZLcuuid[zone.ZoneName] = azLcuuid
 	}
 
-	log.Debug("get regions complete")
+	log.Debug("get regions complete", logger.NewORGPrefix(b.orgID))
 	return retRegions, retAZs, zoneNameToAZLcuuid, nil
 }

@@ -113,6 +113,7 @@ type StaticConfig struct {
 	DefaultTapType                     *uint32                      `yaml:"default-tap-type,omitempty"`
 	DebugListenPort                    *uint16                      `yaml:"debug-listen-port,omitempty"`
 	EnableQosBypass                    *bool                        `yaml:"enable-qos-bypass,omitempty"`
+	MultipleSocketsToIngester          *bool                        `yaml:"multiple-sockets-to-ingester,omitempty"`
 	FastPathMapSize                    *int                         `yaml:"fast-path-map-size,omitempty"`
 	FirstPathLevel                     *int                         `yaml:"first-path-level,omitempty"`
 	LocalDispatcherCount               *int                         `yaml:"local-dispatcher-count,omitempty"`
@@ -127,7 +128,6 @@ type StaticConfig struct {
 	QuadrupleQueueSize                 *int                         `yaml:"quadruple-queue-size,omitempty"`
 	AnalyzerQueueSize                  *int                         `yaml:"analyzer-queue-size,omitempty"`
 	DpdkEnabled                        *bool                        `yaml:"dpdk-enabled,omitempty"`
-	DpdkCoreList                       *string                      `yaml:"dpdk-core-list,omitempty"`
 	LibpcapEnabled                     *bool                        `yaml:"libpcap-enabled,omitempty"`
 	VhostSocketPath                    *string                      `yaml:"vhost-socket-path,omitempty"`
 	XflowCollector                     *XflowCollectorConfig        `yaml:"xflow-collector,omitempty"`
@@ -173,6 +173,8 @@ type StaticConfig struct {
 	L7ProtocolPorts                    map[string]string            `yaml:"l7-protocol-ports,omitempty"`
 	L7LogBlacklist                     map[string][]*L7LogBlacklist `yaml:"l7-log-blacklist,omitempty"`
 	L7ProtocolAdvancedFeatures         *L7ProtocolAdvancedFeatures  `yaml:"l7-protocol-advanced-features,omitempty"`
+	ConsistentTimestampInL7Metrics     *bool                        `yaml:"consistent-timestamp-in-l7-metrics,omitempty"`
+	ServerPorts                        []uint16                     `yaml:"server-ports,omitempty"`
 	Ebpf                               *EbpfConfig                  `yaml:"ebpf,omitempty"`
 	OsAppTagExecUser                   *string                      `yaml:"os-app-tag-exec-user,omitempty"`
 	OsAppTagExec                       []string                     `yaml:"os-app-tag-exec,omitempty"`
@@ -265,6 +267,11 @@ type OffCpuProfile struct {
 	MinBlock *string `yaml:"minblock,omitempty"`
 }
 
+type MemoryProfile struct {
+	Disabled *bool   `yaml:"disabled,omitempty"`
+	Regex    *string `yaml:"regex,omitempty"`
+}
+
 type EbpfConfig struct {
 	Disabled                           *bool                              `yaml:"disabled,omitempty"`
 	GlobalEbpfPpsThreshold             *int                               `yaml:"global-ebpf-pps-threshold,omitempty"`
@@ -283,9 +290,11 @@ type EbpfConfig struct {
 	JavaSymbolFileRefreshDeferInterval *string                            `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
 	OnCpuProfile                       *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 	OffCpuProfile                      *OffCpuProfile                     `yaml:"off-cpu-profile,omitempty"`
+	MemoryProfile                      *MemoryProfile                     `yaml:"memory-profile,omitempty"`
 	SyscallOutOfOrderReassembly        []string                           `yaml:"syscall-out-of-order-reassembly,omitempty"`
 	SyscallSegmentationReassembly      []string                           `yaml:"syscall-segmentation-reassembly,omitempty"`
 	SyscallOutOfOrderCacheSize         *int                               `yaml:"syscall-out-of-order-cache-size,omitempty"`
+	SyscallTraceIdDisabled             *bool                              `yaml:"syscall-trace-id-disabled,omitempty"`
 }
 
 type OsProcRegex struct {

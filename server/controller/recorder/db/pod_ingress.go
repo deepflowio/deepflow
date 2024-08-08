@@ -22,21 +22,16 @@ import (
 )
 
 type PodIngress struct {
-	OperatorBase[mysql.PodIngress]
+	OperatorBase[*mysql.PodIngress, mysql.PodIngress]
 }
 
 func NewPodIngress() *PodIngress {
 	operater := &PodIngress{
-		OperatorBase[mysql.PodIngress]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.PodIngress](
+			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *PodIngress) setDBItemID(dbItem *mysql.PodIngress, id int) {
-	dbItem.ID = id
 }

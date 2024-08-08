@@ -99,7 +99,7 @@ func (s *subDomains) RefreshOne(cloudData map[string]cloudmodel.SubDomainResourc
 func (s *subDomains) newRefresher(lcuuid string) (*subDomain, error) {
 	var sd mysql.SubDomain
 	if err := s.metadata.DB.Where("lcuuid = ?", lcuuid).First(&sd).Error; err != nil {
-		log.Error(s.metadata.Logf("failed to get sub_domain from db: %s", err.Error()))
+		log.Errorf("failed to get sub_domain from db: %s", err.Error(), s.metadata.LogPrefixes)
 		return nil, err
 	}
 	md := s.metadata.Copy()
@@ -138,14 +138,14 @@ func (s *subDomain) tryRefresh(cloudData cloudmodel.SubDomainResource) error {
 		s.refresh(cloudData)
 		s.cache.ResetRefreshSignal(cache.RefreshSignalCallerSubDomain)
 	default:
-		log.Info(s.metadata.Logf("sub_domain refresh is running, does nothing"))
+		log.Info("sub_domain refresh is running, does nothing", s.metadata.LogPrefixes)
 		return RefreshConflictError
 	}
 	return nil
 }
 
 func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
-	log.Info(s.metadata.Logf("sub_domain sync refresh started"))
+	log.Info("sub_domain sync refresh started", s.metadata.LogPrefixes)
 
 	listener := listener.NewWholeSubDomain(s.metadata.Domain.Lcuuid, s.metadata.SubDomain.Lcuuid, s.cache, s.eventQueue)
 	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudData)
@@ -155,24 +155,24 @@ func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
 
 	s.updateSyncedAt(s.metadata.SubDomain.Lcuuid, cloudData.SyncAt)
 
-	log.Info(s.metadata.Logf("sub_domain sync refresh completed"))
+	log.Info("sub_domain sync refresh completed", s.metadata.LogPrefixes)
 }
 
 func (s *subDomain) clear() {
-	log.Info(s.metadata.Logf("sub_domain clean refresh started"))
+	log.Info("sub_domain clean refresh started", s.metadata.LogPrefixes)
 	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudmodel.SubDomainResource{})
 	s.executeUpdaters(subDomainUpdatersInUpdateOrder)
-	log.Info(s.metadata.Logf("sub_domain clean refresh completed"))
+	log.Info("sub_domain clean refresh completed", s.metadata.LogPrefixes)
 }
 
 func (s *subDomain) shouldRefresh(lcuuid string, cloudData cloudmodel.SubDomainResource) error {
 	if cloudData.Verified {
 		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 || len(cloudData.Pods) == 0 {
-			log.Info(s.metadata.Logf("sub_domain has no networks or vinterfaces or pods, does nothing"))
+			log.Info("sub_domain has no networks or vinterfaces or pods, does nothing", s.metadata.LogPrefixes)
 			return DataMissingError
 		}
 	} else {
-		log.Info(s.metadata.Logf("sub_domain is not verified, does nothing"))
+		log.Info("sub_domain is not verified, does nothing", s.metadata.LogPrefixes)
 		return DataNotVerifiedError
 	}
 	return nil
@@ -212,8 +212,6 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 			listener.NewNetwork(s.cache)),
 		updater.NewSubnet(s.cache, cloudData.Subnets).RegisterListener(
 			listener.NewSubnet(s.cache)),
-		// updater.NewPrometheusTarget(s.cache, cloudData.PrometheusTargets).RegisterListener(
-		// 	listener.NewPrometheusTarget(s.cache)),
 		updater.NewVInterface(s.cache, cloudData.VInterfaces, s.domainToolDataSet).RegisterListener(
 			listener.NewVInterface(s.cache)),
 		ip,
@@ -245,7 +243,7 @@ func (r *subDomain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpda
 func (s *subDomain) notifyOnResourceChanged(updatersInUpdateOrder []updater.ResourceUpdater) {
 	changed := isPlatformDataChanged(updatersInUpdateOrder)
 	if changed {
-		log.Info(s.metadata.Logf("sub domain data changed, refresh platform data"))
+		log.Info("sub domain data changed, refresh platform data", s.metadata.LogPrefixes)
 		refresh.RefreshCache(s.metadata.GetORGID(), []common.DataChanged{common.DATA_CHANGED_PLATFORM_DATA})
 	}
 }
@@ -257,12 +255,12 @@ func (s *subDomain) updateSyncedAt(lcuuid string, syncAt time.Time) {
 	var subDomain mysql.SubDomain
 	err := s.metadata.DB.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
-		log.Error(s.metadata.Logf("get sub_domain from db failed: %s", err.Error()))
+		log.Errorf("get sub_domain from db failed: %s", err.Error(), s.metadata.LogPrefixes)
 		return
 	}
 	subDomain.SyncedAt = &syncAt
 	s.metadata.DB.Save(&subDomain)
-	log.Debug(s.metadata.Logf("update sub_domain (%+v)", subDomain))
+	log.Debugf("update sub_domain (%+v)", subDomain, s.metadata.LogPrefixes)
 }
 
 // TODO 单独刷新 sub_domain 时是否需要更新状态信息
@@ -270,11 +268,11 @@ func (s *subDomain) updateStateInfo(cloudData cloudmodel.SubDomainResource) {
 	var subDomain mysql.SubDomain
 	err := s.metadata.DB.Where("lcuuid = ?", s.metadata.SubDomain.Lcuuid).First(&subDomain).Error
 	if err != nil {
-		log.Error(s.metadata.Logf("get sub_domain from db failed: %s", err.Error()))
+		log.Errorf("get sub_domain from db failed: %s", err.Error(), s.metadata.LogPrefixes)
 		return
 	}
 	subDomain.State = cloudData.ErrorState
 	subDomain.ErrorMsg = cloudData.ErrorMessage
 	s.metadata.DB.Save(&subDomain)
-	log.Debug(s.metadata.Logf("update sub_domain (%+v)", subDomain))
+	log.Debugf("update sub_domain (%+v)", subDomain, s.metadata.LogPrefixes)
 }

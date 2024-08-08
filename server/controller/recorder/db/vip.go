@@ -22,21 +22,16 @@ import (
 )
 
 type VIP struct {
-	OperatorBase[mysql.VIP]
+	OperatorBase[*mysql.VIP, mysql.VIP]
 }
 
 func NewVIP() *VIP {
 	operator := &VIP{
-		OperatorBase[mysql.VIP]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_VIP_EN,
-			softDelete:       false,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.VIP](
+			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
+			false,
+			false,
+		),
 	}
-	operator.setter = operator
 	return operator
-}
-
-func (p *VIP) setDBItemID(dbItem *mysql.VIP, id int) {
-	dbItem.ID = id
 }

@@ -19,6 +19,7 @@ package common
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 )
+
+var ClusterIDRegex = regexp.MustCompile("^d-[0-9a-zA-Z]{10}$")
 
 func GetContextOrgDB(ctx *gin.Context) (*mysql.DB, error) {
 	orgID, exist := ctx.Get(common.HEADER_KEY_X_ORG_ID)
@@ -52,4 +55,8 @@ func GetContextOrgID(ctx *gin.Context) (int, error) {
 		orgID = oID
 	}
 	return orgID, nil
+}
+
+func CheckClusterID(clusterID string) bool {
+	return ClusterIDRegex.MatchString(clusterID)
 }

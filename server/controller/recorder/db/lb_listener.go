@@ -22,22 +22,17 @@ import (
 )
 
 type LBListener struct {
-	OperatorBase[mysql.LBListener]
+	OperatorBase[*mysql.LBListener, mysql.LBListener]
 }
 
 func NewLBListener() *LBListener {
 	operater := &LBListener{
-		OperatorBase[mysql.LBListener]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
-			softDelete:       true,
-			allocateID:       false,
-		},
+		newOperatorBase[*mysql.LBListener](
+			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
+			true,
+			false,
+		),
 	}
-	operater.setter = operater
 	operater.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "name", "ips", "snat_ips", "port", "protocol"})
 	return operater
-}
-
-func (a *LBListener) setDBItemID(dbItem *mysql.LBListener, id int) {
-	dbItem.ID = id
 }

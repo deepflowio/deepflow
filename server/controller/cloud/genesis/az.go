@@ -21,10 +21,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (g *Genesis) getAZ() (model.AZ, error) {
-	log.Debug("get az starting")
+	log.Debug("get az starting", logger.NewORGPrefix(g.orgID))
 	azName := common.DEFAULT_REGION_NAME
 	if g.regionUuid != common.DEFAULT_REGION {
 		azName = g.Name
@@ -39,6 +40,6 @@ func (g *Genesis) getAZ() (model.AZ, error) {
 		Name:         azName,
 	}
 	g.azLcuuid = azLcuuid
-	log.Debug("get az complete")
+	log.Debug("get az complete", logger.NewORGPrefix(g.orgID))
 	return az, nil
 }

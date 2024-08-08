@@ -22,21 +22,16 @@ import (
 )
 
 type LB struct {
-	OperatorBase[mysql.LB]
+	OperatorBase[*mysql.LB, mysql.LB]
 }
 
 func NewLB() *LB {
 	operater := &LB{
-		OperatorBase[mysql.LB]{
-			resourceTypeName: ctrlrcommon.RESOURCE_TYPE_LB_EN,
-			softDelete:       true,
-			allocateID:       true,
-		},
+		newOperatorBase[*mysql.LB](
+			ctrlrcommon.RESOURCE_TYPE_LB_EN,
+			true,
+			true,
+		),
 	}
-	operater.setter = operater
 	return operater
-}
-
-func (a *LB) setDBItemID(dbItem *mysql.LB, id int) {
-	dbItem.ID = id
 }

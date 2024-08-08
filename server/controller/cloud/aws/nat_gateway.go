@@ -24,10 +24,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/logger"
 )
 
 func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
-	log.Debug("get nat gateways starting")
+	log.Debug("get nat gateways starting", logger.NewORGPrefix(a.orgID))
 	var natGateways []model.NATGateway
 	var natVinterfaces []model.VInterface
 	var natIPs []model.IP
@@ -44,7 +45,7 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 		}
 		result, err := a.ec2Client.DescribeNatGateways(context.TODO(), input)
 		if err != nil {
-			log.Errorf("nat gateway request aws api error: (%s)", err.Error())
+			log.Errorf("nat gateway request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, err
 		}
 		retNatGateways = append(retNatGateways, result.NatGateways...)
@@ -57,7 +58,7 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 	for _, nData := range retNatGateways {
 		natGatewayID := a.getStringPointerValue(nData.NatGatewayId)
 		if nData.State != "available" {
-			log.Infof("nat gateway (%s) is not available", natGatewayID)
+			log.Infof("nat gateway (%s) is not available", natGatewayID, logger.NewORGPrefix(a.orgID))
 			continue
 		}
 		floatingIPs := []string{}
@@ -102,6 +103,6 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 			})
 		}
 	}
-	log.Debug("get nat gateways complete")
+	log.Debug("get nat gateways complete", logger.NewORGPrefix(a.orgID))
 	return natGateways, natVinterfaces, natIPs, nil
 }

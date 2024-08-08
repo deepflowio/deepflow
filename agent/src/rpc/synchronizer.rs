@@ -796,14 +796,15 @@ impl Synchronizer {
         updated = status_guard.get_local_epc(&runtime_config) || updated;
         let wait_ntp = status_guard.ntp_enabled && status_guard.first;
         drop(status_guard);
-        if updated {
+        if wait_ntp {
             let (ntp_state, ncond) = &**ntp_state;
-            if wait_ntp {
-                let ntp_state_guard = ntp_state.lock().unwrap();
-                // Here, it is necessary to wait for the NTP synchronization timestamp to start
-                // collecting traffic and avoid using incorrect timestamps
-                drop(ncond.wait(ntp_state_guard).unwrap());
-            }
+            info!("Waitting for NTP ...");
+            let ntp_state_guard = ntp_state.lock().unwrap();
+            // Here, it is necessary to wait for the NTP synchronization timestamp to start
+            // collecting traffic and avoid using incorrect timestamps
+            drop(ncond.wait(ntp_state_guard).unwrap());
+        }
+        if updated {
             let status_guard = status.write();
             // 更新策略相关
             let last = SystemTime::now();
@@ -840,7 +841,10 @@ impl Synchronizer {
         drop(status_guard);
 
         let (trident_state, cvar) = &**trident_state;
-        if !runtime_config.enabled || exception_handler.has(Exception::SystemLoadCircuitBreaker) {
+        if !runtime_config.enabled
+            || exception_handler.has(Exception::SystemLoadCircuitBreaker)
+            || exception_handler.has(Exception::FreeMemExceeded)
+        {
             *trident_state.lock().unwrap() = trident::State::Disabled(Some(runtime_config));
         } else {
             *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {

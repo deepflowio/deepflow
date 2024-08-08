@@ -188,7 +188,7 @@ func (s *LabelSynchronizer) assemble(req *trident.PrometheusLabelRequest) (*trid
 
 	err := s.prepare(toEncode)
 	if err != nil {
-		log.Error(s.org.Logf("prepare error: %+v", err))
+		log.Errorf("prepare error: %+v", err, s.org.LogPrefix)
 		return nil, err
 	}
 
@@ -326,13 +326,13 @@ func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelReques
 		// }
 	}
 	if len(nonMetricNameToCount) != 0 {
-		log.Error(s.org.Logf("metric name id not found, name to request count: %+v", nonMetricNameToCount))
+		log.Errorf("metric name id not found, name to request count: %+v", nonMetricNameToCount, s.org.LogPrefix)
 	}
 	if nonLabelNames.Cardinality() > 0 {
-		log.Error(s.org.Logf("label name id not found, names: %v", nonLabelNames.ToSlice()))
+		log.Errorf("label name id not found, names: %v", nonLabelNames.ToSlice(), s.org.LogPrefix)
 	}
 	if nonLabelValues.Cardinality() > 0 {
-		log.Error(s.org.Logf("label value id not found, values: %v", nonLabelValues.ToSlice()))
+		log.Errorf("label value id not found, values: %v", nonLabelValues.ToSlice(), s.org.LogPrefix)
 	}
 	return respMLs, nil
 }

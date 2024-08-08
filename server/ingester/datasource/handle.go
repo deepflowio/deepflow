@@ -54,7 +54,7 @@ const (
 	PROMETHEUS                               = "prometheus"
 	EVENT_EVENT                              = "event.event"
 	EVENT_PERF_EVENT                         = "event.perf_event"
-	EVENT_ALARM_EVENT                        = "event.alarm_event"
+	EVENT_ALERT_EVENT                        = "event.alert_event"
 	PROFILE                                  = "profile.in_process"
 	APPLOG                                   = "application_log.log"
 	DEEPFLOW_TENANT                          = "deepflow_tenant"
@@ -73,7 +73,7 @@ var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
 	PROMETHEUS:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}, []string{"prometheus_custom_field", "prometheus_custom_field_value"}},
 	EVENT_EVENT:       {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
 	EVENT_PERF_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"perf_event"}, []string{}},
-	EVENT_ALARM_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alarm_event"}, []string{}},
+	EVENT_ALERT_EVENT: {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
 	PROFILE:           {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
 	APPLOG:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
 	DEEPFLOW_TENANT:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 13, "deepflow_tenant", []string{"deepflow_collector"}, []string{}},

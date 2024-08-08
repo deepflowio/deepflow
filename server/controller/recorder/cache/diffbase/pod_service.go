@@ -43,12 +43,12 @@ func (b *DataSet) AddPodService(dbItem *mysql.PodService, seq int, toolDataSet *
 		AZLcuuid:         dbItem.AZ,
 		SubDomainLcuuid:  dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodService(lcuuid string) {
 	delete(b.PodServices, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodService struct {

@@ -28,12 +28,12 @@ func (b *DataSet) AddNATRule(dbItem *mysql.NATRule, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteNATRule(lcuuid string) {
 	delete(b.NATRules, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type NATRule struct {

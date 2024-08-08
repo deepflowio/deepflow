@@ -36,3 +36,10 @@ const (
 	LANGUAGE_TYPE_EBPF             = "eBPF"
 	MAX_KERNEL_STACK_DEPTH_DEFAULT = -1
 )
+
+const (
+	TAG_AGENT_ID   = "agent_id"
+	TAG_PROCESS_ID = "process_id"
+)
+
+const DATA_FORMAT_GRAFANA = "grafana"

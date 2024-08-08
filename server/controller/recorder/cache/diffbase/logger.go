@@ -21,10 +21,11 @@ import (
 
 	"github.com/op/go-logging"
 
+	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
-var log = logging.MustGetLogger("recorder.cache.diffbase")
+var log = logger.MustGetLogger("recorder.cache.diffbase")
 
 func addDiffBase(resource string, detail interface{}) string {
 	return fmt.Sprintf("%s (detail: %+v) success", common.LogAdd(resource), detail)

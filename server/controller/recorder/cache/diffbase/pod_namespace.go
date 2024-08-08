@@ -33,12 +33,12 @@ func (b *DataSet) AddPodNamespace(dbItem *mysql.PodNamespace, seq int) {
 		SubDomainLcuuid: dbItem.SubDomain,
 		CloudTags:       dbItem.CloudTags,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, b.PodNamespaces[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, b.PodNamespaces[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeletePodNamespace(lcuuid string) {
 	delete(b.PodNamespaces, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type PodNamespace struct {

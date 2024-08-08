@@ -42,12 +42,17 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 	var networks []mysql.Network
 	err := n.db.Unscoped().Find(&networks).Error
 	if err != nil {
-		log.Errorf(dbQueryResourceFailed(n.resourceTypeName, err))
+		log.Errorf(dbQueryResourceFailed(n.resourceTypeName, err), n.db.LogPrefixORGID)
 		return nil, false
 	}
 
 	keyToItem := make(map[IDKey]mysql.ChNetwork)
 	for _, network := range networks {
+		teamID, err := tagrecorder.GetTeamID(network.Domain, network.SubDomain)
+		if err != nil {
+			log.Errorf("resource(%s) %s, resource: %#v", n.resourceTypeName, err.Error(), network, n.db.LogPrefixORGID)
+		}
+
 		networkName := network.Name
 		if network.DeletedAt.Valid {
 			networkName += " (deleted)"
@@ -56,7 +61,7 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 			ID:          network.ID,
 			Name:        networkName,
 			IconID:      n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
-			TeamID:      tagrecorder.DomainToTeamID[network.Domain],
+			TeamID:      teamID,
 			DomainID:    tagrecorder.DomainToDomainID[network.Domain],
 			SubDomainID: tagrecorder.SubDomainToSubDomainID[network.SubDomain],
 		}

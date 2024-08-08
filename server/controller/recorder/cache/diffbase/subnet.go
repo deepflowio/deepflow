@@ -32,12 +32,12 @@ func (b *DataSet) AddSubnet(dbItem *mysql.Subnet, seq int) {
 		Label:           dbItem.Label,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
 
 func (b *DataSet) DeleteSubnet(lcuuid string) {
 	delete(b.Subnets, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
 type Subnet struct {
