@@ -80,7 +80,7 @@ pub mod kruise {
     )]
     #[serde(rename_all = "camelCase")]
     pub struct CloneSetSpec {
-        pub relicas: Option<i32>,
+        pub replicas: Option<i32>,
         pub selector: LabelSelector,
         pub template: PodTemplateSpec,
     }
@@ -113,7 +113,7 @@ pub mod kruise {
     )]
     #[serde(rename_all = "camelCase")]
     pub struct StatefulSetSpec {
-        pub relicas: Option<i32>,
+        pub replicas: Option<i32>,
         pub selector: LabelSelector,
         pub template: PodTemplateSpec,
     }
@@ -168,6 +168,39 @@ pub mod calico {
                 ..Default::default()
             };
             res
+        }
+    }
+}
+
+pub mod opengauss {
+    use super::*;
+
+    #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+    #[kube(
+        group = "opengauss.sig",
+        version = "v1",
+        kind = "OpenGaussCluster",
+        namespaced
+    )]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenGaussClusterSpec {}
+
+    impl Trimmable for OpenGaussCluster {
+        fn trim(mut self) -> Self {
+            let name = if let Some(name) = self.metadata.name.as_ref() {
+                name
+            } else {
+                ""
+            };
+            let mut ss = Self::new(name, self.spec);
+            ss.metadata = ObjectMeta {
+                uid: self.metadata.uid.take(),
+                name: self.metadata.name.take(),
+                namespace: self.metadata.namespace.take(),
+                labels: self.metadata.labels.take(),
+                ..Default::default()
+            };
+            ss
         }
     }
 }

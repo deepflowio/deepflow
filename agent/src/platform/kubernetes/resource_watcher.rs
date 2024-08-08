@@ -56,6 +56,7 @@ use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
 use super::crd::{
     calico::IpPool,
     kruise::{CloneSet, StatefulSet as KruiseStatefulSet},
+    opengauss::OpenGaussCluster,
     pingan::ServiceRule,
 };
 use crate::utils::stats::{
@@ -100,6 +101,7 @@ pub enum GenericResourceWatcher {
     CloneSet(ResourceWatcher<CloneSet>),
     KruiseStatefulSet(ResourceWatcher<KruiseStatefulSet>),
     IpPool(ResourceWatcher<IpPool>),
+    OpenGaussCluster(ResourceWatcher<OpenGaussCluster>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -378,6 +380,15 @@ pub fn supported_resources() -> Vec<Resource> {
             pb_name: "*v1.IPPool",
             group_versions: vec![GroupVersion {
                 group: "crd.projectcalico.org",
+                version: "v1",
+            }],
+            selected_gv: None,
+        },
+        Resource {
+            name: "opengaussclusters",
+            pb_name: "*v1.OpenGaussCluster",
+            group_versions: vec![GroupVersion {
+                group: "opengauss.sig",
                 version: "v1",
             }],
             selected_gv: None,
@@ -1329,6 +1340,9 @@ impl ResourceWatcherFactory {
                 namespace,
                 config,
             )),
+            "opengaussclusters" => GenericResourceWatcher::OpenGaussCluster(
+                self.new_watcher_inner(resource, stats_collector, namespace, config),
+            ),
             _ => {
                 warn!("unsupported resource {}", resource.name);
                 return None;
