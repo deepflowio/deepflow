@@ -22,7 +22,7 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/scs"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RedisInstance, []model.VInterface, []model.IP, error) {

@@ -33,8 +33,8 @@ import (
 	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type SyncStorage struct {

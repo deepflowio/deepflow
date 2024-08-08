@@ -21,8 +21,8 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var EmptyGPIDResponse = &api.GPIDSyncResponse{}

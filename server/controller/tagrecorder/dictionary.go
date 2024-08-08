@@ -38,7 +38,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/clickhouse"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlCommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var (

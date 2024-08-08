@@ -22,7 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type AccessType string

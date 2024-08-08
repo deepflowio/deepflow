@@ -30,11 +30,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	prometheuscommon "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/encoder"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	queriercfg "github.com/deepflowio/deepflow/server/querier/config"
 )
 

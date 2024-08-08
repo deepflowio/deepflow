@@ -43,8 +43,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	controllermodel "github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("cloud.common")
