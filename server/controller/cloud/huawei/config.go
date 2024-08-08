@@ -22,7 +22,7 @@ import (
 	"github.com/bitly/go-simplejson"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var DEFAULT_DOMAIN = "myhuaweicloud.com"

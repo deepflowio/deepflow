@@ -19,7 +19,7 @@ package event
 import (
 	"fmt"
 
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("recorder.event")

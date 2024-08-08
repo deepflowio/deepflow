@@ -26,7 +26,7 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func GetMasterGRPCConn() (*grpc.ClientConn, error) {
