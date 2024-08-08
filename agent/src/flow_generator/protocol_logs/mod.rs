@@ -37,7 +37,7 @@ use num_enum::TryFromPrimitive;
 pub use parser::{AppProto, MetaAppProto, PseudoAppProto, SessionAggregator, SLOT_WIDTH};
 pub use rpc::{
     decode_new_rpc_trace_context_with_type, BrpcInfo, BrpcLog, DubboInfo, DubboLog, SofaRpcInfo,
-    SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
+    SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY, TarsInfo, TarsLog,
 };
 pub use sql::{
     MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, OracleInfo, OracleLog, PostgreInfo,
