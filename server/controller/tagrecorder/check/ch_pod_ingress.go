@@ -54,19 +54,21 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 
 		if podIngress.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:          podIngress.ID,
-				Name:        podIngress.Name + " (deleted)",
-				TeamID:      teamID,
-				DomainID:    tagrecorder.DomainToDomainID[podIngress.Domain],
-				SubDomainID: tagrecorder.SubDomainToSubDomainID[podIngress.SubDomain],
+				ID:           podIngress.ID,
+				PodClusterID: podIngress.PodClusterID,
+				Name:         podIngress.Name + " (deleted)",
+				TeamID:       teamID,
+				DomainID:     tagrecorder.DomainToDomainID[podIngress.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podIngress.SubDomain],
 			}
 		} else {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
-				ID:          podIngress.ID,
-				Name:        podIngress.Name,
-				TeamID:      teamID,
-				DomainID:    tagrecorder.DomainToDomainID[podIngress.Domain],
-				SubDomainID: tagrecorder.SubDomainToSubDomainID[podIngress.SubDomain],
+				ID:           podIngress.ID,
+				PodClusterID: podIngress.PodClusterID,
+				Name:         podIngress.Name,
+				TeamID:       teamID,
+				DomainID:     tagrecorder.DomainToDomainID[podIngress.Domain],
+				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podIngress.SubDomain],
 			}
 		}
 	}

@@ -47,11 +47,12 @@ func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *mysql.PodIng
 
 	keys = append(keys, IDKey{ID: source.ID})
 	targets = append(targets, mysql.ChPodIngress{
-		ID:          source.ID,
-		Name:        sourceName,
-		TeamID:      md.TeamID,
-		DomainID:    md.DomainID,
-		SubDomainID: md.SubDomainID,
+		ID:           source.ID,
+		Name:         sourceName,
+		PodClusterID: source.PodClusterID,
+		TeamID:       md.TeamID,
+		DomainID:     md.DomainID,
+		SubDomainID:  md.SubDomainID,
 	})
 	return
 }
