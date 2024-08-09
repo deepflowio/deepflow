@@ -727,7 +727,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 			oldWhereSlice := strings.SplitN(outerTransSql, " PREWHERE ", 2)
 			outerSlice = append(outerSlice, oldWhereSlice[0])
 			if sorderByTag != "" {
-				outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
+				outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") GLOBAL IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
 			} else {
 				outerSlice = append(outerSlice, " PREWHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
 			}
@@ -737,7 +737,7 @@ func (e *CHEngine) ParseSlimitSql(sql string, args *common.QuerierParams) (strin
 			oldWhereSlice := strings.SplitN(outerTransSql, " WHERE ", 2)
 			outerSlice = append(outerSlice, oldWhereSlice[0])
 			if sorderByTag != "" {
-				outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
+				outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") GLOBAL IN (SELECT "+outerWhereLeftSql+" FROM ("+innerTransSql+")) AND ")
 			} else {
 				outerSlice = append(outerSlice, " WHERE ("+outerWhereLeftSql+") IN ("+innerTransSql+") AND ")
 			}
