@@ -769,13 +769,15 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 			switch noIDTag {
 			case "service", "chost", "router", "dhcpgw", "redis", "rds", "lb_listener",
-				"natgw", "lb", "host", "pod_node", "user", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess",
-				"pod_ingress", "pod_service", "ip", "alert_policy":
+				"natgw", "lb", "host", "pod_node", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess",
+				"pod_ingress", "pod_service", "ip":
 				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
 					filter = TransAlertEventNoSuffixFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 				} else {
 					filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 				}
+			case "alert_policy", "user":
+				filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
 					if strings.Contains(op, "match") {
