@@ -43,9 +43,10 @@ func NewDatabase(cfg *config.ControllerConfig) *ORGData {
 }
 
 func (d *ORGData) RegisterTo(e *gin.Engine) {
-	e.POST("/v1/org/", d.Create)
-	e.DELETE("/v1/org/:id/", d.Delete)
 	e.GET("/v1/orgs/", d.Get)
+	e.POST("/v1/org/", d.Create)
+	e.DELETE("/v1/org/:id/", d.Delete)        // provide for real-time call when deleting an organization
+	e.DELETE("/v1/org/", d.DeleteNonRealTime) // provide for non-real-time call from master controller after deleting an organization
 }
 
 func (d *ORGData) Create(c *gin.Context) {
@@ -68,6 +69,25 @@ func (d *ORGData) Delete(c *gin.Context) {
 		return
 	}
 	err = service.DeleteORGData(orgID, d.mysqlCfg)
+	common.JsonResponse(c, nil, err)
+}
+
+func (d *ORGData) DeleteNonRealTime(c *gin.Context) {
+	orgIDs, ok := c.GetQueryArray("org_id")
+	if !ok {
+		common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, "org_id is required")
+		return
+	}
+	ints := make([]int, 0, len(orgIDs))
+	for _, id := range orgIDs {
+		i, err := strconv.Atoi(id)
+		if err != nil {
+			common.BadRequestResponse(c, httpcommon.INVALID_POST_DATA, err.Error())
+			return
+		}
+		ints = append(ints, i)
+	}
+	err := service.DeleteORGDataNonRealTime(ints)
 	common.JsonResponse(c, nil, err)
 }
 
