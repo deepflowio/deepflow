@@ -269,9 +269,12 @@ func getMetricsTableName(id uint8, db, table string, t TableType) string {
 	tableId := flow_metrics.MetricsTableID(id)
 	tablePrefix := strings.Split(tableId.TableName(), ".")[0]
 	if len(table) == 0 {
+		if t == GLOBAL {
+			return fmt.Sprintf("%s.`%s`", db, tableId.TableName())
+		}
 		return fmt.Sprintf("%s.`%s_%s`", db, tableId.TableName(), t.String())
 	}
-	if len(t.String()) == 0 {
+	if t == GLOBAL {
 		return fmt.Sprintf("%s.`%s.%s`", db, tablePrefix, table)
 	}
 	return fmt.Sprintf("%s.`%s.%s_%s`", db, tablePrefix, table, t.String())
@@ -361,6 +364,9 @@ func MakeMVTableCreateSQL(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsumma
 
 	// 对于从1m,1s表进行聚合的表，使用local表作为源表
 	baseTableType := LOCAL
+	if t.DBType == ckdb.CKDBTypeByconity {
+		baseTableType = GLOBAL
+	}
 	columnTableType := MV
 	tableBase := getMetricsTableName(t.ID, db, "", baseTableType)
 
@@ -399,6 +405,9 @@ func MakeMVTableCreateSQL(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsumma
 func MakeCreateTableLocal(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsummable string) string {
 	tableAgg := getMetricsTableName(t.ID, db, dstTable, AGG)
 	tableLocal := getMetricsTableName(t.ID, db, dstTable, LOCAL)
+	if t.DBType == ckdb.CKDBTypeByconity {
+		tableLocal = getMetricsTableName(t.ID, db, dstTable, GLOBAL)
+	}
 
 	columns := []string{}
 	groupKeys := t.OrderKeys
@@ -429,6 +438,9 @@ GROUP BY %s`,
 }
 
 func MakeGlobalTableCreateSQL(t *ckdb.Table, db, dstTable string) string {
+	if t.DBType == ckdb.CKDBTypeByconity {
+		return "SELECT VERSION()"
+	}
 	tableGlobal := getMetricsTableName(t.ID, db, dstTable, GLOBAL)
 	tableLocal := getMetricsTableName(t.ID, db, dstTable, LOCAL)
 	tablePrefix := strings.Split(t.GlobalName, ".")[0]
@@ -441,15 +453,6 @@ func MakeGlobalTableCreateSQL(t *ckdb.Table, db, dstTable string) string {
 
 func (m *DatasourceManager) getMetricsTable(id flow_metrics.MetricsTableID) *ckdb.Table {
 	return flow_metrics.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, m.ckdbType, 7, 1, 7, 1, m.ckdbColdStorages)[id]
-}
-
-func deleteFirstLocalSuffix(s string) string {
-	suffix := "_local"
-	idx := strings.Index(s, suffix)
-	if idx > 0 {
-		return s[:idx] + s[idx+len(suffix):]
-	}
-	return s
 }
 
 func (m *DatasourceManager) createTableMV(cks basecommon.DBs, db string, tableId flow_metrics.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
@@ -465,17 +468,11 @@ func (m *DatasourceManager) createTableMV(cks basecommon.DBs, db string, tableId
 		partitionTime = ckdb.TimeFuncYYYYMM
 	}
 
-	globalCreateTable := MakeGlobalTableCreateSQL(table, db, dstTable)
-	localCreateTable := MakeCreateTableLocal(table, db, dstTable, aggrSummable, aggrUnsummable)
-	if m.ckdbType == ckdb.CKDBTypeByconity {
-		globalCreateTable = deleteFirstLocalSuffix(localCreateTable)
-	}
-
 	commands := []string{
 		m.makeAggTableCreateSQL(table, db, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
 		MakeMVTableCreateSQL(table, db, dstTable, aggrSummable, aggrUnsummable, aggTime),
-		localCreateTable,
-		globalCreateTable,
+		MakeCreateTableLocal(table, db, dstTable, aggrSummable, aggrUnsummable),
+		MakeGlobalTableCreateSQL(table, db, dstTable),
 	}
 	for _, cmd := range commands {
 		log.Info(cmd)
@@ -491,6 +488,9 @@ func (m *DatasourceManager) modTableMV(cks basecommon.DBs, tableId flow_metrics.
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
 		tableMod = getMetricsTableName(uint8(tableId), db, "", LOCAL)
+		if m.ckdbType == ckdb.CKDBTypeByconity {
+			tableMod = getMetricsTableName(uint8(tableId), db, "", GLOBAL)
+		}
 	} else {
 		tableMod = getMetricsTableName(uint8(tableId), db, dstTable, AGG)
 	}
