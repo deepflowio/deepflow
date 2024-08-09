@@ -133,7 +133,7 @@ func (c *Dictionary) Update() {
 					clickHouseCfg.Host = address.IP
 				}
 				for _, port := range subset.Ports {
-					if port.Name == "tcp-port" {
+					if port.Name == c.cfg.ClickHouseCfg.EndpointTcpPortName {
 						clickHouseCfg.Port = uint32(port.Port)
 						c.update(&clickHouseCfg)
 					}
