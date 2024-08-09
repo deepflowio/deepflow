@@ -84,7 +84,7 @@ func NewFlowLog(config *config.Config, traceTreeQueue *queue.OverwriteQueue, rec
 
 	flowLogWriter, err := dbwriter.NewFlowLogWriter(
 		config.Base.CKDB.ActualAddrs, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password,
-		config.Base.CKDB.ClusterName, config.Base.CKDB.StoragePolicy, config.Base.CKDB.TimeZone,
+		config.Base.CKDB.ClusterName, config.Base.CKDB.StoragePolicy, config.Base.CKDB.TimeZone, config.Base.CKDB.Type,
 		config.CKWriterConfig, config.FlowLogTTL, config.Base.GetCKDBColdStorages(), config.Base.CKDB.Watcher)
 	if err != nil {
 		return nil, err

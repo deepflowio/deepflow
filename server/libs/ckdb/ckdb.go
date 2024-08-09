@@ -260,6 +260,12 @@ const (
 	ReplicatedAggregatingMergeTree
 	ReplacingMergeTree
 	SummingMergeTree
+
+	EngineByconityOffset
+	CnchMergeTree            = MergeTree + EngineByconityOffset
+	CnchAggregatingMergeTree = AggregatingMergeTree + EngineByconityOffset
+	CnchReplacingMergeTree   = ReplacingMergeTree + EngineByconityOffset
+	CnchSummingMergeTree     = SummingMergeTree + EngineByconityOffset
 )
 
 var engineTypeString = []string{
@@ -270,6 +276,11 @@ var engineTypeString = []string{
 	ReplicatedAggregatingMergeTree: "ReplicatedAggregatingMergeTree('/clickhouse/tables/{shard}/%s/%s', '{replica}')",
 	ReplacingMergeTree:             "ReplacingMergeTree(%s)",
 	SummingMergeTree:               "SummingMergeTree(%s)",
+
+	CnchMergeTree:            "CnchMergeTree()",
+	CnchAggregatingMergeTree: "CnchAggregatingMergeTree()",
+	CnchReplacingMergeTree:   "CnchReplacingMergeTree(%s)",
+	CnchSummingMergeTree:     "CnchSummingMergeTree(%s)",
 }
 
 func (t EngineType) String() string {
@@ -298,6 +309,8 @@ const (
 	DF_CLUSTER            = "df_cluster"
 	DF_REPLICATED_CLUSTER = "df_replicated_cluster"
 	DF_TIMEZONE           = "Asia/Shanghai"
+	CKDBTypeClickhouse    = "clickhouse"
+	CKDBTypeByconity      = "byconity"
 )
 
 type Column struct {

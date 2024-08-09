@@ -32,7 +32,7 @@ const (
 	BUFFER_SIZE      = 1024
 )
 
-func GenTraceTreeCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenTraceTreeCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	table := TRACE_TREE_TABLE
 	timeKey := "time"
 	engine := ckdb.MergeTree
@@ -41,6 +41,7 @@ func GenTraceTreeCKTable(cluster, storagePolicy string, ttl int, coldStorage *ck
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        common.FLOW_LOG_DB,
+		DBType:          ckdbType,
 		LocalName:       table + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      table,
 		Columns:         tracetree.TraceTreeColumns(),
@@ -87,7 +88,7 @@ func NewTraceTreeWriter(config *config.Config, traceTreeQueue queue.QueueReader)
 		traceTreeQueue:    traceTreeQueue,
 	}
 
-	ckTable := GenTraceTreeCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, common.FLOW_LOG_DB, TRACE_TREE_TABLE))
+	ckTable := GenTraceTreeCKTable(w.ckdbCluster, w.ckdbStoragePolicy, config.Base.CKDB.Type, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, common.FLOW_LOG_DB, TRACE_TREE_TABLE))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		TRACE_TREE_TABLE, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)

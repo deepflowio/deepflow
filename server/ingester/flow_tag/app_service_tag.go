@@ -57,7 +57,7 @@ func AppServiceTagColumns() []*ckdb.Column {
 	return columns
 }
 
-func GenAppServiceTagCKTable(cluster, storagePolicy, tableName string, ttl int, partition ckdb.TimeFuncType) *ckdb.Table {
+func GenAppServiceTagCKTable(cluster, storagePolicy, tableName, ckdbType string, ttl int, partition ckdb.TimeFuncType) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.ReplacingMergeTree
 	orderKeys := []string{"table", "app_service", "app_instance"}
@@ -65,6 +65,7 @@ func GenAppServiceTagCKTable(cluster, storagePolicy, tableName string, ttl int, 
 	return &ckdb.Table{
 		Version:         common.CK_VERSION,
 		Database:        FLOW_TAG_DB,
+		DBType:          ckdbType,
 		LocalName:       tableName + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      tableName,
 		Columns:         AppServiceTagColumns(),

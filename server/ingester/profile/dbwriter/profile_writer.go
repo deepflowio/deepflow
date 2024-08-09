@@ -95,7 +95,7 @@ func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *co
 		writerConfig:      config.CKWriterConfig,
 		counter:           &Counter{},
 	}
-	table := GenProfileCKTable(writer.ckdbCluster, PROFILE_DB, PROFILE_TABLE, writer.ckdbStoragePolicy, writer.ttl, ckdb.GetColdStorage(writer.ckdbColdStorages, PROFILE_DB, PROFILE_TABLE))
+	table := GenProfileCKTable(writer.ckdbCluster, PROFILE_DB, PROFILE_TABLE, writer.ckdbStoragePolicy, config.Base.CKDB.Type, writer.ttl, ckdb.GetColdStorage(writer.ckdbColdStorages, PROFILE_DB, PROFILE_TABLE))
 	ckwriter, err := ckwriter.NewCKWriter(
 		writer.ckdbAddrs,
 		writer.ckdbUsername,

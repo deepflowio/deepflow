@@ -67,7 +67,7 @@ func NewAppLogWriter(index int, msgType datatype.MessageType, config *config.Con
 
 func NewAppLogCKWriter(cfg *config.Config) (*ckwriter.CKWriter, error) {
 	ckdbCfg := cfg.Base.CKDB
-	ckTable := GenLogCKTable(ckdbCfg.ClusterName, ckdbCfg.StoragePolicy, LOG_TABLE, cfg.TTL, ckdb.GetColdStorage(cfg.Base.GetCKDBColdStorages(), LOG_DB, LOG_TABLE))
+	ckTable := GenLogCKTable(ckdbCfg.ClusterName, ckdbCfg.StoragePolicy, LOG_TABLE, ckdbCfg.Type, cfg.TTL, ckdb.GetColdStorage(cfg.Base.GetCKDBColdStorages(), LOG_DB, LOG_TABLE))
 	return ckwriter.NewCKWriter(ckdbCfg.ActualAddrs, cfg.Base.CKDBAuth.Username, cfg.Base.CKDBAuth.Password,
 		LOG_TABLE, cfg.Base.CKDB.TimeZone, ckTable, cfg.CKWriterConfig.QueueCount, cfg.CKWriterConfig.QueueSize, cfg.CKWriterConfig.BatchSize, cfg.CKWriterConfig.FlushTimeout, cfg.Base.CKDB.Watcher)
 }
