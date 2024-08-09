@@ -298,12 +298,14 @@ func CutKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int,
 
 func NewProfileDebug(sql string, querierDebug map[string]interface{}) (profileDebug model.Debug) {
 	profileDebug.Sql = sql
-	qDebug := querierDebug["query_sqls"].([]client.Debug)[0]
-	profileDebug.IP = qDebug.IP
-	profileDebug.QueryUUID = qDebug.QueryUUID
-	profileDebug.SqlCH = qDebug.Sql
-	profileDebug.Error = qDebug.Error
-	profileDebug.QueryTime = qDebug.QueryTime
+	if querierDebug != nil {
+		qDebug := querierDebug["query_sqls"].([]client.Debug)[0]
+		profileDebug.IP = qDebug.IP
+		profileDebug.QueryUUID = qDebug.QueryUUID
+		profileDebug.SqlCH = qDebug.Sql
+		profileDebug.Error = qDebug.Error
+		profileDebug.QueryTime = qDebug.QueryTime
+	}
 	return
 }
 

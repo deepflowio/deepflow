@@ -122,7 +122,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	// Parse withSql
 	withResult, withDebug, err := e.QueryWithSql(sql, args)
 	if err != nil {
-		return nil, nil, err
+		debug_info.Debug = append(debug_info.Debug, *withDebug)
+		return nil, debug_info.Get(), err
 	}
 	if withResult != nil {
 		debug_info.Debug = append(debug_info.Debug, *withDebug)
@@ -131,7 +132,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	// Parse slimitSql
 	slimitResult, slimitDebug, err := e.QuerySlimitSql(sql, args)
 	if err != nil {
-		return nil, nil, err
+		debug_info.Debug = append(debug_info.Debug, *slimitDebug)
+		return nil, debug_info.Get(), err
 	}
 	if slimitResult != nil {
 		debug_info.Debug = append(debug_info.Debug, *slimitDebug)
@@ -223,7 +225,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 		result, err := chClient.DoQuery(params)
 		if err != nil {
 			log.Error(err)
-			return nil, nil, err
+			debug_info.Debug = append(debug_info.Debug, *debug)
+			return nil, debug_info.Get(), err
 		}
 		if result != nil {
 			results.Values = append(results.Values, result.Values...)
