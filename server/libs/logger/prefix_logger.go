@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/libs/logger/blocker"
 )
@@ -34,34 +34,30 @@ type Prefix interface {
 var defaultORGID = 1
 
 // ORGPrefix implements LogPrefix to provide a prefix for log messages with an organization ID.
-type ORGPrefix struct {
-	ID int
-}
+type ORGPrefix int
 
 func NewORGPrefix(id int) Prefix {
-	return &ORGPrefix{id}
+	return ORGPrefix(id)
 }
 
-func (o *ORGPrefix) Prefix() string {
-	if blocker.IfBlockORGID(o.ID) {
+func (o ORGPrefix) Prefix() string {
+	if blocker.IfBlockORGID(int(o)) {
 		return ""
 	}
-	return fmt.Sprintf("[ORGID-%d]", o.ID)
+	return fmt.Sprintf("[ORGID-%d]", o)
 }
 
-type TeamPrefix struct {
-	ID int
-}
+type TeamPrefix int
 
 func NewTeamPrefix(id int) Prefix {
-	return &TeamPrefix{id}
+	return TeamPrefix(id)
 }
 
-func (t *TeamPrefix) Prefix() string {
-	if blocker.IfBlockTeamID(t.ID) {
+func (t TeamPrefix) Prefix() string {
+	if blocker.IfBlockTeamID(int(t)) {
 		return ""
 	}
-	return fmt.Sprintf("[TeamID-%d]", t.ID)
+	return fmt.Sprintf("[TeamID-%d]", t)
 }
 
 var argsJoiner = " "
@@ -73,7 +69,7 @@ var argsJoiner = " "
 // Example:
 //
 //	// logger is a *Logger, ORGPrefix is the struct which implements Prefix interface and returns the organization ID information.
-//	logger.Info("message", &ORGPrefix{2})
+//	logger.Info("message", ORGPrefix(2))
 //
 //	will log: "[ORGID-2] message"
 type Logger struct {
