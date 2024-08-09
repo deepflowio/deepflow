@@ -21,6 +21,8 @@
 #include "../bihash_32_8.h"
 #include "../../kernel/include/perf_profiler.h"
 
+#define LOG_CP_TAG	"[CP] "
+
 #define PROFILER_CTX_NUM 3
 // For storing information about continuously running profiling processes.
 #define DEEPFLOW_RUNNING_PID_PATH "/tmp/.deepflow-agent-running-pid"

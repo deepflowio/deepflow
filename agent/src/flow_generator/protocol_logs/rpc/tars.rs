@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
- use crate::{
+use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
@@ -33,8 +33,8 @@
 use serde::Serialize;
 use std::str;
 
-/* 
-These parameters can be determined from the framework code (Refer to the notes below) 
+/*
+These parameters can be determined from the framework code (Refer to the notes below)
 based on the actual value range of some data in the header.
 */
 const MIN_BODY_SIZE: usize = 12;
@@ -86,15 +86,15 @@ pub struct TarsInfo {
     endpoint: Option<String>,
 }
 
-/* 
+/*
 tars reference
 -----------------------
 1. Basic types and packets of TARS protocols
 https://doc.tarsyun.com/#/base/tars-protocol.md
 
 -----------------------
-2. For detailed protocol implementation, 
-   maybe you need to refer to the official framework code, 
+2. For detailed protocol implementation,
+   maybe you need to refer to the official framework code,
    and the protocol documentation is not very detailed
 https://github.com/TarsCloud
 
@@ -107,20 +107,20 @@ Framework code discovery is not mentioned in the protocol documentation:
 -----------------------
 */
 
-const TYPE_INT8        : u8 = 0;
-const TYPE_INT16       : u8 = 1;
-const TYPE_INT32       : u8 = 2;
-const TYPE_INT64       : u8 = 3;
-const TYPE_FLOAT       : u8 = 4;
-const TYPE_DOUBLE      : u8 = 5;
-const TYPE_STRING1     : u8 = 6;
-const TYPE_STRING4     : u8 = 7;
-const TYPE_MAPS        : u8 = 8;
-const TYPE_LIST        : u8 = 9;
+const TYPE_INT8: u8 = 0;
+const TYPE_INT16: u8 = 1;
+const TYPE_INT32: u8 = 2;
+const TYPE_INT64: u8 = 3;
+const TYPE_FLOAT: u8 = 4;
+const TYPE_DOUBLE: u8 = 5;
+const TYPE_STRING1: u8 = 6;
+const TYPE_STRING4: u8 = 7;
+const TYPE_MAPS: u8 = 8;
+const TYPE_LIST: u8 = 9;
 const TYPE_STRUCT_BEGIN: u8 = 10;
-const TYPE_STRUCT_END  : u8 = 11;
-const TYPE_ZERO        : u8 = 12;
-const TYPE_SIMPLE_LIST : u8 = 13;
+const TYPE_STRUCT_END: u8 = 11;
+const TYPE_ZERO: u8 = 12;
+const TYPE_SIMPLE_LIST: u8 = 13;
 
 /*
 The parsing rules are:
@@ -132,8 +132,8 @@ The meaning of parameters in some codes:
 head_x: Data header of the xth field
 data_x: The actual data of the xth field
 
-Since the value range of the first few fields is limited, 
-it may not be necessary to distinguish all shaping types. 
+Since the value range of the first few fields is limited,
+it may not be necessary to distinguish all shaping types.
 For details, please refer to the protocol document and actual framework code.
 */
 
@@ -144,16 +144,16 @@ impl TarsInfo {
         if body_size < MIN_BODY_SIZE {
             return None;
         }
-    
+
         let head_ver = ByteParser::from(payload[HEADER_SIZE]);
         if head_ver.tag != TYPE_INT16 || head_ver.byte_type != TYPE_INT8 {
             return None;
         }
-    
+
         if !matches!(payload[VERSION_INDEX], 1 | 3) {
             return None;
         }
-    
+
         let mut len = INITIAL_LEN;
         let head_pkt_type = ByteParser::from(payload[INITIAL_LEN - 1]);
         let pkt_type = match head_pkt_type.byte_type {
@@ -165,14 +165,14 @@ impl TarsInfo {
             TYPE_ZERO => 0,
             _ => return None,
         };
-    
+
         let mut head_fields = Vec::new();
         let mut data_fields = Vec::new();
-    
+
         for _ in 0..2 {
             let head_field = ByteParser::from(payload[len]);
             len += 1;
-    
+
             let data_field = match head_field.byte_type {
                 TYPE_INT8 => {
                     let value = payload[len] as u32;
@@ -195,10 +195,10 @@ impl TarsInfo {
             head_fields.push(head_field);
             data_fields.push(data_field);
         }
-    
+
         let head_name_or_ret = ByteParser::from(payload[len]);
         len += 1;
-    
+
         match head_name_or_ret.tag {
             5 => match head_name_or_ret.byte_type {
                 TYPE_STRING1 | TYPE_STRING4 => {
@@ -209,7 +209,7 @@ impl TarsInfo {
                     info.imsg_type = data_fields[0];
                     info.pkg_type = pkt_type;
                     info.captured_request_byte = (payload.len() - len) as u32;
-    
+
                     let size = if head_name_or_ret.byte_type == TYPE_STRING1 {
                         let size = payload[len] as usize;
                         len += 1;
@@ -217,10 +217,11 @@ impl TarsInfo {
                     } else {
                         0
                     };
-                    
-                    info.req_service_name = Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
+
+                    info.req_service_name =
+                        Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
                     len += size;
-    
+
                     let head_func_name = ByteParser::from(payload[len]);
                     len += 1;
                     let size = if head_func_name.byte_type == TYPE_STRING1 {
@@ -230,11 +231,12 @@ impl TarsInfo {
                     } else {
                         0
                     };
-    
+
                     if len + size >= payload.len() {
                         return None;
                     }
-                    info.req_method_name = Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
+                    info.req_method_name =
+                        Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
                 }
                 _ => {
                     info.msg_type = LogMessageType::Response;
@@ -253,10 +255,9 @@ impl TarsInfo {
             },
             _ => return None,
         }
-    
+
         Some((payload, info))
     }
-    
 
     fn merge(&mut self, other: &mut Self) {
         if other.is_on_blacklist {

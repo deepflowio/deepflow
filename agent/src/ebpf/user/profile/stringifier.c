@@ -60,6 +60,7 @@
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
 #include "../proc.h"
+#include "trace_utils.h"
 
 static const char *k_err_tag = "[kernel stack trace error]";
 static const char *u_err_tag = "[user stack trace error]";
@@ -172,14 +173,31 @@ static char *kern_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	return ptr;
 }
 
+#define RUST_SYM_SUFFIX "::h0123456789abcdef"
+#define RUST_SYM_MAX_LEN 512
+
 static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 {
 	ASSERT(pid >= 0);
 
 	int len = 0;
-	char *ptr = NULL;
-	len = strlen(sym->demangle_name) + strlen(u_sym_prefix);
-	ptr = (char *)sym->demangle_name;
+	char *ptr = (char *)sym->demangle_name;
+
+	// rust symbols ends with "::h0123456789abcdef", which is "::h" followed by 16 hex digits
+	// for example:
+	//     std::sys_common::backtrace::__rust_begin_short_backtrace::h4385d813972dd7eb
+	// try rustc_demangle if we see this pattern
+	int offset = strlen(sym->demangle_name) - strlen(RUST_SYM_SUFFIX);
+	if (offset > 0 && strncmp(sym->demangle_name + offset, "::h", 3) == 0) {
+		// likely a rust name
+		char rust_name[RUST_SYM_MAX_LEN];
+		memset(rust_name, 0, sizeof(rust_name));
+		if (rustc_demangle(sym->name, rust_name, RUST_SYM_MAX_LEN) > 0) {
+			ptr = rust_name;
+		}
+	}
+
+	len = strlen(ptr) + strlen(u_sym_prefix);
 	char *u_prefix = (char *)u_sym_prefix;
 	if (sym->module != NULL && strlen(sym->module) > 0) {
 		if (strstr(sym->module, ".so")) {
@@ -485,7 +503,9 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	}
 
 	/* Remove the semicolon at the end of the string. */
-	fold_stack_trace_str[len - 1] = '\0';
+	if (len - 1 >= 0) {
+		fold_stack_trace_str[len - 1] = '\0';
+	}
 	vec_free(symbol_array);
 	return fold_stack_trace_str;
 
@@ -571,6 +591,7 @@ static inline char *alloc_stack_trace_str(int len)
 char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
+				      const char *custom_stack_map_name,
 				      stack_str_hash_t * h,
 				      bool new_cache,
 				      char *process_name, void *info_p, bool ignore_libs)
@@ -637,7 +658,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
-							stack_map_name,
+							v->flags & STACK_TRACE_FLAGS_DWARF ? custom_stack_map_name : stack_map_name,
 							h, new_cache, info_p,
 							v->timestamp, ignore_libs);
 		if (u_trace_str == NULL)
