@@ -229,6 +229,24 @@ func TransChostFilter(translator, regexpTranslator, op, value string) (filter st
 	return
 }
 
+func TransAlertEventNoSuffixFilter(translator, regexpTranslator, op, value string) (filter string) {
+	switch strings.ToLower(op) {
+	case "match":
+		filter = fmt.Sprintf(regexpTranslator, op, value, op, value, op, value)
+	case "not match":
+		filter = "not(" + fmt.Sprintf(regexpTranslator, "match", value, "match", value, "match", value) + ")"
+	case "not ilike":
+		filter = "not(" + fmt.Sprintf(translator, "ilike", value, "ilike", value, "ilike", value) + ")"
+	case "not in":
+		filter = "not(" + fmt.Sprintf(translator, "in", value, "in", value, "in", value) + ")"
+	case "!=":
+		filter = "not(" + fmt.Sprintf(translator, "=", value, "=", value, "=", value) + ")"
+	default:
+		filter = fmt.Sprintf(translator, op, value, op, value, op, value)
+	}
+	return
+}
+
 // pod_ingress, pod_service,
 // x_request_id, syscall_thread, syscall_coroutine, syscall_cap_seq, syscall_trace_id, tcp_seq
 func TransIngressFilter(translator, regexpTranslator, op, value string) (filter string) {
@@ -571,7 +589,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					return &view.Expr{Value: filter}, nil
 				}
-			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map":
+			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map", "pod_ingress_map", "pod_node_map":
 				checkTag := strings.TrimSuffix(t.Tag, "_id")
 				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
 					if strings.HasSuffix(t.Tag, "_id") {
@@ -743,16 +761,34 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		}
 		if ok {
-			switch t.Tag {
+			noSuffixTag := strings.TrimSuffix(strings.Trim(t.Tag, "`"), "_0")
+			noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
+			noIDTag := noSuffixTag
+			if !slices.Contains([]string{"_id", "pod_service_id"}, noSuffixTag) {
+				noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
+			}
+			switch noIDTag {
 			case "service", "chost", "router", "dhcpgw", "redis", "rds", "lb_listener",
 				"natgw", "lb", "host", "pod_node", "user", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess",
-				"pod_ingress", "pod_service", "alert_policy":
-				filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
-			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
-				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+				"pod_ingress", "pod_service", "ip", "alert_policy":
+				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
+					filter = TransAlertEventNoSuffixFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+					filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
+				}
+			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
+				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
+					if strings.Contains(op, "match") {
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+					} else {
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+					}
+				} else {
+					if strings.Contains(op, "match") {
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+					} else {
+						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+					}
 				}
 			default:
 				if strings.Contains(op, "match") {
@@ -1377,7 +1413,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 						}
 					}
 				} else {
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " AND " + tagName + " != " + f.Value
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName) + " AND " + tagName + " != " + f.Value
 				}
 			case "not match":
 				if strings.Contains(tagName, "pod_group_type") {

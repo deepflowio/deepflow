@@ -37,7 +37,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	mysql_model "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -45,6 +44,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("trisolaris.vtap")
@@ -303,7 +303,7 @@ func (v *VTapInfo) loadDeviceData() {
 				hypervNetworkHostIds.Add(hostDevice.ID)
 			}
 			vifs, ok := hostIDToVifs[hostDevice.ID]
-			if ok == false {
+			if !ok {
 				continue
 			}
 			vpcID := 0
@@ -465,7 +465,7 @@ func isBlank(value reflect.Value) bool {
 }
 
 func JudgeField(field string) bool {
-	for _, name := range []string{"ID", "VTapGroupLcuuid", "Lcuuid"} {
+	for _, name := range []string{"ID", "VTapGroupLcuuid", "Lcuuid", "TapInterfaceRegex"} {
 		if field == name {
 			return true
 		}
@@ -510,13 +510,13 @@ func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) 
 		tv := reflect.ValueOf(config).Elem()
 		for i := 0; i < tv.NumField(); i++ {
 			field := tt.Field(i)
-			if JudgeField(field.Name) == true {
-				typeOfVTapConfiguration.Field(i).Set(tv.Field(i))
+			value := tv.Field(i)
+			if JudgeField(field.Name) {
+				typeOfVTapConfiguration.Field(i).Set(value)
 				continue
 			}
-			value := tv.Field(i)
 			defaultValue := typeOfDefaultConfig.Field(i)
-			if isBlank(value) == false {
+			if !isBlank(value) {
 				typeOfVTapConfiguration.Field(i).Set(value)
 			} else {
 				typeOfVTapConfiguration.Field(i).Set(defaultValue)
@@ -549,7 +549,7 @@ func (v *VTapInfo) GetVTapConfigFromShortID(shortID string) *VTapConfig {
 		return nil
 	}
 	lcuuid, ok := v.vtapGroupShortIDToLcuuid[shortID]
-	if ok == false {
+	if !ok {
 		return nil
 	}
 
@@ -568,7 +568,7 @@ func (v *VTapInfo) GetVTapLocalConfigByShortID(shortID string) string {
 		return ""
 	}
 	lcuuid, ok := v.vtapGroupShortIDToLcuuid[shortID]
-	if ok == false {
+	if !ok {
 		return ""
 	}
 
@@ -943,7 +943,7 @@ func (v *VTapInfo) getVTapPodDomains(c *VTapCache) []string {
 		for vmID := range vmIDs.Iter() {
 			id := vmID.(int)
 			podNodeID, ok := vmidToPodNodeID[id]
-			if ok == false {
+			if !ok {
 				continue
 			}
 			podNodeIDs = append(podNodeIDs, podNodeID)
@@ -1045,7 +1045,7 @@ func (v *VTapInfo) updateCacheToDB() {
 			continue
 		}
 		dbVTap, ok := keytoDBVTap[cacheKey]
-		if ok == false {
+		if !ok {
 			continue
 		}
 		if dbVTap.Type == VTAP_TYPE_TUNNEL_DECAPSULATION {
@@ -1133,7 +1133,7 @@ func (v *VTapInfo) updateCacheToDB() {
 			}
 		}
 
-		if filterFlag == true {
+		if filterFlag {
 			updateVTaps = append(updateVTaps, dbVTap)
 		}
 	}

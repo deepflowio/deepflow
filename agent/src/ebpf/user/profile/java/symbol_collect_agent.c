@@ -63,6 +63,10 @@ char perf_log_socket_path[128];
 
 int perf_map_socket_fd = -1;
 int perf_map_log_socket_fd = -1;
+
+// Cache symbols for batch sending
+char g_symbol_buffer[STRING_BUFFER_SIZE * 4];
+int g_cached_bytes;
 jint close_files(void);
 
 #define _(e)                                                                \
@@ -301,6 +305,7 @@ void df_send_symbol(enum event_type type, const void *code_addr,
 		return;
 	}
 
+	int send_bytes;
 	struct symbol_metadata *meta;
 	char symbol_str[STRING_BUFFER_SIZE];
 	if (type == METHOD_UNLOAD) {
@@ -315,8 +320,30 @@ void df_send_symbol(enum event_type type, const void *code_addr,
 	meta = (struct symbol_metadata *)symbol_str;
 	meta->len = strlen(symbol_str + sizeof(*meta));
 	meta->type = type;
+	send_bytes = meta->len + sizeof(*meta);
 	pthread_mutex_lock(&g_df_lock);
-	send_msg(perf_map_socket_fd, symbol_str, meta->len + sizeof(*meta));
+	if (replay_finish) {
+		if (g_cached_bytes > 0) {
+			send_msg(perf_map_socket_fd, g_symbol_buffer,
+				 g_cached_bytes);
+			g_cached_bytes = 0;
+		}
+		send_msg(perf_map_socket_fd, symbol_str, send_bytes);
+	} else {
+		int buff_remain_bytes =
+		    sizeof(g_symbol_buffer) - g_cached_bytes;
+		if (buff_remain_bytes >= send_bytes) {
+			memcpy(g_symbol_buffer + g_cached_bytes, symbol_str,
+			       send_bytes);
+			g_cached_bytes += send_bytes;
+		} else {
+			send_msg(perf_map_socket_fd, g_symbol_buffer,
+				 g_cached_bytes);
+			memcpy(g_symbol_buffer, symbol_str, send_bytes);
+			g_cached_bytes = send_bytes;
+		}
+	}
+
 	if (!replay_finish)
 		replay_count++;
 	pthread_mutex_unlock(&g_df_lock);
@@ -505,6 +532,7 @@ Agent_OnAttach(JavaVM * vm, char *options, void *reserved)
 	_(get_jvmti_env(vm, &jvmti));
 
 enable_replay:
+	g_cached_bytes = 0;
 	_(df_agent_config(options));
 	_(open_perf_map_log_file(getpid()));
 	_(open_perf_map_file(getpid()));

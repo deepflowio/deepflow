@@ -25,9 +25,9 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/trident"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type UpgradeEvent struct{}

@@ -23,7 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string, map[string]string, error) {

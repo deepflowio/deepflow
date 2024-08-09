@@ -39,7 +39,7 @@ const (
 	INTERVAL_HOUR = 60
 	INTERVAL_DAY  = 1440
 	DEFAULT_TTL   = 168
-	RETRY_COUNT   = 3
+	RETRY_COUNT   = 2
 )
 
 type Issu struct {
@@ -892,7 +892,7 @@ func Query(connect *sql.DB, sql string) (*sql.Rows, error) {
 	retryTimes := RETRY_COUNT
 	for err != nil && retryTimes > 0 {
 		log.Warningf("Query SQL (%s) failed: %s, will retry", sql, err)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 		rows, err = connect.Query(sql)
 		if err == nil {
 			log.Infof("Retry query SQL (%s) success", sql)
@@ -908,7 +908,7 @@ func Exec(connect *sql.DB, sql string) (sql.Result, error) {
 	retryTimes := RETRY_COUNT
 	for err != nil && retryTimes > 0 {
 		log.Warningf("Exec SQL (%s) failed: %s, will retry", sql, err)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 		result, err = connect.Exec(sql)
 		if err == nil {
 			log.Infof("Retry exec SQL (%s) success", sql)
