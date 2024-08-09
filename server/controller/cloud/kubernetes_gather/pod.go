@@ -117,7 +117,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		podGroupLcuuid := ""
 		podLcuuid := ""
 		pgLcuuid := common.IDGenerateUUID(k.orgID, podGroupUID)
-		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[podGroupUID]; ok {
+		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[pgLcuuid]; ok {
 			podRSLcuuid = pgLcuuid
 			podGroupLcuuid = gLcuuid
 		} else {
