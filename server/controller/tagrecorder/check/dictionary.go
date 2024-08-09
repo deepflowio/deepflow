@@ -86,7 +86,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 					clickHouseCfg.Host = address.IP
 				}
 				for _, port := range subset.Ports {
-					if port.Name == "tcp-port" {
+					if port.Name == c.cfg.ClickHouseCfg.EndpointTcpPortName {
 						clickHouseCfg.Port = uint32(port.Port)
 						// 在本区域所有数据节点更新字典
 						// Update the dictionary at all data nodes in the region
