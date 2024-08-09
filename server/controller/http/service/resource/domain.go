@@ -39,11 +39,11 @@ import (
 	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	svc "github.com/deepflowio/deepflow/server/controller/http/service"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("service.resource")

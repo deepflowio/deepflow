@@ -23,7 +23,7 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/vpc"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]string) (

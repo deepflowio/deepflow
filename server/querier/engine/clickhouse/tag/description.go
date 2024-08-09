@@ -951,9 +951,9 @@ func GetAlertEventTagDescriptions(staticTag, dynamicTag *common.Result) (respons
 
 	// if dynamiic tag_name not in staticvalues, add to result
 	for _, dynamicItem := range dynamiicValues {
-		dynamicTagName := strings.TrimPrefix(dynamicItem.([]interface{})[0].(string), "_0")
-		dynamicTagName = strings.TrimPrefix(dynamicTagName, "_1")
-		dynamicTagName = strings.TrimPrefix(dynamicTagName, "_id")
+		dynamicTagName := strings.TrimSuffix(dynamicItem.([]interface{})[0].(string), "_0")
+		dynamicTagName = strings.TrimSuffix(dynamicTagName, "_1")
+		dynamicTagName = strings.TrimSuffix(dynamicTagName, "_id")
 		if valuesMap[dynamicTagName] == nil && valuesMap[dynamicItem.([]interface{})[0].(string)] == nil {
 			valuesMap[dynamicTagName] = dynamicItem
 		}

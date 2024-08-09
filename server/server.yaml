@@ -346,6 +346,7 @@ querier:
     timeout: 60
     max-connection: 20
     # user-password:
+    endpoint-tcp-port-name: tcp-port
 
   # profile相关配置
   profile:

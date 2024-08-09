@@ -33,8 +33,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 const (

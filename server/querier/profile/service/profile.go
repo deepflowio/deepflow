@@ -153,7 +153,13 @@ func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string
 		// 3. decompress & cut kernel function
 		profileLocationStrByte, _ = ingester_common.ZstdDecompress(profileLocationStrByte, utils.Slice(profileLocationCompress))
 		if *args.MaxKernelStackDepth != common.MAX_KERNEL_STACK_DEPTH_DEFAULT && args.ProfileLanguageType == common.LANGUAGE_TYPE_EBPF {
-			profileLocationStrByte = CutKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth)
+			cutted := false
+			// cut kernel functions
+			profileLocationStrByte, cutted = CutKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth, "[k]")
+			if !cutted {
+				// cut cuda functions
+				profileLocationStrByte, _ = CutKernelFunction(profileLocationStrByte, *args.MaxKernelStackDepth, "[c]")
+			}
 		}
 
 		// 4. merge to profile tree
@@ -236,6 +242,8 @@ func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string
 	}
 
 	result.Functions = locations
+	locationTypes := GetLocationType(locations, result.FunctionValues.Values, args.ProfileEventType)
+	result.FunctionTypes = locationTypes
 	result.FunctionValues.Columns = []string{"self_value", "total_value"}
 	result.NodeValues.Columns = []string{"function_id", "parent_node_id", "self_value", "total_value"}
 	formatEndTime := int64(time.Since(formatStartTime))
@@ -267,9 +275,9 @@ func updateAllParentNodes(nodes []model.ProfileTreeNode, thisNodeID, selfValue, 
 
 }
 
-func CutKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int) []byte {
+func CutKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int, sep string) ([]byte, bool) {
 	startIndex := 0
-	sep := "[k]"
+	cutted := true
 	clipIndex := len(profileLocationByteSlice)
 	for layer := -1; layer < maxKernelStackDepth; layer++ {
 		kernelFuncIndex := strings.Index(utils.String(profileLocationByteSlice[startIndex:]), sep)
@@ -282,8 +290,10 @@ func CutKernelFunction(profileLocationByteSlice []byte, maxKernelStackDepth int)
 	}
 	if clipIndex > 0 && clipIndex < len(profileLocationByteSlice) {
 		clipIndex -= 1
+	} else {
+		cutted = false
 	}
-	return profileLocationByteSlice[:clipIndex]
+	return profileLocationByteSlice[:clipIndex], cutted
 }
 
 func NewProfileDebug(sql string, querierDebug map[string]interface{}) (profileDebug model.Debug) {
@@ -295,4 +305,36 @@ func NewProfileDebug(sql string, querierDebug map[string]interface{}) (profileDe
 	profileDebug.Error = qDebug.Error
 	profileDebug.QueryTime = qDebug.QueryTime
 	return
+}
+
+func GetLocationType(locations []string, locationValues [][]int, profileEventType string) []string {
+	locationTypes := make([]string, len(locations))
+	for i, location := range locations {
+		if locationValues[i][0] == locationValues[i][1] && strings.HasPrefix(profileEventType, "mem-") { // leaf node && memory profile
+			locationTypes[i] = "O" // object type
+		} else if i == 0 { // root node
+			if location != "Total" {
+				locationTypes[i] = "P" // process
+			} else {
+				locationTypes[i] = "H" // host
+			}
+		} else {
+			hasLocationType := false
+			for preffix, locatonType := range common.LOCATION_TYPE_MAP {
+				if strings.HasPrefix(location, preffix) {
+					locationTypes[i] = locatonType
+					hasLocationType = true
+					break
+				}
+			}
+			if !hasLocationType {
+				if strings.HasPrefix(location, "[") {
+					locationTypes[i] = "?" // unknown
+				} else {
+					locationTypes[i] = "A" // application function
+				}
+			}
+		}
+	}
+	return locationTypes
 }
