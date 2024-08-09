@@ -176,8 +176,9 @@ func (c *DeletedORGChecker) Stop() {
 }
 
 func (c *DeletedORGChecker) checkRegularly(sCtx context.Context) {
+	c.check()
 	go func() {
-		ticker := time.NewTicker(time.Duration(5) * time.Minute)
+		ticker := time.NewTicker(time.Duration(1) * time.Minute)
 		defer ticker.Stop()
 	LOOP:
 		for {
