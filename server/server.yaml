@@ -409,15 +409,21 @@ ingester:
   #ckdb:
   #  # use internal or external ckdb
   #  external: false
+  #  # database type: suport 'clickhouse', 'byconity', default is 'clickhouse'
+  #  type: clickhouse
+  #  # if type is 'byconity', default host is 'byconity-server', else 'deepflow-clickhouse'
   #  host: deepflow-clickhouse
   #  port: 9000
   #  # for get clickchouse endpoints tcp port value
   #  endpoint-tcp-port-name: tcp-port
   #  # if `external` is 'true', default value is 'default', else 'df_cluster'
+  #  # if type is 'byconity', this setting is invalid
   #  cluster-name:
-  #  # if `external` is 'true', default value 'default', else 'df_storage'
+  #  # if `external` is 'true', default value is 'default', else 'df_storage'
+  #  # if type is 'byconity', default value is 'cnch_default_s3'
   #  storage-policy:
-  #  A list of supported time zones can be found in https://www.iana.org/time-zones and also can be queried by SELECT * FROM system.time_zones
+  #  # A list of supported time zones can be found in https://www.iana.org/time-zones and also can be queried by SELECT * FROM system.time_zones
+  #  # if type is 'byconity', this setting is ignored
   #  time-zone: Asia/Shanghai
 
   ## This configuration is only valid when the ClickHouse tables have not yet been created. If the tables have been created, you need to delete the databases/tables and restart to create the tables according to the configuration

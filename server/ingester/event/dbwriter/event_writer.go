@@ -102,7 +102,7 @@ func NewEventWriter(eventType common.EventType, decoderIndex int, config *config
 	}
 	w.flowTagWriter = flowTagWriter
 
-	ckTable := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, table, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, table))
+	ckTable := GenEventCKTable(w.ckdbCluster, w.ckdbStoragePolicy, table, config.Base.CKDB.Type, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, table))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		fmt.Sprintf("%s-%d", eventType, decoderIndex), config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)

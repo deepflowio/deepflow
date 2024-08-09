@@ -106,7 +106,7 @@ func ReleasePcapStore(l *PcapStore) {
 	poolPcapStore.Put(l)
 }
 
-func GenPcapCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenPcapCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
 	orderKeys := []string{"flow_id", timeKey, "agent_id"}
@@ -114,6 +114,7 @@ func GenPcapCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.Co
 	return &ckdb.Table{
 		Version:         common.CK_VERSION,
 		Database:        PCAP_DB,
+		DBType:          ckdbType,
 		LocalName:       PCAP_TABLE + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      PCAP_TABLE,
 		Columns:         PcapStoreColumns(),
