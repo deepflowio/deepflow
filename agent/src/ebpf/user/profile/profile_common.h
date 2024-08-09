@@ -17,6 +17,18 @@
 #ifndef DF_USER_PROFILE_COMMON_H
 #define DF_USER_PROFILE_COMMON_H
 
+#include "../load.h"
+#include "perf_profiler.h"
+#include "stringifier.h"
+
+typedef struct {
+	char name[MAP_NAME_SZ];
+	// Record all stack IDs in each iteration for quick retrieval.
+	struct stack_ids_bitmap ids;
+	// This vector table is used to remove a stack from the stack map.
+	int *clear_ids;
+} stack_map_t;
+
 struct profiler_context {
 	// profiler name
 	const char *name;
@@ -29,9 +41,11 @@ struct profiler_context {
 	// The dual-buffered reader is used to read data from the perf buffer.
 	struct bpf_perf_reader *r_a;
 	struct bpf_perf_reader *r_b;
-	// stack map name
-	char stack_map_name_a[MAP_NAME_SZ];
-	char stack_map_name_b[MAP_NAME_SZ];
+
+	stack_map_t stack_map_a;
+	stack_map_t stack_map_b;
+	stack_map_t custom_stack_map_a;
+	stack_map_t custom_stack_map_b;
 
 	// Read raw data from the eBPF perfbuf and temporarily store it.
 	struct stack_trace_key_t *raw_stack_data;
@@ -98,13 +112,6 @@ struct profiler_context {
 	 */
 	u64 sample_period;
 
-	// Record all stack IDs in each iteration for quick retrieval.
-	struct stack_ids_bitmap stack_ids_a;
-	struct stack_ids_bitmap stack_ids_b;
-	// This vector table is used to remove a stack from the stack map.
-	int *clear_stack_ids_a;
-	int *clear_stack_ids_b;
-
 	// for stack_trace_msg_hash relese
 	stack_trace_msg_hash_kv *trace_msg_kvps;
 	bool msg_clear_hash;
@@ -161,6 +168,8 @@ int profiler_context_init(struct profiler_context *ctx,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
 			  const char *stack_map_name_b,
+			  const char *custom_stack_map_name_a,
+			  const char *custom_stack_map_name_b,
 			  bool only_matched,
 			  bool use_delta_time, u64 sample_period);
 bool run_conditions_check(void);

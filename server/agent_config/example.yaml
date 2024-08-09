@@ -1428,6 +1428,21 @@ static_config:
     # Note: Only collect IO events with delay exceeding this threshold, the default value is 1ms.
     io-event-minimal-duration: 1ms
 
+    # Disable DWARF unwinding
+    # Default: false
+    # Note:
+    #   Processes without frame pointers will be unwinded with DWARF, which will consume more system resources
+    #   Set to "true" to disable DWARF
+    dwarf_disabled: false
+
+    # DWARF unwinding regex
+    # Default: ""
+    # Note:
+    #   Only processes that match this regex will use DWARF unwinding.
+    #   Agent will use heuristic methods to determine whether a process needs to be unwinded with DWARF,
+    #   i.e., the process does not have frame pointer, if this setting is left blank
+    dwarf_regex: ""
+
     # Java compliant update latency time
     # Default: 60s. Range: [5, 3600]s
     # Note:

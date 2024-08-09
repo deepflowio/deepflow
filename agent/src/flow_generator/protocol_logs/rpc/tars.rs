@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
- use crate::{
+use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},

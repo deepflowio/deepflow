@@ -122,3 +122,23 @@ bool bpf_table_delete_key(struct bpf_tracer *tracer,
 
 	return true;
 }
+
+void insert_prog_to_map(struct bpf_tracer *tracer, const char *map_name,
+					const char *prog_name, int key)
+{
+	struct ebpf_prog *prog = ebpf_obj__get_prog_by_name(tracer->obj, prog_name);
+	if (prog == NULL) {
+		ebpf_error("bpf_obj__get_prog_by_name() not find \"%s\"\n",
+			   prog_name);
+		return;
+	}
+
+	if (!bpf_table_set_value(tracer, map_name, key, &prog->prog_fd)) {
+		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n",
+			   prog->prog_fd);
+		return;
+	}
+
+	ebpf_info("Insert into map('%s'), key %d, program name %s\n",
+		  map_name, key, prog_name);
+}

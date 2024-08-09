@@ -2460,6 +2460,38 @@ inputs:
     # name: Profile
     # description:
     profile:
+      # type: bool
+      # name:
+      #   en: dwarf unwinding disabled
+      #   ch: 禁用 DWARF 栈回溯
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     disable stack unwinding with DWARF, forcing frame pointer based unwinding.
+      #   ch: |-
+      #     禁用 DWARF 栈回溯，强制使用帧指针。
+      # upgrade_from: static_config.ebpf.dwarf_disabled
+      dwarf_disabled: false
+      # type: string
+      # name:
+      #   en: dwarf unwinding string
+      #   ch: DWARF 回溯正则表达式
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     use DWARF unwinding for matched processes instead of inferring.
+      #   ch: |-
+      #     对匹配进程使用 DWARF 栈回溯，取代自动推断。
+      # upgrade_from: static_config.ebpf.dwarf_regex
+      dwarf_regex: ""
       # type: section
       # name: On-CPU
       # description:

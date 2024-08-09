@@ -48,16 +48,18 @@
 #include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
 #include "../proc.h"
+#include "../unwind_tracer.h"
 
 #include "../perf_profiler_bpf_common.c"
+#include "../perf_profiler_bpf_5_2_plus.c"
 
-#define LOG_CP_TAG	"[CP] "
 #define CP_PERF_PG_NUM	16
 #define ONCPU_PROFILER_NAME "oncpu"
 #define PROFILER_CTX_ONCPU_IDX THREAD_PROFILER_READER_IDX
 #define DEEPFLOW_AGENT_NAME "deepflow-agent"
 
 extern int sys_cpus_count;
+extern int major, minor;
 struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 static struct profiler_context oncpu_ctx;
 
@@ -331,6 +333,16 @@ static int create_profiler(struct bpf_tracer *tracer)
 	if ((ret = maps_config(tracer, MAP_STACK_B_NAME, cap)))
 		return ret;
 
+	if (major > 5 || (major == 5 && minor >= 2)) {
+		if ((ret = maps_config(tracer, MAP_CUSTOM_STACK_A_NAME, cap))) {
+			return ret;
+		}
+
+		if ((ret = maps_config(tracer, MAP_CUSTOM_STACK_B_NAME, cap))) {
+			return ret;
+		}
+	}
+
 	extended_maps_set(tracer);
 
 	/* load ebpf perf profiler */
@@ -447,6 +459,8 @@ int stop_continuous_profiler(void)
 	if (flame_graph_end_time == NULL) {
 		flame_graph_end_time = gen_file_name_by_datetime();
 	}
+
+	unwind_tracer_drop();
 
 	release_bpf_tracer(CP_TRACER_NAME);
 	profiler_tracer = NULL;
@@ -651,6 +665,13 @@ int write_profiler_running_pid(void)
 	return ETR_OK;
 }
 
+void build_prog_jump_tables(struct bpf_tracer *tracer) {
+	insert_prog_to_map(tracer,
+				    MAP_PROGS_JMP_PE_NAME,
+				    PROG_DWARF_UNWIND_FOR_PE,
+				    PROG_DWARF_UNWIND_PE_IDX);
+}
+
 /*
  * start continuous profiler
  * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)
@@ -684,8 +705,10 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	memset(g_ctx_array, 0, sizeof(g_ctx_array));
 	profiler_context_init(&oncpu_ctx, ONCPU_PROFILER_NAME, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
-			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
-			      MAP_STACK_B_NAME, false, true,
+			      MAP_PROFILER_STATE_NAME,
+			      MAP_STACK_A_NAME, MAP_STACK_B_NAME,
+			      MAP_CUSTOM_STACK_A_NAME, MAP_CUSTOM_STACK_B_NAME,
+			      false, true,
 			      NANOSEC_PER_SEC / freq);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
 
@@ -710,9 +733,19 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	if (java_libs_and_tools_install() != 0)
 		return (-1);
 
-	snprintf(bpf_load_buffer_name, NAME_LEN, "continuous_profiler");
-	bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
-	buffer_sz = sizeof(perf_profiler_common_ebpf_data);
+	enum linux_kernel_type k_type;
+	if (major > 5 || (major == 5 && minor >= 2)) {
+		k_type = K_TYPE_VER_5_2_PLUS;
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+		     "continuous-profiler-5.2_plus");
+		bpf_bin_buffer = (void *)perf_profiler_5_2_plus_ebpf_data;
+		buffer_sz = sizeof(perf_profiler_5_2_plus_ebpf_data);
+	} else {
+		k_type = K_TYPE_COMM;
+		snprintf(bpf_load_buffer_name, NAME_LEN, "continuous-profiler-common");
+		bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
+		buffer_sz = sizeof(perf_profiler_common_ebpf_data);
+	}
 
 	struct tracer_probes_conf *tps =
 	    malloc(sizeof(struct tracer_probes_conf));
@@ -732,6 +765,13 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 			     (void *)callback, freq);
 	if (tracer == NULL)
 		return (-1);
+
+	if (k_type == K_TYPE_VER_5_2_PLUS) {
+		unwind_tracer_init(tracer);
+		build_prog_jump_tables(tracer);
+	} else {
+		ebpf_info("This kernel version does not support DWARF unwinding.");
+	}
 
 	if (sockopt_register(&cpdbg_sockopts) != ETR_OK)
 		return (-1);

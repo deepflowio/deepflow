@@ -15,12 +15,14 @@
  */
 
 extern crate libc;
+extern crate trace_utils;
 
 pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; // u8
 pub use libc::c_uint; // u32
 pub use libc::c_ulonglong;
+pub use libc::c_void;
 use log::info;
 pub use std::ffi::CStr;
 use std::fmt;
@@ -704,6 +706,8 @@ extern "C" {
     pub fn disable_oncpu_profiler() -> c_int;
     pub fn show_collect_pool();
     pub fn disable_syscall_trace_id() -> c_int;
+    pub fn set_dwarf_enabled(enabled: bool) -> c_void;
+    pub fn set_dwarf_regex(pattern: *const c_char) -> c_int;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_profile")] {
@@ -730,6 +734,15 @@ extern "C" {
 
 #[no_mangle]
 extern "C" fn rust_info_wrapper(msg: *const libc::c_char) {
-    let msg_str: &str = unsafe { std::ffi::CStr::from_ptr(msg).to_str().unwrap() };
-    info!("{}", msg_str);
+    unsafe {
+        let cstr = std::ffi::CStr::from_ptr(msg);
+        match cstr.to_str() {
+            Ok(s) => info!("{}", s),
+            Err(e) => {
+                let bs = cstr.to_bytes();
+                let (valid, after_valid) = (&bs[..e.valid_up_to()], &bs[e.valid_up_to()..]);
+                info!("{} {:?}", std::str::from_utf8_unchecked(valid), after_valid);
+            }
+        }
+    }
 }

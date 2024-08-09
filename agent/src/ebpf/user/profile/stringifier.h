@@ -17,6 +17,8 @@
 #ifndef DF_USER_STRINGIFIER_H
 #define DF_USER_STRINGIFIER_H
 
+#include "../bihash_8_8.h"
+
 #define stack_str_hash_t	clib_bihash_8_8_t
 #define stack_str_hash_init	clib_bihash_init_8_8
 #define stack_str_hash_kv	clib_bihash_kv_8_8_t
@@ -44,6 +46,7 @@ void release_stack_str_hash(stack_str_hash_t *h);
 char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
+				      const char *custom_stack_map_name,
 				      stack_str_hash_t *h,
 				      bool new_cache,
 				      char *process_name, void *info_p, bool ignore_libs);

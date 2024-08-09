@@ -19,7 +19,6 @@ use chrono::FixedOffset;
 use chrono::Utc;
 use std::ffi::CString;
 use profiler::ebpf::*;
-use std::env::set_var;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
@@ -122,8 +121,8 @@ extern "C" fn socket_trace_callback(_sd: *mut SK_BPF_DATA) {}
 
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
-        //process_stack_trace_data_for_flame_graph(cp);
-        increment_counter((*cp).count, 1);
+        process_stack_trace_data_for_flame_graph(cp);
+        increment_counter((*cp).count as u32, 1);
         increment_counter(1, 0);
         //let data = sk_data_str_safe(cp);
         //println!("\n+ --------------------------------- +");
@@ -154,7 +153,6 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
-    set_var("RUST_LOG", "info");
     env_logger::builder()
       .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
       .init();
@@ -192,11 +190,18 @@ fn main() {
         }
 
         set_profiler_regex(
-            CString::new("^(socket_tracer|java|deepflow-.*)$".as_bytes())
+            CString::new("^(socket_tracer|java|deepflow-.*|python3.*)$".as_bytes())
                 .unwrap()
                 .as_c_str()
                 .as_ptr(),
         );
+        set_dwarf_enabled(true);
+        // set_dwarf_regex(
+        //     CString::new("^(socket_tracer|java|deepflow-.*|python3.*)$".as_bytes())
+        //         .unwrap()
+        //         .as_c_str()
+        //         .as_ptr(),
+        // );
 
         // CPUID will not be included in the aggregation of stack trace data.
         set_profiler_cpu_aggregation(0);
@@ -217,20 +222,20 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        //thread::sleep(Duration::from_secs(150));
-        //stop_continuous_profiler();
-        //print!(
-        //  "====== capture count {}, sum {}\n",
-        //  get_counter(0),
-        //  get_counter(1)
-        //);
-        //release_flame_graph_hash();
+        thread::sleep(Duration::from_secs(150));
+        stop_continuous_profiler();
+        print!(
+          "====== capture count {}, sum {}\n",
+          get_counter(0),
+          get_counter(1)
+        );
+        release_flame_graph_hash();
     }
 
     loop {
-        thread::sleep(Duration::from_secs(15));
-	unsafe {
-            show_collect_pool();
-	}
+        thread::sleep(Duration::from_secs(30));
+	    // unsafe {
+        //     show_collect_pool();
+	    // }
     }
 }

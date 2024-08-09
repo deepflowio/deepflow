@@ -19,7 +19,6 @@ use chrono::FixedOffset;
 use chrono::Utc;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
-use std::env::set_var;
 use std::ffi::CString;
 use std::fmt::Write;
 use std::net::IpAddr;
@@ -355,7 +354,7 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
         process_stack_trace_data_for_flame_graph(cp);
-        increment_counter((*cp).count, 1);
+        increment_counter((*cp).count as u32, 1);
         increment_counter(1, 0);
         //let data = cp_data_str_safe(cp);
         //println!("\n+ --------------------------------- +");
@@ -384,7 +383,6 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
-    set_var("RUST_LOG", "info");
     env_logger::builder()
         .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
         .init();

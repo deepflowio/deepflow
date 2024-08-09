@@ -33,6 +33,7 @@
 #include "log.h"
 #include "go_tracer.h"
 #include "ssl_tracer.h"
+#include "unwind_tracer.h"
 #include "load.h"
 #include "btf_vmlinux.h"
 #include "config.h"
@@ -651,6 +652,7 @@ static void process_event(struct process_event_t *e)
 		go_process_exec(e->pid);
 		ssl_process_exec(e->pid);
 		extended_process_exec(e->pid);
+		unwind_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		/* Cache for updating process information used in
 		 * symbol resolution. */
@@ -658,6 +660,7 @@ static void process_event(struct process_event_t *e)
 		go_process_exit(e->pid);
 		ssl_process_exit(e->pid);
 		extended_process_exit(e->pid);
+		unwind_process_exit(e->pid);
 	}
 }
 
@@ -1253,6 +1256,7 @@ static void process_events_handle_main(__unused void *arg)
 		go_process_events_handle();
 		ssl_events_handle();
 		extended_events_handle();
+		unwind_events_handle();
 		check_datadump_timeout();
 		/* check and clean symbol cache */
 		exec_proc_info_cache_update();
@@ -1709,26 +1713,6 @@ int set_io_event_minimal_duration(uint64_t duration)
 	return 0;
 }
 
-static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
-					const char *map_name,
-					const char *prog_name, int key)
-{
-	struct ebpf_prog *prog;
-	prog = ebpf_obj__get_prog_by_name(tracer->obj, prog_name);
-	if (prog == NULL) {
-		ebpf_error("bpf_obj__get_prog_by_name() not find \"%s\"\n",
-			   prog_name);
-	}
-
-	if (!bpf_table_set_value(tracer, map_name, key, &prog->prog_fd)) {
-		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n",
-			   prog->prog_fd);
-	}
-
-	ebpf_info("Insert into map('%s'), key %d, program name %s\n",
-		  map_name, key, prog_name);
-}
-
 /*
  * Using an eBPF program specifically designed to send data, the goal is to solve the
  * problem of instructions exceeding the maximum limit.
@@ -1738,33 +1722,33 @@ static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
 static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 {
 	// jmp for tracepoints
-	__insert_output_prog_to_map(tracer,
+	insert_prog_to_map(tracer,
 				    MAP_PROGS_JMP_TP_NAME,
 				    PROG_PROTO_INFER_FOR_TP,
 				    PROG_PROTO_INFER_TP_IDX);
-	__insert_output_prog_to_map(tracer,
+	insert_prog_to_map(tracer,
 				    MAP_PROGS_JMP_TP_NAME,
 				    PROG_DATA_SUBMIT_NAME_FOR_TP,
 				    PROG_DATA_SUBMIT_TP_IDX);
-	__insert_output_prog_to_map(tracer,
+	insert_prog_to_map(tracer,
 				    MAP_PROGS_JMP_TP_NAME,
 				    PROG_OUTPUT_DATA_NAME_FOR_TP,
 				    PROG_OUTPUT_DATA_TP_IDX);
-	__insert_output_prog_to_map(tracer,
+	insert_prog_to_map(tracer,
 				    MAP_PROGS_JMP_TP_NAME,
 				    PROG_IO_EVENT_NAME_FOR_TP,
 				    PROG_IO_EVENT_TP_IDX);
 
 	// jmp for kprobe/uprobe
-	__insert_output_prog_to_map(tracer,
+	insert_prog_to_map(tracer,
 				    MAP_PROGS_JMP_KP_NAME,
 				    PROG_PROTO_INFER_FOR_KP,
 				    PROG_PROTO_INFER_KP_IDX);
-	__insert_output_prog_to_map(tracer,
+	insert_prog_to_map(tracer,
 				    MAP_PROGS_JMP_KP_NAME,
 				    PROG_DATA_SUBMIT_NAME_FOR_KP,
 				    PROG_DATA_SUBMIT_KP_IDX);
-	__insert_output_prog_to_map(tracer,
+	insert_prog_to_map(tracer,
 				    MAP_PROGS_JMP_KP_NAME,
 				    PROG_OUTPUT_DATA_NAME_FOR_KP,
 				    PROG_OUTPUT_DATA_KP_IDX);
