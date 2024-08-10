@@ -35,6 +35,7 @@ import (
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+
 	logging "github.com/op/go-logging"
 )
 
@@ -199,7 +200,9 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 	// clickhouse init default organization database/tables
 	for _, addr := range addrs {
 		orgIds := grpc.QueryAllOrgIDs()
-		log.Infof("database %s get orgIDs: %v", table.Database, orgIds)
+		if len(orgIds) > 1 {
+			log.Infof("database %s get orgIDs: %v", table.Database, orgIds)
+		}
 		for _, orgId := range orgIds {
 			if err = InitTable(addr, user, password, timeZone, table, orgId); err != nil {
 				return nil, err

@@ -39,6 +39,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/hmap/lru"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/receiver"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
@@ -483,7 +484,7 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 				err = table.ReloadSlave(orgId)
 			}
 			if err != nil {
-				log.Warningf("org %d reload failed: %s", orgId, err)
+				log.Warningf("reload failed: %s", err, logger.NewORGPrefix(int(orgId)))
 			}
 		}
 	}
@@ -1088,12 +1089,12 @@ func (t *PlatformInfoTable) ReloadSlave(orgId uint16) error {
 	newGroupsVersion := masterTable.versionGroups[orgId]
 	if newGroupsVersion != t.versionGroups[orgId] {
 		t.versionGroups[orgId], t.ServiceTable[orgId] = newGroupsVersion, masterTable.ServiceTable[orgId]
-		log.Infof("org %d update slave (%s) rpc groups version %d -> %d ", orgId, t.moduleName, t.versionGroups[orgId], newGroupsVersion)
+		log.Infof("update slave (%s) rpc groups version %d -> %d ", t.moduleName, t.versionGroups[orgId], newGroupsVersion, logger.NewORGPrefix(int(orgId)))
 	}
 
 	newVersion := masterTable.versionPlatformData[orgId]
 	if newVersion != t.versionPlatformData[orgId] {
-		log.Infof("org %d update slave (%s) rpc platformdata version %d -> %d  regionID=%d", orgId, t.moduleName, t.versionPlatformData[orgId], newVersion, t.regionID[orgId])
+		log.Infof("update slave (%s) rpc platformdata version %d -> %d  regionID=%d", t.moduleName, t.versionPlatformData[orgId], newVersion, t.regionID[orgId], logger.NewORGPrefix(int(orgId)))
 		t.peerConnections[orgId] = masterTable.peerConnections[orgId]
 		t.gprocessInfos[orgId] = masterTable.gprocessInfos[orgId]
 		t.vtapIDProcessInfos[orgId] = masterTable.vtapIDProcessInfos[orgId]
@@ -1188,11 +1189,11 @@ func (t *PlatformInfoTable) ReloadMaster(orgId uint16) error {
 
 	newGroupsVersion := response.GetVersionGroups()
 	if newGroupsVersion != t.versionGroups[orgId] {
-		log.Infof("org %d update rpc groups version %d -> %d ", orgId, t.versionGroups[orgId], newGroupsVersion)
+		log.Infof("update rpc groups version %d -> %d", t.versionGroups[orgId], newGroupsVersion, logger.NewORGPrefix(int(orgId)))
 		groupsData := trident.Groups{}
 		if compressed := response.GetGroups(); compressed != nil {
 			if err := groupsData.Unmarshal(compressed); err != nil {
-				log.Warningf("org %d unmarshal grpc compressed groups failed as %v", orgId, err)
+				log.Warningf("unmarshal grpc compressed groups failed as %v", err, logger.NewORGPrefix(int(orgId)))
 			}
 		}
 
@@ -1210,14 +1211,14 @@ func (t *PlatformInfoTable) ReloadMaster(orgId uint16) error {
 		platformData := trident.PlatformData{}
 		if plarformCompressed := response.GetPlatformData(); plarformCompressed != nil {
 			if err := platformData.Unmarshal(plarformCompressed); err != nil {
-				log.Warningf("org %d unmarshal grpc compressed platformData failed as %v", orgId, err)
+				log.Warningf("unmarshal grpc compressed platformData failed as %v", err, logger.NewORGPrefix(int(orgId)))
 			} else {
 				isUnmarshalSuccess = true
 			}
 		}
 
 		if isUnmarshalSuccess {
-			log.Infof("org %d update rpc platformdata version %d -> %d  regionID=%d", orgId, t.versionPlatformData[orgId], newVersion, t.regionID[orgId])
+			log.Infof("update rpc platformdata version %d -> %d  regionID=%d", t.versionPlatformData[orgId], newVersion, t.regionID[orgId], logger.NewORGPrefix(int(orgId)))
 			t.updatePlatformData(orgId, &platformData)
 			t.otherRegionCount[orgId] = 0
 		}

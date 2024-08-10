@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	logging "github.com/op/go-logging"
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/proto"
 
@@ -34,10 +33,11 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/debug"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
-var log = logging.MustGetLogger("universal_tag")
+var log = logger.MustGetLogger("universal_tag")
 
 const (
 	Unknown = iota
@@ -356,7 +356,7 @@ func (u *UniversalTagsManager) Reload(orgId uint16) error {
 
 	u.universalTagMaps[orgId] = u.GetUniversalTagMaps(response)
 
-	log.Infof("org %d eporter update rpc universalTagNames version %d -> %d", orgId, u.versionUniversalTagMaps, newVersion)
+	log.Infof("eporter update rpc universalTagNames version %d -> %d", u.versionUniversalTagMaps, newVersion, logger.NewORGPrefix(int(orgId)))
 	u.versionUniversalTagMaps[orgId] = newVersion
 
 	return nil
