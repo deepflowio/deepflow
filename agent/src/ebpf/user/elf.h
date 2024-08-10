@@ -30,7 +30,7 @@ struct sec_desc {
 	size_t size;
 	char *name;
 	size_t strtabidx;	// for SHT_SYMTAB (shdr.sh_link)
-
+	int nr_reloc;
 };
 
 struct elf_info {
@@ -57,6 +57,7 @@ struct elf_info {
 };
 
 int openelf(const char *path, Elf ** elf, int *fd);
+Elf_Scn *get_scn_by_sec_name(Elf * e, const char *sec_name);
 Elf_Data *get_sec_elf_data(Elf * e, const char *section_name);
 int elf_info_collect(struct elf_info *elf_info, const void *buf, size_t buf_sz);
 int find_sym_by_idx(Elf * e, Elf_Scn * syms_scn, int sym_idx, GElf_Sym * sym);
