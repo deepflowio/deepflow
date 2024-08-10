@@ -127,13 +127,13 @@ func GetPrometheusGroup(name string, e *CHEngine) string {
 			for _, appLabel := range appLabels {
 				if appLabel.AppLabelName == nameNoPreffix {
 					isAppLabel = true
-					tagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.app_label_map, 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.AppLabelColumnIndex)
+					tagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.AppLabelColumnIndex)
 					break
 				}
 			}
 		}
 		if !isAppLabel {
-			tagTranslatorStr = fmt.Sprintf("dictGet(flow_tag.target_label_map, 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+			tagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.target_label_map', 'label_value', (%d, %d, target_id))", metricID, labelNameID)
 		}
 	} else {
 		tagTranslatorStr = name
@@ -165,13 +165,13 @@ func GetPrometheusNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
 		for _, appLabel := range appLabels {
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
-				filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d)", appLabel.AppLabelColumnIndex, labelNameID)
+				filter = fmt.Sprintf("toUInt64(app_label_value_id_%d) GLOBAL IN (SELECT label_value_id FROM flow_tag.app_label_live_view WHERE label_name_id=%d)", appLabel.AppLabelColumnIndex, labelNameID)
 				break
 			}
 		}
 	}
 	if !isAppLabel {
-		filter = fmt.Sprintf("toUInt64(target_id) IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d)", metricID, labelNameID)
+		filter = fmt.Sprintf("toUInt64(target_id) GLOBAL IN (SELECT target_id FROM flow_tag.target_label_live_view WHERE metric_id=%d and label_name_id=%d)", metricID, labelNameID)
 	}
 	return &view.Expr{Value: "(" + filter + ")"}, true
 }
