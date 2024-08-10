@@ -28,9 +28,75 @@
 #define EBPF_LOG_LEVEL2 2
 #define EBPF_LOG_LEVEL  (EBPF_LOG_LEVEL1 | EBPF_LOG_LEVEL2)
 
+#define BPF_INSN_SZ (sizeof(struct bpf_insn))
+
 struct elf_info;
 struct btf_ext;
 struct btf;
+struct btf_type;
+
+struct btf_ext_info {
+        /*
+         * info points to the individual info section (e.g. func_info and
+         * line_info) from the .BTF.ext. It does not include the __u32 rec_size.
+         */
+        void *info;
+        __u32 rec_size;
+        __u32 len;
+        /* optional (maintained internally by libbpf) mapping between .BTF.ext
+         * section and corresponding ELF section. This is used to join
+         * information like CO-RE relocation records with corresponding BPF
+         * programs defined in ELF sections
+         */
+        __u32 *sec_idxs;
+        int sec_cnt;
+};
+
+#define for_each_btf_ext_sec(seg, sec)                                  \
+        for (sec = (seg)->info;                                         \
+             (void *)sec < (seg)->info + (seg)->len;                    \
+             sec = (void *)sec + sizeof(struct btf_ext_info_sec) +      \
+                   (seg)->rec_size * sec->num_info)
+
+#define for_each_btf_ext_rec(seg, sec, i, rec)                          \
+        for (i = 0, rec = (void *)&(sec)->data;                         \
+             i < (sec)->num_info;                                       \
+             i++, rec = (void *)rec + (seg)->rec_size)
+
+struct btf_ext_header {
+        __u16   magic;
+        __u8    version;
+        __u8    flags;
+        __u32   hdr_len;
+
+        /* All offsets are in bytes relative to the end of this header */
+        __u32   func_info_off;
+        __u32   func_info_len;
+        __u32   line_info_off;
+        __u32   line_info_len;
+
+        /* optional part of .BTF.ext header */
+        __u32   core_relo_off;
+        __u32   core_relo_len;
+};
+
+struct btf_ext {
+        union {
+                struct btf_ext_header *hdr;
+                void *data;
+        };
+        struct btf_ext_info func_info;
+        struct btf_ext_info line_info;
+        struct btf_ext_info core_relo_info;
+        __u32 data_size;
+};
+
+struct btf_ext_info_sec {
+        __u32   sec_name_off;
+        __u32   num_info;
+        /* Followed by num_info * record_size number of bytes */
+        __u8    data[];
+};
 
 #define DF_MAX_ERRNO       4095
 #define DF_IS_ERR_VALUE(x) ((x) >= (unsigned long)-DF_MAX_ERRNO)
@@ -78,6 +144,20 @@ struct ebpf_prog {
 	size_t insns_cnt;
 	struct ebpf_object *obj;
 	enum bpf_prog_type type;
+	/* 
+	 * The instruction offset of this program within its
+	 * associated ELF section (measured by the number of
+	 * instructions) 
+	 */
+	size_t sec_insn_off;
+
+	/*
+	 * The original instruction count of this program within
+	 * the ELF section, excluding any additional subroutine
+	 * instructions that may have been added during relocation.
+	 */
+	size_t sec_insn_cnt;
+	struct sec_desc *sec_desc;
 };
 
 struct bpf_load_map_def {

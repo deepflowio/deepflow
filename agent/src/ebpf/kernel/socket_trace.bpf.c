@@ -1816,8 +1816,8 @@ TP_SYSCALL_PROG(exit_recvfrom) (struct syscall_comm_exit_ctx * ctx) {
 	return 0;
 }
 
-// ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
-KPROG(__sys_sendmsg) (struct pt_regs * ctx) {
+static __inline int process_enter___sys_sendmsg (struct pt_regs *ctx)
+{
 	__u64 id = bpf_get_current_pid_tgid();
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	struct user_msghdr *msghdr_ptr =
@@ -1841,6 +1841,23 @@ KPROG(__sys_sendmsg) (struct pt_regs * ctx) {
 
 	return 0;
 }
+
+// ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
+KPROG(__sys_sendmsg) (struct pt_regs * ctx) {
+#if 0
+	int sockfd = (int)PT_REGS_PARM1(ctx);
+	struct user_msghdr *msghdr_ptr =
+		(struct user_msghdr *)PT_REGS_PARM2(ctx);
+	if (msghdr_ptr == NULL)
+		return 0;
+#endif
+	return process_enter___sys_sendmsg(ctx);
+}
+
+//KFUNC_PROG(sendmsg, int sockfd, const struct msghdr *msg, int flags)
+//{
+//
+//}
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_exit_sendmsg/format
 TP_SYSCALL_PROG(exit_sendmsg) (struct syscall_comm_exit_ctx * ctx) {
@@ -2235,15 +2252,13 @@ TP_SYSCALL_PROG(enter_connect) (struct syscall_comm_enter_ctx * ctx) {
 	socket_role_map__update(&conn_key, &role);
 	return 0;
 }
-
 struct filename {
-    const char *name;
     const char *uptr;
+    const char *name;
     int refcnt;
     void *aname;
     const char iname[];
 };
-
 ///////////////////////// fentry/fexit //////////////////////////////
 //long do_unlinkat(int dfd, struct filename *name)
 KFUNC_PROG(do_unlinkat, int dfd, struct filename *name)
@@ -2251,9 +2266,13 @@ KFUNC_PROG(do_unlinkat, int dfd, struct filename *name)
 	__u32 k0 = 0;
 	adapt_kern_uid_map__lookup(&k0);
 	pid_t pid;
-
+	const char *name_p;
+	bpf_probe_read_kernel(&name_p, sizeof(name_p), (void *)name);
+	bpf_debug(">>> name_p = %p (%s)\n",name_p, name_p);
 	pid = bpf_get_current_pid_tgid() >> 32;
-	bpf_debug("fentry: pid = %d, filename = %s\n", pid, name->name);
+	int offset = __builtin_preserve_access_index((&((struct filename *)0)->name));
+	const char *p = __builtin_preserve_access_index(({ name->name; }));
+	bpf_debug("fentry: offset %d pid = %d, filename = %s)\n", offset, pid, p);
 	return 0;
 }
 //#if 0
@@ -2262,10 +2281,9 @@ KRETFUNC_PROG(do_unlinkat, int dfd, struct filename *name, long ret)
 	__u32 k0 = 0;
 	adapt_kern_uid_map__lookup(&k0);
 	pid_t pid;
-
 	pid = bpf_get_current_pid_tgid() >> 32;
-	bpf_debug("fexit: pid = %d, filename = %s, ret = %ld\n", pid,
-		  name->name, ret);
+//	bpf_debug("fexit: pid = %d, filename = %s, ret = %ld\n", pid,
+//		  name->name, ret);
 	return 0;
 }
 //#endif
