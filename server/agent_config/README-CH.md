@@ -1,5 +1,32 @@
 # 全局配置 {#global}
 
+## Enabled {#global.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.enabled`
+
+Upgrade from old version: `enabled`
+
+**默认值**:
+```yaml
+global:
+  enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+禁用 / 启用 deepflow-agent。
+
 ## 资源限制 {#global.limits}
 
 控制 deepflow-agent 资源用量
@@ -1082,6 +1109,35 @@ global:
 
 deepflow-agent 的诊断功能配置参数
 
+#### Enabled {#global.self_monitoring.debug.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.self_monitoring.debug.enabled`
+
+Upgrade from old version: `debug_enabled`
+
+**默认值**:
+```yaml
+global:
+  self_monitoring:
+    debug:
+      enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+禁用 / 启用 deepflow-agent 的诊断功能。
+
 #### 本地 UDP 端口号 {#global.self_monitoring.debug.local_udp_port}
 
 **标签**:
@@ -1142,6 +1198,34 @@ global:
 **详细描述**:
 
 该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
+
+### Hostname {#global.self_monitoring.hostname}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.self_monitoring.hostname`
+
+Upgrade from old version: `host`
+
+**默认值**:
+```yaml
+global:
+  self_monitoring:
+    hostname: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+覆盖 statsd 主机标签。
 
 ## 独立运行模式 {#global.standalone_mode}
 
@@ -1207,6 +1291,224 @@ global:
 **详细描述**:
 
 数据文件的写入位置。
+
+## 标签 {#global.tags}
+
+deepflow-agent 关联标签。
+
+### Region ID {#global.tags.region_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.region_id`
+
+Upgrade from old version: `region_id`
+
+**默认值**:
+```yaml
+global:
+  tags:
+    region_id: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+采集器所在区域 ID 或数据节点所在区域 ID。
+
+### 容器集群 ID {#global.tags.pod_cluster_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.pod_cluster_id`
+
+Upgrade from old version: `pod_cluster_id`
+
+**默认值**:
+```yaml
+global:
+  tags:
+    pod_cluster_id: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+采集器所在容器集群 ID。
+
+### VPC ID {#global.tags.vpc_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.vpc_id`
+
+Upgrade from old version: `epc_id`
+
+**默认值**:
+```yaml
+global:
+  tags:
+    vpc_id: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+采集器所在的 vpc 的 ID, 仅对 Workload-V/P, 容器-V/P 类型有意义。
+
+### Agent ID {#global.tags.agent_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.agent_id`
+
+Upgrade from old version: `vtap_id`
+
+**默认值**:
+```yaml
+global:
+  tags:
+    agent_id: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 64000] |
+
+**详细描述**:
+
+采集器 ID。
+
+### 采集器类型 {#global.tags.agent_type}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.agent_type`
+
+Upgrade from old version: `trident_type`
+
+**默认值**:
+```yaml
+global:
+  tags:
+    agent_type: 0
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| 0 | TT_UNKNOWN |
+| 1 | TT_PROCESS, Agent in KVM |
+| 2 | TT_VM, Agent in a dedicated VM on ESXi |
+| 3 | TT_PUBLIC_CLOUD, Agent in Cloud host (VM) |
+| 5 | TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host |
+| 6 | TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic |
+| 7 | TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host) |
+| 8 | TT_VM_POD, Agent in K8s Node (Cloud VM) |
+| 9 | TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic |
+| 10 | TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node |
+| 11 | TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node |
+| 12 | TT_K8S_SIDECAR, Agent in K8s POD |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 12] |
+
+**详细描述**:
+
+采集器类型。
+
+### 团队 ID {#global.tags.team_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.team_id`
+
+Upgrade from old version: `team_id`
+
+**默认值**:
+```yaml
+global:
+  tags:
+    team_id: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+采集器所在的团队的 ID。
+
+### 组织 ID {#global.tags.organize_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.organize_id`
+
+Upgrade from old version: `organize_id`
+
+**默认值**:
+```yaml
+global:
+  tags:
+    organize_id: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+采集器所在的组织的 ID。
 
 # 输入 {#inputs}
 
@@ -3981,6 +4283,35 @@ inputs:
 TODO
 
 ### 采集 K8s 资源 {#inputs.resources.kubernetes}
+
+#### Enabled {#inputs.resources.kubernetes.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.resources.kubernetes.enabled`
+
+Upgrade from old version: `kubernetes_api_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  resources:
+    kubernetes:
+      enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当同个 K8s 集群中有多个 deepflow-agent 时，只有一个 deepflow-agent 会被启用采集 K8s 资源。
 
 #### K8s 命名空间 {#inputs.resources.kubernetes.kubernetes_namespace}
 
