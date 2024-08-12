@@ -455,8 +455,10 @@ func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysql.ChVTapPort) (map[
 		return nil, false
 	}
 	for oldKey, oldValue := range oldItemMap {
-		if oldValue != newItemMap[oldKey] {
-			updateInfo[strings.ToLower(oldKey)] = newItemMap[oldKey]
+		if strings.ToLower(oldKey) != "updated_at" {
+			if oldValue != newItemMap[oldKey] {
+				updateInfo[strings.ToLower(oldKey)] = newItemMap[oldKey]
+			}
 		}
 	}
 	if len(updateInfo) > 0 {

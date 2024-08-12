@@ -18,7 +18,6 @@ package tagrecorder
 
 import (
 	"sync"
-	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -292,16 +291,6 @@ func (s *SubscriberComponent[MUPT, MUT, MT, CT, KT]) ResourceUpdateAtInfoUpdated
 	var updateItems []MT
 	err := db.Unscoped().First(&updateItems).Error
 	if err == nil {
-		var testItems []*MT
-		for _, item := range updateItems {
-			testItems = append(testItems, &item)
-		}
-		updateKeys, updateDBItem := s.generateKeyTargets(md, testItems)
-		if len(updateDBItem) > 0 && len(updateKeys) > 0 {
-			updateTimeInfo := make(map[string]interface{})
-			now := time.Now()
-			updateTimeInfo["updated_at"] = now.Format("2006-01-02 15:04:05")
-			s.dbOperator.update(updateDBItem[0], updateTimeInfo, updateKeys[0], db)
-		}
+		db.Save(updateItems)
 	}
 }

@@ -208,15 +208,7 @@ func (b *UpdaterComponent[MT, KT]) Refresh() bool {
 			}
 
 			if len(itemsToDelete) > 0 && len(itemsToAdd) == 0 && !isUpdate {
-				updateDBItem, updateOK := b.generateOneData(db)
-				if updateOK {
-					for key, updateDBItem := range updateDBItem {
-						updateTimeInfo := make(map[string]interface{})
-						now := time.Now()
-						updateTimeInfo["updated_at"] = now.Format("2006-01-02 15:04:05")
-						b.dbOperator.update(updateDBItem, updateTimeInfo, key, db) // 1是个占位符
-					}
-				}
+				b.ResourceUpdateAtInfoUpdated(db)
 			}
 			if (isUpdate || len(itemsToDelete) > 0 || len(itemsToAdd) > 0) && (b.resourceTypeName == RESOURCE_TYPE_CH_APP_LABEL || b.resourceTypeName == RESOURCE_TYPE_CH_TARGET_LABEL) {
 				return true
@@ -258,4 +250,13 @@ func (b *UpdaterComponent[MT, KT]) generateOneData(db *mysql.DB) (map[KT]MT, boo
 		idToItem[b.updaterDG.generateKey(item)] = item
 	}
 	return idToItem, true
+}
+
+// Update updated_at when resource is deleted
+func (b *UpdaterComponent[MT, KT]) ResourceUpdateAtInfoUpdated(db *mysql.DB) {
+	var updateItems []MT
+	err := db.Unscoped().First(&updateItems).Error
+	if err == nil {
+		db.Save(updateItems)
+	}
 }
