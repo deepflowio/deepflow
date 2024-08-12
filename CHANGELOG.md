@@ -8,6 +8,11 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: recorder log fmt error [#7782](https://github.com/deepflowio/deepflow/pull/7782) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Modify ch_table update time #26153 [#7777](https://github.com/deepflowio/deepflow/pull/7777) by [Ericsssss](https://github.com/Ericsssss)
+* fix: server allows empty values not to be overwritten as default values [#7775](https://github.com/deepflowio/deepflow/pull/7775) by [TomatoMr](https://github.com/TomatoMr)
+* fix: resolve show tag values filter error [#7774](https://github.com/deepflowio/deepflow/pull/7774) by [duandaa](https://github.com/duandaa)
+* fix: profileDebug assert error [#7760](https://github.com/deepflowio/deepflow/pull/7760) by [duandaa](https://github.com/duandaa)
 * fix: not found replicaset pod [#7762](https://github.com/deepflowio/deepflow/pull/7762) by [askyrie](https://github.com/askyrie)
 * fix: Modify alert_policy filter [#7757](https://github.com/deepflowio/deepflow/pull/7757) by [Ericsssss](https://github.com/Ericsssss)
 * fix: traffic.go log [#7738](https://github.com/deepflowio/deepflow/pull/7738) by [roryye](https://github.com/roryye)
@@ -119,6 +124,11 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Using libpcap without restarting when the network card does not… [#7780](https://github.com/deepflowio/deepflow/pull/7780) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: add endpoint-tcp-port-name configuration [#7778](https://github.com/deepflowio/deepflow/pull/7778) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: use dynamic library instead of libpcap static library [#7772](https://github.com/deepflowio/deepflow/pull/7772) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: increase billing function control capabilities [#7714](https://github.com/deepflowio/deepflow/pull/7714) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: agent license func operate [#7712](https://github.com/deepflowio/deepflow/pull/7712) by [roryye](https://github.com/roryye)
 * feat: support ByConity database [#7756](https://github.com/deepflowio/deepflow/pull/7756) by [lzf575](https://github.com/lzf575)
 * feat: querier support byconity [#7753](https://github.com/deepflowio/deepflow/pull/7753) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: mac displays the resources to which the agent belongs [#7765](https://github.com/deepflowio/deepflow/pull/7765) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -268,6 +278,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: agent config [#7745](https://github.com/deepflowio/deepflow/pull/7745) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: define field value type using enum [#7686](https://github.com/deepflowio/deepflow/pull/7686) by [lzf575](https://github.com/lzf575)
 * refactor: polish agent config [#7342](https://github.com/deepflowio/deepflow/pull/7342) by [sharang](https://github.com/sharang)
 * refactor: update monitor, server log with org info [#7597](https://github.com/deepflowio/deepflow/pull/7597) by [roryye](https://github.com/roryye)
