@@ -39,24 +39,24 @@ var (
 )
 
 type ResourceAccess struct {
-	fpermit  common.FPermit
-	userInfo *httpcommon.UserInfo
+	Fpermit  common.FPermit
+	UserInfo *httpcommon.UserInfo
 }
 
 func NewResourceAccess(fpermit common.FPermit, userInfo *httpcommon.UserInfo) *ResourceAccess {
 	return &ResourceAccess{
-		fpermit:  fpermit,
-		userInfo: userInfo,
+		Fpermit:  fpermit,
+		UserInfo: userInfo,
 	}
 }
 
 func (ra *ResourceAccess) CanAddResource(teamID int, resourceType, resourceUUID string) error {
-	if !ra.fpermit.Enabled {
+	if !ra.Fpermit.Enabled {
 		return nil
 	}
-	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessAdd)
+	url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessAdd)
 	url += fmt.Sprintf("&team_id=%d", teamID)
-	if err := PermitVerify(url, ra.userInfo, teamID); err != nil {
+	if err := PermitVerify(url, ra.UserInfo, teamID); err != nil {
 		return err
 	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
@@ -64,21 +64,21 @@ func (ra *ResourceAccess) CanAddResource(teamID int, resourceType, resourceUUID 
 		return nil
 	}
 
-	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	url = fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 	body := map[string]interface{}{
 		"team_id":       teamID,
-		"owner_user_id": ra.userInfo.ID,
+		"owner_user_id": ra.UserInfo.ID,
 		"resource_type": resourceType,
 		"resource_id":   resourceUUID,
 	}
-	return resourceVerify(url, http.MethodPost, ra.userInfo, teamID, body)
+	return resourceVerify(url, http.MethodPost, ra.UserInfo, teamID, body)
 }
 
 func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUUID string, resourceUp map[string]interface{}) error {
-	if !ra.fpermit.Enabled {
+	if !ra.Fpermit.Enabled {
 		return nil
 	}
-	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessUpdate)
+	url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessUpdate)
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
 		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
 		url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
@@ -86,7 +86,7 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
 	}
 
-	if err := PermitVerify(url, ra.userInfo, teamID); err != nil {
+	if err := PermitVerify(url, ra.UserInfo, teamID); err != nil {
 		return err
 	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
@@ -102,13 +102,13 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 			"resource_type": resourceType,
 			"resource_id":   resourceUUID,
 		}
-		url = fmt.Sprintf(urlUGCPermission, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
-		if err := ugcPermission(url, ra.userInfo, body); err != nil {
+		url = fmt.Sprintf(urlUGCPermission, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
+		if err := ugcPermission(url, ra.UserInfo, body); err != nil {
 			return err
 		}
 	}
 
-	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	url = fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 	body := map[string]interface{}{
 		"resource_where": map[string]interface{}{
 			"resource_type": resourceType,
@@ -116,14 +116,14 @@ func (ra *ResourceAccess) CanUpdateResource(teamID int, resourceType, resourceUU
 		},
 		"resource_up": resourceUp,
 	}
-	return resourceVerify(url, http.MethodPatch, ra.userInfo, teamID, body)
+	return resourceVerify(url, http.MethodPatch, ra.UserInfo, teamID, body)
 }
 
 func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUUID string) error {
-	if !ra.fpermit.Enabled {
+	if !ra.Fpermit.Enabled {
 		return nil
 	}
-	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessDelete)
+	url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessDelete)
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
 		resourceType == common.SET_RESOURCE_TYPE_DATA_SOURCE {
 		url += fmt.Sprintf("&team_id=%d&resource_type=%s", teamID, resourceType)
@@ -131,7 +131,7 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 		url += fmt.Sprintf("&resource_type=%s&resource_id=%s", resourceType, resourceUUID)
 	}
 
-	if err := PermitVerify(url, ra.userInfo, teamID); err != nil {
+	if err := PermitVerify(url, ra.UserInfo, teamID); err != nil {
 		return err
 	}
 	if resourceType == common.SET_RESOURCE_TYPE_AGENT ||
@@ -139,42 +139,42 @@ func (ra *ResourceAccess) CanDeleteResource(teamID int, resourceType, resourceUU
 		return nil
 	}
 
-	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	url = fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 	body := map[string]interface{}{
 		"resource_type": resourceType,
 		"resource_ids":  resourceUUID,
 	}
-	return resourceVerify(url, http.MethodDelete, ra.userInfo, teamID, body)
+	return resourceVerify(url, http.MethodDelete, ra.UserInfo, teamID, body)
 }
 
 func (ra *ResourceAccess) CanAddSubDomainResource(domainTeamID, subDomainTeamID int, resourceUUID string) error {
-	if !ra.fpermit.Enabled {
+	if !ra.Fpermit.Enabled {
 		return nil
 	}
-	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessAdd)
+	url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessAdd)
 	url += fmt.Sprintf("&parent_team_id=%d&team_id=%d", domainTeamID, subDomainTeamID)
-	if err := PermitVerify(url, ra.userInfo, subDomainTeamID); err != nil {
+	if err := PermitVerify(url, ra.UserInfo, subDomainTeamID); err != nil {
 		return err
 	}
 
-	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	url = fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 	body := map[string]interface{}{
 		"team_id":       subDomainTeamID,
-		"owner_user_id": ra.userInfo.ID,
+		"owner_user_id": ra.UserInfo.ID,
 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
 		"resource_id":   resourceUUID,
 	}
-	return resourceVerify(url, http.MethodPost, ra.userInfo, subDomainTeamID, body)
+	return resourceVerify(url, http.MethodPost, ra.UserInfo, subDomainTeamID, body)
 }
 
 func (ra *ResourceAccess) CanUpdateSubDomainResource(domainTeamID, subDomainTeamID int, resourceUUID string, resourceUp map[string]interface{}) error {
-	if !ra.fpermit.Enabled {
+	if !ra.Fpermit.Enabled {
 		return nil
 	}
-	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessUpdate)
+	url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessUpdate)
 	url += fmt.Sprintf("&parent_team_id=%d&team_id=%d&resource_type=%s&resource_id=%s", domainTeamID, subDomainTeamID, common.SET_RESOURCE_TYPE_SUB_DOMAIN, resourceUUID)
 
-	if err := PermitVerify(url, ra.userInfo, subDomainTeamID); err != nil {
+	if err := PermitVerify(url, ra.UserInfo, subDomainTeamID); err != nil {
 		return err
 	}
 
@@ -186,16 +186,16 @@ func (ra *ResourceAccess) CanUpdateSubDomainResource(domainTeamID, subDomainTeam
 	teamID, tOK := resourceUp["team_id"]
 	if tOK {
 		newTeamID = int(teamID.(float64))
-		url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessAdd)
+		url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessAdd)
 		url += fmt.Sprintf("&parent_team_id=%d&team_id=%d", domainTeamID, newTeamID)
-		if err := PermitVerify(url, ra.userInfo, newTeamID); err != nil {
+		if err := PermitVerify(url, ra.UserInfo, newTeamID); err != nil {
 			return err
 		}
 	}
 	return nil
 
 	// TODO: support update
-	// var newOwnerID int = ra.userInfo.ID
+	// var newOwnerID int = ra.UserInfo.ID
 	// userID, uOK := resourceUp["owner_user_id"]
 	// if uOK {
 	// 	newOwnerID = int(userID.(float64))
@@ -207,13 +207,13 @@ func (ra *ResourceAccess) CanUpdateSubDomainResource(domainTeamID, subDomainTeam
 	// 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
 	// 		"resource_id":   resourceUUID,
 	// 	}
-	// 	url = fmt.Sprintf(urlUGCPermission, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
-	// 	if err := ugcPermission(url, ra.userInfo, body); err != nil {
+	// 	url = fmt.Sprintf(urlUGCPermission, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
+	// 	if err := ugcPermission(url, ra.UserInfo, body); err != nil {
 	// 		return err
 	// 	}
 	// }
 
-	// url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	// url = fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 	// body := map[string]interface{}{
 	// 	"resource_where": map[string]interface{}{
 	// 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
@@ -221,40 +221,40 @@ func (ra *ResourceAccess) CanUpdateSubDomainResource(domainTeamID, subDomainTeam
 	// 	},
 	// 	"resource_up": resourceUp,
 	// }
-	// return resourceVerify(url, http.MethodPatch, ra.userInfo, domainTeamID, body)
+	// return resourceVerify(url, http.MethodPatch, ra.UserInfo, domainTeamID, body)
 }
 
 func (ra *ResourceAccess) CanDeleteSubDomainResource(domainTeamID, subDomainTeamID int, resourceUUID string) error {
-	if !ra.fpermit.Enabled {
+	if !ra.Fpermit.Enabled {
 		return nil
 	}
-	url := fmt.Sprintf(urlPermitVerify, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, AccessDelete)
+	url := fmt.Sprintf(urlPermitVerify, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, AccessDelete)
 	url += fmt.Sprintf("&parent_team_id=%d&team_id=%d&resource_type=%s&resource_id=%s", domainTeamID, subDomainTeamID, common.SET_RESOURCE_TYPE_SUB_DOMAIN, resourceUUID)
 
-	if err := PermitVerify(url, ra.userInfo, subDomainTeamID); err != nil {
+	if err := PermitVerify(url, ra.UserInfo, subDomainTeamID); err != nil {
 		return err
 	}
 
-	url = fmt.Sprintf(urlResource, ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID)
+	url = fmt.Sprintf(urlResource, ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID)
 	body := map[string]interface{}{
 		"resource_type": common.SET_RESOURCE_TYPE_SUB_DOMAIN,
 		"resource_ids":  resourceUUID,
 	}
-	return resourceVerify(url, http.MethodDelete, ra.userInfo, subDomainTeamID, body)
+	return resourceVerify(url, http.MethodDelete, ra.UserInfo, subDomainTeamID, body)
 }
 
 func (ra *ResourceAccess) CanOperateDomainResource(teamID int, domainUUID string) error {
-	if !ra.fpermit.Enabled {
+	if !ra.Fpermit.Enabled {
 		return nil
 	}
 	if (domainUUID == "" || domainUUID == common.DEFAULT_DOMAIN) &&
-		ra.userInfo.Type != common.USER_TYPE_SUPER_ADMIN {
+		ra.UserInfo.Type != common.USER_TYPE_SUPER_ADMIN {
 		return fmt.Errorf("non-super administrators do not have permission to operate")
 	}
 
 	url := fmt.Sprintf("http://%s:%d/v1/org/%d/permit_verify?method=update&resource_type=domain&resource_id=%s",
-		ra.fpermit.Host, ra.fpermit.Port, ra.userInfo.ORGID, domainUUID)
-	return PermitVerify(url, ra.userInfo, teamID)
+		ra.Fpermit.Host, ra.Fpermit.Port, ra.UserInfo.ORGID, domainUUID)
+	return PermitVerify(url, ra.UserInfo, teamID)
 }
 
 func PermitVerify(url string, userInfo *httpcommon.UserInfo, teamID int) error {
