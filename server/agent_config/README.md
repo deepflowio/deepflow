@@ -1,5 +1,32 @@
 # Global {#global}
 
+## Enabled {#global.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.enabled`
+
+Upgrade from old version: `enabled`
+
+**Default value**:
+```yaml
+global:
+  enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Disabled / Enabled the deepflow-agent.
+
 ## Limits {#global.limits}
 
 Resource limitations
@@ -1100,6 +1127,35 @@ Only available for Trident (Golang version of Agent).
 
 ### Debug {#global.self_monitoring.debug}
 
+#### Enabled {#global.self_monitoring.debug.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.self_monitoring.debug.enabled`
+
+Upgrade from old version: `debug_enabled`
+
+**Default value**:
+```yaml
+global:
+  self_monitoring:
+    debug:
+      enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Disabled / Enabled the debug function of the deepflow-agent.
+
 #### Local UDP Port {#global.self_monitoring.debug.local_udp_port}
 
 **Tags**:
@@ -1160,6 +1216,34 @@ global:
 **Description**:
 
 Only available for Trident (Golang version of Agent).
+
+### Hostname {#global.self_monitoring.hostname}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.self_monitoring.hostname`
+
+Upgrade from old version: `host`
+
+**Default value**:
+```yaml
+global:
+  self_monitoring:
+    hostname: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Override statsd host tag.
 
 ## Standalone Mode {#global.standalone_mode}
 
@@ -1225,6 +1309,224 @@ global:
 **Description**:
 
 Directory where data files are written to.
+
+## Tags {#global.tags}
+
+Tags related to deepflow-agent.
+
+### Region ID {#global.tags.region_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.region_id`
+
+Upgrade from old version: `region_id`
+
+**Default value**:
+```yaml
+global:
+  tags:
+    region_id: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Region ID of the deepflow-agent or Region ID of the data node.
+
+### Pod cluster ID {#global.tags.pod_cluster_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.pod_cluster_id`
+
+Upgrade from old version: `pod_cluster_id`
+
+**Default value**:
+```yaml
+global:
+  tags:
+    pod_cluster_id: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Cluster ID of the container where the deepflow-agent is located.
+
+### VPC ID {#global.tags.vpc_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.vpc_id`
+
+Upgrade from old version: `epc_id`
+
+**Default value**:
+```yaml
+global:
+  tags:
+    vpc_id: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+The ID of the VPC where the deepflow-agent is located is meaningful only for Workload-V/P and pod-V/P types.
+
+### Agent ID {#global.tags.agent_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.agent_id`
+
+Upgrade from old version: `vtap_id`
+
+**Default value**:
+```yaml
+global:
+  tags:
+    agent_id: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 64000] |
+
+**Description**:
+
+Agent ID.
+
+### Agent Type {#global.tags.agent_type}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.agent_type`
+
+Upgrade from old version: `trident_type`
+
+**Default value**:
+```yaml
+global:
+  tags:
+    agent_type: 0
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| 0 | TT_UNKNOWN |
+| 1 | TT_PROCESS, Agent in KVM |
+| 2 | TT_VM, Agent in a dedicated VM on ESXi |
+| 3 | TT_PUBLIC_CLOUD, Agent in Cloud host (VM) |
+| 5 | TT_PHYSICAL_MACHINE, Agent in Cloud host (BM), or legacy host |
+| 6 | TT_DEDICATED_PHYSICAL_MACHINE, Agent in a dedicated host to receive mirror traffic |
+| 7 | TT_HOST_POD, Agent in K8s Node (Cloud BM, or legacy host) |
+| 8 | TT_VM_POD, Agent in K8s Node (Cloud VM) |
+| 9 | TT_TUNNEL_DECAPSULATION, Agent in a dedicated host to decap tunnel traffic |
+| 10 | TT_HYPER_V_COMPUTE, Agent in Hyper-V Compute Node |
+| 11 | TT_HYPER_V_NETWORK, Agent in Hyper-V Network Node |
+| 12 | TT_K8S_SIDECAR, Agent in K8s POD |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 12] |
+
+**Description**:
+
+Agent Type.
+
+### Team ID {#global.tags.team_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.team_id`
+
+Upgrade from old version: `team_id`
+
+**Default value**:
+```yaml
+global:
+  tags:
+    team_id: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+The ID of the team where the deepflow-agent is located.
+
+### Organize ID {#global.tags.organize_id}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.tags.organize_id`
+
+Upgrade from old version: `organize_id`
+
+**Default value**:
+```yaml
+global:
+  tags:
+    organize_id: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+The ID of the organize where the deepflow-agent is located.
 
 # Inputs {#inputs}
 
@@ -4123,6 +4425,36 @@ script:
    - tap2d283223,aa:bb:cc:dd:ee:ff
 
 ### Collect K8s Resource {#inputs.resources.kubernetes}
+
+#### Enabled {#inputs.resources.kubernetes.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.resources.kubernetes.enabled`
+
+Upgrade from old version: `kubernetes_api_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  resources:
+    kubernetes:
+      enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When there are multiple deepflow-agents in the same K8s cluster, 
+only one deepflow-agent will be enabled to collect K8s resources.
 
 #### K8s Namespace {#inputs.resources.kubernetes.kubernetes_namespace}
 
