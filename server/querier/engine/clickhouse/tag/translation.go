@@ -602,7 +602,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 
 	// vtap对应资源
 	vtapResource := "'device_type','device_id','device_name','icon_id','host_id','host_name','chost_id','chost_name','pod_node_id','pod_node_name'"
-	gwDictGet := fmt.Sprintf("dictGet('flow_tag.vtap_port_map', (%s),(toUInt64(agent_id),toUInt64(capture_nic)))", vtapResource)
+	gwDictGet := fmt.Sprintf("dictGet(flow_tag.vtap_port_map, (%s),(toUInt64(agent_id),toUInt64(capture_nic)))", vtapResource)
 	tagResourceMap["resource_from_vtap"] = map[string]*Tag{
 		"default": NewTag(
 			gwDictGet,
