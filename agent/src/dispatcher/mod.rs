@@ -1227,11 +1227,6 @@ impl DispatcherBuilder {
                 )))
             }
             TapMode::Mirror | TapMode::Local if options.libpcap_enabled => {
-                if pcap_interfaces.is_none() || pcap_interfaces.as_ref().unwrap().is_empty() {
-                    return Err(error::Error::Libpcap(
-                        "libpcap capture must give interface to capture packet".into(),
-                    ));
-                }
                 #[cfg(target_os = "windows")]
                 let src_ifaces = pcap_interfaces
                     .as_ref()
