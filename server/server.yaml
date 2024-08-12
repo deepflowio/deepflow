@@ -130,6 +130,7 @@ controller:
     host: clickhouse
     port: 9000
     # user-password:
+    endpoint-tcp-port-name: tcp-port
 
   # datasource-api from ingester
   ingester-api:
@@ -346,7 +347,6 @@ querier:
     timeout: 60
     max-connection: 20
     # user-password:
-    endpoint-tcp-port-name: tcp-port
 
   # profile相关配置
   profile:
