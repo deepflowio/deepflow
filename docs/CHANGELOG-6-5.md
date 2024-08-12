@@ -7,6 +7,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: Modify ch_table update time #26153 [#7785](https://github.com/deepflowio/deepflow/pull/7785) by [Ericsssss](https://github.com/Ericsssss)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
@@ -57,6 +58,10 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: Using libpcap without restarting when the network card does not… [#7781](https://github.com/deepflowio/deepflow/pull/7781) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent license func operate [#7771](https://github.com/deepflowio/deepflow/pull/7771) by [roryye](https://github.com/roryye)
+* feat: increase billing function control capabilities [#7770](https://github.com/deepflowio/deepflow/pull/7770) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: use dynamic library libpcap instead of libelf static library [#7769](https://github.com/deepflowio/deepflow/pull/7769) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
 * feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
