@@ -1050,7 +1050,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
-				cacheFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(entryKey)
+				cacheFilter, ok := prometheusSubqueryCache.Get(entryKey)
 				if ok {
 					filter = cacheFilter.Filter
 					timeout := cacheFilter.Time
@@ -1062,7 +1062,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.AppLabelColumnIndex, op)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 					entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
-					prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
+					prometheusSubqueryCache.Add(entryKey, entryValue)
 					return filter, nil
 				}
 
@@ -1097,7 +1097,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.AppLabelColumnIndex, valueIDFilter)
 				}
 				entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
-				prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
+				prometheusSubqueryCache.Add(entryKey, entryValue)
 				return filter, nil
 			}
 		}
