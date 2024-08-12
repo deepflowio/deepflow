@@ -29,7 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/mikioh/ipaddr"
 )
 

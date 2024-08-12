@@ -41,7 +41,7 @@ type PrometheusSampleInterface interface {
 	OrgID() uint16
 	Columns(int) []*ckdb.Column
 	AppLabelLen() int
-	GenCKTable(string, string, int, *ckdb.ColdStorage, int) *ckdb.Table
+	GenCKTable(string, string, string, int, *ckdb.ColdStorage, int) *ckdb.Table
 	GenerateNewFlowTags(*flow_tag.FlowTagCache, string, *prompb.TimeSeries, []prompb.Label, []uint32, []uint32)
 	VpcId() int32
 	PodNsId() uint16
@@ -124,7 +124,7 @@ func (m *PrometheusSampleMini) Columns(appLabelColumnCount int) []*ckdb.Column {
 	return columns
 }
 
-func (m *PrometheusSampleMini) GenCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage, appLabelColumnCount int) *ckdb.Table {
+func (m *PrometheusSampleMini) GenCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage, appLabelColumnCount int) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
 	// order key
@@ -133,6 +133,7 @@ func (m *PrometheusSampleMini) GenCKTable(cluster, storagePolicy string, ttl int
 	return &ckdb.Table{
 		Version:         common.CK_VERSION,
 		Database:        m.DatabaseName(),
+		DBType:          ckdbType,
 		LocalName:       m.TableName() + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      m.TableName(),
 		Columns:         m.Columns(appLabelColumnCount),
@@ -260,8 +261,8 @@ func (m *PrometheusSample) Release() {
 	ReleasePrometheusSample(m)
 }
 
-func (m *PrometheusSample) GenCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage, appLabelColumnCount int) *ckdb.Table {
-	table := m.PrometheusSampleMini.GenCKTable(cluster, storagePolicy, ttl, coldStorage, appLabelColumnCount)
+func (m *PrometheusSample) GenCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage, appLabelColumnCount int) *ckdb.Table {
+	table := m.PrometheusSampleMini.GenCKTable(cluster, storagePolicy, ckdbType, ttl, coldStorage, appLabelColumnCount)
 	table.Columns = m.Columns(appLabelColumnCount)
 	return table
 }

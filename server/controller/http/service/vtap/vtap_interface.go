@@ -224,8 +224,8 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 						}
 					}
 					if macVIF == nil {
-						log.Warningf("vif with mac: %s not found", vtapVIF.MAC, v.db.LogPrefixORGID)
-						continue
+						// Agent-owned resource
+						macVIF = &mysql.VInterface{DeviceType: deviceType, DeviceID: vtapVIF.VTapLaunchServerID}
 					}
 				}
 				vtapVIF.DeviceType = macVIF.DeviceType

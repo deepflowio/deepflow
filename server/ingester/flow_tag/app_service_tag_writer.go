@@ -78,7 +78,7 @@ func NewAppServiceTagWriter(
 		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		fmt.Sprintf("tag-%s-%d", tableName, decoderIndex),
 		config.CKDB.TimeZone,
-		GenAppServiceTagCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, ttl, partition),
+		GenAppServiceTagCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, config.CKDB.Type, ttl, partition),
 		WRITER_QUEUE_COUNT, WRITER_QUEUE_SIZE, WRITER_BATCH_SIZE, WRITER_FLUSH_TIMEOUT, config.CKDB.Watcher)
 	if err != nil {
 		return nil, err

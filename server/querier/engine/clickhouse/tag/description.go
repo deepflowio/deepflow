@@ -56,7 +56,7 @@ var AUTO_CUSTOM_TAG_MAP = map[string][]string{}
 var AUTO_CUSTOM_TAG_CHECK_MAP = map[string][]string{}
 
 var tagNativeTagDB = []string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}
-var noCustomTagTable = []string{"traffic_policy", "l4_packet", "l7_packet"}
+var noCustomTagTable = []string{"traffic_policy", "l4_packet", "l7_packet", "alert_event"}
 var noCustomTagDB = []string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}
 
 var tagTypeToOperators = map[string][]string{
@@ -328,7 +328,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									ip6Suffix := "ip6" + suffix
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + "))"
 									ipTagTranslator := fmt.Sprintf("if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s))", ip4Suffix, ip6Suffix)
-									iconIDTranslator = fmt.Sprintf("%s, %s", ipTagTranslator+"!=''", "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))")
+									iconIDTranslator = fmt.Sprintf("%s, %s", ipTagTranslator+"!=''", "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))")
 									nodeTypeTranslator = fmt.Sprintf("%s, '%s'", ipTagTranslator+"!=''", tagValue)
 								case "auto_instance", "auto_service", "resource_gl0", "resource_gl1", "resource_gl2":
 									tagAutoIDSuffix := tagValue + "_id" + suffix
@@ -343,13 +343,13 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									ip4Suffix := "ip4" + suffix
 									ip6Suffix := "ip6" + suffix
 									subnetIDSuffix := "subnet_id" + suffix
-									nodeTypeStrSuffix := "dictGet(flow_tag.node_type_map, 'node_type', toUInt64(" + autoTypeSuffix + "))"
-									internetIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
-									ipIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
-									autoIconDictGet := fmt.Sprintf("dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
+									nodeTypeStrSuffix := "dictGet('flow_tag.node_type_map', 'node_type', toUInt64(" + autoTypeSuffix + "))"
+									internetIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(63999),toUInt64(63999)))"
+									ipIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))"
+									autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
 									iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoIDSuffix] = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")"
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+autoNameSuffix] = "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet(flow_tag.device_map, 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+autoNameSuffix] = "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet('flow_tag.device_map', 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoTypeSuffix] = autoTypeSuffix
 									selectPrefixTranslator = "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")!=0"
 									iconIDPrefixTranslator := iconIDStrSuffix + "!=0"
@@ -361,9 +361,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									tagValueID := tagValue + "_id" + suffix
 									tagValueMap := tagValue + "_map"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = tagValueID
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.%s, 'name', toUInt64(%s))", tagValueMap, tagValueID)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet('flow_tag.%s', 'name', toUInt64(%s))", tagValueMap, tagValueID)
 									selectPrefixTranslator = tagValueID + "!=0"
-									iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", selectPrefixTranslator, tagValueMap, tagValueID)
+									iconIDTranslator = fmt.Sprintf("%s, dictGet('flow_tag.%s', 'icon_id', toUInt64(%s))", selectPrefixTranslator, tagValueMap, tagValueID)
 									nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 								case "vpc", "l2_vpc":
 									tagValueName := tagValue + suffix
@@ -374,18 +374,18 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										EPCIDSuffix = "l3_epc_id" + suffix
 									}
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = EPCIDSuffix
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.%s, 'name', toUInt64(%s))", tagValueMap, EPCIDSuffix)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet('flow_tag.%s', 'name', toUInt64(%s))", tagValueMap, EPCIDSuffix)
 									selectPrefixTranslator = EPCIDSuffix + "!=-2"
-									iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", selectPrefixTranslator, tagValueMap, EPCIDSuffix)
+									iconIDTranslator = fmt.Sprintf("%s, dictGet('flow_tag.%s', 'icon_id', toUInt64(%s))", selectPrefixTranslator, tagValueMap, EPCIDSuffix)
 									nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 								case "service", "pod_service":
 									tagValueName := tagValue + suffix
 									tagValueID := tagValue + "_id" + suffix
 									serviceID := "service_id" + suffix
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = serviceID
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(11), toUInt64(%s)))", serviceID)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet('flow_tag.device_map', 'name', (toUInt64(11), toUInt64(%s)))", serviceID)
 									selectPrefixTranslator = serviceID + "!=0"
-									iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(11), toUInt64(%s)))", selectPrefixTranslator, serviceID)
+									iconIDTranslator = fmt.Sprintf("%s, dictGet('flow_tag.device_map', 'icon_id', (toUInt64(11), toUInt64(%s)))", selectPrefixTranslator, serviceID)
 									nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 
 								default:
@@ -395,8 +395,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										podNSIDSuffix := "pod_ns_id" + suffix
 										deviceIDSuffix := "l3_device_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "cloud.tag.")
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='',if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "')))"
-										tagSelectPrefixTranslaterStr := "(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='') OR (dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "'))!= '')"
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(if(" + deviceTypeSuffix + "=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='',if(" + deviceTypeSuffix + "=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), ''), dictGet('flow_tag.pod_ns_cloud_tag_map', 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "')))"
+										tagSelectPrefixTranslaterStr := "(if(" + deviceTypeSuffix + "=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='') OR (dictGet('flow_tag.pod_ns_cloud_tag_map', 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "'))!= '')"
 										selectPrefixTranslator = tagSelectPrefixTranslaterStr
 										iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
@@ -405,8 +405,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										podIDSuffix := "pod_id" + suffix
 										serviceIDSuffix := "service_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "k8s.label.")
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "')), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
-										tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "')), dictGet('flow_tag.pod_k8s_label_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
+										tagSelectPrefixTranslaterStr := "(dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet('flow_tag.pod_k8s_label_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
 										selectPrefixTranslator = tagSelectPrefixTranslaterStr
 										iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
@@ -415,8 +415,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										podIDSuffix := "pod_id" + suffix
 										serviceIDSuffix := "service_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "k8s.annotation.")
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'%s')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
-										tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "if(dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64(" + serviceIDSuffix + "),'%s')), dictGet('flow_tag.pod_k8s_annotation_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
+										tagSelectPrefixTranslaterStr := "(dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet('flow_tag.pod_k8s_annotation_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
 										selectPrefixTranslator = tagSelectPrefixTranslaterStr
 										iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
@@ -424,8 +424,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										tagValueName := tagValue + suffix
 										podIDSuffix := "pod_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "k8s.env.")
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))"
-										tagSelectPrefixTranslaterStr := "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!=''"
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "dictGet('flow_tag.pod_k8s_env_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))"
+										tagSelectPrefixTranslaterStr := "dictGet('flow_tag.pod_k8s_env_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!=''"
 										selectPrefixTranslator = tagSelectPrefixTranslaterStr
 										iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
@@ -433,8 +433,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										tagValueName := tagValue + suffix
 										processIDSuffix := "gprocess_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "os.app.")
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))"
-										tagSelectPrefixTranslaterStr := "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))!=''"
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = "dictGet('flow_tag.os_app_tag_map', 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))"
+										tagSelectPrefixTranslaterStr := "dictGet('flow_tag.os_app_tag_map', 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))!=''"
 										selectPrefixTranslator = tagSelectPrefixTranslaterStr
 										iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
@@ -451,9 +451,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										deviceTypeSuffix := "l3_device_type" + suffix
 										diviceIDTranslator := fmt.Sprintf("if(%s=%d, %s, -1)", deviceTypeSuffix, deviceType, deviceIDSuffix)
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = diviceIDTranslator
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s)))", nameDeviceType, deviceIDSuffix)
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet('flow_tag.device_map', 'name', (toUInt64(%d), toUInt64(%s)))", nameDeviceType, deviceIDSuffix)
 										selectPrefixTranslator = fmt.Sprintf("(%s!=0 AND %s=%d)", deviceIDSuffix, deviceTypeSuffix, deviceType)
-										iconIDTranslator = fmt.Sprintf("%s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", selectPrefixTranslator, nameDeviceType, deviceIDSuffix)
+										iconIDTranslator = fmt.Sprintf("%s, dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%d), toUInt64(%s)))", selectPrefixTranslator, nameDeviceType, deviceIDSuffix)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 									}
 								}
@@ -465,7 +465,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									ip6Suffix := "ip6" + suffix
 									ipTagTranslator := fmt.Sprintf("IF(%s, '', if(is_ipv4=1, IPv4NumToString(%s), IPv6NumToString(%s)))", selectPrefixTranslator, ip4Suffix, ip6Suffix)
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = ipTagTranslator
-									iconIDTranslator += fmt.Sprintf(", %s, %s", ipTagTranslator+"!=''", "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))")
+									iconIDTranslator += fmt.Sprintf(", %s, %s", ipTagTranslator+"!=''", "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))")
 									nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", ipTagTranslator+"!=''", tagValue)
 								case "auto_instance", "auto_service", "resource_gl0", "resource_gl1", "resource_gl2":
 									tagAutoIDSuffix := tagValue + "_id" + suffix
@@ -480,12 +480,12 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									ip4Suffix := "ip4" + suffix
 									ip6Suffix := "ip6" + suffix
 									subnetIDSuffix := "subnet_id" + suffix
-									nodeTypeStrSuffix := "dictGet(flow_tag.node_type_map, 'node_type', toUInt64(" + autoTypeSuffix + "))"
-									internetIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
-									ipIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
-									autoIconDictGet := fmt.Sprintf("dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
+									nodeTypeStrSuffix := "dictGet('flow_tag.node_type_map', 'node_type', toUInt64(" + autoTypeSuffix + "))"
+									internetIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(63999),toUInt64(63999)))"
+									ipIconDictGet := "dictGet('flow_tag.device_map', 'icon_id', (toUInt64(64000),toUInt64(64000)))"
+									autoIconDictGet := fmt.Sprintf("dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
 									iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
-									tagNameSelectFilterStr := "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet(flow_tag.device_map, 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
+									tagNameSelectFilterStr := "if(" + autoTypeSuffix + " in (0,255),if(is_ipv4=1, IPv4NumToString(" + ip4Suffix + "), IPv6NumToString(" + ip6Suffix + ")),dictGet('flow_tag.device_map', 'name', (toUInt64(" + autoTypeSuffix + "),toUInt64(" + autoIDSuffix + "))))"
 									tagIDSelectFilterStr := "if(" + autoTypeSuffix + " in (0,255)," + subnetIDSuffix + "," + autoIDSuffix + ")"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagAutoIDSuffix] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagIDSelectFilterStr)
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+autoNameSuffix] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagNameSelectFilterStr)
@@ -500,9 +500,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 									tagValueID := tagValue + "_id" + suffix
 									tagValueMap := tagValue + "_map"
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, tagValueID)
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.%s, 'name', toUInt64(%s)))", selectPrefixTranslator, tagValueMap, tagValueID)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet('flow_tag.%s', 'name', toUInt64(%s)))", selectPrefixTranslator, tagValueMap, tagValueID)
 									selectPrefixTranslator += " OR " + tagValueID + "!=0"
-									iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", tagValueID+"!=0", tagValueMap, tagValueID)
+									iconIDTranslator += fmt.Sprintf(", %s, dictGet('flow_tag.%s', 'icon_id', toUInt64(%s))", tagValueID+"!=0", tagValueMap, tagValueID)
 									nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagValueID+"!=0", tagValue)
 								case "vpc", "l2_vpc":
 									tagValueName := tagValue + suffix
@@ -513,18 +513,18 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										EPCIDSuffix = "l3_epc_id" + suffix
 									}
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, EPCIDSuffix)
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.%s, 'name', toUInt64(%s)))", selectPrefixTranslator, tagValueMap, EPCIDSuffix)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet('flow_tag.%s', 'name', toUInt64(%s)))", selectPrefixTranslator, tagValueMap, EPCIDSuffix)
 									selectPrefixTranslator += " OR " + EPCIDSuffix + "!=-2"
-									iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.%s, 'icon_id', toUInt64(%s))", EPCIDSuffix+"!=-2", tagValueMap, EPCIDSuffix)
+									iconIDTranslator += fmt.Sprintf(", %s, dictGet('flow_tag.%s', 'icon_id', toUInt64(%s))", EPCIDSuffix+"!=-2", tagValueMap, EPCIDSuffix)
 									nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", EPCIDSuffix+"!=-2", tagValue)
 								case "service", "pod_service":
 									tagValueName := tagValue + suffix
 									tagValueID := tagValue + "_id" + suffix
 									serviceID := "service_id" + suffix
 									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, serviceID)
-									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(11), toUInt64(%s) )))", selectPrefixTranslator, serviceID)
+									TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet('flow_tag.device_map', 'name', (toUInt64(11), toUInt64(%s) )))", selectPrefixTranslator, serviceID)
 									selectPrefixTranslator += " OR " + serviceID + "!=0"
-									iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(11), toUInt64(%s)))", selectPrefixTranslator, serviceID)
+									iconIDTranslator += fmt.Sprintf(", %s, dictGet('flow_tag.device_map', 'icon_id', (toUInt64(11), toUInt64(%s)))", selectPrefixTranslator, serviceID)
 									nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", selectPrefixTranslator, tagValue)
 								default:
 									if strings.HasPrefix(tagValue, "cloud.tag.") {
@@ -533,9 +533,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										podNSIDSuffix := "pod_ns_id" + suffix
 										deviceIDSuffix := "l3_device_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "cloud.tag.")
-										tagSelectFilterStr := "if(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='',if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "')))"
+										tagSelectFilterStr := "if(if(" + deviceTypeSuffix + "=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='',if(" + deviceTypeSuffix + "=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), ''), dictGet('flow_tag.pod_ns_cloud_tag_map', 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "')))"
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
-										tagSelectPrefixTranslaterStr := "(if(" + deviceTypeSuffix + "=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='') OR (dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "'))!= '')"
+										tagSelectPrefixTranslaterStr := "(if(" + deviceTypeSuffix + "=1, dictGet('flow_tag.chost_cloud_tag_map', 'value', (toUInt64(" + deviceIDSuffix + "),'" + tagKey + "')), '')!='') OR (dictGet('flow_tag.pod_ns_cloud_tag_map', 'value', (toUInt64(" + podNSIDSuffix + "),'" + tagKey + "'))!= '')"
 										selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
 										iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
@@ -544,9 +544,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										podIDSuffix := "pod_id" + suffix
 										serviceIDSuffix := "service_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "k8s.label.")
-										tagSelectFilterStr := "if(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "')), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
+										tagSelectFilterStr := "if(dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "')), dictGet('flow_tag.pod_k8s_label_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
-										tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
+										tagSelectPrefixTranslaterStr := "(dictGet('flow_tag.pod_service_k8s_label_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet('flow_tag.pod_k8s_label_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
 										selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
 										iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
@@ -555,9 +555,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										podIDSuffix := "pod_id" + suffix
 										serviceIDSuffix := "service_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "k8s.annotation.")
-										tagSelectFilterStr := "if(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'%s')), dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
+										tagSelectFilterStr := "if(dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='', dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64(" + serviceIDSuffix + "),'%s')), dictGet('flow_tag.pod_k8s_annotation_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "')))"
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
-										tagSelectPrefixTranslaterStr := "(dictGet(flow_tag.pod_service_k8s_annotation_map, 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet(flow_tag.pod_k8s_annotation_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
+										tagSelectPrefixTranslaterStr := "(dictGet('flow_tag.pod_service_k8s_annotation_map', 'value', (toUInt64(" + serviceIDSuffix + "),'" + tagKey + "'))!='') OR (dictGet('flow_tag.pod_k8s_annotation_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!='')"
 										selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
 										iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
@@ -565,9 +565,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										tagValueName := tagValue + suffix
 										podIDSuffix := "pod_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "k8s.env.")
-										tagSelectFilterStr := "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))"
+										tagSelectFilterStr := "dictGet('flow_tag.pod_k8s_env_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))"
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
-										tagSelectPrefixTranslaterStr := "dictGet(flow_tag.pod_k8s_env_map, 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!=''"
+										tagSelectPrefixTranslaterStr := "dictGet('flow_tag.pod_k8s_env_map', 'value', (toUInt64(" + podIDSuffix + "),'" + tagKey + "'))!=''"
 										selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
 										iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
@@ -575,9 +575,9 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										tagValueName := tagValue + suffix
 										processIDSuffix := "gprocess_id" + suffix
 										tagKey := strings.TrimPrefix(tagValue, "os.app.")
-										tagSelectFilterStr := "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))"
+										tagSelectFilterStr := "dictGet('flow_tag.os_app_tag_map', 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))"
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
-										tagSelectPrefixTranslaterStr := "dictGet(flow_tag.os_app_tag_map, 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))!=''"
+										tagSelectPrefixTranslaterStr := "dictGet('flow_tag.os_app_tag_map', 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))!=''"
 										selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
 										iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
@@ -594,10 +594,10 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										deviceTypeSuffix := "l3_device_type" + suffix
 										diviceIDTranslator := fmt.Sprintf("if(%s=%d, %s, -1)", deviceTypeSuffix, deviceType, deviceIDSuffix)
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueID] = fmt.Sprintf("IF(%s, -1, %s)", selectPrefixTranslator, diviceIDTranslator)
-										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet(flow_tag.device_map, 'name', (toUInt64(%d), toUInt64(%s) )))", selectPrefixTranslator, nameDeviceType, deviceIDSuffix)
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', dictGet('flow_tag.device_map', 'name', (toUInt64(%d), toUInt64(%s) )))", selectPrefixTranslator, nameDeviceType, deviceIDSuffix)
 										deviceSelectPrefixTranslator := fmt.Sprintf("%s!=0 AND %s=%d", deviceIDSuffix, deviceTypeSuffix, deviceType)
 										selectPrefixTranslator += fmt.Sprintf(" OR (%s)", deviceSelectPrefixTranslator)
-										iconIDTranslator += fmt.Sprintf(", %s, dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%d), toUInt64(%s)))", deviceSelectPrefixTranslator, nameDeviceType, deviceIDSuffix)
+										iconIDTranslator += fmt.Sprintf(", %s, dictGet('flow_tag.device_map', 'icon_id', (toUInt64(%d), toUInt64(%s)))", deviceSelectPrefixTranslator, nameDeviceType, deviceIDSuffix)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", deviceSelectPrefixTranslator, tagValue)
 									}
 								}
@@ -868,6 +868,8 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", whereSql, limit)
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, whereSql, limit)
+		} else if table == "alert_event" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_value_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table, field_value_type ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		}
@@ -876,6 +878,8 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", limit)
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, limit)
+		} else if table == "alert_event" {
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_value_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table, field_value_type ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		}
@@ -897,6 +901,22 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 				externalTag, externalTag, externalTag, externalTag, "map_item",
 				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
 			})
+		} else if table == "alert_event" {
+			externalTag := tagName.(string)
+			var categoryValue string
+			// fieltValueType := _tagName.([]interface{})[2]
+			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") {
+				categoryValue = "Custom Tag"
+			} else if strings.HasPrefix(externalTag, "tag.") || strings.HasPrefix(externalTag, "attribute.") {
+				categoryValue = "Native Tag"
+			} else {
+				categoryValue = _tagName.([]interface{})[2].(string)
+			}
+
+			response.Values = append(response.Values, []interface{}{
+				externalTag, externalTag, externalTag, externalTag, "map_item",
+				categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+			})
 		} else if slices.Contains(tagNativeTagDB, db) {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
@@ -912,6 +932,38 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		}
 	}
 	return
+}
+
+func GetAlertEventTagDescriptions(staticTag, dynamicTag *common.Result) (response *common.Result, err error) {
+	response = &common.Result{
+		Columns: []interface{}{
+			"name", "client_name", "server_name", "display_name", "type", "category",
+			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+		},
+		Values: []interface{}{},
+	}
+	valuesMap := map[string]interface{}{}
+	staticValues := staticTag.Values
+	dynamiicValues := dynamicTag.Values
+	for _, staticItem := range staticValues {
+		valuesMap[staticItem.([]interface{})[0].(string)] = staticItem
+	}
+
+	// if dynamiic tag_name not in staticvalues, add to result
+	for _, dynamicItem := range dynamiicValues {
+		dynamicTagName := strings.TrimSuffix(dynamicItem.([]interface{})[0].(string), "_0")
+		dynamicTagName = strings.TrimSuffix(dynamicTagName, "_1")
+		dynamicTagName = strings.TrimSuffix(dynamicTagName, "_id")
+		if valuesMap[dynamicTagName] == nil && valuesMap[dynamicItem.([]interface{})[0].(string)] == nil {
+			valuesMap[dynamicTagName] = dynamicItem
+		}
+	}
+
+	for _, value := range valuesMap {
+		response.Values = append(response.Values, value)
+	}
+
+	return response, nil
 }
 
 func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
@@ -932,6 +984,9 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	DynamicResponse, err := GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)
 	if err != nil {
 		return
+	}
+	if table == "alert_event" {
+		return GetAlertEventTagDescriptions(staticResponse, DynamicResponse)
 	}
 	response.Values = append(response.Values, staticResponse.Values...)
 	response.Values = append(response.Values, DynamicResponse.Values...)

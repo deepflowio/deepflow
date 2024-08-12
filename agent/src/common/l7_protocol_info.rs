@@ -25,8 +25,8 @@ use crate::{
     common::l7_protocol_log::LogCache,
     flow_generator::{
         protocol_logs::{
-            fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, BrpcInfo, DnsInfo,
-            DubboInfo, HttpInfo, KafkaInfo, MongoDBInfo, MqttInfo, MysqlInfo, NatsInfo,
+            fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, BrpcInfo, TarsInfo, 
+            DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MongoDBInfo, MqttInfo, MysqlInfo, NatsInfo,
             OpenWireInfo, OracleInfo, PostgreInfo, PulsarInfo, RedisInfo, SofaRpcInfo, TlsInfo,
             ZmtpInfo,
         },
@@ -70,6 +70,7 @@ all_protocol_info!(
     DubboInfo(DubboInfo),
     FastCGIInfo(FastCGIInfo),
     BrpcInfo(BrpcInfo),
+    TarsInfo(TarsInfo),
     KafkaInfo(KafkaInfo),
     MqttInfo(MqttInfo),
     AmqpInfo(AmqpInfo),
@@ -77,11 +78,11 @@ all_protocol_info!(
     PulsarInfo(PulsarInfo),
     ZmtpInfo(ZmtpInfo),
     PostgreInfo(PostgreInfo),
+    OpenWireInfo(OpenWireInfo),
     OracleInfo(OracleInfo),
     SofaRpcInfo(SofaRpcInfo),
     TlsInfo(TlsInfo),
     CustomInfo(CustomInfo),
-    OpenWireInfo(OpenWireInfo),
     // add new protocol info below
 );
 

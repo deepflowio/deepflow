@@ -337,7 +337,7 @@ type Field struct {
 	TunnelIPID uint16
 }
 
-func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 
 	var orderKeys []string
@@ -367,6 +367,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 		Version:         version,
 		ID:              uint8(id),
 		Database:        ckdb.METRICS_DB,
+		DBType:          ckdbType,
 		LocalName:       id.TableName() + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      id.TableName(),
 		Columns:         append(GenTagColumns(metricsTableCodes[id]), meterColumns...),
@@ -396,17 +397,17 @@ func newMetricsSecondTable(minuteTable *ckdb.Table, ttl int, coldStorages *ckdb.
 	return &t
 }
 
-func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy string, flowMinuteTtl, flowSecondTtl, appMinuteTtl, appSecondTtl int, coldStorages map[string]*ckdb.ColdStorage) []*ckdb.Table {
+func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy, ckdbType string, flowMinuteTtl, flowSecondTtl, appMinuteTtl, appSecondTtl int, coldStorages map[string]*ckdb.ColdStorage) []*ckdb.Table {
 	var metricsTables []*ckdb.Table
 
 	minuteTables := []*ckdb.Table{}
 	for i := NETWORK_1M; i <= NETWORK_MAP_1M; i++ {
-		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, flowMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, ckdbType, flowMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
 	for i := APPLICATION_1M; i <= APPLICATION_MAP_1M; i++ {
-		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, appMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, ckdbType, appMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
-	minuteTables = append(minuteTables, newMetricsMinuteTable(TRAFFIC_POLICY_1M, engine, version, cluster, storagePolicy, 3*24, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, TRAFFIC_POLICY_1M.TableName()))) // traffic_policy ttl is 3 day default
+	minuteTables = append(minuteTables, newMetricsMinuteTable(TRAFFIC_POLICY_1M, engine, version, cluster, storagePolicy, ckdbType, 3*24, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, TRAFFIC_POLICY_1M.TableName()))) // traffic_policy ttl is 3 day default
 
 	secondTables := []*ckdb.Table{}
 	for i := NETWORK_1S; i <= NETWORK_MAP_1S; i++ {

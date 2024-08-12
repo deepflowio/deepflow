@@ -22,7 +22,7 @@ import (
 
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 // This project is not an actual project that is visible to the console, so ignore its exceptions when learning

@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {

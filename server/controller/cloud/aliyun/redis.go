@@ -20,7 +20,7 @@ import (
 	r_kvstore "github.com/aliyun/alibaba-cloud-sdk-go/services/r-kvstore"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (a *Aliyun) getRedisInstances(region model.Region) (

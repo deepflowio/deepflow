@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (t *Tencent) getRegions() ([]tencentRegion, error) {

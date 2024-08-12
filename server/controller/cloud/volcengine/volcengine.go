@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/credentials"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/session"

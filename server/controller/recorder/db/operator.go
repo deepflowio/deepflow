@@ -21,10 +21,10 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("recorder.db")

@@ -273,7 +273,7 @@ func EventColumns(hasMetrics bool) []*ckdb.Column {
 	return columns
 }
 
-func GenEventCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
 	orderKeys := []string{timeKey, "signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
@@ -287,6 +287,7 @@ func GenEventCKTable(cluster, storagePolicy, table string, ttl int, coldStorage 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        EVENT_DB,
+		DBType:          ckdbType,
 		LocalName:       table + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      table,
 		Columns:         EventColumns(hasMetrics),

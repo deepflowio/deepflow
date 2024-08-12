@@ -83,6 +83,7 @@ type PrometheusWriter struct {
 	ckdbPassword      string
 	ckdbCluster       string
 	ckdbStoragePolicy string
+	ckdbType          string
 	ckdbColdStorages  map[string]*ckdb.ColdStorage
 	ckdbTimeZone      string
 	ttl               int
@@ -143,7 +144,7 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 	startTime := time.Now()
 	log.Infof("start create new ckwriter for prometheus, app label count: %d", appLabelCount)
 	// 将要创建的表信息
-	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()), appLabelCount)
+	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ckdbType, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()), appLabelCount)
 
 	ckwriter, err := ckwriter.NewCKWriter(
 		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
@@ -328,6 +329,7 @@ func NewPrometheusWriter(
 		ckdbPassword:            config.Base.CKDBAuth.Password,
 		ckdbCluster:             config.Base.CKDB.ClusterName,
 		ckdbStoragePolicy:       config.Base.CKDB.StoragePolicy,
+		ckdbType:                config.Base.CKDB.Type,
 		ckdbColdStorages:        config.Base.GetCKDBColdStorages(),
 		ckdbTimeZone:            config.Base.CKDB.TimeZone,
 		ttl:                     config.TTL,

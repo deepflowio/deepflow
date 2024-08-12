@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("db.mysql")

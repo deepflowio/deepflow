@@ -26,7 +26,6 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/election"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/kubernetes"
@@ -35,6 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("trisolaris")

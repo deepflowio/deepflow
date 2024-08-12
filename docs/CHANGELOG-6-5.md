@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: not found replicaset pod [#7761](https://github.com/deepflowio/deepflow/pull/7761) by [askyrie](https://github.com/askyrie)
+* fix: uses wrong host when request server http service [#7759](https://github.com/deepflowio/deepflow/pull/7759) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Fix enum filter error [#7731](https://github.com/deepflowio/deepflow/pull/7731) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: ntp support profile data [#7706](https://github.com/deepflowio/deepflow/pull/7706) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Modify show tags API error #26063 [#7703](https://github.com/deepflowio/deepflow/pull/7703) by [Ericsssss](https://github.com/Ericsssss)
 * fix: agent fixes empty endpoint when setting http-endpoint-extraction.match-rules.prefix: "" [#7699](https://github.com/deepflowio/deepflow/pull/7699) by [TomatoMr](https://github.com/TomatoMr)
@@ -94,6 +97,14 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: shortens the interval of checking deleted_org [#7764](https://github.com/deepflowio/deepflow/pull/7764) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: OTel’s HTTP protocol parsing optimization [#7758](https://github.com/deepflowio/deepflow/pull/7758) by [lzf575](https://github.com/lzf575)
+* feat: Support k8s opengauss cluster [#7751](https://github.com/deepflowio/deepflow/pull/7751) by [rvql](https://github.com/rvql)
+* feat: support opengauss svc [#7744](https://github.com/deepflowio/deepflow/pull/7744) by [askyrie](https://github.com/askyrie)
+* Revert "feat: agent - eBPF Modify the version number of the Java agent [#7741](https://github.com/deepflowio/deepflow/pull/7741) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Modify the version number of the Java agent [#7732](https://github.com/deepflowio/deepflow/pull/7732) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Java agent uses caching to reduce send frequency [#7726](https://github.com/deepflowio/deepflow/pull/7726) by [yinjiping](https://github.com/yinjiping)
+* feat: supports non-real-time deletion of ck of deleted orgs [#7725](https://github.com/deepflowio/deepflow/pull/7725) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: kubernetes support OpenGaussCluster [#7721](https://github.com/deepflowio/deepflow/pull/7721) by [askyrie](https://github.com/askyrie)
 * feat: agent - eBPF Adjust method for checking if agent is running [#7717](https://github.com/deepflowio/deepflow/pull/7717) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - flow&app log collected by lo nic do not report ctrl_mac [#7713](https://github.com/deepflowio/deepflow/pull/7713) by [yuanchaoa](https://github.com/yuanchaoa)

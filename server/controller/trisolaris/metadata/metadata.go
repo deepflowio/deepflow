@@ -25,10 +25,10 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/message/trident"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("trisolaris.metadata")

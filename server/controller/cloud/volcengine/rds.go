@@ -21,7 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/rdsmssql"
 	"github.com/volcengine/volcengine-go-sdk/service/rdsmysqlv2"
 	"github.com/volcengine/volcengine-go-sdk/service/rdspostgresql"
