@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
@@ -95,7 +95,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		podGroupLcuuid := ""
 		podLcuuid := ""
 		pgLcuuid := common.IDGenerateUUID(k.orgID, podGroupUID)
-		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[podGroupUID]; ok {
+		if gLcuuid, ok := k.rsLcuuidToPodGroupLcuuid[pgLcuuid]; ok {
 			podRSLcuuid = pgLcuuid
 			podGroupLcuuid = gLcuuid
 		} else {

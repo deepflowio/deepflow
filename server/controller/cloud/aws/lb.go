@@ -29,7 +29,7 @@ import (
 	v2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener, []model.LBTargetServer, error) {

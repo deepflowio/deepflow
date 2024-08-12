@@ -47,9 +47,9 @@ type CkDbWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, timeZone string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl flowmetricsconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage, ckdbWatcher *config.Watcher) (DbWriter, error) {
+func NewCkDbWriter(addrs []string, user, password, clusterName, storagePolicy, timeZone, ckdbType string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl flowmetricsconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage, ckdbWatcher *config.Watcher) (DbWriter, error) {
 	ckwriters := []*ckwriter.CKWriter{}
-	tables := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
+	tables := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, ckdbType, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
 	for _, table := range tables {
 		counterName := "metrics_1m"
 		if table.ID >= uint8(flow_metrics.NETWORK_1S) && table.ID <= uint8(flow_metrics.NETWORK_MAP_1S) {

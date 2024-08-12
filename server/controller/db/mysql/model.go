@@ -228,6 +228,21 @@ func (VTapGroup) TableName() string {
 	return "vtap_group"
 }
 
+type LicenseFuncLog struct {
+	ID              int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	TeamID          int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
+	AgentID         int       `gorm:"column:agent_id;type:int" json:"AGENT_ID"`
+	AgentName       string    `gorm:"column:agent_name;type:varchar(256)" json:"AGENT_NAME"`
+	UserID          int       `gorm:"column:user_id;type:int" json:"USER_ID"`
+	LicenseFunction int       `gorm:"column:license_function;type:int;" json:"ENABLED_FEATURE"`
+	Enabled         int       `gorm:"column:enabled;type:int" json:"ENABLED"`
+	CreatedAt       time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+}
+
+func (LicenseFuncLog) TableName() string {
+	return "license_func_log"
+}
+
 type DataSource struct {
 	ID                        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	DisplayName               string    `gorm:"column:display_name;type:char(64);default:''" json:"DISPLAY_NAME"`

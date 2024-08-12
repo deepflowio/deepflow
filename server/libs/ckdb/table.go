@@ -80,6 +80,7 @@ type Table struct {
 	Version         string       // 表版本，用于表结构变更时，做自动更新
 	ID              uint8        // id
 	Database        string       // 所属数据库名
+	DBType          string       // clickhouse or byconity
 	LocalName       string       // 本地表名
 	GlobalName      string       // 全局表名
 	Columns         []*Column    // 表列结构
@@ -126,12 +127,20 @@ func (t *Table) makeLocalTableCreateSQL(database string) string {
 		}
 	}
 
+	preload := ""
+	if t.DBType == CKDBTypeByconity {
+		if t.Engine < EngineByconityOffset {
+			t.Engine = t.Engine + EngineByconityOffset
+		}
+		preload = ", parts_preload_level = 3" // enable preloading for the table, preload both metadata and some data
+	}
+
 	engine := t.Engine.String()
 	if t.Engine == ReplicatedMergeTree || t.Engine == ReplicatedAggregatingMergeTree {
 		engine = fmt.Sprintf(t.Engine.String(), t.Database, t.LocalName)
-	} else if t.Engine == ReplacingMergeTree {
+	} else if t.Engine == ReplacingMergeTree || t.Engine == CnchReplacingMergeTree {
 		engine = fmt.Sprintf(t.Engine.String(), t.TimeKey)
-	} else if t.Engine == SummingMergeTree {
+	} else if t.Engine == SummingMergeTree || t.Engine == CnchSummingMergeTree {
 		engine = fmt.Sprintf(t.Engine.String(), t.SummingKey)
 	}
 
@@ -155,7 +164,7 @@ PRIMARY KEY (%s)
 ORDER BY (%s)
 %s
 %s
-SETTINGS storage_policy = '%s', ttl_only_drop_parts = 1`,
+SETTINGS storage_policy = '%s', ttl_only_drop_parts = 1%s`,
 		database, fmt.Sprintf("`%s`", t.LocalName),
 		strings.Join(columns, ",\n"),
 		engine,
@@ -163,19 +172,30 @@ SETTINGS storage_policy = '%s', ttl_only_drop_parts = 1`,
 		strings.Join(t.OrderKeys, ","),
 		partition,
 		ttl,
-		t.StoragePolicy)
+		t.StoragePolicy,
+		preload) // only for Byconity
 	return createTable
 }
 
 func (t *Table) MakeLocalTableCreateSQL() string {
+	if t.DBType == CKDBTypeByconity {
+		return "SELECT VERSION()"
+	}
 	return t.makeLocalTableCreateSQL(t.Database)
 }
 
 func (t *Table) MakeOrgLocalTableCreateSQL(orgID uint16) string {
+	if t.DBType == CKDBTypeByconity {
+		return "SELECT VERSION()"
+	}
 	return t.makeLocalTableCreateSQL(t.OrgDatabase(orgID))
 }
 
 func (t *Table) makeGlobalTableCreateSQL(database string) string {
+	if t.DBType == CKDBTypeByconity {
+		t.LocalName = t.GlobalName
+		return t.makeLocalTableCreateSQL(t.Database)
+	}
 	engine := fmt.Sprintf(Distributed.String(), t.Cluster, database, t.LocalName)
 	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`%s` AS %s.`%s` ENGINE=%s",
 		database, t.GlobalName, database, t.LocalName, engine)
@@ -233,6 +253,9 @@ func (t *Table) MakeViewsCreateSQLForDeepflowSystem(orgID uint16) []string {
 }
 
 func (t *Table) makePrepareTableInsertSQL(database string) string {
+	if t.DBType == CKDBTypeByconity {
+		t.LocalName = t.GlobalName
+	}
 	columns := []string{}
 	values := []string{}
 	for _, c := range t.Columns {

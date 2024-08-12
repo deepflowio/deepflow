@@ -37,7 +37,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	mysql_model "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -45,6 +44,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("trisolaris.vtap")
@@ -465,7 +465,7 @@ func isBlank(value reflect.Value) bool {
 }
 
 func JudgeField(field string) bool {
-	for _, name := range []string{"ID", "VTapGroupLcuuid", "Lcuuid", "TapInterfaceRegex"} {
+	for _, name := range []string{"ID", "VTapGroupLcuuid", "Lcuuid"} {
 		if field == name {
 			return true
 		}
@@ -474,8 +474,8 @@ func JudgeField(field string) bool {
 	return false
 }
 
-func DefaultFieldNone(filed string) bool {
-	for _, name := range []string{"CaptureBpf"} {
+func AllowEmptyField(filed string) bool {
+	for _, name := range []string{"TapInterfaceRegex"} {
 		if filed == name {
 			return true
 		}
@@ -512,6 +512,11 @@ func (v *VTapInfo) convertConfig(configs []*agent_config.AgentGroupConfigModel) 
 			field := tt.Field(i)
 			value := tv.Field(i)
 			if JudgeField(field.Name) {
+				typeOfVTapConfiguration.Field(i).Set(value)
+				continue
+			}
+			// Allow empty values not to be overwritten as default values. For example, it can be set: `tap_interface_regex: ""`
+			if AllowEmptyField(field.Name) && value.Kind() == reflect.Ptr && !value.IsNil() {
 				typeOfVTapConfiguration.Field(i).Set(value)
 				continue
 			}

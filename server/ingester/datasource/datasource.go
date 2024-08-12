@@ -52,6 +52,7 @@ type DatasourceManager struct {
 
 	ckdbCluster       string
 	ckdbStoragePolicy string
+	ckdbType          string
 
 	server *http.Server
 }
@@ -64,6 +65,7 @@ func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManage
 		readTimeout:       readTimeout,
 		ckdbCluster:       cfg.CKDB.ClusterName,
 		ckdbStoragePolicy: cfg.CKDB.StoragePolicy,
+		ckdbType:          cfg.CKDB.Type,
 		ckdbColdStorages:  cfg.GetCKDBColdStorages(),
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),

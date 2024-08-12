@@ -22,14 +22,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/gopacket/layers"
+	"github.com/pyroscope-io/pyroscope/pkg/storage"
+
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/grpc"
 	"github.com/deepflowio/deepflow/server/libs/pool"
 	"github.com/deepflowio/deepflow/server/libs/utils"
-	"github.com/google/gopacket/layers"
-	"github.com/pyroscope-io/pyroscope/pkg/storage"
 )
 
 const (
@@ -82,6 +83,11 @@ type InProcessProfile struct {
 	PodNSID      uint16
 	PodClusterID uint16
 	PodGroupID   uint32
+
+	AutoInstanceID   uint32
+	AutoInstanceType uint8
+	AutoServiceID    uint32
+	AutoServiceType  uint8
 
 	IP4    uint32 `json:"ip4"`
 	IP6    net.IP `json:"ip6"`
@@ -163,6 +169,11 @@ func ProfileColumns() []*ckdb.Column {
 		ckdb.NewColumn("pod_cluster_id", ckdb.UInt16).SetComment("容器集群ID"),
 		ckdb.NewColumn("pod_group_id", ckdb.UInt32).SetComment("容器组ID"),
 
+		ckdb.NewColumn("auto_instance_id", ckdb.UInt32),
+		ckdb.NewColumn("auto_instance_type", ckdb.UInt8),
+		ckdb.NewColumn("auto_service_id", ckdb.UInt32),
+		ckdb.NewColumn("auto_service_type", ckdb.UInt8),
+
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
 		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
@@ -170,7 +181,7 @@ func ProfileColumns() []*ckdb.Column {
 	}
 }
 
-func GenProfileCKTable(cluster, dbName, tableName, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenProfileCKTable(cluster, dbName, tableName, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
 	orderKeys := []string{"app_service", timeKey, "ip4", "ip6"}
@@ -178,6 +189,7 @@ func GenProfileCKTable(cluster, dbName, tableName, storagePolicy string, ttl int
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        dbName,
+		DBType:          ckdbType,
 		LocalName:       tableName + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      tableName,
 		Columns:         ProfileColumns(),
@@ -231,6 +243,12 @@ func (p *InProcessProfile) WriteBlock(block *ckdb.Block) {
 		p.PodNSID,
 		p.PodClusterID,
 		p.PodGroupID,
+
+		p.AutoInstanceID,
+		p.AutoInstanceType,
+		p.AutoServiceID,
+		p.AutoServiceType,
+
 		p.L3DeviceType,
 		p.L3DeviceID,
 		p.ServiceID,
@@ -384,6 +402,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 		}
 	}
 
+	podGroupType := uint8(0)
 	if info != nil {
 		p.RegionID = uint16(info.RegionID)
 		p.AZID = uint16(info.AZID)
@@ -398,6 +417,7 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 			p.PodClusterID = uint16(info.PodClusterID)
 		}
 		p.PodGroupID = info.PodGroupID
+		podGroupType = info.PodGroupType
 		p.L3DeviceType = uint8(info.DeviceType)
 		p.L3DeviceID = info.DeviceID
 		p.ServiceID = platformData.QueryService(p.OrgId, p.PodID, p.PodNodeID, uint32(p.PodClusterID), p.PodGroupID, p.L3EpcID, !p.IsIPv4, p.IP4, p.IP6, layers.IPProtocolTCP, 0)
@@ -407,6 +427,10 @@ func (p *InProcessProfile) fillResource(vtapID uint16, podID uint32, platformDat
 	if vtapPlatformInfo != nil {
 		p.fillInfraInfo(vtapPlatformInfo)
 	}
+
+	p.AutoInstanceID, p.AutoInstanceType = basecommon.GetAutoInstance(p.PodID, p.GPID, p.PodNodeID, p.L3DeviceID, uint32(p.SubnetID), p.L3DeviceType, p.L3EpcID)
+	p.AutoServiceID, p.AutoServiceType = basecommon.GetAutoService(p.ServiceID, p.PodGroupID, p.GPID, uint32(p.PodClusterID), p.L3DeviceID, uint32(p.SubnetID), p.L3DeviceType, podGroupType, p.L3EpcID)
+
 }
 
 func (p *InProcessProfile) fillPodInfo(vtapID uint16, containerID string, platformData *grpc.PlatformInfoTable) {

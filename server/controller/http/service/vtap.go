@@ -26,11 +26,13 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/agentlicense"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -49,7 +51,7 @@ type Agent struct {
 func NewAgent(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *Agent {
 	return &Agent{
 		cfg:            cfg,
-		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+		resourceAccess: &ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
 	}
 }
 
@@ -65,7 +67,7 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	var azs []mysql.AZ
 	var vtapRepos []mysql.VTapRepo
 
-	userInfo := a.resourceAccess.userInfo
+	userInfo := a.resourceAccess.UserInfo
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
@@ -245,7 +247,7 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 	if err := a.resourceAccess.CanAddResource(vtapCreate.TeamID, common.SET_RESOURCE_TYPE_AGENT, ""); err != nil {
 		return model.Vtap{}, err
 	}
-	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -297,7 +299,7 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 }
 
 func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
-	orgID := a.resourceAccess.userInfo.ORGID
+	orgID := a.resourceAccess.UserInfo.ORGID
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return model.Vtap{}, err
@@ -331,21 +333,38 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 		}
 	}
 
-	if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"].([]interface{}); ok {
-		licenseFunctionStrs := []string{}
-		for _, licenseFunction := range licenseFunctions {
-			licenseFunctionStrs = append(licenseFunctionStrs, strconv.Itoa(int(licenseFunction.(float64))))
+	var operateLogs []mysql.LicenseFuncLog
+	if _, ok := vtapUpdate["ENABLED_FEATURES"]; ok {
+		if _, ok = vtapUpdate["ENABLED_FEATURES"].([]interface{}); !ok {
+			return model.Vtap{}, fmt.Errorf("param(ENABLED_FEATURES) must be slice")
 		}
-		dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
+		var licenseFunctionStr string
+		licenseFunctionStr, operateLogs, err = agentlicense.GetAgentLicenseFunctions(
+			a.cfg, a.resourceAccess.UserInfo.ID, &vtap, vtapUpdate["ENABLED_FEATURES"].([]interface{}))
+		if err != nil {
+			return model.Vtap{}, err
+		}
+		dbUpdateMap["license_functions"] = licenseFunctionStr
 	}
 
-	db.Model(&vtap).Updates(dbUpdateMap)
-
-	if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
-		key := vtap.CtrlIP + "-" + vtap.CtrlMac
-		if err := db.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
-			log.Errorf("error: %v", err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&vtap).Updates(dbUpdateMap).Error; err != nil {
+			return err
 		}
+		if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
+			key := vtap.CtrlIP + "-" + vtap.CtrlMac
+			if err := tx.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
+				log.Errorf("error: %v", err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
+			}
+		}
+		if len(operateLogs) > 0 {
+			return tx.CreateInBatches(operateLogs, len(operateLogs)).Error
+		}
+		return nil
+	})
+	if err != nil {
+		log.Error(err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
+		return model.Vtap{}, err
 	}
 
 	response, _ := a.Get(map[string]interface{}{"lcuuid": vtap.Lcuuid})
@@ -405,7 +424,7 @@ func (a *Agent) checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
 }
 
 func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return model.Vtap{}, err
 	}
@@ -450,7 +469,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 }
 
 func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +530,7 @@ func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (
 }
 
 func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
-	dbInfo, err := mysql.GetDB(a.resourceAccess.userInfo.ORGID)
+	dbInfo, err := mysql.GetDB(a.resourceAccess.UserInfo.ORGID)
 	if err != nil {
 		return nil, err
 	}

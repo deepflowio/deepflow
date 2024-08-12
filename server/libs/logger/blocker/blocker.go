@@ -16,22 +16,10 @@
 
 package blocker
 
-import "slices"
-
-const (
-	defaultORGID  = 1
-	defaultTeamID = 1
-)
-
-var (
-	ORGIDsToBlock  = []int{defaultORGID}
-	TeamIDsToBlock = []int{defaultTeamID}
-)
-
 func IfBlockORGID(id int) bool {
-	return slices.Contains(ORGIDsToBlock, id)
+	return true
 }
 
 func IfBlockTeamID(id int) bool {
-	return slices.Contains(TeamIDsToBlock, id)
+	return true
 }

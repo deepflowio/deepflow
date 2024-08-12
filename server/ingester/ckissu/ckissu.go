@@ -39,7 +39,7 @@ const (
 	INTERVAL_HOUR = 60
 	INTERVAL_DAY  = 1440
 	DEFAULT_TTL   = 168
-	RETRY_COUNT   = 3
+	RETRY_COUNT   = 2
 )
 
 type Issu struct {
@@ -56,6 +56,7 @@ type Issu struct {
 	VersionMaps        []map[string]string
 	Addrs              []string
 	username, password string
+	ckdbType           string
 	exit               bool
 }
 
@@ -375,7 +376,7 @@ func (i *Issu) addColumnDatasource(index int, d *DatasourceInfo, isMapTable, isA
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
 	dstTableName := d.name[lastDotIndex+1:]
-	rawTable := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[flow_metrics.MetricsTableNameToID(d.name[:lastDotIndex+1]+d.baseTable)]
+	rawTable := flow_metrics.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, i.ckdbType, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[flow_metrics.MetricsTableNameToID(d.name[:lastDotIndex+1]+d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
 		rawTable, d.db, dstTableName,
@@ -422,6 +423,7 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		username:       cfg.CKDBAuth.Username,
 		password:       cfg.CKDBAuth.Password,
 		datasourceInfo: make(map[string]*DatasourceInfo),
+		ckdbType:       cfg.CKDB.Type,
 	}
 
 	i.columnAdds = []*ColumnAdd{}
@@ -451,6 +453,10 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		i.modTTLs = append(i.modTTLs, v...)
 	}
 
+	if i.ckdbType == ckdb.CKDBTypeByconity {
+		i.updateTablesForByConity()
+	}
+
 	var err error
 	i.Connections, err = common.NewCKConnections(i.Addrs, i.username, i.password)
 	if err != nil {
@@ -466,6 +472,33 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 	}
 
 	return i, nil
+}
+
+// ByConity does not have a local table, so you need to skip processing the local table
+func (i *Issu) updateTablesForByConity() {
+	byconityAdds := []*ColumnAdd{}
+	for _, k := range i.columnAdds {
+		if !strings.HasSuffix(k.Table, "_local") {
+			byconityAdds = append(byconityAdds, k)
+		}
+	}
+	i.columnAdds = byconityAdds
+
+	byconityMods := []*ColumnMod{}
+	for _, k := range i.columnMods {
+		if !strings.HasSuffix(k.Table, "_local") {
+			byconityMods = append(byconityMods, k)
+		}
+	}
+	i.columnMods = byconityMods
+
+	byconityRenames := []*ColumnRename{}
+	for _, k := range i.columnRenames {
+		if !strings.HasSuffix(k.Table, "_local") {
+			byconityRenames = append(byconityRenames, k)
+		}
+	}
+	i.columnRenames = byconityRenames
 }
 
 // called in server/ingester/ingester/ingester.go, executed before Start()
@@ -892,7 +925,7 @@ func Query(connect *sql.DB, sql string) (*sql.Rows, error) {
 	retryTimes := RETRY_COUNT
 	for err != nil && retryTimes > 0 {
 		log.Warningf("Query SQL (%s) failed: %s, will retry", sql, err)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 		rows, err = connect.Query(sql)
 		if err == nil {
 			log.Infof("Retry query SQL (%s) success", sql)
@@ -908,7 +941,7 @@ func Exec(connect *sql.DB, sql string) (sql.Result, error) {
 	retryTimes := RETRY_COUNT
 	for err != nil && retryTimes > 0 {
 		log.Warningf("Exec SQL (%s) failed: %s, will retry", sql, err)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 		result, err = connect.Exec(sql)
 		if err == nil {
 			log.Infof("Retry exec SQL (%s) success", sql)

@@ -107,7 +107,7 @@ func (t *SpanWithTraceID) Encode() {
 	t.EncodedSpan = encoder.Bytes()
 }
 
-func GenSpanWithTraceIDCKTable(cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenSpanWithTraceIDCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	table := SPAN_WITH_TRACE_ID_TABLE
 	timeKey := "time"
 	engine := ckdb.MergeTree
@@ -116,6 +116,7 @@ func GenSpanWithTraceIDCKTable(cluster, storagePolicy string, ttl int, coldStora
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        common.FLOW_LOG_DB,
+		DBType:          ckdbType,
 		LocalName:       table + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      table,
 		Columns:         SpanWithTraceIDColumns(),
@@ -159,7 +160,7 @@ func NewSpanWriter(config *config.Config) (*SpanWriter, error) {
 		writerConfig:      config.CKWriterConfig,
 	}
 
-	ckTable := GenSpanWithTraceIDCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, common.FLOW_LOG_DB, SPAN_WITH_TRACE_ID_TABLE))
+	ckTable := GenSpanWithTraceIDCKTable(w.ckdbCluster, w.ckdbStoragePolicy, config.Base.CKDB.Type, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, common.FLOW_LOG_DB, SPAN_WITH_TRACE_ID_TABLE))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		SPAN_WITH_TRACE_ID_TABLE, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)

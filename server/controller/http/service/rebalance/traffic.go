@@ -34,8 +34,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
-	"github.com/deepflowio/deepflow/server/controller/logger"
 	"github.com/deepflowio/deepflow/server/controller/model"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
@@ -129,18 +129,18 @@ func (r *AnalyzerInfo) RebalanceAnalyzerByTraffic(db *mysql.DB, ifCheckout bool,
 		allVTapIDToVTap[vtap.ID] = &vtap
 	}
 	vtapCounter := statsd.GetVTapCounter()
-	for name, counter := range vtapCounter.GetVtapNameCounter(db.ORGID) {
+	for name := range vtapCounter.GetVtapNameCounter(db.ORGID) {
 		vtapID, ok := allVTapNameToID[name]
 		// set weight to 0 if vtap losed
 		if !ok {
 			vtapCounter.SetNull(db.ORGID, name)
-			log.Infof("agent(name: %s) set null when agent losed", counter.ORGID, name, db.LogPrefixORGID)
+			log.Infof("agent(name: %s) set null when agent losed", name, db.LogPrefixORGID)
 			continue
 		}
 		// set weight to 0 if vtap not normal
 		if vtap, ok := allVTapIDToVTap[vtapID]; ok && vtap.State != common.VTAP_STATE_NORMAL {
 			vtapCounter.SetNull(db.ORGID, name)
-			log.Infof("agent(name: %s) set null when agent not normal", counter.ORGID, name, db.LogPrefixORGID)
+			log.Infof("agent(name: %s) set null when agent not normal", name, db.LogPrefixORGID)
 			continue
 		}
 	}
@@ -549,7 +549,7 @@ func (p *AZInfo) rebalanceAnalyzer(db *mysql.DB, ifCheckout bool) (map[int]*Chan
 			db.Model(mysql.VTap{}).Where("id = ?", allocVTap.VtapID).Update("analyzer_ip", allocIP)
 		}
 		if _, ok := analyzerIPToInfo[allocIP]; !ok {
-			log.Warningf("allocate vtap(%d) failed, wanted analyzer ip", allocVTap.VtapID, allocIP, db.LogPrefixORGID, db.LogPrefixName)
+			log.Warningf("allocate vtap(%d) failed, wanted analyzer ip(%s)", allocVTap.VtapID, allocIP, db.LogPrefixORGID, db.LogPrefixName)
 			continue
 		}
 		analyzerIPToInfo[allocIP].SumTraffic += allocVTap.Traffic

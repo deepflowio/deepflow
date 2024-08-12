@@ -43,7 +43,7 @@ type AgentGroupConfig struct {
 func NewAgentGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
 	return &AgentGroupConfig{
 		cfg:            cfg,
-		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+		resourceAccess: &ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
 	}
 }
 

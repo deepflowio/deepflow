@@ -43,3 +43,11 @@ const (
 )
 
 const DATA_FORMAT_GRAFANA = "grafana"
+
+var LOCATION_TYPE_MAP = map[string]string{
+	"[c] ": "C", // cuda functions
+	"[k] ": "K", // kernel function
+	"[l] ": "L", // dynamic link library function
+	"[p] ": "P", // process
+	"[t] ": "T", // thread
+}

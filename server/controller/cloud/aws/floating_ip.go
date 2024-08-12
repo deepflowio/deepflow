@@ -19,7 +19,7 @@ package aws
 import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (a *Aws) getFloatingIPs() (floatingIPs []model.FloatingIP, err error) {

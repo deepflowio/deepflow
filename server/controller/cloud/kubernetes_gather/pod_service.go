@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/logger"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 func (k *KubernetesGather) getPodServices() (services []model.PodService, servicePorts []model.PodServicePort, podGroupPorts []model.PodGroupPort, network model.Network, subnets []model.Subnet, vinterfaces []model.VInterface, ips []model.IP, err error) {
@@ -113,8 +113,8 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			specPorts := sData.Get("spec").Get("ports")
 			var hasPodGroup bool
 			for i := range specPorts.MustArray() {
-				labels, fErr := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
 				podGroupLcuuids := mapset.NewSet()
+				labels, fErr := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
 				if fErr == nil && labels != "[]" && labels != "null" {
 					labelArray, lErr := simplejson.NewJson([]byte(labels))
 					if lErr != nil {
@@ -129,6 +129,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 						}
 					}
 				}
+
 				groupLcuuidsList := []mapset.Set{}
 				for key, v := range selector {
 					vString, ok := v.(string)
@@ -142,9 +143,20 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 					}
 					groupLcuuidsList = append(groupLcuuidsList, groupLcuuids)
 				}
-				// 如果存在label匹配不到PodGroup，则认为找不到匹配的PodGroup
-				if len(groupLcuuidsList) != len(selector) {
-					continue
+
+				// support OpenGaussCluster
+				if ogcName, ok := sData.GetPath("spec", "selector").CheckGet("opengauss.cluster"); ok {
+					nsLabel := namespace + "statefulset:" + namespace + ":" + ogcName.MustString()
+					if groupLcuuids, ok := k.nsLabelToGroupLcuuids[nsLabel]; ok {
+						if groupLcuuids.Cardinality() > 0 {
+							podGroupLcuuids = podGroupLcuuids.Union(groupLcuuids)
+						}
+					}
+				} else {
+					// 如果存在label匹配不到PodGroup，则认为找不到匹配的PodGroup
+					if len(groupLcuuidsList) != len(selector) {
+						continue
+					}
 				}
 
 				// 各Label的PodGroup求交集，作为service关联的PodGroup

@@ -234,7 +234,7 @@ func LogColumns() []*ckdb.Column {
 	return columns
 }
 
-func GenLogCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+func GenLogCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
 	orderKeys := []string{timeKey, "app_service", "timestamp"}
@@ -243,6 +243,7 @@ func GenLogCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *c
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        LOG_DB,
+		DBType:          ckdbType,
 		LocalName:       table + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      table,
 		Columns:         LogColumns(),
