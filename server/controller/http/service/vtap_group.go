@@ -48,7 +48,7 @@ type AgentGroup struct {
 func NewAgentGroup(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *AgentGroup {
 	return &AgentGroup{
 		cfg:            cfg,
-		resourceAccess: &ResourceAccess{fpermit: cfg.FPermit, userInfo: userInfo},
+		resourceAccess: &ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
 	}
 }
 
@@ -61,7 +61,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 	var groupToPendingVtapLcuuids map[string][]string
 	var groupToDisableVtapLcuuids map[string][]string
 
-	userInfo := a.resourceAccess.userInfo
+	userInfo := a.resourceAccess.UserInfo
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 
 	cfg := a.cfg
 	var vtapGroupCount int64
-	userInfo := a.resourceAccess.userInfo
+	userInfo := a.resourceAccess.UserInfo
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return model.VtapGroup{}, err
@@ -198,7 +198,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	vtapGroup.ShortUUID = shortUUID
 	vtapGroup.Name = vtapGroupCreate.Name
 	vtapGroup.TeamID = vtapGroupCreate.TeamID
-	vtapGroup.UserID = a.resourceAccess.userInfo.ID
+	vtapGroup.UserID = a.resourceAccess.UserInfo.ID
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&vtapGroup).Error; err != nil {
@@ -248,7 +248,7 @@ func verifyGroupID(db *gorm.DB, groupID string) error {
 }
 
 func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
-	userInfo := a.resourceAccess.userInfo
+	userInfo := a.resourceAccess.UserInfo
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
 	if err != nil {
 		return model.VtapGroup{}, err
@@ -408,7 +408,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 }
 
 func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
-	orgID := a.resourceAccess.userInfo.ORGID
+	orgID := a.resourceAccess.UserInfo.ORGID
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
