@@ -29,6 +29,7 @@ import (
 
 const ORG_TABLE = "org"
 
+// GetORGIDs returns a slice of organization IDs, including the default organization ID, but not including the soft deleted organization IDs.
 func GetORGIDs() ([]int, error) {
 	ids := []int{common.DEFAULT_ORG_ID}
 	if oids, err := GetNonDefaultORGIDs(); err != nil {
@@ -39,6 +40,7 @@ func GetORGIDs() ([]int, error) {
 	return ids, nil
 }
 
+// GetNonDefaultORGIDs returns a slice of organization IDs, not including the default organization ID and the soft deleted organization IDs.
 func GetNonDefaultORGIDs() ([]int, error) {
 	ids := make([]int, 0)
 	var orgTable string
@@ -60,6 +62,21 @@ func GetNonDefaultORGIDs() ([]int, error) {
 		ids = append(ids, org.ORGID)
 	}
 	sort.Ints(ids)
+	return ids, nil
+}
+
+func GetDeletedORGIDs() ([]int, error) {
+	ids := make([]int, 0)
+	var orgs []*ORG
+	if err := DefaultDB.Unscoped().Find(&orgs).Error; err != nil {
+		log.Errorf("failed to get orgs: %s", err.Error())
+		return ids, err
+	}
+	for _, org := range orgs {
+		if org.DeletedAt.Valid {
+			ids = append(ids, org.ORGID)
+		}
+	}
 	return ids, nil
 }
 

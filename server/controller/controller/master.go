@@ -103,7 +103,7 @@ func checkAndStartMasterFunctions(
 	tagRecorder := tagrecorder.GetSingleton()
 	tagrecordercheck.GetSingleton().Init(ctx, *cfg)
 	tr := tagrecordercheck.GetSingleton()
-	deletedORGChecker := service.GetDeletedORGChecker(ctx)
+	deletedORGChecker := service.GetDeletedORGChecker(ctx, cfg.FPermit)
 
 	httpService := http.GetSingleton()
 

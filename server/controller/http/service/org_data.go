@@ -22,9 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/bitly/go-simplejson"
+
 	servercommon "github.com/deepflowio/deepflow/server/common"
 	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -78,20 +81,6 @@ func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 	log.Infof("delete org (id: %d) data", orgID)
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
 	if err = migrator.DropDatabase(cfg); err != nil {
-		return err
-	}
-	// copy deleted org info to deleted_org table which is used for deleting clickhouse org data asynchronously
-	var org *mysql.ORG
-	if err = mysql.DefaultDB.Where("org_id = ?", orgID).First(&org).Error; err != nil {
-		return err
-	}
-	deletedORG := &mysql.DeletedORG{
-		ORGID:       org.ORGID,
-		Name:        org.Name,
-		Lcuuid:      org.Lcuuid,
-		OwnerUserID: org.OwnerUserID,
-	}
-	if err = mysql.DefaultDB.Create(deletedORG).Error; err != nil {
 		return err
 	}
 	return nil
@@ -153,14 +142,24 @@ func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 	return response, err
 }
 
+var (
+	deletedORGCheckerOnce sync.Once
+	deleteORGChecker      *DeletedORGChecker
+)
+
 type DeletedORGChecker struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	fpermitCfg controllerCommon.FPermit
 }
 
-func GetDeletedORGChecker(ctx context.Context) *DeletedORGChecker {
-	cCtx, cCancel := context.WithCancel(ctx)
-	return &DeletedORGChecker{ctx: cCtx, cancel: cCancel}
+func GetDeletedORGChecker(ctx context.Context, fpermitCfg controllerCommon.FPermit) *DeletedORGChecker {
+	deletedORGCheckerOnce.Do(func() {
+		cCtx, cCancel := context.WithCancel(ctx)
+		deleteORGChecker = &DeletedORGChecker{ctx: cCtx, cancel: cCancel, fpermitCfg: fpermitCfg}
+	})
+	return deleteORGChecker
 }
 
 func (c *DeletedORGChecker) Start(sCtx context.Context) {
@@ -176,7 +175,6 @@ func (c *DeletedORGChecker) Stop() {
 }
 
 func (c *DeletedORGChecker) checkRegularly(sCtx context.Context) {
-	c.check()
 	go func() {
 		ticker := time.NewTicker(time.Duration(1) * time.Minute)
 		defer ticker.Stop()
@@ -198,31 +196,44 @@ func (c *DeletedORGChecker) check() {
 	log.Infof("check deleted orgs start")
 	defer log.Infof("check deleted orgs end")
 
-	var deletedORGs []*mysql.DeletedORG
-	if err := mysql.DefaultDB.Find(&deletedORGs).Error; err != nil {
+	deletedORGIDs, err := mysql.GetDeletedORGIDs()
+	if err != nil {
 		log.Errorf("failed to get deleted orgs: %s", err.Error())
 		return
 	}
-	if len(deletedORGs) == 0 {
+	log.Infof("handle deleted orgs: %v", deletedORGIDs)
+	if len(deletedORGIDs) == 0 {
 		return
 	}
-	if err := c.triggerAllServersToDelete(deletedORGs); err != nil {
+	if err := c.triggerAllServersToDelete(deletedORGIDs); err != nil {
 		log.Errorf("failed to trigger all servers to delete orgs: %s", err.Error())
 		return
 	}
-	if err := mysql.DefaultDB.Delete(&deletedORGs).Error; err != nil {
-		log.Errorf("failed to delete deleted orgs: %s", err.Error())
+	if err := c.triggerFpermit(deletedORGIDs); err != nil {
+		log.Errorf("failed to trigger fpermit to delete orgs: %s", err.Error())
 	}
 	return
 }
 
-func (c *DeletedORGChecker) triggerAllServersToDelete(deletedORGs []*mysql.DeletedORG) error {
+func (c *DeletedORGChecker) triggerFpermit(ids []int) error {
+	body := map[string]interface{}{
+		"org_ids": ids,
+	}
+	_, err := controllerCommon.CURLPerform(
+		http.MethodDelete,
+		fmt.Sprintf("http://%s/v1/org", net.JoinHostPort(c.fpermitCfg.Host, fmt.Sprintf("%d", c.fpermitCfg.Port))),
+		body,
+	)
+	return err
+}
+
+func (c *DeletedORGChecker) triggerAllServersToDelete(ids []int) error {
 	query := ""
-	for i, org := range deletedORGs {
+	for i, id := range ids {
 		if i == 0 {
-			query += fmt.Sprintf("org_id=%d", org.ORGID)
+			query += fmt.Sprintf("org_id=%d", id)
 		} else {
-			query += fmt.Sprintf("&org_id=%d", org.ORGID)
+			query += fmt.Sprintf("&org_id=%d", id)
 		}
 	}
 	var controllers []*mysql.Controller

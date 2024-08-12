@@ -287,7 +287,7 @@ func ugcPermission(url string, userInfo *httpcommon.UserInfo, body map[string]in
 		body,
 		common.WithHeader(common.HEADER_KEY_X_USER_TYPE, fmt.Sprintf("%d", userInfo.Type)),
 		common.WithHeader(common.HEADER_KEY_X_USER_ID, fmt.Sprintf("%d", userInfo.ID)),
-		common.WithHeader(common.HEADER_X_APP_KEY, common.DEFAULT_APP_KEY),
+		common.WithHeader(common.HEADER_KEY_X_APP_KEY, common.DEFAULT_APP_KEY),
 	)
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) body(%#v) error: %s",
@@ -312,7 +312,7 @@ func resourceVerify(url, httpMethod string, userInfo *httpcommon.UserInfo, teamI
 		body,
 		common.WithHeader(common.HEADER_KEY_X_USER_TYPE, fmt.Sprintf("%d", userInfo.Type)),
 		common.WithHeader(common.HEADER_KEY_X_USER_ID, fmt.Sprintf("%d", userInfo.ID)),
-		common.WithHeader(common.HEADER_X_APP_KEY, common.DEFAULT_APP_KEY),
+		common.WithHeader(common.HEADER_KEY_X_APP_KEY, common.DEFAULT_APP_KEY),
 	)
 	if err != nil {
 		log.Errorf("url(%s) user_type(%d) user_id(%d) team_id(%d) body(%#v) error: %s",
