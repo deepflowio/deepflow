@@ -34,7 +34,7 @@
 #include "go_tracer.h"
 #include "ssl_tracer.h"
 #include "load.h"
-#include "btf_vmlinux.h"
+#include "btf_core.h"
 #include "config.h"
 #include "perf_reader.h"
 #include "extended/extended.h"
