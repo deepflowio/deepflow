@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	//"github.com/k0kubun/pp"
@@ -51,6 +52,8 @@ var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 var fromRegexp = regexp.MustCompile(`(?i)from\s+(\S+)`)
 var whereRegexp = regexp.MustCompile(`(?i)where\s+(\S.*)`)
+
+var Lock sync.Mutex
 
 // Perform regular checks on show SQL and support the following formats:
 // show tag {tag_name} values from {table_name} where xxx order by xxx limit xxx :{tag_name} and {table_name} can be any character
@@ -976,7 +979,9 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 		targetOriginFilterStr := strings.Join(trgetOriginFilters, " AND ")
 		prometheusSubqueryCache := GetPrometheusSubqueryCache()
 		entryKey := common.EntryKey{ORGID: e.ORGID, Filter: targetOriginFilterStr}
+		Lock.Lock()
 		targetFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(entryKey)
+		Lock.Unlock()
 		if ok {
 			filter := targetFilter.Filter
 			filterTime := targetFilter.Time
@@ -1031,12 +1036,16 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 			op := view.Operator{Type: view.AND}
 			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
 			entryValue := common.EntryValue{Time: time.Now(), Filter: targetFilter}
+			Lock.Lock()
 			prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
+			Lock.Unlock()
 		} else if len(targetIDs) >= config.Cfg.MaxCacheableEntrySize {
 			// When you find that you can't join the cache,
 			// insert a special value into the cache so that the next time you check the cache, you will find
 			entryValue := common.EntryValue{Time: time.Now(), Filter: INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY}
+			Lock.Lock()
 			prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
+			Lock.Unlock()
 
 			targetFilter := fmt.Sprintf("toUInt64(target_id) IN (%s)", sql)
 			rightExpr := &view.Expr{Value: targetFilter}
