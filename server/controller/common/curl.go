@@ -72,6 +72,9 @@ func fillHeader(req *http.Request) {
 	if req.Header.Get(HEADER_KEY_ACCEPT) == "" {
 		req.Header.Set(HEADER_KEY_ACCEPT, ACCEPT_JSON)
 	}
+	if req.Header.Get(HEADER_KEY_X_APP_KEY) == "" {
+		req.Header.Set(HEADER_KEY_X_APP_KEY, DEFAULT_APP_KEY)
+	}
 }
 
 // CURLPerform 调用 deepflow 其他服务 API 并获取返回结果，Content-Type 为 application/json
