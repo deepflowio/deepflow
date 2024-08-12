@@ -122,20 +122,11 @@ func (r *Recorder) shouldRefresh(cloudData cloudmodel.Resource) bool {
 	}
 	r.domainName = domain.Name
 
-	if cloudData.Verified {
-		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 {
-			log.Infof("domain (lcuuid: %s, name: %s) has no networks or vinterfaces, does nothing", r.domainLcuuid, r.domainName)
-			return false
-		}
-		if len(cloudData.VMs) == 0 && len(cloudData.Pods) == 0 {
-			log.Infof("domain (lcuuid: %s, name: %s) has no vms and pods, does nothing", r.domainLcuuid, r.domainName)
-			return false
-		}
-	} else {
-		log.Infof("domain (lcuuid: %s, name: %s) is not verified, does nothing", r.domainLcuuid, r.domainName)
-		return false
+	should := cloudData.Verified
+	for _, subDomainResource := range cloudData.SubDomainResources {
+		should = should || subDomainResource.Verified
 	}
-	return true
+	return should
 }
 
 func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
@@ -160,7 +151,28 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 	}()
 }
 
+func (r *Recorder) shouldRefreshDomain(cloudData cloudmodel.Resource) bool {
+	if cloudData.Verified {
+		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 {
+			log.Infof("domain (lcuuid: %s, name: %s) has no networks or vinterfaces, does nothing", r.domainLcuuid, r.domainName)
+			return false
+		}
+		if len(cloudData.VMs) == 0 && len(cloudData.Pods) == 0 {
+			log.Infof("domain (lcuuid: %s, name: %s) has no vms and pods, does nothing", r.domainLcuuid, r.domainName)
+			return false
+		}
+	} else {
+		log.Infof("domain (lcuuid: %s, name: %s) is not verified, does nothing", r.domainLcuuid, r.domainName)
+		return false
+	}
+	return true
+}
+
 func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
+	if !r.shouldRefreshDomain(cloudData) {
+		return
+	}
+
 	log.Infof("domain (lcuuid: %s, name: %s) refresh started", r.domainLcuuid, r.domainName)
 
 	// 指定创建及更新操作的资源顺序
