@@ -934,7 +934,7 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 		}
 		targetOriginFilterStr := strings.Join(trgetOriginFilters, " AND ")
 		prometheusSubqueryCache := GetPrometheusSubqueryCache()
-		targetFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(targetOriginFilterStr)
+		targetFilter, ok := prometheusSubqueryCache.Get(targetOriginFilterStr)
 		if ok {
 			filter := targetFilter.Filter
 			filterTime := targetFilter.Time
@@ -989,13 +989,12 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 			op := view.Operator{Type: view.AND}
 			expr = &view.BinaryExpr{Left: expr, Right: rightExpr, Op: &op}
 			entryValue := common.EntryValue{Time: time.Now(), Filter: targetFilter}
-			prometheusSubqueryCache.PrometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
+			prometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
 		} else if len(targetIDs) >= config.Cfg.MaxCacheableEntrySize {
 			// When you find that you can't join the cache,
 			// insert a special value into the cache so that the next time you check the cache, you will find
 			entryValue := common.EntryValue{Time: time.Now(), Filter: INVALID_PROMETHEUS_SUBQUERY_CACHE_ENTRY}
-			prometheusSubqueryCache.PrometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
-
+			prometheusSubqueryCache.Add(targetOriginFilterStr, entryValue)
 			targetFilter := fmt.Sprintf("toUInt64(target_id) IN (%s)", sql)
 			rightExpr := &view.Expr{Value: targetFilter}
 			op := view.Operator{Type: view.AND}
