@@ -345,7 +345,6 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 			return model.Vtap{}, err
 		}
 		dbUpdateMap["license_functions"] = licenseFunctionStr
-		refresh.RefreshCache(orgID, []common.DataChanged{common.DATA_CHANGED_VTAP})
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
