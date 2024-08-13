@@ -105,15 +105,14 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 
 func (c *Cloud) GetResource() model.Resource {
 	cResource := c.resource
-	if !cResource.Verified {
-		return model.Resource{
-			ErrorState:   cResource.ErrorState,
-			ErrorMessage: cResource.ErrorMessage,
-		}
-	}
-
 	if c.basicInfo.Type != common.KUBERNETES {
-		cResource.SubDomainResources = c.getSubDomainData(cResource)
+		subDomainResources := map[string]model.SubDomainResource{}
+		if cResource.Verified {
+			subDomainResources = c.getSubDomainData(cResource)
+		} else {
+			subDomainResources = c.getSubDomainData(c.getOwnDomainResource())
+		}
+		cResource.SubDomainResources = subDomainResources
 		cResource = c.appendResourceVIPs(cResource)
 	}
 
@@ -343,6 +342,10 @@ func (c *Cloud) runKubernetesGatherTask() {
 }
 
 func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Resource {
+	if !resource.Verified {
+		return resource
+	}
+
 	dbItem, err := getContentFromAdditionalResource(c.basicInfo.Lcuuid)
 	if err != nil {
 		log.Errorf("domain (lcuuid: %s) get additional resources failed: %s", c.basicInfo.Lcuuid, err)
@@ -483,7 +486,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 			StartTime:   sProcess.StartTime,
 			OSAPPTags:   sProcess.OSAPPTags,
 		}
-		if lcuuid == "" {
+		if resource.Verified && lcuuid == "" {
 			resource.Processes = append(resource.Processes, process)
 			continue
 		}
@@ -499,6 +502,9 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 }
 
 func (c *Cloud) appendResourceVIPs(resource model.Resource) model.Resource {
+	if !resource.Verified {
+		return resource
+	}
 
 	if genesis.GenesisService == nil {
 		log.Error("genesis service is nil")
