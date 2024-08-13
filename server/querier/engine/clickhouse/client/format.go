@@ -17,180 +17,115 @@
 package client
 
 import (
-	//"errors"
-	//"fmt"
 	"math"
 	"net"
+	"reflect"
 	"time"
 )
 
-const (
-	VALUE_TYPE_INT     = "Int"
-	VALUE_TYPE_STRING  = "String"
-	VALUE_TYPE_FLOAT64 = "Float64"
-	VALUE_TYPE_TUPLE   = "Tuple"
-	VALUE_TYPE_ARRAY   = "Array"
-)
-
-var VALUE_TYPE_MAP = map[string]int{
-	VALUE_TYPE_INT:     0,
-	VALUE_TYPE_STRING:  1,
-	VALUE_TYPE_FLOAT64: 2,
-}
-
-func TransType(value interface{}, columnName, columnDatabaseTypeName string) (interface{}, string, error) {
+func TransType(value interface{}) interface{} {
 	switch v := value.(type) {
 	case *int8:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case *int16:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case *int32:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case *int64:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case **int8: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case **int16: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case **int32: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case **int64: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case *uint8:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case *uint16:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case *uint32:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case *uint64:
-		return int(*v), VALUE_TYPE_INT, nil
+		return *v
 	case **uint8: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case **uint16: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case **uint32: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case **uint64: // for nullable
-		if *v == nil {
-			return nil, VALUE_TYPE_INT, nil
-		}
-		return int(**v), VALUE_TYPE_INT, nil
+		return *v
 	case *time.Time:
-		return *v, VALUE_TYPE_STRING, nil
+		return *v
 	case *net.IP:
-		return *v, VALUE_TYPE_STRING, nil
+		return *v
 	case **float64: // Nullable(float64)
 		// NaN, Inf
 		if *v == nil || math.IsNaN(**v) || **v == math.Inf(1) || **v == math.Inf(-1) {
-			return nil, VALUE_TYPE_FLOAT64, nil
+			return nil
 		}
-		return **v, VALUE_TYPE_FLOAT64, nil
+		return *v
 	case *float64:
 		// NaN, Inf
 		if math.IsNaN(*v) || *v == math.Inf(1) || *v == math.Inf(-1) {
-			return nil, VALUE_TYPE_FLOAT64, nil
+			return nil
 		}
-		return *v, VALUE_TYPE_FLOAT64, nil
+		return *v
 	case *string:
-		return *v, VALUE_TYPE_STRING, nil
+		return *v
 	case *[]int8:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]int16:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]int32:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]int64:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]uint8:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]uint16:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]uint32:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]uint64:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]time.Time:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]net.IP:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]float64:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]string:
-		return *v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]int8:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]int16:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]int32:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]int64:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]uint8:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]uint16:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]uint32:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]uint64:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case **[]float64:
-		if *v == nil {
-			return nil, VALUE_TYPE_ARRAY, nil
-		}
-		return **v, VALUE_TYPE_ARRAY, nil
+		return *v
 	case *[]interface{}:
-		return *v, VALUE_TYPE_TUPLE, nil
+		return *v
 	case *[][]interface{}:
-		return *v, columnDatabaseTypeName, nil
+		return *v
 	default:
-		// unkown type field return origin type
-		return value, columnDatabaseTypeName, nil
-		//return nil, "", errors.New(fmt.Sprintf("Unknown db field with name %s, golang type %T, clickhouse type %s, value: %v (%v)",
-		//	columnName, v, columnDatabaseTypeName, value, v))
+		// unkown type field
+		refValue := reflect.ValueOf(value)
+		elemValue := refValue.Elem()
+		realValue := elemValue.Interface()
+		return realValue
 	}
 }

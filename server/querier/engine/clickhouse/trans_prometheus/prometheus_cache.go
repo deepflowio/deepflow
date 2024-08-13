@@ -33,10 +33,10 @@ var log = logging.MustGetLogger("clickhouse.trans_prometheus")
 var ORGPrometheus = make(map[string]PrometheusMap)
 
 type PrometheusMap struct {
-	MetricNameToID       map[string]int
+	MetricNameToID       map[string]uint64
 	MetricAppLabelLayout map[string][]AppLabel
-	LabelNameToID        map[string]int
-	LabelIDToName        map[int]string
+	LabelNameToID        map[string]uint64
+	LabelIDToName        map[uint64]string
 }
 
 type Label struct {
@@ -67,10 +67,10 @@ func GenerateOrgMap() {
 }
 
 func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
-	METRIC_NAME_TO_ID := map[string]int{}
+	METRIC_NAME_TO_ID := map[string]uint64{}
 	METRIC_APP_LABEL_LAYOUT := map[string][]AppLabel{}
-	LABEL_NAME_TO_ID := map[string]int{}
-	LABEL_ID_TO_NAME := map[int]string{}
+	LABEL_NAME_TO_ID := map[string]uint64{}
+	LABEL_ID_TO_NAME := map[uint64]string{}
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -90,7 +90,7 @@ func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
 		metricNameKey := _key.([]interface{})[0]
 		metricIDKey := _key.([]interface{})[1]
 		metricName := metricNameKey.(string)
-		metricID := metricIDKey.(int)
+		metricID := metricIDKey.(uint64)
 		METRIC_NAME_TO_ID[metricName] = metricID
 	}
 	prometheusMap.MetricNameToID = METRIC_NAME_TO_ID
@@ -107,7 +107,7 @@ func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
 		labelNameKey := _key.([]interface{})[0]
 		labelNameIDKey := _key.([]interface{})[1]
 		labelName := labelNameKey.(string)
-		labelNameID := labelNameIDKey.(int)
+		labelNameID := labelNameIDKey.(uint64)
 		LABEL_NAME_TO_ID[labelName] = labelNameID
 		LABEL_ID_TO_NAME[labelNameID] = labelName
 	}
@@ -128,7 +128,7 @@ func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
 		appLabelColumnIndexKey := _key.([]interface{})[2]
 		metricName := metricNameKey.(string)
 		appLabelName := appLabelNameKey.(string)
-		appLabelColumnIndex := appLabelColumnIndexKey.(int)
+		appLabelColumnIndex := int(appLabelColumnIndexKey.(uint64))
 		appLabel := AppLabel{AppLabelName: appLabelName, AppLabelColumnIndex: appLabelColumnIndex}
 		METRIC_APP_LABEL_LAYOUT[metricName] = append(METRIC_APP_LABEL_LAYOUT[metricName], appLabel)
 	}
