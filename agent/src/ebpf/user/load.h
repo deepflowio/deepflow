@@ -74,6 +74,7 @@ struct ebpf_prog {
 	char *name;		// function name
 	struct bpf_insn *insns;	// instructions that belong to BPF program
 	size_t insns_cnt;
+	size_t insns_size;
 	struct ebpf_object *obj;
 	enum bpf_prog_type type;
 	/* 
@@ -137,4 +138,5 @@ int df_prog_load(enum bpf_prog_type prog_type, const char *name,
 		 const struct bpf_insn *insns, int prog_len);
 int suspend_stderr();
 void resume_stderr(int fd);
+int load_ebpf_prog(struct ebpf_prog *prog);
 #endif /* DF_BPF_LOAD_H */

@@ -135,7 +135,7 @@ static int ebpf_link__detach_kfunc(struct ebpf_link *link)
 	if (ret == -1)
 		ebpf_warning("kfunc detach failed, with %s(%d)\n",
 			     strerror(errno), errno);
-	return 0;
+	return ret;
 }
 
 /*

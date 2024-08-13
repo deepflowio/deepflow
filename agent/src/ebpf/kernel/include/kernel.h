@@ -139,4 +139,18 @@ struct fdtable {
 	unsigned int max_fds;
 	void **fd;      /* current fd array, struct file *  */
 };
+
+typedef long long int __kernel_time64_t;
+struct __kernel_timespec {
+	__kernel_time64_t tv_sec;
+	long long int tv_nsec;
+};
+
+typedef __s32 old_time32_t;
+
+struct old_timespec32 {
+	old_time32_t tv_sec;
+	__s32 tv_nsec;
+};
+
 #endif /* DF_LINUX_KERN_H */

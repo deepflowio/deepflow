@@ -917,8 +917,8 @@ static int tracepoint_detach(struct tracepoint *tp)
 		tp->link->detach(tp->link);
 	}
 
-	tp->link = NULL;
 	free(tp->link);
+	tp->link = NULL;
 	return ETR_OK;
 }
 
@@ -927,6 +927,9 @@ static int kfunc_attach(struct kfunc *p)
 	if (p->link) {
 		return ETR_EXIST;
 	}
+
+	if (p->prog->prog_fd == 0)
+		p->prog->prog_fd = load_ebpf_prog(p->prog);
 
 	struct ebpf_link *bl = program__attach_kfunc(p->prog);
 	p->link = bl;
@@ -947,12 +950,17 @@ static int kfunc_detach(struct kfunc *p)
 		return ETR_NOTEXIST;
 	}
 
+	if (p->prog->prog_fd > 0) {
+		close(p->prog->prog_fd);
+		p->prog->prog_fd = 0;
+	}
+
 	if (p->link->detach) {
 		p->link->detach(p->link);
 	}
 
-	p->link = NULL;
 	free(p->link);
+	p->link = NULL;
 	return ETR_OK;
 }
 

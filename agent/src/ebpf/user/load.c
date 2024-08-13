@@ -85,6 +85,14 @@ static inline bool str_is_empty(const char *s)
 	return !s || !s[0];
 }
 
+int load_ebpf_prog(struct ebpf_prog *prog)
+{
+	return bcc_prog_load(prog->type, prog->name,
+			     prog->insns, prog->insns_size, prog->obj->license,
+			     prog->obj->kern_version, 0, NULL,
+			     0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
+}
+
 int df_prog_load(enum bpf_prog_type prog_type, const char *name,
 		 const struct bpf_insn *insns, int prog_len)
 {
@@ -175,8 +183,6 @@ static void sanitize_prog_instructions(struct ebpf_object *obj,
 
 static void ebpf_object__release_elf(struct ebpf_object *obj)
 {
-	int i;
-
 	if (obj->elf_info.elf) {
 		elf_end(obj->elf_info.elf);
 		obj->elf_info.elf = NULL;
@@ -224,11 +230,11 @@ static void ebpf_object__release_elf(struct ebpf_object *obj)
 		zfree(obj->elf_info.btf_ext_sec);
 	}
 
-	struct ebpf_prog *prog;
-	for (i = 0; i < obj->progs_cnt; i++) {
-		prog = &obj->progs[i];
-		prog->insns = NULL;
-	}
+	//struct ebpf_prog *prog;
+	//for (i = 0; i < obj->progs_cnt; i++) {
+	//	prog = &obj->progs[i];
+	//	prog->insns = NULL;
+	//}
 }
 
 void release_object(struct ebpf_object *obj)
@@ -546,6 +552,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 
 		new_prog->insns = insns + sec_off;
 		new_prog->insns_cnt = desc->size / BPF_INSN_SZ;
+		new_prog->insns_size = desc->size;
 		new_prog->obj = obj;
 		new_prog->type = prog_type;
 		new_prog->sec_insn_off = sec_off / BPF_INSN_SZ;
