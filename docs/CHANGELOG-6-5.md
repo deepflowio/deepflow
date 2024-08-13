@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent enable feature permission [#7795](https://github.com/deepflowio/deepflow/pull/7795) by [roryye](https://github.com/roryye)
+* Revert "fix: refresh agent enable feature" [#7793](https://github.com/deepflowio/deepflow/pull/7793) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: refresh agent enable feature [#7791](https://github.com/deepflowio/deepflow/pull/7791) by [roryye](https://github.com/roryye)
 * fix: Modify ch_table update time #26153 [#7785](https://github.com/deepflowio/deepflow/pull/7785) by [Ericsssss](https://github.com/Ericsssss)
 * fix: not found replicaset pod [#7761](https://github.com/deepflowio/deepflow/pull/7761) by [askyrie](https://github.com/askyrie)
 * fix: uses wrong host when request server http service [#7759](https://github.com/deepflowio/deepflow/pull/7759) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
