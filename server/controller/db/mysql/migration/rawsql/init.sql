@@ -288,6 +288,7 @@ CREATE TABLE IF NOT EXISTS vl2_net (
     name                VARCHAR(256) DEFAULT '',
     label               VARCHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
+    domain              CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
     PRIMARY KEY (id)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;

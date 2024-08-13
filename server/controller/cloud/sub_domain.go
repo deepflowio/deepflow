@@ -25,6 +25,7 @@ import (
 	kubernetes_model "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
 // 合并附属容器集群的资源到云平台资源中
@@ -145,6 +146,179 @@ func (c *Cloud) getSubDomainData(cResource model.Resource) map[string]model.SubD
 	}
 
 	return subDomainResources
+}
+
+// 当云平台未同步或同步异常时，从数据库获取所需的已同步的主云平台资源信息
+func (c *Cloud) getOwnDomainResource() model.Resource {
+	oResource := model.Resource{}
+	var vpcs []mysql.VPC
+	err := mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vpcs).Error
+	if err != nil {
+		log.Errorf("get own domain resource vpc failed: (%s)", err.Error())
+		return oResource
+	}
+	vpcIDToLcuuid := map[int]string{}
+	for _, vpc := range vpcs {
+		vpcIDToLcuuid[vpc.ID] = vpc.Lcuuid
+	}
+
+	var vms []mysql.VM
+	err = mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vms).Error
+	if err != nil {
+		log.Errorf("get own domain resource vm failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var vinterfaces []mysql.VInterface
+	err = mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
+	if err != nil {
+		log.Errorf("get own domain resource vinterface failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var wanIPs []mysql.WANIP
+	err = mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&wanIPs).Error
+	if err != nil {
+		log.Errorf("get own domain resource wan ip failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var lanIPs []mysql.LANIP
+	err = mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&lanIPs).Error
+	if err != nil {
+		log.Errorf("get own domain resource lan ip failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var networks []mysql.Network
+	err = mysql.Db.Where("domain = ? AND sub_domain = ''", c.basicInfo.Lcuuid).Find(&networks).Error
+	if err != nil {
+		log.Errorf("get own domain resource network failed: (%s)", err.Error())
+		return oResource
+	}
+
+	var subnets []mysql.Subnet
+	err = mysql.Db.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subnets).Error
+	if err != nil {
+		log.Errorf("get own domain resource subnet failed: (%s)", err.Error())
+		return oResource
+	}
+
+	vmIDToVM := map[int]model.VM{}
+	for _, vm := range vms {
+		vpcLcuuid, ok := vpcIDToLcuuid[vm.VPCID]
+		if !ok || vpcLcuuid == "" {
+			continue
+		}
+		resourceVM := model.VM{
+			Lcuuid:       vm.Lcuuid,
+			Name:         vm.Name,
+			Label:        vm.Label,
+			HType:        vm.HType,
+			State:        vm.State,
+			CreatedAt:    vm.CreatedAt,
+			AZLcuuid:     vm.AZ,
+			RegionLcuuid: vm.Region,
+			VPCLcuuid:    vpcLcuuid,
+		}
+		oResource.VMs = append(oResource.VMs, resourceVM)
+		vmIDToVM[vm.ID] = resourceVM
+	}
+
+	viIDToVI := map[int]model.VInterface{}
+	for _, vi := range vinterfaces {
+		if vi.DeviceType != common.VIF_DEVICE_TYPE_VM {
+			continue
+		}
+		vm, ok := vmIDToVM[vi.DeviceID]
+		if !ok {
+			continue
+		}
+		resourceVInterface := model.VInterface{
+			Lcuuid:       vi.Lcuuid,
+			Type:         vi.Type,
+			Mac:          vi.Mac,
+			DeviceType:   vi.DeviceType,
+			DeviceLcuuid: vm.Lcuuid,
+			VPCLcuuid:    vm.VPCLcuuid,
+			RegionLcuuid: vi.Region,
+		}
+		oResource.VInterfaces = append(oResource.VInterfaces, resourceVInterface)
+		viIDToVI[vi.ID] = resourceVInterface
+	}
+
+	for _, w := range wanIPs {
+		vinterface, ok := viIDToVI[w.VInterfaceID]
+		if !ok {
+			continue
+		}
+		oResource.IPs = append(oResource.IPs, model.IP{
+			Lcuuid:           w.Lcuuid,
+			VInterfaceLcuuid: vinterface.Lcuuid,
+			IP:               w.IP,
+			RegionLcuuid:     vinterface.RegionLcuuid,
+		})
+	}
+
+	for _, l := range lanIPs {
+		vinterface, ok := viIDToVI[l.VInterfaceID]
+		if !ok {
+			continue
+		}
+		oResource.IPs = append(oResource.IPs, model.IP{
+			Lcuuid:           l.Lcuuid,
+			VInterfaceLcuuid: vinterface.Lcuuid,
+			IP:               l.IP,
+			RegionLcuuid:     vinterface.RegionLcuuid,
+		})
+	}
+
+	networkIDToNetwork := map[int]model.Network{}
+	for _, n := range networks {
+		vpcLcuuid, ok := vpcIDToLcuuid[n.VPCID]
+		if !ok || vpcLcuuid == "" {
+			continue
+		}
+		resourceNetwork := model.Network{
+			Lcuuid:         n.Lcuuid,
+			Name:           n.Name,
+			SegmentationID: n.SegmentationID,
+			VPCLcuuid:      vpcLcuuid,
+			Shared:         n.Shared,
+			NetType:        n.NetType,
+			AZLcuuid:       n.AZ,
+			RegionLcuuid:   n.Region,
+		}
+		oResource.Networks = append(oResource.Networks, resourceNetwork)
+		networkIDToNetwork[n.ID] = resourceNetwork
+	}
+
+	for _, s := range subnets {
+		network, ok := networkIDToNetwork[s.NetworkID]
+		if !ok {
+			continue
+		}
+		ip, err := netaddr.ParseIP(s.Prefix)
+		if err != nil {
+			log.Error(err.Error())
+			continue
+		}
+		mask := net.IPMask(net.ParseIP(s.Netmask).To4())
+		maskSize, _ := mask.Size()
+		if maskSize == 0 {
+			log.Errorf("parse netmask (%s) failed", s.Netmask)
+			continue
+		}
+		cidr := netaddr.IPPrefixFrom(ip, uint8(maskSize))
+		oResource.Subnets = append(oResource.Subnets, model.Subnet{
+			Lcuuid:        s.Lcuuid,
+			Name:          s.Name,
+			CIDR:          cidr.String(),
+			NetworkLcuuid: network.Lcuuid,
+			VPCLcuuid:     network.VPCLcuuid,
+		})
+	}
+	return oResource
 }
 
 // - 根据IP查询对应的虚拟机，生成与虚拟机的关联关系
