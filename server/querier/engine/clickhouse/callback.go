@@ -19,7 +19,6 @@ package clickhouse
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -78,11 +77,9 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 				break
 			}
 		}
+
 		for i, schema := range result.Schemas {
 			if i == timeFieldIndex {
-				continue
-			}
-			if _, ok := client.VALUE_TYPE_MAP[schema.ValueType]; !ok {
 				continue
 			}
 			if schema.Type == common.COLUMN_SCHEMA_TYPE_TAG {
@@ -92,7 +89,6 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 		}
 		seriesSort.SortIndex = append(seriesSort.SortIndex, timeFieldIndex)
 		seriesSort.Reverse = append(seriesSort.Reverse, reverse)
-		sort.Sort(seriesSort)
 		groups := client.Group(seriesSort.Series, seriesSort.SortIndex[:len(seriesSort.SortIndex)-1], result.Schemas)
 
 		// fix start and end
@@ -135,10 +131,11 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 				record := series.Values
 				// get localtion of record in newValues
 				var timeIndex int
+				timeInt := int(record[timeFieldIndex].(uint32))
 				if !reverse {
-					timeIndex = (record[timeFieldIndex].(int) - start) / m.Time.Interval
+					timeIndex = (timeInt - start) / m.Time.Interval
 				} else {
-					timeIndex = (end - record[timeFieldIndex].(int)) / m.Time.Interval
+					timeIndex = (end - timeInt) / m.Time.Interval
 				}
 				if timeIndex >= intervalLength || timeIndex < 0 {
 					continue
@@ -170,7 +167,7 @@ func TimeFill(args []interface{}) func(result *common.Result) error { // group b
 					} else {
 						timestamp = end - i*m.Time.Interval
 					}
-					newValue[timeFieldIndex] = timestamp
+					newValue[timeFieldIndex] = uint32(timestamp)
 					newValues[i] = newValue
 				} else {
 					// if point exist && metrics is null, fill the metrics
@@ -222,15 +219,17 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 		for i, newValue := range newValues {
 			newValueSlice := newValue.([]interface{})
 			switch newValueSlice[macIndex].(type) {
-			case int:
-				newMac := utils.Uint64ToMac(uint64((newValueSlice[macIndex]).(int))).String()
+			// capture_nic, tunnel_tx_mac_0, tunnel_tx_mac_1, tunnel_rx_mac_0, tunnel_rx_mac_1"
+			case uint32:
+				mac := newValueSlice[macIndex].(uint32)
+				newMac := utils.Uint64ToMac(uint64(mac)).String()
 				if (args[0].(string) == "tap_port" || args[0].(string) == "capture_nic") && macTypeIndex != -1 {
 					newMac = strings.TrimPrefix(newMac, "00:00:")
-					if newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_MAC_1 {
+					if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_1 {
 						newValueSlice[macIndex] = newMac
 						newValues[i] = newValueSlice
-					} else if newValueSlice[macTypeIndex].(int) == tag.TAP_PORT_IPV4 {
-						newIP := utils.IpFromUint32(uint32((newValueSlice[macIndex]).(int)))
+					} else if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_IPV4 {
+						newIP := utils.IpFromUint32(mac)
 						newIPString := newIP.String()
 						newValueSlice[macIndex] = newIPString
 						newValues[i] = newValueSlice
@@ -239,6 +238,12 @@ func MacTranslate(args []interface{}) func(result *common.Result) error {
 					newValueSlice[macIndex] = newMac
 					newValues[i] = newValueSlice
 				}
+			// mac_0, mac_1
+			case uint64:
+				mac := newValueSlice[macIndex].(uint64)
+				newMac := utils.Uint64ToMac(mac).String()
+				newValueSlice[macIndex] = newMac
+				newValues[i] = newValueSlice
 			}
 		}
 		result.Values = newValues

@@ -1027,8 +1027,8 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 		targetIDs := []string{}
 		for _, v := range targetLabelRst.Values {
 			targetID := v.([]interface{})[0]
-			targetIDInt := targetID.(int)
-			targetIDString := fmt.Sprintf("%d", targetIDInt)
+			targetIDUInt64 := targetID.(uint64)
+			targetIDString := fmt.Sprintf("%d", targetIDUInt64)
 			targetIDs = append(targetIDs, targetIDString)
 		}
 

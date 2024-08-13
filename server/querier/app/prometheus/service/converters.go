@@ -650,7 +650,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	for i, v := range result.Values {
 		values := v.([]interface{})
 		// don't append series if it's outside query time range
-		currentTimestamp := int64(values[columnIndexes[TIME_INDEX]].(int))
+		currentTimestamp := int64(values[columnIndexes[TIME_INDEX]].(uint32))
 		if currentTimestamp < start || currentTimestamp > end {
 			continue
 		}
@@ -828,7 +828,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		// get metrics
 		values := result.Values[i].([]interface{})
 		// don't append series if it's outside query time range
-		currentTimestamp := int64(values[columnIndexes[TIME_INDEX]].(int))
+		currentTimestamp := int64(values[columnIndexes[TIME_INDEX]].(uint32))
 		if currentTimestamp < start || currentTimestamp > end {
 			continue
 		}
