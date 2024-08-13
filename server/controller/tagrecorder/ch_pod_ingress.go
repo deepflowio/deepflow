@@ -50,6 +50,7 @@ func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *mysql.PodIng
 		ID:           source.ID,
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
+		PodNsID:      source.PodNamespaceID,
 		TeamID:       md.TeamID,
 		DomainID:     md.DomainID,
 		SubDomainID:  md.SubDomainID,

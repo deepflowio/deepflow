@@ -305,7 +305,7 @@ type ChPodNode struct {
 	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
 	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
+	PodClusterID int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
@@ -344,7 +344,8 @@ type ChPodIngress struct {
 	TeamID       int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 	DomainID     int       `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
 	SubDomainID  int       `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`
-	PodClusterID int       `gorm:"column:pod_cluster_id;type:int" json:"POD_CLUSTER_ID"`
+	PodClusterID int       `gorm:"column:pod_cluster_id;type:int;not null" json:"POD_CLUSTER_ID"`
+	PodNsID      int       `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
