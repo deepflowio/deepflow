@@ -138,6 +138,7 @@ all: build
 SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 	user/socket_trace_bpf_3_10_0.c \
 	user/socket_trace_bpf_5_2_plus.c \
+	user/socket_trace_bpf_kfunc.c \
 	user/socket_trace_bpf_kylin.c
 
 PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c
@@ -167,6 +168,10 @@ user/socket_trace_bpf_3_10_0.c: tools/bintobuffer kernel/socket_trace.bpf.c
 user/socket_trace_bpf_5_2_plus.c: tools/bintobuffer kernel/socket_trace.bpf.c
 	$(call check_clang)
 	$(call compile_socket_trace_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
+
+user/socket_trace_bpf_kfunc.c: tools/bintobuffer kernel/socket_trace.bpf.c
+	$(call check_clang)
+	$(call compile_socket_trace_elf, kfunc, LINUX_VER_KFUNC=1)
 
 user/socket_trace_bpf_kylin.c: tools/bintobuffer kernel/socket_trace.bpf.c
 	$(call check_clang)

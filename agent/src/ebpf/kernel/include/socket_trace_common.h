@@ -185,6 +185,23 @@ struct socket_info_s {
 	__u64 uid; // Unique identifier ID for the socket.
 } __attribute__((packed));
 
+/**
+ * @brief Used to describe the runtime state of the tracer.
+ */
+struct tracer_ctx_s {
+	__u64 socket_id;          /**< Session identifier */
+	__u64 coroutine_trace_id; /**< Data forwarding association within the same coroutine */
+	__u64 thread_trace_id;    /**< Data forwarding association within the same process/thread, used for multi-transaction scenarios */
+	__u32 data_limit_max;     /**< Maximum number of data transfers */
+	__u32 go_tracing_timeout; /**< Go tracing timeout */
+	__u32 io_event_collect_mode; /**< IO event collection mode */
+	__u64 io_event_minimal_duration; /**< Minimum duration for IO events */
+	int push_buffer_refcnt; /**< Reference count of the data push buffer */
+	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
+	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
+	struct socket_info_s sk_info; /**< Prevent stack overflow; this option is used as an alternative to stack allocation. */
+};
+
 struct trace_key_t {
 	__u32 tgid;
 	__u32 pid;

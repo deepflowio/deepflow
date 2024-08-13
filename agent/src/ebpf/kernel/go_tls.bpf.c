@@ -173,8 +173,10 @@ UPROG(go_tls_write_exit) (struct pt_regs *ctx)
 	if (!process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
 			  bytes_count, &extra)) {
 		submit_debug(2, 5, 0);
+#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
+#endif
 	}
 	active_write_args_map__delete(&id);
 	return 0;
@@ -305,8 +307,10 @@ UPROG(go_tls_read_exit) (struct pt_regs *ctx)
 	if (!process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args,
 			  bytes_count, &extra)) {
 		submit_debug(4, 5, 0);
+#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
+#endif
 	}
 	active_read_args_map__delete(&id);
 	return 0;

@@ -323,23 +323,23 @@ __attribute__((__always_inline__))                           	\
 static int ____##name(unsigned long long *ctx, ##args);         \
 int name(unsigned long long *ctx)                               \
 {                                                               \
-        int __ret;                                              \
+	int __ret;                                              \
                                                                 \
-        _Pragma("GCC diagnostic push")                          \
-        _Pragma("GCC diagnostic ignored \"-Wint-conversion\"")  \
-        __ret = ____##name(___bpf_ctx_cast(args));              \
-        _Pragma("GCC diagnostic pop")                           \
-        return __ret;                                           \
+	_Pragma("GCC diagnostic push")                          \
+	_Pragma("GCC diagnostic ignored \"-Wint-conversion\"")  \
+	__ret = ____##name(___bpf_ctx_cast(args));              \
+	_Pragma("GCC diagnostic pop")                           \
+	return __ret;                                           \
 }                                                               \
 static int ____##name(unsigned long long *ctx, ##args)
 
 #define KFUNC_PROG(event, args...) \
 	SEC("fentry/"__stringify(event)) \
-        BPF_PROG(kfunc__ ## event, ##args)
+	BPF_PROG(kfunc__ ## event, ##args)
 
 #define KRETFUNC_PROG(event, args...) \
 	SEC("fexit/"__stringify(event)) \
-        BPF_PROG(kretfunc__ ## event, ##args)
+	BPF_PROG(kretfunc__ ## event, ##args)
 
 #ifndef CUR_CPU_IDENTIFIER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
