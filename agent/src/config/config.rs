@@ -50,7 +50,7 @@ use public::{
     bitmap::Bitmap,
     consts::NPB_DEFAULT_PORT,
     proto::{
-        common,
+        agent, common,
         trident::{self, KubernetesClusterIdRequest, TapMode},
     },
     utils::bitmap::parse_u16_range_list_to_bitmap,
@@ -276,6 +276,1788 @@ impl Default for Config {
             team_id: "".into(),
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TagExtraction {
+    pub script_command: Vec<String>,
+    pub exec_username: String,
+}
+
+impl Default for TagExtraction {
+    fn default() -> Self {
+        Self {
+            script_command: vec![],
+            exec_username: "deepflow".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ProcessMatcher {
+    pub match_regex: String,
+    pub match_type: String,
+    pub match_languages: Vec<String>,
+    pub match_usernames: Vec<String>,
+    pub only_in_container: bool,
+    pub only_with_tag: bool,
+    pub ignore: bool,
+    pub rewrite_name: String,
+    pub enabled_features: Vec<String>,
+    pub action: String,
+}
+
+impl Default for ProcessMatcher {
+    fn default() -> Self {
+        Self {
+            match_regex: "deepflow-*".to_string(),
+            match_type: "cmdline".to_string(),
+            match_languages: vec![],
+            match_usernames: vec![],
+            only_in_container: false,
+            only_with_tag: false,
+            ignore: false,
+            rewrite_name: "".to_string(),
+            enabled_features: vec![
+                "ebpf.profile.on_cpu".to_string(),
+                "ebpf.profile.off_cpu".to_string(),
+            ],
+            action: OS_PROC_REGEXP_MATCH_ACTION_ACCEPT.to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct GolangSpecific {
+    pub enabled: bool,
+}
+
+impl Default for GolangSpecific {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Java {
+    #[serde(with = "humantime_serde")]
+    pub refresh_defer_duration: Duration,
+    pub max_symbol_file_size: usize,
+}
+
+impl Default for Java {
+    fn default() -> Self {
+        Self {
+            refresh_defer_duration: Duration::from_secs(60),
+            max_symbol_file_size: 10,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct SymbolTable {
+    pub golang_specific: GolangSpecific,
+    pub java: Java,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Proc {
+    pub enabled: bool,
+    pub proc_dir_path: String,
+    #[serde(with = "humantime_serde")]
+    pub sync_interval: Duration,
+    #[serde(with = "humantime_serde")]
+    pub min_lefttime: Duration,
+    pub tag_extraction: TagExtraction,
+    pub process_matcher: Vec<ProcessMatcher>,
+    pub symbol_table: SymbolTable,
+}
+
+impl Default for Proc {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            proc_dir_path: "/proc".to_string(),
+            sync_interval: Duration::from_secs(10),
+            min_lefttime: Duration::from_secs(3),
+            tag_extraction: TagExtraction::default(),
+            process_matcher: vec![],
+            symbol_table: SymbolTable::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(remote = "agent::PacketCaptureType")]
+enum PacketCaptureTypeDef {
+    #[serde(rename = "0")]
+    Local,
+    #[serde(rename = "1")]
+    Mirror,
+    #[serde(rename = "2")]
+    Analyzer,
+    #[serde(rename = "3")]
+    Decap,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Common {
+    #[serde(with = "PacketCaptureTypeDef")]
+    pub capture_mode: agent::PacketCaptureType,
+}
+
+impl Default for Common {
+    fn default() -> Self {
+        Self {
+            capture_mode: agent::PacketCaptureType::Local,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AfPacketTunning {
+    pub socket_version: usize,
+    pub ring_blocks_enabled: bool,
+    pub ring_blocks: usize,
+    pub packet_fanout_count: usize,
+    pub packet_fanout_mode: u32,
+}
+
+impl Default for AfPacketTunning {
+    fn default() -> Self {
+        Self {
+            socket_version: 0,
+            ring_blocks_enabled: false,
+            ring_blocks: 128,
+            packet_fanout_count: 1,
+            packet_fanout_mode: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AfPacket {
+    pub interface_regex: String,
+    pub bond_interfaces: Vec<String>,
+    pub extra_netns_regex: String,
+    pub extra_bpf_filter: String,
+    pub src_interfaces: Vec<String>,
+    pub vlan_pcp_in_physical_mirror_traffic: u16,
+    pub bpf_filter_disabled: bool,
+    pub tunning: AfPacketTunning,
+}
+
+impl Default for AfPacket {
+    fn default() -> Self {
+        Self {
+            interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"
+                .to_string(),
+            bond_interfaces: vec![],
+            extra_netns_regex: "".to_string(),
+            extra_bpf_filter: "".to_string(),
+            src_interfaces: vec![],
+            vlan_pcp_in_physical_mirror_traffic: 0,
+            bpf_filter_disabled: false,
+            tunning: AfPacketTunning::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Dpdk {
+    pub enabled: bool,
+}
+
+impl Default for Dpdk {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Libpcap {
+    pub enabled: bool,
+}
+
+impl Default for Libpcap {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct VhostUser {
+    pub vhost_socket_path: String,
+}
+
+impl Default for VhostUser {
+    fn default() -> Self {
+        Self {
+            vhost_socket_path: "".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PhysicalSwitch {
+    pub sflow_ports: Vec<u16>,
+    pub netflow_ports: Vec<u16>,
+}
+
+impl Default for PhysicalSwitch {
+    fn default() -> Self {
+        Self {
+            sflow_ports: vec![],
+            netflow_ports: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct SpecialNetwork {
+    pub dpdk: Dpdk,
+    pub libpcap: Libpcap,
+    pub vhost_user: VhostUser,
+    pub physical_switch: PhysicalSwitch,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CbpfTunning {
+    pub dispatcher_queue_enabled: bool,
+    pub max_capture_packet_size: usize,
+    pub raw_packet_buffer_block_size: usize,
+    pub raw_packet_queue_size: usize,
+    pub max_capture_pps: usize,
+}
+
+impl Default for CbpfTunning {
+    fn default() -> Self {
+        Self {
+            dispatcher_queue_enabled: false,
+            max_capture_packet_size: 65535,
+            raw_packet_buffer_block_size: 65536,
+            raw_packet_queue_size: 131072,
+            max_capture_pps: 200,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PreProcess {
+    pub tunnel_decap_protocols: Vec<usize>,
+    pub tunnel_trim_protocols: Vec<String>,
+}
+
+impl Default for PreProcess {
+    fn default() -> Self {
+        Self {
+            tunnel_decap_protocols: vec![1, 2],
+            tunnel_trim_protocols: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PhysicalMirror {
+    pub default_capture_network_type: u16,
+    pub packet_dedup_disabled: bool,
+    pub private_cloud_gateway_traffic: bool,
+}
+
+impl Default for PhysicalMirror {
+    fn default() -> Self {
+        Self {
+            default_capture_network_type: 3,
+            packet_dedup_disabled: false,
+            private_cloud_gateway_traffic: false,
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Cbpf {
+    pub common: Common,
+    pub af_packet: AfPacket,
+    pub special_network: SpecialNetwork,
+    pub tunning: CbpfTunning,
+    pub preprocess: PreProcess,
+    pub physical_mirror: PhysicalMirror,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketUprobeTls {
+    pub enabled: bool,
+}
+
+impl Default for EbpfSocketUprobeTls {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketUprobeGolang {
+    pub enabled: bool,
+    #[serde(with = "humantime_serde")]
+    pub tracing_timeout: Duration,
+}
+
+impl Default for EbpfSocketUprobeGolang {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            tracing_timeout: Duration::from_secs(120),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketUprobe {
+    pub golang: EbpfSocketUprobeGolang,
+    pub tls: EbpfSocketUprobeTls,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketKprobePorts {
+    pub ports: String,
+}
+
+impl Default for EbpfSocketKprobePorts {
+    fn default() -> Self {
+        Self {
+            ports: "".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketKprobe {
+    pub blacklist: EbpfSocketKprobePorts,
+    pub whitelist: EbpfSocketKprobePorts,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketTunning {
+    pub max_capture_rate: u64,
+    pub syscall_trace_id_disabled: bool,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocket {
+    pub uprobe: EbpfSocketUprobe,
+    pub kprobe: EbpfSocketKprobe,
+    pub tunning: EbpfSocketTunning,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfFileIoEvent {
+    pub collect_mode: usize,
+    #[serde(with = "humantime_serde")]
+    pub minimal_duration: Duration,
+}
+
+impl Default for EbpfFileIoEvent {
+    fn default() -> Self {
+        Self {
+            collect_mode: 1,
+            minimal_duration: Duration::from_millis(1),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfFile {
+    io_event: EbpfFileIoEvent,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfProfileOnCpu {
+    pub disabled: bool,
+    pub sampling_frequency: i32,
+    pub aggregate_by_cpu: bool,
+}
+
+impl Default for EbpfProfileOnCpu {
+    fn default() -> Self {
+        Self {
+            disabled: false,
+            sampling_frequency: 99,
+            aggregate_by_cpu: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfProfileOffCpu {
+    pub disabled: bool,
+    #[serde(with = "humantime_serde")]
+    pub min_blocking_time: Duration,
+    pub aggregate_by_cpu: bool,
+}
+
+impl Default for EbpfProfileOffCpu {
+    fn default() -> Self {
+        Self {
+            disabled: true,
+            min_blocking_time: Duration::from_micros(50),
+            aggregate_by_cpu: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfProfileMemory {
+    pub disabled: bool,
+}
+
+impl Default for EbpfProfileMemory {
+    fn default() -> Self {
+        Self { disabled: true }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfProfile {
+    pub on_cpu: EbpfProfileOnCpu,
+    pub off_cpu: EbpfProfileOffCpu,
+    pub memory: EbpfProfileMemory,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfTunning {
+    pub max_capture_rate: usize,
+    pub collector_queue_size: usize,
+    pub userspace_worker_threads: i32,
+    pub perf_pages_count: u32,
+    pub kernel_ring_size: u32,
+    pub max_socket_entries: u32,
+    pub socket_map_reclaim_threshold: u32,
+    pub max_trace_entries: u32,
+}
+
+impl Default for EbpfTunning {
+    fn default() -> Self {
+        Self {
+            max_capture_rate: 0,
+            collector_queue_size: 65535,
+            userspace_worker_threads: 1,
+            perf_pages_count: 128,
+            kernel_ring_size: 65536,
+            max_socket_entries: 131072,
+            socket_map_reclaim_threshold: 120000,
+            max_trace_entries: 131072,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfPreprocess {
+    pub out_of_order_reassembly_cache_size: usize,
+    pub out_of_order_reassembly_protocols: Vec<String>,
+    pub segmentation_reassembly_protocols: Vec<String>,
+}
+
+impl Default for EbpfPreprocess {
+    fn default() -> Self {
+        Self {
+            out_of_order_reassembly_cache_size: 16,
+            out_of_order_reassembly_protocols: vec![],
+            segmentation_reassembly_protocols: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Ebpf {
+    pub disabled: bool,
+    pub socket: EbpfSocket,
+    pub file: EbpfFile,
+    pub profile: EbpfProfile,
+    pub tunning: EbpfTunning,
+    pub preprocess: EbpfPreprocess,
+}
+
+impl Default for Ebpf {
+    fn default() -> Self {
+        Self {
+            disabled: false,
+            socket: EbpfSocket::default(),
+            file: EbpfFile::default(),
+            profile: EbpfProfile::default(),
+            tunning: EbpfTunning::default(),
+            preprocess: EbpfPreprocess::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PrivateCloud {
+    pub hypervisor_resource_enabled: bool,
+    pub vm_mac_source: usize,
+    pub vm_xml_directory: String,
+    pub vm_mac_mapping_script: String,
+}
+
+impl Default for PrivateCloud {
+    fn default() -> Self {
+        Self {
+            hypervisor_resource_enabled: false,
+            vm_mac_source: 0,
+            vm_xml_directory: "/etc/libvirt/qemu/".to_string(),
+            vm_mac_mapping_script: "".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ApiResources {
+    pub name: String,
+    pub disabled: bool,
+    pub group: String,
+}
+
+impl Default for ApiResources {
+    fn default() -> Self {
+        Self {
+            name: "".to_string(),
+            disabled: false,
+            group: "".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct KubernetesNamespace {
+    pub name: String,
+    pub group: String,
+    pub version: String,
+    pub disabled: bool,
+    pub field_selector: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Kubernetes {
+    pub kubernetes_namespace: Vec<KubernetesNamespace>,
+    pub api_resources: Vec<ApiResources>,
+    pub api_list_page_size: usize,
+    #[serde(with = "humantime_serde")]
+    pub api_list_max_interval: Duration,
+    pub ingress_flavour: String,
+    pub pod_mac_collection_method: String,
+}
+
+impl Default for Kubernetes {
+    fn default() -> Self {
+        Self {
+            kubernetes_namespace: vec![],
+            api_resources: vec![],
+            api_list_page_size: 1000,
+            api_list_max_interval: Duration::from_millis(10),
+            ingress_flavour: "kubernetes".to_string(),
+            pod_mac_collection_method: "adaptive".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PullResourceFromController {
+    pub domain_filter: Vec<usize>,
+    pub only_kubernetes_pod_ip_in_local_cluster: bool,
+}
+
+impl Default for PullResourceFromController {
+    fn default() -> Self {
+        Self {
+            domain_filter: vec![0],
+            only_kubernetes_pod_ip_in_local_cluster: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Resources {
+    #[serde(with = "humantime_serde")]
+    pub push_interval: Duration,
+    pub private_cloud: PrivateCloud,
+    pub kubernetes: Kubernetes,
+    pub pull_resource_from_controller: PullResourceFromController,
+}
+
+impl Default for Resources {
+    fn default() -> Self {
+        Self {
+            push_interval: Duration::from_secs(10),
+            private_cloud: PrivateCloud::default(),
+            kubernetes: Kubernetes::default(),
+            pull_resource_from_controller: PullResourceFromController::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PrometheusExtraLabels {
+    pub enabled: bool,
+    pub extra_labels: Vec<String>,
+    pub label_length: usize,
+    pub value_length: usize,
+}
+
+impl Default for PrometheusExtraLabels {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            extra_labels: vec![],
+            label_length: 1024,
+            value_length: 4096,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FeatureControl {
+    pub profile_integration_disabled: bool,
+    pub trace_integration_disabled: bool,
+    pub metric_integration_disabled: bool,
+    pub log_integration_disabled: bool,
+}
+
+impl Default for FeatureControl {
+    fn default() -> Self {
+        Self {
+            profile_integration_disabled: false,
+            trace_integration_disabled: false,
+            metric_integration_disabled: false,
+            log_integration_disabled: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Integration {
+    pub enabled: bool,
+    pub listen_port: u16,
+    pub data_compression: bool,
+    pub prometheus_extra_labels: PrometheusExtraLabels,
+    pub feature_control: FeatureControl,
+}
+
+impl Default for Integration {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            listen_port: 38086,
+            data_compression: false,
+            prometheus_extra_labels: PrometheusExtraLabels::default(),
+            feature_control: FeatureControl::default(),
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Inputs {
+    pub proc: Proc,
+    pub cbpf: Cbpf,
+    pub ebpf: Ebpf,
+    pub resources: Resources,
+    pub integration: Integration,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Policy {
+    pub fast_path_map_size: usize,
+    pub fast_path_disabled: bool,
+    pub forward_table_capacity: usize,
+    pub max_first_path_level: usize,
+}
+
+impl Default for Policy {
+    fn default() -> Self {
+        Self {
+            fast_path_map_size: 0,
+            fast_path_disabled: false,
+            forward_table_capacity: 16384,
+            max_first_path_level: 8,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TcpHeader {
+    pub block_size: usize,
+    pub sender_queue_size: usize,
+    pub sender_queue_count: usize,
+    pub header_fields_flag: u8,
+}
+
+impl Default for TcpHeader {
+    fn default() -> Self {
+        Self {
+            block_size: 256,
+            sender_queue_size: 65536,
+            sender_queue_count: 1,
+            header_fields_flag: 0b0000_0000,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PcapStream {
+    pub receiver_queue_size: usize,
+    pub buffer_size_per_flow: u32,
+    pub total_buffer_size: u64,
+    #[serde(with = "humantime_serde")]
+    pub flush_interval: Duration,
+}
+
+impl Default for PcapStream {
+    fn default() -> Self {
+        Self {
+            receiver_queue_size: 65536,
+            buffer_size_per_flow: 65536,
+            total_buffer_size: 88304,
+            flush_interval: Duration::from_secs(60),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Toa {
+    pub sender_queue_size: usize,
+    pub cache_size: usize,
+}
+
+impl Default for Toa {
+    fn default() -> Self {
+        Self {
+            sender_queue_size: 65536,
+            cache_size: 65536,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Packet {
+    pub policy: Policy,
+    pub tcp_header: TcpHeader,
+    pub pcap_stream: PcapStream,
+    pub toa: Toa,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OracleConfig {
+    pub is_be: bool,
+    pub int_compressed: bool,
+    pub resp_0x04_extra_byte: bool,
+}
+
+impl Default for OracleConfig {
+    fn default() -> Self {
+        Self {
+            is_be: true,
+            int_compressed: true,
+            resp_0x04_extra_byte: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ProtocolSpecialConfig {
+    pub oracle: OracleConfig,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ApplicationProtocolInference {
+    pub inference_max_retries: usize,
+    #[serde(with = "humantime_serde")]
+    pub inference_result_ttl: Duration,
+    pub enabled_protocols: Vec<String>,
+    pub protocol_special_config: ProtocolSpecialConfig,
+}
+
+impl Default for ApplicationProtocolInference {
+    fn default() -> Self {
+        Self {
+            inference_max_retries: 5,
+            inference_result_ttl: Duration::from_secs(60),
+            enabled_protocols: vec![
+                "HTTP".to_string(),
+                "HTTP2".to_string(),
+                "Dubbo".to_string(),
+                "SofaRPC".to_string(),
+                "FastCGI".to_string(),
+                "bRPC".to_string(),
+                "MySQL".to_string(),
+                "PostgreSQL".to_string(),
+                "Oracle".to_string(),
+                "Redis".to_string(),
+                "MongoDB".to_string(),
+                "Kafka".to_string(),
+                "MQTT".to_string(),
+                "AMQP".to_string(),
+                "OpenWire".to_string(),
+                "NATS".to_string(),
+                "Pulsar".to_string(),
+                "ZMTP".to_string(),
+                "DNS".to_string(),
+                "TLS".to_string(),
+                "Custom".to_string(),
+            ],
+            protocol_special_config: ProtocolSpecialConfig::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct PortNumberPrefilters {
+    #[serde(rename = "HTTP")]
+    pub http: String,
+    #[serde(rename = "HTTP")]
+    pub http2: String,
+    #[serde(rename = "Dubbo")]
+    pub dubbo: String,
+    #[serde(rename = "SofaRPC")]
+    pub sofa_rpc: String,
+    #[serde(rename = "FastCGI")]
+    pub fast_cgi: String,
+    #[serde(rename = "bRPC")]
+    pub b_rpc: String,
+    #[serde(rename = "MySQL")]
+    pub mysql: String,
+    #[serde(rename = "PostgreSQL")]
+    pub postgre_sql: String,
+    #[serde(rename = "Oracle")]
+    pub oracle: String,
+    #[serde(rename = "Redis")]
+    pub redis: String,
+    #[serde(rename = "MongoDB")]
+    pub mongodb: String,
+    #[serde(rename = "Kafka")]
+    pub kafka: String,
+    #[serde(rename = "MQTT")]
+    pub mqtt: String,
+    #[serde(rename = "AMQP")]
+    pub amqp: String,
+    #[serde(rename = "OpenWire")]
+    pub openwire: String,
+    #[serde(rename = "NATS")]
+    pub nats: String,
+    #[serde(rename = "Pulsar")]
+    pub pulsar: String,
+    #[serde(rename = "ZMTP")]
+    pub zmtp: String,
+    #[serde(rename = "DNS")]
+    pub dns: String,
+    #[serde(rename = "TLS")]
+    pub tls: String,
+    #[serde(rename = "Custom")]
+    pub custom: String,
+}
+
+impl Default for PortNumberPrefilters {
+    fn default() -> Self {
+        Self {
+            http: "1-65535".to_string(),
+            http2: "1-65535".to_string(),
+            dubbo: "1-65535".to_string(),
+            sofa_rpc: "1-65535".to_string(),
+            fast_cgi: "1-65535".to_string(),
+            b_rpc: "1-65535".to_string(),
+            mysql: "1-65535".to_string(),
+            postgre_sql: "1-65535".to_string(),
+            oracle: "1521".to_string(),
+            redis: "1-65535".to_string(),
+            mongodb: "1-65535".to_string(),
+            kafka: "1-65535".to_string(),
+            mqtt: "1-65535".to_string(),
+            amqp: "1-65535".to_string(),
+            openwire: "1-65535".to_string(),
+            nats: "1-65535".to_string(),
+            pulsar: "1-65535".to_string(),
+            zmtp: "1-65535".to_string(),
+            dns: "53,5353".to_string(),
+            tls: "443,6443".to_string(),
+            custom: "1-65535".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TagFilterOperator {
+    pub name: String,
+    pub operator: String,
+    pub value: String,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TagFilters {
+    #[serde(rename = "HTTP")]
+    pub http: Vec<TagFilterOperator>,
+    #[serde(rename = "HTTP")]
+    pub http2: Vec<TagFilterOperator>,
+    #[serde(rename = "Dubbo")]
+    pub dubbo: Vec<TagFilterOperator>,
+    #[serde(rename = "SofaRPC")]
+    pub sofa_rpc: Vec<TagFilterOperator>,
+    #[serde(rename = "FastCGI")]
+    pub fast_cgi: Vec<TagFilterOperator>,
+    #[serde(rename = "bRPC")]
+    pub b_rpc: Vec<TagFilterOperator>,
+    #[serde(rename = "MySQL")]
+    pub mysql: Vec<TagFilterOperator>,
+    #[serde(rename = "PostgreSQL")]
+    pub postgre_sql: Vec<TagFilterOperator>,
+    #[serde(rename = "Oracle")]
+    pub oracle: Vec<TagFilterOperator>,
+    #[serde(rename = "Redis")]
+    pub redis: Vec<TagFilterOperator>,
+    #[serde(rename = "MongoDB")]
+    pub mongodb: Vec<TagFilterOperator>,
+    #[serde(rename = "Kafka")]
+    pub kafka: Vec<TagFilterOperator>,
+    #[serde(rename = "MQTT")]
+    pub mqtt: Vec<TagFilterOperator>,
+    #[serde(rename = "AMQP")]
+    pub amqp: Vec<TagFilterOperator>,
+    #[serde(rename = "OpenWire")]
+    pub openwire: Vec<TagFilterOperator>,
+    #[serde(rename = "NATS")]
+    pub nats: Vec<TagFilterOperator>,
+    #[serde(rename = "Pulsar")]
+    pub pulsar: Vec<TagFilterOperator>,
+    #[serde(rename = "ZMTP")]
+    pub zmtp: Vec<TagFilterOperator>,
+    #[serde(rename = "DNS")]
+    pub dns: Vec<TagFilterOperator>,
+    #[serde(rename = "TLS")]
+    pub tls: Vec<TagFilterOperator>,
+    #[serde(rename = "Custom")]
+    pub custom: Vec<TagFilterOperator>,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Filters {
+    pub port_number_prefilters: PortNumberPrefilters,
+    pub tag_filters: TagFilters,
+    pub unconcerned_dns_nxdomain_response_suffixes: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Timeouts {
+    #[serde(with = "humantime_serde")]
+    pub tcp_request_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    pub udp_request_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    pub session_aggregate_window_duration: Duration,
+}
+
+impl Default for Timeouts {
+    fn default() -> Self {
+        Self {
+            tcp_request_timeout: Duration::from_secs(1800),
+            udp_request_timeout: Duration::from_secs(150),
+            session_aggregate_window_duration: Duration::from_secs(120),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TracingTag {
+    pub http_real_client: String,
+    pub x_request_id: String,
+    pub apm_trace_id: Vec<String>,
+    pub apm_span_id: Vec<String>,
+}
+
+impl Default for TracingTag {
+    fn default() -> Self {
+        Self {
+            http_real_client: "X_Forwarded_For".to_string(),
+            x_request_id: "X_Request_ID".to_string(),
+            apm_trace_id: vec!["traceparent".to_string(), "sw8".to_string()],
+            apm_span_id: vec!["traceparent".to_string(), "sw8".to_string()],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct HttpEndpointMatchRule {
+    pub url_prefix: String,
+    pub keep_segments: usize,
+}
+
+impl Default for HttpEndpointMatchRule {
+    fn default() -> Self {
+        Self {
+            url_prefix: "".to_string(),
+            keep_segments: 2,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct HttpEndpoint {
+    pub extraction_disabled: bool,
+    pub match_rules: Vec<HttpEndpointMatchRule>,
+}
+
+impl Default for HttpEndpoint {
+    fn default() -> Self {
+        Self {
+            extraction_disabled: false,
+            match_rules: vec![HttpEndpointMatchRule::default()],
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CustomFields {
+    pub http: Vec<String>,
+    pub http2: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct RequestLogTagExtraction {
+    pub tracing_tag: TracingTag,
+    pub http_endpoint: HttpEndpoint,
+    pub custom_fields: CustomFields,
+    pub obfuscate_protocols: Vec<String>,
+}
+
+impl Default for RequestLogTagExtraction {
+    fn default() -> Self {
+        Self {
+            tracing_tag: TracingTag::default(),
+            http_endpoint: HttpEndpoint::default(),
+            custom_fields: CustomFields::default(),
+            obfuscate_protocols: vec!["Redis".to_string()],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct RequestLogTunning {
+    pub payload_truncation: u32,
+    pub session_aggregate_slot_capacity: usize,
+    pub consistent_timestamp_in_l7_metrics: bool,
+}
+
+impl Default for RequestLogTunning {
+    fn default() -> Self {
+        Self {
+            payload_truncation: 1024,
+            session_aggregate_slot_capacity: 1024,
+            consistent_timestamp_in_l7_metrics: false,
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct RequestLog {
+    pub application_protocol_inference: ApplicationProtocolInference,
+    pub filters: Filters,
+    pub timeouts: Timeouts,
+    pub tag_extraction: RequestLogTagExtraction,
+    pub tunning: RequestLogTunning,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TimeWindow {
+    #[serde(with = "humantime_serde")]
+    pub max_tolerable_packet_delay: Duration,
+    #[serde(with = "humantime_serde")]
+    pub extra_tolerable_flow_delay: Duration,
+}
+
+impl Default for TimeWindow {
+    fn default() -> Self {
+        Self {
+            max_tolerable_packet_delay: Duration::from_secs(1),
+            extra_tolerable_flow_delay: Duration::ZERO,
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FlowGeneration {
+    pub server_ports: Vec<u16>,
+    pub cloud_traffic_ignore_mac: bool,
+    pub ignore_l2_end: bool,
+    pub idc_traffic_ignore_vlan: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ConntrackTimeouts {
+    #[serde(with = "humantime_serde")]
+    pub established: Duration,
+    #[serde(with = "humantime_serde")]
+    pub closing_rst: Duration,
+    #[serde(with = "humantime_serde")]
+    pub opening_rst: Duration,
+    #[serde(with = "humantime_serde")]
+    pub others: Duration,
+}
+
+impl Default for ConntrackTimeouts {
+    fn default() -> Self {
+        Self {
+            established: Duration::from_secs(300),
+            closing_rst: Duration::from_secs(35),
+            opening_rst: Duration::from_secs(1),
+            others: Duration::from_secs(5),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Conntrack {
+    #[serde(with = "humantime_serde")]
+    pub flow_flush_interval: Duration,
+    pub flow_generation: FlowGeneration,
+    pub timeouts: ConntrackTimeouts,
+}
+
+impl Default for Conntrack {
+    fn default() -> Self {
+        Self {
+            flow_flush_interval: Duration::from_secs(1),
+            flow_generation: FlowGeneration::default(),
+            timeouts: ConntrackTimeouts::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ProcessorsFlowLogTunning {
+    pub flow_map_hash_slots: u32,
+    pub concurrent_flow_limit: u32,
+    pub memory_pool_size: usize,
+    pub max_batched_buffer_size: usize,
+    pub flow_aggregator_queue_size: usize,
+    pub flow_generator_queue_size: usize,
+    pub quadruple_generator_queue_size: usize,
+}
+
+impl Default for ProcessorsFlowLogTunning {
+    fn default() -> Self {
+        Self {
+            flow_map_hash_slots: 131072,
+            concurrent_flow_limit: 65535,
+            memory_pool_size: 65536,
+            max_batched_buffer_size: 131072,
+            flow_aggregator_queue_size: 65535,
+            flow_generator_queue_size: 65536,
+            quadruple_generator_queue_size: 262144,
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ProcessorsFlowLog {
+    pub time_window: TimeWindow,
+    pub conntrack: Conntrack,
+    pub tunning: ProcessorsFlowLogTunning,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Processors {
+    pub packet: Packet,
+    pub request_log: RequestLog,
+    pub flow_log: ProcessorsFlowLog,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Limits {
+    pub max_millicpus: usize,
+    pub max_cpus: usize,
+    pub max_memory: u64,
+    pub max_log_backhaul_rate: usize,
+    pub max_local_log_file_size: usize,
+    pub local_log_retention: Duration,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_millicpus: 1000,
+            max_cpus: 1,
+            max_memory: 768,
+            max_log_backhaul_rate: 300,
+            max_local_log_file_size: 1000,
+            local_log_retention: Duration::from_secs(300 * 24 * 3600),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Alerts {
+    pub thread_threshold: usize,
+    pub process_threshold: usize,
+    pub check_core_file_disabled: bool,
+}
+
+impl Default for Alerts {
+    fn default() -> Self {
+        Self {
+            thread_threshold: 500,
+            process_threshold: 10,
+            check_core_file_disabled: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct SysFreeMemoryPercentage {
+    trigger_threshold: usize,
+}
+
+fn to_system_load_metric<'de, D>(deserializer: D) -> Result<agent::SystemLoadMetric, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(agent::SystemLoadMetric::Load1),
+        1 => Ok(agent::SystemLoadMetric::Load5),
+        2 => Ok(agent::SystemLoadMetric::Load15),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"[0-2]",
+        )),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialOrd)]
+#[serde(default)]
+pub struct RelativeSysLoad {
+    trigger_threshold: f64,
+    recovery_threshold: f64,
+    #[serde(deserialize_with = "to_system_load_metric")]
+    system_load_circuit_breaker_metric: agent::SystemLoadMetric,
+}
+
+impl PartialEq for RelativeSysLoad {
+    fn eq(&self, other: &Self) -> bool {
+        self.trigger_threshold == other.trigger_threshold
+            || self.recovery_threshold == other.recovery_threshold
+            || self.system_load_circuit_breaker_metric == other.system_load_circuit_breaker_metric
+    }
+}
+impl Eq for RelativeSysLoad {}
+
+impl Default for RelativeSysLoad {
+    fn default() -> Self {
+        RelativeSysLoad {
+            trigger_threshold: 1.0,
+            recovery_threshold: 0.9,
+            system_load_circuit_breaker_metric: agent::SystemLoadMetric::Load15,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TxThroughput {
+    trigger_threshold: usize,
+    throughput_monitoring_interval: Duration,
+}
+
+impl Default for TxThroughput {
+    fn default() -> Self {
+        Self {
+            trigger_threshold: 0,
+            throughput_monitoring_interval: Duration::from_secs(10),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CircuitBreakers {
+    pub sys_free_memory_percentage: SysFreeMemoryPercentage,
+    pub relative_sys_load: RelativeSysLoad,
+    pub tx_throughput: TxThroughput,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Tunning {
+    pub cpu_affinity: Vec<usize>,
+    pub process_scheduling_priority: usize,
+    pub idle_memory_trimming: bool,
+    pub resource_monitoring_interval: Duration,
+}
+
+impl Default for Tunning {
+    fn default() -> Self {
+        Self {
+            cpu_affinity: vec![],
+            process_scheduling_priority: 0,
+            idle_memory_trimming: false,
+            resource_monitoring_interval: Duration::from_secs(10),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Ntp {
+    pub enabled: bool,
+    pub max_drift: Duration,
+    pub min_drift: Duration,
+}
+
+impl Default for Ntp {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_drift: Duration::from_secs(300),
+            min_drift: Duration::from_secs(10),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Communication {
+    pub proactive_request_interval: Duration,
+    pub max_escape_duration: Duration,
+    pub controller_ip: Vec<String>,
+    pub controller_port: u16,
+    pub ingester_ip: String,
+    pub ingester_port: u16,
+    pub grpc_buffer_size: usize,
+    pub request_via_nat_ip: bool,
+    #[serde(skip)]
+    pub proxy_controller_ip: String,
+    #[serde(skip)]
+    pub proxy_controller_port: u16,
+}
+
+impl Default for Communication {
+    fn default() -> Self {
+        Self {
+            proactive_request_interval: Duration::from_secs(60),
+            max_escape_duration: Duration::from_secs(3600),
+            controller_ip: vec![],
+            controller_port: 30035,
+            ingester_ip: "".to_string(),
+            ingester_port: 30033,
+            grpc_buffer_size: 5,
+            request_via_nat_ip: false,
+            proxy_controller_ip: "".to_string(),
+            proxy_controller_port: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(remote = "log::Level")]
+enum LevelDef {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Log {
+    #[serde(with = "LevelDef")]
+    pub log_level: log::Level,
+    pub log_file: String,
+    pub log_backhaul_enabled: bool,
+}
+
+impl Default for Log {
+    fn default() -> Self {
+        Self {
+            log_level: log::Level::Info,
+            log_file: "/var/log/deepflow_agent/deepflow_agent.log".to_string(),
+            log_backhaul_enabled: true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Profile {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Debug {
+    pub local_udp_port: u16,
+    pub debug_metrics_enabled: bool,
+}
+
+impl Default for Debug {
+    fn default() -> Self {
+        Self {
+            local_udp_port: 0,
+            debug_metrics_enabled: false,
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct SelfMonitoring {
+    pub log: Log,
+    pub profile: Profile,
+    pub debug: Debug,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct StandaloneMode {
+    pub max_data_file_size: usize,
+    pub data_file_dir: String,
+}
+
+impl Default for StandaloneMode {
+    fn default() -> Self {
+        Self {
+            max_data_file_size: 200,
+            data_file_dir: "/var/log/deepflow_agent/".to_string(),
+        }
+    }
+}
+
+fn to_agent_type<'de, D>(deserializer: D) -> Result<agent::AgentType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(agent::AgentType::TtUnknown),
+        1 => Ok(agent::AgentType::TtProcess),
+        2 => Ok(agent::AgentType::TtVm),
+        3 => Ok(agent::AgentType::TtPublicCloud),
+        5 => Ok(agent::AgentType::TtPhysicalMachine),
+        6 => Ok(agent::AgentType::TtDedicatedPhysicalMachine),
+        7 => Ok(agent::AgentType::TtHostPod),
+        8 => Ok(agent::AgentType::TtVmPod),
+        9 => Ok(agent::AgentType::TtTunnelDecapsulation),
+        10 => Ok(agent::AgentType::TtHyperVCompute),
+        11 => Ok(agent::AgentType::TtHyperVNetwork),
+        12 => Ok(agent::AgentType::TtK8sSidecar),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"[0-12]",
+        )),
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+pub struct Global {
+    pub enabled: bool,
+    pub epc_id: u32,
+    pub agent_id: u16,
+    #[serde(deserialize_with = "to_agent_type")]
+    pub agent_type: agent::AgentType,
+    pub region_id: u32,
+    pub pod_cluster_id: u32,
+    pub limits: Limits,
+    pub alerts: Alerts,
+    pub circuit_breakers: CircuitBreakers,
+    pub tunning: Tunning,
+    pub ntp: Ntp,
+    pub communication: Communication,
+    pub self_monitoring: SelfMonitoring,
+    pub standalone_mode: StandaloneMode,
+}
+
+fn to_agent_socket_type<'de, D>(deserializer: D) -> Result<agent::SocketType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.as_str() {
+        "FILE" => Ok(agent::SocketType::File),
+        "TCP" => Ok(agent::SocketType::Tcp),
+        "UDP" => Ok(agent::SocketType::Udp),
+        "RAW_UDP" => Ok(agent::SocketType::RawUdp),
+        "" => Ok(agent::SocketType::File),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"FILE|TCP|UDP|RAW_UDP",
+        )),
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Socket {
+    #[serde(deserialize_with = "to_agent_socket_type")]
+    pub data_socket_type: agent::SocketType,
+    #[serde(deserialize_with = "to_agent_socket_type")]
+    pub pcap_socket_type: agent::SocketType,
+    #[serde(deserialize_with = "to_agent_socket_type")]
+    pub npb_socket_type: agent::SocketType,
+    pub raw_udp_qos_bypass: bool,
+}
+
+impl Default for Socket {
+    fn default() -> Self {
+        Self {
+            data_socket_type: agent::SocketType::Tcp,
+            pcap_socket_type: agent::SocketType::Tcp,
+            npb_socket_type: agent::SocketType::RawUdp,
+            raw_udp_qos_bypass: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FlowLogFilters {
+    pub l4_capture_network_types: Vec<u16>,
+    pub l7_capture_network_types: Vec<u16>,
+    pub l4_ignored_observation_points: Vec<u16>,
+    pub l7_ignored_observation_points: Vec<u16>,
+}
+
+impl Default for FlowLogFilters {
+    fn default() -> Self {
+        Self {
+            l4_capture_network_types: vec![0],
+            l7_capture_network_types: vec![],
+            l4_ignored_observation_points: vec![],
+            l7_ignored_observation_points: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Throttles {
+    pub l4_throttle: usize,
+    pub l7_throttle: usize,
+}
+
+impl Default for Throttles {
+    fn default() -> Self {
+        Self {
+            l4_throttle: 10000,
+            l7_throttle: 10000,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OutputsFlowLogTunning {
+    pub collector_queue_size: usize,
+    pub collector_queue_count: usize,
+}
+
+impl Default for OutputsFlowLogTunning {
+    fn default() -> Self {
+        Self {
+            collector_queue_size: 65536,
+            collector_queue_count: 1,
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OutputsFlowLog {
+    pub filters: FlowLogFilters,
+    pub throttles: Throttles,
+    pub tunning: OutputsFlowLogTunning,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FlowMetricsFilters {
+    pub inactive_server_port_aggregation: bool,
+    pub inactive_ip_aggregation: bool,
+    pub npm_metrics: bool,
+    pub apm_metrics: bool,
+    pub second_metrics: bool,
+}
+
+impl Default for FlowMetricsFilters {
+    fn default() -> Self {
+        Self {
+            inactive_server_port_aggregation: false,
+            inactive_ip_aggregation: false,
+            npm_metrics: true,
+            apm_metrics: true,
+            second_metrics: true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FlowMetricsTunning {
+    pub sender_queue_size: usize,
+    pub sender_queue_count: usize,
+}
+
+impl Default for FlowMetricsTunning {
+    fn default() -> Self {
+        Self {
+            sender_queue_size: 65536,
+            sender_queue_count: 1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct FlowMetrics {
+    pub enabled: bool,
+    pub filters: FlowMetricsFilters,
+    pub tunning: FlowMetricsTunning,
+}
+
+impl Default for FlowMetrics {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            filters: FlowMetricsFilters::default(),
+            tunning: FlowMetricsTunning::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Npb {
+    pub max_mtu: usize,
+    pub raw_udp_vlan_tag: usize,
+    pub extra_vlan_header: usize,
+    pub traffic_global_dedup: bool,
+    pub target_port: u16,
+    pub custom_vxlan_flags: u8,
+    pub overlay_vlan_header_trimming: bool,
+    pub max_tx_throughput: usize,
+}
+
+impl Default for Npb {
+    fn default() -> Self {
+        Self {
+            max_mtu: 1500,
+            raw_udp_vlan_tag: 0,
+            extra_vlan_header: 0,
+            traffic_global_dedup: true,
+            target_port: 4789,
+            custom_vxlan_flags: 0b1111_1111,
+            overlay_vlan_header_trimming: false,
+            max_tx_throughput: 1000,
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Outputs {
+    pub socket: Socket,
+    pub flow_log: OutputsFlowLog,
+    pub flow_metrics: FlowMetrics,
+    pub npb: Npb,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Plugins {
+    pub update_time: Duration,
+    pub wasm_plugins: Vec<String>,
+    pub so_plugins: Vec<String>,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Dev {
+    pub feature_flags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+//#[serde(default = "RuntimeConfig::standalone_default")]
+pub struct AgentRuntimeConfig {
+    pub global: Global,
+    pub inputs: Inputs,
+    pub outputs: Outputs,
+    pub processors: Processors,
+    pub plugins: Plugins,
+    pub dev: Dev,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -1097,16 +2879,6 @@ impl Default for YamlConfig {
             consistent_timestamp_in_l7_metrics: false,
         }
     }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(remote = "log::Level", rename_all = "kebab-case")]
-enum LevelDef {
-    Error,
-    Warn,
-    Info,
-    Debug,
-    Trace,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

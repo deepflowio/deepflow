@@ -556,6 +556,12 @@ enum RoleType {
     ROLE_SERVER = 2;
 }
 
+enum ServiceProtocol {
+    ANY = 0;
+    TCP_SERVICE = 1;
+    UDP_SERVICE = 2;
+}
+
 message GPIDSyncEntry {
     optional ServiceProtocol protocol = 1 [default = ANY];  // ANY means compressed
     // server side
