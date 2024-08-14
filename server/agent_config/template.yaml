@@ -4367,7 +4367,8 @@ processors:
       #   ch: |-
       #     deepflow-agent 采集 TCP 承载的应用调用时等待响应消息的最大时长，如果响应与请求之间的时间差超过该参数值，
       #     该次调用将被识别为超时，并且不会参与平均时延、总时延的计算。
-      #     该参数值需大于会话合并的 SLOT_TIME （10s），并小于 3600s。
+      #     
+      #     注意：该参数值需大于会话合并的 SLOT_TIME （10s），并小于 3600s。 
       # upgrade_from: static_config.rrt-tcp-timeout
       tcp_request_timeout: 1800s
       # type: duration
