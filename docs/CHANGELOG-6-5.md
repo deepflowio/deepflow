@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: CVE-2024-35195 vuln [#7809](https://github.com/deepflowio/deepflow/pull/7809) by [taloric](https://github.com/taloric)
+* fix: turn off the call monitoring function and stop related functions [#7806](https://github.com/deepflowio/deepflow/pull/7806) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: agent enable feature permission [#7795](https://github.com/deepflowio/deepflow/pull/7795) by [roryye](https://github.com/roryye)
 * Revert "fix: refresh agent enable feature" [#7793](https://github.com/deepflowio/deepflow/pull/7793) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: refresh agent enable feature [#7791](https://github.com/deepflowio/deepflow/pull/7791) by [roryye](https://github.com/roryye)
