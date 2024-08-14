@@ -334,6 +334,8 @@ func UpdateController(
 		//   - 增加 az_controller_connection 逻辑
 		//     - addConnAzs = newConnAzs - oldConnAzs
 		if _, ok := controllerUpdate["REGION"]; ok {
+			
+
 			if oldConnAzs.Contains("ALL") {
 				delConnAzs.Add("ALL")
 				for _, az := range dbAzs {

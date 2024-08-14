@@ -462,7 +462,9 @@ func (c *ControllerCheck) SyncDefaultOrgData() {
 	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Error(err)
 	}
-	if err := mysql.SyncDefaultOrgData(controllers, SyncControllerExcludeField); err != nil {
+	if err := mysql.SyncDefaultORGData("id", controllers,
+		mysql.WithExcludeFields(SyncControllerExcludeField),
+	); err != nil {
 		log.Error(err)
 	}
 }

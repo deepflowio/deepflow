@@ -120,8 +120,15 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		patchMap := map[string]interface{}{}
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
-		lcuuid := c.Param("lcuuid")
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
+		if _, ok := patchMap["REGION"]; ok {
+			if orgID.(int) != common.DEFAULT_ORG_ID {
+				StatusForbiddenResponse(c, "only default orgination can modify region")
+				return
+			}
+		}
+
+		lcuuid := c.Param("lcuuid")
 		data, err := service.UpdateController(orgID.(int), lcuuid, patchMap, m, cfg)
 		if err != nil {
 			err = fmt.Errorf("org id(%d), %s", orgID.(int), err.Error())
