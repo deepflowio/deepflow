@@ -436,12 +436,15 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 
 	if c.EnabledCallMonitoring() == false {
+		disabled := int(DISABLED)
 		if yamlConfig.Ebpf == nil {
 			yamlConfig.Ebpf = &agent_config.EbpfConfig{
-				Disabled: proto.Bool(true),
+				Disabled:           proto.Bool(true),
+				IOEventCollectMode: &disabled,
 			}
 		} else {
 			yamlConfig.Ebpf.Disabled = proto.Bool(true)
+			yamlConfig.Ebpf.IOEventCollectMode = &disabled
 		}
 	}
 
