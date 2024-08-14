@@ -1098,7 +1098,11 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 		DB: db, Table: table, TagName: tag,
 	}]
 	if !ok {
-		return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+		if table == "alert_event" {
+			return nil, sqlList, nil
+		} else {
+			return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+		}
 	}
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]

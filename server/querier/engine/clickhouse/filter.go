@@ -780,16 +780,33 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
-					if strings.Contains(op, "match") {
-						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+					if strings.HasSuffix(noSuffixTag, "_id") {
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value)
+						}
 					} else {
-						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+						}
 					}
+
 				} else {
-					if strings.Contains(op, "match") {
-						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+					if strings.HasSuffix(noSuffixTag, "_id") {
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+						}
 					} else {
-						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+						}
 					}
 				}
 			default:
