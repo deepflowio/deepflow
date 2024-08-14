@@ -317,7 +317,7 @@ global:
       #     `outputs.npb.max_npb_throughput`. Set to 0 will disable this feature.
       #   ch: |-
       #     如果流量分发所用网络接口的出方向吞吐量达到或超出此阈值，deepflow-agent 停止流量
-      #     分发；如果该网络接口的出方向吞吐量连续 5 个监控周期低于`(trigger_threshold -
+      #     分发；如果该网络接口的出方向吞吐量连续 5 个监控周期低于 `(trigger_threshold -
       #     outputs.npb.max_npb_throughput)*90%`，deepflow-agent 恢复流量分发。
       #
       #     注意：
@@ -496,7 +496,7 @@ global:
     #   en: |-
     #     When the clock drift exceeds this value, the timestamp will be corrected.
     #   ch: |-
-    #     当 deepflow-agent 与 deepflow-server 之间的时间偏移大于`min_drift`设置值时，对 agent 的
+    #     当 deepflow-agent 与 deepflow-server 之间的时间偏移大于 `min_drift` 设置值时，对 agent 的
     #     时间戳进行纠正。
     # upgrade_from: static_config.ntp-min-interval
     min_drift: 10s
@@ -655,7 +655,7 @@ global:
     #     set an additional NAT IP for each deepflow-server address, and modify this
     #     value to true.
     #   ch: |-
-    #     在未设置`global.communication.controller_ip`的情况下，打开`nat_ip_enabled`控制开关后
+    #     在未设置 `global.communication.controller_ip` 的情况下，打开 `nat_ip_enabled` 控制开关后
     #     deepflow-server 将向 deepflow-agent 下发自己的 NAT IP 作为 server 端控制面、数据面
     #     通信 IP。
     # upgrade_from: nat_ip_enabled
@@ -1222,18 +1222,16 @@ inputs:
     #     ```
     #   ch: |-
     #     1. deepflow-agent 会遍历序列中的所有进程匹配器，并且在序列中靠前的匹配器优先生效。
-    #     2. 当`match_type`选择`parent_process_name`时，会自动递归匹配父进程名，并且忽略`rewrite_name`字段。
-    #     3. `rewrite_name`可以使用`regexp capture group`和 Windows 格式的环境变量名，比如 `$1-py-script-%HOSTNAME%`
-    #     将被替代为`regexp capture group` 1 和 HOSTNAME 环境变量。
+    #     2. 当 `match_type` 选择 `parent_process_name` 时，会自动递归匹配父进程名，并且忽略 `rewrite_name` 字段。
+    #     3. `rewrite_name` 可以使用正则捕获组和 Windows 格式的环境变量名，比如 `$1-py-script-%HOSTNAME%`
+    #     将被替代为 1 号正则捕获组和 HOSTNAME 环境变量。
     #     4. 如果未匹配序列中的任何一条正则表达式，进程将被接受。
     #
-    #     TODO: `regexp capture group`的含义待解释。
-    #
     #     配置项:
-    #     - match_regex: 匹配进程所用的正则表达式，默认值为`.*`表示匹配所有进程
-    #     - match_type: 匹配进程所用的字段，默认值为`process_name`，可选项包括[process_name, cmdline, parent_process_name, tag]
-    #     - ignore: 是否忽略所匹配到的进程，默认值为`false`
-    #     - rewrite_name: 进程名正则替换表达式，默认值为`""`表示不做任何替换
+    #     - match_regex: 匹配进程所用的正则表达式，默认值为 `.*` 表示匹配所有进程
+    #     - match_type: 匹配进程所用的字段，默认值为 `process_name`，可选项包括 [process_name, cmdline, parent_process_name, tag]
+    #     - ignore: 是否忽略所匹配到的进程，默认值为 `false`
+    #     - rewrite_name: 进程名正则替换表达式，默认值为 `""` 表示不做任何替换
     #
     #     配置举例:
     #     ```yaml
@@ -1278,7 +1276,7 @@ inputs:
     #   en: |-
     #     The regex of matcher.
     #   ch: |-
-    #     匹配进程所用的正则表达式，默认值为`.*`表示匹配所有进程。
+    #     匹配进程所用的正则表达式，默认值为 `.*` 表示匹配所有进程。
     # upgrade_from: static_config.os-proc-regex.match-regex
     # ---
     # match_regex: ""
@@ -1296,7 +1294,7 @@ inputs:
     #   en: |-
     #     The type of matcher.
     #   ch: |-
-    #     匹配进程所用的字段，默认值为`process_name`，可选项包括[process_name, cmdline, parent_process_name, tag]
+    #     匹配进程所用的字段，默认值为 `process_name`，可选项包括 [process_name, cmdline, parent_process_name, tag]
     # upgrade_from: static_config.os-proc-regex.match-regex
     # ---
     # match_type: ""
@@ -1314,7 +1312,7 @@ inputs:
     #   en: |-
     #     Default value `[]` match all languages.
     #   ch: |-
-    #     默认值为`[]`表示匹配所有开发语言。
+    #     默认值为 `[]` 表示匹配所有开发语言。
     # TODO: 6.6 新增
     # ---
     # match_languages: []
@@ -1332,7 +1330,7 @@ inputs:
     #   en: |-
     #     Default value `[]` match all usernames.
     #   ch: |-
-    #     默认账户为`[]`表示匹配所有用户名。
+    #     默认账户为 `[]` 表示匹配所有用户名。
     # TODO: 6.6 新增
     # ---
     # match_usernames: []
@@ -1350,7 +1348,7 @@ inputs:
     #   en: |-
     #     Default value true means only match processes in container.
     #   ch: |-
-    #     默认值为`ture`，表示仅匹配容器内的进程。
+    #     默认值为 `ture`，表示仅匹配容器内的进程。
     # TODO: 6.6 新增
     # ---
     # only_in_container: true
@@ -1368,7 +1366,7 @@ inputs:
     #   en: |-
     #     Default value false means match processes with or without tags.
     #   ch: |-
-    #     默认值为`false`，表示匹配含 Tag 或 不含 Tag 的所有进程。
+    #     默认值为 `false`，表示匹配含 Tag 或 不含 Tag 的所有进程。
     # upgrade_from: static_config.os-proc-sync-tagged-only
     # TODO: 放到内层来来了
     # ---
@@ -1387,7 +1385,7 @@ inputs:
     #   en: |-
     #     Whether to ingore matched processes.
     #   ch: |-
-    #     是否忽略所匹配到的进程，默认值为`false`。
+    #     是否忽略所匹配到的进程，默认值为 `false`。
     # upgrade_from: static_config.os-proc-regex.action
     # TODO: 注意类型变成了 bool
     # ---
@@ -1702,7 +1700,7 @@ inputs:
       #           - slave_interfaces: [eth2, eth3]
       #     ```
       #   ch: |-
-      #     同一个组内的多个网络接口的数据包将被聚合处理。注：该参数仅在`capture_mode`为`0`时生效。
+      #     同一个组内的多个网络接口的数据包将被聚合处理。注：该参数仅在 `capture_mode = 0` 时生效。
       #
       #     配置样例:
       #     ```yaml
@@ -1752,8 +1750,8 @@ inputs:
       #     Default value `""` means no extra network namespace (default namespace only).
       #   ch: |-
       #     除默认的网络 namespace 之外，deepflow-agent 还会根据此参数正则匹配额外的网络 namespace，
-      #     在匹配命中的网络 namespace 中根据`tap_interface_regex`正则匹配网络接口并采集流量。默认
-      #     配置`""`表示仅采集默认网络 namesapce，不采集额外的网络 namespace 流量。
+      #     在匹配命中的网络 namespace 中根据 `tap_interface_regex` 正则匹配网络接口并采集流量。默认
+      #     配置 `""` 表示仅采集默认网络 namesapce，不采集额外的网络 namespace 流量。
       # upgrade_from: extra_netns_regex
       extra_netns_regex: ""
       # type: string
@@ -1783,8 +1781,18 @@ inputs:
       #   en: VLAN PCP in Physical Mirror Traffic
       #   ch: 物理网络镜像流量中的 VLAN PCP
       # unit:
-      # range: [0, 8]
-      # enum_options: []
+      # range: [0, 9]
+      # enum_options:
+      #   - 0: PCP 0
+      #   - 1: PCP 1
+      #   - ...
+      #   - 7: PCP 7
+      #   - 8:
+      #     en: Ignore PCP and identify outer VLAN
+      #     ch: 忽略 PCP 并识别外层 VLAN
+      #   - 9:
+      #     en: Ignore PCP and identify inner VLAN
+      #     ch: 忽略 PCP 并识别内层 VLAN
       # modification: agent_restart
       # ee_feature: true
       # description:
@@ -1794,9 +1802,9 @@ inputs:
       #     calculate TAP value from inner vlan tag.
       #   ch: |-
       #     deepflow-agent 工作在`物理网络镜像`模式时：
-      #     - `mirror-traffic-pcp`小于或等于`7`，表示仅对流量中 VLAN PCP 值与`mirror-traffic-pcp`相等的数据包进行处理；
-      #     - `mirror-traffic-pcp`设置为`8`，表示通过数据包外层 VLAN 标签计算 TAP 值；
-      #     - `mirror-traffic-pcp`设置为`9`，表示通过数据包内层 VLAN 标签计算 TAP 值。
+      #     - `mirror-traffic-pcp` 小于或等于 `7`，表示仅对流量中 VLAN PCP 值与 `mirror-traffic-pcp` 相等的数据包进行处理；
+      #     - `mirror-traffic-pcp` 设置为 `8`，表示不校验 VLAN PCP 值，并通过数据包外层 VLAN 标签计算 TAP 值；
+      #     - `mirror-traffic-pcp` 设置为 `9`，表示不校验 VLAN PCP 值，并通过数据包内层 VLAN 标签计算 TAP 值。
       # upgrade_from: static_config.mirror-traffic-pcp
       vlan_pcp_in_physical_mirror_traffic: 0
       # type: bool
@@ -1862,7 +1870,7 @@ inputs:
         #     When capture_mode != 2, you need to explicitly turn on this switch to
         #     configure 'afpacket-blocks'.
         #   ch: |-
-        #     deepflow-agent 工作在`本地流量`和`虚拟网络镜像`模式时，如果需要配置`afpacket-blocks`参数，需首先开启此开关。
+        #     deepflow-agent 工作在`本地流量`和`虚拟网络镜像`模式时，如果需要配置 `afpacket-blocks` 参数，需首先开启此开关。
         # upgrade_from: static_config.afpacket-blocks-enabled
         ring_blocks_enabled: false
         # type: int
@@ -1904,10 +1912,10 @@ inputs:
         #     Attention: only valid for `traffic_capture_mode` = Local
         #   ch: |-
         #     数据包 Fanout 的路数大于 1 时，deepflow-agent 将开启多个 dispatcher 线程，并把数据包分散到多个处理
-        #     线程并行处理，以优化应用的的性能。增加`packet_fanout_count`可以降低多核服务器的操作系统软中断数量，但
+        #     线程并行处理，以优化应用的的性能。增加 `packet_fanout_count` 可以降低多核服务器的操作系统软中断数量，但
         #     会消耗更多的 CPU 和内存。
         #
-        #     注意：参数仅在`capture_mode`为 `0`，且`extra_netns_regex`为空时有效。
+        #     注意：参数仅在 `capture_mode = 0`，且 `extra_netns_regex` 为空时有效。
         # upgrade_from: static_config.local-dispatcher-count
         # TODO: 【待确定】另外以前没有最大值，现在加上了 64 的限制
         packet_fanout_count: 1
@@ -2025,7 +2033,7 @@ inputs:
         #     In general, sFlow uses port 6343. Default value `[]` means that no sFlow
         #     data will be collected.
         #   ch: |-
-        #     配置 sFlow 的接收端口号，默认值`[]`表示不采集 sFlow 数据。通常 sFlow 使用 6343 端口。
+        #     配置 sFlow 的接收端口号，默认值 `[]` 表示不采集 sFlow 数据。通常 sFlow 使用 6343 端口。
         #     注意，该特性仅对企业版的 Trident 有效。
         # upgrade_from: static_config.xflow-collector.sflow-ports
         sflow_ports: []
@@ -2044,7 +2052,7 @@ inputs:
         #     Additionally, only NetFlow v5 is currently supported. In general, NetFlow
         #     uses port 2055. Default value `[]` means that no NetFlow data will be collected.
         #   ch: |-
-        #     配置 NetFlow 的接收端口号，默认值`[]`表示不采集 NetFlow 数据。通常 sFlow 使用 2055 端口。
+        #     配置 NetFlow 的接收端口号，默认值 `[]` 表示不采集 NetFlow 数据。通常 sFlow 使用 2055 端口。
         #     注意，该特性仅对企业版的 Trident 有效，且目前仅支持 NetFlow v5 协议。
         # upgrade_from: static_config.xflow-collector.netflow-ports
         netflow_ports: []
@@ -2215,13 +2223,13 @@ inputs:
       #     deepflow-agent will mark the TAP (Traffic Access Point) location
       #     according to the outer vlan tag in the mirrored traffic of the physical
       #     switch. When the vlan tag has no corresponding TAP value, or the vlan
-      #     pcp does not match the 'mirror-traffic-pcp', it will assign the TAP value.
+      #     pcp does not match the `mirror-traffic-pcp`, it will assign the TAP value.
       #     This configuration item. Default value `3` means Cloud Network.
       #   ch: |-
       #     在`物理网络镜像`模式下，deepflow-agent 通过镜像流量的外层 VLAN 标签识别并标记采集数据的
       #     TAP(Traffic Access Point)值。当流量外层 VLAN 标签没有对应的 TAP 值，或 VLAN pcp 值与
-      #     'vlan_pcp_in_physical_mirror_traffic'的配置不一致时，deepflow-agent 使用本参数值
-      #     标记数据的 TAP 值。默认值为`3`，表示`云网络`。
+      #     `vlan_pcp_in_physical_mirror_traffic` 的配置不一致时，deepflow-agent 使用本参数值
+      #     标记数据的 TAP 值。默认值为 `3`，表示`云网络`。
       # upgrade_from: static_config.default-tap-type
       # TODO: 候选项特殊，需要改写
       default_capture_network_type: 3
@@ -2486,7 +2494,7 @@ inputs:
         #     由于 eBPF socket 事件是以批处理的方式向用户态空间发送数据，同一个应用调用的请求、响应由不同 CPU 处理时，可能
         #     会出现请求、响应乱序的情况，开启 Syscall 数据乱序重排特性后，每个 TCP/UDP 流会缓存一定数量的 eBPF socket
         #     事件，以修正乱序数据对应用调用解析的影响。该参数设置了每个 TCP/UDP 流可以缓存的 eBPF socket 事件数量上限（每
-        #     条事件数据占用的字节数上限受`l7_log_packet_size`控制）。在 Syscall 数据乱序较严重导致应用调用采集不全的环境
+        #     条事件数据占用的字节数上限受 `l7_log_packet_size` 控制）。在 Syscall 数据乱序较严重导致应用调用采集不全的环境
         #     中，可适当调大该参数。
         # upgrade_from: static_config.ebpf.syscall-out-of-order-cache-size
         out_of_order_reassembly_cache_size: 16
@@ -2513,7 +2521,7 @@ inputs:
         #     Attention: use `HTTP2` for `gRPC` Protocol.
         #   ch: |-
         #     配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
-        #     需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+        #     需关注 agent 内存用量；（2）如需对 `gRPC` 协议乱序重排，请配置 `HTTP2` 协议。
         # upgrade_from: static_config.ebpf.syscall-out-of-order-reassembly
         out_of_order_reassembly_protocols: []
         # type: string
@@ -2540,8 +2548,8 @@ inputs:
         #     Attention: use `HTTP2` for `gRPC` Protocol.
         #   ch: |-
         #     配置后 deepflow-agent 将对指定应用协议的处理增加分片重组过程，将多个 Syscall 的内容分片重组后再进行
-        #     协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是`syscall-out-of-order-reassembly`
-        #     开启并生效；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+        #     协议解析，以增强应用协议的采集成功率。注意：（1）该特性的生效的前提条件是 `syscall-out-of-order-reassembly`
+        #     开启并生效；（2）如需对 `gRPC` 协议乱序重排，请配置 `HTTP2` 协议。
         # upgrade_from: static_config.ebpf.syscall-segmentation-reassembly
         segmentation_reassembly_protocols: []
     # type: section
@@ -3028,20 +3036,24 @@ inputs:
       #     The MAC address mapping relationship of TAP NIC in complex environment can be
       #     constructed by writing a script. The following conditions must be met to use this
       #     script:
-      #     1. if_mac_source = 2
-      #     2. tap_mode = 0
+      #     1. `inputs.resources.private_cloud.vm_mac_source` = 2
+      #     2. `inputs.cbpf.common.capture_mode` = 0
       #     3. The name of the TAP NIC is the same as in the virtual machine XML file
       #     4. The format of the script output is as follows:
+      #        ```
       #        - tap2d283dfe,11:22:33:44:55:66
       #        - tap2d283223,aa:bb:cc:dd:ee:ff
+      #        ```
       #   ch: |-
       #     在复杂的环境中，虚拟机的 MAC 地址与 TAP NIC 之间的关系可以用脚本构建，但必须满足如下条件：
-      #     1. if_mac_source = 2
-      #     2. tap_mode = 0
+      #     1. `inputs.resources.private_cloud.vm_mac_source` = 2
+      #     2. `inputs.cbpf.common.capture_mode` = 0
       #     3. TAP NIC 名称与虚拟机 XML 文件中的名称一致
-      #     4. 脚本需满足如下格式:
+      #     4. 脚本的输出内容需满足如下格式：
+      #        ```
       #        - tap2d283dfe,11:22:33:44:55:66
       #        - tap2d283223,aa:bb:cc:dd:ee:ff
+      #        ```
       # upgrade_from: static_config.tap-mac-script
       # TODO: 增加了最小、最大长度
       vm_mac_mapping_script: ""
@@ -3134,7 +3146,7 @@ inputs:
       #   ch: |-
       #     配置 deepflow-agent 需要 watch 的 kubernetes 资源列表。
       #
-      #     如果需要停止 watch 某个资源，可在列表中添加一条记录并设置`disabled: true`：
+      #     如果需要停止 watch 某个资源，可在列表中添加一条记录并设置 `disabled: true`：
       #     ```yaml
       #     inputs:
       #       resources:
@@ -3145,7 +3157,7 @@ inputs:
       #     ```
       #
       #     如果需要 watch 某个资源，可在列表中添加一条记录，但该配置会导致同类资源的默认 watch 失效。
-      #     比如，同时 watch 两个`statefulsets`类型的资源时(假设为`apps`和`apps.kruise.io`)，需要显式添加两条记录：
+      #     比如，同时 watch 两个 `statefulsets` 类型的资源时(假设为 `apps` 和 `apps.kruise.io`)，需要显式添加两条记录：
       #     ```yaml
       #     inputs:
       #       resources:
@@ -3158,7 +3170,7 @@ inputs:
       #             version: v1beta1
       #     ```
       #
-      #     如果需要在 openshift 环境 watch `routes`资源，可添加如下配置：
+      #     如果需要在 openshift 环境 watch `routes` 资源，可添加如下配置：
       #     ```yaml
       #     inputs:
       #       resources:
@@ -3290,7 +3302,7 @@ inputs:
       #   en: |-
       #     Used when limit k8s api list entry size.
       #   ch: |-
-      #     用于控制 deepflow-agent 向 K8s API list 资源时单次列表的长度。
+      #     用于控制 deepflow-agent 向 K8s API list 资源时单次返回的列表长度。
       # upgrade_from: static_config.kubernetes-api-list-limit
       api_list_page_size: 1000
       # type: duration
@@ -3367,7 +3379,7 @@ inputs:
       #     在运行过程中 deepflow-agent 周期性从 deepflow-server 获取 IP、MAC 列表，用于
       #     向采集的观测数据注入标签。该参数可以控制向 deepflow-agent 发送的 IP、MAC 数据范围，
       #     以减少下发的数据量，当业务系统中不存在跨云平台的服务访问时，可以配置仅向 deepflow-agent
-      #     下发本云平台的数据。参数的默认值为`0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
+      #     下发本云平台的数据。参数的默认值为 `0`，表示获取所有云平台的数据；也可以设置 lcuuid 列表，
       #     仅获取部分云平台的数据。
       # upgrade_from: domains
       # TODO: 特殊字段，候选项需要通过自己的 API 获取。这个字段是 int 还是 string？默认值为空数组更合理？
@@ -3636,7 +3648,7 @@ processors:
       #     When set to 0, deepflow-agent will automatically adjust the map size
       #     according to max_memory.
       #   ch: |-
-      #     设置为`0`时，deepflow-agent 根据`max_memory`参数自动调整 Fast-path 字典大小。
+      #     设置为 `0` 时，deepflow-agent 根据 `max_memory` 参数自动调整 Fast-path 字典大小。
       # upgrade_from: static_config.fast-path-map-size
       # TODO: 需要确认允许的范围
       fast_path_map_size: 0
@@ -3653,7 +3665,7 @@ processors:
       #   en: |-
       #     When set to true, deepflow-agent will not use fast path.
       #   ch: |-
-      #     设置为`true`时，deepflow-agent 不启用 fast path。
+      #     设置为 `true` 时，deepflow-agent 不启用 fast path。
       # upgrade_from: static_config.fast-path-disabled
       fast_path_disabled: false
       # type: int
@@ -3777,7 +3789,7 @@ processors:
       #     | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
       #         7     6     5              4             3         2        1          0
       #     ```
-      #     flag 设置为`0`表示全部关闭，设置为`255`表示全部
+      #     flag 设置为 `0` 表示全部关闭，设置为 `255` 表示全部
       # upgrade_from: static_config.packet-sequence-flag
       header_fields_flag: 0b0000_0000
     # type: section
@@ -3818,7 +3830,7 @@ processors:
       #   en: |-
       #     Buffer flushes when one of the flows reach this limit.
       #   ch: |-
-      #     Pcap 数据每个 Flow 的缓冲区大小。当某个 Flow 的缓冲区数据填满后，会对缓冲区刷新。
+      #     Pcap 数据每个 Flow 的缓冲区大小。当某个 Flow 的缓冲区数据填满后，会将该缓冲区输出。
       # upgrade_from: static_config.pcap.flow-buffer-size
       # TODO: 增加了最小、最大值
       buffer_size_per_flow: 65536
@@ -3925,7 +3937,7 @@ processors:
       #     try (incurring significant computational overhead) until the duration exceeds
       #     l7-protocol-inference-ttl.
       #   ch: |-
-      #     deepflow-agent 会周期性标记每一个`<vpc, ip, protocol, port>`四元组承载的应用协议类型，以加速
+      #     deepflow-agent 会周期性标记每一个 `<vpc, ip, protocol, port>` 四元组承载的应用协议类型，以加速
       #     后续数据的应用协议处理过程。如果一个时间周期内，连续多次尝试解析 Packet 数据、Socket 数据仍无法推断
       #     出该四元组承载的应用协议，agent 会将该四元组标记为 unknown 类型，并在此周期内暂停对后续数据的应用
       #     协议解析，以避免更多的无效运算。该参数控制每个时间周期内的应用协议解析重试次数。
@@ -3948,7 +3960,7 @@ processors:
       #     changes, the validity period after successfully identifying the protocol will be
       #     limited to this value.
       #   ch: |-
-      #     deepflow-agent 会周期性标记每一个`<vpc, ip, protocol, port>`四元组承载的应用协议类型，以加速
+      #     deepflow-agent 会周期性标记每一个 `<vpc, ip, protocol, port>` 四元组承载的应用协议类型，以加速
       #     后续数据的应用协议处理过程。为避免误判，应用协议类型的标记结果会周期性更新。该参数控制应用协议的更
       #     新周期。
       # upgrade_from: static_config.l7-protocol-inference-ttl
@@ -4091,9 +4103,8 @@ processors:
       #     配置样例: `80,1000-2000`
       #
       #     注意：
-      #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 生效，对 Uprobe 无效；
-      #     2. 所有 Uprobe 数据的采集不受端口限制；
-      #     3. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
+      #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 生效，对 Uprobe 不生效（所有 Uprobe 数据的采集不受端口限制）；
+      #     2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
       # upgrade_from: static_config.l7-protocol-ports
       # TODO: 格式改成和 l7-log-blacklist 一样，不用 dict 了，这样 key 更明确，且默认值的行为更明确。
       # TODO: 确认一下 SofaRPC 的拼写
@@ -4326,10 +4337,10 @@ processors:
       #     `response_status` in the l7_flow_log is forcibly set to `Success`.
       #   ch: |-
       #     配置该参数后，当系统中 DNS 响应异常为 `Non-Existent Domain`，且响应结果中的后缀与参数中的字段
-      #     匹配时， deepflow-agent 会将 DNS 响应码置为`0`，响应状态置为`正常`。
+      #     匹配时， deepflow-agent 会将 DNS 响应码置为 `0`，响应状态置为`正常`。
       #     该特性用于忽略特定的 `Non-Existent Domain` 类型的 DNS 响应，比如 K8s Pod 解析外部域名时，会将
       #     待解析域名与 cluster 内的域名后缀做拼接并多次尝试解析，因而会产生多次的 `Non-Existent Domain`
-      #     的响应结果并干扰对调用的统计分析，此时可以将需要忽略的`response_result`的后缀列入配置中，强制将这些应用调用的
+      #     的响应结果并干扰对调用的统计分析，此时可以将需要忽略的 `response_result` 的后缀列入配置中，强制将这些应用调用的
       #     响应状态强制置为`正常`。
       # upgrade_from: static_config.l7-protocol-advanced-features.unconcerned-dns-nxdomain-response-suffixes
       unconcerned_dns_nxdomain_response_suffixes: []
@@ -4421,7 +4432,7 @@ processors:
         #     such as X-Forwarded-For, etc. Leave it empty to disable this feature.
         #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
-        #     的结果填充到应用调用日志的`http_proxy_client`字段中，作为调用链追踪的特征值。
+        #     的结果填充到应用调用日志的 `http_proxy_client` 字段中，作为调用链追踪的特征值。
         # upgrade_from: http_log_proxy_client
         # TODO: 支持数组吗？应该要支持。
         http_real_client: X_Forwarded_For
@@ -4440,7 +4451,7 @@ processors:
         #     it to empty.
         #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP header 中匹配特征字段，并将匹配到
-        #     的结果填充到应用调用日志的`x_request_id`字段中，作为调用链追踪的特征值。
+        #     的结果填充到应用调用日志的 `x_request_id` 字段中，作为调用链追踪的特征值。
         # upgrade_from: http_log_x_request_id
         # TODO: 支持数组吗？应该要支持。
         x_request_id: X_Request_ID
@@ -4458,8 +4469,8 @@ processors:
         #     setting it to empty.
         #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP 和 RPC header 中匹配特征字段，并将匹配到
-        #     的结果填充到应用调用日志的`trace_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
-        #     特征字段，中间用`,`分隔。
+        #     的结果填充到应用调用日志的 `trace_id` 字段中，作为调用链追踪的特征值。参数支持填写多个不同的
+        #     特征字段，中间用 `,` 分隔。
         # upgrade_from: http_log_trace_id
         # TODO: 以前是一个字符串，支持逗号分割填写多个值，现在变成一个数组
         apm_trace_id: [traceparent, sw8]
@@ -4477,8 +4488,8 @@ processors:
         #     setting it to empty.
          #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP 和 RPC header 中匹配特征字段，并将匹配到
-        #     的结果填充到应用调用日志的`span_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
-        #     特征字段，中间用`,`分隔。
+        #     的结果填充到应用调用日志的 `span_id` 字段中，作为调用链追踪的特征值。参数支持填写多个不同的
+        #     特征字段，中间用 `,` 分隔。
         # upgrade_from: http_log_span_id
         # TODO: 以前是一个字符串，支持逗号分割填写多个值，现在变成一个数组
         apm_span_id: [traceparent, sw8]
@@ -4501,7 +4512,7 @@ processors:
         #   en: |-
         #     HTTP endpoint extration is enabled by default.
         #   ch: |-
-        #     默认值为`false`，表示开启 HTTP 协议的 endpoint 提取功能；设置为`true`时，表示关闭该功能。
+        #     默认值为 `false` ，表示开启 HTTP 协议的 endpoint 提取功能；设置为 `true` 时，表示关闭该功能。
         # upgrade_from: static_config.l7-protocol-advanced-features.http-endpoint-extraction.disabled
         extraction_disabled: false
         # type: dict
@@ -4609,7 +4620,7 @@ processors:
       #             - field-name: "cookie"
       #     ```
       #
-      #     注意：如需配置`gRPC`协议，使用`HTTP2`匹配。
+      #     注意：如需配置 `gRPC` 协议，使用 `HTTP2` 匹配。
       # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields
       # TODO: http 和 http2 的大小写调整了一下。
       custom_fields:
@@ -4652,7 +4663,7 @@ processors:
         #             - field-name: "cookie"
         #     ```
         #
-        #     注意：如需配置`gRPC`协议，使用`HTTP2`匹配。
+        #     注意：如需配置 `gRPC` 协议，使用 `HTTP2` 匹配。
         # upgrade_from: static_config.l7-protocol-advanced-features.extra-log-fields.$protocol
         # ---
         # type: string
@@ -4757,9 +4768,9 @@ processors:
       #     （基于 LRU 策略），驱逐的数据不会被丢弃，而是直接作为单向的调用日志发往 deepflow-server。
       #
       #     可根据 deepflow-agent 的如下监测指标对参数进行调整：
-      #     - `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource`用于统计当前
+      #     - `deepflow_system.deepflow_agent_l7_session_aggr.cached-request-resource` 用于统计当前
       #       单向 l7_flow_log 中 request_resource 字段的内存占用量（单位：bytes）。
-      #     - `deepflow_system.deepflow_agent_l7_session_aggr.over-limit`用于统计由于达到 LRU 缓存
+      #     - `deepflow_system.deepflow_agent_l7_session_aggr.over-limit` 用于统计由于达到 LRU 缓存
       #       数量上限而触发的单向 l7_flow_log 驱逐的次数。
       # upgrade_from: static_config.l7-log-session-slot-capacity
       # TODO: 增加了最大值
@@ -4908,12 +4919,13 @@ processors:
         # description:
         #   en: |-
         #     For Cloud traffic, only the MAC address corresponding to the side with
-        #     L2End = true is matched when generating the flow. Set this value to true to
+        #     L2End = true is matched when generating the flow. Set this value to `false` to
         #     force a double-sided MAC address match and only aggregate traffic with
         #     exactly equal MAC addresses.
         #   ch: |-
         #     deepflow-agent 对云网络的数据包进行处理过程中，只有 MAC 地址与两端匹配的数据包才能正确聚合流。
-        #     将参数设置为 true，将强制比对双端的 MAC 地址，只有双端 MAC 均匹配的数据包才可以聚合为流。
+        #     将参数设置为 `false` 表示强制比对双端的 MAC 地址，只有双端 MAC 均匹配的数据包才可以聚合为流；设置
+        #     为 `true` 表示忽略 MAC 地址校验。
         #     TODO: 待二次确认。
         # upgrade_from: static_config.flow.ignore-l2-end
         # TODO: 待理解
@@ -4934,7 +4946,7 @@ processors:
         #     set this value at this time. Only valid for IDC (not Cloud) traffic.
         #   ch: |-
         #     如果同一位置的双方向数据包的 VLAN 不一致，数据包将无法聚合为同一条流，此时可以将该参数
-        #     设置为`true`，deepflow-agent 在流聚合时将忽略 VLAN。该参数对 IDC 网络生效，对云网络不生效。
+        #     设置为 `true`，deepflow-agent 在流聚合时将忽略 VLAN。该参数对 IDC 网络生效，对云网络不生效。
         # upgrade_from: static_config.flow.ignore-idc-vlan
         # TODO: 命名对吗？所有镜像流量都适用？
         idc_traffic_ignore_vlan: false
@@ -4955,7 +4967,7 @@ processors:
         #   en: |-
         #     Timeouts for TCP State Machine - Established.
         #   ch: |-
-        #     TCP 状态机超时时长——Established
+        #     TCP 状态机超时时长 —— Established
         # upgrade_from: static_config.flow.established-timeout
         # TODO: 增加了最小、最大值。描述信息要修改
         established: 300s
@@ -4970,7 +4982,7 @@ processors:
         #   en: |-
         #     Timeouts for TCP State Machine - Closing Reset.
         #   ch: |-
-        #     TCP 状态机超时时长——Closing Reset
+        #     TCP 状态机超时时长 —— Closing Reset
         # upgrade_from: static_config.flow.closing-rst-timeout
         # TODO: 增加了最小、最大值。描述信息要修改
         closing_rst: 35s
@@ -4985,7 +4997,7 @@ processors:
         #   en: |-
         #     Timeouts for TCP State Machine - Opening Reset.
         #   ch: |-
-        #     TCP 状态机超时时长——Opening Reset
+        #     TCP 状态机超时时长 —— Opening Reset
         # upgrade_from: static_config.flow.opening-rst-timeout
         # TODO: 增加了最小、最大值。描述信息要修改
         opening_rst: 1s
@@ -5000,7 +5012,7 @@ processors:
         #   en: |-
         #     Timeouts for TCP State Machine - Others.
         #   ch: |-
-        #     TCP 状态机超时时长——Others
+        #     TCP 状态机超时时长 —— Others
         # upgrade_from: static_config.flow.others-timeout
         # TODO: 增加了最小、最大值。描述信息要修改
         others: 5s
@@ -5044,8 +5056,8 @@ processors:
       #     the RRT cache, Example: `rrt-cache-capacity` = `flow-count-limit`. When `rrt-cache-capacity`
       #     is not enough, it will be unable to calculate the rrt of l7.
       #   ch: |-
-      #     可同时处理的 Flow 数量上限，该参数同样影响 RRT 缓存，即`rrt-cache-capacity` = `flow-count-limit`。
-      #     当`rrt-cache-capacity`数值过小，会影响应用调用日志的 RRT 计算。
+      #     可同时处理的 Flow 数量上限，该参数同样影响 RRT 缓存，即 `rrt-cache-capacity` = `flow-count-limit`。
+      #     当 `rrt-cache-capacity` 数值过小，会影响应用调用日志的 RRT 计算。
       # upgrade_from: static_config.flow.flow-count-limit
       # TODO: 增加了最小、最大值
       concurrent_flow_limit: 65535
@@ -5373,7 +5385,7 @@ outputs:
       #     the Enterprise Edition. Default value `[]` means store everything.
       #   ch: |-
       #     配置该参数后，deepflow-agent将不采集列表中观测点的流日志（同时 TCP 时序数据、Pcap 数据
-      #     的采集也将被忽略）。默认值`[]`表示所有观测点均采集。
+      #     的采集也将被忽略）。默认值 `[]` 表示所有观测点均采集。
       # upgrade_from: l4_log_ignore_tap_sides
       l4_ignored_observation_points: []
       # type: int
@@ -5432,7 +5444,7 @@ outputs:
       #     Use the value of tap_side to control which l7_flow_log should be ignored for
       #     collection.
       #   ch: |-
-      #     配置该参数后，deepflow-agent将不采集列表中观测点的应用调用日志。默认值`[]`表示所有观测点均采集。
+      #     配置该参数后，deepflow-agent将不采集列表中观测点的应用调用日志。默认值 `[]` 表示所有观测点均采集。
       # upgrade_from: l7_log_ignore_tap_sides
       l7_ignored_observation_points: []
     # type: section
@@ -5566,10 +5578,10 @@ outputs:
       #     When enabled, deepflow-agent will not generate detailed metrics for each
       #     inactive port (ports that only receive data, not send data), and the data of
       #     all inactive ports will be aggregated into the metrics with a tag
-      #     'server_port = 0'.
+      #     `server_port = 0`.
       #   ch: |-
-      #     开启功能后 deepflow-agent 将对非活跃的端口（仅有正向数据，没有反向数据）的指标数据采集
-      #     做聚合处理，所有非活跃端口的数据聚合生成一条'server_port = 0'的指标，而不再生成每个
+      #     开启功能后 deepflow-agent 将对非活跃的端口（仅接收数据，不发送数据）的指标数据采集
+      #     做聚合处理，所有非活跃端口的数据聚合生成一条 `server_port = 0` 的指标，而不再生成每个
       #     server_port 单独的指标。
       # upgrade_from: inactive_server_port_enabled
       # TODO: 原来是 int，需要改为 bool
@@ -5714,7 +5726,7 @@ outputs:
     #   ch: |-
     #     NPB 分发时的 UDP 传输的 MTU 值。
     #
-    #     注意：当 UDP 报文长度接近 1500 字节后，云平台可能会修改数据包的尾部数据，因此建议`max_mtu`的值略小于 1500。
+    #     注意：当 UDP 报文长度接近 1500 字节时，个别公有云可能会修改数据包的尾部数据，因此建议 `max_mtu` 的值略小于 1500。
     # upgrade_from: mtu
     max_mtu: 1500
     # type: int
@@ -5731,7 +5743,7 @@ outputs:
     #     When using RAW_UDP Socket to transmit UDP data, this value can be used to
     #     set the VLAN tag. Default value `0` means no VLAN tag.
     #   ch: |-
-    #     当使用 RAW_UDP Socket 发送 NPB 数据时，通过该参数设置数据包 VLAN 标签。默认值为`0`，表示
+    #     当使用 RAW_UDP Socket 发送 NPB 数据时，通过该参数设置数据包 VLAN 标签。默认值为 `0`，表示
     #     不使用 VLAN 标签。
     # upgrade_from: output_vlan
     raw_udp_vlan_tag: 0
@@ -5755,8 +5767,8 @@ outputs:
     #     set, deepflow-agent will insert a VLAN Tag into the NPB traffic header, and
     #     the value is the lower 12 bits of TunnelID in the VXLAN header.
     #   ch: |-
-    #     设置 NPB 分发数据的 VLAN 模式。`0`表示不加 VLAN；`1`表示添加 802.1Q header；
-    #     `2`表示添加 QinQ。
+    #     设置 NPB 分发数据的 VLAN 模式。`0` 表示不加 VLAN；`1` 表示添加 802.1Q header；
+    #     `2` 表示添加 QinQ。
     # upgrade_from: npb_vlan_mode
     extra_vlan_header: 0
     # type: bool
