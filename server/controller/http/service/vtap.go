@@ -372,7 +372,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	return response[0], nil
 }
 
-func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (resp map[string][]string, err error) {
+func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (map[string][]string, error) {
 	var description string
 	var succeedLcuuids []string
 	var failedLcuuids []string
@@ -380,12 +380,12 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (resp map[string
 	var isNoPermission bool
 	for _, vtapUpdate := range updateMap {
 		if lcuuid, ok := vtapUpdate["LCUUID"].(string); ok {
-			_, _err := a.Update(lcuuid, "", vtapUpdate)
+			_, err := a.Update(lcuuid, "", vtapUpdate)
 			if errors.Is(err, httpcommon.ERR_NO_PERMISSIONS) {
 				isNoPermission = true
 			}
-			if _err != nil {
-				description += strings.TrimPrefix(_err.Error(), httpcommon.NO_PERMISSIONS)
+			if err != nil {
+				description += strings.TrimPrefix(err.Error(), httpcommon.NO_PERMISSIONS)
 				failedLcuuids = append(failedLcuuids, lcuuid)
 			} else {
 				succeedLcuuids = append(succeedLcuuids, lcuuid)

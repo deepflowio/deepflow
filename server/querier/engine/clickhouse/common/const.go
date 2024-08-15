@@ -58,6 +58,6 @@ var SHOW_TAG_VALUE_MAP = map[string][]string{
 	"pod_map":         []string{"pod", "pod_cluster", "pod_ns", "pod_node", "pod_service", "pod_group"},
 	"chost_map":       []string{"chost", "host", "l3_epc", "chost_ip", "chost_hostname"},
 	"gprocess_map":    []string{"gprocess", "chost", "l3_epc"},
-	"pod_ingress_map": []string{"pod_cluster", "pod_ns"},
-	"pod_node_map":    []string{"pod_cluster"},
+	"pod_ingress_map": []string{"pod_cluster", "pod_ns", "pod_ingress"},
+	"pod_node_map":    []string{"pod_cluster", "pod_node"},
 }

@@ -186,16 +186,20 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 		return false
 	}
 	if len(ids) != 1 {
-		log.Error(r.Logf("request ids=%s err", ids))
+		log.Error(r.Logf("request ids=%v err", ids))
 		return false
 	}
 	dbVTap.ID = ids[0]
+	// Voucher mode turns on all features
+	if r.vTapInfo.config.BillingMethod == BILLING_METHOD_VOUCHER {
+		dbVTap.LicenseFunctions = VTAP_ALL_LICENSE_FUNCTIONS
+	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(dbVTap).Error; err != nil {
 			log.Errorf(r.Logf("insert agent(%s) to DB faild, err: %s", r, err))
 			errID := idmng.ReleaseIDs(r.GetORGID(), RESOURCE_TYPE_VTAP_EN, ids)
 			if errID != nil {
-				log.Error(r.Logf("Release ids=%s err: %s", ids, errID))
+				log.Error(r.Logf("Release ids=%v err: %s", ids, errID))
 			}
 			return err
 		}

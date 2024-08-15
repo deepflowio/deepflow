@@ -56,6 +56,7 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
 				ID:           podIngress.ID,
 				PodClusterID: podIngress.PodClusterID,
+				PodNsID:      podIngress.PodNamespaceID,
 				Name:         podIngress.Name + " (deleted)",
 				TeamID:       teamID,
 				DomainID:     tagrecorder.DomainToDomainID[podIngress.Domain],
@@ -65,6 +66,7 @@ func (p *ChPodIngress) generateNewData() (map[IDKey]mysql.ChPodIngress, bool) {
 			keyToItem[IDKey{ID: podIngress.ID}] = mysql.ChPodIngress{
 				ID:           podIngress.ID,
 				PodClusterID: podIngress.PodClusterID,
+				PodNsID:      podIngress.PodNamespaceID,
 				Name:         podIngress.Name,
 				TeamID:       teamID,
 				DomainID:     tagrecorder.DomainToDomainID[podIngress.Domain],

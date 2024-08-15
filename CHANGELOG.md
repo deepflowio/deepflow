@@ -8,6 +8,17 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Modify alert_event auto_service/auto_instance error and showtagv… [#7807](https://github.com/deepflowio/deepflow/pull/7807) by [Ericsssss](https://github.com/Ericsssss)
+* fix: turn off the call monitoring function and stop related functions [#7805](https://github.com/deepflowio/deepflow/pull/7805) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: agent enable feature permission [#7794](https://github.com/deepflowio/deepflow/pull/7794) by [roryye](https://github.com/roryye)
+* Revert "fix: refresh agent enable feature" [#7792](https://github.com/deepflowio/deepflow/pull/7792) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: refresh agent enable feature [#7790](https://github.com/deepflowio/deepflow/pull/7790) by [roryye](https://github.com/roryye)
+* fix: concurrent map read and map write [#7776](https://github.com/deepflowio/deepflow/pull/7776) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: recorder log fmt error [#7782](https://github.com/deepflowio/deepflow/pull/7782) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: Modify ch_table update time #26153 [#7777](https://github.com/deepflowio/deepflow/pull/7777) by [Ericsssss](https://github.com/Ericsssss)
+* fix: server allows empty values not to be overwritten as default values [#7775](https://github.com/deepflowio/deepflow/pull/7775) by [TomatoMr](https://github.com/TomatoMr)
+* fix: resolve show tag values filter error [#7774](https://github.com/deepflowio/deepflow/pull/7774) by [duandaa](https://github.com/duandaa)
+* fix: profileDebug assert error [#7760](https://github.com/deepflowio/deepflow/pull/7760) by [duandaa](https://github.com/duandaa)
 * fix: not found replicaset pod [#7762](https://github.com/deepflowio/deepflow/pull/7762) by [askyrie](https://github.com/askyrie)
 * fix: Modify alert_policy filter [#7757](https://github.com/deepflowio/deepflow/pull/7757) by [Ericsssss](https://github.com/Ericsssss)
 * fix: traffic.go log [#7738](https://github.com/deepflowio/deepflow/pull/7738) by [roryye](https://github.com/roryye)
@@ -119,6 +130,12 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add column in ck pod_node and pod_ingress [#7799](https://github.com/deepflowio/deepflow/pull/7799) by [duandaa](https://github.com/duandaa)
+* feat: Using libpcap without restarting when the network card does not… [#7780](https://github.com/deepflowio/deepflow/pull/7780) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: add endpoint-tcp-port-name configuration [#7778](https://github.com/deepflowio/deepflow/pull/7778) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: use dynamic library instead of libpcap static library [#7772](https://github.com/deepflowio/deepflow/pull/7772) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: increase billing function control capabilities [#7714](https://github.com/deepflowio/deepflow/pull/7714) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: agent license func operate [#7712](https://github.com/deepflowio/deepflow/pull/7712) by [roryye](https://github.com/roryye)
 * feat: support ByConity database [#7756](https://github.com/deepflowio/deepflow/pull/7756) by [lzf575](https://github.com/lzf575)
 * feat: querier support byconity [#7753](https://github.com/deepflowio/deepflow/pull/7753) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: mac displays the resources to which the agent belongs [#7765](https://github.com/deepflowio/deepflow/pull/7765) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -268,6 +285,9 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: add configuration structures [#7804](https://github.com/deepflowio/deepflow/pull/7804) by [yuanchaoa](https://github.com/yuanchaoa)
+* refactor: modify the default batch write size for metrics and flow logs [#7789](https://github.com/deepflowio/deepflow/pull/7789) by [lzf575](https://github.com/lzf575)
+* refactor: agent config [#7745](https://github.com/deepflowio/deepflow/pull/7745) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: define field value type using enum [#7686](https://github.com/deepflowio/deepflow/pull/7686) by [lzf575](https://github.com/lzf575)
 * refactor: polish agent config [#7342](https://github.com/deepflowio/deepflow/pull/7342) by [sharang](https://github.com/sharang)
 * refactor: update monitor, server log with org info [#7597](https://github.com/deepflowio/deepflow/pull/7597) by [roryye](https://github.com/roryye)
@@ -286,6 +306,7 @@
 * refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
+* perf: improve the performance of ClickHouse table changes under multiple organizations [#7788](https://github.com/deepflowio/deepflow/pull/7788) by [lzf575](https://github.com/lzf575)
 * perf: speed up the update of ClickHouse table structure [#7748](https://github.com/deepflowio/deepflow/pull/7748) by [lzf575](https://github.com/lzf575)
 * perf: speed up the update of ClickHouse table structure [#7746](https://github.com/deepflowio/deepflow/pull/7746) by [lzf575](https://github.com/lzf575)
 * perf: optimize trace_tree slice assignment [#7414](https://github.com/deepflowio/deepflow/pull/7414) by [lzf575](https://github.com/lzf575)

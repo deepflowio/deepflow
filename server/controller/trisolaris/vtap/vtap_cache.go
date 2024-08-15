@@ -436,12 +436,15 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 
 	if c.EnabledCallMonitoring() == false {
+		disabled := int(DISABLED)
 		if yamlConfig.Ebpf == nil {
 			yamlConfig.Ebpf = &agent_config.EbpfConfig{
-				Disabled: proto.Bool(true),
+				Disabled:           proto.Bool(true),
+				IOEventCollectMode: &disabled,
 			}
 		} else {
 			yamlConfig.Ebpf.Disabled = proto.Bool(true)
+			yamlConfig.Ebpf.IOEventCollectMode = &disabled
 		}
 	}
 
@@ -1061,9 +1064,7 @@ func (c *VTapCache) initVTapConfig() {
 			realConfig = *v.realDefaultConfig
 		}
 	}
-	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
-		c.modifyVTapConfigByLicense(&realConfig)
-	}
+	c.modifyVTapConfigByLicense(&realConfig)
 	realConfig.modifyConfig(v)
 	c.updateVTapConfig(&realConfig)
 }
@@ -1087,9 +1088,7 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 		}
 	}
 
-	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
-		c.modifyVTapConfigByLicense(&newConfig)
-	}
+	c.modifyVTapConfigByLicense(&newConfig)
 	newConfig.modifyConfig(v)
 	c.updateVTapConfig(&newConfig)
 }
@@ -1110,9 +1109,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *mysql.VTap) {
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State
 	c.enable = vtap.Enable
-	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
-		c.updateLicenseFunctions(vtap.LicenseFunctions)
-	}
+	c.updateLicenseFunctions(vtap.LicenseFunctions)
 	c.updateTapMode(vtap.TapMode)
 	c.updateTeamID(vtap.TeamID)
 	if c.vTapType != vtap.Type {

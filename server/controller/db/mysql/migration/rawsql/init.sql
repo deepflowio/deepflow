@@ -2233,6 +2233,7 @@ CREATE TABLE IF NOT EXISTS ch_pod_ingress (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
     pod_cluster_id          INTEGER,
+    pod_ns_id               INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
     sub_domain_id           INTEGER,

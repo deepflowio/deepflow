@@ -780,16 +780,33 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				filter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 			case "resource_gl0", "resource_gl1", "resource_gl2", "auto_instance", "auto_service":
 				if !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") && !strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
-					if strings.Contains(op, "match") {
-						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+					if strings.HasSuffix(noSuffixTag, "_id") {
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value)
+						}
 					} else {
-						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value, op, t.Value)
+						}
 					}
+
 				} else {
-					if strings.Contains(op, "match") {
-						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+					if strings.HasSuffix(noSuffixTag, "_id") {
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+						}
 					} else {
-						filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+						if strings.Contains(op, "match") {
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, t.Value, op, t.Value)
+						} else {
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
+						}
 					}
 				}
 			default:
@@ -801,7 +818,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		} else {
 			switch t.Tag {
-			case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1":
+			case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id":
 				if strings.Contains(op, "match") {
 					filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 				} else {
@@ -1148,7 +1165,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
+				Lock.Lock()
 				cacheFilter, ok := prometheusSubqueryCache.PrometheusSubqueryCache.Get(entryKey)
+				Lock.Unlock()
 				if ok {
 					filter = cacheFilter.Filter
 					timeout := cacheFilter.Time
@@ -1160,7 +1179,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.AppLabelColumnIndex, op)
 					entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
 					entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
+					Lock.Lock()
 					prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
+					Lock.Unlock()
 					return filter, nil
 				}
 
@@ -1195,7 +1216,9 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 					filter = fmt.Sprintf("app_label_value_id_%d IN (%s)", appLabel.AppLabelColumnIndex, valueIDFilter)
 				}
 				entryValue := common.EntryValue{Time: time.Now(), Filter: filter}
+				Lock.Lock()
 				prometheusSubqueryCache.PrometheusSubqueryCache.Add(entryKey, entryValue)
+				Lock.Unlock()
 				return filter, nil
 			}
 		}
