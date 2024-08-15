@@ -7,6 +7,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: Add libpcap dependency to installation package [#7834](https://github.com/deepflowio/deepflow/pull/7834) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: fix agent rebalance panic [#7830](https://github.com/deepflowio/deepflow/pull/7830) by [roryye](https://github.com/roryye)
+* fix: fix the problem of config pointer copy [#7823](https://github.com/deepflowio/deepflow/pull/7823) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
