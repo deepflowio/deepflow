@@ -28,6 +28,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
+	"github.com/mohae/deepcopy"
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
@@ -1058,10 +1059,11 @@ func (c *VTapCache) initVTapConfig() {
 	realConfig := VTapConfig{}
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
-		realConfig = *config
+
+		realConfig = deepcopy.Copy(*config).(VTapConfig)
 	} else {
 		if v.realDefaultConfig != nil {
-			realConfig = *v.realDefaultConfig
+			realConfig = deepcopy.Copy(*v.realDefaultConfig).(VTapConfig)
 		}
 	}
 	c.modifyVTapConfigByLicense(&realConfig)
@@ -1074,10 +1076,10 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 	newConfig := VTapConfig{}
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
-		newConfig = *config
+		newConfig = deepcopy.Copy(*config).(VTapConfig)
 	} else {
 		if v.realDefaultConfig != nil {
-			newConfig = *v.realDefaultConfig
+			newConfig = deepcopy.Copy(*v.realDefaultConfig).(VTapConfig)
 		}
 	}
 	oldConfig := c.GetVTapConfig()
