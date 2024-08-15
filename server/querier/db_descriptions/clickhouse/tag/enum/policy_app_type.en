@@ -1,4 +1,3 @@
 # Value , DisplayName     , Description
 1       , System          ,
-2       , View            ,
-3       , Metric          ,
+3       , Custom          ,
