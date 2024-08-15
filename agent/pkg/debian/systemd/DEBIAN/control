@@ -6,3 +6,4 @@ Maintainer: deepflow@yunshan.net
 Provides: Yunshan
 Architecture: amd64
 Description: Deepflow agent
+Depends: libpcap-dev
