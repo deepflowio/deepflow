@@ -156,6 +156,7 @@ const (
 	L7_PROTOCOL_SOFARPC  L7Protocol = 43
 	L7_PROTOCOL_FASTCGI  L7Protocol = 44
 	L7_PROTOCOL_BRPC     L7Protocol = 45
+	L7_PROTOCOL_TARS     L7Protocol = 46
 	L7_PROTOCOL_MYSQL    L7Protocol = 60
 	L7_PROTOCOL_POSTGRE  L7Protocol = 61
 	L7_PROTOCOL_ORACLE   L7Protocol = 62
@@ -654,6 +655,12 @@ func (p L7Protocol) String(isTLS bool) string {
 			return "bRPC_TLS"
 		} else {
 			return "bRPC"
+		}
+	case L7_PROTOCOL_TARS:
+		if isTLS {
+			return "Tars_TLS"
+		} else {
+			return "Tars"
 		}
 	case L7_PROTOCOL_MYSQL:
 		if isTLS {
