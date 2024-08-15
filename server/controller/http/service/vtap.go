@@ -523,8 +523,12 @@ func execAZRebalance(
 		}
 	}
 
+	if availableHostNum == 0 {
+		log.Warningf("available host num (%v) == 0", vtapNum, availableHostNum)
+		return model.AZVTapRebalanceResult{}
+	}
 	// 计算平均采集器个数（向上取整），仅考虑状态正常的控制器/数据节点
-	avgVTapNum := int(math.Ceil(float64(vtapNum) / float64(availableHostNum)))
+	avgVTapNum := uint64(math.Ceil(float64(vtapNum / availableHostNum)))
 
 	// 超出平均个数的控制器，对其上采集器进行重新分配
 	response := model.AZVTapRebalanceResult{}
@@ -535,12 +539,12 @@ func execAZRebalance(
 		}
 
 		// 未超出无需进行重新分配
-		if len(vtaps) <= avgVTapNum {
+		if uint64(len(vtaps)) <= avgVTapNum {
 			continue
 		}
 
 		// 遍历超出部分，进行重新分配
-		for i := avgVTapNum; i < len(vtaps); i++ {
+		for i := avgVTapNum; i < uint64(len(vtaps)); i++ {
 			vtap := vtaps[i]
 
 			// 优先分配剩余采集器个数最多的控制器/数据节点
