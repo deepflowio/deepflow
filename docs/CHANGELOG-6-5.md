@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: Add libpcap dependency to installation package [#7834](https://github.com/deepflowio/deepflow/pull/7834) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: fix agent rebalance panic [#7830](https://github.com/deepflowio/deepflow/pull/7830) by [roryye](https://github.com/roryye)
+* fix: fix the problem of config pointer copy [#7823](https://github.com/deepflowio/deepflow/pull/7823) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: CVE-2024-35195 vuln [#7809](https://github.com/deepflowio/deepflow/pull/7809) by [taloric](https://github.com/taloric)
 * fix: turn off the call monitoring function and stop related functions [#7806](https://github.com/deepflowio/deepflow/pull/7806) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: agent enable feature permission [#7795](https://github.com/deepflowio/deepflow/pull/7795) by [roryye](https://github.com/roryye)
