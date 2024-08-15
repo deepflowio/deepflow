@@ -91,6 +91,16 @@ func (m *Manager) GetCloudResource(lcuuid string) (model.Resource, error) {
 	return cloudResource, nil
 }
 
+func (m *Manager) TriggerDomain(lcuuid string) error {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	task, ok := m.taskMap[lcuuid]
+	if !ok {
+		return fmt.Errorf("domain (%s) not found", lcuuid)
+	}
+	return task.Cloud.ClientTrigger()
+}
+
 func (m *Manager) GetKubernetesGatherBasicInfos(lcuuid string) ([]kubernetes_gather_model.KubernetesGatherBasicInfo, error) {
 	var k8sGatherBasicInfos []kubernetes_gather_model.KubernetesGatherBasicInfo
 
