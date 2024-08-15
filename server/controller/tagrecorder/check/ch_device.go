@@ -461,20 +461,6 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 
-			// service
-			serviceKey := DeviceKey{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-			}
-			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType:  CH_DEVICE_TYPE_SERVICE,
-				DeviceID:    podService.ID,
-				Name:        podService.Name + " (deleted)",
-				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:      teamID,
-				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
-				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
-			}
 		} else {
 			// pod_service
 			podServiceKey := DeviceKey{
@@ -491,20 +477,6 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 
-			// service
-			serviceKey := DeviceKey{
-				DeviceType: CH_DEVICE_TYPE_SERVICE,
-				DeviceID:   podService.ID,
-			}
-			keyToItem[serviceKey] = mysql.ChDevice{
-				DeviceType:  CH_DEVICE_TYPE_SERVICE,
-				DeviceID:    podService.ID,
-				Name:        podService.Name,
-				IconID:      d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-				TeamID:      tagrecorder.DomainToTeamID[podService.Domain],
-				DomainID:    tagrecorder.DomainToDomainID[podService.Domain],
-				SubDomainID: tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
-			}
 		}
 	}
 	return true
