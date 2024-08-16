@@ -81,7 +81,11 @@ func (c *TagRecorder) Check() {
 
 func (c *TagRecorder) check(db *mysql.DB) error {
 	// 调用API获取资源对应的icon_id
-	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo(db)
+	domainToIconID, resourceToIconID, err := c.UpdateIconInfo(db)
+	if err != nil {
+		log.Warningf("get icon failed: %s", err.Error())
+		return nil
+	}
 	for _, updater := range c.getUpdaters(db, domainToIconID, resourceToIconID) {
 		if err := updater.Check(); err != nil {
 			return err
