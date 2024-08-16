@@ -101,7 +101,7 @@ UPROG(go_tls_write_enter) (struct pt_regs *ctx)
 		submit_debug(1, 2, 0);
 		return 0;
 	}
-	c.tcp_seq = get_tcp_write_seq_from_fd(c.fd);
+	c.tcp_seq = get_tcp_write_seq_from_fd(c.fd, &c.sk);
 
 	key.tgid = pid;
 	key.goid = get_current_goroutine();
@@ -156,6 +156,7 @@ UPROG(go_tls_write_exit) (struct pt_regs *ctx)
 		.buf = c->buffer,
 		.fd = c->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.sk = c->sk,
 		.tcp_seq = c->tcp_seq,
 	};
 
@@ -225,7 +226,7 @@ UPROG(go_tls_read_enter) (struct pt_regs *ctx)
 		submit_debug(3, 2, 0);
 		return 0;
 	}
-	c.tcp_seq = get_tcp_read_seq_from_fd(c.fd);
+	c.tcp_seq = get_tcp_read_seq_from_fd(c.fd, &c.sk);
 
 	key.tgid = bpf_get_current_pid_tgid() >> 32;
 	key.goid = get_current_goroutine();
@@ -265,7 +266,7 @@ UPROG(go_tls_read_exit) (struct pt_regs *ctx)
 	struct http2_tcp_seq_key tcp_seq_key = {
 		.tgid = key.tgid,
 		.fd = c->fd,
-		.tcp_seq_end = get_tcp_read_seq_from_fd(c->fd),
+		.tcp_seq_end = get_tcp_read_seq_from_fd(c->fd, NULL),
 	};
 	// make linux 4.14 validator happy
 	__u32 tcp_seq = c->tcp_seq;
@@ -291,6 +292,7 @@ UPROG(go_tls_read_exit) (struct pt_regs *ctx)
 		.buf = c->buffer,
 		.fd = c->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.sk = c->sk,
 		.tcp_seq = c->tcp_seq,
 	};
 
