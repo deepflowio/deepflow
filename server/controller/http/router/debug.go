@@ -45,6 +45,7 @@ func (d *Debug) RegisterTo(e *gin.Engine) {
 	e.GET("/v1/tasks/", getCloudBasicInfos(d.m))
 	e.GET("/v1/tasks/:lcuuid/", getCloudBasicInfo(d.m))
 	e.GET("/v1/info/:lcuuid/", getCloudResource(d.m))
+	e.GET("/v1/trigger-domain/:lcuuid/", triggerDomain(d.m))
 	e.GET("/v1/genesis/:type/", getGenesisSyncData(d.g, true))
 	e.GET("/v1/sync/:type/", getGenesisSyncData(d.g, false))
 	e.GET("/v1/agent-stats/:vtapID/", getAgentStats(d.g))
@@ -84,6 +85,14 @@ func getCloudResource(m *manager.Manager) gin.HandlerFunc {
 		lcuuid := c.Param("lcuuid")
 		data, err := service.GetCloudResource(lcuuid, m)
 		JsonResponse(c, data, err)
+	})
+}
+
+func triggerDomain(m *manager.Manager) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		lcuuid := c.Param("lcuuid")
+		err := service.TriggerDomain(lcuuid, m)
+		JsonResponse(c, nil, err)
 	})
 }
 
