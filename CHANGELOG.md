@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: skip check when getting icon fails [#7849](https://github.com/deepflowio/deepflow/pull/7849) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: Add libpcap dependency to installation package [#7833](https://github.com/deepflowio/deepflow/pull/7833) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: service data is not written to ck [#7832](https://github.com/deepflowio/deepflow/pull/7832) by [duandaa](https://github.com/duandaa)
 * fix: fix agent rebalance panic [#7831](https://github.com/deepflowio/deepflow/pull/7831) by [roryye](https://github.com/roryye)
@@ -137,6 +138,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: change service chsql filter [#7842](https://github.com/deepflowio/deepflow/pull/7842) by [duandaa](https://github.com/duandaa)
+* feat: service_type of auto_service_type change to pod_service_type [#7841](https://github.com/deepflowio/deepflow/pull/7841) by [lzf575](https://github.com/lzf575)
 * feat: Modify policy_app_type value [#7822](https://github.com/deepflowio/deepflow/pull/7822) by [Ericsssss](https://github.com/Ericsssss)
 * feat: add column in ck pod_node and pod_ingress [#7799](https://github.com/deepflowio/deepflow/pull/7799) by [duandaa](https://github.com/duandaa)
 * feat: Using libpcap without restarting when the network card does not… [#7780](https://github.com/deepflowio/deepflow/pull/7780) by [yuanchaoa](https://github.com/yuanchaoa)
