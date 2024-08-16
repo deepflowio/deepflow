@@ -293,11 +293,12 @@ func (w *CKWriter) Put(items ...interface{}) {
 }
 
 type Cache struct {
-	orgID         uint16
-	prepare       string
-	items         []CKItem
-	lastWriteTime time.Time
-	tableCreated  bool
+	orgID               uint16
+	prepare             string
+	items               []CKItem
+	lastWriteTime       time.Time
+	lastWriteFailedTime time.Time
+	tableCreated        bool
 }
 
 func (c *Cache) Release() {
@@ -392,6 +393,13 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 		cache.tableCreated = true
 	}
 	if err := w.writeItems(queueID, connID, cache); err != nil {
+		now := time.Now()
+		// each writing fails for more than 5 minutes, execute the table creation statement to prevent the table from being deleted and causing writing failure.
+		if now.Sub(cache.lastWriteFailedTime) > 5*time.Minute {
+			cache.lastWriteFailedTime = now
+			cache.tableCreated = false
+		}
+
 		if logEnabled {
 			log.Warningf("write table (%s.%s) failed, will retry write (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 		}
