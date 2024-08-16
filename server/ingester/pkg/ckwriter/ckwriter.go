@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	server_common "github.com/deepflowio/deepflow/server/common"
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
@@ -46,17 +47,46 @@ const (
 	RETRY_COUNT    = 3
 )
 
+var ckwriterManager *CKWriterManager
+
+type CKWriterManager struct {
+	ckwriters []*CKWriter
+	sync.Mutex
+}
+
+func RegisterToCkwriterManager(w *CKWriter) {
+	if ckwriterManager == nil {
+		ckwriterManager = &CKWriterManager{}
+		server_common.SetOrgHandler(ckwriterManager)
+	}
+	ckwriterManager.Lock()
+	ckwriterManager.ckwriters = append(ckwriterManager.ckwriters, w)
+	ckwriterManager.Unlock()
+}
+
+func (m *CKWriterManager) DropOrg(orgId uint16) error {
+	log.Infof("call ckwriters drop org %d", orgId)
+	ckwriterManager.Lock()
+	for _, ckwriter := range m.ckwriters {
+		log.Infof("ckwriter %s drop org %d", ckwriter.name, orgId)
+		ckwriter.dropOrg(orgId)
+	}
+	ckwriterManager.Unlock()
+	return nil
+}
+
 type CKWriter struct {
-	addrs         []string
-	user          string
-	password      string
-	timeZone      string
-	table         *ckdb.Table
-	queueCount    int
-	queueSize     int           // 队列长度
-	batchSize     int           // 累积多少行数据，一起写入
-	flushDuration time.Duration // 超时写入
-	counterName   string        // 写入成功失败的统计数据表名称，若写入失败，会根据该数据上报告警
+	addrs          []string
+	user           string
+	password       string
+	timeZone       string
+	table          *ckdb.Table
+	queueCount     int
+	queueSize      int           // 队列长度
+	batchSize      int           // 累积多少行数据，一起写入
+	flushDuration  time.Duration // 超时写入
+	counterName    string        // 写入成功失败的统计数据表名称，若写入失败，会根据该数据上报告警
+	orgQueueCaches [][]*Cache    // all queue's caches for all Orgs
 
 	name         string // 数据库名-表名 用作 queue名字和counter名字
 	prepare      string // 写入数据时，先执行prepare
@@ -226,17 +256,30 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 		queue.OptionRelease(func(p interface{}) { p.(CKItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
-	return &CKWriter{
-		addrs:         addrs,
-		user:          user,
-		password:      password,
-		timeZone:      timeZone,
-		table:         table,
-		queueCount:    queueCount,
-		queueSize:     queueSize,
-		batchSize:     batchSize,
-		flushDuration: time.Duration(flushTimeout) * time.Second,
-		counterName:   counterName,
+	orgQueueCaches := make([][]*Cache, queueCount)
+	for i := range orgQueueCaches {
+		orgCaches := make([]*Cache, ckdb.MAX_ORG_ID+1)
+		for i := range orgCaches {
+			orgCaches[i] = new(Cache)
+			orgCaches[i].items = make([]CKItem, 0)
+			orgCaches[i].orgID = uint16(i)
+			orgCaches[i].prepare = table.MakeOrgPrepareTableInsertSQL(uint16(i))
+		}
+		orgQueueCaches[i] = orgCaches
+	}
+
+	w := &CKWriter{
+		addrs:          addrs,
+		user:           user,
+		password:       password,
+		timeZone:       timeZone,
+		table:          table,
+		queueCount:     queueCount,
+		queueSize:      queueSize,
+		batchSize:      batchSize,
+		flushDuration:  time.Duration(flushTimeout) * time.Second,
+		counterName:    counterName,
+		orgQueueCaches: orgQueueCaches,
 
 		name:        name,
 		prepare:     table.MakePrepareTableInsertSQL(),
@@ -246,7 +289,16 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 		dataQueues:  dataQueues,
 		counters:    make([]Counter, queueCount),
 		ckdbwatcher: ckdbwatcher,
-	}, nil
+	}
+	RegisterToCkwriterManager(w)
+	return w, nil
+}
+
+func (w *CKWriter) dropOrg(orgId uint16) {
+	for i := range w.orgQueueCaches {
+		log.Debugf("ckwriter %s queue %d drop org %d", w.name, i, orgId)
+		w.orgQueueCaches[i][orgId].tableCreated = false
+	}
 }
 
 func (w *CKWriter) Run() {
@@ -306,13 +358,7 @@ func (w *CKWriter) queueProcess(queueID int) {
 
 	rawItems := make([]interface{}, 1024)
 	var cache *Cache
-	orgCaches := make([]*Cache, ckdb.MAX_ORG_ID+1)
-	for i := range orgCaches {
-		orgCaches[i] = new(Cache)
-		orgCaches[i].items = make([]CKItem, 0)
-		orgCaches[i].orgID = uint16(i)
-		orgCaches[i].prepare = w.table.MakeOrgPrepareTableInsertSQL(uint16(i))
-	}
+	orgCaches := w.orgQueueCaches[queueID]
 
 	for !w.exit {
 		n := w.dataQueues.Gets(queue.HashKey(queueID), rawItems)

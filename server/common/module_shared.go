@@ -86,16 +86,22 @@ type OrgHanderInterface interface {
 	DropOrg(orgId uint16) error
 }
 
-var ingesterOrgHander OrgHanderInterface
+var ingesterOrgHanders []OrgHanderInterface
 
 func SetOrgHandler(orgHandler OrgHanderInterface) {
-	ingesterOrgHander = orgHandler
+	ingesterOrgHanders = append(ingesterOrgHanders, orgHandler)
 }
 
 func DropOrg(orgId uint16) error {
 	log.Info("drop org id:", orgId)
-	if ingesterOrgHander == nil {
-		return fmt.Errorf("ingesterOrgHander is nil, drop org id %d failed", orgId)
+	if ingesterOrgHanders == nil {
+		return fmt.Errorf("ingesterOrgHanders is nil, drop org id %d failed", orgId)
 	}
-	return ingesterOrgHander.DropOrg(orgId)
+	for _, ingesterOrgHander := range ingesterOrgHanders {
+		err := ingesterOrgHander.DropOrg(orgId)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
