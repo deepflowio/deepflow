@@ -619,6 +619,18 @@ func (c *ChPodServiceDevice) sourceToTarget(md *message.Metadata, source *mysql.
 		SubDomainID: md.SubDomainID,
 	})
 
+	// service
+	keys = append(keys, DeviceKey{DeviceType: CH_DEVICE_TYPE_SERVICE,
+		DeviceID: source.ID})
+	targets = append(targets, mysql.ChDevice{
+		DeviceType:  CH_DEVICE_TYPE_SERVICE,
+		DeviceID:    source.ID,
+		Name:        sourceName,
+		IconID:      iconID,
+		TeamID:      md.TeamID,
+		DomainID:    md.DomainID,
+		SubDomainID: md.SubDomainID,
+	})
 	return
 }
 
