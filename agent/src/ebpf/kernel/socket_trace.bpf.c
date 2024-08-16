@@ -193,7 +193,7 @@ static __inline void delete_socket_info(__u64 conn_key,
 	socket_role_map__delete(&conn_key);
 }
 
-static __u32 __inline get_tcp_write_seq_from_fd(int fd)
+static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk)
 {
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
@@ -201,6 +201,8 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd)
 		return 0;
 
 	void *sock = get_socket_from_fd(fd, offset);
+	if (sk)
+		*sk = sock;
 	if (sock == NULL)
 		return 0;
 
@@ -210,7 +212,7 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd)
 	return tcp_seq;
 }
 
-static __u32 __inline get_tcp_read_seq_from_fd(int fd)
+static __u32 __inline get_tcp_read_seq_from_fd(int fd, void **sk)
 {
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
@@ -218,6 +220,8 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 		return 0;
 
 	void *sock = get_socket_from_fd(fd, offset);
+	if (sk)
+		*sk = sock;
 	if (sock == NULL)
 		return 0;
 
@@ -1527,7 +1531,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (unlikely(!offset->ready))
 		return -1;
 
-	void *sk = get_socket_from_fd(args->fd, offset);
+	void *sk = args->sk;
 	struct conn_info_s *conn_info, __conn_info = { 0 };
 	conn_info = &__conn_info;
 	__u8 sock_state;
@@ -1690,7 +1694,7 @@ KFUNC_PROG(ksys_write, unsigned int fd, const char __user * buf, size_t count)
 	write_args.fd = fd;
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
-	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd);
+	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd, &write_args.sk);
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
@@ -1737,7 +1741,7 @@ KFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count)
 	read_args.fd = fd;
 	read_args.buf = buf;
 	read_args.enter_ts = bpf_ktime_get_ns();
-	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd);
+	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd, &read_args.sk);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1813,7 +1817,7 @@ KFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 	write_args.fd = sockfd;
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
-	write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
+	write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd, &write_args.sk);
 	if (write_args.tcp_seq == 0) {
 #ifndef LINUX_VER_KFUNC
 		struct syscall_sendto_enter_ctx *sendto_ctx =
@@ -1899,7 +1903,7 @@ KFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
 	read_args.fd = sockfd;
 	read_args.buf = buf;
 	read_args.enter_ts = bpf_ktime_get_ns();
-	read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
+	read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd, &read_args.sk);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1957,7 +1961,7 @@ KFUNC_PROG(__sys_sendmsg, int fd, struct user_msghdr __user * msg,
 		write_args.iov = msghdr->msg_iov;
 		write_args.iovlen = msghdr->msg_iovlen;
 		write_args.enter_ts = bpf_ktime_get_ns();
-		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
+		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd, &write_args.sk);
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -2016,7 +2020,7 @@ KFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 		write_args.iovlen = msgvec[0].msg_hdr.msg_iovlen;
 		write_args.msg_len = (void *)msgvec_ptr + offsetof(typeof(struct mmsghdr), msg_len);	//&msgvec[0].msg_len;
 		write_args.enter_ts = bpf_ktime_get_ns();
-		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd);
+		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd, &write_args.sk);
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -2081,7 +2085,7 @@ KFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 		read_args.iov = msghdr->msg_iov;
 		read_args.iovlen = msghdr->msg_iovlen;
 		read_args.enter_ts = bpf_ktime_get_ns();
-		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
+		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd, &read_args.sk);
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -2157,7 +2161,7 @@ KFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
 
 		read_args.msg_len =
 		    (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
-		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
+		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd, &read_args.sk);
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -2219,7 +2223,7 @@ KFUNC_PROG(do_writev, unsigned long fd, const struct iovec __user * vec,
 	write_args.iov = iov;
 	write_args.iovlen = iovlen;
 	write_args.enter_ts = bpf_ktime_get_ns();
-	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd);
+	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd, &write_args.sk);
 	active_write_args_map__update(&id, &write_args);
 	return 0;
 }
@@ -2274,7 +2278,7 @@ KFUNC_PROG(do_readv, unsigned long fd, const struct iovec __user * vec,
 	read_args.iov = iov;
 	read_args.iovlen = iovlen;
 	read_args.enter_ts = bpf_ktime_get_ns();
-	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd);
+	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd, &read_args.sk);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;

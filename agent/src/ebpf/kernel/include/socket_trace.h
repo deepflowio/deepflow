@@ -273,6 +273,7 @@ struct data_args_t {
 	const char *buf;
 	// For sendmsg()/recvmsg()/writev()/readv().
 	const struct iovec *iov;
+	void *sk;
 	size_t iovlen;
 	union {
 		// For sendmmsg()
@@ -388,6 +389,7 @@ struct go_string {
 struct tls_conn {
 	int fd;
 	char *buffer;
+	void *sk;
 	__u32 tcp_seq;
 	void *sp;		// stack pointer
 };

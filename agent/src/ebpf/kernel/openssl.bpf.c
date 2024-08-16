@@ -21,6 +21,7 @@
 
 struct ssl_ctx_struct {
 	void *buf;
+	void *sk;
 	int num;
 
 	int fd;
@@ -67,12 +68,14 @@ UPROG(openssl_write_enter) (struct pt_regs *ctx)
 	void *ssl = (void *)PT_REGS_PARM1(ctx);
 	int fd = get_fd_from_openssl_ssl(ssl);
 	__u64 id = bpf_get_current_pid_tgid();
+	void *sk = NULL;
 	struct ssl_ctx_struct ssl_ctx = {
 		.fd = fd,
 		.buf = (void *)PT_REGS_PARM2(ctx),
 		.num = (int)PT_REGS_PARM3(ctx),
-		.tcp_seq = get_tcp_write_seq_from_fd(fd),
+		.tcp_seq = get_tcp_write_seq_from_fd(fd, &sk),
 	};
+	ssl_ctx.sk = sk;
 	ssl_ctx_map__update(&id, &ssl_ctx);
 	return 0;
 }
@@ -95,6 +98,7 @@ UPROG(openssl_write_exit) (struct pt_regs *ctx)
 		.buf = ssl_ctx->buf,
 		.fd = ssl_ctx->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.sk = ssl_ctx->sk,
 		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
@@ -123,12 +127,14 @@ UPROG(openssl_read_enter) (struct pt_regs *ctx)
 	void *ssl = (void *)PT_REGS_PARM1(ctx);
 	int fd = get_fd_from_openssl_ssl(ssl);
 	__u64 id = bpf_get_current_pid_tgid();
+	void *sk = NULL;
 	struct ssl_ctx_struct ssl_ctx = {
 		.fd = fd,
 		.buf = (void *)PT_REGS_PARM2(ctx),
 		.num = (int)PT_REGS_PARM3(ctx),
-		.tcp_seq = get_tcp_read_seq_from_fd(fd),
+		.tcp_seq = get_tcp_read_seq_from_fd(fd, &sk),
 	};
+	ssl_ctx.sk = sk;
 	ssl_ctx_map__update(&id, &ssl_ctx);
 	return 0;
 }
@@ -151,6 +157,7 @@ UPROG(openssl_read_exit) (struct pt_regs *ctx)
 		.buf = ssl_ctx->buf,
 		.fd = ssl_ctx->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.sk = ssl_ctx->sk,
 		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
