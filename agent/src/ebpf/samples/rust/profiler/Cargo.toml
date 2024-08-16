@@ -6,7 +6,7 @@ edition = "2021"
 build = "build.rs"
 
 [build-dependencies]
-dunce = "0.1.1"
+dunce = "1"
 
 [dependencies]
 libc = "0.2"
