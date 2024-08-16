@@ -2339,6 +2339,15 @@ CREATE TABLE IF NOT EXISTS license (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE license;
 
+CREATE TABLE IF NOT EXISTS agent_key (
+    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    agent_id            INTEGER,
+    status              INTEGER DEFAULT 0,
+    value               blob,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE agent_key;
+
 CREATE TABLE IF NOT EXISTS sys_event_alarm (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     process_name        VARCHAR(256),

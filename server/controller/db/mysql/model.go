@@ -245,6 +245,18 @@ func (LicenseFuncLog) TableName() string {
 	return "license_func_log"
 }
 
+type AgentKey struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	AgentID   int       `gorm:"column:agent_id;type:int" json:"AGENT_ID"`
+	Status    int       `gorm:"column:status;type:int" json:"STATUS"`
+	Value     []byte    `gorm:"column:value;type:blob" json:"VALUE"`
+	CreatedAt time.Time `gorm:"column:created_at;type:datetime;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+}
+
+func (AgentKey) TableName() string {
+	return "agent_key"
+}
+
 type DataSource struct {
 	ID                        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	DisplayName               string    `gorm:"column:display_name;type:char(64);default:''" json:"DISPLAY_NAME"`

@@ -19,6 +19,7 @@ package config
 import (
 	"net"
 	"os"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -45,13 +46,15 @@ type Config struct {
 	RegionDomainPrefix             string   `yaml:"region-domain-prefix"`
 	ClearKubernetesTime            int      `default:"600" yaml:"clear-kubernetes-time"`
 	NodeIP                         string
-	VTapCacheRefreshInterval       int  `default:"300" yaml:"vtapcache-refresh-interval"`
-	MetaDataRefreshInterval        int  `default:"60" yaml:"metadata-refresh-interval"`
-	NodeRefreshInterval            int  `default:"60" yaml:"node-refresh-interval"`
-	GPIDRefreshInterval            int  `default:"9" yaml:"gpid-refresh-interval"`
-	VTapAutoRegister               bool `default:"true" yaml:"vtap-auto-register"`
-	DomainAutoRegister             bool `default:"true" yaml:"domain-auto-register"`
-	DefaultTapMode                 int  `yaml:"default-tap-mode"`
+	VTapCacheRefreshInterval       int           `default:"300" yaml:"vtapcache-refresh-interval"`
+	MetaDataRefreshInterval        int           `default:"60" yaml:"metadata-refresh-interval"`
+	NodeRefreshInterval            int           `default:"60" yaml:"node-refresh-interval"`
+	GPIDRefreshInterval            int           `default:"9" yaml:"gpid-refresh-interval"`
+	VTapAutoRegister               bool          `default:"true" yaml:"vtap-auto-register"`
+	DomainAutoRegister             bool          `default:"true" yaml:"domain-auto-register"`
+	AgentKeyAgingTime              time.Duration `default:"720h" yaml:"agent-key-aging-time"`
+	AgentKeyLength                 int           `default:"16" yaml:"agent-key-length"`
+	DefaultTapMode                 int           `yaml:"default-tap-mode"`
 	BillingMethod                  string
 	GrpcPort                       int
 	IngesterPort                   int
@@ -65,6 +68,7 @@ type Config struct {
 	IngesterAPI                    common.IngesterApi // data source
 	AllAgentConnectToNatIP         bool
 	NoIPOverlapping                bool
+	DataPlaneEncryption            bool
 }
 
 func (c *Config) Convert() {
@@ -169,4 +173,13 @@ func (c *Config) SetFPermitConfig(fpermit common.FPermit) {
 
 func (c *Config) GetFPermitConfig() common.FPermit {
 	return c.FPermit
+}
+
+func (c *Config) SetDataPlaneEncryption(enabled bool) {
+	log.Infof("set data plane encryption enabled(%v)", enabled)
+	c.DataPlaneEncryption = enabled
+}
+
+func (c *Config) GetDataPlaneEncryption() bool {
+	return c.DataPlaneEncryption
 }

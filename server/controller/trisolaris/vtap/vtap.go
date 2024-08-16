@@ -36,7 +36,7 @@ import (
 	"github.com/deepflowio/deepflow/server/agent_config"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	mysql_model "github.com/deepflowio/deepflow/server/controller/db/mysql" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
+	mysql_model "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -44,6 +44,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils/atomicbool"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap/agent_key"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -112,6 +113,8 @@ type VTapInfo struct {
 	processInfo *ProcessInfo
 	dbVTapIDs   mapset.Set
 
+	agentKeyManager *agent_key.AgentKeyManager
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	ORGID
@@ -154,6 +157,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		config:                         cfg,
 		vTapIPs:                        &atomic.Value{},
 		dbVTapIDs:                      mapset.NewSet(),
+		agentKeyManager:                agent_key.NewAgentKeyManager(db, cfg, orgID),
 		ORGID:                          ORGID(orgID),
 		ctx:                            ctx,
 		cancel:                         cancel,
@@ -177,6 +181,14 @@ func (v *VTapInfo) AddVTapCache(vtap *mysql_model.VTap) {
 		v.kvmVTapCaches.Add(vTapCache)
 	}
 	log.Infof(v.Logf("add cache ctrl_ip: %s ctrl_mac: %s", vTapCache.GetCtrlIP(), vTapCache.GetCtrlMac()))
+}
+
+func (v *VTapInfo) GetAgentKeyManager() *agent_key.AgentKeyManager {
+	if v == nil {
+		return nil
+	}
+
+	return v.agentKeyManager
 }
 
 func (v *VTapInfo) GetVTapCache(key string) *VTapCache {
@@ -875,6 +887,7 @@ func (v *VTapInfo) InitData() {
 	v.generateAllVTapRemoteSegements()
 	v.generateVTapIP()
 	v.generateLocalClusterID()
+	v.agentKeyManager.InitData()
 	v.isReady.Set()
 }
 
@@ -1255,6 +1268,7 @@ func (v *VTapInfo) monitorVTapRegister() {
 			select {
 			case <-v.chRegisterSuccess:
 				v.putChVTapChangedForSegment()
+				v.agentKeyManager.MonitorAgentKey()
 			default:
 			}
 			log.Info(v.Logf("end vtap register"))
@@ -1274,11 +1288,13 @@ func (v *VTapInfo) timedRefreshVTapCache() {
 		case <-tickerVTapCache:
 			log.Info(v.Logf("start generate vtap cache data from timed"))
 			v.GenerateVTapCache()
+			v.agentKeyManager.MonitorAgentKey()
 			v.processInfo.DeleteAgentExpiredData(v.dbVTapIDs)
 			log.Info(v.Logf("end generate vtap cache data from timed"))
 		case <-v.chVTapCacheRefresh:
 			log.Info(v.Logf("start generate vtap cache data from rpc"))
 			v.GenerateVTapCache()
+			v.agentKeyManager.MonitorAgentKey()
 			pushmanager.Broadcast(v.GetORGID())
 			log.Info(v.Logf("end generate vtap cache data from rpc"))
 		case <-v.ctx.Done():

@@ -124,3 +124,20 @@ func DropOrg(orgId uint16) error {
 	}
 	return nil
 }
+
+var agentKeyOP AgentKeyOP
+
+type AgentKeyOP interface {
+	GetAgentKey(orgID int, AgentID int) ([]byte, error)
+}
+
+func SetAgentKeyOP(akOP AgentKeyOP) {
+	agentKeyOP = akOP
+}
+
+func GetAgentKey(orgID int, AgentID int) ([]byte, error) {
+	if agentKeyOP == nil {
+		return nil, fmt.Errorf("agentKeyOP is nil, get agent(orgid=%d, id=%d) failed", orgID, AgentID)
+	}
+	return agentKeyOP.GetAgentKey(orgID, AgentID)
+}

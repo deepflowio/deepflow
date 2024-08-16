@@ -108,6 +108,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 	tapMode := api.TapMode(*vtapConfig.TapMode)
 	breakerMetricStr := convertBreakerMetric(*vtapConfig.SystemLoadCircuitBreakerMetric)
 	loadMetric := api.SystemLoadMetric(api.SystemLoadMetric_value[breakerMetricStr])
+	agentKey, _ := gVTapInfo.GetAgentKeyManager().GetAgentKey(int(c.GetVTapID()))
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(*vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -187,6 +188,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string, gVTa
 
 		TeamId:     proto.Uint32(uint32(c.GetTeamID())),
 		OrganizeId: proto.Uint32(uint32(c.GetOrganizeID())),
+		SecretKey:  proto.String(string(agentKey)),
 	}
 
 	cacheTSBIP := c.GetTSDBIP()

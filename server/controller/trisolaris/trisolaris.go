@@ -18,12 +18,14 @@ package trisolaris
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	scommon "github.com/deepflowio/deepflow/server/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/election"
@@ -390,6 +392,7 @@ func (m *TrisolarisManager) Start() error {
 	}
 	go m.TimedCheckORG()
 	m.getTeamData(orgIDs)
+	scommon.SetAgentKeyOP(m)
 	log.Infof("finish orgdata init %v", orgIDs)
 	return nil
 }
@@ -467,11 +470,20 @@ func (m *TrisolarisManager) GetVTapInfo(orgID int) *vtap.VTapInfo {
 }
 
 func (m *TrisolarisManager) GetVTapCache(orgID int, key string) *vtap.VTapCache {
-	vttridentnfo := m.GetVTapInfo(orgID)
-	if vttridentnfo != nil {
-		return vttridentnfo.GetVTapCache(key)
+	vtapInfo := m.GetVTapInfo(orgID)
+	if vtapInfo != nil {
+		return vtapInfo.GetVTapCache(key)
 	}
 	return nil
+}
+
+func (m *TrisolarisManager) GetAgentKey(orgID int, agentID int) ([]byte, error) {
+	vtapInfo := m.GetVTapInfo(orgID)
+	if vtapInfo != nil {
+		return vtapInfo.GetAgentKeyManager().GetAgentKey(agentID)
+	}
+
+	return nil, fmt.Errorf("org(id=%d) not foud vtapInfo", orgID)
 }
 
 func (m *TrisolarisManager) checkORG() {
@@ -486,7 +498,8 @@ func (m *TrisolarisManager) checkORG() {
 		orgIDsUint32[index] = uint32(orgID)
 	}
 	m.orgIDData = &trident.OrgIDsResponse{
-		OrgIds: orgIDsUint32,
+		OrgIds:     orgIDsUint32,
+		UpdateTime: proto.Uint32(uint32(time.Now().Unix())),
 	}
 
 	for orgID, trisolaris := range m.orgToTrisolaris {
