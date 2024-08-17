@@ -298,6 +298,7 @@ func (w *CKWriter) dropOrg(orgId uint16) {
 	for i := range w.orgQueueCaches {
 		log.Debugf("ckwriter %s queue %d drop org %d", w.name, i, orgId)
 		w.orgQueueCaches[i][orgId].tableCreated = false
+		w.orgQueueCaches[i][orgId].dropTime = uint32(time.Now().Unix())
 	}
 }
 
@@ -342,6 +343,7 @@ type Cache struct {
 	items         []CKItem
 	lastWriteTime time.Time
 	tableCreated  bool
+	dropTime      uint32
 }
 
 func (c *Cache) Release() {
@@ -349,6 +351,19 @@ func (c *Cache) Release() {
 		item.Release()
 	}
 	c.items = c.items[:0]
+}
+
+func (c *Cache) OrgIdExists() bool {
+	updateTime, exists := grpc.QueryOrgIDExist(c.orgID)
+	if updateTime == 0 || c.dropTime == 0 {
+		return exists
+	}
+	// dropped but not update org id list, return false
+	if updateTime <= c.dropTime {
+		return false
+	}
+	c.dropTime = 0
+	return exists
 }
 
 func (w *CKWriter) queueProcess(queueID int) {
@@ -417,6 +432,14 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 	itemsLen := len(cache.items)
 	// Prevent frequent log writing
 	logEnabled := w.counters[queueID].WriteFailedCount == 0
+	if !cache.OrgIdExists() {
+		if logEnabled {
+			log.Warningf("table (%s.%s) orgId is not exist, drop (%d) items", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen)
+		}
+		w.counters[queueID].OrgInvalidCount += int64(itemsLen)
+		cache.Release()
+		return
+	}
 	if !cache.tableCreated {
 		err := w.InitTable(cache.orgID)
 		if err != nil {
