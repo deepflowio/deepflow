@@ -154,11 +154,6 @@ protocol_port_check_2(enum traffic_protocol proto,
 #endif
 }
 
-static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
-{
-	return (sk_info != NULL && sk_info->uid != 0);
-}
-
 static __inline bool is_infer_socket_valid(struct socket_info_s *sk_info)
 {
 	/*
@@ -599,7 +594,7 @@ static __inline enum message_type infer_http2_message(const char *buf_kern,
 				.tgid = bpf_get_current_pid_tgid() >> 32,
 				.fd = conn_info->fd,
 				.tcp_seq_end =
-				    get_tcp_read_seq_from_fd(conn_info->fd, NULL),
+				    get_tcp_read_seq_from_fd(conn_info->fd, NULL, NULL),
 			};
 			// make linux 4.14 validator happy
 			__u32 tcp_seq = tcp_seq_key.tcp_seq_end - count;

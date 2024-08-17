@@ -87,23 +87,6 @@ struct __socket_data_buffer {
 };
 
 /**
- * @brief Used to describe the runtime state of the tracer.
- */
-struct tracer_ctx_s {
-	__u64 socket_id;          /**< Session identifier */
-	__u64 coroutine_trace_id; /**< Data forwarding association within the same coroutine */
-	__u64 thread_trace_id;    /**< Data forwarding association within the same process/thread, used for multi-transaction scenarios */
-	__u32 data_limit_max;     /**< Maximum number of data transfers */
-	__u32 go_tracing_timeout; /**< Go tracing timeout */
-	__u32 io_event_collect_mode; /**< IO event collection mode */
-	__u64 io_event_minimal_duration; /**< Minimum duration for IO events */
-	int push_buffer_refcnt; /**< Reference count of the data push buffer */
-	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
-	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
-	bool disable_tracing;  /**< Disable tracing feature. */
-};
-
-/**
  * @brief Trace statistics.
  */
 struct trace_stats {
@@ -183,6 +166,12 @@ struct socket_info_s {
 	__u32 prev_data_len;
 	__u64 trace_id;
 	__u64 uid; // Unique identifier ID for the socket.
+	void *sk;
+	struct __tuple_t tuple;
+	__u32 write_tcpseq_base;
+	__u32 read_tcpseq_base;
+	ssize_t total_read_bytes;
+	ssize_t total_write_bytes;
 } __attribute__((packed));
 
 /**
@@ -199,6 +188,7 @@ struct tracer_ctx_s {
 	int push_buffer_refcnt; /**< Reference count of the data push buffer */
 	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
 	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
+	bool disable_tracing;  /**< Disable tracing feature. */
 	struct socket_info_s sk_info; /**< Prevent stack overflow; this option is used as an alternative to stack allocation. */
 };
 
