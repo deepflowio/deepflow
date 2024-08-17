@@ -527,6 +527,14 @@ type ORG struct {
 	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;type:timestamp;default:null" json:"DELETED_AT" mapstructure:"DELETED_AT"`
 }
 
+func (o ORG) GetID() int {
+	return o.ID
+}
+
+func (o ORG) GetLcuuid() string {
+	return o.Lcuuid
+}
+
 type Team struct {
 	ID          int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name        string `gorm:"column:name;type:char(128);default:''" json:"NAME"`

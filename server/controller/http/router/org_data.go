@@ -47,6 +47,7 @@ func (d *ORGData) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/org/", d.Create)
 	e.DELETE("/v1/org/:id/", d.Delete)        // provide for real-time call when deleting an organization
 	e.DELETE("/v1/org/", d.DeleteNonRealTime) // provide for non-real-time call from master controller after deleting an organization
+	e.GET("/v1/alloc-org-id/", d.AllocORGID)
 }
 
 func (d *ORGData) Create(c *gin.Context) {
@@ -93,5 +94,10 @@ func (d *ORGData) DeleteNonRealTime(c *gin.Context) {
 
 func (d *ORGData) Get(c *gin.Context) {
 	data, err := service.GetORGData(d.cfg)
+	common.JsonResponse(c, data, err)
+}
+
+func (d *ORGData) AllocORGID(c *gin.Context) {
+	data, err := service.AllocORGID()
 	common.JsonResponse(c, data, err)
 }
