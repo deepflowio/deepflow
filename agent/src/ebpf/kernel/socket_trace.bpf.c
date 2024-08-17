@@ -193,43 +193,89 @@ static __inline void delete_socket_info(__u64 conn_key,
 	socket_role_map__delete(&conn_key);
 }
 
-static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk)
+static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
 {
+	return (sk_info != NULL && sk_info->uid != 0);
+}
+
+/* *INDENT-OFF* */
+static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk, struct socket_info_s
+						*socket_info_ptr)
+{
+	void *sock;
+#ifndef LINUX_VER_KFUNC
 	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	struct member_fields_offset *offset =
+	    members_offset__lookup(&k0);
 	if (!offset)
 		return 0;
 
-	void *sock = get_socket_from_fd(fd, offset);
+#endif
+	if (is_socket_info_valid(socket_info_ptr)) {
+		sock = socket_info_ptr->sk;
+	} else {
+#ifndef LINUX_VER_KFUNC
+		sock = get_socket_from_fd(fd, offset);
+#else
+		sock = get_socket_from_fd(fd, NULL);
+#endif
+	}
+
 	if (sk)
 		*sk = sock;
 	if (sock == NULL)
 		return 0;
 
 	__u32 tcp_seq = 0;
-	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq),
-			      sock + offset->tcp_sock__write_seq_offset);
+	int seq_off;
+#ifndef LINUX_VER_KFUNC
+	seq_off = offset->tcp_sock__write_seq_offset;
+#else
+	seq_off = (int)((uintptr_t)
+	    __builtin_preserve_access_index(&((struct tcp_sock *)0)->write_seq));
+#endif
+	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq), sock + seq_off);
 	return tcp_seq;
 }
 
-static __u32 __inline get_tcp_read_seq_from_fd(int fd, void **sk)
+static __u32 __inline get_tcp_read_seq_from_fd(int fd, void **sk, struct socket_info_s
+					       *socket_info_ptr)
 {
+#ifndef LINUX_VER_KFUNC
 	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	struct member_fields_offset *offset =
+	    members_offset__lookup(&k0);
 	if (!offset)
 		return 0;
+#endif
+	void *sock;
+	if (is_socket_info_valid(socket_info_ptr)) {
+		sock = socket_info_ptr->sk;
+	} else {
+#ifndef LINUX_VER_KFUNC
+		sock = get_socket_from_fd(fd, offset);
+#else
+		sock = get_socket_from_fd(fd, NULL);
+#endif
+	}
 
-	void *sock = get_socket_from_fd(fd, offset);
 	if (sk)
 		*sk = sock;
 	if (sock == NULL)
 		return 0;
 
 	__u32 tcp_seq = 0;
-	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq),
-			      sock + offset->tcp_sock__copied_seq_offset);
+	int seq_off;
+#ifndef LINUX_VER_KFUNC
+	seq_off = offset->tcp_sock__copied_seq_offset;
+#else
+	seq_off = (int)((uintptr_t)
+	    __builtin_preserve_access_index(&((struct tcp_sock *)0)->copied_seq));
+#endif
+	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq), sock + seq_off);
 	return tcp_seq;
 }
+/* *INDENT-ON* */
 
 /*
  * B : buffer
@@ -568,59 +614,82 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 				    struct conn_info_s *conn_info, void *sk,
 				    struct member_fields_offset *offset)
 {
-	__be16 inet_dport;
-	__u16 inet_sport;
-	bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
-			      sk + offset->struct_sock_dport_offset);
-	bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
-			      sk + offset->struct_sock_sport_offset);
-	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
-	conn_info->tuple.num = inet_sport;
-	conn_info->correlation_id = -1;	// 当前用于kafka,openwire协议推断
+	conn_info->correlation_id = -1;	// Currently used for Kafka and OpenWire protocol inference
 	conn_info->fd = fd;
 
 	conn_info->sk = sk;
 	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) conn_info->fd);
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
-	if (conn_info->socket_info_ptr)
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		conn_info->no_trace = conn_info->socket_info_ptr->no_trace;
+		conn_info->tuple.dport =
+		    conn_info->socket_info_ptr->tuple.dport;
+		conn_info->tuple.num = conn_info->socket_info_ptr->tuple.num;
+	} else {
+		__be16 inet_dport;
+		__u16 inet_sport;
+		bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
+				      sk + offset->struct_sock_dport_offset);
+		bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
+				      sk + offset->struct_sock_sport_offset);
+		conn_info->tuple.dport = __bpf_ntohs(inet_dport);
+		conn_info->tuple.num = inet_sport;
+	}
 }
 
-static __inline bool get_socket_info(struct __socket_data *v, void *sk,
+/* *INDENT-OFF* */
+static __inline bool get_socket_info(struct __tuple_t *tuple, void *sk,
 				     struct conn_info_s *conn_info)
 {
-	if (v == NULL || sk == NULL)
+	if (sk == NULL)
 		return false;
 
+#if !defined(LINUX_VER_KFUNC)
 	unsigned int k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
 		return false;
+#endif
+	int saddr_off, daddr_off, ip6saddr_off, ip6daddr_off;
 	/*
 	 * Without thinking about PF_UNIX.
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
-		bpf_probe_read_kernel(v->tuple.rcv_saddr, 4,
-				      sk + offset->struct_sock_saddr_offset);
-		bpf_probe_read_kernel(v->tuple.daddr, 4,
-				      sk + offset->struct_sock_daddr_offset);
-		v->tuple.addr_len = 4;
+#if !defined(LINUX_VER_KFUNC)
+		saddr_off = offset->struct_sock_saddr_offset;
+		daddr_off = offset->struct_sock_daddr_offset;
+#else
+		saddr_off = (int)((uintptr_t)
+		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_rcv_saddr));
+		daddr_off = (int)((uintptr_t)
+		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_daddr));
+#endif
+		bpf_probe_read_kernel(tuple->rcv_saddr, 4, sk + saddr_off);
+		bpf_probe_read_kernel(tuple->daddr, 4, sk + daddr_off);
+		tuple->addr_len = 4;
 		break;
 	case PF_INET6:
+#if !defined(LINUX_VER_KFUNC)
+		ip6saddr_off = offset->struct_sock_ip6saddr_offset;
+		ip6daddr_off = offset->struct_sock_ip6daddr_offset;
 		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
-			bpf_probe_read_kernel(v->tuple.rcv_saddr, 16,
-					      sk +
-					      offset->
-					      struct_sock_ip6saddr_offset);
+			bpf_probe_read_kernel(tuple->rcv_saddr, 16,
+					      sk + ip6saddr_off);
 		}
 		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
-			bpf_probe_read_kernel(v->tuple.daddr, 16,
-					      sk +
-					      offset->
-					      struct_sock_ip6daddr_offset);
+			bpf_probe_read_kernel(tuple->daddr, 16,
+					      sk + ip6daddr_off);
 		}
-		v->tuple.addr_len = 16;
+#else
+		ip6saddr_off = (int)((uintptr_t)
+		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_v6_rcv_saddr));
+		ip6daddr_off = (int)((uintptr_t)
+		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_v6_daddr));
+		bpf_probe_read_kernel(tuple->rcv_saddr, 16, sk + ip6saddr_off);
+		bpf_probe_read_kernel(tuple->daddr, 16, sk + ip6daddr_off);
+#endif
+		tuple->addr_len = 16;
 		break;
 	default:
 		return false;
@@ -628,6 +697,7 @@ static __inline bool get_socket_info(struct __socket_data *v, void *sk,
 
 	return true;
 }
+/* *INDENT-ON* */
 
 #ifdef PROBE_CONN_SUBMIT
 static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_s *v,
@@ -1227,6 +1297,13 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
+		tracer_ctx->sk_info.sk = args->sk;
+		get_socket_info(&tracer_ctx->sk_info.tuple, conn_info->sk,
+				conn_info);
+		tracer_ctx->sk_info.tuple.l4_protocol =
+		    conn_info->tuple.l4_protocol;
+		tracer_ctx->sk_info.tuple.dport = conn_info->tuple.dport;
+		tracer_ctx->sk_info.tuple.num = conn_info->tuple.num;
 		tracer_ctx->sk_info.no_trace = conn_info->no_trace;
 		tracer_ctx->sk_info.uid = tracer_ctx->socket_id + 1;
 		tracer_ctx->socket_id++;	// Ensure that socket_id is incremented.
@@ -1247,8 +1324,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
 		    args->port > 0) {
 			bpf_probe_read_kernel(tracer_ctx->sk_info.ipaddr,
-					      sizeof(tracer_ctx->sk_info.
-						     ipaddr), args->addr);
+					      sizeof(tracer_ctx->
+						     sk_info.ipaddr),
+					      args->addr);
 			tracer_ctx->sk_info.udp_pre_set_addr = 1;
 			tracer_ctx->sk_info.port = args->port;
 		}
@@ -1258,8 +1336,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 */
 		if (conn_info->message_type == MSG_PRESTORE) {
 			bpf_probe_read_kernel(tracer_ctx->sk_info.prev_data,
-					      sizeof(tracer_ctx->sk_info.
-						     prev_data),
+					      sizeof(tracer_ctx->
+						     sk_info.prev_data),
 					      conn_info->prev_buf);
 			tracer_ctx->sk_info.prev_data_len =
 			    conn_info->prev_count;
@@ -1295,11 +1373,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	}
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-	if (get_socket_info(v, conn_info->sk, conn_info) == false) {
-		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
-		return SUBMIT_INVALID;
-	}
-
 	__u32 send_reasm_bytes = 0;
 	if (is_socket_info_valid(socket_info_ptr)) {
 		tracer_ctx->sk_info.uid = socket_info_ptr->uid;
@@ -1324,6 +1397,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		tracer_ctx->sk_info.seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
+		v->tuple = socket_info_ptr->tuple;
+
 		/*
 		 * Currently, only the backend socket of NGINX sets the 'socket_info_ptr->peer_fd'
 		 * value, which is the frontend fd. This handles notifying the frontend socket
@@ -1333,7 +1408,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
-							      socket_info_ptr->peer_fd);
+							      socket_info_ptr->
+							      peer_fd);
 			/*
 			 * Query the socket information of the NGINX frontend and modify the
 			 * traceID of the data returned by the frontend.
@@ -1377,11 +1453,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			     remain_bytes ? remain_bytes : syscall_len);
 			socket_info_ptr->reasm_bytes += send_reasm_bytes;
 		}
+	} else {
+		v->tuple = tracer_ctx->sk_info.tuple;
 	}
 
-	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
-	v->tuple.dport = conn_info->tuple.dport;
-	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
 	if (conn_info->tuple.l4_protocol == IPPROTO_UDP && args->port > 0) {
 		if (conn_info->skc_family == PF_INET) {
@@ -1551,8 +1626,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 			    conn_info->socket_info_ptr->port;
 			args->port = conn_info->tuple.dport;
 			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
-					      conn_info->socket_info_ptr->
-					      ipaddr);
+					      conn_info->
+					      socket_info_ptr->ipaddr);
 		}
 	}
 
@@ -1691,7 +1766,11 @@ KFUNC_PROG(ksys_write, unsigned int fd, const char __user * buf, size_t count)
 	write_args.fd = fd;
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
-	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd, &write_args.sk);
+	__u64 conn_key = gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+	    socket_info_map__lookup(&conn_key);
+	write_args.tcp_seq =
+	    get_tcp_write_seq_from_fd(fd, &write_args.sk, socket_info_ptr);
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
@@ -1738,7 +1817,11 @@ KFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count)
 	read_args.fd = fd;
 	read_args.buf = buf;
 	read_args.enter_ts = bpf_ktime_get_ns();
-	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd, &read_args.sk);
+	__u64 conn_key = gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+	    socket_info_map__lookup(&conn_key);
+	read_args.tcp_seq =
+	    get_tcp_read_seq_from_fd(fd, &read_args.sk, socket_info_ptr);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1814,7 +1897,11 @@ KFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 	write_args.fd = sockfd;
 	write_args.buf = buf;
 	write_args.enter_ts = bpf_ktime_get_ns();
-	write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd, &write_args.sk);
+	__u64 conn_key = gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+	    socket_info_map__lookup(&conn_key);
+	write_args.tcp_seq =
+	    get_tcp_write_seq_from_fd(sockfd, &write_args.sk, socket_info_ptr);
 	if (write_args.tcp_seq == 0) {
 #ifndef LINUX_VER_KFUNC
 		struct syscall_sendto_enter_ctx *sendto_ctx =
@@ -1900,7 +1987,11 @@ KFUNC_PROG(__sys_recvfrom, int fd, void __user * ubuf, size_t size,
 	read_args.fd = sockfd;
 	read_args.buf = buf;
 	read_args.enter_ts = bpf_ktime_get_ns();
-	read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd, &read_args.sk);
+	__u64 conn_key = gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+	    socket_info_map__lookup(&conn_key);
+	read_args.tcp_seq =
+	    get_tcp_read_seq_from_fd(sockfd, &read_args.sk, socket_info_ptr);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1958,7 +2049,13 @@ KFUNC_PROG(__sys_sendmsg, int fd, struct user_msghdr __user * msg,
 		write_args.iov = msghdr->msg_iov;
 		write_args.iovlen = msghdr->msg_iovlen;
 		write_args.enter_ts = bpf_ktime_get_ns();
-		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd, &write_args.sk);
+		__u64 conn_key =
+		    gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+		struct socket_info_s *socket_info_ptr =
+		    socket_info_map__lookup(&conn_key);
+		write_args.tcp_seq =
+		    get_tcp_write_seq_from_fd(sockfd, &write_args.sk,
+					      socket_info_ptr);
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -2017,7 +2114,13 @@ KFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 		write_args.iovlen = msgvec[0].msg_hdr.msg_iovlen;
 		write_args.msg_len = (void *)msgvec_ptr + offsetof(typeof(struct mmsghdr), msg_len);	//&msgvec[0].msg_len;
 		write_args.enter_ts = bpf_ktime_get_ns();
-		write_args.tcp_seq = get_tcp_write_seq_from_fd(sockfd, &write_args.sk);
+		__u64 conn_key =
+		    gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+		struct socket_info_s *socket_info_ptr =
+		    socket_info_map__lookup(&conn_key);
+		write_args.tcp_seq =
+		    get_tcp_write_seq_from_fd(sockfd, &write_args.sk,
+					      socket_info_ptr);
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -2082,7 +2185,13 @@ KFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 		read_args.iov = msghdr->msg_iov;
 		read_args.iovlen = msghdr->msg_iovlen;
 		read_args.enter_ts = bpf_ktime_get_ns();
-		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd, &read_args.sk);
+		__u64 conn_key =
+		    gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+		struct socket_info_s *socket_info_ptr =
+		    socket_info_map__lookup(&conn_key);
+		read_args.tcp_seq =
+		    get_tcp_read_seq_from_fd(sockfd, &read_args.sk,
+					     socket_info_ptr);
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -2158,7 +2267,13 @@ KFUNC_PROG(__sys_recvmmsg, int fd, struct mmsghdr __user * mmsg,
 
 		read_args.msg_len =
 		    (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
-		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd, &read_args.sk);
+		__u64 conn_key =
+		    gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+		struct socket_info_s *socket_info_ptr =
+		    socket_info_map__lookup(&conn_key);
+		read_args.tcp_seq =
+		    get_tcp_read_seq_from_fd(sockfd, &read_args.sk,
+					     socket_info_ptr);
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -2220,7 +2335,11 @@ KFUNC_PROG(do_writev, unsigned long fd, const struct iovec __user * vec,
 	write_args.iov = iov;
 	write_args.iovlen = iovlen;
 	write_args.enter_ts = bpf_ktime_get_ns();
-	write_args.tcp_seq = get_tcp_write_seq_from_fd(fd, &write_args.sk);
+	__u64 conn_key = gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+	    socket_info_map__lookup(&conn_key);
+	write_args.tcp_seq =
+	    get_tcp_write_seq_from_fd(fd, &write_args.sk, socket_info_ptr);
 	active_write_args_map__update(&id, &write_args);
 	return 0;
 }
@@ -2275,7 +2394,11 @@ KFUNC_PROG(do_readv, unsigned long fd, const struct iovec __user * vec,
 	read_args.iov = iov;
 	read_args.iovlen = iovlen;
 	read_args.enter_ts = bpf_ktime_get_ns();
-	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd, &read_args.sk);
+	__u64 conn_key = gen_conn_key_id((__u64) (id >> 32), (__u64) fd);
+	struct socket_info_s *socket_info_ptr =
+	    socket_info_map__lookup(&conn_key);
+	read_args.tcp_seq =
+	    get_tcp_read_seq_from_fd(fd, &read_args.sk, socket_info_ptr);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;

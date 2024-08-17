@@ -73,7 +73,7 @@ UPROG(openssl_write_enter) (struct pt_regs *ctx)
 		.fd = fd,
 		.buf = (void *)PT_REGS_PARM2(ctx),
 		.num = (int)PT_REGS_PARM3(ctx),
-		.tcp_seq = get_tcp_write_seq_from_fd(fd, &sk),
+		.tcp_seq = get_tcp_write_seq_from_fd(fd, &sk, NULL),
 	};
 	ssl_ctx.sk = sk;
 	ssl_ctx_map__update(&id, &ssl_ctx);
@@ -132,7 +132,7 @@ UPROG(openssl_read_enter) (struct pt_regs *ctx)
 		.fd = fd,
 		.buf = (void *)PT_REGS_PARM2(ctx),
 		.num = (int)PT_REGS_PARM3(ctx),
-		.tcp_seq = get_tcp_read_seq_from_fd(fd, &sk),
+		.tcp_seq = get_tcp_read_seq_from_fd(fd, &sk, NULL),
 	};
 	ssl_ctx.sk = sk;
 	ssl_ctx_map__update(&id, &ssl_ctx);

@@ -166,6 +166,8 @@ struct socket_info_s {
 	__u32 prev_data_len;
 	__u64 trace_id;
 	__u64 uid; // Unique identifier ID for the socket.
+	void *sk;
+	struct __tuple_t tuple;
 } __attribute__((packed));
 
 /**
