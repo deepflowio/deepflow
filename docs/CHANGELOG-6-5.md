@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: drop Org data in ckwriter [#7859](https://github.com/deepflowio/deepflow/pull/7859) by [lzf575](https://github.com/lzf575)
 * fix: skip check when getting icon fails [#7851](https://github.com/deepflowio/deepflow/pull/7851) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: Add libpcap dependency to installation package [#7834](https://github.com/deepflowio/deepflow/pull/7834) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: fix agent rebalance panic [#7830](https://github.com/deepflowio/deepflow/pull/7830) by [roryye](https://github.com/roryye)
