@@ -35,7 +35,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
+	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
+	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
+	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"gorm.io/gorm"
 )
 
@@ -140,6 +143,19 @@ func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 	}
 	response := orgResponse.Get("DATA")
 	return response, err
+}
+
+func AllocORGID() (map[string]int, error) {
+	ids, err := idmng.GetIDs(controllerCommon.DEFAULT_ORG_ID, controllerCommon.RESOURCE_TYPE_ORG_EN, 1)
+	if err != nil {
+		log.Errorf("%s request ids failed", controllerCommon.RESOURCE_TYPE_ORG_EN)
+		return nil, err
+	}
+	if len(ids) != 1 {
+		log.Errorf("request ids=%v err", ids)
+		return nil, NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("request ids=%v err", ids))
+	}
+	return map[string]int{"ID": ids[0]}, nil
 }
 
 var (
