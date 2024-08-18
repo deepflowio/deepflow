@@ -528,7 +528,7 @@ type ORG struct {
 }
 
 func (o ORG) GetID() int {
-	return o.ID
+	return o.ORGID
 }
 
 func (o ORG) GetLcuuid() string {
