@@ -1268,6 +1268,7 @@ func (t *PlatformInfoTable) requestOrgIds() []uint16 {
 		return t.orgIds
 	}
 	orgIdU32s := response.GetOrgIds()
+	orgIdsUpdateTime := response.GetUpdateTime()
 	orgIdU16s := make([]uint16, 0, len(orgIdU32s))
 	for _, orgId := range orgIdU32s {
 		if ckdb.IsValidOrgID(uint16(orgId)) {
@@ -1301,7 +1302,7 @@ func (t *PlatformInfoTable) requestOrgIds() []uint16 {
 		}
 		t.orgIdExists = orgIdExists
 	}
-	t.orgIdsUpdateTime = uint32(time.Now().Unix())
+	t.orgIdsUpdateTime = orgIdsUpdateTime
 	return t.orgIds
 }
 
