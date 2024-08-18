@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
@@ -484,7 +485,8 @@ func (m *TrisolarisManager) checkORG() {
 		orgIDsUint32[index] = uint32(orgID)
 	}
 	m.orgIDData = &trident.OrgIDsResponse{
-		OrgIds: orgIDsUint32,
+		OrgIds:     orgIDsUint32,
+		UpdateTime: proto.Uint32(uint32(time.Now().Unix())),
 	}
 
 	for orgID, trisolaris := range m.orgToTrisolaris {
@@ -513,7 +515,7 @@ func (m *TrisolarisManager) checkORG() {
 }
 
 func (m *TrisolarisManager) TimedCheckORG() {
-	interval := time.Duration(60)
+	interval := time.Duration(m.config.ORGDataRefreshInterval)
 	ticker := time.NewTicker(interval * time.Second).C
 	for {
 		select {

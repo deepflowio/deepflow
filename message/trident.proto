@@ -1158,4 +1158,5 @@ message OrgIDsRequest {}
 
 message OrgIDsResponse {
     repeated uint32 org_ids = 1;
+    optional uint32 update_time = 2;
 }
