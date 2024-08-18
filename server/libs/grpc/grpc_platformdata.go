@@ -1265,6 +1265,7 @@ func (t *PlatformInfoTable) requestOrgIds() {
 		log.Errorf("request org ids failed: %s", err)
 	}
 	orgIdU32s := response.GetOrgIds()
+	orgIdsUpdateTime := response.GetUpdateTime()
 	orgIdU16s := make([]uint16, 0, len(orgIdU32s))
 	for _, orgId := range orgIdU32s {
 		if ckdb.IsValidOrgID(uint16(orgId)) {
@@ -1298,7 +1299,7 @@ func (t *PlatformInfoTable) requestOrgIds() {
 		}
 		t.orgIdExists = orgIdExists
 	}
-	t.orgIdsUpdateTime = uint32(time.Now().Unix())
+	t.orgIdsUpdateTime = orgIdsUpdateTime
 }
 
 func (t *PlatformInfoTable) Version(orgId uint16) uint64 {
