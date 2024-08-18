@@ -81,7 +81,7 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig
 }
 
 func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
-	log.Infof("delete org (id: %d) data", orgID)
+	log.Infof("delete org (id: %d) mysql data", orgID)
 	cfg := common.ReplaceConfigDatabaseName(mysqlCfg, orgID)
 	if err = migrator.DropDatabase(cfg); err != nil {
 		return err
@@ -90,13 +90,18 @@ func DeleteORGData(orgID int, mysqlCfg mysqlcfg.MySqlConfig) (err error) {
 }
 
 func DeleteORGDataNonRealTime(orgIDs []int) error {
-	var res error
+	log.Infof("delete orgs (ids: %v) clickhouse data", orgIDs)
+	var msg string
 	for _, id := range orgIDs {
 		if err := servercommon.DropOrg(uint16(id)); err != nil {
-			res = err
+			log.Errorf("failed to drop org %d ck: %s", id, err.Error())
+			msg += fmt.Sprintf("%s. ", err.Error())
 		}
 	}
-	return res
+	if msg == "" {
+		return nil
+	}
+	return fmt.Errorf(msg)
 }
 
 func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
