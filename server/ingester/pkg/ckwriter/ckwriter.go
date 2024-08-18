@@ -305,8 +305,8 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 func (w *CKWriter) dropOrg(orgId uint16) {
 	for i := range w.orgQueueCaches {
 		log.Debugf("ckwriter %s queue %d drop org %d", w.name, i, orgId)
-		w.orgQueueCaches[i][orgId].tableCreated = false
 		w.orgQueueCaches[i][orgId].dropTime = uint32(time.Now().Unix())
+		w.orgQueueCaches[i][orgId].tableCreated = false
 	}
 }
 
