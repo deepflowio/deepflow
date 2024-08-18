@@ -59,6 +59,7 @@ type Config struct {
 	GrpcMaxMessageLength           int
 	ExportersEnabled               bool
 	PlatformDataRefreshDelayTime   int `default:"1" yaml:"platform-data-refresh-delay-time"`
+	ORGDataRefreshInterval         int `default:"60" yaml:"org-data-refresh-interval"`
 	NoTeamIDRefused                bool
 	FPermit                        common.FPermit
 	IngesterAPI                    common.IngesterApi // data source
