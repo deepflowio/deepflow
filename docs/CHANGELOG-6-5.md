@@ -7,6 +7,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* feat: fixes allocating wrong org id [#7864](https://github.com/deepflowio/deepflow/pull/7864) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: drop data which organization is not exist [#7863](https://github.com/deepflowio/deepflow/pull/7863) by [lzf575](https://github.com/lzf575)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
@@ -57,6 +59,10 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: support update time of org list [#7867](https://github.com/deepflowio/deepflow/pull/7867) by [lzf575](https://github.com/lzf575)
+* feat: optimize org data check and sync [#7866](https://github.com/deepflowio/deepflow/pull/7866) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: adds detail error record when calling ingester org deletion [#7865](https://github.com/deepflowio/deepflow/pull/7865) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: add api for allocate org id [#7862](https://github.com/deepflowio/deepflow/pull/7862) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
 * feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
