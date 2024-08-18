@@ -73,7 +73,12 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[mysql.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
 	}
 
-	if orgID == ctrlrcommon.DEFAULT_ORG_ID {
+	orgTableExists, err := mysql.CheckIfORGTableExists()
+	if err != nil {
+		log.Errorf("failed to check if org table exists: %s", err.Error())
+		return nil, err
+	}
+	if orgTableExists && orgID == ctrlrcommon.DEFAULT_ORG_ID {
 		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newIDPool[mysql.ORG](
 			mng.org, ctrlrcommon.RESOURCE_TYPE_ORG_EN, ctrlrcommon.ORG_ID_MAX,
 		)
