@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Modify array tag filter zero check #26069 [#7853](https://github.com/deepflowio/deepflow/pull/7853) by [Ericsssss](https://github.com/Ericsssss)
 * fix: skip check when getting icon fails [#7849](https://github.com/deepflowio/deepflow/pull/7849) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: Add libpcap dependency to installation package [#7833](https://github.com/deepflowio/deepflow/pull/7833) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: service data is not written to ck [#7832](https://github.com/deepflowio/deepflow/pull/7832) by [duandaa](https://github.com/duandaa)
@@ -138,6 +139,9 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: drop data which organization is not exist [#7877](https://github.com/deepflowio/deepflow/pull/7877) by [lzf575](https://github.com/lzf575)
+* feat: supports non-real-time deletion of ck of deleted orgs [#7876](https://github.com/deepflowio/deepflow/pull/7876) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: optimize org data check and sync [#7870](https://github.com/deepflowio/deepflow/pull/7870) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: change service chsql filter [#7842](https://github.com/deepflowio/deepflow/pull/7842) by [duandaa](https://github.com/duandaa)
 * feat: service_type of auto_service_type change to pod_service_type [#7841](https://github.com/deepflowio/deepflow/pull/7841) by [lzf575](https://github.com/lzf575)
 * feat: Modify policy_app_type value [#7822](https://github.com/deepflowio/deepflow/pull/7822) by [Ericsssss](https://github.com/Ericsssss)
@@ -296,6 +300,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: agent divides the config into dynamic_config and user_config [#7872](https://github.com/deepflowio/deepflow/pull/7872) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: add configuration structures [#7804](https://github.com/deepflowio/deepflow/pull/7804) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: modify the default batch write size for metrics and flow logs [#7789](https://github.com/deepflowio/deepflow/pull/7789) by [lzf575](https://github.com/lzf575)
 * refactor: agent config [#7745](https://github.com/deepflowio/deepflow/pull/7745) by [TomatoMr](https://github.com/TomatoMr)
