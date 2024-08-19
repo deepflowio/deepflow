@@ -168,7 +168,7 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 		log.Debugf("decoder %d vtap %d recv telegraf point: %v", d.index, vtapID, point)
 	}
 	extMetrics, err := d.PointToExtMetrics(vtapID, point)
-	if err != nil {
+	if err != nil || !extMetrics.IsValid() {
 		if d.counter.ErrMetrics == 0 {
 			log.Warning(err)
 		}
@@ -202,6 +202,13 @@ func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecode
 			log.Debugf("decoder %d vtap %d recv deepflow stats: %v", d.index, vtapID, pbStats)
 		}
 		metrics, dbId := d.StatsToExtMetrics(vtapID, pbStats)
+		if !metrics.IsValid() {
+			if d.counter.ErrMetrics == 0 {
+				log.Warningf("ext metrics is invalid. %+v", metrics)
+			}
+			d.counter.ErrMetrics++
+			continue
+		}
 		d.extMetricsWriters[dbId].Write(metrics)
 		d.counter.OutCount++
 	}

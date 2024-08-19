@@ -19,6 +19,7 @@ package stats
 import (
 	"io"
 	"net"
+	"sync"
 
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 )
@@ -88,9 +89,11 @@ type UDPClient struct {
 	payloadSize int
 	buffer      []byte
 	header      []byte // 需要封装消息类型头
+	lock        sync.Mutex
 }
 
 func (uc *UDPClient) Write(bs []byte) error {
+	uc.lock.Lock()
 	var err error
 	n := len(bs)
 
@@ -105,5 +108,6 @@ func (uc *UDPClient) Write(bs []byte) error {
 	}
 	uc.buffer = append(uc.buffer, bs...)
 
+	uc.lock.Unlock()
 	return err
 }
