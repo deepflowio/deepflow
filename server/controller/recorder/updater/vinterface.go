@@ -119,8 +119,6 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		SubDomain:  cloudItem.SubDomainLcuuid,
 		Domain:     i.metadata.Domain.Lcuuid,
 		Region:     cloudItem.RegionLcuuid,
-		NetnsID:    cloudItem.NetnsID,
-		VtapID:     cloudItem.VTapID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
@@ -177,14 +175,6 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 	if diffBase.Type != cloudItem.Type {
 		mapInfo["iftype"] = cloudItem.Type
 		structInfo.Type.Set(diffBase.Type, cloudItem.Type)
-	}
-	if diffBase.NetnsID != cloudItem.NetnsID {
-		mapInfo["netns_id"] = cloudItem.NetnsID
-		structInfo.NetnsID.Set(diffBase.NetnsID, cloudItem.NetnsID)
-	}
-	if diffBase.VtapID != cloudItem.VTapID {
-		mapInfo["vtap_id"] = cloudItem.VTapID
-		structInfo.VTapID.Set(diffBase.VtapID, cloudItem.VTapID)
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

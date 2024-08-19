@@ -338,8 +338,6 @@ type VInterfaceFieldsUpdate struct {
 	Name          fieldDetail[string]
 	TapMac        fieldDetail[string]
 	Type          fieldDetail[int]
-	NetnsID       fieldDetail[uint32]
-	VTapID        fieldDetail[uint32]
 	NetworkID     fieldDetail[int]
 	NetworkLcuuid fieldDetail[string]
 	RegionLcuuid  fieldDetail[string]

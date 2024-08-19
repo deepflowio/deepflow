@@ -39,8 +39,6 @@ func (b *DataSet) AddVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *
 		},
 		Name:            dbItem.Name,
 		Type:            dbItem.Type,
-		VtapID:          dbItem.VtapID,
-		NetnsID:         dbItem.NetnsID,
 		TapMac:          dbItem.TapMac,
 		DeviceType:      dbItem.DeviceType,
 		DeviceLcuuid:    deviceLcuuid,
@@ -61,8 +59,6 @@ type VInterface struct {
 	Name            string `json:"name"`
 	Type            int    `json:"type"`
 	TapMac          string `json:"tap_mac"`
-	NetnsID         uint32 `json:"netns_id"`
-	VtapID          uint32 `json:"vtap_id"`
 	DeviceType      int    `json:"device_type"`
 	DeviceLcuuid    string `json:"device_lcuuid"`
 	NetworkLcuuid   string `json:"network_lcuuid"`
@@ -74,8 +70,6 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.Name = cloudItem.Name
 	v.Type = cloudItem.Type
 	v.TapMac = cloudItem.TapMac
-	v.NetnsID = cloudItem.NetnsID
-	v.VtapID = cloudItem.VTapID
 	v.DeviceLcuuid = cloudItem.DeviceLcuuid
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
