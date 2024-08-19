@@ -45,6 +45,10 @@ type ExtMetrics struct {
 	MetricsFloatValues []float64
 }
 
+func (m *ExtMetrics) IsValid() bool {
+	return len(m.TagNames) == len(m.TagValues) && len(m.MetricsFloatNames) == len(m.MetricsFloatValues)
+}
+
 func (m *ExtMetrics) DatabaseName() string {
 	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS {
 		return DEEPFLOW_SYSTEM_DB
@@ -150,6 +154,10 @@ func (m *ExtMetrics) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
 
+	if !m.IsValid() {
+		log.Warningf("ext metrics is invalid. %+v", m)
+		return
+	}
 	// tags
 	flowTagInfo.FieldType = flow_tag.FieldTag
 	for i, name := range m.TagNames {

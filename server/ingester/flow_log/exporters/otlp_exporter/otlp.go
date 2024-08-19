@@ -136,7 +136,7 @@ func L7FlowLogToExportResourceSpans(l7 *log_data.L7FlowLog, universalTagsManager
 	span := resSpan.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	spanAttrs := span.Attributes()
 
-	if dataTypeBits&config.NATIVE_TAG != 0 {
+	if dataTypeBits&config.NATIVE_TAG != 0 && len(l7.AttributeNames) == len(l7.AttributeValues) {
 		for i := range l7.AttributeNames {
 			putStrWithoutEmpty(spanAttrs, l7.AttributeNames[i], l7.AttributeValues[i])
 		}
