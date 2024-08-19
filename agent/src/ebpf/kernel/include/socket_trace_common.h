@@ -166,12 +166,10 @@ struct socket_info_s {
 	__u32 prev_data_len;
 	__u64 trace_id;
 	__u64 uid; // Unique identifier ID for the socket.
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	void *sk;
 	struct __tuple_t tuple;
-	__u32 write_tcpseq_base;
-	__u32 read_tcpseq_base;
-	ssize_t total_read_bytes;
-	ssize_t total_write_bytes;
+#endif
 } __attribute__((packed));
 
 /**
@@ -189,7 +187,9 @@ struct tracer_ctx_s {
 	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
 	__u64 period_timestamp; /**< Record the timestamp of the periodic check of the push buffer. */
 	bool disable_tracing;  /**< Disable tracing feature. */
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	struct socket_info_s sk_info; /**< Prevent stack overflow; this option is used as an alternative to stack allocation. */
+#endif
 };
 
 struct trace_key_t {

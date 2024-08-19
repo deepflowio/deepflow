@@ -594,7 +594,7 @@ static __inline enum message_type infer_http2_message(const char *buf_kern,
 				.tgid = bpf_get_current_pid_tgid() >> 32,
 				.fd = conn_info->fd,
 				.tcp_seq_end =
-				    get_tcp_read_seq_from_fd(conn_info->fd, NULL, NULL),
+				    get_tcp_read_seq(conn_info->fd, NULL, NULL),
 			};
 			// make linux 4.14 validator happy
 			__u32 tcp_seq = tcp_seq_key.tcp_seq_end - count;

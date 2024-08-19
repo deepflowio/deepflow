@@ -193,34 +193,35 @@ static __inline void *get_socket_from_fd(int fd_num,
 {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	void *file = NULL;
-	int files_off, fdt_off;
 #ifdef LINUX_VER_KFUNC
+	int files_off, fdt_off;
 	files_off = (int)((uintptr_t)
 			  __builtin_preserve_access_index
 			  (&((struct task_struct *)0)->files));
 	fdt_off = (int)((uintptr_t)
 			__builtin_preserve_access_index
 			(&((struct files_struct *)0)->fdt));
+	file = get_socket_file_addr_with_check(task, fd_num, files_off, fdt_off);
 #else
-	files_off = offset->task__files_offset;
-	fdt_off = offset->struct_files_struct_fdt_offset;
-#endif
 	file =
-	    get_socket_file_addr_with_check(task, fd_num, files_off, fdt_off);
-
+	    get_socket_file_addr_with_check(task, fd_num,
+					    offset->task__files_offset,
+					    offset->
+					    struct_files_struct_fdt_offset);
+#endif
 	if (file == NULL)
 		return NULL;
-	void *private_data;
-	int data_off;
+	void *private_data = NULL;
 #ifdef LINUX_VER_KFUNC
-	data_off = (int)((uintptr_t)
+	int data_off = (int)((uintptr_t)
 			 __builtin_preserve_access_index(&((struct file *)
 							   0)->private_data));
-#else
-	data_off = offset->struct_files_private_data_offset;
-#endif
 	bpf_probe_read_kernel(&private_data, sizeof(private_data),
 			      file + data_off);
+#else
+	bpf_probe_read_kernel(&private_data, sizeof(private_data),
+			      file + offset->struct_files_private_data_offset);
+#endif
 	if (private_data == NULL) {
 		return NULL;
 	}

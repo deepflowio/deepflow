@@ -389,7 +389,6 @@ struct go_string {
 struct tls_conn {
 	int fd;
 	char *buffer;
-	void *sk;
 	__u32 tcp_seq;
 	void *sp;		// stack pointer
 };

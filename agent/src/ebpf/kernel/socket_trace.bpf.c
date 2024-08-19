@@ -209,20 +209,15 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk, struct socket
 	    members_offset__lookup(&k0);
 	if (!offset)
 		return 0;
-
-#endif
-	if (is_socket_info_valid(socket_info_ptr)) {
-		sock = socket_info_ptr->sk;
-	} else {
-#ifndef LINUX_VER_KFUNC
-		sock = get_socket_from_fd(fd, offset);
+	sock = get_socket_from_fd(fd, offset);
 #else
+	if (is_socket_info_valid(socket_info_ptr))
+		sock = socket_info_ptr->sk;
+	else
 		sock = get_socket_from_fd(fd, NULL);
-#endif
-	}
-
 	if (sk)
 		*sk = sock;
+#endif
 	if (sock == NULL)
 		return 0;
 
@@ -241,26 +236,22 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk, struct socket
 static __u32 __inline get_tcp_read_seq_from_fd(int fd, void **sk, struct socket_info_s
 					       *socket_info_ptr)
 {
+	void *sock;
 #ifndef LINUX_VER_KFUNC
 	__u32 k0 = 0;
 	struct member_fields_offset *offset =
 	    members_offset__lookup(&k0);
 	if (!offset)
 		return 0;
-#endif
-	void *sock;
-	if (is_socket_info_valid(socket_info_ptr)) {
-		sock = socket_info_ptr->sk;
-	} else {
-#ifndef LINUX_VER_KFUNC
-		sock = get_socket_from_fd(fd, offset);
+	sock = get_socket_from_fd(fd, offset);
 #else
+	if (is_socket_info_valid(socket_info_ptr))
+		sock = socket_info_ptr->sk;
+	else
 		sock = get_socket_from_fd(fd, NULL);
-#endif
-	}
-
 	if (sk)
 		*sk = sock;
+#endif
 	if (sock == NULL)
 		return 0;
 
@@ -281,6 +272,7 @@ static __u32 __inline get_tcp_write_seq(int fd, void **sk, struct socket_info_s
 					*socket_info_ptr)
 {
 	__u32 tcpseq = get_tcp_write_seq_from_fd(fd, sk, socket_info_ptr);
+#if 0
 	// Check if the TCP sequence number is correct
 	if (is_socket_info_valid(socket_info_ptr)) {
 		__u32 check_seq;
@@ -293,13 +285,12 @@ static __u32 __inline get_tcp_write_seq(int fd, void **sk, struct socket_info_s
 		 */
 		if (!(tcpseq == check_seq || tcpseq == (check_seq + 1))) {
 			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
-			__u64 conn_key =
-			    gen_conn_key_id((__u64) tgid,
-					    (__u64) fd);
+			__u64 conn_key = gen_conn_key_id((__u64) tgid,
+							 (__u64) fd);
 			delete_socket_info(conn_key, socket_info_ptr);
 		}
 	}
-
+#endif
 	return tcpseq;
 }
 
@@ -307,6 +298,7 @@ static __u32 __inline get_tcp_read_seq(int fd, void **sk, struct socket_info_s
 				       *socket_info_ptr)
 {
 	__u32 tcpseq = get_tcp_read_seq_from_fd(fd, sk, socket_info_ptr);
+#if 0
 	// Check if the TCP sequence number is correct
 	if (is_socket_info_valid(socket_info_ptr)) {
 		__u32 check_seq;
@@ -319,13 +311,12 @@ static __u32 __inline get_tcp_read_seq(int fd, void **sk, struct socket_info_s
 		 */
 		if (!(tcpseq == check_seq || tcpseq == (check_seq + 1))) {
 			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
-			__u64 conn_key =
-			    gen_conn_key_id((__u64) tgid,
-					    (__u64) fd);
+			__u64 conn_key = gen_conn_key_id((__u64) tgid,
+							 (__u64) fd);
 			delete_socket_info(conn_key, socket_info_ptr);
 		}
 	}
-
+#endif
 	return tcpseq;
 }
 
@@ -675,79 +666,97 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		conn_info->no_trace = conn_info->socket_info_ptr->no_trace;
+#if defined(LINUX_VER_KFUNC)
 		conn_info->tuple.dport =
 		    conn_info->socket_info_ptr->tuple.dport;
 		conn_info->tuple.num = conn_info->socket_info_ptr->tuple.num;
-		if (direction == T_EGRESS)
-			conn_info->socket_info_ptr->total_write_bytes +=
-			    bytes_count;
-		else
-			conn_info->socket_info_ptr->total_read_bytes +=
-			    bytes_count;
 	} else {
-		__be16 inet_dport;
-		__u16 inet_sport;
-		bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
-				      sk + offset->struct_sock_dport_offset);
-		bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
-				      sk + offset->struct_sock_sport_offset);
-		conn_info->tuple.dport = __bpf_ntohs(inet_dport);
-		conn_info->tuple.num = inet_sport;
+#else
 	}
+#endif
+	__be16 inet_dport;
+	__u16 inet_sport;
+	bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
+			      sk + offset->struct_sock_dport_offset);
+	bpf_probe_read_kernel(&inet_sport, sizeof(inet_sport),
+			      sk + offset->struct_sock_sport_offset);
+	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
+	conn_info->tuple.num = inet_sport;
+#if defined(LINUX_VER_KFUNC)
+}
+#endif
 }
 
 /* *INDENT-OFF* */
+#if !defined(LINUX_VER_KFUNC)
+static __inline bool get_socket_info(struct __socket_data *v, void *sk,
+				     struct conn_info_s *conn_info)
+{
+	if (v == NULL || sk == NULL)
+		return false;
+
+	unsigned int k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return false;
+	/*
+	 * Without thinking about PF_UNIX.
+	 */
+	switch (conn_info->skc_family) {
+	case PF_INET:
+		bpf_probe_read_kernel(v->tuple.rcv_saddr, 4,
+				      sk + offset->struct_sock_saddr_offset);
+		bpf_probe_read_kernel(v->tuple.daddr, 4,
+				      sk + offset->struct_sock_daddr_offset);
+		v->tuple.addr_len = 4;
+		break;
+	case PF_INET6:
+		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
+			bpf_probe_read_kernel(v->tuple.rcv_saddr, 16,
+					      sk +
+					      offset->struct_sock_ip6saddr_offset);
+		}
+		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
+			bpf_probe_read_kernel(v->tuple.daddr, 16,
+					      sk +
+					      offset->struct_sock_ip6daddr_offset);
+		}
+		v->tuple.addr_len = 16;
+		break;
+	default:
+		return false;
+	}
+
+	return true;
+}
+#else
 static __inline bool get_socket_info(struct __tuple_t *tuple, void *sk,
 				     struct conn_info_s *conn_info)
 {
 	if (sk == NULL)
 		return false;
 
-#if !defined(LINUX_VER_KFUNC)
-	unsigned int k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
-	if (!offset)
-		return false;
-#endif
 	int saddr_off, daddr_off, ip6saddr_off, ip6daddr_off;
 	/*
 	 * Without thinking about PF_UNIX.
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
-#if !defined(LINUX_VER_KFUNC)
-		saddr_off = offset->struct_sock_saddr_offset;
-		daddr_off = offset->struct_sock_daddr_offset;
-#else
 		saddr_off = (int)((uintptr_t)
 		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_rcv_saddr));
 		daddr_off = (int)((uintptr_t)
 		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_daddr));
-#endif
 		bpf_probe_read_kernel(tuple->rcv_saddr, 4, sk + saddr_off);
 		bpf_probe_read_kernel(tuple->daddr, 4, sk + daddr_off);
 		tuple->addr_len = 4;
 		break;
 	case PF_INET6:
-#if !defined(LINUX_VER_KFUNC)
-		ip6saddr_off = offset->struct_sock_ip6saddr_offset;
-		ip6daddr_off = offset->struct_sock_ip6daddr_offset;
-		if (sk + offset->struct_sock_ip6saddr_offset >= 0) {
-			bpf_probe_read_kernel(tuple->rcv_saddr, 16,
-					      sk + ip6saddr_off);
-		}
-		if (sk + offset->struct_sock_ip6daddr_offset >= 0) {
-			bpf_probe_read_kernel(tuple->daddr, 16,
-					      sk + ip6daddr_off);
-		}
-#else
 		ip6saddr_off = (int)((uintptr_t)
 		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_v6_rcv_saddr));
 		ip6daddr_off = (int)((uintptr_t)
 		    __builtin_preserve_access_index(&((struct sock_common *)0)->skc_v6_daddr));
 		bpf_probe_read_kernel(tuple->rcv_saddr, 16, sk + ip6saddr_off);
 		bpf_probe_read_kernel(tuple->daddr, 16, sk + ip6daddr_off);
-#endif
 		tuple->addr_len = 16;
 		break;
 	default:
@@ -756,6 +765,7 @@ static __inline bool get_socket_info(struct __tuple_t *tuple, void *sk,
 
 	return true;
 }
+#endif
 /* *INDENT-ON* */
 
 #ifdef PROBE_CONN_SUBMIT
@@ -1297,7 +1307,14 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 
 	__u32 tcp_seq = args->tcp_seq;
 	__u64 thread_trace_id = 0;
+	struct socket_info_s *sk_info;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	__builtin_memset(&tracer_ctx->sk_info, 0, sizeof(tracer_ctx->sk_info));
+	sk_info = &tracer_ctx->sk_info;
+#else
+	struct socket_info_s __sk_info = { 0 };
+	sk_info = &__sk_info;
+#endif
 
 	if (tracer_ctx->disable_tracing)
 		conn_info->no_trace = true;
@@ -1359,65 +1376,54 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		if (socket_info_ptr &&
 		    conn_info->direction == T_EGRESS &&
 		    !conn_info->no_trace && socket_info_ptr->peer_fd > 0) {
-			tracer_ctx->sk_info.peer_fd = socket_info_ptr->peer_fd;
+			sk_info->peer_fd = socket_info_ptr->peer_fd;
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
-
-		tracer_ctx->sk_info.sk = args->sk;
-		get_socket_info(&tracer_ctx->sk_info.tuple, conn_info->sk,
-				conn_info);
-		tracer_ctx->sk_info.tuple.l4_protocol =
-		    conn_info->tuple.l4_protocol;
-		tracer_ctx->sk_info.tuple.dport = conn_info->tuple.dport;
-		tracer_ctx->sk_info.tuple.num = conn_info->tuple.num;
-		tracer_ctx->sk_info.no_trace = conn_info->no_trace;
-		tracer_ctx->sk_info.uid = tracer_ctx->socket_id + 1;
+#if defined(LINUX_VER_KFUNC)
+		sk_info->sk = args->sk;
+		get_socket_info(&sk_info->tuple, conn_info->sk, conn_info);
+		sk_info->tuple.l4_protocol = conn_info->tuple.l4_protocol;
+		sk_info->tuple.dport = conn_info->tuple.dport;
+		sk_info->tuple.num = conn_info->tuple.num;
+#endif
+		sk_info->no_trace = conn_info->no_trace;
+		sk_info->uid = tracer_ctx->socket_id + 1;
 		tracer_ctx->socket_id++;	// Ensure that socket_id is incremented.
-		tracer_ctx->sk_info.l7_proto = conn_info->protocol;
-		if (conn_info->direction == T_EGRESS) {
-			tracer_ctx->sk_info.total_write_bytes = syscall_len;
-			tracer_ctx->sk_info.write_tcpseq_base = tcp_seq;
-		} else {
-			tracer_ctx->sk_info.total_read_bytes = syscall_len;
-			tracer_ctx->sk_info.read_tcpseq_base = tcp_seq;
-		}
+		sk_info->l7_proto = conn_info->protocol;
 		//Confirm whether data reassembly is required for this socket.
 		if (is_proto_reasm_enabled(conn_info->protocol)) {
-			tracer_ctx->sk_info.allow_reassembly = true;
-			tracer_ctx->sk_info.reasm_bytes =
+			sk_info->allow_reassembly = true;
+			sk_info->reasm_bytes =
 			    syscall_len >
 			    data_max_sz ? data_max_sz : syscall_len;
 		}
-		tracer_ctx->sk_info.direction = conn_info->direction;
-		tracer_ctx->sk_info.pre_direction = conn_info->direction;
-		tracer_ctx->sk_info.role = conn_info->role;
-		tracer_ctx->sk_info.update_time = time_stamp / NS_PER_SEC;
-		tracer_ctx->sk_info.need_reconfirm = conn_info->need_reconfirm;
-		tracer_ctx->sk_info.correlation_id = conn_info->correlation_id;
+		sk_info->direction = conn_info->direction;
+		sk_info->pre_direction = conn_info->direction;
+		sk_info->role = conn_info->role;
+		sk_info->update_time = time_stamp / NS_PER_SEC;
+		sk_info->need_reconfirm = conn_info->need_reconfirm;
+		sk_info->correlation_id = conn_info->correlation_id;
 		if (conn_info->tuple.l4_protocol == IPPROTO_UDP &&
 		    args->port > 0) {
-			bpf_probe_read_kernel(tracer_ctx->sk_info.ipaddr,
-					      sizeof(tracer_ctx->sk_info.
-						     ipaddr), args->addr);
-			tracer_ctx->sk_info.udp_pre_set_addr = 1;
-			tracer_ctx->sk_info.port = args->port;
+			bpf_probe_read_kernel(sk_info->ipaddr,
+					      sizeof(sk_info->ipaddr),
+					      args->addr);
+			sk_info->udp_pre_set_addr = 1;
+			sk_info->port = args->port;
 		}
 
 		/*
 		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
 		 */
 		if (conn_info->message_type == MSG_PRESTORE) {
-			bpf_probe_read_kernel(tracer_ctx->sk_info.prev_data,
-					      sizeof(tracer_ctx->sk_info.
-						     prev_data),
+			bpf_probe_read_kernel(sk_info->prev_data,
+					      sizeof(sk_info->prev_data),
 					      conn_info->prev_buf);
-			tracer_ctx->sk_info.prev_data_len =
-			    conn_info->prev_count;
-			tracer_ctx->sk_info.uid = 0;
+			sk_info->prev_data_len = conn_info->prev_count;
+			sk_info->uid = 0;
 		}
 
-		int ret =
-		    socket_info_map__update(&conn_key, &tracer_ctx->sk_info);
+		int ret = socket_info_map__update(&conn_key, sk_info);
 		if (socket_info_ptr == NULL && ret == 0) {
 			__sync_fetch_and_add(&trace_stats->socket_map_count, 1);
 		}
@@ -1445,11 +1451,16 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	}
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+#if !defined(LINUX_VER_KFUNC)
+	if (get_socket_info(v, conn_info->sk, conn_info) == false) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return SUBMIT_INVALID;
+	}
+#endif
 	__u32 send_reasm_bytes = 0;
 	if (is_socket_info_valid(socket_info_ptr)) {
-		tracer_ctx->sk_info.uid = socket_info_ptr->uid;
-		tracer_ctx->sk_info.allow_reassembly =
-		    socket_info_ptr->allow_reassembly;
+		sk_info->uid = socket_info_ptr->uid;
+		sk_info->allow_reassembly = socket_info_ptr->allow_reassembly;
 
 		/*
 		 * The kernel syscall interface determines that it is the TLS
@@ -1466,10 +1477,12 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * threads read/write to the socket simultaneously.
 		 */
 		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-		tracer_ctx->sk_info.seq = socket_info_ptr->seq;
+		sk_info->seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
+#if defined(LINUX_VER_KFUNC)
 		v->tuple = socket_info_ptr->tuple;
+#endif
 
 		/*
 		 * Currently, only the backend socket of NGINX sets the 'socket_info_ptr->peer_fd'
@@ -1480,7 +1493,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		    && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64) tgid,
 							      (__u64)
-							      socket_info_ptr->peer_fd);
+							      socket_info_ptr->
+							      peer_fd);
 			/*
 			 * Query the socket information of the NGINX frontend and modify the
 			 * traceID of the data returned by the frontend.
@@ -1515,7 +1529,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * enabling data reassembly. The data transmission size is limited by
 		 * the maximum transmission configuration value.
 		 */
-		if (tracer_ctx->sk_info.allow_reassembly
+		if (sk_info->allow_reassembly
 		    && socket_info_ptr->reasm_bytes < data_max_sz) {
 			__u32 remain_bytes =
 			    data_max_sz - socket_info_ptr->reasm_bytes;
@@ -1524,10 +1538,16 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			     remain_bytes ? remain_bytes : syscall_len);
 			socket_info_ptr->reasm_bytes += send_reasm_bytes;
 		}
-	} else {
-		v->tuple = tracer_ctx->sk_info.tuple;
 	}
-
+#if defined(LINUX_VER_KFUNC)
+	else {
+		v->tuple = sk_info->tuple;
+	}
+#else
+	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
+	v->tuple.dport = conn_info->tuple.dport;
+	v->tuple.num = conn_info->tuple.num;
+#endif
 	v->data_type = conn_info->protocol;
 	if (conn_info->tuple.l4_protocol == IPPROTO_UDP && args->port > 0) {
 		if (conn_info->skc_family == PF_INET) {
@@ -1549,8 +1569,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 
 	__u32 *socket_role = socket_role_map__lookup(&conn_key);
 	v->socket_role = socket_role ? *socket_role : 0;
-	v->socket_id = tracer_ctx->sk_info.uid;
-	v->data_seq = tracer_ctx->sk_info.seq;
+	v->socket_id = sk_info->uid;
+	v->data_seq = sk_info->seq;
 	v->tgid = tgid;
 	v->is_tls = false;
 	v->pid = (__u32) bpf_get_current_pid_tgid();
@@ -1566,7 +1586,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->msg_type = MSG_COMMON;
 
 	// Reassembly modification type
-	if (tracer_ctx->sk_info.allow_reassembly) {
+	if (sk_info->allow_reassembly) {
 		v->msg_type = MSG_REASM_START;
 		if (conn_info->is_reasm_seg)
 			v->msg_type = MSG_REASM_SEG;
@@ -1698,8 +1718,8 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 			    conn_info->socket_info_ptr->port;
 			args->port = conn_info->tuple.dport;
 			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
-					      conn_info->socket_info_ptr->
-					      ipaddr);
+					      conn_info->
+					      socket_info_ptr->ipaddr);
 		}
 	}
 
