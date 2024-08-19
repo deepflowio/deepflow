@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: concurrent map read and map write [#7811](https://github.com/deepflowio/deepflow/pull/7811) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: fixes allocating wrong org id [#7864](https://github.com/deepflowio/deepflow/pull/7864) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: drop data which organization is not exist [#7863](https://github.com/deepflowio/deepflow/pull/7863) by [lzf575](https://github.com/lzf575)
 * fix: drop Org data in ckwriter [#7859](https://github.com/deepflowio/deepflow/pull/7859) by [lzf575](https://github.com/lzf575)
