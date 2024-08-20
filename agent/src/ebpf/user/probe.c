@@ -408,7 +408,7 @@ int program__attach_perf_event(int prog_fd, uint32_t ev_type,
 		}
 
 		fds[i] = fd;
-		ebpf_info
+		ebpf_debug
 		    ("attach perf event sample_freq %d pid %d cpu %d done\n",
 		     sample_freq, pid, i);
 	}
@@ -434,8 +434,8 @@ int program__detach_perf_event(int *attach_fds, int len)
 	for (i = 0; i < len; i++) {
 		if (attach_fds[i] > 0) {
 			close(attach_fds[i]);
-			ebpf_info("detach cpu %d close fd %d\n",
-				  i, attach_fds[i]);
+			ebpf_debug("detach cpu %d close fd %d\n",
+				   i, attach_fds[i]);
 			attach_fds[i] = 0;
 		}
 	}

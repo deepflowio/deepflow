@@ -199,8 +199,8 @@ static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
 }
 
 /* *INDENT-OFF* */
-static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk, struct socket_info_s
-						*socket_info_ptr)
+static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk,
+						struct socket_info_s *socket_info_ptr)
 {
 	void *sock;
 #ifndef LINUX_VER_KFUNC
@@ -233,8 +233,8 @@ static __u32 __inline get_tcp_write_seq_from_fd(int fd, void **sk, struct socket
 	return tcp_seq;
 }
 
-static __u32 __inline get_tcp_read_seq_from_fd(int fd, void **sk, struct socket_info_s
-					       *socket_info_ptr)
+static __u32 __inline get_tcp_read_seq_from_fd(int fd, void **sk,
+					       struct socket_info_s *socket_info_ptr)
 {
 	void *sock;
 #ifndef LINUX_VER_KFUNC
@@ -266,59 +266,47 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd, void **sk, struct socket_
 	bpf_probe_read_kernel(&tcp_seq, sizeof(tcp_seq), sock + seq_off);
 	return tcp_seq;
 }
-/* *INDENT-ON* */
 
-static __u32 __inline get_tcp_write_seq(int fd, void **sk, struct socket_info_s
-					*socket_info_ptr)
+static bool __inline check_socket_valid(struct socket_info_s *socket_info_ptr, int fd)
 {
-	__u32 tcpseq = get_tcp_write_seq_from_fd(fd, sk, socket_info_ptr);
-#if 0
-	// Check if the TCP sequence number is correct
+#ifdef LINUX_VER_KFUNC
 	if (is_socket_info_valid(socket_info_ptr)) {
-		__u32 check_seq;
-		check_seq =
-		    socket_info_ptr->write_tcpseq_base +
-		    socket_info_ptr->total_write_bytes;
-		/*
-		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received,
-		 * tcpseq needs to be incremented by 1
-		 */
-		if (!(tcpseq == check_seq || tcpseq == (check_seq + 1))) {
+		int sk_off = (int)((uintptr_t) __builtin_preserve_access_index(&((struct sock *)0)->sk_socket));
+		void *check_socket;
+                bpf_probe_read_kernel(&check_socket, sizeof(check_socket),
+				      socket_info_ptr->sk + sk_off);
+		if (unlikely(check_socket != socket_info_ptr->socket)) {
 			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
 			__u64 conn_key = gen_conn_key_id((__u64) tgid,
 							 (__u64) fd);
 			delete_socket_info(conn_key, socket_info_ptr);
+			return false;
 		}
+		return true;
 	}
 #endif
-	return tcpseq;
+	return false;
+}
+
+static __u32 __inline get_tcp_write_seq(int fd, void **sk, struct socket_info_s
+					*socket_info_ptr)
+{
+	if (check_socket_valid(socket_info_ptr, fd))
+		return get_tcp_write_seq_from_fd(fd, sk, socket_info_ptr);
+	else
+		return get_tcp_write_seq_from_fd(fd, sk, NULL);
 }
 
 static __u32 __inline get_tcp_read_seq(int fd, void **sk, struct socket_info_s
 				       *socket_info_ptr)
 {
-	__u32 tcpseq = get_tcp_read_seq_from_fd(fd, sk, socket_info_ptr);
-#if 0
-	// Check if the TCP sequence number is correct
-	if (is_socket_info_valid(socket_info_ptr)) {
-		__u32 check_seq;
-		check_seq =
-		    socket_info_ptr->read_tcpseq_base +
-		    socket_info_ptr->total_read_bytes;
-		/*
-		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received,
-		 * tcpseq needs to be incremented by 1
-		 */
-		if (!(tcpseq == check_seq || tcpseq == (check_seq + 1))) {
-			__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
-			__u64 conn_key = gen_conn_key_id((__u64) tgid,
-							 (__u64) fd);
-			delete_socket_info(conn_key, socket_info_ptr);
-		}
-	}
-#endif
-	return tcpseq;
+	if (check_socket_valid(socket_info_ptr, fd))
+		return get_tcp_read_seq_from_fd(fd, sk, socket_info_ptr);
+	else
+		return get_tcp_read_seq_from_fd(fd, sk, NULL);
 }
+
+/* *INDENT-ON* */
 
 /*
  * B : buffer
@@ -666,14 +654,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	conn_info->socket_info_ptr = socket_info_map__lookup(&conn_key);
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		conn_info->no_trace = conn_info->socket_info_ptr->no_trace;
-#if defined(LINUX_VER_KFUNC)
-		conn_info->tuple.dport =
-		    conn_info->socket_info_ptr->tuple.dport;
-		conn_info->tuple.num = conn_info->socket_info_ptr->tuple.num;
-	} else {
-#else
 	}
-#endif
 	__be16 inet_dport;
 	__u16 inet_sport;
 	bpf_probe_read_kernel(&inet_dport, sizeof(inet_dport),
@@ -682,9 +663,6 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 			      sk + offset->struct_sock_sport_offset);
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
-#if defined(LINUX_VER_KFUNC)
-}
-#endif
 }
 
 /* *INDENT-OFF* */
@@ -1332,6 +1310,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	struct trace_key_t trace_key = {};
 	struct trace_info_t *trace_info_ptr = NULL;
+	if (!conn_info->no_trace) {
+		trace_key = get_trace_key(tracer_ctx->go_tracing_timeout, true);
+		trace_info_ptr = trace_map__lookup(&trace_key);
+	}
 #else
 	struct trace_key_t trace_key =
 	    get_trace_key(tracer_ctx->go_tracing_timeout,
@@ -1380,11 +1362,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 #if defined(LINUX_VER_KFUNC)
+		/* *INDENT-OFF* */
 		sk_info->sk = args->sk;
-		get_socket_info(&sk_info->tuple, conn_info->sk, conn_info);
-		sk_info->tuple.l4_protocol = conn_info->tuple.l4_protocol;
-		sk_info->tuple.dport = conn_info->tuple.dport;
-		sk_info->tuple.num = conn_info->tuple.num;
+		int sk_off = (int)((uintptr_t) __builtin_preserve_access_index(&((struct sock *)0)->sk_socket));
+		bpf_probe_read_kernel(&sk_info->socket, sizeof(sk_info->socket), args->sk + sk_off);
+		/* *INDENT-ON* */
 #endif
 		sk_info->no_trace = conn_info->no_trace;
 		sk_info->uid = tracer_ctx->socket_id + 1;
@@ -1451,8 +1433,13 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	}
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-#if !defined(LINUX_VER_KFUNC)
+#ifndef LINUX_VER_KFUNC
 	if (get_socket_info(v, conn_info->sk, conn_info) == false) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return SUBMIT_INVALID;
+	}
+#else
+	if (get_socket_info(&v->tuple, conn_info->sk, conn_info) == false) {
 		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 		return SUBMIT_INVALID;
 	}
@@ -1480,9 +1467,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info->seq = socket_info_ptr->seq;
 		socket_info_ptr->direction = conn_info->direction;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
-#if defined(LINUX_VER_KFUNC)
-		v->tuple = socket_info_ptr->tuple;
-#endif
 
 		/*
 		 * Currently, only the backend socket of NGINX sets the 'socket_info_ptr->peer_fd'
@@ -1539,15 +1523,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			socket_info_ptr->reasm_bytes += send_reasm_bytes;
 		}
 	}
-#if defined(LINUX_VER_KFUNC)
-	else {
-		v->tuple = sk_info->tuple;
-	}
-#else
+
 	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 	v->tuple.dport = conn_info->tuple.dport;
 	v->tuple.num = conn_info->tuple.num;
-#endif
 	v->data_type = conn_info->protocol;
 	if (conn_info->tuple.l4_protocol == IPPROTO_UDP && args->port > 0) {
 		if (conn_info->skc_family == PF_INET) {
@@ -1694,7 +1673,13 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (unlikely(!offset->ready))
 		return -1;
 
+#if defined(LINUX_VER_KFUNC)
 	void *sk = args->sk;
+	if (sk == NULL)
+		sk = get_socket_from_fd(args->fd, offset);
+#else
+	void *sk = get_socket_from_fd(args->fd, offset);
+#endif
 	struct conn_info_s *conn_info, __conn_info = { 0 };
 	conn_info = &__conn_info;
 	__u8 sock_state;

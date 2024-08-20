@@ -92,6 +92,7 @@ struct sock_common {
 	struct in6_addr skc_v6_rcv_saddr;
 };
 
+struct socket;
 struct sock {
 	/*
 	 * Now struct inet_timewait_sock also uses sock_common, so please just
@@ -105,6 +106,7 @@ struct sock {
 #define sk_rcv_saddr            __sk_common.skc_rcv_saddr
 #define sk_family               __sk_common.skc_family
 #define sk_v6_daddr		__sk_common.skc_v6_daddr
+	struct socket *sk_socket;
 };
 
 typedef enum {
