@@ -177,7 +177,7 @@ pub mod opengauss {
 
     #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
     #[kube(
-        group = "opengauss.sig",
+        group = "opengauss.cmbc.com.cn",
         version = "v1",
         kind = "OpenGaussCluster",
         namespaced
