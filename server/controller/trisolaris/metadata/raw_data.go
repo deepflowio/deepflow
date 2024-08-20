@@ -1250,8 +1250,6 @@ func (r *PlatformRawData) vInterfaceToProto(
 		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
 		PodId:          proto.Uint32(uint32(device.PodID)),
 		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
-		NetnsId:        proto.Uint32(vif.NetnsID),
-		VtapId:         proto.Uint32(vif.VtapID),
 		PodGroupType:   proto.Uint32(podGroupType),
 	}
 	sInterface := &trident.Interface{
