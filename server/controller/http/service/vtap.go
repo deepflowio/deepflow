@@ -32,7 +32,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	"github.com/deepflowio/deepflow/server/controller/http/service/agentlicense"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -125,7 +124,7 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 		vtapRepoNameToRevision[item.Name] = item.Branch + " " + item.RevCount
 	}
 
-	agents, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
+	agents, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return nil, err
 	}
@@ -192,14 +191,10 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			bitNum += 1
 		}
 		// license_functions
-		functions := strings.Split(vtap.LicenseFunctions, ",")
-		for _, function := range functions {
-			functionInt, err := strconv.Atoi(function)
-			if err != nil {
-				continue
-			}
-			vtapResp.LicenseFunctions = append(vtapResp.LicenseFunctions, functionInt)
-		}
+		vtapResp.LicenseFunctions, _ = ConvertStrToIntList(vtap.LicenseFunctions)
+		vtapResp.EnableFeatures, _ = ConvertStrToIntList(vtap.EnableFeatures)
+		vtapResp.DisableFeatures, _ = ConvertStrToIntList(vtap.DisableFeatures)
+		vtapResp.FollowGroupFeatures, _ = ConvertStrToIntList(vtap.FollowGroupFeatures)
 		// az
 		vtapResp.AZ = vtap.AZ
 		if azName, ok := lcuuidToAz[vtap.AZ]; ok {
@@ -333,20 +328,6 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 		}
 	}
 
-	var operateLogs []mysql.LicenseFuncLog
-	if _, ok := vtapUpdate["ENABLED_FEATURES"]; ok {
-		if _, ok = vtapUpdate["ENABLED_FEATURES"].([]interface{}); !ok {
-			return model.Vtap{}, fmt.Errorf("param(ENABLED_FEATURES) must be slice")
-		}
-		var licenseFunctionStr string
-		licenseFunctionStr, operateLogs, err = agentlicense.GetAgentLicenseFunctions(
-			a.cfg, a.resourceAccess.UserInfo.ID, &vtap, vtapUpdate["ENABLED_FEATURES"].([]interface{}))
-		if err != nil {
-			return model.Vtap{}, err
-		}
-		dbUpdateMap["license_functions"] = licenseFunctionStr
-	}
-
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&vtap).Updates(dbUpdateMap).Error; err != nil {
 			return err
@@ -356,9 +337,6 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 			if err := tx.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
 				log.Errorf("error: %v", err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 			}
-		}
-		if len(operateLogs) > 0 {
-			return tx.CreateInBatches(operateLogs, len(operateLogs)).Error
 		}
 		return nil
 	})
