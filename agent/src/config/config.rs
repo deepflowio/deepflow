@@ -784,7 +784,7 @@ impl Default for YamlConfig {
             default_tap_type: 3,
             debug_listen_port: 0,
             enable_qos_bypass: false,
-            fast_path_map_size: 1 << 14,
+            fast_path_map_size: 0,
             first_path_level: 0,
             src_interfaces: vec![],
             mirror_traffic_pcp: 0,
