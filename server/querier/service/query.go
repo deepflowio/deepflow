@@ -40,3 +40,11 @@ func Execute(args *common.QuerierParams) (jsonData map[string]interface{}, debug
 func getDbBy() string {
 	return "clickhouse"
 }
+
+func SimpleExecute(args *common.QuerierParams) (jsonData map[string]interface{}, debug map[string]interface{}, err error) {
+	result, debug, err := clickhouse.SimpleExecute(args)
+	if result != nil {
+		jsonData = result.ToJson()
+	}
+	return jsonData, debug, err
+}
