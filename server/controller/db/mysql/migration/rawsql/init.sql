@@ -1079,6 +1079,9 @@ CREATE TABLE IF NOT EXISTS vtap (
     current_k8s_image       VARCHAR(512),
     license_type            INTEGER COMMENT '1: A类 2: B类 3: C类',
     license_functions       CHAR(64) COMMENT 'separated by ,; 1: 流量分发 2: 网络监控 3: 应用监控',
+    enable_features         CHAR(64) DEFAULT NULL COMMENT 'separated by ,',
+    disable_features        CHAR(64) DEFAULT NULL COMMENT 'separated by ,',
+    follow_group_features   CHAR(64) DEFAULT NULL COMMENT 'separated by ,',
     tap_mode                INTEGER,
     team_id                 INTEGER,
     expected_revision       TEXT,
@@ -1095,6 +1098,7 @@ CREATE TABLE IF NOT EXISTS vtap_group (
     created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     lcuuid                  CHAR(64),
+    license_functions       CHAR(64),
     short_uuid              CHAR(32)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE vtap_group;
@@ -2378,6 +2382,8 @@ CREATE TABLE IF NOT EXISTS license_func_log (
     user_id                 INTEGER NOT NULL,
     license_function        INTEGER NOT NULL COMMENT '1.traffic distribution 2.network monitoring 3.call monitoring 4.function monitoring 5.application monitoring 6.indicator monitoring 7.database monitoring 8.log monitoring 9.max',
     enabled                 INTEGER NOT NULL COMMENT '0.false 1.true',
+    agent_group_name        VARCHAR(64) DEFAULT NULL,
+    agent_group_operation   TINYINT(1) DEFAULT NULL, COMMENT '0.follow 1.update', 
     created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE license_func_log;

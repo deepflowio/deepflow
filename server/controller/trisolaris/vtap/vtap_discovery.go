@@ -192,7 +192,9 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	dbVTap.ID = ids[0]
 	// Voucher mode turns on all features
 	if r.vTapInfo.config.BillingMethod == BILLING_METHOD_VOUCHER {
-		dbVTap.LicenseFunctions = VTAP_ALL_LICENSE_FUNCTIONS
+		// TODO(weiqiang): add func log, calculate license functions
+		// dbVTap.LicenseFunctions = VTAP_ALL_LICENSE_FUNCTIONS
+		dbVTap.FollowGroupFeatures = VTAP_ALL_LICENSE_FUNCTIONS
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(dbVTap).Error; err != nil {
