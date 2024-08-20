@@ -47,6 +47,7 @@ type QueryParams struct {
 	QueryUUID       string
 	ColumnSchemaMap map[string]*common.ColumnSchema
 	ORGID           string
+	SimpleSql       bool
 }
 
 // All ClickHouse Client share one connection
@@ -108,7 +109,7 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error) {
-	sqlstr, callbacks, query_uuid, columnSchemaMap := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap
+	sqlstr, callbacks, query_uuid, columnSchemaMap, simpleSql := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap, params.SimpleSql
 	queryCacheStr := ""
 	if params.UseQueryCache {
 		queryCacheStr = " SETTINGS use_query_cache = true, query_cache_store_results_of_queries_with_nondeterministic_functions = 1"
@@ -118,7 +119,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 		sqlstr += queryCacheStr
 	}
 	// ORGID
-	if params.ORGID != common.DEFAULT_ORG_ID && params.ORGID != "" {
+	if !simpleSql && params.ORGID != common.DEFAULT_ORG_ID && params.ORGID != "" {
 		orgIDInt, err := strconv.Atoi(params.ORGID)
 		if err != nil {
 			return nil, err
