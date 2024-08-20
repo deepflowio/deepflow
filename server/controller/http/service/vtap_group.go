@@ -82,7 +82,7 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 		vtapGroupLcuuids = append(vtapGroupLcuuids, vtapGroup.Lcuuid)
 	}
 	vtapDB.Where("vtap_group_lcuuid IN (?)", vtapGroupLcuuids).Find(&allVTaps)
-	vtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
+	vtaps, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +118,11 @@ func (a *AgentGroup) Get(filter map[string]interface{}) (resp []model.VtapGroup,
 			VtapLcuuids:        []string{},
 			PendingVtapLcuuids: []string{},
 			DisableVtapLcuuids: []string{},
+		}
+
+		vtapGroupResp.LicenseFunctions, err = ConvertStrToIntList(vtapGroup.LicenseFunctions)
+		if err != nil {
+			return nil, err
 		}
 
 		if _, ok := groupToVtapLcuuids[vtapGroup.Lcuuid]; ok {
@@ -173,7 +178,7 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	if err = db.Where("lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&allVTaps).Error; err != nil {
 		return model.VtapGroup{}, err
 	}
-	vtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
+	vtaps, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return model.VtapGroup{}, err
 	}
@@ -199,11 +204,13 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 	vtapGroup.Name = vtapGroupCreate.Name
 	vtapGroup.TeamID = vtapGroupCreate.TeamID
 	vtapGroup.UserID = a.resourceAccess.UserInfo.ID
+	vtapGroup.LicenseFunctions = common.VTAP_ALL_LICENSE_FUNCTIONS
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&vtapGroup).Error; err != nil {
 			return err
 		}
+		// TODO(weiqiang): add func log, calculate license functions
 		for _, vtap := range vtaps {
 			if err := tx.Model(&vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": lcuuid,
 				"team_id": vtapGroupCreate.TeamID}).Error; err != nil {
@@ -319,7 +326,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 
 		var allOldVtaps []mysql.VTap
 		tx.Where("vtap_group_lcuuid IN (?)", vtapGroup.Lcuuid).Find(&allOldVtaps)
-		oldVtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allOldVtaps)
+		oldVtaps, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allOldVtaps)
 		if err != nil {
 			return err
 		}
@@ -344,7 +351,7 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 
 			var allNewVtaps []mysql.VTap
 			tx.Where("lcuuid IN (?)", vtapGroupUpdate["VTAP_LCUUIDS"]).Find(&allNewVtaps)
-			newVtaps, err := getAgentByUser(userInfo, &a.cfg.FPermit, allNewVtaps)
+			newVtaps, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allNewVtaps)
 			if err != nil {
 				return err
 			}
