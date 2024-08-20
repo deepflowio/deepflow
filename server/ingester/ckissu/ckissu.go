@@ -423,7 +423,7 @@ func (i *Issu) addColumnDatasource(index int, d *DatasourceInfo, isMapTable, isA
 func NewCKIssu(cfg *config.Config) (*Issu, error) {
 	i := &Issu{
 		cfg:            cfg,
-		Addrs:          cfg.CKDB.ActualAddrs,
+		Addrs:          *cfg.CKDB.ActualAddrs,
 		username:       cfg.CKDBAuth.Username,
 		password:       cfg.CKDBAuth.Password,
 		datasourceInfo: make(map[string]*DatasourceInfo),

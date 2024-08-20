@@ -486,3 +486,7 @@ func EscapeJSONString(value string) string {
 	)
 	return replacer.Replace(value)
 }
+
+func CloneStringSlice(strs []string) []string {
+	return append([]string{}, strs...)
+}

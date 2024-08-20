@@ -52,7 +52,7 @@ type Counter struct {
 
 type ProfileWriter struct {
 	msgType           datatype.MessageType
-	ckdbAddrs         []string
+	ckdbAddrs         *[]string
 	ckdbUsername      string
 	ckdbPassword      string
 	ckdbCluster       string
@@ -97,7 +97,7 @@ func NewProfileWriter(msgType datatype.MessageType, decoderIndex int, config *co
 	}
 	table := GenProfileCKTable(writer.ckdbCluster, PROFILE_DB, PROFILE_TABLE, writer.ckdbStoragePolicy, config.Base.CKDB.Type, writer.ttl, ckdb.GetColdStorage(writer.ckdbColdStorages, PROFILE_DB, PROFILE_TABLE))
 	ckwriter, err := ckwriter.NewCKWriter(
-		writer.ckdbAddrs,
+		*writer.ckdbAddrs,
 		writer.ckdbUsername,
 		writer.ckdbPassword,
 		fmt.Sprintf("%s-%s-%d", msgType, PROFILE_TABLE, decoderIndex),

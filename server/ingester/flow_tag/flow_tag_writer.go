@@ -49,7 +49,7 @@ type Counter struct {
 }
 
 type FlowTagWriter struct {
-	ckdbAddrs    []string
+	ckdbAddrs    *[]string
 	ckdbUsername string
 	ckdbPassword string
 	writerConfig *config.CKWriterConfig
@@ -115,7 +115,7 @@ func NewFlowTagWriter(
 		tableName := fmt.Sprintf("%s_%s", srcDB, tagType.String())
 		t.TagType = tagType
 		w.ckwriters[tagType], err = ckwriter.NewCKWriter(
-			w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+			*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 			fmt.Sprintf("%s-%s-%d", name, tableName, decoderIndex),
 			config.CKDB.TimeZone,
 			t.GenCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, config.CKDB.Type, ttl, partition),

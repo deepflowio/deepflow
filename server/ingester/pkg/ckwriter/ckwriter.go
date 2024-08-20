@@ -45,10 +45,10 @@ var log = logging.MustGetLogger("ckwriter")
 const (
 	FLUSH_TIMEOUT  = 10 * time.Second
 	SQL_LOG_LENGTH = 256
-	RETRY_COUNT    = 3
+	RETRY_COUNT    = 2
 )
 
-var ckwriterManager *CKWriterManager
+var ckwriterManager = &CKWriterManager{}
 
 type CKWriterManager struct {
 	ckwriters []*CKWriter
@@ -56,11 +56,11 @@ type CKWriterManager struct {
 }
 
 func RegisterToCkwriterManager(w *CKWriter) {
-	if ckwriterManager == nil {
-		ckwriterManager = &CKWriterManager{}
-		server_common.SetOrgHandler(ckwriterManager)
-	}
 	ckwriterManager.Lock()
+	if len(ckwriterManager.ckwriters) == 0 {
+		server_common.SetOrgHandler(ckwriterManager)
+		config.AddClickHouseEndpointsOnChange(ckwriterManager)
+	}
 	ckwriterManager.ckwriters = append(ckwriterManager.ckwriters, w)
 	ckwriterManager.Unlock()
 }
@@ -76,32 +76,77 @@ func (m *CKWriterManager) DropOrg(orgId uint16) error {
 	return nil
 }
 
-type CKWriter struct {
-	addrs          []string
-	user           string
-	password       string
-	timeZone       string
-	table          *ckdb.Table
-	queueCount     int
-	queueSize      int           // 队列长度
-	batchSize      int           // 累积多少行数据，一起写入
-	flushDuration  time.Duration // 超时写入
-	counterName    string        // 写入成功失败的统计数据表名称，若写入失败，会根据该数据上报告警
-	orgQueueCaches [][]*Cache    // all queue's caches for all Orgs
+func (m *CKWriterManager) EndpointsChange(addrs []string) {
+	ckwriterManager.Lock()
+	for _, ckwriter := range m.ckwriters {
+		log.Infof("ckwriter %s addrs change from %s to %s ", ckwriter.name, ckwriter.addrs, addrs)
+		ckwriter.addrs = addrs
+		ckwriter.endpointsChange(addrs)
+	}
+	ckwriterManager.Unlock()
+}
 
-	name         string // 数据库名-表名 用作 queue名字和counter名字
-	prepare      string // 写入数据时，先执行prepare
-	conns        []clickhouse.Conn
-	batchs       []driver.Batch
-	connCount    uint64
-	dataQueues   queue.FixedMultiQueue
-	counters     []Counter
-	putCounter   int
-	writeCounter uint64
-	ckdbwatcher  *config.Watcher
+type CKWriter struct {
+	addrs         []string
+	user          string
+	password      string
+	timeZone      string
+	table         *ckdb.Table
+	queueCount    int
+	queueSize     int           // 队列长度
+	batchSize     int           // 累积多少行数据，一起写入
+	flushDuration time.Duration // 超时写入
+	counterName   string        // 写入成功失败的统计数据表名称，若写入失败，会根据该数据上报告警
+
+	name          string // 数据库名-表名 用作 queue名字和counter名字
+	prepare       string // 写入数据时，先执行prepare
+	dataQueues    queue.FixedMultiQueue
+	putCounter    int
+	ckdbwatcher   *config.Watcher
+	queueContexts []*QueueContext
 
 	wg   sync.WaitGroup
 	exit bool
+}
+
+type QueueContext struct {
+	endpointsChange bool
+	orgCaches       []*Cache // write caches for all organizations
+	user, password  string
+	conns           []clickhouse.Conn
+	connCount       int
+	batchs          []driver.Batch
+	writeCounter    uint64
+	counter         Counter
+}
+
+func (qc *QueueContext) EndpointsChange(addrs []string) {
+	if !qc.endpointsChange || len(addrs) == 0 {
+		return
+	}
+	for _, conn := range qc.conns {
+		if conn != nil {
+			conn.Close()
+		}
+	}
+	qc.connCount = len(addrs)
+	qc.conns = make([]clickhouse.Conn, qc.connCount)
+	for i, addr := range addrs {
+		qc.conns[i], _ = clickhouse.Open(&clickhouse.Options{
+			Addr: []string{addr},
+			Auth: clickhouse.Auth{
+				Database: "default",
+				Username: qc.user,
+				Password: qc.password,
+			},
+			DialTimeout: 5 * time.Second,
+		})
+	}
+	qc.batchs = make([]driver.Batch, qc.connCount)
+	qc.endpointsChange = false
+	for _, cache := range qc.orgCaches {
+		cache.tableCreated = false
+	}
 }
 
 type CKItem interface {
@@ -187,8 +232,8 @@ func InitTable(addr, user, password, timeZone string, t *ckdb.Table, orgID uint1
 	return nil
 }
 
-func (w *CKWriter) InitTable(orgID uint16) error {
-	for _, conn := range w.conns {
+func (w *CKWriter) InitTable(queueID int, orgID uint16) error {
+	for _, conn := range w.queueContexts[queueID].conns {
 		if err := initTable(conn, w.timeZone, w.table, orgID); err != nil {
 			return err
 		}
@@ -241,20 +286,35 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 	}
 
 	addrCount := len(addrs)
-	conns := make([]clickhouse.Conn, addrCount)
-	batchs := make([]driver.Batch, queueCount*addrCount)
-	for i := 0; i < addrCount; i++ {
-		if conns[i], err = clickhouse.Open(&clickhouse.Options{
-			Addr: []string{addrs[i]},
-			Auth: clickhouse.Auth{
-				Database: "default",
-				Username: user,
-				Password: password,
-			},
-			ConnMaxLifetime: time.Hour * 24,
-		}); err != nil {
-			return nil, err
+	queueContexts := make([]*QueueContext, queueCount)
+	for i := range queueContexts {
+		queueContexts[i] = &QueueContext{}
+		qc := queueContexts[i]
+		qc.connCount = addrCount
+		qc.conns = make([]clickhouse.Conn, addrCount)
+		for i := 0; i < addrCount; i++ {
+			if qc.conns[i], err = clickhouse.Open(&clickhouse.Options{
+				Addr: []string{addrs[i]},
+				Auth: clickhouse.Auth{
+					Database: "default",
+					Username: user,
+					Password: password,
+				},
+				ConnMaxLifetime: time.Hour * 24,
+			}); err != nil {
+				return nil, err
+			}
 		}
+		qc.batchs = make([]driver.Batch, addrCount)
+		orgCaches := make([]*Cache, ckdb.MAX_ORG_ID+1)
+		for i := range orgCaches {
+			orgCaches[i] = new(Cache)
+			orgCaches[i].items = make([]CKItem, 0)
+			orgCaches[i].orgID = uint16(i)
+			orgCaches[i].prepare = table.MakeOrgPrepareTableInsertSQL(uint16(i))
+		}
+		qc.orgCaches = orgCaches
+		qc.user, qc.password = user, password
 	}
 
 	name := fmt.Sprintf("%s-%s-%s", table.Database, table.LocalName, counterName)
@@ -264,38 +324,22 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 		queue.OptionRelease(func(p interface{}) { p.(CKItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
-	orgQueueCaches := make([][]*Cache, queueCount)
-	for i := range orgQueueCaches {
-		orgCaches := make([]*Cache, ckdb.MAX_ORG_ID+1)
-		for i := range orgCaches {
-			orgCaches[i] = new(Cache)
-			orgCaches[i].items = make([]CKItem, 0)
-			orgCaches[i].orgID = uint16(i)
-			orgCaches[i].prepare = table.MakeOrgPrepareTableInsertSQL(uint16(i))
-		}
-		orgQueueCaches[i] = orgCaches
-	}
-
 	w := &CKWriter{
-		addrs:          addrs,
-		user:           user,
-		password:       password,
-		timeZone:       timeZone,
-		table:          table,
-		queueCount:     queueCount,
-		queueSize:      queueSize,
-		batchSize:      batchSize,
-		flushDuration:  time.Duration(flushTimeout) * time.Second,
-		counterName:    counterName,
-		orgQueueCaches: orgQueueCaches,
+		addrs:         addrs,
+		user:          user,
+		password:      password,
+		timeZone:      timeZone,
+		table:         table,
+		queueCount:    queueCount,
+		queueSize:     queueSize,
+		batchSize:     batchSize,
+		flushDuration: time.Duration(flushTimeout) * time.Second,
+		counterName:   counterName,
+		queueContexts: queueContexts,
 
 		name:        name,
 		prepare:     table.MakePrepareTableInsertSQL(),
-		conns:       conns,
-		batchs:      batchs,
-		connCount:   uint64(len(conns)),
 		dataQueues:  dataQueues,
-		counters:    make([]Counter, queueCount),
 		ckdbwatcher: ckdbwatcher,
 	}
 	RegisterToCkwriterManager(w)
@@ -303,10 +347,17 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 }
 
 func (w *CKWriter) dropOrg(orgId uint16) {
-	for i := range w.orgQueueCaches {
+	for i, qc := range w.queueContexts {
 		log.Debugf("ckwriter %s queue %d drop org %d", w.name, i, orgId)
-		w.orgQueueCaches[i][orgId].dropTime = uint32(time.Now().Unix())
-		w.orgQueueCaches[i][orgId].tableCreated = false
+		qc.orgCaches[orgId].dropTime = uint32(time.Now().Unix())
+		qc.orgCaches[orgId].tableCreated = false
+	}
+}
+
+func (w *CKWriter) endpointsChange(addrs []string) {
+	for i := 0; i < len(w.queueContexts); i++ {
+		log.Debugf("ckwriter %s queue %d endpoints will change to %s", w.name, i, addrs)
+		w.queueContexts[i].endpointsChange = true
 	}
 }
 
@@ -375,29 +426,30 @@ func (c *Cache) OrgIdExists() bool {
 }
 
 func (w *CKWriter) queueProcess(queueID int) {
-	common.RegisterCountableForIngester("ckwriter", &(w.counters[queueID]), stats.OptionStatTags{"thread": strconv.Itoa(queueID), "table": w.name, "name": w.counterName})
-	defer w.wg.Done()
+	qc := w.queueContexts[queueID]
+	common.RegisterCountableForIngester("ckwriter", &(qc.counter), stats.OptionStatTags{"thread": strconv.Itoa(queueID), "table": w.name, "name": w.counterName})
+
 	w.wg.Add(1)
+	defer w.wg.Done()
 
 	rawItems := make([]interface{}, 1024)
-	var cache *Cache
-	orgCaches := w.orgQueueCaches[queueID]
+	orgCaches := qc.orgCaches
 
 	for !w.exit {
 		n := w.dataQueues.Gets(queue.HashKey(queueID), rawItems)
 		for i := 0; i < n; i++ {
 			item := rawItems[i]
-			if ck, ok := item.(CKItem); ok {
-				orgID := ck.OrgID()
+			if ckItem, ok := item.(CKItem); ok {
+				orgID := ckItem.OrgID()
 				if orgID > ckdb.MAX_ORG_ID {
-					if w.counters[queueID].OrgInvalidCount == 0 {
+					if qc.counter.OrgInvalidCount == 0 {
 						log.Warningf("writer queue (%s) item wrong orgID %d", w.name, orgID)
 					}
-					w.counters[queueID].OrgInvalidCount++
+					qc.counter.OrgInvalidCount++
 					continue
 				}
-				cache = orgCaches[orgID]
-				cache.items = append(cache.items, ck)
+				cache := orgCaches[orgID]
+				cache.items = append(cache.items, ckItem)
 				if len(cache.items) >= w.batchSize {
 					w.Write(queueID, cache)
 					cache.lastWriteTime = time.Now()
@@ -411,19 +463,19 @@ func (w *CKWriter) queueProcess(queueID int) {
 					}
 				}
 			} else {
-				log.Warningf("get writer queue data type wrong %T", ck)
+				log.Warningf("get writer queue data type wrong %T", item)
 			}
 		}
 	}
 }
 
-func (w *CKWriter) ResetConnection(connID int) error {
+func (w *CKWriter) ResetConnection(queueID, connID int) error {
 	var err error
 	// FIXME: do reset actually
-	if !IsNil(w.conns[connID]) {
+	if !IsNil(w.queueContexts[queueID].conns[connID]) {
 		return nil
 	}
-	w.conns[connID], err = clickhouse.Open(&clickhouse.Options{
+	w.queueContexts[queueID].conns[connID], err = clickhouse.Open(&clickhouse.Options{
 		Addr: []string{w.addrs[connID]},
 		Auth: clickhouse.Auth{
 			Database: "default",
@@ -436,25 +488,27 @@ func (w *CKWriter) ResetConnection(connID int) error {
 }
 
 func (w *CKWriter) Write(queueID int, cache *Cache) {
-	connID := int(atomic.AddUint64(&w.writeCounter, 1) % w.connCount)
+	qc := w.queueContexts[queueID]
+	qc.EndpointsChange(w.addrs)
+	connID := int(atomic.AddUint64(&qc.writeCounter, 1)) % qc.connCount
 	itemsLen := len(cache.items)
 	// Prevent frequent log writing
-	logEnabled := w.counters[queueID].WriteFailedCount == 0
+	logEnabled := qc.counter.WriteFailedCount == 0
 	if !cache.OrgIdExists() {
 		if logEnabled {
 			log.Warningf("table (%s.%s) orgId is not exist, drop (%d) items", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen)
 		}
-		w.counters[queueID].OrgInvalidCount += int64(itemsLen)
+		qc.counter.OrgInvalidCount += int64(itemsLen)
 		cache.Release()
 		return
 	}
 	if !cache.tableCreated {
-		err := w.InitTable(cache.orgID)
+		err := w.InitTable(queueID, cache.orgID)
 		if err != nil {
 			if logEnabled {
 				log.Warningf("create table (%s.%s) failed, drop (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 			}
-			w.counters[queueID].WriteFailedCount += int64(itemsLen)
+			qc.counter.WriteFailedCount += int64(itemsLen)
 			cache.Release()
 			return
 		}
@@ -464,7 +518,7 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 		if logEnabled {
 			log.Warningf("write table (%s.%s) failed, will retry write (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 		}
-		if err := w.ResetConnection(connID); err != nil {
+		if err := w.ResetConnection(queueID, connID); err != nil {
 			log.Warningf("reconnect clickhouse failed: %s", err)
 			time.Sleep(time.Second * 10)
 		} else {
@@ -473,24 +527,24 @@ func (w *CKWriter) Write(queueID int, cache *Cache) {
 			}
 		}
 
-		w.counters[queueID].RetryCount++
+		qc.counter.RetryCount++
 		// 写失败重连后重试一次, 规避偶尔写失败问题
 		err = w.writeItems(queueID, connID, cache)
 		if logEnabled {
 			if err != nil {
-				w.counters[queueID].RetryFailedCount++
+				qc.counter.RetryFailedCount++
 				log.Warningf("retry write table (%s.%s) failed, drop (%d) items: %s", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen, err)
 			} else {
 				log.Infof("retry write table (%s.%s) success, write (%d) items", w.table.OrgDatabase(cache.orgID), w.table.LocalName, itemsLen)
 			}
 		}
 		if err != nil {
-			w.counters[queueID].WriteFailedCount += int64(itemsLen)
+			qc.counter.WriteFailedCount += int64(itemsLen)
 		} else {
-			w.counters[queueID].WriteSuccessCount += int64(itemsLen)
+			qc.counter.WriteSuccessCount += int64(itemsLen)
 		}
 	} else {
-		w.counters[queueID].WriteSuccessCount += int64(itemsLen)
+		qc.counter.WriteSuccessCount += int64(itemsLen)
 	}
 
 	cache.Release()
@@ -508,32 +562,33 @@ func IsNil(i interface{}) bool {
 }
 
 func (w *CKWriter) writeItems(queueID, connID int, cache *Cache) error {
+	qc := w.queueContexts[queueID]
 	if len(cache.items) == 0 {
 		return nil
 	}
-	ck := w.conns[connID]
+	ck := qc.conns[connID]
 	if IsNil(ck) {
-		if err := w.ResetConnection(connID); err != nil {
+		if err := w.ResetConnection(queueID, connID); err != nil {
 			time.Sleep(time.Second * 10)
 			return fmt.Errorf("write block failed, can not connect to clickhouse: %s", err)
 		}
-		ck = w.conns[connID]
+		ck = qc.conns[connID]
 	}
 	var err error
-	batchID := queueID*int(w.connCount) + connID
-	batch := w.batchs[batchID]
+	batchID := connID
+	batch := qc.batchs[batchID]
 	if IsNil(batch) {
-		w.batchs[batchID], err = ck.PrepareBatch(context.Background(), cache.prepare)
+		qc.batchs[batchID], err = ck.PrepareBatch(context.Background(), cache.prepare)
 		if err != nil {
 			return fmt.Errorf("prepare batch item write block failed: %s", err)
 		}
-		batch = w.batchs[batchID]
+		batch = qc.batchs[batchID]
 	} else {
 		batch, err = ck.PrepareReuseBatch(context.Background(), cache.prepare, batch)
 		if err != nil {
 			return fmt.Errorf("prepare reuse batch item write block failed: %s", err)
 		}
-		w.batchs[batchID] = batch
+		qc.batchs[batchID] = batch
 	}
 
 	ckdbBlock := ckdb.NewBlock(batch)
@@ -554,14 +609,14 @@ func (w *CKWriter) writeItems(queueID, connID int, cache *Cache) error {
 func (w *CKWriter) Close() {
 	w.exit = true
 	w.wg.Wait()
-	for i, c := range w.conns {
-		if !IsNil(c) {
-			c.Close()
-			w.conns[i] = nil
+	for i, qc := range w.queueContexts {
+		for _, c := range qc.conns {
+			if !IsNil(c) {
+				c.Close()
+				qc.conns[i] = nil
+			}
 		}
-	}
-	for _, c := range w.counters {
-		c.Close()
+		qc.counter.Close()
 	}
 
 	for _, q := range w.dataQueues {

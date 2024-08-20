@@ -71,7 +71,7 @@ func (o *OrgHandler) dropOrgDatabase(orgId uint16) error {
 	if ckdb.IsDefaultOrgID(orgId) {
 		return fmt.Errorf("can not drop default org id: %d", orgId)
 	}
-	conns, err := common.NewCKConnections(o.cfg.CKDB.ActualAddrs, o.cfg.CKDBAuth.Username, o.cfg.CKDBAuth.Password)
+	conns, err := common.NewCKConnections(*o.cfg.CKDB.ActualAddrs, o.cfg.CKDBAuth.Username, o.cfg.CKDBAuth.Password)
 	if err != nil {
 		return err
 	}
