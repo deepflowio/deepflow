@@ -3063,7 +3063,7 @@ impl ModuleConfig {
 }
 
 impl YamlConfig {
-    fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
+    pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
         if self.fast_path_map_size > 0 {
             return self.fast_path_map_size;
         }

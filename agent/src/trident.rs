@@ -1857,7 +1857,7 @@ impl AgentComponents {
                 1
             }),
             yaml_config.first_path_level as usize,
-            yaml_config.fast_path_map_size,
+            yaml_config.get_fast_path_map_size(candidate_config.dispatcher.max_memory),
             yaml_config.forward_capacity,
             yaml_config.fast_path_disabled,
         );
