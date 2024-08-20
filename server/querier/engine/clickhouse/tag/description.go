@@ -920,8 +920,8 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			} else {
 				categoryValue = _tagName.([]interface{})[2].(string)
 				response.Values = append(response.Values, []interface{}{
-					externalTag, externalTag, externalTag, externalTag, "map_item",
-					categoryValue, tagTypeToOperators[_tagName.([]interface{})[2].(string)], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+					externalTag, externalTag, externalTag, externalTag, categoryValue,
+					categoryValue, tagTypeToOperators[categoryValue], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
 				})
 			}
 

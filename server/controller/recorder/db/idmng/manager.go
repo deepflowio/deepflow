@@ -72,6 +72,18 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_PROCESS_EN:         newIDPool[mysql.Process](mng.org, ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_VTAP_EN:            newIDPool[mysql.VTap](mng.org, ctrlrcommon.RESOURCE_TYPE_VTAP_EN, cfg.ResourceMaxID0),
 	}
+
+	orgTableExists, err := mysql.CheckIfORGTableExists()
+	if err != nil {
+		log.Errorf("failed to check if org table exists: %s", err.Error())
+		return nil, err
+	}
+	if orgTableExists && orgID == ctrlrcommon.DEFAULT_ORG_ID {
+		mng.resourceTypeToIDPool[ctrlrcommon.RESOURCE_TYPE_ORG_EN] = newIDPool[mysql.ORG](
+			mng.org, ctrlrcommon.RESOURCE_TYPE_ORG_EN, ctrlrcommon.ORG_ID_MAX,
+		)
+	}
+
 	return mng, nil
 }
 
@@ -130,7 +142,11 @@ func newIDPool[MT MySQLModel](org *common.ORG, resourceType string, max int) *ID
 }
 
 func (p *IDPool[MT]) load() (mapset.Set[int], error) {
-	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select("id"))
+	idField := "id"
+	if p.resourceType == ctrlrcommon.RESOURCE_TYPE_ORG_EN {
+		idField = "org_id"
+	}
+	items, err := query.FindInBatches[MT](p.org.DB.Unscoped().Select(idField))
 	if err != nil {
 		log.Errorf("failed to query %s: %v", p.resourceType, err, p.org.LogPrefix)
 		return nil, err

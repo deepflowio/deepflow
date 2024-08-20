@@ -86,16 +86,41 @@ type OrgHanderInterface interface {
 	DropOrg(orgId uint16) error
 }
 
-var ingesterOrgHander OrgHanderInterface
+var ingesterOrgHanders []OrgHanderInterface
 
 func SetOrgHandler(orgHandler OrgHanderInterface) {
-	ingesterOrgHander = orgHandler
+	ingesterOrgHanders = append(ingesterOrgHanders, orgHandler)
 }
 
+/*
+* 调用此接口删除组织时，ingester 会删除 ClickHouse 中所有该组织的数据库，并清理内存中对应的 ClickHouse session。
+* 注意：当 deepflow-agent 携带的 org_id 在 ClickHouse 中没有对应的数据库时，
+* 同时满足下面两个条件，则 ingester 会自动为该 org_id 创建 ClickHouse 数据库：
+* 1. ingester 最近一次（每分钟获取一次）从 controller 获取到的 org_id list 中存在该 org_id
+* 2. 该 org_id 最近没有被删除过，或者被删除的时间早于 ingester 获取到 org_id list 的时间
+* 因此，被删除的 org_id 不要立即复用，以避免被删除的组织中有一些 deepflow-agent 仍然在运行且未进入逃逸状态时，会将数据写入到复用此 org_id 的数据库中。
+* 另外，注意当 org 被删除时，controller 需要确保下发的 org_id list 中不要包含被删除的 org_id。
+* ----------------------------------------------------------------------
+* When calling this interface to delete an organization,
+* Ingester will delete all the databases of that organization in ClickHouse and clean up the corresponding ClickHouse sessions in memory.
+* Note: When the org_id carried by the Deepflow-agent does not have a corresponding database in ClickHouse,
+* If both of the following conditions are met simultaneously, Ingester will automatically create a ClickHouse database for the org_id:
+* 1. The latest (obtained every minute) org_id list obtained by Ingester from the Controller contains the same org_id
+* 2. The org_id has not been deleted recently, or it was deleted earlier than the time when Ingester obtained the org_id list
+* Therefore, the deleted org_id should not be reused immediately to avoid some Deepflow-agents in the deleted organization still running and not entering the escape state,
+* which will write data to the database that reuses this org_id.
+* Additionally, please note that when an org is deleted, the controller needs to ensure that the issued org_i list does not contain the deleted org_id.
+ */
 func DropOrg(orgId uint16) error {
 	log.Info("drop org id:", orgId)
-	if ingesterOrgHander == nil {
-		return fmt.Errorf("ingesterOrgHander is nil, drop org id %d failed", orgId)
+	if ingesterOrgHanders == nil {
+		return fmt.Errorf("ingesterOrgHanders is nil, drop org id %d failed", orgId)
 	}
-	return ingesterOrgHander.DropOrg(orgId)
+	for _, ingesterOrgHander := range ingesterOrgHanders {
+		err := ingesterOrgHander.DropOrg(orgId)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

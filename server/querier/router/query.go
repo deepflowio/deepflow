@@ -43,6 +43,7 @@ func executeQuery() gin.HandlerFunc {
 		args.Context = c.Request.Context()
 		args.Debug = c.Query("debug")
 		args.UseQueryCache, _ = strconv.ParseBool(c.DefaultQuery("use_query_cache", "false"))
+		args.SimpleSql, _ = strconv.ParseBool(c.DefaultQuery("simple_sql", "false"))
 		args.QueryCacheTTL = c.Query("query_cache_ttl")
 		args.QueryUUID = c.Query("query_uuid")
 		args.NoPreWhere, _ = strconv.ParseBool(c.DefaultQuery("no_prewhere", "false"))
@@ -64,7 +65,16 @@ func executeQuery() gin.HandlerFunc {
 			args.DB, _ = json["db"].(string)
 			args.Sql, _ = json["sql"].(string)
 		}
-		result, debug, err := service.Execute(&args)
+
+		result := map[string]interface{}{}
+		debug := map[string]interface{}{}
+		var err error
+		// simple sql
+		if args.SimpleSql {
+			result, debug, err = service.SimpleExecute(&args)
+		} else {
+			result, debug, err = service.Execute(&args)
+		}
 		if err == nil && args.Debug != "true" {
 			debug = nil
 		}

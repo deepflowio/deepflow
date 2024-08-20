@@ -29,7 +29,7 @@ type MySQLModel interface {
 		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
 		mysql.PodService |
 		mysql.PodGroup | mysql.PodReplicaSet |
-		mysql.Pod | mysql.Process | mysql.VTap
+		mysql.Pod | mysql.Process | mysql.VTap | mysql.ORG
 
 	GetID() int
 }

@@ -63,6 +63,7 @@ const (
 	RESOURCE_TYPE_PROMETHEUS_TARGET_EN        = "prometheus_target"
 	RESOURCE_TYPE_VIP_EN                      = "vip"
 	RESOURCE_TYPE_VTAP_EN                     = "vtap"
+	RESOURCE_TYPE_ORG_EN                      = "org"
 
 	// http api resource type
 	RESOURCE_TYPE_IP_EN      = "ip"

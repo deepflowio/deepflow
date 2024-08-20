@@ -25,7 +25,7 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-            AppProtoHead, LogMessageType,
+            AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::{read_u16_be, read_u32_be},
@@ -41,6 +41,22 @@ const MIN_BODY_SIZE: usize = 12;
 const HEADER_SIZE: usize = 4;
 const VERSION_INDEX: usize = 5;
 const INITIAL_LEN: usize = 7;
+
+const TARS_SERVER_SUCCESS: i32 = 0; // Server-side processing is successful
+const TARS_SERVER_DECODE_ERR: i32 = -1; // Server-side decoding exception
+const TARS_SERVER_ENCODE_ERR: i32 = -2; // Server-side encoding exception
+const TARS_SERVER_NO_FUNC_ERR: i32 = -3; // Server-side does not have the function
+const TARS_SERVER_NO_SERVANT_ERR: i32 = -4; // Server-side does not have the Servant object
+const TARS_SERVER_RESET_GRID: i32 = -5; // Server-side gray status is inconsistent
+const TARS_SERVER_QUEUE_TIMEOUT: i32 = -6; // Server-side queue exceeds the limit
+const TARS_ASYNC_CALL_TIMEOUT: i32 = -7; // Asynchronous call timeout
+const TARS_INVOKE_TIMEOUT: i32 = -7; // Invocation timeout, duplicate of TARS_ASYNC_CALL_TIMEOUT
+const TARS_PROXY_CONNECT_ERR: i32 = -8; // Proxy connection exception
+const TARS_SERVER_OVERLOAD: i32 = -9; // Server-side overload, exceeds queue length
+const TARS_ADAPTER_NULL: i32 = -10; // Client-side routing is empty, service does not exist or all services are down
+const TARS_INVOKE_BY_INVALID_ESET: i32 = -11; // Client-side invocation by set rule is illegal
+const TARS_CLIENT_DECODE_ERR: i32 = -12; // Client-side decoding exception
+const TARS_SERVER_UNKNOWN_ERR: i32 = -99; // Server-side unknown exception
 
 #[derive(Debug, Clone)]
 struct ByteParser {
@@ -66,6 +82,7 @@ pub struct TarsInfo {
 
     req_len: u32,
     resp_len: u32,
+    resp_status: L7ResponseStatus,
 
     request_id: u32,
     imsg_type: u32,
@@ -251,6 +268,27 @@ impl TarsInfo {
                     } else {
                         0
                     };
+                    match info.ret {
+                        TARS_ADAPTER_NULL
+                        | TARS_INVOKE_BY_INVALID_ESET
+                        | TARS_CLIENT_DECODE_ERR => {
+                            info.resp_status = L7ResponseStatus::ClientError;
+                        }
+
+                        TARS_SERVER_DECODE_ERR
+                        | TARS_SERVER_ENCODE_ERR
+                        | TARS_SERVER_NO_FUNC_ERR
+                        | TARS_SERVER_NO_SERVANT_ERR
+                        | TARS_SERVER_RESET_GRID
+                        | TARS_SERVER_QUEUE_TIMEOUT
+                        | TARS_SERVER_UNKNOWN_ERR => {
+                            info.resp_status = L7ResponseStatus::ServerError;
+                        }
+
+                        _ => {
+                            info.resp_status = L7ResponseStatus::Ok;
+                        }
+                    }
                 }
             },
             _ => return None,
@@ -371,11 +409,14 @@ impl From<TarsInfo> for L7ProtocolSendLog {
             req_len: info.req_len.into(),
             resp_len: info.resp_len.into(),
             req: L7Request {
-                resource: info.request_id.to_string(),
+                req_type: info.req_method_name.unwrap_or_default(),
+                resource: info.req_service_name.unwrap_or_default(),
+                endpoint: info.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
                 code: info.ret.into(),
+                status: info.resp_status,
                 ..Default::default()
             },
             version: info.tars_version.to_string().into(),
