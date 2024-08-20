@@ -46,11 +46,13 @@ var log = logger.MustGetLogger("cloud")
 
 type Cloud struct {
 	orgID                   int
+	synchronizing           bool
 	db                      *mysql.DB
 	cfg                     config.CloudConfig
 	cCtx                    context.Context
 	cCancel                 context.CancelFunc
 	mutex                   sync.RWMutex
+	triggerTime             time.Time
 	basicInfo               model.BasicInfo
 	resource                model.Resource
 	platform                platform.Platform
@@ -74,12 +76,22 @@ func NewCloud(orgID int, domain mysql.Domain, cfg config.CloudConfig, ctx contex
 		return nil
 	}
 
+	// maybe all types will be supported later
+	var triggerTime time.Time
+	if domain.Type == common.QINGCLOUD || domain.Type == common.QINGCLOUD_PRIVATE {
+		triggerTime, err = time.ParseInLocation("15:04", cfg.QingCloudConfig.DailyTriggerTime, time.Local)
+		if err != nil {
+			log.Errorf("parse qing config daily trigger time failed: (%s)", err.Error(), logger.NewORGPrefix(orgID))
+		}
+	}
+
 	log.Infof("cloud task (%s) init success", domain.Name, logger.NewORGPrefix(orgID))
 
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
-		orgID: orgID,
-		db:    mysqlDB,
+		orgID:       orgID,
+		db:          mysqlDB,
+		triggerTime: triggerTime,
 		basicInfo: model.BasicInfo{
 			OrgID:     orgID,
 			TeamID:    domain.TeamID,
@@ -287,6 +299,11 @@ func (c *Cloud) getCloudGatherInterval() int {
 }
 
 func (c *Cloud) getCloudData() {
+	log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+
+	c.synchronizing = true
+	defer func() { c.synchronizing = false }()
+
 	var cResource model.Resource
 	var cloudCost float64
 	if c.basicInfo.Type != common.KUBERNETES {
@@ -327,6 +344,7 @@ func (c *Cloud) getCloudData() {
 	}
 	// trigger recorder refresh domain resource
 	c.domainRefreshSignal.Put(struct{}{})
+	log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 }
 
 func (c *Cloud) sendStatsd(cloudCost float64) {
@@ -336,15 +354,40 @@ func (c *Cloud) sendStatsd(cloudCost float64) {
 	statsd.MetaStatsd.RegisterStatsdTable(c)
 }
 
+func (c *Cloud) ClientTrigger() error {
+	if c.synchronizing {
+		return fmt.Errorf("cloud (%s) is synchronizing, please try again later", c.basicInfo.Name)
+	}
+	go c.getCloudData()
+	return nil
+}
+
+func (c *Cloud) dailyTrigger() bool {
+	if c.triggerTime.IsZero() {
+		return true
+	}
+
+	now := time.Now()
+	dailyTime := time.Date(now.Year(), now.Month(), now.Day(), c.triggerTime.Hour(), c.triggerTime.Minute(), 0, 0, time.Local)
+	timeSub := now.Sub(dailyTime)
+	if timeSub >= 0 && timeSub <= time.Minute {
+		return true
+	}
+	log.Infof("now is not trigger time (%s), task (%s) not running", dailyTime.Format(common.GO_BIRTHDAY), c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+	return false
+}
+
 func (c *Cloud) run() {
 	log.Infof("cloud (%s) started", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 
 	if err := c.platform.CheckAuth(); err != nil {
 		log.Errorf("cloud (%+v) check auth failed", c.basicInfo, logger.NewORGPrefix(c.orgID))
 	}
-	log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
-	c.getCloudData()
-	log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+
+	// execute immediately upon startup
+	if c.dailyTrigger() {
+		c.getCloudData()
+	}
 
 	cloudGatherInterval := c.getCloudGatherInterval()
 	c.basicInfo.Interval = cloudGatherInterval
@@ -354,9 +397,13 @@ func (c *Cloud) run() {
 	for {
 		select {
 		case <-ticker.C:
-			log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+			if c.synchronizing {
+				continue
+			}
+			if !c.dailyTrigger() {
+				continue
+			}
 			c.getCloudData()
-			log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 		case <-c.cCtx.Done():
 			log.Infof("cloud (%s) stopped", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 			return

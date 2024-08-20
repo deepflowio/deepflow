@@ -58,7 +58,6 @@ type QingCloud struct {
 	httpTimeout           int
 	MaxRetries            uint
 	RetryDuration         uint
-	DailyTriggerTime      time.Time
 
 	defaultVPCName   string
 	defaultVxnetName string
@@ -113,15 +112,6 @@ func NewQingCloud(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (
 		url = "https://api.qingcloud.com"
 	}
 
-	var dailyTriggerTime time.Time
-	if cfg.QingCloudConfig.DailyTriggerTime != "" {
-		dailyTriggerTime, err = time.ParseInLocation("15:04", cfg.QingCloudConfig.DailyTriggerTime, time.Local)
-		if err != nil {
-			log.Errorf("parse qing config daily trigger time failed: (%s)", err.Error(), logger.NewORGPrefix(orgID))
-			return nil, err
-		}
-	}
-
 	return &QingCloud{
 		orgID:  orgID,
 		teamID: domain.TeamID,
@@ -138,7 +128,6 @@ func NewQingCloud(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (
 		MaxRetries:            cfg.QingCloudConfig.MaxRetries,
 		RetryDuration:         cfg.QingCloudConfig.RetryDuration,
 		DisableSyncLBListener: cfg.QingCloudConfig.DisableSyncLBListener,
-		DailyTriggerTime:      dailyTriggerTime,
 
 		defaultVPCName:            domain.Name + "_default_vpc",
 		defaultVxnetName:          "vxnet-0",
@@ -331,16 +320,6 @@ func (q *QingCloud) GetStatter() statsd.StatsdStatter {
 
 func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
-
-	if !q.DailyTriggerTime.IsZero() {
-		now := time.Now()
-		triggerTime := time.Date(now.Year(), now.Month(), now.Day(), q.DailyTriggerTime.Hour(), q.DailyTriggerTime.Minute(), 0, 0, time.Local)
-		timeSub := now.Sub(triggerTime)
-		if timeSub < time.Second || timeSub > time.Minute {
-			log.Infof("now is not the trigger time (%s), the task is not running", triggerTime.Format(common.GO_BIRTHDAY), logger.NewORGPrefix(q.orgID))
-			return resource, nil
-		}
-	}
 
 	// every tasks must init
 	q.CloudStatsd = statsd.NewCloudStatsd()

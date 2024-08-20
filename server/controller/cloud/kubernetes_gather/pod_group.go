@@ -111,7 +111,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					// 可以通过 lua 插件根据 pod 的信息来抽象出符合规则的工作负载名称和类型
 					abstractPGType, abstractPGName, err := plugin.GeneratePodGroup(k.orgID, k.db, metaData)
 					if err != nil {
-						log.Warningf("pod (%s) abstract pod group failed: (%s)", name, err.Error, logger.NewORGPrefix(k.orgID))
+						log.Warningf("pod (%s) abstract pod group failed: (%s)", name, err.Error(), logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					if abstractPGType == "" || abstractPGName == "" {
