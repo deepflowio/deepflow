@@ -95,7 +95,7 @@ func Load(base *config.Config, path string) *Config {
 	config := &FlowMetricsConfig{
 		FlowMetrics: Config{
 			Base:                 base,
-			CKWriterConfig:       config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			CKWriterConfig:       config.CKWriterConfig{QueueCount: 1, QueueSize: 256000, BatchSize: 128000, FlushTimeout: 10},
 			CKReadTimeout:        DefaultCKReadTimeout,
 			UnmarshallQueueCount: DefaultUnmarshallQueueCount,
 			UnmarshallQueueSize:  DefaultUnmarshallQueueSize,

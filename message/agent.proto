@@ -341,9 +341,22 @@ message SkipInterface {
     optional uint64 mac = 1;
 }
 
+message DynamicConfig {
+    optional bool kubernetes_api_enabled = 1;
+
+    optional uint32 region_id = 10;       // Region ID of the deepflow-agent or Region ID of the data node
+    optional uint32 pod_cluster_id = 11;  // Cluster ID of the container where the deepflow-agent is located
+    optional uint32 vpc_id = 12;  
+    optional uint32 agent_id = 13;  // range: [0, 64000]
+    optional uint32 team_id = 14;
+    optional uint32 organize_id = 15;
+
+    optional string secret_key = 20; // secret key for dataplane
+}
+
 message SyncResponse {
     optional Status status = 1;
-    optional string config = 2;
+    optional string user_config = 2;
     optional string revision = 3;         // 指定升级的目标revision
     optional string self_update_url = 4;  // 指定升级的URL路径
 
@@ -365,6 +378,8 @@ message SyncResponse {
     optional bytes groups = 13;         // serialized result of `message Groups`, transmitted only when the content changes
     repeated CaptureNetworkType capture_network_types = 14;
     repeated SkipInterface skip_interface = 15;
+
+    optional DynamicConfig dynamic_config = 20;
 }
 
 message UpgradeRequest {
@@ -554,6 +569,12 @@ enum RoleType {
     ROLE_NONE = 0;
     ROLE_CLIENT = 1;
     ROLE_SERVER = 2;
+}
+
+enum ServiceProtocol {
+    ANY = 0;
+    TCP_SERVICE = 1;
+    UDP_SERVICE = 2;
 }
 
 message GPIDSyncEntry {

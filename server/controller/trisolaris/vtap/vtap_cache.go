@@ -28,6 +28,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
+	"github.com/mohae/deepcopy"
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowio/deepflow/message/trident"
@@ -436,12 +437,15 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 	}
 
 	if c.EnabledCallMonitoring() == false {
+		disabled := int(DISABLED)
 		if yamlConfig.Ebpf == nil {
 			yamlConfig.Ebpf = &agent_config.EbpfConfig{
-				Disabled: proto.Bool(true),
+				Disabled:           proto.Bool(true),
+				IOEventCollectMode: &disabled,
 			}
 		} else {
 			yamlConfig.Ebpf.Disabled = proto.Bool(true)
+			yamlConfig.Ebpf.IOEventCollectMode = &disabled
 		}
 	}
 
@@ -1055,15 +1059,14 @@ func (c *VTapCache) initVTapConfig() {
 	realConfig := VTapConfig{}
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
-		realConfig = *config
+
+		realConfig = deepcopy.Copy(*config).(VTapConfig)
 	} else {
 		if v.realDefaultConfig != nil {
-			realConfig = *v.realDefaultConfig
+			realConfig = deepcopy.Copy(*v.realDefaultConfig).(VTapConfig)
 		}
 	}
-	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
-		c.modifyVTapConfigByLicense(&realConfig)
-	}
+	c.modifyVTapConfigByLicense(&realConfig)
 	realConfig.modifyConfig(v)
 	c.updateVTapConfig(&realConfig)
 }
@@ -1073,10 +1076,10 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 	newConfig := VTapConfig{}
 	config, ok := v.vtapGroupLcuuidToConfiguration[c.GetVTapGroupLcuuid()]
 	if ok {
-		newConfig = *config
+		newConfig = deepcopy.Copy(*config).(VTapConfig)
 	} else {
 		if v.realDefaultConfig != nil {
-			newConfig = *v.realDefaultConfig
+			newConfig = deepcopy.Copy(*v.realDefaultConfig).(VTapConfig)
 		}
 	}
 	oldConfig := c.GetVTapConfig()
@@ -1087,9 +1090,7 @@ func (c *VTapCache) updateVTapConfigFromDB() {
 		}
 	}
 
-	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
-		c.modifyVTapConfigByLicense(&newConfig)
-	}
+	c.modifyVTapConfigByLicense(&newConfig)
 	newConfig.modifyConfig(v)
 	c.updateVTapConfig(&newConfig)
 }
@@ -1110,9 +1111,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *mysql.VTap) {
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State
 	c.enable = vtap.Enable
-	if v.config.BillingMethod == BILLING_METHOD_LICENSE {
-		c.updateLicenseFunctions(vtap.LicenseFunctions)
-	}
+	c.updateLicenseFunctions(vtap.LicenseFunctions)
 	c.updateTapMode(vtap.TapMode)
 	c.updateTeamID(vtap.TeamID)
 	if c.vTapType != vtap.Type {

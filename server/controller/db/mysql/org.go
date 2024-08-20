@@ -29,6 +29,7 @@ import (
 
 const ORG_TABLE = "org"
 
+// GetORGIDs returns a slice of organization IDs, including the default organization ID, but not including the soft deleted organization IDs.
 func GetORGIDs() ([]int, error) {
 	ids := []int{common.DEFAULT_ORG_ID}
 	if oids, err := GetNonDefaultORGIDs(); err != nil {
@@ -39,19 +40,15 @@ func GetORGIDs() ([]int, error) {
 	return ids, nil
 }
 
+// GetNonDefaultORGIDs returns a slice of organization IDs, not including the default organization ID and the soft deleted organization IDs.
 func GetNonDefaultORGIDs() ([]int, error) {
 	ids := make([]int, 0)
-	var orgTable string
-	err := DefaultDB.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", GetConfig().Database, ORG_TABLE)).Scan(&orgTable).Error
-	if err != nil {
-		log.Errorf("failed to check org table: %v", err.Error())
+	exists, err := CheckIfORGTableExists()
+	if err != nil || !exists {
 		return ids, err
 	}
-	if orgTable == "" {
-		return ids, nil
-	}
 
-	var orgs []*Org
+	var orgs []*ORG
 	if err := DefaultDB.Where("org_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
 		log.Errorf("failed to get org ids: %v", err.Error())
 		return ids, err
@@ -61,6 +58,34 @@ func GetNonDefaultORGIDs() ([]int, error) {
 	}
 	sort.Ints(ids)
 	return ids, nil
+}
+
+func GetDeletedORGIDs() ([]int, error) {
+	ids := make([]int, 0)
+	var orgs []*ORG
+	if err := DefaultDB.Unscoped().Find(&orgs).Error; err != nil {
+		log.Errorf("failed to get orgs: %s", err.Error())
+		return ids, err
+	}
+	for _, org := range orgs {
+		if org.DeletedAt.Valid {
+			ids = append(ids, org.ORGID)
+		}
+	}
+	return ids, nil
+}
+
+func CheckIfORGTableExists() (bool, error) {
+	var orgTable string
+	err := DefaultDB.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", GetConfig().Database, ORG_TABLE)).Scan(&orgTable).Error
+	if err != nil {
+		log.Errorf("failed to check org table: %v", err.Error())
+		return false, err
+	}
+	if orgTable == "" {
+		return false, nil
+	}
+	return true, nil
 }
 
 func CheckORGNumberAndLog() ([]int, error) {

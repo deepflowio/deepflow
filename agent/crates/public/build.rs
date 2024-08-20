@@ -23,6 +23,7 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
         .out_dir("src/proto")
         .compile(
             &[
+                "../../../message/agent.proto",
                 "../../../message/common.proto",
                 "../../../message/trident.proto",
                 "../../../message/metric.proto",

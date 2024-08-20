@@ -429,13 +429,29 @@ const (
 		SQL_SOURCE_MYSQL +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
+	CREATE_POD_NODE_DICTIONARY_SQL = SQL_CREATE_DICT +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64,\n" +
+		"    `sub_domain_id` UInt64,\n" +
+		"    `pod_cluster_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		SQL_SOURCE_MYSQL +
+		SQL_LIFETIME +
+		SQL_LAYOUT_FLAT
 	CREATE_POD_INGRESS_DICTIONARY_SQL = SQL_CREATE_DICT +
 		"(\n" +
 		"    `id` UInt64,\n" +
 		"    `name` String,\n" +
 		"    `team_id` UInt64,\n" +
 		"    `domain_id` UInt64,\n" +
-		"    `sub_domain_id` UInt64\n" +
+		"    `pod_ns_id` UInt64,\n" +
+		"    `sub_domain_id` UInt64,\n" +
+		"    `pod_cluster_id` UInt64\n" +
 		")\n" +
 		"PRIMARY KEY id\n" +
 		SQL_SOURCE_MYSQL +
@@ -911,7 +927,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_VL2:                    CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_CLUSTER:            CREATE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_NAMESPACE:          CREATE_POD_NS_DICTIONARY_SQL,
-	CH_DICTIONARY_POD_NODE:               CREATE_DICTIONARY_SQL,
+	CH_DICTIONARY_POD_NODE:               CREATE_POD_NODE_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_GROUP:              CREATE_POD_GROUP_DICTIONARY_SQL,
 	CH_DICTIONARY_POD:                    CREATE_POD_DICTIONARY_SQL,
 	CH_DICTIONARY_DEVICE:                 CREATE_DEVICE_DICTIONARY_SQL,

@@ -253,7 +253,7 @@ message Config {
     // _ = 46; // deprecated
     optional SocketType npb_socket_type = 47 [default = RAW_UDP];
 
-    optional uint32 pcap_data_retention = 51 [default = 7];  // uint: day
+    optional uint32 pcap_data_retention = 51 [default = 7];  // deprecated, uint: day
     optional uint32 capture_packet_size = 52 [default = 65535];
     optional bool inactive_server_port_enabled = 53 [default = true];
     optional string capture_bpf = 54 [default = ""];
@@ -302,6 +302,7 @@ message Config {
     optional float system_load_circuit_breaker_threshold = 504 [default = 1.0];
     optional SystemLoadMetric system_load_circuit_breaker_metric = 505 [default = Load15];
     optional float system_load_circuit_breaker_recover = 506 [default = 0.9];
+    optional string secret_key = 507; // secret key for dataplane
 
     optional string local_config = 510;  // 全量的配置文件内容
 }
@@ -1143,4 +1144,5 @@ message OrgIDsRequest {}
 
 message OrgIDsResponse {
     repeated uint32 org_ids = 1;
+    optional uint32 update_time = 2;
 }

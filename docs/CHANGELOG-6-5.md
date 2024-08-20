@@ -11,6 +11,20 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: concurrent map read and map write [#7811](https://github.com/deepflowio/deepflow/pull/7811) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: fixes allocating wrong org id [#7864](https://github.com/deepflowio/deepflow/pull/7864) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: drop data which organization is not exist [#7863](https://github.com/deepflowio/deepflow/pull/7863) by [lzf575](https://github.com/lzf575)
+* fix: drop Org data in ckwriter [#7859](https://github.com/deepflowio/deepflow/pull/7859) by [lzf575](https://github.com/lzf575)
+* fix: skip check when getting icon fails [#7851](https://github.com/deepflowio/deepflow/pull/7851) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: Add libpcap dependency to installation package [#7834](https://github.com/deepflowio/deepflow/pull/7834) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: fix agent rebalance panic [#7830](https://github.com/deepflowio/deepflow/pull/7830) by [roryye](https://github.com/roryye)
+* fix: fix the problem of config pointer copy [#7823](https://github.com/deepflowio/deepflow/pull/7823) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: CVE-2024-35195 vuln [#7809](https://github.com/deepflowio/deepflow/pull/7809) by [taloric](https://github.com/taloric)
+* fix: turn off the call monitoring function and stop related functions [#7806](https://github.com/deepflowio/deepflow/pull/7806) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: agent enable feature permission [#7795](https://github.com/deepflowio/deepflow/pull/7795) by [roryye](https://github.com/roryye)
+* Revert "fix: refresh agent enable feature" [#7793](https://github.com/deepflowio/deepflow/pull/7793) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: refresh agent enable feature [#7791](https://github.com/deepflowio/deepflow/pull/7791) by [roryye](https://github.com/roryye)
+* fix: Modify ch_table update time #26153 [#7785](https://github.com/deepflowio/deepflow/pull/7785) by [Ericsssss](https://github.com/Ericsssss)
 * fix: not found replicaset pod [#7761](https://github.com/deepflowio/deepflow/pull/7761) by [askyrie](https://github.com/askyrie)
 * fix: uses wrong host when request server http service [#7759](https://github.com/deepflowio/deepflow/pull/7759) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Fix enum filter error [#7731](https://github.com/deepflowio/deepflow/pull/7731) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -97,6 +111,16 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: support update time of org list [#7867](https://github.com/deepflowio/deepflow/pull/7867) by [lzf575](https://github.com/lzf575)
+* feat: optimize org data check and sync [#7866](https://github.com/deepflowio/deepflow/pull/7866) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: adds detail error record when calling ingester org deletion [#7865](https://github.com/deepflowio/deepflow/pull/7865) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: add api for allocate org id [#7862](https://github.com/deepflowio/deepflow/pull/7862) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: add trace query delta for tracemap [#7847](https://github.com/deepflowio/deepflow/pull/7847) by [taloric](https://github.com/taloric)
+* feat: supports clear soft deleted orgs [#7827](https://github.com/deepflowio/deepflow/pull/7827) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: Using libpcap without restarting when the network card does not… [#7781](https://github.com/deepflowio/deepflow/pull/7781) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent license func operate [#7771](https://github.com/deepflowio/deepflow/pull/7771) by [roryye](https://github.com/roryye)
+* feat: increase billing function control capabilities [#7770](https://github.com/deepflowio/deepflow/pull/7770) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: use dynamic library libpcap instead of libelf static library [#7769](https://github.com/deepflowio/deepflow/pull/7769) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: shortens the interval of checking deleted_org [#7764](https://github.com/deepflowio/deepflow/pull/7764) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: OTel’s HTTP protocol parsing optimization [#7758](https://github.com/deepflowio/deepflow/pull/7758) by [lzf575](https://github.com/lzf575)
 * feat: Support k8s opengauss cluster [#7751](https://github.com/deepflowio/deepflow/pull/7751) by [rvql](https://github.com/rvql)

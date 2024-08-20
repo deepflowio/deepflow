@@ -130,6 +130,7 @@ controller:
     host: clickhouse
     port: 9000
     # user-password:
+    endpoint-tcp-port-name: tcp-port
 
   # datasource-api from ingester
   ingester-api:
@@ -277,6 +278,10 @@ controller:
     ## uint: s, default: 1
     #platform-data-refresh-delay-time: 1
 
+    ## org data refresh interval
+    ## uint: s, default: 60
+    #org-data-refresh-interval: 60
+
   genesis:
     # 平台数据老化时间，单位：秒
     aging_time: 86400
@@ -346,7 +351,6 @@ querier:
     timeout: 60
     max-connection: 20
     # user-password:
-    endpoint-tcp-port-name: tcp-port
 
   # profile相关配置
   profile:
@@ -470,15 +474,15 @@ ingester:
   ## 遥测数据写入配置
   #metrics-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
-  #  queue-size: 1000000 # 数据队列长度
-  #  batch-size: 512000  # 多少行数据同时写入
+  #  queue-size: 256000  # 数据队列长度
+  #  batch-size: 128000  # 多少行数据同时写入
   #  flush-timeout: 10   # 超时写入时间
 
   ## 流日志写入配置
   #flowlog-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
-  #  queue-size: 1000000 # 数据队列长度
-  #  batch-size: 512000  # 多少行数据同时写入
+  #  queue-size: 256000  # 数据队列长度
+  #  batch-size: 128000  # 多少行数据同时写入
   #  flush-timeout: 10   # 超时写入时间
 
   ## ext metrics写入配置

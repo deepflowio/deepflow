@@ -221,6 +221,8 @@ const (
 	VTAP_LICENSE_FUNCTION_MAX
 )
 
+const VTAP_ALL_LICENSE_FUNCTIONS = "1,2,3,4,5,6,7,8"
+
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
 	VTAP_TYPE_KVM:                  VIF_DEVICE_TYPE_HOST,
 	VTAP_TYPE_ESXI:                 VIF_DEVICE_TYPE_HOST,
@@ -696,7 +698,7 @@ const (
 	HEADER_KEY_X_ORG_ID    = "X-Org-Id"
 	HEADER_KEY_X_USER_TYPE = "X-User-Type"
 	HEADER_KEY_X_USER_ID   = "X-User-Id"
-	HEADER_X_APP_KEY       = "X-App-Key"
+	HEADER_KEY_X_APP_KEY   = "X-App-Key"
 
 	USER_TYPE_SUPER_ADMIN = 1
 	USER_TYPE_ADMIN       = 2

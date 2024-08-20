@@ -187,6 +187,8 @@ type PlatformInfoTable struct {
 	podNameInfos       [MAX_ORG_COUNT]map[string][]*PodInfo
 	vtapIdInfos        [MAX_ORG_COUNT]map[uint16]*VtapInfo
 	orgIds             []uint16
+	orgIdsUpdateTime   uint32
+	orgIdExists        [MAX_ORG_COUNT]bool
 	containerInfos     [MAX_ORG_COUNT]map[string][]*PodInfo
 	containerHitCount  [MAX_ORG_COUNT]map[string]*uint64
 	containerMissCount [MAX_ORG_COUNT]map[string]*uint64
@@ -212,6 +214,20 @@ func QueryAllOrgIDs() []uint16 {
 		time.Sleep(time.Second)
 	}
 	return nil
+}
+
+func QueryOrgIDExist(orgID uint16) (uint32, bool) {
+	if orgID == ckdb.INVALID_ORG_ID {
+		return 0, true
+	}
+	if orgID > ckdb.MAX_ORG_ID {
+		return 0, false
+	}
+	if platformDataManager == nil {
+		return 0, false
+	}
+	masterTable := platformDataManager.GetMasterPlatformInfoTable()
+	return masterTable.orgIdsUpdateTime, masterTable.orgIdExists[orgID]
 }
 
 func QueryVtapOrgAndTeamID(orgId, vtapId uint16) (uint16, uint16) {
@@ -1128,6 +1144,8 @@ func (t *PlatformInfoTable) ReloadSlave(orgId uint16) error {
 	}
 	t.vtapIdInfos[orgId] = masterTable.vtapIdInfos[orgId]
 	t.orgIds = masterTable.orgIds
+	t.orgIdExists = masterTable.orgIdExists
+	t.orgIdsUpdateTime = masterTable.orgIdsUpdateTime
 	t.podNameInfos[orgId] = masterTable.podNameInfos[orgId]
 	t.regionID = masterTable.regionID
 	t.analyzerID = masterTable.analyzerID
@@ -1250,6 +1268,7 @@ func (t *PlatformInfoTable) requestOrgIds() []uint16 {
 		return t.orgIds
 	}
 	orgIdU32s := response.GetOrgIds()
+	orgIdsUpdateTime := response.GetUpdateTime()
 	orgIdU16s := make([]uint16, 0, len(orgIdU32s))
 	for _, orgId := range orgIdU32s {
 		if ckdb.IsValidOrgID(uint16(orgId)) {
@@ -1277,7 +1296,13 @@ func (t *PlatformInfoTable) requestOrgIds() []uint16 {
 	if isChanged {
 		log.Infof("org ids changed from %+v to %+v", t.orgIds, orgIdU16s)
 		t.orgIds = orgIdU16s
+		var orgIdExists [MAX_ORG_COUNT]bool
+		for _, v := range orgIdU16s {
+			orgIdExists[v] = true
+		}
+		t.orgIdExists = orgIdExists
 	}
+	t.orgIdsUpdateTime = orgIdsUpdateTime
 	return t.orgIds
 }
 

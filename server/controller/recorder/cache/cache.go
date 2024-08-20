@@ -70,7 +70,7 @@ func NewCacheManager(ctx context.Context, cfg config.RecorderConfig, md *rcommon
 
 func (m *CacheManager) CreateSubDomainCacheIfNotExists(md *rcommon.Metadata) *Cache {
 	if _, exists := m.SubDomainCacheMap[md.SubDomain.Lcuuid]; !exists {
-		log.Info("new subdomain cache (lcuuid: %s) because not exists", md.SubDomain.Lcuuid, m.metadata.LogPrefixes)
+		log.Infof("new subdomain cache (lcuuid: %s) because not exists", md.SubDomain.Lcuuid, m.metadata.LogPrefixes)
 		m.SubDomainCacheMap[md.SubDomain.Lcuuid] = NewCache(m.ctx, md, m.cacheSetSelfHealInterval)
 	}
 	return m.SubDomainCacheMap[md.SubDomain.Lcuuid]
@@ -160,7 +160,7 @@ const (
 )
 
 func (c *Cache) ResetRefreshSignal(caller string) {
-	log.Info("domain: %s reset cache refresh signal (caller: %s)", c.metadata.Domain.Lcuuid, caller, c.metadata.LogPrefixes)
+	log.Infof("domain: %s reset cache refresh signal (caller: %s)", c.metadata.Domain.Lcuuid, caller, c.metadata.LogPrefixes)
 	c.RefreshSignal <- struct{}{}
 }
 

@@ -113,6 +113,7 @@ require (
 	github.com/grafana/pyroscope-go v1.0.4
 	github.com/klauspost/compress v1.17.7
 	github.com/mitchellh/mapstructure v1.4.3
+	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/pyroscope-io/pyroscope v0.37.1
 	github.com/volcengine/volcengine-go-sdk v1.0.141

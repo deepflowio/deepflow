@@ -95,7 +95,7 @@ func Load(base *config.Config, path string) *Config {
 			ThrottleBucket:    DefaultThrottleBucket,
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
-			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 256000, BatchSize: 128000, FlushTimeout: 10},
 			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL, DefaultFlowLogTTL},
 		},
 	}

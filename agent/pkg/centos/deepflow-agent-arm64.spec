@@ -9,7 +9,7 @@ License:    Copyright (c) 2012-2016 Yunshan Netwoks
 URL:        http://yunshan.net
 Source:     deepflow-agent.spec
 
-Requires(post): %{_sbindir}/update-alternatives
+Requires(post): libpcap %{_sbindir}/update-alternatives
 Requires(postun): %{_sbindir}/update-alternatives
 Autoreq: 0
 

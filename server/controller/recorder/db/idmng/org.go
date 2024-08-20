@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 )
@@ -115,16 +116,19 @@ func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
 		log.Error("failed to get db: %v", err)
 		return nil, err
 	}
-	// 仅当组织中存在 domain 时，才创建组织的 IDManager，以避免内存浪费
-	var domain *mysql.Domain
-	result := db.Limit(1).Find(&domain)
-	if result.Error != nil {
-		log.Errorf("failed to get domain: %v", err, db.LogPrefixORGID)
-		return nil, err
-	}
-	if result.RowsAffected == 0 {
-		log.Infof("no domain in db, skip creating id manager", db.LogPrefixORGID)
-		return nil, nil
+
+	if orgID != common.DEFAULT_ORG_ID {
+		// 仅当组织中存在 domain 时，才创建组织的 IDManager，以避免内存浪费
+		var domain *mysql.Domain
+		result := db.Limit(1).Find(&domain)
+		if result.Error != nil {
+			log.Errorf("failed to get domain: %v", err, db.LogPrefixORGID)
+			return nil, err
+		}
+		if result.RowsAffected == 0 {
+			log.Infof("no domain in db, skip creating id manager", db.LogPrefixORGID)
+			return nil, nil
+		}
 	}
 	return m.NewIDManagerAndInitIfNotExists(orgID)
 }

@@ -907,16 +907,24 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			// fieltValueType := _tagName.([]interface{})[2]
 			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") {
 				categoryValue = "Custom Tag"
+				response.Values = append(response.Values, []interface{}{
+					externalTag, externalTag, externalTag, externalTag, "map_item",
+					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+				})
 			} else if strings.HasPrefix(externalTag, "tag.") || strings.HasPrefix(externalTag, "attribute.") {
 				categoryValue = "Native Tag"
+				response.Values = append(response.Values, []interface{}{
+					externalTag, externalTag, externalTag, externalTag, "map_item",
+					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+				})
 			} else {
 				categoryValue = _tagName.([]interface{})[2].(string)
+				response.Values = append(response.Values, []interface{}{
+					externalTag, externalTag, externalTag, externalTag, "map_item",
+					categoryValue, tagTypeToOperators[_tagName.([]interface{})[2].(string)], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
+				})
 			}
 
-			response.Values = append(response.Values, []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "map_item",
-				categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "", false, notSupportOperator, tableName,
-			})
 		} else if slices.Contains(tagNativeTagDB, db) {
 			externalTag := "tag." + tagName.(string)
 			response.Values = append(response.Values, []interface{}{
@@ -1098,7 +1106,11 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache boo
 		DB: db, Table: table, TagName: tag,
 	}]
 	if !ok {
-		return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+		if table == "alert_event" {
+			return nil, sqlList, nil
+		} else {
+			return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+		}
 	}
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
