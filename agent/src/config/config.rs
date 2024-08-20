@@ -2761,7 +2761,7 @@ impl Default for YamlConfig {
             debug_listen_port: 0,
             enable_qos_bypass: false,
             multiple_sockets_to_ingester: false,
-            fast_path_map_size: 1 << 14,
+            fast_path_map_size: 0,
             first_path_level: 0,
             src_interfaces: vec![],
             tap_interface_bond_groups: vec![],
