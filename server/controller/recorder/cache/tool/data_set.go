@@ -1071,14 +1071,14 @@ func (t *DataSet) GetHostIDByIP(ip string) (int, bool) {
 	if exists {
 		return id, true
 	}
-	log.Warning("cache %s id (ip: %s) not found", ctrlrcommon.RESOURCE_TYPE_HOST_EN, ip, t.metadata.LogPrefixes)
+	log.Warningf("cache %s id (ip: %s) not found", ctrlrcommon.RESOURCE_TYPE_HOST_EN, ip, t.metadata.LogPrefixes)
 	var host mysql.Host
 	result := t.metadata.DB.Where("ip = ?", ip).Find(&host)
 	if result.RowsAffected == 1 {
 		t.AddHost(&host)
 		return host.ID, true
 	} else {
-		log.Error("db %s (ip: %s) not found", ctrlrcommon.RESOURCE_TYPE_HOST_EN, ip, t.metadata.LogPrefixes)
+		log.Errorf("db %s (ip: %s) not found", ctrlrcommon.RESOURCE_TYPE_HOST_EN, ip, t.metadata.LogPrefixes)
 		return id, false
 	}
 }
@@ -1210,7 +1210,7 @@ func (t *DataSet) GetNetworkIDByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
 	if exists {
 		return id, true
 	}
-	log.Warning("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
 	var vif mysql.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
@@ -1227,7 +1227,7 @@ func (t *DataSet) GetDeviceTypeByVInterfaceLcuuid(vifLcuuid string) (int, bool) 
 	if exists {
 		return id, true
 	}
-	log.Warning("cache device type (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache device type (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
 	var vif mysql.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
@@ -1244,7 +1244,7 @@ func (t *DataSet) GetDeviceIDByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
 	if exists {
 		return id, true
 	}
-	log.Warning("cache device id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache device id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
 	var vif mysql.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
@@ -1261,7 +1261,7 @@ func (t *DataSet) GetMacByVInterfaceLcuuid(vifLcuuid string) (string, bool) {
 	if exists {
 		return mac, true
 	}
-	log.Warning("cache mac (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache mac (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
 	var vif mysql.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
@@ -1383,7 +1383,7 @@ func (t *DataSet) GetVInterfaceTypeByLcuuid(lcuuid string) (int, bool) {
 	if exists {
 		return vt, true
 	}
-	log.Warning("cache %s type (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache %s type (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid, t.metadata.LogPrefixes)
 	var vinterface mysql.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&vinterface)
 	if result.RowsAffected == 1 {
@@ -1419,7 +1419,7 @@ func (t *DataSet) GetDeviceLcuuidByID(deviceType, deviceID int) (string, bool) {
 	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
 		return t.GetPodLcuuidByID(deviceID)
 	} else {
-		log.Error("device type %d not supported", deviceType, t.metadata.LogPrefixes)
+		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
 		return "", false
 	}
 }
@@ -1448,7 +1448,7 @@ func (t *DataSet) GetDeviceIDByDeviceLcuuid(deviceType int, deviceLcuuid string)
 	} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
 		return t.GetPodIDByLcuuid(deviceLcuuid)
 	} else {
-		log.Error("device type %d not supported", deviceType, t.metadata.LogPrefixes)
+		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
 		return 0, false
 	}
 }
@@ -1812,7 +1812,7 @@ func (t *DataSet) GetPodGroupTypeByID(id int) (int, bool) {
 	if exists {
 		return podGroupType, true
 	}
-	log.Warning(fmt.Sprintf("cache %s type (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, id), t.metadata.LogPrefixes)
+	log.Warningf("cache %s type (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, id, t.metadata.LogPrefixes)
 	var podGroup mysql.PodGroup
 	result := t.metadata.DB.Where("id = ?", id).Find(&podGroup)
 	if result.RowsAffected == 1 {
@@ -2211,7 +2211,7 @@ func (t *DataSet) GetVInterfaceIDByWANIPLcuuid(lcuuid string) (int, bool) {
 	if exists {
 		return vifID, true
 	}
-	log.Warning("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid, t.metadata.LogPrefixes)
 	var wanIP mysql.WANIP
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&wanIP)
 	if result.RowsAffected == 1 {
@@ -2246,7 +2246,7 @@ func (t *DataSet) GetVInterfaceIDByLANIPLcuuid(lcuuid string) (int, bool) {
 	if exists {
 		return vifID, true
 	}
-	log.Warning("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid, t.metadata.LogPrefixes)
 	var lanIP mysql.LANIP
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&lanIP)
 	if result.RowsAffected == 1 {
@@ -2281,7 +2281,7 @@ func (t *DataSet) GetVMIDByPodNodeID(podNodeID int) (int, bool) {
 	if exists {
 		return id, true
 	}
-	log.Warning("cache %s id (%s id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VM_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, podNodeID, t.metadata.LogPrefixes)
+	log.Warningf("cache %s id (%s id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VM_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, podNodeID, t.metadata.LogPrefixes)
 	var conn mysql.VMPodNodeConnection
 	result := t.metadata.DB.Where("pod_node_id = ?", podNodeID).Find(&conn)
 	if result.RowsAffected == 1 {
@@ -2296,7 +2296,7 @@ func (t *DataSet) GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid string) (int, b
 	if exists {
 		return id, true
 	}
-	log.Warning("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid, t.metadata.LogPrefixes)
+	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid, t.metadata.LogPrefixes)
 	var conn mysql.VMPodNodeConnection
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&conn)
 	if result.RowsAffected == 1 {
