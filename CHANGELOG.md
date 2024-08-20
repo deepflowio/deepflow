@@ -8,6 +8,12 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Fix windows compile [#7897](https://github.com/deepflowio/deepflow/pull/7897) by [rvql](https://github.com/rvql)
+* fix: abnormal stats data, causing deepflow-server to panic [#7894](https://github.com/deepflowio/deepflow/pull/7894) by [lzf575](https://github.com/lzf575)
+* fix: fixes invalid controller formatted logs [#7890](https://github.com/deepflowio/deepflow/pull/7890) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: incorrect fast path map size [#7888](https://github.com/deepflowio/deepflow/pull/7888) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: Modify alert_event tag type error #26069 [#7886](https://github.com/deepflowio/deepflow/pull/7886) by [Ericsssss](https://github.com/Ericsssss)
+* fix: Log analysis content [#7878](https://github.com/deepflowio/deepflow/pull/7878) by [incoffeemonster](https://github.com/incoffeemonster)
 * fix: Modify array tag filter zero check #26069 [#7853](https://github.com/deepflowio/deepflow/pull/7853) by [Ericsssss](https://github.com/Ericsssss)
 * fix: skip check when getting icon fails [#7849](https://github.com/deepflowio/deepflow/pull/7849) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: Add libpcap dependency to installation package [#7833](https://github.com/deepflowio/deepflow/pull/7833) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -139,6 +145,11 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: when only exporting a single kafka data, use the 'sendMessage' interface [#7885](https://github.com/deepflowio/deepflow/pull/7885) by [lzf575](https://github.com/lzf575)
+* feat: querier support simple sql [#7883](https://github.com/deepflowio/deepflow/pull/7883) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: update domain daily trigger [#7850](https://github.com/deepflowio/deepflow/pull/7850) by [askyrie](https://github.com/askyrie)
+* feat: The interface sent to ingester deletes some fields [#7840](https://github.com/deepflowio/deepflow/pull/7840) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: DWARF unwind support [#7821](https://github.com/deepflowio/deepflow/pull/7821) by [rvql](https://github.com/rvql)
 * feat: drop data which organization is not exist [#7877](https://github.com/deepflowio/deepflow/pull/7877) by [lzf575](https://github.com/lzf575)
 * feat: supports non-real-time deletion of ck of deleted orgs [#7876](https://github.com/deepflowio/deepflow/pull/7876) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: optimize org data check and sync [#7870](https://github.com/deepflowio/deepflow/pull/7870) by [SongZhen0704](https://github.com/SongZhen0704)
