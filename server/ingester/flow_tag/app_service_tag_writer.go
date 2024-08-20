@@ -44,7 +44,7 @@ type AppServiceCounter struct {
 }
 
 type AppServiceTagWriter struct {
-	ckdbAddrs    []string
+	ckdbAddrs    *[]string
 	ckdbUsername string
 	ckdbPassword string
 
@@ -75,7 +75,7 @@ func NewAppServiceTagWriter(
 	var err error
 	tableName := fmt.Sprintf("%s_app_service", db)
 	w.ckwriter, err = ckwriter.NewCKWriter(
-		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		fmt.Sprintf("tag-%s-%d", tableName, decoderIndex),
 		config.CKDB.TimeZone,
 		GenAppServiceTagCKTable(config.CKDB.ClusterName, config.CKDB.StoragePolicy, tableName, config.CKDB.Type, ttl, partition),

@@ -86,7 +86,7 @@ type tableInfo struct {
 type ExtMetricsWriter struct {
 	decoderIndex      int
 	msgType           datatype.MessageType
-	ckdbAddrs         []string
+	ckdbAddrs         *[]string
 	ckdbUsername      string
 	ckdbPassword      string
 	ckdbCluster       string
@@ -118,8 +118,8 @@ func (w *ExtMetricsWriter) getClusterNodesWithoutLocal(clusterName string) ([]Cl
 	var port uint16
 	var isLocal uint8
 	var clusterNodes = []ClusterNode{}
-	for rows.Next() {
-		err := rows.Scan(&addr, &port, &isLocal)
+	for rows[0].Next() {
+		err := rows[0].Scan(&addr, &port, &isLocal)
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +205,7 @@ func NewExtMetricsWriter(
 	}
 	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, config.Base.CKDB.Type, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()))
 	ckwriter, err := ckwriter.NewCKWriter(
-		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		fmt.Sprintf("%s-%s-%d", w.msgType, s.TableName(), w.decoderIndex), w.ckdbTimeZone,
 		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, w.ckdbWatcher)
 	if err != nil {

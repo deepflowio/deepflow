@@ -18,6 +18,7 @@ package dbwriter
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,30 +56,47 @@ type Counter struct {
 	WriteErr     int64 `statsd:"write-err"`
 }
 
-// all 'PrometheusWriters' share 'prometheusCKWriters' to write to ClickHouse, preventing each PrometheusWriter from creating CKWriter and causing excessive resource consumption
-var prometheusCKWriters [MAX_APP_LABEL_COLUMN_INDEX + 1]*ckwriter.CKWriter
-var prometheusCKWritersMutex sync.Mutex
-
-func getPrometheusCKWriters(columnCount int) *ckwriter.CKWriter {
-	return prometheusCKWriters[columnCount]
+type PrometheusCKWriter struct {
+	ckwriter             *ckwriter.CKWriter
+	updateAppLabelColumn bool
 }
 
-func setPrometheusCKWriters(columnCount int, w *ckwriter.CKWriter) {
-	prometheusCKWriters[columnCount] = w
+// all 'PrometheusWriters' share 'prometheusCKWriters' to write to ClickHouse, preventing each PrometheusWriter from creating CKWriter and causing excessive resource consumption
+type PrometheusCKWriters struct {
+	writers [MAX_APP_LABEL_COLUMN_INDEX + 1]PrometheusCKWriter
+	sync.Mutex
+}
+
+var prometheusCKWriters PrometheusCKWriters
+
+func getPrometheusCKWriter(columnCount int) *PrometheusCKWriter {
+	return &prometheusCKWriters.writers[columnCount]
+}
+
+func setPrometheusCKWriter(columnCount int, w *ckwriter.CKWriter) {
+	prometheusCKWriters.writers[columnCount] = PrometheusCKWriter{ckwriter: w}
+}
+
+func (p PrometheusCKWriters) EndpointsChange(addrs []string) {
+	log.Infof("prometheus clickhouse endpoints changes to %+v", addrs)
+	for i := range prometheusCKWriters.writers {
+		prometheusCKWriters.writers[i].updateAppLabelColumn = true
+	}
 }
 
 func lockPrometheusCKWriters() {
-	prometheusCKWritersMutex.Lock()
+	prometheusCKWriters.Lock()
 }
 
 func unlockPrometheusCKWriters() {
-	prometheusCKWritersMutex.Unlock()
+	prometheusCKWriters.Unlock()
 }
 
 type PrometheusWriter struct {
 	decoderIndex      int
 	name              string
-	ckdbAddrs         []string
+	ckdbAddrs         *[]string
+	currentCkdbAddrs  []string
 	ckdbUsername      string
 	ckdbPassword      string
 	ckdbCluster       string
@@ -102,7 +120,7 @@ type PrometheusWriter struct {
 
 func (w *PrometheusWriter) InitTable(appLabelCount int) error {
 	if w.ckdbConn == nil {
-		conn, err := common.NewCKConnections(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
+		conn, err := common.NewCKConnections(w.currentCkdbAddrs, w.ckdbUsername, w.ckdbPassword)
 		if err != nil {
 			return err
 		}
@@ -114,49 +132,12 @@ func (w *PrometheusWriter) InitTable(appLabelCount int) error {
 	return err
 }
 
-func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ckwriter.CKWriter, error) {
-	// AppLabelValueIDs[0] is target label
-	if s.AppLabelLen() == 0 {
-		return nil, fmt.Errorf("AppLabelValueIDs is empty")
-	}
-	appLabelCount := s.AppLabelLen() - 1
-	if appLabelCount > MAX_APP_LABEL_COLUMN_INDEX {
-		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", s.AppLabelLen(), MAX_APP_LABEL_COLUMN_INDEX)
-	}
-	if writer := getPrometheusCKWriters(appLabelCount); writer != nil {
-		return writer, nil
-	}
-	lockPrometheusCKWriters()
-	defer unlockPrometheusCKWriters()
-	// check again
-	if writer := getPrometheusCKWriters(appLabelCount); writer != nil {
-		return writer, nil
-	}
-
-	if w.ckdbConn == nil {
-		conn, err := common.NewCKConnections(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword)
-		if err != nil {
-			return nil, err
-		}
-		w.ckdbConn = conn
-	}
-
-	startTime := time.Now()
-	log.Infof("start create new ckwriter for prometheus, app label count: %d", appLabelCount)
-	// 将要创建的表信息
-	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ckdbType, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()), appLabelCount)
-
-	ckwriter, err := ckwriter.NewCKWriter(
-		w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
-		fmt.Sprintf("%s-%s-%d-%d", w.name, s.TableName(), w.decoderIndex, appLabelCount), w.ckdbTimeZone,
-		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, w.ckdbWatcher)
-	if err != nil {
-		return nil, err
-	}
-	orgDatabase := ckdb.OrgDatabasePrefix(s.OrgID()) + PROMETHEUS_DB
+func (w *PrometheusWriter) updateAppLabelValueIdColumns(orgID uint16, appLabelCount int) error {
+	log.Infof("organization %d needs to update the number of app_label_value_id column in the prometheus table to %d", orgID, appLabelCount)
+	orgDatabase := ckdb.OrgDatabasePrefix(orgID) + PROMETHEUS_DB
 	currentCount, err := w.getCurrentAppLabelColumnCount(orgDatabase)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	maxLabelColumnIndex, err := w.getMaxAppLabelColumnIndex(orgDatabase)
 	if err != nil {
@@ -171,16 +152,74 @@ func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ck
 	if currentCount < appLabelCount {
 		startIndex, endIndex := currentCount+1, appLabelCount
 		if err := w.addAppLabelColumns(w.ckdbConn, startIndex, endIndex, orgDatabase); err != nil {
-			return nil, err
+			return err
 		}
 		// 需要在cluseter其他节点也增加列
 		if err := w.addAppLabelColumnsOnCluster(startIndex, endIndex, orgDatabase); err != nil {
 			log.Warningf("other node failed when add app_value_id columns which index from %d to %d: %s", startIndex, endIndex, err)
 		}
 	}
+	return nil
+}
+
+func (w *PrometheusWriter) getOrCreateCkwriter(s PrometheusSampleInterface) (*ckwriter.CKWriter, error) {
+	// AppLabelValueIDs[0] is target label
+	if s.AppLabelLen() == 0 {
+		return nil, fmt.Errorf("AppLabelValueIDs is empty")
+	}
+	appLabelCount := s.AppLabelLen() - 1
+	if appLabelCount > MAX_APP_LABEL_COLUMN_INDEX {
+		return nil, fmt.Errorf("the length of AppLabelValueIDs(%d) is > MAX_APP_LABEL_COLUMN_INDEX(%d)", s.AppLabelLen(), MAX_APP_LABEL_COLUMN_INDEX)
+	}
+	writer := getPrometheusCKWriter(appLabelCount)
+	if writer.ckwriter != nil && !writer.updateAppLabelColumn {
+		return writer.ckwriter, nil
+	}
+	lockPrometheusCKWriters()
+	defer unlockPrometheusCKWriters()
+	// check again
+	writer = getPrometheusCKWriter(appLabelCount)
+	if writer.ckwriter != nil && !writer.updateAppLabelColumn {
+		return writer.ckwriter, nil
+	}
+
+	if w.ckdbConn == nil || !reflect.DeepEqual(w.currentCkdbAddrs, *w.ckdbAddrs) {
+		w.currentCkdbAddrs = utils.CloneStringSlice(*w.ckdbAddrs)
+		if w.ckdbConn != nil {
+			w.ckdbConn.Close()
+			log.Infof("prometheus clickhouse endpoints change from %+v to %+v", w.currentCkdbAddrs, *w.ckdbAddrs)
+		}
+		conn, err := common.NewCKConnections(w.currentCkdbAddrs, w.ckdbUsername, w.ckdbPassword)
+		if err != nil {
+			return nil, err
+		}
+		w.ckdbConn = conn
+	}
+
+	if err := w.updateAppLabelValueIdColumns(s.OrgID(), appLabelCount); err != nil {
+		return nil, err
+	}
+	writer.updateAppLabelColumn = false
+
+	if writer.ckwriter != nil {
+		return writer.ckwriter, nil
+	}
+
+	startTime := time.Now()
+	log.Infof("start create new ckwriter for prometheus, app label count: %d", appLabelCount)
+	// 将要创建的表信息
+	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ckdbType, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.DatabaseName(), s.TableName()), appLabelCount)
+
+	ckwriter, err := ckwriter.NewCKWriter(
+		w.currentCkdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		fmt.Sprintf("%s-%s-%d-%d", w.name, s.TableName(), w.decoderIndex, appLabelCount), w.ckdbTimeZone,
+		table, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, w.ckdbWatcher)
+	if err != nil {
+		return nil, err
+	}
 
 	ckwriter.Run()
-	setPrometheusCKWriters(appLabelCount, ckwriter)
+	setPrometheusCKWriter(appLabelCount, ckwriter)
 	log.Infof("finish create new ckwriter for prometheus, app label count: %d, cost time: %s", appLabelCount, time.Since(startTime))
 
 	return ckwriter, nil
@@ -216,7 +255,7 @@ func (w *PrometheusWriter) addAppLabelColumns(conn common.DBs, startIndex, endIn
 	}
 	for i := startIndex; i <= endIndex; i++ {
 		for _, table := range prometheusTables {
-			_, err := conn.Exec(fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN app_label_value_id_%d %s",
+			_, err := conn.ExecParallel(fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN app_label_value_id_%d %s",
 				orgDatabase, table, i, ckdb.UInt32))
 			if err != nil {
 				if strings.Contains(err.Error(), "column with this name already exists") {
@@ -238,18 +277,23 @@ func (w *PrometheusWriter) getCurrentAppLabelColumnCount(orgDatabase string) (in
 		w.ckdbConn = nil
 		return 0, err
 	}
-	var count int
-	for rows.Next() {
-		err := rows.Scan(&count)
-		if err != nil {
-			return 0, err
+	var count, minCount int
+	for i := range rows {
+		for rows[i].Next() {
+			err := rows[i].Scan(&count)
+			if err != nil {
+				return 0, err
+			}
+			if minCount == 0 || minCount > count {
+				minCount = count
+			}
 		}
 	}
-	return count, nil
+	return minCount, nil
 }
 
 func (w *PrometheusWriter) getMaxAppLabelColumnIndex(orgDatabase string) (int, error) {
-	var name string
+	var name, maxName string
 	sql := fmt.Sprintf("WITH (SELECT max(length(name)) FROM system.columns where database='%s' and  table='%s' and name like '%%app_label_value%%') as maxNameLength SELECT max(name) from system.columns where database='%s' and  table='%s' and name like '%%app_label_value%%' and length(name)=maxNameLength", orgDatabase, PROMETHEUS_TABLE, orgDatabase, PROMETHEUS_TABLE)
 	log.Info(sql)
 	rows, err := w.ckdbConn.Query(sql)
@@ -257,10 +301,16 @@ func (w *PrometheusWriter) getMaxAppLabelColumnIndex(orgDatabase string) (int, e
 		w.ckdbConn = nil
 		return 0, err
 	}
-	for rows.Next() {
-		err := rows.Scan(&name)
-		if err != nil {
-			return 0, err
+
+	for i := range rows {
+		for rows[i].Next() {
+			err := rows[i].Scan(&name)
+			if err != nil {
+				return 0, err
+			}
+			if maxName == "" || maxName < name {
+				maxName = name
+			}
 		}
 	}
 
@@ -329,6 +379,7 @@ func NewPrometheusWriter(
 		decoderIndex:            decoderIndex,
 		name:                    name,
 		ckdbAddrs:               config.Base.CKDB.ActualAddrs,
+		currentCkdbAddrs:        utils.CloneStringSlice(*config.Base.CKDB.ActualAddrs),
 		ckdbUsername:            config.Base.CKDBAuth.Username,
 		ckdbPassword:            config.Base.CKDBAuth.Password,
 		ckdbCluster:             config.Base.CKDB.ClusterName,
@@ -347,6 +398,7 @@ func NewPrometheusWriter(
 	if err := writer.InitTable(initAppLabelCount); err != nil {
 		return nil, err
 	}
+	baseconfig.AddClickHouseEndpointsOnChange(prometheusCKWriters)
 	common.RegisterCountableForIngester("prometheus_writer", writer, stats.OptionStatTags{"msg": name, "decoder_index": strconv.Itoa(decoderIndex)})
 	return writer, nil
 }

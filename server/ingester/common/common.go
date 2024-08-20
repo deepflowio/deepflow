@@ -49,10 +49,11 @@ func (s DBs) Exec(query string, args ...any) (sql.Result, error) {
 	for _, conn := range s {
 		log.Infof("Begin exec SQL: %s", query)
 		result, err = conn.Exec(query, args...)
-		log.Infof("End exec SQL: %s, err: %v", query, err)
 		if err != nil {
+			log.Infof("End exec SQL: %s, err: %v", query, err)
 			return result, err
 		}
+		log.Infof("End exec SQL: %s", query)
 	}
 	return result, nil
 }
@@ -78,20 +79,23 @@ func (s DBs) ExecParallel(query string, args ...any) (sql.Result, error) {
 	return result, err
 }
 
-func (s DBs) Query(query string, args ...any) (*sql.Rows, error) {
-	var result *sql.Rows
-	var err error
+func (s DBs) Query(query string, args ...any) ([]*sql.Rows, error) {
+	var results []*sql.Rows
 	for _, conn := range s {
-		result, err = conn.Query(query, args...)
+		result, err := conn.Query(query, args...)
+		results = append(results, result)
 		if err != nil {
-			return result, err
+			return results, err
 		}
 	}
-	return result, nil
+	return results, nil
 }
 
 func (s DBs) Close() error {
 	for _, conn := range s {
+		if conn == nil {
+			continue
+		}
 		if err := conn.Close(); err != nil {
 			return err
 		}

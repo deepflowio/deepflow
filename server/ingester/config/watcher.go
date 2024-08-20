@@ -22,6 +22,7 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
@@ -40,7 +41,17 @@ type Endpoint struct {
 	Port uint16
 }
 
+func (e Endpoint) String() string {
+	// if it is an IPv6 address, it needs to be enclosed in []
+	if strings.Contains(e.Host, ":") {
+		return fmt.Sprintf("[%s]:%d", e.Host, e.Port)
+	} else {
+		return fmt.Sprintf("%s:%d", e.Host, e.Port)
+	}
+}
+
 type Watcher struct {
+	config                        *Config
 	NodePodNamesWatch             *ServerInstanceInfo
 	EndpointWatch                 libs.Watcher
 	clickhouseEndpointKey         string
@@ -53,7 +64,28 @@ type Watcher struct {
 	lastServerEndpointsMap        map[string][]Endpoint
 }
 
-func NewWatcher(myNodeName, myPodName, myPodNamespace, clickhouseEndpointKey, clickhouseEndpointTCPPortName string, clickhouseIsExternal bool, controllerIPs []string, controllerPort, grpcBufferSize int) (*Watcher, error) {
+type EndpointsOnChange interface {
+	EndpointsChange([]string)
+}
+
+var clickhouseEndpointsOnChanges []EndpointsOnChange
+
+func AddClickHouseEndpointsOnChange(onChange EndpointsOnChange) {
+	clickhouseEndpointsOnChanges = append(clickhouseEndpointsOnChanges, onChange)
+}
+
+func clickhouseEndpointsChange(endpoints []Endpoint) {
+	addrs := []string{}
+	for _, endpoint := range endpoints {
+		addrs = append(addrs, endpoint.String())
+	}
+	log.Infof("my ClickHouse endpoints chanage to %+v", addrs)
+	for i := range clickhouseEndpointsOnChanges {
+		clickhouseEndpointsOnChanges[i].EndpointsChange(addrs)
+	}
+}
+
+func NewWatcher(cfg *Config, myNodeName, myPodName, myPodNamespace string) (*Watcher, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		errMsg := fmt.Errorf("get cluster config failed: %v", err)
@@ -74,23 +106,24 @@ func NewWatcher(myNodeName, myPodName, myPodNamespace, clickhouseEndpointKey, cl
 		return nil, errMsg
 	}
 
-	controllers := make([]net.IP, len(controllerIPs))
-	for i, ipString := range controllerIPs {
+	controllers := make([]net.IP, len(cfg.ControllerIPs))
+	for i, ipString := range cfg.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)
 		if controllers[i].To4() != nil {
 			controllers[i] = controllers[i].To4()
 		}
 	}
-	nodePodNamesWatch := NewServerInstranceInfo(controllers, controllerPort, grpcBufferSize)
+	nodePodNamesWatch := NewServerInstranceInfo(controllers, int(cfg.ControllerPort), cfg.GrpcBufferSize)
 
 	watcher := &Watcher{
+		config:                        cfg,
 		NodePodNamesWatch:             nodePodNamesWatch,
 		EndpointWatch:                 endpointsWatcher,
-		clickhouseEndpointKey:         clickhouseEndpointKey,
-		clickhouseEndpointTCPPortName: clickhouseEndpointTCPPortName,
+		clickhouseEndpointKey:         cfg.CKDB.Host,
+		clickhouseEndpointTCPPortName: cfg.CKDB.EndpointTCPPortName,
 		myNodeName:                    myNodeName,
 		myPodName:                     myPodName,
-		clickhouseIsExternal:          clickhouseIsExternal,
+		clickhouseIsExternal:          cfg.CKDB.External,
 		lastNodePodNames:              make(map[string][]string),
 		lastServerEndpointsMap:        make(map[string][]Endpoint),
 	}
@@ -116,13 +149,23 @@ func (w *Watcher) Run() {
 			time.Sleep(10 * time.Second)
 		}
 
+		if len(endpoints) > MaxClickHouseEndpointsPerServer {
+			ignores := endpoints[MaxClickHouseEndpointsPerServer:]
+			endpoints = endpoints[:MaxClickHouseEndpointsPerServer]
+			log.Warningf("the count of my clickhouse endpoints is exceed %d, ingnore endpoints %+v",
+				MaxClickHouseEndpointsPerServer,
+				ignores)
+		}
+
 		if len(w.myClickhouseEndpoints) == 0 {
 			w.myClickhouseEndpoints = endpoints
 		}
 
 		if !reflect.DeepEqual(endpoints, w.myClickhouseEndpoints) {
 			log.Warningf("my clickhouse endpoints change from %v to %v", w.myClickhouseEndpoints, endpoints)
-			sleepAndExit()
+			w.myClickhouseEndpoints = endpoints
+			w.config.CKDB.updateActualAddrs(endpoints)
+			clickhouseEndpointsChange(endpoints)
 		}
 	}
 }
@@ -181,7 +224,7 @@ func (w *Watcher) getMyClickhouseEndpointsInternal() ([]Endpoint, error) {
 
 	serverEndpointMap := getServerEndpointMap(nodePodNames, nodeEndpoints)
 	if !serverEndpointMapEqual(w.lastServerEndpointsMap, serverEndpointMap) {
-		log.Infof("the correspondence between Server Pod and ClickHouse Endpoint change from %+v to  %+v", w.lastServerEndpointsMap, serverEndpointMap)
+		log.Infof("the correspondence between server pod and clickhouse endpoint change from %+v to  %+v", w.lastServerEndpointsMap, serverEndpointMap)
 		w.lastServerEndpointsMap = serverEndpointMap
 	}
 	if endpoints, ok := serverEndpointMap[w.myNodeName+w.myPodName]; ok {

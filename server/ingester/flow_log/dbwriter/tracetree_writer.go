@@ -58,7 +58,7 @@ func GenTraceTreeCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldS
 }
 
 type TraceTreeWriter struct {
-	ckdbAddrs         []string
+	ckdbAddrs         *[]string
 	ckdbUsername      string
 	ckdbPassword      string
 	ckdbCluster       string
@@ -90,7 +90,7 @@ func NewTraceTreeWriter(config *config.Config, traceTreeQueue queue.QueueReader)
 
 	ckTable := GenTraceTreeCKTable(w.ckdbCluster, w.ckdbStoragePolicy, config.Base.CKDB.Type, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, common.FLOW_LOG_DB, TRACE_TREE_TABLE))
 
-	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+	ckwriter, err := ckwriter.NewCKWriter(*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		TRACE_TREE_TABLE, config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
 	if err != nil {
 		return nil, err

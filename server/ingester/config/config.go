@@ -63,6 +63,9 @@ const (
 	EnvRunningMode                  = "DEEPFLOW_SERVER_RUNNING_MODE"
 	RunningModeStandalone           = "STANDALONE"
 	DefaultByconityStoragePolicy    = "cnch_default_s3"
+	// the maximum number of endpoints for a server corresponding to ClickHouse;
+	//   any endpoints beyond this limit will be ignored
+	MaxClickHouseEndpointsPerServer = 128
 )
 
 type DatabaseTable struct {
@@ -119,16 +122,28 @@ type CKWriterConfig struct {
 }
 
 type CKDB struct {
-	External            bool   `yaml:"external"`
-	Type                string `yaml:"type"`
-	Host                string `yaml:"host"`
-	ActualAddrs         []string
+	External            bool     `yaml:"external"`
+	Type                string   `yaml:"type"`
+	Host                string   `yaml:"host"`
+	actualAddrsValue    []string // the maximum length must not exceed MaxClickHouseEndpointsPerServer.
+	ActualAddrs         *[]string
 	Watcher             *Watcher
 	Port                int    `yaml:"port"`
 	EndpointTCPPortName string `yaml:"endpoint-tcp-port-name"`
 	ClusterName         string `yaml:"cluster-name"`
 	StoragePolicy       string `yaml:"storage-policy"`
 	TimeZone            string `yaml:"time-zone"`
+}
+
+func (c *CKDB) updateActualAddrs(endpoints []Endpoint) {
+	if c.actualAddrsValue == nil {
+		c.actualAddrsValue = make([]string, 0, MaxClickHouseEndpointsPerServer)
+	}
+	c.actualAddrsValue = c.actualAddrsValue[:0]
+	for _, endpoint := range endpoints {
+		c.actualAddrsValue = append(c.actualAddrsValue, endpoint.String())
+	}
+	c.ActualAddrs = &c.actualAddrsValue
 }
 
 type Config struct {
@@ -269,7 +284,9 @@ func (c *Config) Validate() error {
 			c.CKDB.Port = DefaultCKDBServicePort
 		}
 		// in standalone mode, only supports one ClickHouse node
-		c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("%s:%d", c.CKDB.Host, c.CKDB.Port))
+		var actualAddrs []string
+		actualAddrs = append(actualAddrs, fmt.Sprintf("%s:%d", c.CKDB.Host, c.CKDB.Port))
+		c.CKDB.ActualAddrs = &actualAddrs
 	} else {
 		if c.NodeIP == "" && c.ControllerIPs[0] == DefaultLocalIP {
 			nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
@@ -358,7 +375,7 @@ func (c *Config) Validate() error {
 			time.Sleep(time.Second * 30)
 		}
 		if watcher == nil {
-			watcher, err = NewWatcher(myNodeName, myPodName, myNamespace, c.CKDB.Host, c.CKDB.EndpointTCPPortName, c.CKDB.External, c.ControllerIPs, int(c.ControllerPort), c.GrpcBufferSize)
+			watcher, err = NewWatcher(c, myNodeName, myPodName, myNamespace)
 			if err != nil {
 				log.Warningf("get kubernetes watcher failed: %s", err)
 				continue
@@ -370,21 +387,13 @@ func (c *Config) Validate() error {
 			log.Warningf("get clickhouse endpoints (%s) failed: %s", c.CKDB.Host, err)
 			continue
 		}
-		c.CKDB.ActualAddrs = c.CKDB.ActualAddrs[:0]
-		for _, endpoint := range endpoints {
-			// if it is an IPv6 address, it needs to be enclosed in []
-			if strings.Contains(endpoint.Host, ":") {
-				c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("[%s]:%d", endpoint.Host, endpoint.Port))
-			} else {
-				c.CKDB.ActualAddrs = append(c.CKDB.ActualAddrs, fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port))
-			}
-		}
+		c.CKDB.updateActualAddrs(endpoints)
 		c.CKDB.Watcher = watcher
-		log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddrs)
+		log.Infof("get clickhouse actual address: %s", c.CKDB.actualAddrsValue)
 
-		conns, err := common.NewCKConnections(c.CKDB.ActualAddrs, c.CKDBAuth.Username, c.CKDBAuth.Password)
+		conns, err := common.NewCKConnections(c.CKDB.actualAddrsValue, c.CKDBAuth.Username, c.CKDBAuth.Password)
 		if err != nil {
-			log.Warningf("connect to clickhouse %s failed: %s", c.CKDB.ActualAddrs, err)
+			log.Warningf("connect to clickhouse %s failed: %s", c.CKDB.actualAddrsValue, err)
 			continue
 		}
 
@@ -523,8 +532,8 @@ func CheckCluster(conns common.DBs, clusterName string) error {
 	}
 	var addr string
 	var port uint16
-	for rows.Next() {
-		return rows.Scan(&addr, &port)
+	for rows[0].Next() {
+		return rows[0].Scan(&addr, &port)
 	}
 
 	return fmt.Errorf("cluster '%s' not find", clusterName)
@@ -537,8 +546,8 @@ func CheckStoragePolicy(conns common.DBs, storagePolicy string) error {
 		return err
 	}
 	var policyName string
-	for rows.Next() {
-		return rows.Scan(&policyName)
+	for rows[0].Next() {
+		return rows[0].Scan(&policyName)
 	}
 	return fmt.Errorf("storage policy '%s' not find", storagePolicy)
 }

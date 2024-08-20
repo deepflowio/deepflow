@@ -34,7 +34,7 @@ const (
 	DefaultPrometheusTTL                = 168       // hour
 	DefaultLabelMsgMaxSize              = 100 << 20 // 100M
 	DefaultLabelRequestMetricBatchCount = 128
-	DefaultAppLabelColumnIncrement      = 4
+	DefaultAppLabelColumnIncrement      = 8
 	DefaultAppLabelColumnMinCount       = 8
 	DefaultLabelCacheExpiration         = 86400 // 1 day
 )

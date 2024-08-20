@@ -26,14 +26,14 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
-	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/config"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/gorilla/mux"
 	logging "github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("datasource")
+var log = logging.MustGetLogger("data_source")
 
 const (
 	DATASOURCE_PORT      = 20106
@@ -41,7 +41,8 @@ const (
 )
 
 type DatasourceManager struct {
-	ckAddrs          []string // 需要修改数据源的clickhouse地址, 支持多个
+	ckAddrs          *[]string // 需要修改数据源的clickhouse地址, 支持多个
+	currentCkAddrs   []string
 	user             string
 	password         string
 	readTimeout      int
@@ -58,8 +59,9 @@ type DatasourceManager struct {
 }
 
 func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManager {
-	return &DatasourceManager{
+	m := &DatasourceManager{
 		ckAddrs:           cfg.CKDB.ActualAddrs,
+		currentCkAddrs:    utils.CloneStringSlice(*cfg.CKDB.ActualAddrs),
 		user:              cfg.CKDBAuth.Username,
 		password:          cfg.CKDBAuth.Password,
 		readTimeout:       readTimeout,
@@ -72,6 +74,12 @@ func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManage
 			Handler: mux.NewRouter(),
 		},
 	}
+	cks, err := common.NewCKConnections(m.currentCkAddrs, m.user, m.password)
+	if err != nil {
+		log.Fatalf("create clickhouse connections failed: %s", err)
+	}
+	m.cks = cks
+	return m
 }
 
 type JsonResp struct {
@@ -212,18 +220,13 @@ func (m *DatasourceManager) RegisterHandlers() {
 
 func (m *DatasourceManager) Start() {
 	m.RegisterHandlers()
-	cks, err := basecommon.NewCKConnections(m.ckAddrs, m.user, m.password)
-	if err != nil {
-		log.Fatalf("new ck connections failed: %s", err)
-	}
-	m.cks = cks
 
 	go func() {
 		if err := m.server.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("ListenAndServe() failed: %v", err)
 		}
 	}()
-	log.Info("datasource manager started")
+	log.Info("data_source manager started")
 }
 
 func (m *DatasourceManager) Close() error {
@@ -237,7 +240,7 @@ func (m *DatasourceManager) Close() error {
 	if err != nil {
 		log.Warningf("shutdown failed: %v", err)
 	} else {
-		log.Info("datasource manager stopped")
+		log.Info("data_source manager stopped")
 	}
 	cancel()
 

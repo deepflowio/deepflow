@@ -602,7 +602,7 @@ ingester:
 
   ## when prometheus requests labels, how many metric batch requests
   #prometheus-label-request-metric-batch-count: 128
-  #prometheus-app-label-column-increment: 4
+  #prometheus-app-label-column-increment: 8
   #prometheus-app-label-column-min-count: 8
 
   ## Whether to ignore the writing of Universal Tag, the default is false, which means writing

@@ -18,11 +18,13 @@ package datasource
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 const (
@@ -458,7 +460,7 @@ func (m *DatasourceManager) getMetricsTable(id flow_metrics.MetricsTableID) *ckd
 func (m *DatasourceManager) createTableMV(cks basecommon.DBs, db string, tableId flow_metrics.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := m.getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
-		return fmt.Errorf("Only support base datasource 1s,1m")
+		return fmt.Errorf("Only support base data_source 1s,1m")
 	}
 
 	aggTime := ckdb.TimeFuncHour
@@ -528,11 +530,24 @@ func (m *DatasourceManager) modTableTTL(cks basecommon.DBs, db, table string, du
 	return err
 }
 
-func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
-	if len(m.cks) == 0 {
-		return fmt.Errorf("ck connections is empty")
+func (m *DatasourceManager) updateCKConnections() {
+	if len(m.cks) == 0 || !reflect.DeepEqual(m.currentCkAddrs, *m.ckAddrs) {
+		log.Infof("data_source clickhouse endpoints change from %+v to %+v", m.currentCkAddrs, *m.ckAddrs)
+		m.currentCkAddrs = utils.CloneStringSlice(*m.ckAddrs)
+		m.cks.Close()
+		cks, err := basecommon.NewCKConnections(m.currentCkAddrs, m.user, m.password)
+		if err != nil {
+			log.Errorf("create clickhouse connections failed: %s", err)
+		}
+		m.cks = cks
 	}
+}
 
+func (m *DatasourceManager) Handle(orgID int, action ActionEnum, dbGroup, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
+	m.updateCKConnections()
+	if len(m.cks) == 0 {
+		return fmt.Errorf("clickhouse connections is empty")
+	}
 	if IsModifiedOnlyDatasource(dbGroup) && action == MOD {
 		datasoureInfo := DatasourceModifiedOnly(dbGroup).DatasourceInfo()
 		datasourceId := datasoureInfo.ID
