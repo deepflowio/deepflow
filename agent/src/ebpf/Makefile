@@ -76,6 +76,7 @@ OBJS := user/elf.o \
 	user/proc.o \
 	user/go_tracer.o \
 	user/ssl_tracer.o \
+	user/unwind_tracer.o \
 	user/ring.o \
 	user/btf_vmlinux.o \
 	user/load.o \
@@ -114,6 +115,9 @@ ifeq ($(GCC_VER_GTE71),1)
 endif
 CFLAGS += $(JAVA_AGENT_MACROS)
 
+# trace-utils header
+CFLAGS += -I../../crates/trace-utils/src
+
 # -DBPF_DEBUG for parse and load ebpf probes.
 # -fsanitize=address: Enable the Address Sanitizer tool, which
 #  can detect memory errors such as using uninitialized memory,
@@ -140,7 +144,8 @@ SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 	user/socket_trace_bpf_5_2_plus.c \
 	user/socket_trace_bpf_kylin.c
 
-PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c
+PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c \
+	user/perf_profiler_bpf_5_2_plus.c \
 
 ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS)
 
@@ -175,6 +180,10 @@ user/socket_trace_bpf_kylin.c: tools/bintobuffer kernel/socket_trace.bpf.c
 user/perf_profiler_bpf_common.c: tools/bintobuffer kernel/perf_profiler.bpf.c
 	$(call check_clang)
 	$(call compile_perf_profiler_elf, common)
+
+user/perf_profiler_bpf_5_2_plus.c: tools/bintobuffer kernel/perf_profiler.bpf.c
+	$(call check_clang)
+	$(call compile_perf_profiler_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)

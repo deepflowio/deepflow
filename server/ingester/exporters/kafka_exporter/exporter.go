@@ -224,7 +224,16 @@ func (e *KafkaExporter) exportBatch(queueID int, batch []*sarama.ProducerMessage
 	producer := e.producers[queueID]
 
 	now := time.Now()
-	if err := producer.SendMessages(batch); err != nil {
+
+	// when sending fails, you can view detailed error information by setting 'batch-size' to 1.
+	// 'SendMessage' will return detailed error information, but 'SendMessages' only returns the number of failed messages.
+	var err error
+	if len(batch) == 1 {
+		_, _, err = producer.SendMessage(batch[0])
+	} else {
+		err = producer.SendMessages(batch)
+	}
+	if err != nil {
 		if e.counter.DropCounter == 0 {
 			log.Warningf("exporter %d send kafka messages failed. err: %s", e.index, err)
 		}

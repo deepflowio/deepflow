@@ -2175,6 +2175,8 @@ pub struct EbpfYamlConfig {
     pub max_trace_entries: usize,
     pub socket_map_max_reclaim: usize,
     pub go_tracing_timeout: usize,
+    pub dwarf_disabled: bool,
+    pub dwarf_regex: String,
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
@@ -2207,6 +2209,8 @@ impl Default for EbpfYamlConfig {
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
+            dwarf_disabled: false,
+            dwarf_regex: "".to_owned(),
             java_symbol_file_refresh_defer_interval: Duration::from_secs(60),
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),

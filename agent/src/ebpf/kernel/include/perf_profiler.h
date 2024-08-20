@@ -49,6 +49,8 @@ struct java_symbol_map_key {
 	__u64 class_id;
 };
 
+#define STACK_TRACE_FLAGS_DWARF 0x1
+
 struct stack_trace_key_t {
 	__u32 pid;		// processID or threadID
 	__u32 tgid;		// processID
@@ -56,6 +58,7 @@ struct stack_trace_key_t {
 	char comm[TASK_COMM_LEN];
 	int kernstack;
 	int userstack;
+	__u32 flags;
 	__u64 timestamp;
 
 	union {
