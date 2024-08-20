@@ -388,7 +388,7 @@ pub fn supported_resources() -> Vec<Resource> {
             name: "opengaussclusters",
             pb_name: "*v1.OpenGaussCluster",
             group_versions: vec![GroupVersion {
-                group: "opengauss.sig",
+                group: "opengauss.cmbc.com.cn",
                 version: "v1",
             }],
             selected_gv: None,
