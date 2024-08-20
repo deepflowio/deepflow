@@ -33,6 +33,7 @@ type QuerierParams struct {
 	Context       context.Context
 	NoPreWhere    bool
 	ORGID         string
+	SimpleSql     bool
 }
 
 type TempoParams struct {
