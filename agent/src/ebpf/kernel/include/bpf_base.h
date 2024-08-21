@@ -32,8 +32,6 @@
 #include <bcc/compat/linux/bpf.h>
 #include "utils.h"
 
-struct task_struct;
-
 /*
  * bpf helpers
  */
@@ -281,6 +279,10 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
  * tracepoint: prog->name:df_T_enter_recvfrom
  * kprobe: prog->name:df_K_sys_sendmsg
  * kretprobe: prog->name:df_KR_sys_sendmsg
+ *
+ * For probes of type fentry/fexit, use the 'kfunc__' or 'kretfunc__'
+ * prefixes, as these specific prefixes are utilized during loading
+ * to perform corresponding BTF operations.
  */
 
 #define TP_SYSCALL_PROG(F) SEC("tracepoint/syscalls/sys_"__stringify(F)) int df_T_##F
@@ -293,6 +295,54 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #define UPROG(F) SEC("uprobe/"__stringify(F)) int df_U_##F
 #define URETPROG(F) SEC("uretprobe/"__stringify(F)) int df_UR_##F
 #define PERF_EVENT_PROG(F) SEC("perf_event") int df_##F
+
+#define ___bpf_concat(a, b) a ## b
+#define ___bpf_apply(fn, n) ___bpf_concat(fn, n)
+#define ___bpf_nth(_, _1, _2, _3, _4, _5, _6, _7, _8, _9, _a, _b, _c, N, ...) N
+#define ___bpf_narg(...) \
+	___bpf_nth(_, ##__VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+#define ___bpf_empty(...) \
+	___bpf_nth(_, ##__VA_ARGS__, N, N, N, N, N, N, N, N, N, N, 0)
+
+#define ___bpf_ctx_cast0() ctx
+#define ___bpf_ctx_cast1(x) ___bpf_ctx_cast0(), (void *)ctx[0]
+#define ___bpf_ctx_cast2(x, args...) ___bpf_ctx_cast1(args), (void *)ctx[1]
+#define ___bpf_ctx_cast3(x, args...) ___bpf_ctx_cast2(args), (void *)ctx[2]
+#define ___bpf_ctx_cast4(x, args...) ___bpf_ctx_cast3(args), (void *)ctx[3]
+#define ___bpf_ctx_cast5(x, args...) ___bpf_ctx_cast4(args), (void *)ctx[4]
+#define ___bpf_ctx_cast6(x, args...) ___bpf_ctx_cast5(args), (void *)ctx[5]
+#define ___bpf_ctx_cast7(x, args...) ___bpf_ctx_cast6(args), (void *)ctx[6]
+#define ___bpf_ctx_cast8(x, args...) ___bpf_ctx_cast7(args), (void *)ctx[7]
+#define ___bpf_ctx_cast9(x, args...) ___bpf_ctx_cast8(args), (void *)ctx[8]
+#define ___bpf_ctx_cast10(x, args...) ___bpf_ctx_cast9(args), (void *)ctx[9]
+#define ___bpf_ctx_cast11(x, args...) ___bpf_ctx_cast10(args), (void *)ctx[10]
+#define ___bpf_ctx_cast12(x, args...) ___bpf_ctx_cast11(args), (void *)ctx[11]
+#define ___bpf_ctx_cast(args...) \
+	___bpf_apply(___bpf_ctx_cast, ___bpf_narg(args))(args)
+
+#define BPF_PROG(name, args...)                                 \
+int name(unsigned long long *ctx);                              \
+__attribute__((__always_inline__))                           	\
+static int ____##name(unsigned long long *ctx, ##args);         \
+int name(unsigned long long *ctx)                               \
+{                                                               \
+	int __ret;                                              \
+                                                                \
+	_Pragma("GCC diagnostic push")                          \
+	_Pragma("GCC diagnostic ignored \"-Wint-conversion\"")  \
+	__ret = ____##name(___bpf_ctx_cast(args));              \
+	_Pragma("GCC diagnostic pop")                           \
+	return __ret;                                           \
+}                                                               \
+static int ____##name(unsigned long long *ctx, ##args)
+
+#define KFUNC_PROG(event, args...) \
+	SEC("fentry/"__stringify(event)) \
+	BPF_PROG(kfunc__ ## event, ##args)
+
+#define KRETFUNC_PROG(event, args...) \
+	SEC("fexit/"__stringify(event)) \
+	BPF_PROG(kretfunc__ ## event, ##args)
 
 #ifndef CUR_CPU_IDENTIFIER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)

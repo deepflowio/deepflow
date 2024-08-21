@@ -243,11 +243,11 @@ http2_fill_common_socket_1(struct http2_header_data *data,
 	int tcp_seq;
 	enum traffic_direction direction;
 	if (data->read) {
-		tcp_seq = get_tcp_read_seq_from_fd(data->fd);
+		tcp_seq = get_tcp_read_seq(data->fd, NULL, NULL);
 		tcp_seq = get_previous_read_tcp_seq(data->fd, tcp_seq);
 		direction = T_INGRESS;
 	} else {
-		tcp_seq = get_tcp_write_seq_from_fd(data->fd);
+		tcp_seq = get_tcp_write_seq(data->fd, NULL, NULL);
 		direction = T_EGRESS;
 	}
 

@@ -25,7 +25,7 @@
 #define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
 #define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
-
+#define TEST_KFUNC_NAME "__sys_sendmsg"
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
 #define OFFSET_INFER_SERVER_PORT 54583
@@ -37,7 +37,8 @@ enum linux_kernel_type {
 	K_TYPE_COMM,
 	K_TYPE_KYLIN,
 	K_TYPE_VER_5_2_PLUS,
-	K_TYPE_VER_3_10
+	K_TYPE_VER_3_10,
+	K_TYPE_KFUNC,
 };
 
 enum probes_act_type {
@@ -379,4 +380,28 @@ int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
 int disable_syscall_trace_id(void);
+
+/**
+ * eBPF Probe Point Configuration
+ *
+ * Configure probe points. The types of probe points may include:
+ * (1) kprobe/kretprobe
+ * (2) tracepoint
+ * During the configuration process, the kernel is automatically checked
+ * to determine if it supports 'fentry/fexit'. If supported, this type
+ * of probe point is preferred to improve performance. Otherwise,
+ * 'kprobe/kretprobe' or 'tracepoint' types are used.
+ *
+ * @param tps Pointer to the structure that stores the configuration of
+ * 	      all probe points.
+ * @param type eBPF program type.
+ * @param fn Name of the kernel probe interface.
+ * @param tp_name Name of the tracepoint type probe point.
+ * @param is_eixt Used to specify the position of the kernel probe
+ * 		  interface. If probing at the exit of the kernel interface,
+ * 		  it is set to true. Otherwise, it is set to false. This
+ * 		  is not applicable for handling tracepoint type interfaces.
+ */
+void config_probe(struct tracer_probes_conf *tps, int type, const char *fn,
+		  const char *tp_name, bool is_exit);
 #endif /* DF_USER_SOCKET_H */

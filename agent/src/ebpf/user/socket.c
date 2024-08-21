@@ -35,7 +35,7 @@
 #include "ssl_tracer.h"
 #include "unwind_tracer.h"
 #include "load.h"
-#include "btf_vmlinux.h"
+#include "btf_core.h"
 #include "config.h"
 #include "perf_reader.h"
 #include "extended/extended.h"
@@ -44,7 +44,9 @@
 #include "socket_trace_bpf_3_10_0.c"
 #include "socket_trace_bpf_5_2_plus.c"
 #include "socket_trace_bpf_kylin.c"
+#include "socket_trace_bpf_kfunc.c"
 
+static enum linux_kernel_type g_k_type;
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
 /*
@@ -141,10 +143,104 @@ static bool bpf_stats_map_update(struct bpf_tracer *tracer,
 				 int conflict_count,
 				 int max_delay,
 				 int total_time, int event_count);
-static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
+extern int bpf_raw_tracepoint_open(const char *name, int prog_fd);
+static bool fentry_try_attach(const char *fn)
 {
-	int index = 0, curr_idx;
+	int prog_fd, attach_fd;
+	char kfunc_name[PROBE_NAME_SZ];
+	snprintf(kfunc_name, sizeof(kfunc_name), "kfunc__%s", fn);
+	struct bpf_insn insns[] = {
+		BPF_ALU64_IMM(BPF_MOV, BPF_REG_0, 0),	/* r0 = 0 */
+		BPF_EXIT_INSN(),
+	};
 
+	int stderr_fd = suspend_stderr();
+	if (stderr_fd < 0) {
+		ebpf_warning("Failed to suspend stderr.\n");
+		return false;
+	}
+
+	prog_fd = df_prog_load
+	    (BPF_PROG_TYPE_TRACING, kfunc_name, insns, sizeof(insns));
+
+	if (prog_fd < 0) {
+		resume_stderr(stderr_fd);
+		return false;
+	}
+
+	attach_fd = bpf_raw_tracepoint_open(NULL, prog_fd);
+	if (attach_fd >= 0)
+		close(attach_fd);
+
+	close(prog_fd);
+	resume_stderr(stderr_fd);
+
+	return attach_fd >= 0;
+}
+
+static bool fentry_can_attach(const char *name)
+{
+	const char *vmlinux_path = "/sys/kernel/btf/vmlinux";
+	if (access(vmlinux_path, R_OK))
+		return false;
+	return fentry_try_attach(name);
+}
+
+static inline void
+kfunc_set_sym_for_entry_and_exit(struct tracer_probes_conf *tps, const char *fn)
+{
+	kfunc_set_symbol(tps, fn, false);
+	kfunc_set_symbol(tps, fn, true);
+}
+
+static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
+{
+	kfunc_set_sym_for_entry_and_exit(tps, "ksys_write");
+	kfunc_set_sym_for_entry_and_exit(tps, "ksys_read");
+	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendto");
+	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvfrom");
+	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmsg");
+	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmmsg");
+	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvmsg");
+	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvmmsg");
+	kfunc_set_sym_for_entry_and_exit(tps, "do_writev");
+	kfunc_set_sym_for_entry_and_exit(tps, "do_readv");
+#if defined(__x86_64__)
+	kfunc_set_symbol(tps, "__x64_sys_close", false);
+#else
+	kfunc_set_symbol(tps, "__arm64_sys_close", false);
+#endif
+	kfunc_set_symbol(tps, "__sys_socket", true);
+	kfunc_set_symbol(tps, "__sys_accept4", true);
+	kfunc_set_symbol(tps, "__sys_connect", false);
+	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
+		/*
+		 * Different CPU architectures have variations in system calls.
+		 * It is necessary to confirm whether a specific system call exists.
+		 * You can check https://arm64.syscall.sh/ for reference.
+		 */
+		if (kallsyms_lookup_name("sys_fork"))
+			probes_set_exit_symbol(tps, "sys_fork");
+	}
+
+	if (access(SYSCALL_CLONE_TP_PATH, F_OK)) {
+		if (kallsyms_lookup_name("sys_clone"))
+			probes_set_exit_symbol(tps, "sys_clone");
+	}
+	// process execute
+	if (!access(SYSCALL_FORK_TP_PATH, F_OK))
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_fork");
+	if (!access(SYSCALL_CLONE_TP_PATH, F_OK))
+		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_clone");
+
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
+	// process exit
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
+}
+
+static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
+						    *tps)
+{
 	probes_set_enter_symbol(tps, "__sys_sendmsg");
 	probes_set_enter_symbol(tps, "__sys_sendmmsg");
 	probes_set_enter_symbol(tps, "__sys_recvmsg");
@@ -177,10 +273,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 			probes_set_exit_symbol(tps, "sys_clone");
 	}
 
-	tps->kprobes_nr = index;
-
 	/* tracepoints */
-	index = 0;
 
 	/*
 	 * 由于在Linux 4.17+ sys_write, sys_read, sys_sendto, sys_recvfrom
@@ -227,12 +320,17 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 
 	// clear trace connection & fetch close info
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
+}
 
-	tps->tps_nr = index;
+static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
+{
+	if (g_k_type == K_TYPE_KFUNC)
+		config_probes_for_kfunc(tps);
+	else
+		config_probes_for_kprobe_and_tracepoint(tps);
 
 	// 收集go可执行文件uprobe符号信息
 	collect_go_uprobe_syms_from_procfs(tps);
-
 	collect_ssl_uprobe_syms_from_procfs(tps);
 }
 
@@ -2021,27 +2119,32 @@ int running_socket_tracer(tracer_callback_t handle,
 		ebpf_warning("Fetch system type faild.\n");
 	}
 
-	enum linux_kernel_type k_type;
-	if (strcmp(sys_type_str, "ky10") == 0) {
-		k_type = K_TYPE_KYLIN;
+	if (fentry_can_attach(TEST_KFUNC_NAME)) {
+		g_k_type = K_TYPE_KFUNC;
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "socket-trace-bpf-linux-kfunc");
+		bpf_bin_buffer = (void *)socket_trace_kfunc_ebpf_data;
+		buffer_sz = sizeof(socket_trace_kfunc_ebpf_data);
+	} else if (strcmp(sys_type_str, "ky10") == 0) {
+		g_k_type = K_TYPE_KYLIN;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-kylin");
 		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
 		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
 	} else if (major > 5 || (major == 5 && minor >= 2)) {
-		k_type = K_TYPE_VER_5_2_PLUS;
+		g_k_type = K_TYPE_VER_5_2_PLUS;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-5.2_plus");
 		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
 		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
 	} else if (major == 3 && minor == 10) {
-		k_type = K_TYPE_VER_3_10;
+		g_k_type = K_TYPE_VER_3_10;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-3.10.0");
 		bpf_bin_buffer = (void *)socket_trace_3_10_0_ebpf_data;
 		buffer_sz = sizeof(socket_trace_3_10_0_ebpf_data);
 	} else {
-		k_type = K_TYPE_COMM;
+		g_k_type = K_TYPE_COMM;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-common");
 		bpf_bin_buffer = (void *)socket_trace_common_ebpf_data;
@@ -2124,7 +2227,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (update_offset_map_from_btf_vmlinux(tracer) != ETR_OK) {
 		ebpf_info
 		    ("[eBPF Kernel Adapt] Set offsets map from btf_vmlinux, not support.\n");
-		if (update_offset_map_default(tracer, k_type) != ETR_OK) {
+		if (update_offset_map_default(tracer, g_k_type) != ETR_OK) {
 			ebpf_error
 			    ("Fatal error, failed to update default offset\n");
 		}

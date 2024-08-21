@@ -78,7 +78,7 @@ OBJS := user/elf.o \
 	user/ssl_tracer.o \
 	user/unwind_tracer.o \
 	user/ring.o \
-	user/btf_vmlinux.o \
+	user/btf_core.o \
 	user/load.o \
 	user/log.o \
 	user/probe.o \
@@ -107,7 +107,7 @@ JAVA_AGENT_SRC := user/profile/java/symbol_collect_agent.c
 JAVA_AGENT_MACROS := -DAGENT_LIB_NAME="\"$(JAVA_AGENT_GNU_SO)\"" -DAGENT_MUSL_LIB_NAME="\"$(JAVA_AGENT_MUSL_SO)\""
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
-CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
+CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -I/usr/include/bcc
 # '-Wformat-truncation' : The warning was added in gcc7.1
 GCC_VER_GTE71 := $(shell echo `gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.` \>= 7.1 | sed -e 's/\./*100+/g' | bc )
 ifeq ($(GCC_VER_GTE71),1)
@@ -142,6 +142,7 @@ all: build
 SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 	user/socket_trace_bpf_3_10_0.c \
 	user/socket_trace_bpf_5_2_plus.c \
+	user/socket_trace_bpf_kfunc.c \
 	user/socket_trace_bpf_kylin.c
 
 PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c \
@@ -172,6 +173,10 @@ user/socket_trace_bpf_3_10_0.c: tools/bintobuffer kernel/socket_trace.bpf.c
 user/socket_trace_bpf_5_2_plus.c: tools/bintobuffer kernel/socket_trace.bpf.c
 	$(call check_clang)
 	$(call compile_socket_trace_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
+
+user/socket_trace_bpf_kfunc.c: tools/bintobuffer kernel/socket_trace.bpf.c
+	$(call check_clang)
+	$(call compile_socket_trace_elf, kfunc, LINUX_VER_KFUNC=1)
 
 user/socket_trace_bpf_kylin.c: tools/bintobuffer kernel/socket_trace.bpf.c
 	$(call check_clang)

@@ -273,6 +273,7 @@ struct data_args_t {
 	const char *buf;
 	// For sendmsg()/recvmsg()/writev()/readv().
 	const struct iovec *iov;
+	void *sk;
 	size_t iovlen;
 	union {
 		// For sendmmsg()

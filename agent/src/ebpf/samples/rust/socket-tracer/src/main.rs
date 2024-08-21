@@ -353,9 +353,9 @@ fn cp_process_name_safe(cp: *mut stack_profile_data) -> String {
 #[allow(dead_code)]
 extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
     unsafe {
-        process_stack_trace_data_for_flame_graph(cp);
-        increment_counter((*cp).count as u32, 1);
-        increment_counter(1, 0);
+        //process_stack_trace_data_for_flame_graph(cp);
+        //increment_counter((*cp).count, 1);
+        //increment_counter(1, 0);
         //let data = cp_data_str_safe(cp);
         //println!("\n+ --------------------------------- +");
         //println!("{} PID {} START-TIME {} NETNS-ID {} U-STACKID {} K-STACKID {} COMM {} CPU {} COUNT {} LEN {} \n  - {}",

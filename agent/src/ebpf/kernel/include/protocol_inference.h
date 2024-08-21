@@ -147,12 +147,11 @@ static __inline bool
 protocol_port_check_2(enum traffic_protocol proto,
 		      struct conn_info_s *conn_info)
 {
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_1);
+#else
 	return __protocol_port_check(proto, conn_info, L7_PROTO_INFER_PROG_2);
-}
-
-static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
-{
-	return (sk_info != NULL && sk_info->uid != 0);
+#endif
 }
 
 static __inline bool is_infer_socket_valid(struct socket_info_s *sk_info)
@@ -424,7 +423,7 @@ static __inline enum message_type parse_http2_headers_frame(const char
 // In some cases, the compiled binary instructions exceed the limit, the
 // specific reason is unknown, reduce the number of cycles of http2, which
 // may cause http2 packet loss
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 #define HTTPV2_LOOP_MAX 8
 #else
 #define HTTPV2_LOOP_MAX 6
@@ -595,7 +594,7 @@ static __inline enum message_type infer_http2_message(const char *buf_kern,
 				.tgid = bpf_get_current_pid_tgid() >> 32,
 				.fd = conn_info->fd,
 				.tcp_seq_end =
-				    get_tcp_read_seq_from_fd(conn_info->fd),
+				    get_tcp_read_seq(conn_info->fd, NULL, NULL),
 			};
 			// make linux 4.14 validator happy
 			__u32 tcp_seq = tcp_seq_key.tcp_seq_end - count;
@@ -3319,6 +3318,130 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 	}
 }
 
+/* Will be called by proto_infer_2 eBPF program. */
+static __inline struct protocol_message_t
+infer_protocol_2(const char *infer_buf, size_t count,
+		 struct conn_info_s *conn_info)
+{
+	/*
+	 * Note:
+	 * infer_buf: inferred data length is within 32 bytes (including 32 bytes).
+	 * If the length that needs to be read in the inference program exceeds 32 bytes,
+	 * you can use `syscall_infer_addr` and `syscall_infer_len`, but it is strongly
+	 * recommended to complete the inference of the protocol within 32 bytes.
+	 *
+	 * Use the 'protocol_port_check_2()' interface when performing specific protocol
+	 * inference checks.
+	 */
+	struct protocol_message_t inferred_message;
+	inferred_message.protocol = PROTO_UNKNOWN;
+	inferred_message.type = MSG_UNKNOWN;
+	__u32 syscall_infer_len = conn_info->syscall_infer_len;
+	char *syscall_infer_addr = conn_info->syscall_infer_addr;
+
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	__u8 skip_proto = conn_info->skip_proto;
+	if (skip_proto != PROTO_DUBBO && (inferred_message.type =
+#else
+	if ((inferred_message.type =
+#endif
+	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_DUBBO;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_AMQP && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_amqp_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_AMQP;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_NATS && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_nats_message(infer_buf, count,
+				       syscall_infer_addr,
+				       syscall_infer_len,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_NATS;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_PULSAR && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_pulsar_message(syscall_infer_addr,
+					 syscall_infer_len,
+					 count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_PULSAR;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_BRPC && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_brpc_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_BRPC;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_postgre_message(syscall_infer_addr, syscall_infer_len,
+					  conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_POSTGRESQL;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_ORACLE && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_oracle_tns_message(infer_buf,
+					     count,
+					     conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ORACLE;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_OPENWIRE && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_openwire_message(infer_buf, count,
+					   conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_OPENWIRE;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_ZMTP && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_zmtp_message(infer_buf, count,
+				       syscall_infer_addr,
+				       syscall_infer_len,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_ZMTP;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_mongo_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_MONGO;
+	}
+
+	if (conn_info->enable_reasm) {
+		if (inferred_message.type == MSG_UNKNOWN) {
+			inferred_message.type = MSG_REQUEST;
+			if (conn_info->socket_info_ptr) {
+				inferred_message.protocol =
+				    conn_info->socket_info_ptr->l7_proto;
+				conn_info->socket_info_ptr->finish_reasm = true;
+			}
+			conn_info->is_reasm_seg = true;
+		}
+	}
+
+	return inferred_message;
+}
+
 static __inline struct protocol_message_t
 infer_protocol_1(struct ctx_info_s *ctx,
 		 const struct data_args_t *args,
@@ -3436,7 +3559,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	 * Use the 'protocol_port_check_1()' interface when performing specific protocol
 	 * inference checks.
 	 */
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	/*
 	 * Protocol inference fast matching.
 	 * One thread or process processes the application layer data, and the protocol
@@ -3663,14 +3786,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	 *     ... ...
 	 *   进行快速判断。
 	 */
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	if (skip_proto != PROTO_HTTP1 && (inferred_message.type =
 #else
 	if ((inferred_message.type =
 #endif
 	     infer_http_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_HTTP1;
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_REDIS && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3678,7 +3801,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		    infer_redis_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_REDIS;
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_MQTT && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3686,7 +3809,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		    infer_mqtt_message(infer_buf, count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MQTT;
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_DNS && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3701,7 +3824,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	if (inferred_message.protocol != MSG_UNKNOWN)
 		return inferred_message;
 
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	if (skip_proto != PROTO_KAFKA && (inferred_message.type =
 #else
 	if ((inferred_message.type =
@@ -3711,7 +3834,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_KAFKA;
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_SOFARPC && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3719,7 +3842,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		    infer_sofarpc_message(infer_buf, count,
 					  conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_SOFARPC;
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_MYSQL && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3728,7 +3851,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_MYSQL;
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_FASTCGI && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3738,7 +3861,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		if (inferred_message.type == MSG_PRESTORE)
 			return inferred_message;
 		inferred_message.protocol = PROTO_FASTCGI;
-#ifdef LINUX_VER_5_2_PLUS
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_HTTP2 && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3749,129 +3872,11 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		inferred_message.protocol = PROTO_HTTP2;
 	}
 
-	return inferred_message;
-}
-
-/* Will be called by proto_infer_2 eBPF program. */
-static __inline struct protocol_message_t
-infer_protocol_2(const char *infer_buf, size_t count,
-		 struct conn_info_s *conn_info)
-{
-	/*
-	 * Note:
-	 * infer_buf: inferred data length is within 32 bytes (including 32 bytes).
-	 * If the length that needs to be read in the inference program exceeds 32 bytes,
-	 * you can use `syscall_infer_addr` and `syscall_infer_len`, but it is strongly
-	 * recommended to complete the inference of the protocol within 32 bytes.
-	 *
-	 * Use the 'protocol_port_check_2()' interface when performing specific protocol
-	 * inference checks.
-	 */
-	struct protocol_message_t inferred_message;
-	inferred_message.protocol = PROTO_UNKNOWN;
-	inferred_message.type = MSG_UNKNOWN;
-	__u32 syscall_infer_len = conn_info->syscall_infer_len;
-	char *syscall_infer_addr = conn_info->syscall_infer_addr;
-
-#ifdef LINUX_VER_5_2_PLUS
-	__u8 skip_proto = conn_info->skip_proto;
-	if (skip_proto != PROTO_DUBBO && (inferred_message.type =
-#else
-	if ((inferred_message.type =
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	if (inferred_message.protocol != MSG_UNKNOWN)
+		return inferred_message;
+	return infer_protocol_2(infer_buf, count, conn_info);
 #endif
-	     infer_dubbo_message(infer_buf, count, conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_DUBBO;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_AMQP && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_amqp_message(infer_buf, count,
-				       conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_AMQP;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_NATS && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_nats_message(infer_buf, count,
-				       syscall_infer_addr,
-				       syscall_infer_len,
-				       conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_NATS;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_PULSAR && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_pulsar_message(syscall_infer_addr,
-					 syscall_infer_len,
-					 count, conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_PULSAR;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_BRPC && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_brpc_message(infer_buf, count,
-				       conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_BRPC;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_postgre_message(syscall_infer_addr, syscall_infer_len,
-					  conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_POSTGRESQL;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_ORACLE && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_oracle_tns_message(infer_buf,
-					     count,
-					     conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_ORACLE;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_OPENWIRE && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_openwire_message(infer_buf, count,
-					   conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_OPENWIRE;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_ZMTP && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_zmtp_message(infer_buf, count,
-				       syscall_infer_addr,
-				       syscall_infer_len,
-				       conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_ZMTP;
-#ifdef LINUX_VER_5_2_PLUS
-	} else if (skip_proto != PROTO_MONGO && (inferred_message.type =
-#else
-	} else if ((inferred_message.type =
-#endif
-		    infer_mongo_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN) {
-		inferred_message.protocol = PROTO_MONGO;
-	}
-
-	if (conn_info->enable_reasm) {
-		if (inferred_message.type == MSG_UNKNOWN) {
-			inferred_message.type = MSG_REQUEST;
-			if (conn_info->socket_info_ptr) {
-				inferred_message.protocol =
-				    conn_info->socket_info_ptr->l7_proto;
-				conn_info->socket_info_ptr->finish_reasm = true;
-			}
-			conn_info->is_reasm_seg = true;
-		}
-	}
 
 	return inferred_message;
 }

@@ -30,9 +30,10 @@
 #include "elf.h"
 #include <bcc/linux/bpf.h>
 #include <bcc/linux/bpf_common.h>
+#include <bcc/linux/btf.h>
 #include <bcc/libbpf.h>
 #include "load.h"
-#include "btf_vmlinux.h"
+#include "btf_core.h"
 #include "../kernel/include/bpf_base.h"
 
 extern struct btf_ext *btf_ext__new(const uint8_t * data, uint32_t size);
@@ -48,7 +49,7 @@ extern int btf__set_pointer_size(struct btf *btf, size_t ptr_sz);
 
 static int probe_read_kernel_feat;
 
-static int suspend_stderr()
+int suspend_stderr()
 {
 	fflush(stderr);
 
@@ -70,13 +71,33 @@ static int suspend_stderr()
 	return ret;
 }
 
-static void resume_stderr(int fd)
+void resume_stderr(int fd)
 {
 	fflush(stderr);
 	if (fd < 0)
 		return;
 	dup2(fd, STDERR_FILENO);
 	close(fd);
+}
+
+static inline bool str_is_empty(const char *s)
+{
+	return !s || !s[0];
+}
+
+int load_ebpf_prog(struct ebpf_prog *prog)
+{
+	return bcc_prog_load(prog->type, prog->name,
+			     prog->insns, prog->insns_size, prog->obj->license,
+			     prog->obj->kern_version, 0, NULL,
+			     0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
+}
+
+int df_prog_load(enum bpf_prog_type prog_type, const char *name,
+		 const struct bpf_insn *insns, int prog_len)
+{
+	return bcc_prog_load(prog_type, name, insns, prog_len, LICENSE_DEF,
+			     fetch_kernel_version_code(), 0, NULL, 0);
 }
 
 /*
@@ -162,8 +183,6 @@ static void sanitize_prog_instructions(struct ebpf_object *obj,
 
 static void ebpf_object__release_elf(struct ebpf_object *obj)
 {
-	int i;
-
 	if (obj->elf_info.elf) {
 		elf_end(obj->elf_info.elf);
 		obj->elf_info.elf = NULL;
@@ -211,11 +230,11 @@ static void ebpf_object__release_elf(struct ebpf_object *obj)
 		zfree(obj->elf_info.btf_ext_sec);
 	}
 
-	struct ebpf_prog *prog;
-	for (i = 0; i < obj->progs_cnt; i++) {
-		prog = &obj->progs[i];
-		prog->insns = NULL;
-	}
+	//struct ebpf_prog *prog;
+	//for (i = 0; i < obj->progs_cnt; i++) {
+	//	prog = &obj->progs[i];
+	//	prog->insns = NULL;
+	//}
 }
 
 void release_object(struct ebpf_object *obj)
@@ -287,6 +306,7 @@ static struct ebpf_object *create_new_obj(const void *buf, size_t buf_sz,
 		zfree(obj);
 		return NULL;
 	}
+
 	safe_buf_copy(obj->name, sizeof(obj->name), (void *)name, strlen(name));
 	obj->name[sizeof(obj->name) - 1] = '\0';
 	obj->elf_info.fd = -1;
@@ -433,6 +453,9 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 		prog_type = BPF_PROG_TYPE_TRACEPOINT;
 	} else if (!memcmp(desc->name, "perf_event", 10)) {
 		prog_type = BPF_PROG_TYPE_PERF_EVENT;
+	} else if (!memcmp(desc->name, "fentry/", 7) ||
+		   !memcmp(desc->name, "fexit/", 6)) {
+		prog_type = BPF_PROG_TYPE_TRACING;
 	} else {
 		prog_type = BPF_PROG_TYPE_UNSPEC;
 	}
@@ -509,6 +532,10 @@ static int load_obj__progs(struct ebpf_object *obj)
 					    obj->elf_info.syms_sec->strtabidx,
 					    sym.st_name);
 
+		// Typically, the sec_off offset value is 0
+		size_t sec_off = sym.st_value;
+		size_t prog_sz = sym.st_size;
+
 		new_prog = NULL;
 		add_new_prog(obj->progs, obj->progs_cnt, new_prog);
 		if (new_prog == NULL) {
@@ -525,16 +552,28 @@ static int load_obj__progs(struct ebpf_object *obj)
 			return ETR_NOMEM;
 		}
 
-		new_prog->insns = insns;
-		new_prog->insns_cnt = desc->size / sizeof(struct bpf_insn);
+		new_prog->insns = insns + sec_off;
+		new_prog->insns_cnt = desc->size / BPF_INSN_SZ;
+		new_prog->insns_size = desc->size;
 		new_prog->obj = obj;
 		new_prog->type = prog_type;
+		new_prog->sec_insn_off = sec_off / BPF_INSN_SZ;
+		new_prog->sec_insn_cnt = prog_sz / BPF_INSN_SZ;
+		new_prog->sec_desc = desc;
+
+		ebpf_debug
+		    ("sec '%s': found program '%s' at insn offset %zu (%zu bytes), code size %zu insns (%zu bytes)\n",
+		     new_prog->sec_name, new_prog->name, new_prog->sec_insn_off,
+		     sec_off, prog_sz / BPF_INSN_SZ, prog_sz);
 
 		/*
 		 * Addressing the adaptability issues of bpf_probe_read{kernel,user}[_str]
 		 * helpers in the kernel.
 		 */
 		sanitize_prog_instructions(obj, new_prog);
+
+		// Modify eBPF instructions based on BTF relocation information.
+		obj_relocate_core(new_prog);
 
 		new_prog->prog_fd =
 		    bcc_prog_load(new_prog->type, new_prog->name,
@@ -589,6 +628,7 @@ static int ebpf_btf_ext_collect(struct ebpf_object *obj)
 {
 	struct sec_desc *desc = obj->elf_info.btf_ext_sec;
 	struct btf_ext *ext = btf_ext__new(desc->d_buf, desc->size);
+
 	if (DF_IS_ERR(ext)) {
 		ebpf_warning("Processing .BTF.ext section failed\n");
 		obj->btf_ext = NULL;
@@ -599,7 +639,52 @@ static int ebpf_btf_ext_collect(struct ebpf_object *obj)
 		   desc->name);
 	obj->btf_ext = ext;
 
+	// Setup .BTF.ext to ELF section mapping
+	struct btf_ext_info *ext_segs[] = {
+		&obj->btf_ext->func_info,
+		&obj->btf_ext->line_info,
+		&obj->btf_ext->core_relo_info
+	};
+
+	for (int seg_num = 0; seg_num < ARRAY_SIZE(ext_segs); seg_num++) {
+		struct btf_ext_info *seg = ext_segs[seg_num];
+
+		if (seg->sec_cnt == 0)
+			continue;
+
+		seg->sec_idxs = calloc(seg->sec_cnt, sizeof(*seg->sec_idxs));
+		if (!seg->sec_idxs) {
+			ebpf_warning("calloc failed\n");
+			return ETR_INVAL;
+		}
+
+		int sec_num = 0;
+		const struct btf_ext_info_sec *sec;
+
+		// Iterate through each section within the current segment
+		for_each_btf_ext_sec(seg, sec) {
+			sec_num++;
+
+			const char *sec_name =
+			    btf_name_by_offset(obj->btf, sec->sec_name_off);
+			if (str_is_empty(sec_name))
+				continue;
+
+			Elf_Scn *scn =
+			    get_scn_by_sec_name(obj->elf_info.elf, sec_name);
+			if (!scn)
+				continue;
+
+			seg->sec_idxs[sec_num - 1] = elf_ndxscn(scn);
+		}
+	}
+
 	return ETR_OK;
+}
+
+static inline bool is_ldimm64_insn(struct bpf_insn *insn)
+{
+	return insn->code == (BPF_LD | BPF_IMM | BPF_DW);
 }
 
 static int ebpf_obj__maps_collect(struct ebpf_object *obj)

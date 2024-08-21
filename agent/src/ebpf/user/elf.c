@@ -49,7 +49,7 @@ failed:
 	return -1;
 }
 
-static Elf_Scn *get_scn_by_sec_name(Elf * e, const char *sec_name)
+Elf_Scn *get_scn_by_sec_name(Elf * e, const char *sec_name)
 {
 	Elf_Scn *scn = NULL;
 	GElf_Shdr hdr;
