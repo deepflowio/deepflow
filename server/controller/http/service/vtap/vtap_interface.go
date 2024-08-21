@@ -43,7 +43,7 @@ func NewVTapInterface(cfg common.FPermit, userInfo *httpcommon.UserInfo) *VTapIn
 	}
 }
 
-func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterface, error) {
+func (v *VTapInterface) getVIF(filter map[string]interface{}, function func(*simplejson.Json, map[string]interface{}, *vpToolDataSet) []model.VTapInterface) ([]model.VTapInterface, error) {
 	// only super admin and admin can get vtap interfaces
 	if v.userInfo.Type != common.USER_TYPE_SUPER_ADMIN && v.userInfo.Type != common.USER_TYPE_ADMIN {
 		return []model.VTapInterface{}, nil
@@ -86,7 +86,7 @@ func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterfac
 	masterRegionVVIFs := v.getRawVTapVinterfacesByRegion(common.LOCALHOST, common.GConfig.HTTPPort, syncAPIQuery)
 
 	var vtapVIFs []model.VTapInterface
-	vtapVIFs = append(vtapVIFs, v.formatVTapVInterfaces(masterRegionVVIFs, filter, toolDS)...)
+	vtapVIFs = append(vtapVIFs, function(masterRegionVVIFs, filter, toolDS)...)
 	for slaveRegion, regionControllerIPs := range slaveRegionLcuuidToHealthyControllerIPs {
 		log.Infof("get region (lcuuid: %s) vtap interfaces", slaveRegion, v.db.LogPrefixORGID)
 		for _, ip := range regionControllerIPs {
@@ -94,12 +94,20 @@ func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterfac
 			if err != nil {
 				log.Error(err.Error(), v.db.LogPrefixORGID)
 			} else {
-				vtapVIFs = append(vtapVIFs, v.formatVTapVInterfaces(v.getRawVTapVinterfacesByRegion(ip, common.GConfig.HTTPNodePort, syncAPIQuery), filter, toolDS)...)
+				vtapVIFs = append(vtapVIFs, function(v.getRawVTapVinterfacesByRegion(ip, common.GConfig.HTTPNodePort, syncAPIQuery), filter, toolDS)...)
 				break
 			}
 		}
 	}
 	return vtapVIFs, nil
+}
+
+func (v *VTapInterface) Get(filter map[string]interface{}) ([]model.VTapInterface, error) {
+	return v.getVIF(filter, v.formatVTapVInterfaces)
+}
+
+func (v *VTapInterface) GetVIFResource(filter map[string]interface{}) ([]model.VTapInterface, error) {
+	return v.getVIF(filter, v.formatVTapResource)
 }
 
 func (v *VTapInterface) formatSyncAPIQuery(filter map[string]interface{}) (queryStr string, dropAll bool, err error) {
@@ -283,6 +291,93 @@ func (v *VTapInterface) formatVTapVInterfaces(vifs *simplejson.Json, filter map[
 					vtapVIF.DevicePodNodeID = toolDS.podIDToPodNodeID[vtapVIF.DeviceID]
 					vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DevicePodNodeID]
 				}
+			}
+		} else if vtapID != 0 {
+			log.Errorf("vtap (%d) not found", vtapID, v.db.LogPrefixORGID)
+		}
+		vtapVIFs = append(vtapVIFs, vtapVIF)
+	}
+	return vtapVIFs
+}
+
+// get host, chost, pod_node by vtap
+func (v *VTapInterface) formatVTapResource(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
+	var vtapVIFs []model.VTapInterface
+	for i := range vifs.MustArray() {
+		jVIF := vifs.GetIndex(i)
+		name := jVIF.Get("NAME").MustString()
+		if n, ok := filter["name"]; ok {
+			if n != name {
+				continue
+			}
+		}
+		vtapID := jVIF.Get("VTAP_ID").MustInt()
+		lastSeen, err := time.Parse(time.RFC3339, jVIF.Get("LAST_SEEN").MustString())
+		if err != nil {
+			log.Errorf("parse time (%s) failed: %s", jVIF.Get("LAST_SEEN").MustString(), err.Error(), v.db.LogPrefixORGID)
+		}
+		vtapVIF := model.VTapInterface{
+			ID:       jVIF.Get("ID").MustInt(),
+			TeamID:   jVIF.Get("TEAM_ID").MustInt(),
+			Name:     name,
+			MAC:      jVIF.Get("MAC").MustString(),
+			TapName:  jVIF.Get("TAP_NAME").MustString(),
+			TapMAC:   jVIF.Get("TAP_MAC").MustString(),
+			VTapID:   vtapID,
+			HostIP:   jVIF.Get("HOST_IP").MustString(),
+			NodeIP:   jVIF.Get("NODE_IP").MustString(),
+			LastSeen: lastSeen.Format(common.GO_BIRTHDAY),
+		}
+		vtap, ok := toolDS.idToVTap[vtapID]
+		if ok {
+			vtapVIF.VTapLaunchServer = vtap.LaunchServer
+			vtapVIF.VTapLaunchServerID = vtap.LaunchServerID
+			vtapVIF.VTapType = vtap.Type
+			vtapVIF.VTapName = vtap.Name
+
+			deviceType, ok := common.VTAP_TYPE_TO_DEVICE_TYPE[vtapVIF.VTapType]
+			if !ok {
+				continue
+			}
+			vtapVIF.DeviceType = deviceType
+			vtapVIF.DeviceID = vtapVIF.VTapLaunchServerID
+			switch vtapVIF.DeviceType {
+			case common.VIF_DEVICE_TYPE_HOST:
+				vtapVIF.DeviceName = toolDS.hostIDToName[vtapVIF.DeviceID]
+				vtapVIF.DeviceHostID = vtapVIF.DeviceID
+				vtapVIF.DeviceHostName = vtapVIF.DeviceName
+			case common.VIF_DEVICE_TYPE_VM:
+				if podNodeID, ok := toolDS.vmIDToPodNodeID[vtapVIF.DeviceID]; ok {
+					vtapVIF.DeviceType = common.VIF_DEVICE_TYPE_POD_NODE
+					vtapVIF.DeviceID = podNodeID
+					vtapVIF.DeviceName = toolDS.podNodeIDToName[podNodeID]
+					vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[podNodeID]
+					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+					vtapVIF.DevicePodNodeID = podNodeID
+					vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[podNodeID]
+				} else {
+					vtapVIF.DeviceName = toolDS.vmIDToName[vtapVIF.DeviceID]
+					vtapVIF.DeviceCHostID = vtapVIF.DeviceID
+					vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceID]
+				}
+				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[vtapVIF.DeviceID]]
+				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
+			case common.VIF_DEVICE_TYPE_POD_NODE:
+				vtapVIF.DeviceName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
+				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[vtapVIF.DeviceID]]]
+				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
+				vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[vtapVIF.DeviceID]
+				vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+				vtapVIF.DevicePodNodeID = vtapVIF.DeviceID
+				vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DeviceID]
+			case common.VIF_DEVICE_TYPE_POD:
+				vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
+				vtapVIF.DeviceHostID = toolDS.hostIPToID[toolDS.vmIDToLaunchServer[toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]]]
+				vtapVIF.DeviceHostName = toolDS.hostIDToName[vtapVIF.DeviceHostID]
+				vtapVIF.DeviceCHostID = toolDS.podNodeIDToVMID[toolDS.podIDToPodNodeID[vtapVIF.DeviceID]]
+				vtapVIF.DeviceCHostName = toolDS.vmIDToName[vtapVIF.DeviceCHostID]
+				vtapVIF.DevicePodNodeID = toolDS.podIDToPodNodeID[vtapVIF.DeviceID]
+				vtapVIF.DevicePodNodeName = toolDS.podNodeIDToName[vtapVIF.DevicePodNodeID]
 			}
 		} else if vtapID != 0 {
 			log.Errorf("vtap (%d) not found", vtapID, v.db.LogPrefixORGID)

@@ -2040,6 +2040,12 @@ CREATE TABLE IF NOT EXISTS ch_vtap (
     name                    VARCHAR(256),
     type                    INTEGER,
     team_id                 INTEGER,
+    host_id                 INTEGER,
+    host_name               VARCHAR(256),
+    chost_id                INTEGER,
+    chost_name              VARCHAR(256),
+    pod_node_id             INTEGER,
+    pod_node_name           VARCHAR(256),
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_vtap;

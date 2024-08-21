@@ -310,11 +310,17 @@ type ChPodNode struct {
 }
 
 type ChVTap struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	Type      int       `gorm:"column:type;type:int;not null" json:"TYPE"`
-	TeamID    int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
-	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name        string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	Type        int       `gorm:"column:type;type:int;not null" json:"TYPE"`
+	TeamID      int       `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	HostID      int       `gorm:"column:host_id;type:int;default:null" json:"HOST_ID"`
+	HostName    string    `gorm:"column:host_name;type:varchar(256);default:null" json:"HOST_NAME"`
+	CHostID     int       `gorm:"column:chost_id;type:int;default:null" json:"CHOST_ID"`
+	CHostName   string    `gorm:"column:chost_name;type:varchar(256);default:null" json:"CHOST_NAME"`
+	PodNodeID   int       `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID"`
+	PodNodeName string    `gorm:"column:pod_node_name;type:varchar(256);default:null" json:"POD_NODE_NAME"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
 func (ChVTap) TableName() string {
