@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: concurrent map read and map write [#7811](https://github.com/deepflowio/deepflow/pull/7811) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: fixes allocating wrong org id [#7864](https://github.com/deepflowio/deepflow/pull/7864) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* fix: drop data which organization is not exist [#7863](https://github.com/deepflowio/deepflow/pull/7863) by [lzf575](https://github.com/lzf575)
 * fix: drop Org data in ckwriter [#7859](https://github.com/deepflowio/deepflow/pull/7859) by [lzf575](https://github.com/lzf575)
 * fix: skip check when getting icon fails [#7851](https://github.com/deepflowio/deepflow/pull/7851) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: Add libpcap dependency to installation package [#7834](https://github.com/deepflowio/deepflow/pull/7834) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -108,6 +111,10 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: support update time of org list [#7867](https://github.com/deepflowio/deepflow/pull/7867) by [lzf575](https://github.com/lzf575)
+* feat: optimize org data check and sync [#7866](https://github.com/deepflowio/deepflow/pull/7866) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: adds detail error record when calling ingester org deletion [#7865](https://github.com/deepflowio/deepflow/pull/7865) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: add api for allocate org id [#7862](https://github.com/deepflowio/deepflow/pull/7862) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: add trace query delta for tracemap [#7847](https://github.com/deepflowio/deepflow/pull/7847) by [taloric](https://github.com/taloric)
 * feat: supports clear soft deleted orgs [#7827](https://github.com/deepflowio/deepflow/pull/7827) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: Using libpcap without restarting when the network card does not… [#7781](https://github.com/deepflowio/deepflow/pull/7781) by [yuanchaoa](https://github.com/yuanchaoa)

@@ -19,7 +19,6 @@ use chrono::FixedOffset;
 use chrono::Utc;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
-use std::env::set_var;
 use std::ffi::CString;
 use std::fmt::Write;
 use std::net::IpAddr;
@@ -384,7 +383,6 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
-    set_var("RUST_LOG", "info");
     env_logger::builder()
         .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
         .init();

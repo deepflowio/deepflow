@@ -738,6 +738,13 @@ impl EbpfCollector {
                 } else {
                     ebpf::disable_oncpu_profiler();
                 }
+                ebpf::set_dwarf_enabled(!config.ebpf.dwarf_disabled);
+                ebpf::set_dwarf_regex(
+                    CString::new(config.ebpf.dwarf_regex.as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
 
                 #[cfg(feature = "extended_profile")]
                 {
@@ -964,6 +971,15 @@ impl EbpfCollector {
             Self::ebpf_on_config_change(config.l7_log_packet_size);
         } else {
             self.stop();
+        }
+        unsafe {
+            ebpf::set_dwarf_enabled(!config.ebpf.dwarf_disabled);
+            ebpf::set_dwarf_regex(
+                CString::new(config.ebpf.dwarf_regex.as_bytes())
+                    .unwrap()
+                    .as_c_str()
+                    .as_ptr(),
+            );
         }
     }
 

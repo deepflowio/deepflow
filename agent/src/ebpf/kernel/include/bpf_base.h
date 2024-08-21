@@ -114,6 +114,10 @@ static int
     __attribute__ ((__unused__)) (*bpf_get_stackid) (void *ctx, void *map,
 						     int flags) = (void *)27;
 
+static int
+    __attribute__ ((__unused__)) (*bpf_get_stack) (void *ctx, void *buf, __u32 size,
+						     int flags) = (void *)67;
+
 #if __GNUC__ && !__clang__
 #define SEC(name) __attribute__((section(name), used))
 #else
@@ -285,6 +289,7 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #define TP_SCHED_PROG(F) SEC("tracepoint/sched/sched_"__stringify(F)) int df_T_##F
 #define PROGTP(F) SEC("prog/tp/"__stringify(F)) int df_TP_##F
 #define PROGKP(F) SEC("prog/kp/"__stringify(F)) int df_KP_##F
+#define PROGPE(F) SEC("prog/pe/"__stringify(F)) int df_PE_##F
 #define KPROG(F) SEC("kprobe/"__stringify(F)) int df_K_##F
 #define KRETPROG(F) SEC("kretprobe/"__stringify(F)) int df_KR_##F
 #define UPROG(F) SEC("uprobe/"__stringify(F)) int df_U_##F

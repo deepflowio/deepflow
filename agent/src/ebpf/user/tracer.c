@@ -164,7 +164,7 @@ static struct bpf_tracer *__find_bpf_tracer(const char *name)
 			return t;
 	}
 
-	ebpf_info("Tracer '%s', Not Found.\n", name);
+	ebpf_debug("Tracer '%s', Not Found.\n", name);
 
 	return NULL;
 }

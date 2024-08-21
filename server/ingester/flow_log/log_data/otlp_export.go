@@ -137,7 +137,7 @@ func (l7 *L7FlowLog) EncodeToOtlp(utags *utag.UniversalTagsManager, dataTypeBits
 	span := resSpan.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	spanAttrs := span.Attributes()
 
-	if dataTypeBits&config.NATIVE_TAG != 0 {
+	if dataTypeBits&config.NATIVE_TAG != 0 && len(l7.AttributeNames) == len(l7.AttributeValues) {
 		for i := range l7.AttributeNames {
 			putStrWithoutEmpty(spanAttrs, l7.AttributeNames[i], l7.AttributeValues[i])
 		}

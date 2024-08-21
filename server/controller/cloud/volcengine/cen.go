@@ -102,7 +102,7 @@ func (v *VolcEngine) getCens(sess *session.Session) ([]model.CEN, error) {
 		}
 
 		if len(vpcLcuuids) == 0 {
-			log.Infof("cen (%s) not bind vpc", logger.NewORGPrefix(v.orgID))
+			log.Infof("cen (%s) not bind vpc", cenName, logger.NewORGPrefix(v.orgID))
 			continue
 		}
 		cens = append(cens, model.CEN{

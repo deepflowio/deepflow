@@ -49,7 +49,12 @@
 // perf profiler
 #define MAP_PERF_PROFILER_BUF_A_NAME	"__profiler_output_a"
 #define MAP_PERF_PROFILER_BUF_B_NAME    "__profiler_output_b"
+#define MAP_PROCESS_SHARD_LIST_NAME     "__process_shard_list_table"
+#define MAP_UNWIND_ENTRY_SHARD_NAME     "__unwind_entry_shard_table"
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
+
+#define MAP_PROGS_JMP_PE_NAME		"__progs_jmp_pe_map"
+#define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
 
 enum {
 	PROG_PROTO_INFER_TP_IDX,
@@ -64,6 +69,11 @@ enum {
 	PROG_DATA_SUBMIT_KP_IDX,
 	PROG_OUTPUT_DATA_KP_IDX,
 	PROG_KP_NUM
+};
+
+enum {
+	PROG_DWARF_UNWIND_PE_IDX,
+	PROG_PE_NUM
 };
 
 //thread index for bihash
@@ -136,6 +146,8 @@ enum {
  */
 #define MAP_STACK_A_NAME	"__stack_map_a"
 #define MAP_STACK_B_NAME	"__stack_map_b"
+#define MAP_CUSTOM_STACK_A_NAME	"__custom_stack_map_a"
+#define MAP_CUSTOM_STACK_B_NAME	"__custom_stack_map_b"
 #define MAP_PROFILER_STATE_NAME	"__profiler_state_map"
 
 #define STRINGIFIER_STACK_STR_HASH_BUCKETS_NUM	8192

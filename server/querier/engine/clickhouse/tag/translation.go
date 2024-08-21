@@ -1335,7 +1335,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]",
 						groupNotNullFilter,
-						"(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_1')] %s %s)",
+						"(if(indexOf(tag_int_names,'"+resourceIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+resourceIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+resourceIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_1')]) %s %s)",
 						"",
 					),
 				}
@@ -1364,7 +1364,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]",
 						groupNotNullFilter,
-						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')] %s %s",
+						"if(indexOf(tag_int_names,'"+resourceIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) %s %s",
 						"",
 					),
 				}
@@ -1403,7 +1403,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]!=-2",
-					"(tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"_1')] %s %s)",
+					"(if(indexOf(tag_int_names,'"+vpcIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+vpcIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+vpcIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"_1')]) %s %s)",
 					"",
 				)}
 			tagResourceMap[vpcNameSuffix] = map[string]*Tag{
@@ -1431,7 +1431,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]!=-2",
-					"tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')] %s %s",
+					"if(indexOf(tag_int_names,'"+vpcIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+vpcIDSuffix+"')]) %s %s",
 					"",
 				)}
 			tagResourceMap[vpcNameSuffix] = map[string]*Tag{
@@ -1464,7 +1464,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]!=-2",
-					"(tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"_1')] %s %s)",
+					"(if(indexOf(tag_int_names,'"+l2VpcIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+l2VpcIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+l2VpcIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"_1')]) %s %s)",
 					"",
 				)}
 			tagResourceMap[l2VpcNameSuffix] = map[string]*Tag{
@@ -1492,7 +1492,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]!=-2",
-					"tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')] %s %s",
+					"if(indexOf(tag_int_names,'"+l2VpcIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+l2VpcIDSuffix+"')]) %s %s",
 					"",
 				)}
 			tagResourceMap[l2VpcNameSuffix] = map[string]*Tag{
@@ -1528,7 +1528,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]!=0",
-					"(tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"_1')] %s %s)",
+					"(if(indexOf(tag_int_names,'"+hostIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+hostIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+hostIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"_1')]) %s %s)",
 					"",
 				)}
 			tagResourceMap[hostNameSuffix] = map[string]*Tag{
@@ -1556,7 +1556,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]!=0",
-					"tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')] %s %s",
+					"if(indexOf(tag_int_names,'"+hostIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+hostIDSuffix+"')]) %s %s",
 					"",
 				)}
 			tagResourceMap[hostNameSuffix] = map[string]*Tag{
@@ -1595,7 +1595,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]!=0",
-					"(tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"_1')] %s %s)",
+					"(if(indexOf(tag_int_names,'"+serviceIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+serviceIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+serviceIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"_1')]) %s %s)",
 					"",
 				)}
 			tagResourceMap[serviceNameSuffix] = map[string]*Tag{
@@ -1623,7 +1623,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 				"default": NewTag(
 					"tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]",
 					"tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]!=0",
-					"tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')] %s %s",
+					"if(indexOf(tag_int_names,'"+serviceIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+serviceIDSuffix+"')]) %s %s",
 					"",
 				)}
 			tagResourceMap[serviceNameSuffix] = map[string]*Tag{
@@ -1660,7 +1660,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]",
 						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]!=0",
-						"(tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_1')] %s %s)",
+						"(if(indexOf(tag_int_names,'"+resourceIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+resourceIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+resourceIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"_1')]) %s %s)",
 						"",
 					)}
 				tagResourceMap[resourceNameSuffix] = map[string]*Tag{
@@ -1688,7 +1688,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]",
 						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]!=0",
-						"tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')] %s %s",
+						"if(indexOf(tag_int_names,'"+resourceIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+resourceIDSuffix+"')]) %s %s",
 						"",
 					)}
 				tagResourceMap[resourceNameSuffix] = map[string]*Tag{
@@ -1765,7 +1765,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]",
 						"",
-						"(tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"_1')] %s %s)",
+						"(if(indexOf(tag_int_names,'"+autoIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+autoIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+autoIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"_1')]) %s %s)",
 						"",
 					),
 				}
@@ -1776,7 +1776,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')]",
 						"",
-						"tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')] %s %s",
+						"(if(indexOf(tag_int_names,'"+autoTypeSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+autoTypeSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+autoTypeSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"_1')]) %s %s)",
 						"",
 					),
 				}
@@ -1805,7 +1805,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]",
 						"",
-						"tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')] %s %s",
+						"if(indexOf(tag_int_names,'"+autoIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoIDSuffix+"')]) %s %s",
 						"",
 					),
 				}
@@ -1816,7 +1816,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')]",
 						"",
-						"tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')] %s %s",
+						"if(indexOf(tag_int_names,'"+autoTypeSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+autoTypeSuffix+"')]) %s %s",
 						"",
 					),
 				}
@@ -1843,7 +1843,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')]",
 						"tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')]!=0",
-						"(tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"_0')] %s %s OR tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"_1')] %s %s)",
+						"(if(indexOf(tag_int_names,'"+tagIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')]) %s %s OR if(indexOf(tag_int_names,'"+tagIDSuffix+"_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"_0')]) %s %s OR if(indexOf(tag_int_names,'"+tagIDSuffix+"_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"_1')]) %s %s)",
 						"",
 					),
 				}
@@ -1860,7 +1860,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')]",
 						"tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')]!=0",
-						"tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')] %s %s",
+						"if(indexOf(tag_int_names,'"+tagIDSuffix+"')=0,NULL,tag_int_values[indexOf(tag_int_names,'"+tagIDSuffix+"')]) %s %s",
 						"",
 					),
 				}
@@ -1973,7 +1973,15 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"tag_int_values[indexOf(tag_int_names,'%s')]",
 			"",
-			"tag_int_values[indexOf(tag_int_names,'%s')] %s %s",
+			"if(indexOf(tag_int_names,'%s')=0,NULL,tag_int_values[indexOf(tag_int_names,'%s')]) %s %s",
+			"",
+		),
+	}
+	tagResourceMap["int_tags_no_suffix"] = map[string]*Tag{
+		"default": NewTag(
+			"tag_int_values[indexOf(tag_int_names,'%s')]",
+			"",
+			"(if(indexOf(tag_int_names,'%s')=0,NULL,tag_int_values[indexOf(tag_int_names,'%s')]) %s %s OR if(indexOf(tag_int_names,'%s_0')=0,NULL,tag_int_values[indexOf(tag_int_names,'%s_0')]) %s %s OR if(indexOf(tag_int_names,'%s_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'%s_1')]) %s %s)",
 			"",
 		),
 	}
@@ -1983,8 +1991,16 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"tag_int_values[indexOf(tag_string_names,'%s')]",
 			"",
-			"tag_string_values[indexOf(tag_string_names,'%s')] %s %s",
-			"%s (tag_string_values[indexOf(tag_string_names,'%s')], %s)",
+			"if(indexOf(tag_string_names,'%s')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s')]) %s %s",
+			"%s (if(indexOf(tag_string_names,'%s')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s')]), %s)",
+		),
+	}
+	tagResourceMap["string_tags_no_suffix"] = map[string]*Tag{
+		"default": NewTag(
+			"tag_int_values[indexOf(tag_string_names,'%s')]",
+			"",
+			"(if(indexOf(tag_string_names,'%s')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s')]) %s %s OR if(indexOf(tag_string_names,'%s_0')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s_0')]) %s %s OR if(indexOf(tag_string_names,'%s_1')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s_1')]) %s %s)",
+			"(%s (if(indexOf(tag_string_names,'%s')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s')]), %s) OR %s (if(indexOf(tag_string_names,'%s_0')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s_0')]), %s) OR %s (if(indexOf(tag_string_names,'%s_1')=0,NULL,tag_string_values[indexOf(tag_string_names,'%s_1')]), %s))",
 		),
 	}
 

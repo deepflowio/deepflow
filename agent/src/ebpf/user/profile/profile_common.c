@@ -82,6 +82,8 @@ int profiler_context_init(struct profiler_context *ctx,
 			  const char *state_map_name,
 			  const char *stack_map_name_a,
 			  const char *stack_map_name_b,
+			  const char *custom_stack_map_name_a,
+			  const char *custom_stack_map_name_b,
 			  bool only_matched,
 			  bool use_delta_time, u64 sample_period)
 {
@@ -94,10 +96,20 @@ int profiler_context_init(struct profiler_context *ctx,
 
 	snprintf(ctx->state_map_name, sizeof(ctx->state_map_name), "%s",
 		 state_map_name);
-	snprintf(ctx->stack_map_name_a, sizeof(ctx->stack_map_name_a), "%s",
+
+	memset(&ctx->stack_map_a, 0, sizeof(stack_map_t));
+	snprintf(ctx->stack_map_a.name, sizeof(ctx->stack_map_a.name), "%s",
 		 stack_map_name_a);
-	snprintf(ctx->stack_map_name_b, sizeof(ctx->stack_map_name_b), "%s",
+	memset(&ctx->stack_map_b, 0, sizeof(stack_map_t));
+	snprintf(ctx->stack_map_b.name, sizeof(ctx->stack_map_b.name), "%s",
 		 stack_map_name_b);
+	memset(&ctx->custom_stack_map_a, 0, sizeof(stack_map_t));
+	snprintf(ctx->custom_stack_map_a.name, sizeof(ctx->custom_stack_map_a.name), "%s",
+		 custom_stack_map_name_a);
+	memset(&ctx->custom_stack_map_b, 0, sizeof(stack_map_t));
+	snprintf(ctx->custom_stack_map_b.name, sizeof(ctx->custom_stack_map_b.name), "%s",
+		 custom_stack_map_name_b);
+
 	ctx->regex_existed = false;
 	ctx->only_matched_data = only_matched;
 	ctx->use_delta_time = use_delta_time;
@@ -314,27 +326,45 @@ static u32 delete_all_stackmap_elems(struct bpf_tracer *tracer,
 	return reclaim_count;
 }
 
+#define CLEAN_STACK_MAP(stack_map)													\
+do {																				\
+	int *sid;																		\
+	vec_foreach(sid, stack_map->clear_ids) {										\
+		int id = *sid;																\
+		if (!bpf_table_delete_key(t, stack_map->name, (u64) id)) {					\
+			/*																		\
+			 * It may be due to the disorder in the perf buffer transmission,		\
+			 * leading to the repetitive deletion of the same stack ID.				\
+			 */																		\
+			ctx->stackmap_clear_failed_count++;										\
+		}																			\
+		clear_bitmap(stack_map->ids.bitmap, id);									\
+	}																				\
+	vec_free(stack_map->clear_ids);													\
+	stack_map->ids.count = 0;														\
+} while (0)
+
 static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
-			     const char *stack_map_name, bool is_a)
+	             stack_map_t *stack_map, stack_map_t *custom_stack_map, bool is_a)
 {
-	struct stack_ids_bitmap *ids;
-	int *clear_stack_ids;
 	u64 *perf_buf_lost_p = NULL;
 
 	if (is_a) {
-		ids = &ctx->stack_ids_a;
-		clear_stack_ids = ctx->clear_stack_ids_a;
 		perf_buf_lost_p = &ctx->perf_buf_lost_a_count;
 	} else {
-		ids = &ctx->stack_ids_b;
-		clear_stack_ids = ctx->clear_stack_ids_b;
 		perf_buf_lost_p = &ctx->perf_buf_lost_b_count;
 	}
 
-	if (ids->count != vec_len(clear_stack_ids)) {
+	if (stack_map->ids.count != vec_len(stack_map->clear_ids)) {
 		ebpf_warning
 		    ("%sstack_ids.count(%lu) != vec_len(clear_stack_ids)(%d)",
-		     ctx->tag, ids->count, vec_len(clear_stack_ids));
+		     ctx->tag, stack_map->ids.count, vec_len(stack_map->clear_ids));
+	}
+
+	if (custom_stack_map->ids.count != vec_len(custom_stack_map->clear_ids)) {
+		ebpf_warning
+		    ("%scustom_stack_ids.count(%lu) != vec_len(clear_stack_ids)(%d)",
+		     ctx->tag, custom_stack_map->ids.count, vec_len(custom_stack_map->clear_ids));
 	}
 
 	/*
@@ -347,27 +377,9 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 	 * Examine the detailed explanation of 'STACKMAP_CLEANUP_THRESHOLD' in
 	 * 'agent/src/ebpf/user/config.h'.
 	 */
-	if (ids->count >= STACKMAP_CLEANUP_THRESHOLD) {
-		int *sid;
-		vec_foreach(sid, clear_stack_ids) {
-			int id = *sid;
-			if (!bpf_table_delete_key(t, stack_map_name, (u64) id)) {
-				/*
-				 * It may be due to the disorder in the perf buffer transmission,
-				 * leading to the repetitive deletion of the same stack ID.
-				 */
-				ctx->stackmap_clear_failed_count++;
-			}
-
-			clear_bitmap(ids->bitmap, id);
-		}
-
-		if (is_a)
-			vec_free(ctx->clear_stack_ids_a);
-		else
-			vec_free(ctx->clear_stack_ids_b);
-
-		ids->count = 0;
+	if (stack_map->ids.count + custom_stack_map->ids.count >= STACKMAP_CLEANUP_THRESHOLD) {
+		CLEAN_STACK_MAP(stack_map);
+		CLEAN_STACK_MAP(custom_stack_map);
 
 		/*
 		 * If data loss occurs due to the user-space receiver program
@@ -378,7 +390,8 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 		 * interface will return -EEXIST).
 		 */
 		if (*perf_buf_lost_p > 0) {
-			delete_all_stackmap_elems(t, stack_map_name);
+			delete_all_stackmap_elems(t, stack_map->name);
+			delete_all_stackmap_elems(t, custom_stack_map->name);
 			*perf_buf_lost_p = 0;
 		}
 	}
@@ -507,31 +520,22 @@ static int init_stack_trace_msg_hash(stack_trace_msg_hash_t * h,
 }
 
 static void add_stack_id_to_bitmap(struct profiler_context *ctx,
-				   int stack_id, bool is_a)
+				   int stack_id, stack_map_t *stack_map)
 {
 	if (stack_id < 0)
 		return;
 
-	struct stack_ids_bitmap *ids;
-	if (is_a)
-		ids = &ctx->stack_ids_a;
-	else
-		ids = &ctx->stack_ids_b;
-
-	if (!is_set_bitmap(ids->bitmap, stack_id)) {
-		set_bitmap(ids->bitmap, stack_id);
+	if (!is_set_bitmap(stack_map->ids.bitmap, stack_id)) {
+		set_bitmap(stack_map->ids.bitmap, stack_id);
 		int ret = VEC_OK;
 
-		if (is_a)
-			vec_add1(ctx->clear_stack_ids_a, stack_id, ret);
-		else
-			vec_add1(ctx->clear_stack_ids_b, stack_id, ret);
+		vec_add1(stack_map->clear_ids, stack_id, ret);
 
 		if (ret != VEC_OK) {
 			ebpf_warning("%svec add failed\n", ctx->tag);
 		}
 
-		ids->count++;
+		stack_map->ids.count++;
 	}
 }
 
@@ -791,7 +795,8 @@ static char *get_java_symbol(struct bpf_tracer *t,
 
 static void aggregate_stack_traces(struct profiler_context *ctx,
 				   struct bpf_tracer *t,
-				   const char *stack_map_name,
+				   stack_map_t *stack_map,
+				   stack_map_t *custom_stack_map,
 				   stack_str_hash_t * stack_str_hash,
 				   stack_trace_msg_hash_t * msg_hash,
 				   u32 * count, bool use_a_map)
@@ -831,8 +836,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		if (v->userstack == -EEXIST)
 			ctx->stack_trace_err++;
 
-		add_stack_id_to_bitmap(ctx, v->kernstack, use_a_map);
-		add_stack_id_to_bitmap(ctx, v->userstack, use_a_map);
+		add_stack_id_to_bitmap(ctx, v->kernstack, stack_map);
+		add_stack_id_to_bitmap(ctx, v->userstack, v->flags & STACK_TRACE_FLAGS_DWARF ? custom_stack_map : stack_map);
 
 		/* Total iteration count for this iteration. */
 		(*count)++;
@@ -975,7 +980,8 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		 */
 
 		char *trace_str =
-		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
+		    resolve_and_gen_stack_trace_str(t, v,
+		                    stack_map->name, custom_stack_map->name,
 						    stack_str_hash, matched,
 						    process_name, info_p,
 						    ctx->type ==
@@ -1083,11 +1089,10 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 {
 	struct bpf_perf_reader *r;
-	const char *stack_map_name;
 	bool using_map_set_a = (ctx->transfer_count % 2 == 0);
 	r = using_map_set_a ? ctx->r_a : ctx->r_b;
-	stack_map_name =
-	    using_map_set_a ? ctx->stack_map_name_a : ctx->stack_map_name_b;
+	stack_map_t *stack_map = using_map_set_a ? &ctx->stack_map_a : &ctx->stack_map_b;
+	stack_map_t *custom_stack_map = using_map_set_a ? &ctx->custom_stack_map_a : &ctx->custom_stack_map_b;
 	const u64 sample_count_idx =
 	    using_map_set_a ? SAMPLE_CNT_A_IDX : SAMPLE_CNT_B_IDX;
 
@@ -1170,7 +1175,7 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 		 * After the reader completes data reading, the work of
 		 * data aggregation will be blocked if there is no data.
 		 */
-		aggregate_stack_traces(ctx, t, stack_map_name,
+		aggregate_stack_traces(ctx, t, stack_map, custom_stack_map,
 				       &ctx->stack_str_hash, &ctx->msg_hash,
 				       &count, using_map_set_a);
 
@@ -1196,7 +1201,7 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 
 release_iter:
 
-	cleanup_stackmap(ctx, t, stack_map_name, using_map_set_a);
+	cleanup_stackmap(ctx, t, stack_map, custom_stack_map, using_map_set_a);
 
 	/* Now that we've consumed the data, reset the sample count in BPF. */
 	sample_cnt_val = 0;

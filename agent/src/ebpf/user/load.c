@@ -510,6 +510,8 @@ static int load_obj__progs(struct ebpf_object *obj)
 				prog_type = BPF_PROG_TYPE_TRACEPOINT;
 			} else if (!memcmp(desc->name, "prog/kp/", 8)) {
 				prog_type = BPF_PROG_TYPE_KPROBE;
+			} else if (!memcmp(desc->name, "prog/pe/", 8)) {
+				prog_type = BPF_PROG_TYPE_PERF_EVENT;
 			} else {
 				ebpf_warning("Prog %s type %d invalid\n",
 					     desc->name, prog_type);

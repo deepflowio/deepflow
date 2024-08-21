@@ -110,6 +110,8 @@ struct ebpf_map {
 	struct bpf_load_map_def def;
 };
 
+#include "elf.h"
+
 struct ebpf_object {
 	char name[OBJ_NAME_SZ];
 	struct elf_info elf_info;
