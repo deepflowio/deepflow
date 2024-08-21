@@ -71,7 +71,7 @@ UPROG(openssl_write_enter) (struct pt_regs *ctx)
 		.fd = fd,
 		.buf = (void *)PT_REGS_PARM2(ctx),
 		.num = (int)PT_REGS_PARM3(ctx),
-		.tcp_seq = get_tcp_write_seq_from_fd(fd),
+		.tcp_seq = get_tcp_write_seq(fd, NULL, NULL),
 	};
 	ssl_ctx_map__update(&id, &ssl_ctx);
 	return 0;
@@ -95,6 +95,7 @@ UPROG(openssl_write_exit) (struct pt_regs *ctx)
 		.buf = ssl_ctx->buf,
 		.fd = ssl_ctx->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.sk = NULL,
 		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
@@ -108,8 +109,10 @@ UPROG(openssl_write_exit) (struct pt_regs *ctx)
 	active_write_args_map__update(&id, &write_args);
 	if (!process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
 			  size, &extra)) {
+#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
+#endif
 	}
 	active_write_args_map__delete(&id);
 	return 0;
@@ -125,7 +128,7 @@ UPROG(openssl_read_enter) (struct pt_regs *ctx)
 		.fd = fd,
 		.buf = (void *)PT_REGS_PARM2(ctx),
 		.num = (int)PT_REGS_PARM3(ctx),
-		.tcp_seq = get_tcp_read_seq_from_fd(fd),
+		.tcp_seq = get_tcp_read_seq(fd, NULL, NULL),
 	};
 	ssl_ctx_map__update(&id, &ssl_ctx);
 	return 0;
@@ -149,6 +152,7 @@ UPROG(openssl_read_exit) (struct pt_regs *ctx)
 		.buf = ssl_ctx->buf,
 		.fd = ssl_ctx->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.sk = NULL,
 		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
@@ -162,8 +166,10 @@ UPROG(openssl_read_exit) (struct pt_regs *ctx)
 	active_read_args_map__update(&id, &read_args);
 	if (!process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args,
 			  size, &extra)) {
+#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
+#endif
 	}
 	active_read_args_map__delete(&id);
 	return 0;

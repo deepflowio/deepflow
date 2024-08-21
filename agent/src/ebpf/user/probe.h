@@ -70,4 +70,5 @@ int program__attach_perf_event(int prog_fd, uint32_t ev_type,
 			       int *attach_fds,
 			       int fds_len);
 int program__detach_perf_event(int *attach_fds, int len);
+struct ebpf_link *program__attach_kfunc(void *prog);
 #endif /* _BPF_PROBE_H_ */

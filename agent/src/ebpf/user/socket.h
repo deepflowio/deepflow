@@ -25,7 +25,7 @@
 #define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
 #define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
-
+#define TEST_KFUNC_NAME "__sys_sendmsg"
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
 #define OFFSET_INFER_SERVER_PORT 54583
@@ -37,7 +37,8 @@ enum linux_kernel_type {
 	K_TYPE_COMM,
 	K_TYPE_KYLIN,
 	K_TYPE_VER_5_2_PLUS,
-	K_TYPE_VER_3_10
+	K_TYPE_VER_3_10,
+	K_TYPE_KFUNC,
 };
 
 enum probes_act_type {

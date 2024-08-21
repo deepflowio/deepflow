@@ -83,6 +83,10 @@ struct symbol_tracepoint {
 	char *name;
 };
 
+struct symbol_kfunc {
+	char *name;
+};
+
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
 			struct tracer_probes_conf *conf);
 void add_uprobe_symbol(int pid, struct symbol_uprobe *u_sym,

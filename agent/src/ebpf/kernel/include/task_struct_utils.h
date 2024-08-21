@@ -123,14 +123,16 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 		for (i = 0; i < ARRAY_SIZE(files_offset_array); i++) {
 			file =
 			    retry_get_socket_file_addr(task, fd_num,
-						       offset->struct_files_struct_fdt_offset,
+						       offset->
+						       struct_files_struct_fdt_offset,
 						       files_offset_array[i]);
 
 			if (file) {
 				bpf_probe_read_kernel(&private_data,
 						      sizeof(private_data),
 						      file +
-						      offset->struct_files_private_data_offset);
+						      offset->
+						      struct_files_private_data_offset);
 				if (private_data != NULL) {
 					socket = private_data;
 					bpf_probe_read_kernel(&__socket,
@@ -148,7 +150,8 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 	} else {
 		file =
 		    retry_get_socket_file_addr(task, fd_num,
-					       offset->struct_files_struct_fdt_offset,
+					       offset->
+					       struct_files_struct_fdt_offset,
 					       offset->task__files_offset);
 	}
 
@@ -190,17 +193,35 @@ static __inline void *get_socket_from_fd(int fd_num,
 {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	void *file = NULL;
+#ifdef LINUX_VER_KFUNC
+	int files_off, fdt_off;
+	files_off = (int)((uintptr_t)
+			  __builtin_preserve_access_index
+			  (&((struct task_struct *)0)->files));
+	fdt_off = (int)((uintptr_t)
+			__builtin_preserve_access_index
+			(&((struct files_struct *)0)->fdt));
+	file = get_socket_file_addr_with_check(task, fd_num, files_off, fdt_off);
+#else
 	file =
 	    get_socket_file_addr_with_check(task, fd_num,
 					    offset->task__files_offset,
 					    offset->
 					    struct_files_struct_fdt_offset);
+#endif
 	if (file == NULL)
 		return NULL;
 	void *private_data = NULL;
-
+#ifdef LINUX_VER_KFUNC
+	int data_off = (int)((uintptr_t)
+			 __builtin_preserve_access_index(&((struct file *)
+							   0)->private_data));
+	bpf_probe_read_kernel(&private_data, sizeof(private_data),
+			      file + data_off);
+#else
 	bpf_probe_read_kernel(&private_data, sizeof(private_data),
 			      file + offset->struct_files_private_data_offset);
+#endif
 	if (private_data == NULL) {
 		return NULL;
 	}
@@ -236,11 +257,9 @@ static __inline void *fd_to_file(int fd_num,
 	}
 
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
-	void *file =
-	    get_socket_file_addr_with_check(task, fd_num,
-					    offset->task__files_offset,
-					    offset->
-					    struct_files_struct_fdt_offset);
+	void *file = get_socket_file_addr_with_check(task, fd_num,
+						     offset->task__files_offset,
+						     offset->struct_files_struct_fdt_offset);
 	return file;
 }
 
