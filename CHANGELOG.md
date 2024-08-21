@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Profiler tries to clean non-exist map [#7905](https://github.com/deepflowio/deepflow/pull/7905) by [rvql](https://github.com/rvql)
+* fix: nil debug panic [#7904](https://github.com/deepflowio/deepflow/pull/7904) by [duandaa](https://github.com/duandaa)
+* fix: uses wrong host when request server http service [#7902](https://github.com/deepflowio/deepflow/pull/7902) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Fix windows compile [#7897](https://github.com/deepflowio/deepflow/pull/7897) by [rvql](https://github.com/rvql)
 * fix: abnormal stats data, causing deepflow-server to panic [#7894](https://github.com/deepflowio/deepflow/pull/7894) by [lzf575](https://github.com/lzf575)
 * fix: fixes invalid controller formatted logs [#7890](https://github.com/deepflowio/deepflow/pull/7890) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -145,6 +148,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: ch_vtap add resource [#7901](https://github.com/deepflowio/deepflow/pull/7901) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: when only exporting a single kafka data, use the 'sendMessage' interface [#7885](https://github.com/deepflowio/deepflow/pull/7885) by [lzf575](https://github.com/lzf575)
 * feat: querier support simple sql [#7883](https://github.com/deepflowio/deepflow/pull/7883) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: update domain daily trigger [#7850](https://github.com/deepflowio/deepflow/pull/7850) by [askyrie](https://github.com/askyrie)
