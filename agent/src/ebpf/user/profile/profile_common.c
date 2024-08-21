@@ -377,7 +377,9 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 	 * Examine the detailed explanation of 'STACKMAP_CLEANUP_THRESHOLD' in
 	 * 'agent/src/ebpf/user/config.h'.
 	 */
-	if (stack_map->ids.count + custom_stack_map->ids.count >= STACKMAP_CLEANUP_THRESHOLD) {
+	bool custom_entries = custom_stack_map->ids.count != 0;
+	if (stack_map->ids.count + custom_stack_map->ids.count >=
+	    STACKMAP_CLEANUP_THRESHOLD) {
 		CLEAN_STACK_MAP(stack_map);
 		CLEAN_STACK_MAP(custom_stack_map);
 
@@ -391,7 +393,9 @@ static void cleanup_stackmap(struct profiler_context *ctx, struct bpf_tracer *t,
 		 */
 		if (*perf_buf_lost_p > 0) {
 			delete_all_stackmap_elems(t, stack_map->name);
-			delete_all_stackmap_elems(t, custom_stack_map->name);
+			if (custom_entries) {
+				delete_all_stackmap_elems(t, custom_stack_map->name);
+			}
 			*perf_buf_lost_p = 0;
 		}
 	}

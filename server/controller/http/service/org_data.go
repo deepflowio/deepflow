@@ -265,17 +265,19 @@ func (c *DeletedORGChecker) triggerAllServersToDelete(ids []int) error {
 	}
 	var res error
 	for _, controller := range controllers {
+		ip := controller.PodIP
 		port := controllerCommon.GConfig.HTTPPort
 		if controller.NodeType == controllerCommon.CONTROLLER_NODE_TYPE_SLAVE {
+			ip = controller.IP
 			port = controllerCommon.GConfig.HTTPNodePort
 		}
 		_, err := controllerCommon.CURLPerform(
 			"DELETE",
-			fmt.Sprintf("http://%s/v1/org/?%s", net.JoinHostPort(controller.IP, fmt.Sprintf("%d", port)), query),
+			fmt.Sprintf("http://%s/v1/org/?%s", net.JoinHostPort(ip, fmt.Sprintf("%d", port)), query),
 			nil,
 		)
 		if err != nil {
-			log.Errorf("failed to call controller %s: %s", controller.IP, err.Error())
+			log.Errorf("failed to call controller %s: %s", controller.Name, err.Error())
 			res = err
 		}
 	}
