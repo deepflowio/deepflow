@@ -213,6 +213,11 @@ impl MetaAppProto {
                     base_info.pod_id_1 = meta_packet.pod_id;
                 }
             }
+        } else if meta_packet.process_id > 0 {
+            match meta_packet.lookup_key.direction {
+                PacketDirection::ClientToServer => base_info.process_id_0 = meta_packet.process_id,
+                PacketDirection::ServerToClient => base_info.process_id_1 = meta_packet.process_id,
+            }
         }
 
         if base_info.is_vip_interface_src {
