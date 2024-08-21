@@ -25,7 +25,7 @@
         error::Result,
         protocol_logs::{
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-            AppProtoHead, LogMessageType,
+            AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
     utils::bytes::{read_u16_be, read_u32_be},
@@ -33,14 +33,30 @@
 use serde::Serialize;
 use std::str;
 
-/* 
-These parameters can be determined from the framework code (Refer to the notes below) 
+/*
+These parameters can be determined from the framework code (Refer to the notes below)
 based on the actual value range of some data in the header.
 */
 const MIN_BODY_SIZE: usize = 12;
 const HEADER_SIZE: usize = 4;
 const VERSION_INDEX: usize = 5;
 const INITIAL_LEN: usize = 7;
+
+const TARS_SERVER_SUCCESS: i32 = 0; // Server-side processing is successful
+const TARS_SERVER_DECODE_ERR: i32 = -1; // Server-side decoding exception
+const TARS_SERVER_ENCODE_ERR: i32 = -2; // Server-side encoding exception
+const TARS_SERVER_NO_FUNC_ERR: i32 = -3; // Server-side does not have the function
+const TARS_SERVER_NO_SERVANT_ERR: i32 = -4; // Server-side does not have the Servant object
+const TARS_SERVER_RESET_GRID: i32 = -5; // Server-side gray status is inconsistent
+const TARS_SERVER_QUEUE_TIMEOUT: i32 = -6; // Server-side queue exceeds the limit
+const TARS_ASYNC_CALL_TIMEOUT: i32 = -7; // Asynchronous call timeout
+const TARS_INVOKE_TIMEOUT: i32 = -7; // Invocation timeout, duplicate of TARS_ASYNC_CALL_TIMEOUT
+const TARS_PROXY_CONNECT_ERR: i32 = -8; // Proxy connection exception
+const TARS_SERVER_OVERLOAD: i32 = -9; // Server-side overload, exceeds queue length
+const TARS_ADAPTER_NULL: i32 = -10; // Client-side routing is empty, service does not exist or all services are down
+const TARS_INVOKE_BY_INVALID_ESET: i32 = -11; // Client-side invocation by set rule is illegal
+const TARS_CLIENT_DECODE_ERR: i32 = -12; // Client-side decoding exception
+const TARS_SERVER_UNKNOWN_ERR: i32 = -99; // Server-side unknown exception
 
 #[derive(Debug, Clone)]
 struct ByteParser {
@@ -66,6 +82,7 @@ pub struct TarsInfo {
 
     req_len: u32,
     resp_len: u32,
+    resp_status: L7ResponseStatus,
 
     request_id: u32,
     imsg_type: u32,
@@ -86,15 +103,15 @@ pub struct TarsInfo {
     endpoint: Option<String>,
 }
 
-/* 
+/*
 tars reference
 -----------------------
 1. Basic types and packets of TARS protocols
 https://doc.tarsyun.com/#/base/tars-protocol.md
 
 -----------------------
-2. For detailed protocol implementation, 
-   maybe you need to refer to the official framework code, 
+2. For detailed protocol implementation,
+   maybe you need to refer to the official framework code,
    and the protocol documentation is not very detailed
 https://github.com/TarsCloud
 
@@ -107,20 +124,20 @@ Framework code discovery is not mentioned in the protocol documentation:
 -----------------------
 */
 
-const TYPE_INT8        : u8 = 0;
-const TYPE_INT16       : u8 = 1;
-const TYPE_INT32       : u8 = 2;
-const TYPE_INT64       : u8 = 3;
-const TYPE_FLOAT       : u8 = 4;
-const TYPE_DOUBLE      : u8 = 5;
-const TYPE_STRING1     : u8 = 6;
-const TYPE_STRING4     : u8 = 7;
-const TYPE_MAPS        : u8 = 8;
-const TYPE_LIST        : u8 = 9;
+const TYPE_INT8: u8 = 0;
+const TYPE_INT16: u8 = 1;
+const TYPE_INT32: u8 = 2;
+const TYPE_INT64: u8 = 3;
+const TYPE_FLOAT: u8 = 4;
+const TYPE_DOUBLE: u8 = 5;
+const TYPE_STRING1: u8 = 6;
+const TYPE_STRING4: u8 = 7;
+const TYPE_MAPS: u8 = 8;
+const TYPE_LIST: u8 = 9;
 const TYPE_STRUCT_BEGIN: u8 = 10;
-const TYPE_STRUCT_END  : u8 = 11;
-const TYPE_ZERO        : u8 = 12;
-const TYPE_SIMPLE_LIST : u8 = 13;
+const TYPE_STRUCT_END: u8 = 11;
+const TYPE_ZERO: u8 = 12;
+const TYPE_SIMPLE_LIST: u8 = 13;
 
 /*
 The parsing rules are:
@@ -132,8 +149,8 @@ The meaning of parameters in some codes:
 head_x: Data header of the xth field
 data_x: The actual data of the xth field
 
-Since the value range of the first few fields is limited, 
-it may not be necessary to distinguish all shaping types. 
+Since the value range of the first few fields is limited,
+it may not be necessary to distinguish all shaping types.
 For details, please refer to the protocol document and actual framework code.
 */
 
@@ -144,16 +161,16 @@ impl TarsInfo {
         if body_size < MIN_BODY_SIZE {
             return None;
         }
-    
+
         let head_ver = ByteParser::from(payload[HEADER_SIZE]);
         if head_ver.tag != TYPE_INT16 || head_ver.byte_type != TYPE_INT8 {
             return None;
         }
-    
+
         if !matches!(payload[VERSION_INDEX], 1 | 3) {
             return None;
         }
-    
+
         let mut len = INITIAL_LEN;
         let head_pkt_type = ByteParser::from(payload[INITIAL_LEN - 1]);
         let pkt_type = match head_pkt_type.byte_type {
@@ -165,14 +182,14 @@ impl TarsInfo {
             TYPE_ZERO => 0,
             _ => return None,
         };
-    
+
         let mut head_fields = Vec::new();
         let mut data_fields = Vec::new();
-    
+
         for _ in 0..2 {
             let head_field = ByteParser::from(payload[len]);
             len += 1;
-    
+
             let data_field = match head_field.byte_type {
                 TYPE_INT8 => {
                     let value = payload[len] as u32;
@@ -195,10 +212,10 @@ impl TarsInfo {
             head_fields.push(head_field);
             data_fields.push(data_field);
         }
-    
+
         let head_name_or_ret = ByteParser::from(payload[len]);
         len += 1;
-    
+
         match head_name_or_ret.tag {
             5 => match head_name_or_ret.byte_type {
                 TYPE_STRING1 | TYPE_STRING4 => {
@@ -209,7 +226,7 @@ impl TarsInfo {
                     info.imsg_type = data_fields[0];
                     info.pkg_type = pkt_type;
                     info.captured_request_byte = (payload.len() - len) as u32;
-    
+
                     let size = if head_name_or_ret.byte_type == TYPE_STRING1 {
                         let size = payload[len] as usize;
                         len += 1;
@@ -217,10 +234,11 @@ impl TarsInfo {
                     } else {
                         0
                     };
-                    
-                    info.req_service_name = Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
+
+                    info.req_service_name =
+                        Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
                     len += size;
-    
+
                     let head_func_name = ByteParser::from(payload[len]);
                     len += 1;
                     let size = if head_func_name.byte_type == TYPE_STRING1 {
@@ -230,11 +248,14 @@ impl TarsInfo {
                     } else {
                         0
                     };
-    
+
                     if len + size >= payload.len() {
                         return None;
                     }
-                    info.req_method_name = Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
+                    info.req_method_name =
+                        Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
+
+                    info.endpoint = info.get_endpoint();
                 }
                 _ => {
                     info.msg_type = LogMessageType::Response;
@@ -249,14 +270,36 @@ impl TarsInfo {
                     } else {
                         0
                     };
+                    match info.ret {
+                        TARS_ADAPTER_NULL
+                        | TARS_INVOKE_BY_INVALID_ESET
+                        | TARS_CLIENT_DECODE_ERR => {
+                            info.resp_status = L7ResponseStatus::ClientError;
+                        }
+
+                        TARS_SERVER_DECODE_ERR
+                        | TARS_SERVER_ENCODE_ERR
+                        | TARS_SERVER_NO_FUNC_ERR
+                        | TARS_SERVER_NO_SERVANT_ERR
+                        | TARS_SERVER_RESET_GRID
+                        | TARS_SERVER_QUEUE_TIMEOUT
+                        | TARS_ASYNC_CALL_TIMEOUT
+                        | TARS_PROXY_CONNECT_ERR
+                        | TARS_SERVER_UNKNOWN_ERR => {
+                            info.resp_status = L7ResponseStatus::ServerError;
+                        }
+
+                        _ => {
+                            info.resp_status = L7ResponseStatus::Ok;
+                        }
+                    }
                 }
             },
             _ => return None,
         }
-    
+
         Some((payload, info))
     }
-    
 
     fn merge(&mut self, other: &mut Self) {
         if other.is_on_blacklist {
@@ -370,11 +413,14 @@ impl From<TarsInfo> for L7ProtocolSendLog {
             req_len: info.req_len.into(),
             resp_len: info.resp_len.into(),
             req: L7Request {
-                resource: info.request_id.to_string(),
+                req_type: info.req_method_name.unwrap_or_default(),
+                resource: info.req_service_name.unwrap_or_default(),
+                endpoint: info.endpoint.unwrap_or_default(),
                 ..Default::default()
             },
             resp: L7Response {
                 code: info.ret.into(),
+                status: info.resp_status,
                 ..Default::default()
             },
             version: info.tars_version.to_string().into(),
