@@ -32,10 +32,13 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 	struct ebpf_prog *prog;
 
 	/*
-	 * tracepoint(syscall): prog->name:df_T_exit_recvfrom
-	 * tracepoint(sched): prog->name:df_T_process_exec
-	 * kprobe: prog->name:df_K_sys_sendmsg
-	 * kretprobe: prog->name:df_KR_sys_sendmsg
+	 * Possible parameter name values:
+	 *   tracepoint(syscall): "prog->name:df_T_exit_recvfrom"
+	 *   tracepoint(sched): "prog->name:df_T_process_exec"
+	 *   kprobe: "prog->name:df_K_sys_sendmsg"
+	 *   kretprobe: "prog->name:df_KR_sys_sendmsg"
+	 *   kfunc: "fentry/do_unlinkat"
+	 *   kretfunc: "fexit/do_unlinkat"
 	 */
 	char prog_name[PROBE_NAME_SZ];
 	int res;
@@ -78,8 +81,27 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 			ebpf_warning("name (%s) snprintf() failed.\n", __name);
 			return -1;
 		}
+	} else if (strstr(__name, "fentry/")) {
+		__name += (sizeof("fentry/") - 1);
+		res =
+		    snprintf((char *)prog_name, sizeof(prog_name), "kfunc__%s",
+			     __name);
+		if (res < 0 || res >= sizeof(prog_name)) {
+			ebpf_warning("name (%s) snprintf() failed.\n", __name);
+			return -1;
+		}
+	} else if (strstr(__name, "fexit/")) {
+		__name += (sizeof("fexit/") - 1);
+		res =
+		    snprintf((char *)prog_name, sizeof(prog_name),
+			     "kretfunc__%s", __name);
+		if (res < 0 || res >= sizeof(prog_name)) {
+			ebpf_warning("name (%s) snprintf() failed.\n", __name);
+			return -1;
+		}
 	} else
-		safe_buf_copy(prog_name, sizeof(prog_name), __name, strlen(__name));
+		safe_buf_copy(prog_name, sizeof(prog_name), __name,
+			      strlen(__name));
 
 	prog = ebpf_obj__get_prog_by_name((struct ebpf_object *)obj, prog_name);
 	if (prog == NULL) {
@@ -100,8 +122,20 @@ static int ebpf_link__detach_perf_event(struct ebpf_link *link)
 	if (err)
 		err = -errno;
 
-	close(link->fd);
+	if (close(link->fd) == -1)
+		ebpf_warning("detach perf event failed, with %s(%d)\n",
+			     strerror(errno), errno);
+
 	return err;
+}
+
+static int ebpf_link__detach_kfunc(struct ebpf_link *link)
+{
+	int ret = close(link->fd);
+	if (ret == -1)
+		ebpf_warning("kfunc detach failed, with %s(%d)\n",
+			     strerror(errno), errno);
+	return ret;
 }
 
 /*
@@ -206,7 +240,7 @@ int program__attach_kprobe(void *prog,
 	 * system call to perform attach/detach operations.
 	 */
 	//if (retprobe) {
-	//	maxactive = KRETPROBE_MAXACTIVE_MAX;
+	//      maxactive = KRETPROBE_MAXACTIVE_MAX;
 	//}
 
 	return program__attach_probe((const struct ebpf_prog *)prog,
@@ -272,6 +306,52 @@ struct ebpf_link *program__attach_tracepoint(void *prog)
 	return link;
 }
 
+struct ebpf_link *program__attach_kfunc(void *prog)
+{
+	// e.g.:
+	// sec_name:  "fentry/do_unlinkat"
+	// prog name: "kfunc__do_unlinkat"
+
+	int pfd;
+	struct ebpf_prog *ebpf_prog;
+	struct ebpf_link *link = NULL;
+
+	if (prog == NULL) {
+		ebpf_warning("prog is NULL.\n");
+		return NULL;
+	}
+
+	ebpf_prog = prog;
+	/*
+	 * bpf_attach_kfunc()
+	 * Return: A new file descriptor (a nonnegative integer), or -1 if an
+	 *         error occurred (in which case, *errno* is set appropriately).
+	 *
+	 * Internally, it actually calls the syscall bpf(), using the attribute
+	 * parameter type 'BPF_RAW_TRACEPOINT_OPEN'.
+	 * ref: https://github.com/iovisor/bcc/blob/052022b0d128f56405b0c4fab818b7479fd0eacc/src/cc/libbpf.c#L1568
+	 *      https://docs.kernel.org/userspace-api/ebpf/syscall.html
+	 */
+	pfd = bpf_attach_kfunc(ebpf_prog->prog_fd);
+	if (pfd < 0) {
+		ebpf_warning("kfunc attach failed, with %s(%d)\n",
+			     strerror(errno), errno);
+		return NULL;
+	}
+
+	link = calloc(1, sizeof(*link));
+	if (!link) {
+		close(pfd);
+		ebpf_warning("Call calloc() is failed.\n");
+		return NULL;
+	}
+
+	link->detach = ebpf_link__detach_kfunc;
+	link->fd = pfd;
+
+	return link;
+}
+
 /**
  * attach perf event
  *
@@ -307,10 +387,9 @@ int program__attach_perf_event(int prog_fd, uint32_t ev_type,
 			       uint32_t ev_config, uint64_t sample_period,
 			       uint64_t sample_freq, pid_t pid,
 			       int cpu, int group_fd,
-			       int *attach_fds,
-			       int fds_len)
+			       int *attach_fds, int fds_len)
 {
-	int i,j;
+	int i, j;
 	int fds[fds_len];
 	memset(fds, 0, sizeof(fds));
 	for (i = 0; i < sys_cpus_count && i < fds_len; i++) {
@@ -329,8 +408,9 @@ int program__attach_perf_event(int prog_fd, uint32_t ev_type,
 		}
 
 		fds[i] = fd;
-		ebpf_info("attach perf event sample_freq %d pid %d cpu %d done\n",
-			  sample_freq, pid, i);
+		ebpf_debug
+		    ("attach perf event sample_freq %d pid %d cpu %d done\n",
+		     sample_freq, pid, i);
 	}
 
 	memcpy((void *)attach_fds, (void *)fds, sizeof(fds));
@@ -354,8 +434,8 @@ int program__detach_perf_event(int *attach_fds, int len)
 	for (i = 0; i < len; i++) {
 		if (attach_fds[i] > 0) {
 			close(attach_fds[i]);
-			ebpf_info("detach cpu %d close fd %d\n",
-				  i, attach_fds[i]);
+			ebpf_debug("detach cpu %d close fd %d\n",
+				   i, attach_fds[i]);
 			attach_fds[i] = 0;
 		}
 	}
