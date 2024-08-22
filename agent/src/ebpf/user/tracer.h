@@ -44,9 +44,11 @@
 #include <bcc/libbpf.h>
 #include "symbol.h"
 #include <regex.h>
+#include "config.h"
 
 #define STRINGIFY(x) #x
 #define UPROBE_FUNC_NAME(N) STRINGIFY(df_U_##N)
+#define URETPROBE_FUNC_NAME(N) STRINGIFY(df_UR_##N)
 
 #define LOOP_DELAY_US  100000
 
@@ -123,8 +125,6 @@ enum cfg_feature_idx {
 	FEATURE_UPROBE_OPENSSL,
 	// golang uprobe
 	FEATURE_UPROBE_GOLANG,
-	// java uprobe
-	FEATURE_UPROBE_JAVA,
 	FEATURE_MAX,
 };
 
@@ -262,7 +262,7 @@ struct mem_block_head {
 	void (*fn)(void *);
 } __attribute__((packed));
 
-typedef void (*tracer_callback_t)(void *cp_data);
+typedef void (*tracer_callback_t)(void *ctx, void *cp_data);
 
 struct tracer_probes_conf {
 	char *bin_file;		// only use uprobe;
@@ -446,6 +446,12 @@ struct bpf_tracer {
 	volatile enum tracer_state state;// 追踪器状态（Tracker status）
 	bool adapt_success;		 // 是否成功适配内核, true 成功适配，false 适配失败
 	uint32_t data_limit_max;	 // The maximum amount of data returned to the user-reader
+
+	/*
+	* Callback function contexts for continuous profiler
+	* Should only be used to create profiler context
+	 */
+	void *profiler_callback_ctx[PROFILER_CTX_NUM];
 };
 
 #define EXTRA_TYPE_SERVER 0
@@ -597,7 +603,9 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    int workers_nr,
 				    tracer_op_fun_t free_cb,
 				    tracer_op_fun_t create_cb,
-				    void *handle, int freq);
+				    void *handle,
+				    void *profiler_callback_ctx[PROFILER_CTX_NUM],
+				    int freq);
 int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries);
 struct bpf_tracer *find_bpf_tracer(const char *name);
 int register_period_event_op(const char *name,

@@ -363,7 +363,7 @@ prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 			 * time precision is in microseconds.
 			 */
 			sd->timestamp = (sd->timestamp + boot_time) / NS_IN_USEC;
-			callback(sd);
+			callback(NULL, sd);
 		}
 
 		if (block_head->is_last == 1)

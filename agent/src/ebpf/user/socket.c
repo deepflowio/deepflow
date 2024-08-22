@@ -2181,7 +2181,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, tps,
-			     thread_nr, NULL, NULL, (void *)handle,
+			     thread_nr, NULL, NULL, (void *)handle, NULL,
 			     MS_IN_SEC / KICK_KERN_PERIOD);
 	if (tracer == NULL)
 		return -EINVAL;

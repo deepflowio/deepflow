@@ -217,6 +217,7 @@ void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
 void remove_event(proc_event_list_t * list, struct process_create_event *event);
 struct process_create_event *get_first_event(proc_event_list_t * list);
 
+bool check_so_path_by_pid_and_name(int pid, const char *so_name);
 char *get_so_path_by_pid_and_name(int pid, const char *so_name);
 int add_probe_sym_to_tracer_probes(int pid, const char *path,
 				   struct tracer_probes_conf *conf,

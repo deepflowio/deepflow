@@ -1121,6 +1121,17 @@ static int which_so_in_process(const char *libname, int pid, char *libpath)
 	return found;
 }
 
+bool check_so_path_by_pid_and_name(int pid, const char *so_name)
+{
+	char so_path[PATH_MAX] = { 0 };
+
+	int offset = snprintf(so_path, sizeof(so_path), "/proc/%d/root", pid);
+	if (offset < 0 || offset >= sizeof(so_path))
+		return NULL;
+
+	return which_so_in_process(so_name, pid, so_path + offset) != 0;
+}
+
 char *get_so_path_by_pid_and_name(int pid, const char *so_name)
 {
 	int ret = 0;
