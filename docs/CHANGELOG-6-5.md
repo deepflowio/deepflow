@@ -113,6 +113,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: add pseudo link field for treenode [#7916](https://github.com/deepflowio/deepflow/pull/7916) by [taloric](https://github.com/taloric)
+* feat: agent - eBPF Optimize eBPF socket trace (#7871) [#7913](https://github.com/deepflowio/deepflow/pull/7913) by [yinjiping](https://github.com/yinjiping)
 * feat: when only exporting a single kafka data, use the 'sendMessage' interface [#7884](https://github.com/deepflowio/deepflow/pull/7884) by [lzf575](https://github.com/lzf575)
 * feat: update domain daily trigger [#7848](https://github.com/deepflowio/deepflow/pull/7848) by [askyrie](https://github.com/askyrie)
 * feat: support update time of org list [#7867](https://github.com/deepflowio/deepflow/pull/7867) by [lzf575](https://github.com/lzf575)

@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: log contents [#7920](https://github.com/deepflowio/deepflow/pull/7920) by [incoffeemonster](https://github.com/incoffeemonster)
 * fix: Profiler tries to clean non-exist map [#7905](https://github.com/deepflowio/deepflow/pull/7905) by [rvql](https://github.com/rvql)
 * fix: nil debug panic [#7904](https://github.com/deepflowio/deepflow/pull/7904) by [duandaa](https://github.com/duandaa)
 * fix: uses wrong host when request server http service [#7902](https://github.com/deepflowio/deepflow/pull/7902) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -148,6 +149,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add pseudo link field for treenode [#7917](https://github.com/deepflowio/deepflow/pull/7917) by [taloric](https://github.com/taloric)
+* feat: Update kubernetes create cli example [#7914](https://github.com/deepflowio/deepflow/pull/7914) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: support countDistinct function [#7896](https://github.com/deepflowio/deepflow/pull/7896) by [duandaa](https://github.com/duandaa)
+* feat: agent - eBPF Optimize eBPF socket trace [#7871](https://github.com/deepflowio/deepflow/pull/7871) by [yinjiping](https://github.com/yinjiping)
 * feat: ch_vtap add resource [#7901](https://github.com/deepflowio/deepflow/pull/7901) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: when only exporting a single kafka data, use the 'sendMessage' interface [#7885](https://github.com/deepflowio/deepflow/pull/7885) by [lzf575](https://github.com/lzf575)
 * feat: querier support simple sql [#7883](https://github.com/deepflowio/deepflow/pull/7883) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -315,6 +320,8 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: Adjust agent profile configurations [#7918](https://github.com/deepflowio/deepflow/pull/7918) by [rvql](https://github.com/rvql)
+* refactor: update trace_tree debug info [#7915](https://github.com/deepflowio/deepflow/pull/7915) by [lzf575](https://github.com/lzf575)
 * refactor: agent divides the config into dynamic_config and user_config [#7872](https://github.com/deepflowio/deepflow/pull/7872) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: add configuration structures [#7804](https://github.com/deepflowio/deepflow/pull/7804) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: modify the default batch write size for metrics and flow logs [#7789](https://github.com/deepflowio/deepflow/pull/7789) by [lzf575](https://github.com/lzf575)
@@ -355,6 +362,7 @@
 
 
 #### OTHER
+* Relaxing regular expression restrictions for the ClusterID [#7907](https://github.com/deepflowio/deepflow/pull/7907) by [Hyzhou](https://github.com/Hyzhou)
 * use .env to config docker-compose.yaml [#7729](https://github.com/deepflowio/deepflow/pull/7729) by [asdfsx](https://github.com/asdfsx)
 * refector: add agent.proto [#7695](https://github.com/deepflowio/deepflow/pull/7695) by [yuanchaoa](https://github.com/yuanchaoa)
 * Update changelog [#7660](https://github.com/deepflowio/deepflow/pull/7660) by [lzf575](https://github.com/lzf575)
