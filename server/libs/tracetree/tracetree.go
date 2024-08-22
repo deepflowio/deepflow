@@ -75,6 +75,7 @@ type TreeNode struct {
 	NodeInfo NodeInfo
 
 	ChildIndices []int32 // helps with calculations, no need to write to Clickhouse
+	PseudoLink   uint8   // helps with calculations, no need to write to Clickhouse
 	Level        uint8   // helps with calculations, no need to write to Clickhouse
 	UID          string  // helps with calculations, no need to write to Clickhouse
 
@@ -229,6 +230,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		}
 		n.ChildIndices = n.ChildIndices[:0]
 		n.Level = 0
+		n.PseudoLink = 0
 		n.UID = ""
 		n.Topic = decoder.ReadString255()
 		n.ResponseDurationSum = decoder.ReadVarintU64()
