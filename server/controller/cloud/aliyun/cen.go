@@ -23,15 +23,15 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
+func (a *Aliyun) getCens(region model.Region) []model.CEN {
 	var retCens []model.CEN
 
 	log.Debug("get cens starting", logger.NewORGPrefix(a.orgID))
 	request := cbn.CreateDescribeCensRequest()
 	response, err := a.getCenResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return nil, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.CEN{}
 	}
 
 	for _, r := range response {
@@ -52,8 +52,8 @@ func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
 			childRequest.CenId = cenId
 			childResponse, err := a.getCenAttributeResponse(region.Label, childRequest)
 			if err != nil {
-				log.Error(err, logger.NewORGPrefix(a.orgID))
-				return nil, err
+				log.Warning(err, logger.NewORGPrefix(a.orgID))
+				return []model.CEN{}
 			}
 
 			vpcLcuuids := []string{}
@@ -83,5 +83,5 @@ func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {
 	}
 
 	log.Debug("get cens complete", logger.NewORGPrefix(a.orgID))
-	return retCens, nil
+	return retCens
 }

@@ -23,7 +23,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []model.RoutingTable, error) {
+func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []model.RoutingTable) {
 	var retVRouters []model.VRouter
 	var retRoutingTables []model.RoutingTable
 
@@ -31,8 +31,8 @@ func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []mod
 	request := vpc.CreateDescribeRouteTableListRequest()
 	response, err := a.getRouterResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return retVRouters, retRoutingTables, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.VRouter{}, []model.RoutingTable{}
 	}
 
 	for _, r := range response {
@@ -63,28 +63,24 @@ func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []mod
 			a.regionLcuuidToResourceNum[retVRouter.RegionLcuuid]++
 
 			// 路由表规则
-			tmpRoutingTables, err := a.getRouterTables(region, routerTableId)
-			if err != nil {
-				return []model.VRouter{}, []model.RoutingTable{}, err
-			}
-			retRoutingTables = append(retRoutingTables, tmpRoutingTables...)
+			retRoutingTables = append(retRoutingTables, a.getRouterTables(region, routerTableId)...)
 
 		}
 	}
 
 	log.Debug("get routers complete", logger.NewORGPrefix(a.orgID))
-	return retVRouters, retRoutingTables, nil
+	return retVRouters, retRoutingTables
 }
 
-func (a *Aliyun) getRouterTables(region model.Region, routerId string) ([]model.RoutingTable, error) {
+func (a *Aliyun) getRouterTables(region model.Region, routerId string) []model.RoutingTable {
 	var retRoutingTables []model.RoutingTable
 
 	request := vpc.CreateDescribeRouteEntryListRequest()
 	request.RouteTableId = routerId
 	response, err := a.getRouterTableResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return retRoutingTables, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.RoutingTable{}
 	}
 
 	routerLcuuid := common.GenerateUUIDByOrgID(a.orgID, routerId)
@@ -137,5 +133,5 @@ func (a *Aliyun) getRouterTables(region model.Region, routerId string) ([]model.
 		}
 	}
 
-	return retRoutingTables, nil
+	return retRoutingTables
 }
