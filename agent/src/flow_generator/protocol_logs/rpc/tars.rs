@@ -24,7 +24,7 @@ use crate::{
     flow_generator::{
         error::Result,
         protocol_logs::{
-            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
+            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, ExtendedInfo},
             AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
@@ -49,8 +49,7 @@ const TARS_SERVER_NO_FUNC_ERR: i32 = -3; // Server-side does not have the functi
 const TARS_SERVER_NO_SERVANT_ERR: i32 = -4; // Server-side does not have the Servant object
 const TARS_SERVER_RESET_GRID: i32 = -5; // Server-side gray status is inconsistent
 const TARS_SERVER_QUEUE_TIMEOUT: i32 = -6; // Server-side queue exceeds the limit
-const TARS_ASYNC_CALL_TIMEOUT: i32 = -7; // Asynchronous call timeout
-const TARS_INVOKE_TIMEOUT: i32 = -7; // Invocation timeout, duplicate of TARS_ASYNC_CALL_TIMEOUT
+const TARS_ASYNC_CALL_OR_INVOKE_TIMEOUT: i32 = -7; // Asynchronous call timeout or Invocation timeout, duplicate of TARS_ASYNC_CALL_TIMEOUT
 const TARS_PROXY_CONNECT_ERR: i32 = -8; // Proxy connection exception
 const TARS_SERVER_OVERLOAD: i32 = -9; // Server-side overload, exceeds queue length
 const TARS_ADAPTER_NULL: i32 = -10; // Client-side routing is empty, service does not exist or all services are down
@@ -281,6 +280,8 @@ impl TarsInfo {
                         | TARS_SERVER_NO_SERVANT_ERR
                         | TARS_SERVER_RESET_GRID
                         | TARS_SERVER_QUEUE_TIMEOUT
+                        | TARS_ASYNC_CALL_OR_INVOKE_TIMEOUT 
+                        | TARS_PROXY_CONNECT_ERR
                         | TARS_SERVER_UNKNOWN_ERR => {
                             info.resp_status = L7ResponseStatus::ServerError;
                         }
@@ -289,6 +290,7 @@ impl TarsInfo {
                             info.resp_status = L7ResponseStatus::Ok;
                         }
                     }
+                    info.endpoint = info.get_endpoint();
                 }
             },
             _ => return None,
@@ -419,6 +421,10 @@ impl From<TarsInfo> for L7ProtocolSendLog {
                 status: info.resp_status,
                 ..Default::default()
             },
+            ext_info: Some(ExtendedInfo {
+                request_id: Some(info.request_id),
+                ..Default::default()
+            }),
             version: info.tars_version.to_string().into(),
             captured_request_byte: info.captured_request_byte,
             captured_response_byte: info.captured_response_byte,
