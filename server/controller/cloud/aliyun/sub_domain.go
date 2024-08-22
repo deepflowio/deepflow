@@ -25,15 +25,15 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aliyun) getSubDomains(region model.Region) ([]model.SubDomain, error) {
+func (a *Aliyun) getSubDomains(region model.Region) []model.SubDomain {
 	var retSubDomains []model.SubDomain
 
 	log.Debug("get sub_domains starting", logger.NewORGPrefix(a.orgID))
 	request := cs.CreateDescribeClustersV1Request()
 	response, err := a.getSubDomainResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return retSubDomains, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.SubDomain{}
 	}
 
 	for _, retArry := range response {
@@ -67,5 +67,5 @@ func (a *Aliyun) getSubDomains(region model.Region) ([]model.SubDomain, error) {
 		}
 	}
 	log.Debug("get sub_domains complete", logger.NewORGPrefix(a.orgID))
-	return retSubDomains, nil
+	return retSubDomains
 }
