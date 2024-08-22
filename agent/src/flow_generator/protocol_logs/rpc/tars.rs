@@ -253,7 +253,7 @@ impl TarsInfo {
                     }
                     info.req_method_name =
                         Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
-                    
+
                     info.endpoint = info.get_endpoint();
                 }
                 _ => {

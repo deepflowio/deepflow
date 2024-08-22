@@ -49,7 +49,11 @@ struct java_symbol_map_key {
 	__u64 class_id;
 };
 
-#define STACK_TRACE_FLAGS_DWARF 0x1
+#define STACK_TRACE_FLAGS_DWARF     0x1
+// Stacks obtained in uretprobe does not have the frame of triggered function.
+// The address is saved in "uprobe_addr" and should be appended to stack string
+// if this flag is on.
+#define STACK_TRACE_FLAGS_URETPROBE 0x2
 
 struct stack_trace_key_t {
 	__u32 pid;		// processID or threadID
@@ -59,6 +63,7 @@ struct stack_trace_key_t {
 	int kernstack;
 	int userstack;
 	__u32 flags;
+	__u64 uprobe_addr;
 	__u64 timestamp;
 
 	union {
@@ -66,10 +71,11 @@ struct stack_trace_key_t {
 			__u64 duration_ns;
 		} off_cpu;
 		struct {
-			__u64 size;
-			__u64 class_id; // Use symbol address as class_id
+			__u64 addr; // allocated or deallocating address
+			__u64 size; // non-zero for allocated size, zero for deallocs
+			__u64 class_id; // Use symbol address as class_id, for java only
 		} memory;
-	} ext_data;
+	};
 };
 
 typedef struct {

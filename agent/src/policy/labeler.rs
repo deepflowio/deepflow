@@ -313,7 +313,7 @@ impl Labeler {
         *self.container_table.write().unwrap() = table;
     }
 
-    pub fn lookup_pod_id(&self, container_id: &String) -> u32 {
+    pub fn lookup_pod_id(&self, container_id: &str) -> u32 {
         if let Some(pod_id) = self.container_table.read().unwrap().get(container_id) {
             return *pod_id;
         }

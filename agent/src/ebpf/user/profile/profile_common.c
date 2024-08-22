@@ -85,7 +85,8 @@ int profiler_context_init(struct profiler_context *ctx,
 			  const char *custom_stack_map_name_a,
 			  const char *custom_stack_map_name_b,
 			  bool only_matched,
-			  bool use_delta_time, u64 sample_period)
+			  bool use_delta_time, u64 sample_period,
+			  void *callback_ctx)
 {
 	memset(ctx, 0, sizeof(struct profiler_context));
 	ctx->name = name;
@@ -115,6 +116,7 @@ int profiler_context_init(struct profiler_context *ctx,
 	ctx->use_delta_time = use_delta_time;
 	ctx->type = type;
 	ctx->sample_period = sample_period;
+	ctx->callback_ctx = callback_ctx;
 
 	return 0;
 }
@@ -440,7 +442,7 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *arg)
 		 * nd the data to the server for storage as required.
 		 */
 		if (likely(ctx->profiler_stop == 0))
-			fun(msg);
+			fun(ctx->callback_ctx, msg);
 
 		clib_mem_free((void *)msg);
 		msg_kv->msg_ptr = 0;
@@ -569,11 +571,7 @@ static void set_msg_kvp(struct profiler_context *ctx,
 	kvp->k.cpu = v->cpu;
 	kvp->k.u_stack_id = (u32) v->userstack;
 	kvp->k.k_stack_id = (u32) v->kernstack;
-	if (ctx->type == PROFILER_TYPE_MEMORY) {
-		kvp->k.e_stack_id = v->ext_data.memory.class_id;
-	} else {
-		kvp->k.e_stack_id = 0;
-	}
+	kvp->k.e_stack_id = 0;
 
 	kvp->msg_ptr = pointer_to_uword(msg_value);
 
@@ -622,6 +620,27 @@ static void set_msg_kvp(struct profiler_context *ctx,
 #endif
 }
 
+static void set_memprof_msg_kvp(struct profiler_context *ctx,
+			stack_trace_msg_kv_t * kvp,
+			struct stack_trace_key_t *v, u64 stime, void *msg_value,
+			struct symbolizer_proc_info *p)
+{
+	kvp->m_k.tgid = v->tgid;
+	kvp->m_k.pid = v->pid;
+	kvp->m_k.cpu = v->cpu;
+	kvp->m_k.stime = stime;
+	kvp->m_k.u_stack_id = (u32) v->userstack;
+	if (v->flags & STACK_TRACE_FLAGS_URETPROBE) {
+		kvp->m_k.uprobe_addr = v->uprobe_addr;
+	} else {
+		// java only
+		kvp->m_k.uprobe_addr = (u32) v->memory.class_id;
+	}
+	kvp->m_k.mem_addr = v->memory.addr;
+
+	kvp->msg_ptr = pointer_to_uword(msg_value);
+}
+
 static void set_stack_trace_msg(struct profiler_context *ctx,
 				stack_trace_msg_t * msg,
 				struct stack_trace_key_t *v,
@@ -635,14 +654,16 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	msg->tid = v->pid;
 	msg->cpu = v->cpu;
 	msg->u_stack_id = (u32) v->userstack;
+	if (ctx->type == PROFILER_TYPE_MEMORY) {
+		msg->u_stack_id ^= (u32) v->uprobe_addr ^ (u32) v->memory.class_id;
+	}
 	msg->k_stack_id = (u32) v->kernstack;
 	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
 	msg->stime = stime;
 	msg->netns_id = ns_id;
 	msg->profiler_type = ctx->type;
 	if (ctx->type == PROFILER_TYPE_MEMORY) {
-		// TODO: add mem_in_use type
-		msg->event_type = PROFILE_EVENT_MEM_ALLOC;
+		msg->mem_addr = v->memory.addr;
 	}
 	if (container_id != NULL) {
 		strcpy_s_inline(msg->container_id, sizeof(msg->container_id),
@@ -692,14 +713,14 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 
 	msg->time_stamp = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	if (ctx->type == PROFILER_TYPE_MEMORY) {
-		msg->count = v->ext_data.memory.size;
+		msg->count = v->memory.size;
 	} else if (ctx->use_delta_time) {
 		// If sampling is used
 		if (ctx->sample_period > 0) {
 			msg->count = ctx->sample_period / 1000;
 		} else {
 			// Using microseconds for storage.
-			msg->count = v->ext_data.off_cpu.duration_ns / 1000;
+			msg->count = v->off_cpu.duration_ns / 1000;
 		}
 	} else {
 		msg->count = 1;
@@ -915,9 +936,13 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				profile_regex_unlock(ctx);
 			}
 
-			if (matched)
-				set_msg_kvp(ctx, &kv, v, stime, (void *)0,
-					    __info_p);
+			if (matched) {
+				if (ctx->type == PROFILER_TYPE_MEMORY) {
+					set_memprof_msg_kvp(ctx, &kv, v, stime, (void *)0, __info_p);
+				} else {
+					set_msg_kvp(ctx, &kv, v, stime, (void *)0, __info_p);
+				}
+			}
 			else {
 				if (ctx->only_matched_data) {
 					if (__info_p)
@@ -954,7 +979,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
 			if (ctx->type == PROFILER_TYPE_MEMORY) {
 				((stack_trace_msg_t *) kv.msg_ptr)->count +=
-				    v->ext_data.memory.size;
+				    v->memory.size;
 			} else if (ctx->use_delta_time) {
 				if (ctx->sample_period > 0) {
 					((stack_trace_msg_t *) kv.
@@ -964,7 +989,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 					// Using microseconds for storage.
 					((stack_trace_msg_t *) kv.
 					 msg_ptr)->count +=
-					   (v->ext_data.off_cpu.duration_ns / 1000);
+					   (v->off_cpu.duration_ns / 1000);
 				}
 			} else {
 				((stack_trace_msg_t *) kv.msg_ptr)->count++;
@@ -1004,10 +1029,10 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			char *class_name = NULL;
 
 			if (ctx->type == PROFILER_TYPE_MEMORY
-			    && v->ext_data.memory.class_id != 0) {
+			    && v->memory.class_id != 0) {
 				struct java_symbol_map_key key = { 0 };
 				key.tgid = v->tgid;
-				key.class_id = v->ext_data.memory.class_id;
+				key.class_id = v->memory.class_id;
 				class_name = get_java_symbol(t, &key);
 				if (class_name) {
 					str_len += strlen(class_name) + 1;
@@ -1048,7 +1073,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 			offset +=
 			    snprintf(msg_str + offset, str_len - offset, "%s",
 				     trace_str);
-			if (ctx->type == PROFILER_TYPE_MEMORY) {
+			if (ctx->type == PROFILER_TYPE_MEMORY && v->memory.class_id != 0) {
 				if (class_name) {
 					offset +=
 					    snprintf(msg_str + offset,

@@ -68,10 +68,21 @@
 
 MAP_PERF_EVENT(profiler_output_a, int, __u32, MAX_CPU)
 MAP_PERF_EVENT(profiler_output_b, int, __u32, MAX_CPU)
-MAP_PROG_ARRAY(progs_jmp_pe_map, __u32, __u32, PROG_PE_NUM)
+MAP_PROG_ARRAY(cp_progs_jmp_pe_map, __u32, __u32, CP_PROG_PE_NUM)
 
 MAP_STACK_TRACE(stack_map_a, STACK_MAP_ENTRIES)
 MAP_STACK_TRACE(stack_map_b, STACK_MAP_ENTRIES)
+
+typedef struct {
+    struct bpf_map_def *state;
+    struct bpf_map_def *stack_map_a;
+    struct bpf_map_def *stack_map_b;
+    struct bpf_map_def *custom_stack_map_a;
+    struct bpf_map_def *custom_stack_map_b;
+    struct bpf_map_def *profiler_output_a;
+    struct bpf_map_def *profiler_output_b;
+} map_group_t;
+
 #ifdef LINUX_VER_5_2_PLUS
 typedef __u64 __raw_stack[PERF_MAX_STACK_DEPTH];
 
@@ -122,6 +133,8 @@ typedef struct {
 
     regs_t regs;
     stack_t stack;
+
+    __u8 output_callback;
 } unwind_state_t;
 
 /*
@@ -136,16 +149,9 @@ static inline __attribute__((always_inline)) void reset_unwind_state(unwind_stat
 }
 
 MAP_PERARRAY(heap, __u32, unwind_state_t, 1)
-
 #else
 
-typedef struct {
-    struct stack_trace_key_t key;
-} unwind_state_t;
-
-static inline __attribute__((always_inline)) void reset_unwind_state(unwind_state_t *state) {
-    __builtin_memset(state, 0, sizeof(unwind_state_t));
-}
+typedef void stack_t; // placeholder
 
 #endif
 
@@ -304,13 +310,13 @@ static inline __attribute__((always_inline)) __u32 get_stackid(struct bpf_map_de
 
 static inline __attribute__((always_inline)) bool is_usermod_regs(struct pt_regs *regs) {
 #if defined(__x86_64__)
-  // On x86_64 the user mode SS should always be __USER_DS.
-  return regs->ss == __USER_DS;
+    // On x86_64 the user mode SS should always be __USER_DS.
+    return regs->ss == __USER_DS;
 #elif defined(__aarch64__)
-  // Check if the processor state is in the EL0t what linux uses for usermode.
-  return (regs->pstate & PSR_MODE_MASK) == PSR_MODE_EL0t;
+    // Check if the processor state is in the EL0t what linux uses for usermode.
+    return (regs->pstate & PSR_MODE_MASK) == PSR_MODE_EL0t;
 #else
-_Pragma("GCC error \"Must specify a BPF target arch\"");
+    _Pragma("GCC error \"Must specify a BPF target arch\"");
 #endif
 }
 
@@ -338,7 +344,6 @@ static inline __attribute__((always_inline)) int get_usermode_regs(struct pt_reg
     if (!sysinfo) {
         return -1;
     }
-
     // use bpf_task_pt_regs after Linux 5.15+ instead
     void *stack;
     int ret = bpf_probe_read_kernel(&stack, sizeof(void *), ((void *)task) + sysinfo->task_struct_stack_offset);
@@ -361,53 +366,51 @@ static inline __attribute__((always_inline)) int get_usermode_regs(struct pt_reg
 
 #endif
 
-static inline __attribute__((always_inline)) int collect_stack_and_send_output(struct bpf_perf_event_data *ctx,
-                                                                               unwind_state_t *state) {
+static inline
+    __attribute__((always_inline)) int collect_stack_and_send_output(struct pt_regs *ctx, struct stack_trace_key_t *key,
+                                                                     stack_t *stack, map_group_t *maps) {
     __u32 count_idx;
 
     count_idx = TRANSFER_CNT_IDX;
-    __u64 *transfer_count_ptr = profiler_state_map__lookup(&count_idx);
+    __u64 *transfer_count_ptr = bpf_map_lookup_elem(maps->state, &count_idx);
 
     __u64 *sample_count_ptrs[2];
 
     count_idx = SAMPLE_CNT_A_IDX;
-    sample_count_ptrs[0] = profiler_state_map__lookup(&count_idx);
+    sample_count_ptrs[0] = bpf_map_lookup_elem(maps->state, &count_idx);
 
     count_idx = SAMPLE_CNT_B_IDX;
-    sample_count_ptrs[1] = profiler_state_map__lookup(&count_idx);
+    sample_count_ptrs[1] = bpf_map_lookup_elem(maps->state, &count_idx);
 
     count_idx = SAMPLE_CNT_DROP;
-    __u64 *drop_count_ptr = profiler_state_map__lookup(&count_idx);
+    __u64 *drop_count_ptr = bpf_map_lookup_elem(maps->state, &count_idx);
 
     count_idx = SAMPLE_ITER_CNT_MAX;
-    __u64 *iter_count_ptr = profiler_state_map__lookup(&count_idx);
+    __u64 *iter_count_ptr = bpf_map_lookup_elem(maps->state, &count_idx);
 
     count_idx = OUTPUT_CNT_IDX;
-    __u64 *output_count_ptr = profiler_state_map__lookup(&count_idx);
+    __u64 *output_count_ptr = bpf_map_lookup_elem(maps->state, &count_idx);
 
     count_idx = ERROR_IDX;
-    __u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
+    __u64 *error_count_ptr = bpf_map_lookup_elem(maps->state, &count_idx);
 
     if (transfer_count_ptr == NULL || sample_count_ptrs[0] == NULL || sample_count_ptrs[1] == NULL ||
         drop_count_ptr == NULL || iter_count_ptr == NULL || error_count_ptr == NULL || output_count_ptr == NULL) {
         count_idx = ERROR_IDX;
         __u64 err_val = 1;
-        profiler_state_map__update(&count_idx, &err_val);
+        bpf_map_update_elem(maps->state, &count_idx, &err_val, BPF_ANY);
         return 0;
     }
 
-    struct stack_trace_key_t *key = &state->key;
     struct bpf_map_def *stack_map = NULL;
 
 #ifdef LINUX_VER_5_2_PLUS
-
-    stack_t *stack = &state->stack;
-    if (!((*transfer_count_ptr) & 0x1ULL)) {
-        stack_map = &NAME(custom_stack_map_a);
-    } else {
-        stack_map = &NAME(custom_stack_map_b);
-    }
-    if (key->flags & STACK_TRACE_FLAGS_DWARF) {
+    if (key->flags & STACK_TRACE_FLAGS_DWARF && stack != NULL) {
+        if (!((*transfer_count_ptr) & 0x1ULL)) {
+            stack_map = maps->custom_stack_map_a;
+        } else {
+            stack_map = maps->custom_stack_map_b;
+        }
         key->userstack = get_stackid(stack_map, stack);
     }
 #endif
@@ -417,12 +420,12 @@ static inline __attribute__((always_inline)) int collect_stack_and_send_output(s
     struct bpf_map_def *profiler_output = NULL;
     if (!((*transfer_count_ptr) & 0x1ULL)) {
         sample_count_ptr = sample_count_ptrs[0];
-        stack_map = &NAME(stack_map_a);
-        profiler_output = &NAME(profiler_output_a);
+        stack_map = maps->stack_map_a;
+        profiler_output = maps->profiler_output_a;
     } else {
         sample_count_ptr = sample_count_ptrs[1];
-        stack_map = &NAME(stack_map_b);
-        profiler_output = &NAME(profiler_output_b);
+        stack_map = maps->stack_map_b;
+        profiler_output = maps->profiler_output_b;
     }
 
     key->kernstack = bpf_get_stackid(ctx, stack_map, KERN_STACKID_FLAGS);
@@ -471,6 +474,18 @@ static inline __attribute__((always_inline)) int collect_stack_and_send_output(s
     return 0;
 }
 
+static map_group_t oncpu_maps = {
+    .state = &NAME(profiler_state_map),
+    .stack_map_a = &NAME(stack_map_a),
+    .stack_map_b = &NAME(stack_map_b),
+#ifdef LINUX_VER_5_2_PLUS
+    .custom_stack_map_a = &NAME(custom_stack_map_a),
+    .custom_stack_map_b = &NAME(custom_stack_map_b),
+#endif
+    .profiler_output_a = &NAME(profiler_output_a),
+    .profiler_output_b = &NAME(profiler_output_b)
+};
+
 PERF_EVENT_PROG(oncpu_profile)(struct bpf_perf_event_data *ctx) {
     __u32 count_idx = ENABLE_IDX;
     __u64 *enable_ptr = profiler_state_map__lookup(&count_idx);
@@ -494,16 +509,14 @@ PERF_EVENT_PROG(oncpu_profile)(struct bpf_perf_event_data *ctx) {
     if (state == NULL) {
         return 0;
     }
+    reset_unwind_state(state);
+    struct stack_trace_key_t *key = &state->key;
 #else
-    // unwind_state without stack info is small enough to allocate on stack
-    unwind_state_t state_on_stack;
-    unwind_state_t *state = &state_on_stack;
+    struct stack_trace_key_t trace_key = { 0 };
+    struct stack_trace_key_t *key = &trace_key;
 #endif
 
-    reset_unwind_state(state);
-
     __u64 id = bpf_get_current_pid_tgid();
-    struct stack_trace_key_t *key = &state->key;
     key->tgid = id >> 32;
     key->pid = (__u32)id;
 
@@ -523,16 +536,17 @@ PERF_EVENT_PROG(oncpu_profile)(struct bpf_perf_event_data *ctx) {
     if (state->shard_list != NULL) {
         key->flags |= STACK_TRACE_FLAGS_DWARF;
 
-        int ret = get_usermode_regs((struct pt_regs*)&ctx->regs, &state->regs);
+        int ret = get_usermode_regs((struct pt_regs *)&ctx->regs, &state->regs);
         if (ret == 0) {
-            bpf_tail_call(ctx, &NAME(progs_jmp_pe_map), PROG_DWARF_UNWIND_PE_IDX);
+            state->output_callback = PROG_ONCPU_OUTPUT_PE_IDX;
+            bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map), PROG_DWARF_UNWIND_PE_IDX);
         }
         __sync_fetch_and_add(error_count_ptr, 1);
         return 0;
     }
 #endif
 
-    return collect_stack_and_send_output(ctx, state);
+    return collect_stack_and_send_output(&ctx->regs, key, NULL, &oncpu_maps);
 }
 
 #ifdef LINUX_VER_5_2_PLUS
@@ -595,7 +609,7 @@ static inline
 #define STACK_FRAMES_PER_RUN 16
 #define UNWIND_PROG_MAX_RUN 8
 
-PROGPE(dwarf_unwind)(struct bpf_perf_event_data *ctx) {
+static inline __attribute__((always_inline)) int dwarf_unwind(void *ctx, struct bpf_map_def *jmp_map) {
     __u32 count_idx;
 
     count_idx = SAMPLE_CNT_DROP;
@@ -714,11 +728,25 @@ PROGPE(dwarf_unwind)(struct bpf_perf_event_data *ctx) {
     }
 
     if (++state->runs < UNWIND_PROG_MAX_RUN) {
-        bpf_tail_call(ctx, &NAME(progs_jmp_pe_map), PROG_DWARF_UNWIND_PE_IDX);
+        bpf_tail_call(ctx, jmp_map, PROG_DWARF_UNWIND_PE_IDX);
     }
 
 finish:
-    return collect_stack_and_send_output(ctx, state);
+    bpf_tail_call(ctx, jmp_map, state->output_callback);
+    return 0;
+}
+
+PROGPE(dwarf_unwind)(struct bpf_perf_event_data *ctx) {
+    return dwarf_unwind(ctx, &NAME(cp_progs_jmp_pe_map));
+}
+
+PROGPE(oncpu_output)(struct bpf_perf_event_data *ctx) {
+    __u32 zero = 0;
+    unwind_state_t *state = heap__lookup(&zero);
+    if (state == NULL) {
+        return 0;
+    }
+    return collect_stack_and_send_output(&ctx->regs, &state->key, &state->stack, &oncpu_maps);
 }
 
 #endif

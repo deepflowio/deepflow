@@ -100,8 +100,6 @@ pub const FEATURE_UPROBE_GOLANG_SYMBOL: c_int = 0;
 pub const FEATURE_UPROBE_OPENSSL: c_int = 1;
 #[allow(dead_code)]
 pub const FEATURE_UPROBE_GOLANG: c_int = 2;
-#[allow(dead_code)]
-pub const FEATURE_UPROBE_JAVA: c_int = 3;
 
 //L7层协议是否需要重新核实
 #[allow(dead_code)]
@@ -185,17 +183,9 @@ cfg_if::cfg_if! {
     }
 }
 
-// Profile event types
-#[allow(dead_code)]
-pub const PROFILE_EVENT_UNKNOWN: u8 = 0;
-cfg_if::cfg_if! {
-    if #[cfg(feature = "extended_profile")] {
-        #[allow(dead_code)]
-        pub const PROFILE_EVENT_MEM_ALLOC: u8 = 1;
-        #[allow(dead_code)]
-        pub const PROFILE_EVENT_MEM_IN_USE: u8 = 2;
-    }
-}
+#[cfg(feature = "extended_profile")]
+pub const PROFILER_CTX_MEMORY_IDX: usize = 2;
+pub const PROFILER_CTX_NUM: usize = 3;
 
 //Process exec/exit events
 #[repr(C)]
@@ -423,7 +413,6 @@ pub struct SK_TRACE_STATS {
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
     pub profiler_type: u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
-    pub event_type: u8,    // Profile event type, such as 1 (PROFILE_EVENT_ONCPU)
     pub timestamp: u64,    // Timestamp of the stack trace data(unit: nanoseconds).
     pub pid: u32,          // User-space process-ID.
     /*
@@ -438,11 +427,16 @@ pub struct stack_profile_data {
     pub k_stack_id: u32, // Kernel space stackID.
     pub cpu: u32,        // The captured stack trace data is generated on which CPU?
     /*
+     * If profiler_type is PROFILER_TYPE_MEMORY, this is allocated or free'd address.
+     * Or 0 for java processes
+     */
+    pub mem_addr: u64,
+    /*
      * The profiler captures the sum of durations of occurrences of the same
      * data by querying with the quadruple
      * "<pid + stime + u_stack_id + k_stack_id + tid + cpu>" as the key.
      * In microseconds as the unit of time.
-     * If event_type is MEM_ALLOC or MEM_IN_USE, this is byte count value
+     * If profiler_type is PROFILER_TYPE_MEMORY, this is allocated byte count value, or 0 for frees
      */
     pub count: u64,
     /*
@@ -552,7 +546,7 @@ extern "C" {
     // socket_map_max_reclaim: socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作。
     // 返回值：成功返回0，否则返回非0
     pub fn running_socket_tracer(
-        callback: extern "C" fn(sd: *mut SK_BPF_DATA),
+        callback: extern "C" fn(_: *mut c_void, sd: *mut SK_BPF_DATA),
         thread_nr: c_int,
         perf_pages_cnt: c_uint,
         ring_size: c_uint,
@@ -580,19 +574,23 @@ extern "C" {
      *   symbols. The unit of measurement used is seconds.
      *   The recommended range for values is [5, 3600], default valuse is 60.
      * @callback Profile data processing callback interface
+     * @callback_ctx Contexts to pass into callback function from different profiler readers.
+     *               Accesses to each context is single threaded.
      * @returns 0 on success, < 0 on error
      */
     pub fn start_continuous_profiler(
         freq: c_int,
         java_syms_update_delay: c_int,
-        callback: extern "C" fn(_data: *mut stack_profile_data),
+        callback: extern "C" fn(ctx: *mut c_void, _data: *mut stack_profile_data),
+        callback_ctx: *const [*mut c_void; PROFILER_CTX_NUM],
     ) -> c_int;
 
     /*
      * stop continuous profiler
+     * @callback_ctx Return the contexts provided from `start_continuous_profiler` for memory releasing.
      * @returns 0 on success, < 0 on error
      */
-    pub fn stop_continuous_profiler() -> c_int;
+    pub fn stop_continuous_profiler(callback_ctx: *mut [*mut c_void; PROFILER_CTX_NUM]) -> c_int;
 
     /*
      * Continuous profiler running state

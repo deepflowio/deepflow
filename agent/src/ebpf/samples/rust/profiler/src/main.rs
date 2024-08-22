@@ -19,6 +19,7 @@ use chrono::FixedOffset;
 use chrono::Utc;
 use std::ffi::CString;
 use profiler::ebpf::*;
+use std::ptr;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
@@ -117,9 +118,9 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
     }
 }
 
-extern "C" fn socket_trace_callback(_sd: *mut SK_BPF_DATA) {}
+extern "C" fn socket_trace_callback(_: *mut c_void, _sd: *mut SK_BPF_DATA) {}
 
-extern "C" fn continuous_profiler_callback(cp: *mut stack_profile_data) {
+extern "C" fn continuous_profiler_callback(_: *mut c_void, cp: *mut stack_profile_data) {
     unsafe {
         process_stack_trace_data_for_flame_graph(cp);
         increment_counter((*cp).count as u32, 1);
@@ -182,9 +183,13 @@ fn main() {
             ::std::process::exit(1);
         }
 
+        set_dwarf_enabled(true);
+
+        let mut contexts = [ptr::null_mut(), ptr::null_mut(), ptr::null_mut()];
+
         // Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
-        if start_continuous_profiler(97, 60, continuous_profiler_callback) != 0 {
+        if start_continuous_profiler(97, 60, continuous_profiler_callback, &contexts as *const [*mut c_void; PROFILER_CTX_NUM]) != 0 {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
@@ -195,7 +200,6 @@ fn main() {
                 .as_c_str()
                 .as_ptr(),
         );
-        set_dwarf_enabled(true);
         // set_dwarf_regex(
         //     CString::new("^(socket_tracer|java|deepflow-.*|python3.*)$".as_bytes())
         //         .unwrap()
@@ -223,7 +227,7 @@ fn main() {
         }
 
         thread::sleep(Duration::from_secs(150));
-        stop_continuous_profiler();
+        stop_continuous_profiler(&mut contexts as *mut [*mut c_void; PROFILER_CTX_NUM]);
         print!(
           "====== capture count {}, sum {}\n",
           get_counter(0),
