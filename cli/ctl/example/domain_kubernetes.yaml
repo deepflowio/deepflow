@@ -3,7 +3,7 @@ name: kubernetes
 # 云平台类型
 type: kubernetes
 # cluster id [选填]
-# 格式：d-xxx，其中 xxx 是长度为10的数字或大小写字母组合，例如：d-1yhIguXABC
+# 格式：长度为1-32的数字或大小写字母组合，例如：d-1yhIguXABC
 cluster_id:
 config:
   # 所属区域标识

@@ -29,7 +29,7 @@ import (
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 )
 
-var ClusterIDRegex = regexp.MustCompile("^d-[0-9a-zA-Z]{10}$")
+var ClusterIDRegex = regexp.MustCompile("^[0-9a-zA-Z][-0-9a-zA-Z]{0,31}$")
 
 func GetContextOrgDB(ctx *gin.Context) (*mysql.DB, error) {
 	orgID, exist := ctx.Get(common.HEADER_KEY_X_ORG_ID)
