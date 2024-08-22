@@ -247,10 +247,15 @@ func decodeTrace(ip, username, password, table, traceId string, port, orgId uint
 				return fmt.Errorf("decode TraceTree failed. %s", err)
 			}
 			fmt.Printf("trace_id: %s\n", dst.TraceId)
-			fmt.Printf("span_list:\n")
-			for _, span := range dst.SpanInfos {
-				fmt.Printf("  ip4_0: %s, ip4_1: %s\n", utils.IpFromUint32(span.IP40), utils.IpFromUint32(span.IP41))
-				fmt.Printf("  span: %+v\n", span)
+			fmt.Printf("node_list:\n")
+			for _, node := range dst.TreeNodes {
+				for _, span := range node.UniqParentSpanInfos {
+					fmt.Printf("    ip4_0: %s, ip4_1: %s\n", utils.IpFromUint32(span.IP40), utils.IpFromUint32(span.IP41))
+					fmt.Printf("    span: %+v\n", span)
+					fmt.Println("    -----")
+				}
+				fmt.Printf("  ip4: %s, ip6: %s\n", utils.IpFromUint32(node.NodeInfo.IP4), node.NodeInfo.IP6)
+				fmt.Printf("  node: %+v\n", node)
 				fmt.Println("  -----")
 			}
 		} else {
