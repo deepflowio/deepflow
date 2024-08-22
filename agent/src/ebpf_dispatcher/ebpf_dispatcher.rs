@@ -404,6 +404,7 @@ pub struct EbpfCollector {
 
 static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
+static mut DPDK_SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
 static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
 static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
 static mut POLICY_GETTER: Option<PolicyGetter> = None;
@@ -421,6 +422,22 @@ impl EbpfCollector {
     #[cfg(target_arch = "aarch64")]
     unsafe fn convert_to_string(ptr: *const u8) -> String {
         CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    }
+
+    extern "C" fn ebpf_dpdk_callback(sd: *mut ebpf::SK_BPF_DATA) {
+        unsafe {
+            if !SWITCH || DPDK_SENDER.is_none() {
+                return;
+            }
+            let packet = MetaPacket::from_ebpf(sd);
+            if packet.is_err() {
+                warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
+                return;
+            }
+            if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet.unwrap())) {
+                warn!("meta packet send ebpf error: {:?}", e);
+            }
+        }
     }
 
     extern "C" fn ebpf_l7_callback(sd: *mut ebpf::SK_BPF_DATA) {
@@ -533,6 +550,7 @@ impl EbpfCollector {
     fn ebpf_init(
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
+        dpdk_sender: Option<DebugSender<Box<MetaPacket<'static>>>>,
         proc_event_sender: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
@@ -814,6 +832,7 @@ impl EbpfCollector {
         unsafe {
             SWITCH = false;
             SENDER = Some(sender);
+            DPDK_SENDER = dpdk_sender;
             PROC_EVENT_SENDER = Some(proc_event_sender);
             EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
             POLICY_GETTER = Some(policy_getter);
@@ -894,6 +913,7 @@ impl EbpfCollector {
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
         exception_handler: ExceptionHandler,
+        dpdk_sender: Option<DebugSender<Box<MetaPacket<'static>>>>,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
         if ebpf_config.ebpf.disabled {
@@ -915,6 +935,7 @@ impl EbpfCollector {
         Self::ebpf_init(
             &ebpf_config,
             sender,
+            dpdk_sender,
             proc_event_output,
             ebpf_profile_sender,
             ebpf_config.l7_protocol_enabled_bitmap,

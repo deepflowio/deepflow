@@ -2365,6 +2365,7 @@ impl AgentComponents {
                 &queue_debugger,
                 stats_collector.clone(),
                 exception_handler.clone(),
+                None,
             ) {
                 Ok(ebpf_collector) => {
                     synchronizer
