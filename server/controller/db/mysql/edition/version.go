@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package migration
+package edition
 
-const (
-	CREATE_TABLE_DB_VERSION = `CREATE TABLE IF NOT EXISTS db_version (
-		version             CHAR(64) PRIMARY KEY,
-		created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	)ENGINE=innodb DEFAULT CHARSET=utf8;`
+import (
+	"gorm.io/gorm"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
 )
+
+func CheckDBVersion(db *gorm.DB, name string) error {
+	return common.CheckCEDBVersion(db, name)
+}

@@ -22,8 +22,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/edition"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table"
 )
 
 var log = logging.MustGetLogger("db.mysql.migrator")
@@ -78,7 +78,7 @@ func migrateNonDefaultDatabase(cfg config.MySqlConfig, orgID int) error {
 
 func upgradeDatabase(cfg config.MySqlConfig, run bool) error {
 	if run {
-		return table.UpgradeDatabase(cfg)
+		return edition.UpgradeDatabase(cfg)
 	}
 	return nil
 }
@@ -100,7 +100,7 @@ func CreateDatabase(cfg config.MySqlConfig) (databaseExisted bool, err error) {
 			return
 		}
 		dc.SetDB(db)
-		err = table.DropDatabaseIfInitTablesFailed(dc)
+		err = edition.DropDatabaseIfInitTablesFailed(dc)
 	}
 	return
 }

@@ -18,13 +18,11 @@ package mysql
 
 import (
 	"errors"
-	"fmt"
 
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -35,14 +33,6 @@ func InitMySQL(cfg config.MySqlConfig) error {
 	Db, _ = common.GetSession(cfg)
 	if Db == nil {
 		return errors.New("connect mysql failed")
-	}
-	var version string
-	err := Db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
-	if err != nil {
-		return errors.New("get current db version failed")
-	}
-	if version != migration.DB_VERSION_EXPECTED {
-		return errors.New(fmt.Sprintf("current db version: %s != expected db version: %s", version, migration.DB_VERSION_EXPECTED))
 	}
 	return nil
 }

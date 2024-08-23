@@ -18,21 +18,16 @@ package common
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration/script"
+	migsource "github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/source"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/source/script"
 )
 
 var log = logging.MustGetLogger("db.mysql.migrator.common")
@@ -57,8 +52,8 @@ func (dc *DBConfig) SetConfig(c config.MySqlConfig) {
 	dc.Config = c
 }
 
-func LogDBName(databaseName string, format string, a ...any) string {
-	return fmt.Sprintf("db: %s, ", databaseName) + fmt.Sprintf(format, a...)
+func LogDBName(databaseName string, format string, a ...any) string { // TODO use log prefix
+	return fmt.Sprintf("[DB-%s] ", databaseName) + fmt.Sprintf(format, a...)
 }
 
 func DropDatabase(dc *DBConfig) error {
@@ -89,6 +84,25 @@ func CreateDatabaseIfNotExists(dc *DBConfig) (bool, error) {
 	}
 }
 
+func CheckCEDBVersion(db *gorm.DB, name string) error {
+	version, err := GetCEDBVersion(db)
+	if err != nil {
+		log.Error(LogDBName(name, "failed to get db version: %s", name, err.Error()))
+		return nil
+	}
+	if version != migsource.DB_VERSION_EXPECTED {
+		log.Error(LogDBName(name, "current db version: %s != expected db version: %s", name, version, migsource.DB_VERSION_EXPECTED))
+		return err
+	}
+	return nil
+}
+
+func GetCEDBVersion(db *gorm.DB) (string, error) {
+	var version string
+	err := db.Raw(fmt.Sprintf("SELECT version FROM %s", migsource.DB_VERSION_TABLE)).Scan(&version).Error
+	return version, err
+}
+
 func InitCETables(dc *DBConfig) error {
 	log.Info(LogDBName(dc.Config.Database, "initialize CE tables"))
 
@@ -103,6 +117,11 @@ func InitCETables(dc *DBConfig) error {
 		if err := initCEDefaultORGTables(dc); err != nil {
 			return err
 		}
+	}
+
+	err = initCEDBVersion(dc)
+	if err != nil {
+		return err
 	}
 
 	log.Info(LogDBName(dc.Config.Database, "initialized CE tables successfully"))
@@ -141,8 +160,8 @@ func initCEDefaultORGTables(dc *DBConfig) error {
 	return nil
 }
 
-func InitDBVersion(dc *DBConfig) error {
-	err := dc.DB.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
+func initCEDBVersion(dc *DBConfig) error {
+	err := dc.DB.Exec(fmt.Sprintf("INSERT INTO %s (version) VALUE ('%s')", migsource.DB_VERSION_TABLE, migsource.DB_VERSION_EXPECTED)).Error
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to initialize db version: %s", err.Error()))
 	}
@@ -181,7 +200,7 @@ func executeIssue(dc *DBConfig, nextVersion string) error {
 		return nil
 	}
 
-	strSQL := fmt.Sprintf("SET @defaultDatabaseName='%s';\n", mysql.DefaultDB.Name) + string(byteSQL)
+	strSQL := fmt.Sprintf("SET @defaultDatabaseName='%s';\n", "deepflow") + string(byteSQL) // TODO use config
 	err = dc.DB.Exec(strSQL).Error
 	if err != nil {
 		log.Error(LogDBName(dc.Config.Database, "failed to execute db issue (version: %s): %s", nextVersion, err.Error()))
@@ -200,44 +219,4 @@ func executeScript(dc *DBConfig, nextVersion string) error {
 		err = script.ScriptUpdateVMPodNSTags(dc.DB)
 	}
 	return err
-}
-
-func getAscSortedNextVersions(files []fs.DirEntry, curVersion string) []string {
-	vs := []string{}
-	for _, f := range files {
-		vs = append(vs, trimFilenameExt(f.Name()))
-	}
-	// asc sort: split version by ".", compare each number from first to end
-	sort.Slice(vs, func(i, j int) bool {
-		il := strings.Split(vs[i], ".")
-		jl := strings.Split(vs[j], ".")
-		return !list1GreaterList2(il, jl)
-	})
-
-	nvs := []string{}
-	cvl := strings.Split(curVersion, ".")
-	for _, v := range vs {
-		vl := strings.Split(v, ".")
-		if list1GreaterList2(vl, cvl) {
-			nvs = append(nvs, v)
-		}
-	}
-	return nvs
-}
-
-func trimFilenameExt(filename string) string {
-	return strings.TrimSuffix(filename, filepath.Ext(filename))
-}
-
-func list1GreaterList2(strList1, strList2 []string) bool {
-	for i := range strList1 {
-		if strList1[i] == strList2[i] {
-			continue
-		} else {
-			in, _ := strconv.Atoi(strList1[i])
-			jn, _ := strconv.Atoi(strList2[i])
-			return in > jn
-		}
-	}
-	return false
 }

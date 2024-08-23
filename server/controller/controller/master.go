@@ -23,7 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/http"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -65,7 +65,7 @@ func IsMasterController(cfg *config.ControllerConfig) bool {
 
 // migrate db by master region master controller
 func migrateMySQL(cfg *config.ControllerConfig) {
-	err := migrator.Migrate(cfg.MySqlCfg)
+	err := mysql.Migrate(cfg.MySqlCfg)
 	if err != nil {
 		log.Errorf("migrate mysql failed: %s", err.Error())
 		time.Sleep(time.Second)
