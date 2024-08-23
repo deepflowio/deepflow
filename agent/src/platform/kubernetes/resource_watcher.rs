@@ -37,6 +37,7 @@ use k8s_openapi::{
         core::v1::{
             Container, ContainerStatus, Namespace, Node, NodeSpec, NodeStatus, Pod, PodSpec,
             PodStatus, ReplicationController, ReplicationControllerSpec, Service, ServiceSpec,
+            ServiceStatus,
         },
         extensions, networking,
     },
@@ -1180,6 +1181,12 @@ impl Trimmable for Service {
                 type_: svc_spec.type_,
                 cluster_ip: svc_spec.cluster_ip,
                 ports: svc_spec.ports,
+                ..Default::default()
+            });
+        }
+        if let Some(svc_status) = self.status.take() {
+            trim_svc.status = Some(ServiceStatus {
+                load_balancer: svc_status.load_balancer,
                 ..Default::default()
             });
         }
