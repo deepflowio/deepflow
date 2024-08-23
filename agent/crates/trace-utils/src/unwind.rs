@@ -27,6 +27,10 @@ use std::slice;
 use ahash::AHasher;
 use libc::{__u64, c_int, c_void};
 use log::{debug, trace, warn};
+use object::{
+    elf::{self, FileHeader64},
+    read::elf::FileHeader,
+};
 
 use dwarf::UnwindEntry;
 use maps::MemoryArea;
@@ -108,6 +112,29 @@ impl UnwindTable {
                 continue;
             }
 
+            // for binaries compiled without "-fPIE" or "-pie", the symbols will not get relocated
+            // so shard offset should be set to 0
+            let is_pic = match FileHeader64::<object::Endianness>::parse(&*data) {
+                Ok(header) => match header.endian() {
+                    Ok(endian) => header.e_type(endian) != elf::ET_EXEC,
+                    Err(e) => {
+                        debug!(
+                            "read elf header endian for process#{pid} in {} failed: {e}",
+                            path.display()
+                        );
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    debug!(
+                        "read elf header for process#{pid} in {} failed: {e}",
+                        path.display()
+                    );
+                    continue;
+                }
+            };
+            trace!("object {} is_pic={is_pic}", path.display());
+
             trace!("load object {} dwarf entries", path.display());
             let entries = match dwarf::read_unwind_entries(&data) {
                 Ok(ue) if ue.is_empty() => {
@@ -132,7 +159,7 @@ impl UnwindTable {
                     entries.len()
                 );
                 let object_info =
-                    self.split_into_shards(pid, &m, &entries, max_pc, &mut shard_list);
+                    self.split_into_shards(pid, &m, &entries, max_pc, &mut shard_list, is_pic);
                 shard_count += object_info.shards.len();
                 self.object_cache.insert(digest, object_info);
                 continue;
@@ -179,7 +206,7 @@ impl UnwindTable {
             }
             let shard_info = &mut shard_list.entries[shard_list.len as usize];
             shard_info.id = shard.id;
-            shard_info.offset = m.m_start;
+            shard_info.offset = if is_pic { m.m_start } else { 0 };
             shard_info.pc_min = entries[0].pc;
             shard_info.pc_max = max_pc;
             shard_info.entry_start = shard.len - entries.len() as u32;
@@ -309,6 +336,7 @@ impl UnwindTable {
         entries: &[UnwindEntry],
         max_pc: u64,
         shard_list: &mut ProcessShardList,
+        is_pic: bool,
     ) -> ObjectInfo {
         let mut object_info = ObjectInfo {
             pids: vec![pid],
@@ -337,7 +365,7 @@ impl UnwindTable {
             }
             let shard_info = &mut shard_list.entries[shard_list.len as usize];
             shard_info.id = shard_id;
-            shard_info.offset = m.m_start;
+            shard_info.offset = if is_pic { m.m_start } else { 0 };
             shard_info.pc_min = chunk[0].pc;
             shard_info.pc_max = max_pc;
             shard_info.entry_start = 0;
