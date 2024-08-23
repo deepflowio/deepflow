@@ -613,11 +613,20 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 			has_error = false;
 	}
 
+	// 4.19.90-vhulk2211.3.0.h1542r10.aarch64
+	if (strstr(sys_info.release, "vhulk")) {
+		*num = 0;
+		if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev) != 3)
+			has_error = true;
+		else
+			has_error = false;
+	}
+
 	if (has_error) {
 		ebpf_warning
 		    ("release %s version %s (major %d minor %d rev %d num %d)\n",
-		     sys_info.release, sys_info.version, major, minor, rev,
-		     num);
+		     sys_info.release, sys_info.version, *major, *minor, *rev,
+		     *num);
 		return ETR_INVAL;
 	}
 
