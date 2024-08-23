@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	"github.com/deepflowio/deepflow/server/controller/http/service/agentlicense"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
@@ -205,12 +206,13 @@ func (a *AgentGroup) Create(vtapGroupCreate model.VtapGroupCreate) (resp model.V
 			return err
 		}
 		for _, vtap := range vtaps {
-			if err := tx.Model(&vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": lcuuid,
+			if err := tx.Model(&mysql.VTap{}).Where("id = ?", vtap.ID).Updates(map[string]interface{}{"vtap_group_lcuuid": lcuuid,
 				"team_id": vtapGroupCreate.TeamID}).Error; err != nil {
 				return err
 			}
 		}
-		return nil
+
+		return agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &vtapGroup, vtaps)
 	})
 	if err != nil {
 		return model.VtapGroup{}, err
@@ -372,15 +374,23 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 				return NewError(httpcommon.RESOURCE_NOT_FOUND, "default vtap_group not found")
 			}
 
+			var agents []mysql.VTap
 			for _, lcuuid := range delVtapLcuuids.ToSlice() {
 				vtap := lcuuidToOldVtap[lcuuid.(string)]
 				log.Infof("ORG(id=%d database=%s) update vtap group lcuuid(%s -> %s)",
 					dbInfo.ORGID, dbInfo.Name, vtap.VtapGroupLcuuid, defaultVtapGroup.Lcuuid)
-				if err = tx.Model(vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": defaultVtapGroup.Lcuuid}).Error; err != nil {
+				if err = tx.Model(&mysql.VTap{}).Where("id = ?", vtap.ID).Updates(map[string]interface{}{"vtap_group_lcuuid": defaultVtapGroup.Lcuuid}).Error; err != nil {
+					return err
+				}
+				agents = append(agents, *vtap)
+			}
+			if len(agents) > 0 {
+				if err := agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &defaultVtapGroup, agents); err != nil {
 					return err
 				}
 			}
 
+			agents = []mysql.VTap{}
 			for _, lcuuid := range addVtapLcuuids.ToSlice() {
 				vtap := lcuuidToNewVtap[lcuuid.(string)]
 				if vtap.TeamID != vtapGroupTeamID {
@@ -389,10 +399,15 @@ func (a *AgentGroup) Update(lcuuid string, vtapGroupUpdate map[string]interface{
 				}
 				log.Infof("ORG(id=%d database=%s) update vtap group lcuuid(%s - > %s)",
 					dbInfo.ORGID, dbInfo.Name, vtap.VtapGroupLcuuid, vtapGroup.Lcuuid)
-				if err = tx.Model(vtap).Updates(map[string]interface{}{"vtap_group_lcuuid": vtapGroup.Lcuuid}).Error; err != nil {
+				if err = tx.Model(&mysql.VTap{}).Where("id = ?", vtap.ID).Updates(map[string]interface{}{"vtap_group_lcuuid": vtapGroup.Lcuuid}).Error; err != nil {
 					return err
 				}
+				agents = append(agents, *vtap)
 			}
+			if len(agents) > 0 {
+				return agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &vtapGroup, agents)
+			}
+			return nil
 		}
 
 		// 更新vtap_group DB
@@ -422,6 +437,10 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 	if err := a.resourceAccess.CanDeleteResource(vtapGroup.TeamID, common.SET_RESOURCE_TYPE_AGENT_GROUP, vtapGroup.Lcuuid); err != nil {
 		return nil, err
 	}
+	var agents []mysql.VTap
+	if err = db.Where("vtap_group_lcuuid = ?", lcuuid).First(&agents).Error; err != nil {
+		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
+	}
 
 	var defaultVtapGroup mysql.VTapGroup
 	if ret := db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
@@ -430,6 +449,9 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 
 	log.Infof("ORG(id=%d database=%s) delete vtap_group (%s)", dbInfo.ORGID, dbInfo.Name, vtapGroup.Name)
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if len(agents) > 0 {
+			return agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &defaultVtapGroup, agents)
+		}
 		if err = tx.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Updates(map[string]interface{}{
 			"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": defaultVtapGroup.TeamID}).Error; err != nil {
 			return err

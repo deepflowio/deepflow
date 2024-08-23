@@ -116,8 +116,10 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	}
 
 	lcuuidToGroup := make(map[string]string)
+	lcuuidToGroupLicenseFunc := make(map[string]string)
 	for _, group := range vtapGroups {
 		lcuuidToGroup[group.Lcuuid] = group.Name
+		lcuuidToGroupLicenseFunc[group.Lcuuid] = group.LicenseFunctions
 	}
 
 	vtapRepoNameToRevision := make(map[string]string, len(vtapRepos))
@@ -192,13 +194,27 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			bitNum += 1
 		}
 		// license_functions
-		functions := strings.Split(vtap.LicenseFunctions, ",")
-		for _, function := range functions {
-			functionInt, err := strconv.Atoi(function)
-			if err != nil {
-				continue
+		vtapResp.LicenseFunctions, _ = ConvertStrToIntList(vtap.LicenseFunctions)
+		vtapResp.EnableFeatures, _ = ConvertStrToIntList(vtap.EnableFeatures)
+		vtapResp.DisableFeatures, _ = ConvertStrToIntList(vtap.DisableFeatures)
+		vtapResp.FollowGroupFeatures, _ = ConvertStrToIntList(vtap.FollowGroupFeatures)
+		if groupLicenseFunc, ok := lcuuidToGroupLicenseFunc[vtap.VtapGroupLcuuid]; ok {
+			m1, m2, m3 := mapset.NewSet(), mapset.NewSet(), mapset.NewSet()
+			for _, item := range vtapResp.FollowGroupFeatures {
+				m1.Add(item)
 			}
-			vtapResp.LicenseFunctions = append(vtapResp.LicenseFunctions, functionInt)
+			for _, item := range vtapResp.LicenseFunctions {
+				m2.Add(item)
+			}
+			groupLicenseFunctions, _ := ConvertStrToIntList(groupLicenseFunc)
+			for _, item := range groupLicenseFunctions {
+				m3.Add(item)
+			}
+			var licenseFunc []int
+			for _, item := range m1.Intersect(m2).Intersect(m3).ToSlice() {
+				licenseFunc = append(licenseFunc, item.(int))
+			}
+			vtapResp.FollowGroupEnableFeatures = licenseFunc
 		}
 		// az
 		vtapResp.AZ = vtap.AZ
