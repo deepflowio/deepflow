@@ -32,7 +32,7 @@ func GetMailServer(filter map[string]interface{}) (resp []model.MailServer, err 
 	var response []model.MailServer
 	var mails []mysql.MailServer
 
-	Db := mysql.Db
+	Db := mysql.DefaultDB.DB
 	for _, param := range []string{"lcuuid"} {
 		if _, ok := filter[param]; ok {
 			Db = Db.Where(fmt.Sprintf("%s = ?", param), filter[param])
@@ -74,7 +74,7 @@ func CreateMailServer(mailCreate model.MailServerCreate) (model.MailServer, erro
 	mailServer.NtlmName = mailCreate.NtlmName
 	mailServer.NtlmPassword = mailCreate.NtlmPassword
 	mailServer.Lcuuid = uuid.New().String()
-	mysql.Db.Create(&mailServer)
+	mysql.DefaultDB.Create(&mailServer)
 
 	response, err := GetMailServer(map[string]interface{}{"lcuuid": mailServer.Lcuuid})
 	return response[0], err
@@ -85,7 +85,7 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 	var dbUpdateMap = make(map[string]interface{})
 
 	if lcuuid != "" {
-		if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
+		if ret := mysql.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
 			return model.MailServer{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mailServer (%s) not found", lcuuid))
 		}
 	} else {
@@ -100,7 +100,7 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 		}
 	}
 
-	mysql.Db.Model(&mailServer).Updates(dbUpdateMap)
+	mysql.DefaultDB.Model(&mailServer).Updates(dbUpdateMap)
 
 	response, err := GetMailServer(map[string]interface{}{"lcuuid": mailServer.Lcuuid})
 	return response[0], err
@@ -109,13 +109,13 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 func DeleteMailServer(lcuuid string) (map[string]string, error) {
 	var mailServer mysql.MailServer
 
-	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
+	if ret := mysql.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mail-server (%s) not found", lcuuid))
 	}
 
 	log.Infof("delete mail server (%s)", mailServer.User)
 
-	mysql.Db.Delete(&mailServer)
+	mysql.DefaultDB.Delete(&mailServer)
 	return map[string]string{"LCUUID": lcuuid}, nil
 
 }

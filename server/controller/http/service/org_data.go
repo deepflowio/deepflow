@@ -129,7 +129,7 @@ func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 	// master region
 	if cfg.TrisolarisCfg.NodeType != controllerCommon.TRISOLARIS_NODE_TYPE_MASTER {
 		var controller mysql.Controller
-		err := mysql.Db.Where("node_type = ? AND state = ?", controllerCommon.CONTROLLER_NODE_TYPE_MASTER, controllerCommon.CONTROLLER_STATE_NORMAL).First(&controller).Error
+		err := mysql.DefaultDB.Where("node_type = ? AND state = ?", controllerCommon.CONTROLLER_NODE_TYPE_MASTER, controllerCommon.CONTROLLER_STATE_NORMAL).First(&controller).Error
 		if err != nil {
 			log.Error(err)
 			return errResponse, err

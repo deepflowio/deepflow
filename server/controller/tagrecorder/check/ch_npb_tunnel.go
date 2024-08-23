@@ -36,7 +36,7 @@ func NewChNpbTunnel() *ChNpbTunnel {
 
 func (p *ChNpbTunnel) generateNewData() (map[IDKey]mysql.ChNpbTunnel, bool) {
 	var npbTunnels []mysql.NpbTunnel
-	err := mysql.Db.Unscoped().Select("id", "name").Find(&npbTunnels).Error
+	err := mysql.DefaultDB.Unscoped().Select("id", "name").Find(&npbTunnels).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false

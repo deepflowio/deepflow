@@ -28,7 +28,7 @@ import (
 
 func GetSelfController() (*mysql.Controller, error) {
 	var controller *mysql.Controller
-	err := mysql.Db.Where("ip = ?", GetNodeIP()).Find(&controller).Error
+	err := mysql.DefaultDB.Where("ip = ?", GetNodeIP()).Find(&controller).Error
 	return controller, err
 }
 
@@ -50,7 +50,7 @@ func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err
 		}
 	} else {
 		var controllers []*mysql.Controller
-		err = mysql.Db.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controllers).Error
+		err = mysql.DefaultDB.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controllers).Error
 		if err != nil {
 			return
 		}

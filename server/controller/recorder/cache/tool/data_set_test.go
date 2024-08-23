@@ -107,7 +107,7 @@ func (t *SuiteTest) TestGetNetworkNameByID() {
 	id2 := RandID()
 	name2 := RandName()
 	dbItem := &mysql.Network{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
-	mysql.Db.Create(&dbItem)
+	mysql.DefaultDB.Create(&dbItem)
 	rname2, _ := ds.GetNetworkNameByID(id2)
 	assert.Equal(t.T(), name2, rname2)
 }
@@ -123,7 +123,7 @@ func (t *SuiteTest) TestGetVInterfaceLcuuidByID() {
 	id2 := RandID()
 	lcuuid2 := RandLcuuid()
 	dbItem := &mysql.VInterface{Base: mysql.Base{ID: id2, Lcuuid: lcuuid2}}
-	mysql.Db.Create(&dbItem)
+	mysql.DefaultDB.Create(&dbItem)
 	rlcuuid2, _ := ds.GetVInterfaceLcuuidByID(id2)
 	assert.Equal(t.T(), lcuuid2, rlcuuid2)
 }
@@ -139,7 +139,7 @@ func (t *SuiteTest) TestGetVInterfaceIDByWANIPLcuuid() {
 	vifID2 := RandID()
 	lcuuid2 := RandLcuuid()
 	dbItem := &mysql.WANIP{Base: mysql.Base{Lcuuid: lcuuid2}, VInterfaceID: vifID2}
-	mysql.Db.Create(&dbItem)
+	mysql.DefaultDB.Create(&dbItem)
 	rvifID2, _ := ds.GetVInterfaceIDByWANIPLcuuid(lcuuid2)
 	assert.Equal(t.T(), vifID2, rvifID2)
 }
@@ -155,7 +155,7 @@ func (t *SuiteTest) TestGetWANIPByLcuuid() {
 	ip2 := faker.IPv4()
 	lcuuid2 := RandLcuuid()
 	dbItem := &mysql.WANIP{Base: mysql.Base{Lcuuid: lcuuid2}, IP: ip2}
-	mysql.Db.Create(&dbItem)
+	mysql.DefaultDB.Create(&dbItem)
 	rip2, _ := ds.GetWANIPByLcuuid(lcuuid2)
 	assert.Equal(t.T(), ip2, rip2)
 }

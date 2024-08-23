@@ -40,7 +40,7 @@ func NewChTargetLabel() *ChTargetLabel {
 func (l *ChTargetLabel) generateNewData() (map[PrometheusTargetLabelKey]mysql.ChTargetLabel, bool) {
 	var prometheusMetricNames []mysql.PrometheusMetricName
 
-	err := mysql.Db.Unscoped().Find(&prometheusMetricNames).Error
+	err := mysql.DefaultDB.Unscoped().Find(&prometheusMetricNames).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
@@ -104,7 +104,7 @@ func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel)
 func (l *ChTargetLabel) generateMetricTargetData() (map[string][]int, bool) {
 	metricNameTargetIDMap := make(map[string][]int)
 	var prometheusMetricTargets []mysql.PrometheusMetricTarget
-	err := mysql.Db.Unscoped().Find(&prometheusMetricTargets).Error
+	err := mysql.DefaultDB.Unscoped().Find(&prometheusMetricTargets).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
@@ -121,7 +121,7 @@ func (l *ChTargetLabel) generateMetricTargetData() (map[string][]int, bool) {
 func (l *ChTargetLabel) generateTargetData() (map[int]string, bool) {
 	targetLabelNameValueMap := make(map[int]string)
 	var prometheusTargets []mysql.PrometheusTarget
-	err := mysql.Db.Unscoped().Find(&prometheusTargets).Error
+	err := mysql.DefaultDB.Unscoped().Find(&prometheusTargets).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
@@ -139,7 +139,7 @@ func (l *ChTargetLabel) generateTargetData() (map[int]string, bool) {
 func (l *ChTargetLabel) generateLabelNameIDData() (map[string]int, bool) {
 	metricLabelNameIDMap := make(map[string]int)
 	var prometheusLabelNames []mysql.PrometheusLabelName
-	err := mysql.Db.Unscoped().Find(&prometheusLabelNames).Error
+	err := mysql.DefaultDB.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
