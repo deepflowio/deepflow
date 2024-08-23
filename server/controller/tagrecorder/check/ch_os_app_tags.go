@@ -20,18 +20,18 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChOSAppTags struct {
-	UpdaterBase[mysql.ChOSAppTags, OSAPPTagsKey]
+	UpdaterBase[mysqlmodel.ChOSAppTags, OSAPPTagsKey]
 }
 
 func NewChOSAppTags() *ChOSAppTags {
 	updater := &ChOSAppTags{
-		UpdaterBase[mysql.ChOSAppTags, OSAPPTagsKey]{
+		UpdaterBase[mysqlmodel.ChOSAppTags, OSAPPTagsKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_OS_APP_TAGS,
 		},
 	}
@@ -39,14 +39,14 @@ func NewChOSAppTags() *ChOSAppTags {
 	return updater
 }
 
-func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, bool) {
-	processes, err := query.FindInBatches[mysql.Process](o.db.Unscoped())
+func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysqlmodel.ChOSAppTags, bool) {
+	processes, err := query.FindInBatches[mysqlmodel.Process](o.db.Unscoped())
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(o.resourceTypeName, err), o.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[OSAPPTagsKey]mysql.ChOSAppTags)
+	keyToItem := make(map[OSAPPTagsKey]mysqlmodel.ChOSAppTags)
 	for _, process := range processes {
 		teamID, err := tagrecorder.GetTeamID(process.Domain, process.SubDomain)
 		if err != nil {
@@ -70,7 +70,7 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 			key := OSAPPTagsKey{
 				PID: process.ID,
 			}
-			keyToItem[key] = mysql.ChOSAppTags{
+			keyToItem[key] = mysqlmodel.ChOSAppTags{
 				PID:         process.ID,
 				OSAPPTags:   string(osAppTagsStr),
 				TeamID:      teamID,
@@ -82,11 +82,11 @@ func (o *ChOSAppTags) generateNewData() (map[OSAPPTagsKey]mysql.ChOSAppTags, boo
 	return keyToItem, true
 }
 
-func (o *ChOSAppTags) generateKey(dbItem mysql.ChOSAppTags) OSAPPTagsKey {
+func (o *ChOSAppTags) generateKey(dbItem mysqlmodel.ChOSAppTags) OSAPPTagsKey {
 	return OSAPPTagsKey{PID: dbItem.PID}
 }
 
-func (o *ChOSAppTags) generateUpdateInfo(oldItem, newItem mysql.ChOSAppTags) (map[string]interface{}, bool) {
+func (o *ChOSAppTags) generateUpdateInfo(oldItem, newItem mysqlmodel.ChOSAppTags) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.OSAPPTags != newItem.OSAPPTags {
 		updateInfo["os_app_tags"] = newItem.OSAPPTags

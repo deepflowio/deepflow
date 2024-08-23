@@ -18,15 +18,16 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChUser struct {
-	UpdaterComponent[mysql.ChUser, IDKey]
+	UpdaterComponent[mysqlmodel.ChUser, IDKey]
 }
 
 func NewChUser() *ChUser {
 	updater := &ChUser{
-		newUpdaterComponent[mysql.ChUser, IDKey](
+		newUpdaterComponent[mysqlmodel.ChUser, IDKey](
 			RESOURCE_TYPE_CH_USER,
 		),
 	}
@@ -34,9 +35,9 @@ func NewChUser() *ChUser {
 	return updater
 }
 
-func (c *ChUser) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChUser, bool) {
+func (c *ChUser) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChUser, bool) {
 	log.Infof("generate data for %s", c.resourceTypeName, db.LogPrefixORGID)
-	var users []mysql.User
+	var users []mysqlmodel.User
 
 	err := mysql.DefaultDB.Unscoped().Find(&users).Error
 	if err != nil {
@@ -44,9 +45,9 @@ func (c *ChUser) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChUser, bool) {
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChUser)
+	keyToItem := make(map[IDKey]mysqlmodel.ChUser)
 	for _, user := range users {
-		keyToItem[IDKey{ID: user.ID}] = mysql.ChUser{
+		keyToItem[IDKey{ID: user.ID}] = mysqlmodel.ChUser{
 			ID:   user.ID,
 			Name: user.UserName,
 		}
@@ -55,11 +56,11 @@ func (c *ChUser) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChUser, bool) {
 	return keyToItem, true
 }
 
-func (c *ChUser) generateKey(dbItem mysql.ChUser) IDKey {
+func (c *ChUser) generateKey(dbItem mysqlmodel.ChUser) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (c *ChUser) generateUpdateInfo(oldItem, newItem mysql.ChUser) (map[string]interface{}, bool) {
+func (c *ChUser) generateUpdateInfo(oldItem, newItem mysqlmodel.ChUser) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

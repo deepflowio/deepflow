@@ -18,16 +18,17 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChVTap struct {
-	UpdaterBase[mysql.ChVTap, IDKey]
+	UpdaterBase[mysqlmodel.ChVTap, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	updater := &ChVTap{
-		UpdaterBase[mysql.ChVTap, IDKey]{
+		UpdaterBase[mysqlmodel.ChVTap, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VTAP,
 		},
 		resourceTypeToIconID,
@@ -36,17 +37,17 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	return updater
 }
 
-func (v *ChVTap) generateNewData() (map[IDKey]mysql.ChVTap, bool) {
-	var vTaps []mysql.VTap
+func (v *ChVTap) generateNewData() (map[IDKey]mysqlmodel.ChVTap, bool) {
+	var vTaps []mysqlmodel.VTap
 	err := mysql.DefaultDB.Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChVTap)
+	keyToItem := make(map[IDKey]mysqlmodel.ChVTap)
 	for _, vTap := range vTaps {
-		keyToItem[IDKey{ID: vTap.ID}] = mysql.ChVTap{
+		keyToItem[IDKey{ID: vTap.ID}] = mysqlmodel.ChVTap{
 			ID:   vTap.ID,
 			Name: vTap.Name,
 			Type: vTap.Type,
@@ -55,11 +56,11 @@ func (v *ChVTap) generateNewData() (map[IDKey]mysql.ChVTap, bool) {
 	return keyToItem, true
 }
 
-func (v *ChVTap) generateKey(dbItem mysql.ChVTap) IDKey {
+func (v *ChVTap) generateKey(dbItem mysqlmodel.ChVTap) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (v *ChVTap) generateUpdateInfo(oldItem, newItem mysql.ChVTap) (map[string]interface{}, bool) {
+func (v *ChVTap) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVTap) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

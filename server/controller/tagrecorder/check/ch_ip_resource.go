@@ -22,18 +22,19 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	json "github.com/goccy/go-json"
 )
 
 type ChIPResource struct {
-	UpdaterBase[mysql.ChIPResource, IPResourceKey]
+	UpdaterBase[mysqlmodel.ChIPResource, IPResourceKey]
 	ctx context.Context
 }
 
 func NewChIPResource(ctx context.Context) *ChIPResource {
 	updater := &ChIPResource{
-		UpdaterBase[mysql.ChIPResource, IPResourceKey]{
+		UpdaterBase[mysqlmodel.ChIPResource, IPResourceKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_IP_RESOURCE,
 		},
 		ctx,
@@ -44,7 +45,7 @@ func NewChIPResource(ctx context.Context) *ChIPResource {
 
 func getVMIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var vms []mysql.VM
+	var vms []mysqlmodel.VM
 	err := db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VM, err), db.LogPrefixORGID)
@@ -58,7 +59,7 @@ func getVMIdToUidMap(db *mysql.DB) map[int]string {
 
 func getRDSIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var rdsInstances []mysql.RDSInstance
+	var rdsInstances []mysqlmodel.RDSInstance
 	err := db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_RDS, err), db.LogPrefixORGID)
@@ -72,7 +73,7 @@ func getRDSIdToUidMap(db *mysql.DB) map[int]string {
 
 func getRedisIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var redisInstances []mysql.RedisInstance
+	var redisInstances []mysqlmodel.RedisInstance
 	err := db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_REDIS, err), db.LogPrefixORGID)
@@ -86,7 +87,7 @@ func getRedisIdToUidMap(db *mysql.DB) map[int]string {
 
 func getLBIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var lbs []mysql.LB
+	var lbs []mysqlmodel.LB
 	err := db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_LB, err), db.LogPrefixORGID)
@@ -100,7 +101,7 @@ func getLBIdToUidMap(db *mysql.DB) map[int]string {
 
 func getNatgwIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var natGateways []mysql.NATGateway
+	var natGateways []mysqlmodel.NATGateway
 	err := db.Unscoped().Find(&natGateways).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err), db.LogPrefixORGID)
@@ -114,7 +115,7 @@ func getNatgwIdToUidMap(db *mysql.DB) map[int]string {
 
 func getVPCIdToUidMap(db *mysql.DB) map[int]string {
 	idToUidMap := map[int]string{}
-	var vpcs []mysql.VPC
+	var vpcs []mysqlmodel.VPC
 	err := db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VPC, err), db.LogPrefixORGID)
@@ -126,8 +127,8 @@ func getVPCIdToUidMap(db *mysql.DB) map[int]string {
 	return idToUidMap
 }
 
-func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, bool) {
-	keyToItem := make(map[IPResourceKey]mysql.ChIPResource)
+func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysqlmodel.ChIPResource, bool) {
+	keyToItem := make(map[IPResourceKey]mysqlmodel.ChIPResource)
 	vmIdToUidMap := getVMIdToUidMap(i.db)
 	rdsIdToUidMap := getRDSIdToUidMap(i.db)
 	redisIdToUidMap := getRedisIdToUidMap(i.db)
@@ -211,7 +212,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 			log.Error(err, i.db.LogPrefixORGID)
 			return nil, false
 		}
-		itemStruct := mysql.ChIPResource{}
+		itemStruct := mysqlmodel.ChIPResource{}
 		err = json.Unmarshal(itemStr, &itemStruct)
 		if err != nil {
 			log.Error(err, i.db.LogPrefixORGID)
@@ -222,11 +223,11 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 	return keyToItem, true
 }
 
-func (i *ChIPResource) generateKey(dbItem mysql.ChIPResource) IPResourceKey {
+func (i *ChIPResource) generateKey(dbItem mysqlmodel.ChIPResource) IPResourceKey {
 	return IPResourceKey{IP: dbItem.IP, SubnetID: dbItem.SubnetID}
 }
 
-func (i *ChIPResource) generateUpdateInfo(oldItem, newItem mysql.ChIPResource) (map[string]interface{}, bool) {
+func (i *ChIPResource) generateUpdateInfo(oldItem, newItem mysqlmodel.ChIPResource) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	oldItemMap := make(map[string]interface{})
 	newItemMap := make(map[string]interface{})

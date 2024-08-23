@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewPodIngress(c *cache.Cache) *PodIngress {
 	return listener
 }
 
-func (i *PodIngress) OnUpdaterAdded(addedDBItems []*mysql.PodIngress) {
+func (i *PodIngress) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodIngress) {
 	i.cache.AddPodIngresses(addedDBItems)
 }
 

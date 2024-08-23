@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type LBListener struct {
-	OperatorBase[*mysql.LBListener, mysql.LBListener]
+	OperatorBase[*mysqlmodel.LBListener, mysqlmodel.LBListener]
 }
 
 func NewLBListener() *LBListener {
 	operater := &LBListener{
-		newOperatorBase[*mysql.LBListener](
+		newOperatorBase[*mysqlmodel.LBListener](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			true,
 			false,

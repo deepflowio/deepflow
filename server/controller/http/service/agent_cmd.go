@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	ctrlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -287,7 +288,7 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*model.RemoteExecResp, err
 	if err != nil {
 		return nil, err
 	}
-	var agent *mysql.VTap
+	var agent *mysqlmodel.VTap
 	if err := dbInfo.Where("id = ?", agentID).Find(&agent).Error; err != nil {
 		return nil, err
 	}
@@ -356,7 +357,7 @@ func RunAgentCMD(timeout, orgID, agentID int, req *trident.RemoteExecRequest, CM
 	if err != nil {
 		return "", fmt.Errorf("%s%s", serverLog, err.Error())
 	}
-	var agent *mysql.VTap
+	var agent *mysqlmodel.VTap
 	if err := dbInfo.Where("id = ?", agentID).Find(&agent).Error; err != nil {
 		return "", fmt.Errorf("%s%s", serverLog, err.Error())
 	}

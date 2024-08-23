@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChostCloudTag struct {
-	UpdaterBase[mysql.ChChostCloudTag, CloudTagKey]
+	UpdaterBase[mysqlmodel.ChChostCloudTag, CloudTagKey]
 }
 
 func NewChChostCloudTag() *ChChostCloudTag {
 	updater := &ChChostCloudTag{
-		UpdaterBase[mysql.ChChostCloudTag, CloudTagKey]{
+		UpdaterBase[mysqlmodel.ChChostCloudTag, CloudTagKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VM_CLOUD_TAG,
 		},
 	}
@@ -35,22 +35,22 @@ func NewChChostCloudTag() *ChChostCloudTag {
 	return updater
 }
 
-func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysql.ChChostCloudTag, bool) {
-	var vms []mysql.VM
+func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysqlmodel.ChChostCloudTag, bool) {
+	var vms []mysqlmodel.VM
 	err := c.db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err), c.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[CloudTagKey]mysql.ChChostCloudTag)
+	keyToItem := make(map[CloudTagKey]mysqlmodel.ChChostCloudTag)
 	for _, vm := range vms {
 		for k, v := range vm.CloudTags {
 			key := CloudTagKey{
 				ID:  vm.ID,
 				Key: k,
 			}
-			keyToItem[key] = mysql.ChChostCloudTag{
+			keyToItem[key] = mysqlmodel.ChChostCloudTag{
 				ID:       vm.ID,
 				Key:      k,
 				Value:    v,
@@ -62,11 +62,11 @@ func (c *ChChostCloudTag) generateNewData() (map[CloudTagKey]mysql.ChChostCloudT
 	return keyToItem, true
 }
 
-func (c *ChChostCloudTag) generateKey(dbItem mysql.ChChostCloudTag) CloudTagKey {
+func (c *ChChostCloudTag) generateKey(dbItem mysqlmodel.ChChostCloudTag) CloudTagKey {
 	return CloudTagKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (c *ChChostCloudTag) generateUpdateInfo(oldItem, newItem mysql.ChChostCloudTag) (map[string]interface{}, bool) {
+func (c *ChChostCloudTag) generateUpdateInfo(oldItem, newItem mysqlmodel.ChChostCloudTag) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

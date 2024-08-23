@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewLBListener(c *cache.Cache) *LBListener {
 	return listener
 }
 
-func (l *LBListener) OnUpdaterAdded(addedDBItems []*mysql.LBListener) {
+func (l *LBListener) OnUpdaterAdded(addedDBItems []*mysqlmodel.LBListener) {
 	l.cache.AddLBListeners(addedDBItems)
 }
 

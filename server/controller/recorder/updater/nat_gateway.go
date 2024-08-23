@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type NATGateway struct {
 	UpdaterBase[
 		cloudmodel.NATGateway,
 		*diffbase.NATGateway,
-		*mysql.NATGateway,
-		mysql.NATGateway,
+		*mysqlmodel.NATGateway,
+		mysqlmodel.NATGateway,
 		*message.NATGatewayAdd,
 		message.NATGatewayAdd,
 		*message.NATGatewayUpdate,
@@ -47,8 +47,8 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 		newUpdaterBase[
 			cloudmodel.NATGateway,
 			*diffbase.NATGateway,
-			*mysql.NATGateway,
-			mysql.NATGateway,
+			*mysqlmodel.NATGateway,
+			mysqlmodel.NATGateway,
 			*message.NATGatewayAdd,
 			message.NATGatewayAdd,
 			*message.NATGatewayUpdate,
@@ -73,7 +73,7 @@ func (g *NATGateway) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATGateway) (d
 	return
 }
 
-func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mysql.NATGateway, bool) {
+func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mysqlmodel.NATGateway, bool) {
 	vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -83,7 +83,7 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 		return nil, false
 	}
 
-	dbItem := &mysql.NATGateway{
+	dbItem := &mysqlmodel.NATGateway{
 		Name:        cloudItem.Name,
 		Label:       cloudItem.Label,
 		UID:         cloudItem.Label,

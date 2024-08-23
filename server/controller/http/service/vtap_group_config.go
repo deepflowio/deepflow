@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
@@ -522,7 +523,7 @@ func (a *AgentGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_co
 		return nil, fmt.Errorf("vtapgroup %s configuration already exist", vTapGroupLcuuid)
 	}
 
-	dbGroup := &mysql.VTapGroup{}
+	dbGroup := &mysqlmodel.VTapGroup{}
 	ret = db.Where("lcuuid = ?", vTapGroupLcuuid).First(dbGroup)
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
@@ -557,7 +558,7 @@ func (a *AgentGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*age
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	var vtapGroup *mysql.VTapGroup
+	var vtapGroup *mysqlmodel.VTapGroup
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
@@ -585,7 +586,7 @@ func (a *AgentGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updat
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	var vtapGroup *mysql.VTapGroup
+	var vtapGroup *mysqlmodel.VTapGroup
 	if err := db.Where("lcuuid = ?", dbConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 		return nil, err
 	}
@@ -661,12 +662,12 @@ func GetVTapGroupConfigs(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPerm
 	db := dbInfo.DB
 
 	var dbConfigs []*agent_config.AgentGroupConfigModel
-	var tapTypes []*mysql.TapType
-	var domains []*mysql.Domain
-	var allVTapGroups []*mysql.VTapGroup
+	var tapTypes []*mysqlmodel.TapType
+	var domains []*mysqlmodel.Domain
+	var allVTapGroups []*mysqlmodel.VTapGroup
 	idToTapTypeName := make(map[int]string)
 	lcuuidToDomain := make(map[string]string)
-	lcuuidToVTapGroup := make(map[string]*mysql.VTapGroup)
+	lcuuidToVTapGroup := make(map[string]*mysqlmodel.VTapGroup)
 
 	db.Find(&dbConfigs)
 	db.Find(&tapTypes)
@@ -731,8 +732,8 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 			realConfig = &agent_config.AgentGroupConfigModel{}
 		}
 	}
-	var tapTypes []*mysql.TapType
-	var domains []*mysql.Domain
+	var tapTypes []*mysqlmodel.TapType
+	var domains []*mysqlmodel.Domain
 	idToTapTypeName := make(map[int]string)
 	lcuuidToDomain := make(map[string]string)
 	db.Find(&tapTypes)
@@ -750,7 +751,7 @@ func GetVTapGroupDetailedConfig(orgID int, lcuuid string) (*model.DetailedConfig
 
 	realData.TeamID = common.DEFAULT_TEAM_ID
 	if realConfig.VTapGroupLcuuid != nil {
-		var vtapGroup mysql.VTapGroup
+		var vtapGroup mysqlmodel.VTapGroup
 		if err := db.Where("lcuuid = ?", *realConfig.VTapGroupLcuuid).First(&vtapGroup).Error; err != nil {
 			return nil, err
 		}
@@ -802,7 +803,7 @@ func GetVTapGroupAdvancedConfigs(orgID int) ([]string, error) {
 	db := dbInfo.DB
 
 	var dbConfigs []agent_config.AgentGroupConfigModel
-	var dbGroups []mysql.VTapGroup
+	var dbGroups []mysqlmodel.VTapGroup
 	lcuuidToShortUUID := make(map[string]string)
 	db.Find(&dbGroups)
 	for _, dbGroup := range dbGroups {
@@ -869,7 +870,7 @@ func CreateVTapGroupAdvancedConfig(orgID int, createData *agent_config.AgentGrou
 		return "", fmt.Errorf("vtap_group_id is None")
 	}
 	shortUUID := createData.VTapGroupID
-	vtapGroup := &mysql.VTapGroup{}
+	vtapGroup := &mysqlmodel.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", *shortUUID)
@@ -909,7 +910,7 @@ func GetVTapGroupConfigByFilter(orgID int, args map[string]string) (string, erro
 	if shortUUID == "" {
 		return "", fmt.Errorf("short uuid is None")
 	}
-	vtapGroup := &mysql.VTapGroup{}
+	vtapGroup := &mysqlmodel.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
@@ -940,7 +941,7 @@ func DeleteVTapGroupConfigByFilter(orgID int, args map[string]string) (string, e
 	if shortUUID == "" {
 		return "", fmt.Errorf("short uuid is None")
 	}
-	vtapGroup := &mysql.VTapGroup{}
+	vtapGroup := &mysqlmodel.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)

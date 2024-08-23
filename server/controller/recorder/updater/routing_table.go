@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type RoutingTable struct {
 	UpdaterBase[
 		cloudmodel.RoutingTable,
 		*diffbase.RoutingTable,
-		*mysql.RoutingTable,
-		mysql.RoutingTable,
+		*mysqlmodel.RoutingTable,
+		mysqlmodel.RoutingTable,
 		*message.RoutingTableAdd,
 		message.RoutingTableAdd,
 		*message.RoutingTableUpdate,
@@ -47,8 +47,8 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		newUpdaterBase[
 			cloudmodel.RoutingTable,
 			*diffbase.RoutingTable,
-			*mysql.RoutingTable,
-			mysql.RoutingTable,
+			*mysqlmodel.RoutingTable,
+			mysqlmodel.RoutingTable,
 			*message.RoutingTableAdd,
 			message.RoutingTableAdd,
 			*message.RoutingTableUpdate,
@@ -73,7 +73,7 @@ func (t *RoutingTable) getDiffBaseByCloudItem(cloudItem *cloudmodel.RoutingTable
 	return
 }
 
-func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*mysql.RoutingTable, bool) {
+func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*mysqlmodel.RoutingTable, bool) {
 	vrouterID, exists := t.cache.ToolDataSet.GetVRouterIDByLcuuid(cloudItem.VRouterLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -82,7 +82,7 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 		), t.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysql.RoutingTable{
+	dbItem := &mysqlmodel.RoutingTable{
 		Destination: cloudItem.Destination,
 		NexthopType: cloudItem.NexthopType,
 		Nexthop:     cloudItem.Nexthop,

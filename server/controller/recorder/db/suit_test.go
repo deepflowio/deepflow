@@ -28,6 +28,7 @@ import (
 	"gorm.io/gorm/schema"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
@@ -82,17 +83,17 @@ func GetDB() *gorm.DB {
 
 func getModels() []interface{} {
 	return []interface{}{
-		&mysql.Region{}, &mysql.AZ{}, &mysql.SubDomain{}, &mysql.Host{}, &mysql.VM{},
-		&mysql.VPC{}, &mysql.Network{}, &mysql.Subnet{}, &mysql.VRouter{}, &mysql.RoutingTable{},
-		&mysql.DHCPPort{}, &mysql.VInterface{}, &mysql.WANIP{}, &mysql.LANIP{}, &mysql.FloatingIP{},
-		&mysql.SecurityGroup{}, &mysql.SecurityGroupRule{}, &mysql.VMSecurityGroup{}, &mysql.LB{},
-		&mysql.LBListener{}, &mysql.LBTargetServer{}, &mysql.NATGateway{}, &mysql.NATRule{},
-		&mysql.NATVMConnection{}, &mysql.LBVMConnection{}, &mysql.CEN{}, &mysql.PeerConnection{},
-		&mysql.RDSInstance{}, &mysql.RedisInstance{},
-		&mysql.PodCluster{}, &mysql.PodNode{}, &mysql.PodNamespace{}, &mysql.VMPodNodeConnection{},
-		&mysql.PodIngress{}, &mysql.PodIngressRule{}, &mysql.PodIngressRuleBackend{},
-		&mysql.PodService{}, &mysql.PodServicePort{}, &mysql.PodGroup{}, &mysql.PodGroupPort{},
-		&mysql.PodReplicaSet{}, &mysql.Pod{},
+		&mysqlmodel.Region{}, &mysqlmodel.AZ{}, &mysqlmodel.SubDomain{}, &mysqlmodel.Host{}, &mysqlmodel.VM{},
+		&mysqlmodel.VPC{}, &mysqlmodel.Network{}, &mysqlmodel.Subnet{}, &mysqlmodel.VRouter{}, &mysqlmodel.RoutingTable{},
+		&mysqlmodel.DHCPPort{}, &mysqlmodel.VInterface{}, &mysqlmodel.WANIP{}, &mysqlmodel.LANIP{}, &mysqlmodel.FloatingIP{},
+		&mysql.SecurityGroup{}, &mysql.SecurityGroupRule{}, &mysql.VMSecurityGroup{}, &mysqlmodel.LB{},
+		&mysqlmodel.LBListener{}, &mysqlmodel.LBTargetServer{}, &mysqlmodel.NATGateway{}, &mysqlmodel.NATRule{},
+		&mysqlmodel.NATVMConnection{}, &mysqlmodel.LBVMConnection{}, &mysqlmodel.CEN{}, &mysqlmodel.PeerConnection{},
+		&mysqlmodel.RDSInstance{}, &mysqlmodel.RedisInstance{},
+		&mysqlmodel.PodCluster{}, &mysqlmodel.PodNode{}, &mysqlmodel.PodNamespace{}, &mysqlmodel.VMPodNodeConnection{},
+		&mysqlmodel.PodIngress{}, &mysqlmodel.PodIngressRule{}, &mysqlmodel.PodIngressRuleBackend{},
+		&mysqlmodel.PodService{}, &mysqlmodel.PodServicePort{}, &mysqlmodel.PodGroup{}, &mysqlmodel.PodGroupPort{},
+		&mysqlmodel.PodReplicaSet{}, &mysqlmodel.Pod{},
 	}
 }
 

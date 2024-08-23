@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type VRouter struct {
-	OperatorBase[*mysql.VRouter, mysql.VRouter]
+	OperatorBase[*mysqlmodel.VRouter, mysqlmodel.VRouter]
 }
 
 func NewVRouter() *VRouter {
 	operater := &VRouter{
-		newOperatorBase[*mysql.VRouter](
+		newOperatorBase[*mysqlmodel.VRouter](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			true,
 			true,

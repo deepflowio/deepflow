@@ -21,18 +21,19 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChAZ struct {
-	SubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, mysql.AZ, mysql.ChAZ, IDKey]
+	SubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, mysqlmodel.AZ, mysqlmodel.ChAZ, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	mng := &ChAZ{
-		newSubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, mysql.AZ, mysql.ChAZ, IDKey](
+		newSubscriberComponent[*message.AZFieldsUpdate, message.AZFieldsUpdate, mysqlmodel.AZ, mysqlmodel.ChAZ, IDKey](
 			common.RESOURCE_TYPE_AZ_EN, RESOURCE_TYPE_CH_AZ,
 		),
 		domainLcuuidToIconID,
@@ -49,14 +50,14 @@ func (a *ChAZ) onResourceUpdated(sourceID int, fieldsUpdate *message.AZFieldsUpd
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysql.ChAZ
+		var chItem mysqlmodel.ChAZ
 		db.Where("id = ?", sourceID).First(&chItem) // TODO use query to update ?
 		a.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysql.AZ) (keys []IDKey, targets []mysql.ChAZ) {
+func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysqlmodel.AZ) (keys []IDKey, targets []mysqlmodel.ChAZ) {
 	iconID := a.domainLcuuidToIconID[az.Domain]
 	var err error
 	if iconID == 0 {
@@ -76,7 +77,7 @@ func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysql.AZ) (keys []IDKey,
 	if az.DeletedAt.Valid {
 		name += " (deleted)"
 	}
-	targets = append(targets, mysql.ChAZ{
+	targets = append(targets, mysqlmodel.ChAZ{
 		ID:       az.ID,
 		Name:     name,
 		IconID:   iconID,
@@ -87,7 +88,7 @@ func (a *ChAZ) sourceToTarget(md *message.Metadata, az *mysql.AZ) (keys []IDKey,
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (a *ChAZ) softDeletedTargetsUpdated(targets []mysql.ChAZ, db *mysql.DB) {
+func (a *ChAZ) softDeletedTargetsUpdated(targets []mysqlmodel.ChAZ, db *mysql.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

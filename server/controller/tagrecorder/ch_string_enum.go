@@ -20,17 +20,18 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
 
 type ChStringEnum struct {
-	UpdaterComponent[mysql.ChStringEnum, StringEnumTagKey]
+	UpdaterComponent[mysqlmodel.ChStringEnum, StringEnumTagKey]
 }
 
 func NewChStringEnum() *ChStringEnum {
 	updater := &ChStringEnum{
-		newUpdaterComponent[mysql.ChStringEnum, StringEnumTagKey](
+		newUpdaterComponent[mysqlmodel.ChStringEnum, StringEnumTagKey](
 			RESOURCE_TYPE_CH_STRING_ENUM,
 		),
 	}
@@ -38,11 +39,11 @@ func NewChStringEnum() *ChStringEnum {
 	return updater
 }
 
-func (e *ChStringEnum) generateNewData(dbClient *mysql.DB) (map[StringEnumTagKey]mysql.ChStringEnum, bool) {
+func (e *ChStringEnum) generateNewData(dbClient *mysql.DB) (map[StringEnumTagKey]mysqlmodel.ChStringEnum, bool) {
 	sql := "show tag all_string_enum values from tagrecorder"
 	db := "tagrecorder"
 	table := "tagrecorder"
-	keyToItem := make(map[StringEnumTagKey]mysql.ChStringEnum)
+	keyToItem := make(map[StringEnumTagKey]mysqlmodel.ChStringEnum)
 	respMap, err := tag.GetEnumTagValues(db, table, sql)
 	if err != nil {
 		log.Errorf("read failed: %v", err, dbClient.LogPrefixORGID)
@@ -58,7 +59,7 @@ func (e *ChStringEnum) generateNewData(dbClient *mysql.DB) (map[StringEnumTagKey
 				TagName:  tagName,
 				TagValue: tagValue.(string),
 			}
-			keyToItem[key] = mysql.ChStringEnum{
+			keyToItem[key] = mysqlmodel.ChStringEnum{
 				TagName:     tagName,
 				Value:       tagValue.(string),
 				Name:        tagDisplayName.(string),
@@ -70,11 +71,11 @@ func (e *ChStringEnum) generateNewData(dbClient *mysql.DB) (map[StringEnumTagKey
 	return keyToItem, true
 }
 
-func (e *ChStringEnum) generateKey(dbItem mysql.ChStringEnum) StringEnumTagKey {
+func (e *ChStringEnum) generateKey(dbItem mysqlmodel.ChStringEnum) StringEnumTagKey {
 	return StringEnumTagKey{TagName: dbItem.TagName, TagValue: dbItem.Value}
 }
 
-func (e *ChStringEnum) generateUpdateInfo(oldItem, newItem mysql.ChStringEnum) (map[string]interface{}, bool) {
+func (e *ChStringEnum) generateUpdateInfo(oldItem, newItem mysqlmodel.ChStringEnum) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.TagName != newItem.TagName {
 		updateInfo["tag_name"] = newItem.TagName

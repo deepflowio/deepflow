@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -36,7 +36,7 @@ func NewSubDomain(c *cache.Cache) *SubDomain {
 	}
 }
 
-func (sd *SubDomain) OnUpdaterAdded(addedDBItems []*mysql.SubDomain) {
+func (sd *SubDomain) OnUpdaterAdded(addedDBItems []*mysqlmodel.SubDomain) {
 	sd.cache.AddSubDomains(addedDBItems)
 }
 

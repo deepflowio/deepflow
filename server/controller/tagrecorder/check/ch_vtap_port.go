@@ -28,13 +28,14 @@ import (
 	"github.com/bitly/go-simplejson"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 const vTapPortNameLength = 256
 
 type ChVTapPort struct {
-	UpdaterBase[mysql.ChVTapPort, VtapPortKey]
+	UpdaterBase[mysqlmodel.ChVTapPort, VtapPortKey]
 }
 
 type DeviceInfo struct {
@@ -46,7 +47,7 @@ type DeviceInfo struct {
 
 func NewChVTapPort() *ChVTapPort {
 	updater := &ChVTapPort{
-		UpdaterBase[mysql.ChVTapPort, VtapPortKey]{
+		UpdaterBase[mysqlmodel.ChVTapPort, VtapPortKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VTAP_PORT,
 		},
 	}
@@ -54,26 +55,26 @@ func NewChVTapPort() *ChVTapPort {
 	return updater
 }
 
-func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) {
-	var vTaps []mysql.VTap
+func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysqlmodel.ChVTapPort, bool) {
+	var vTaps []mysqlmodel.VTap
 	err := mysql.DefaultDB.Where("type = ?", common.VTAP_TYPE_DEDICATED).Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
-	var hosts []mysql.Host
+	var hosts []mysqlmodel.Host
 	err = mysql.DefaultDB.Where("htype = ?", common.HOST_HTYPE_GATEWAY).Unscoped().Find(&hosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
-	var vInterfaces []mysql.VInterface
+	var vInterfaces []mysqlmodel.VInterface
 	err = mysql.DefaultDB.Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&vInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
-	var chDevices []mysql.ChDevice
+	var chDevices []mysqlmodel.ChDevice
 	err = mysql.DefaultDB.Unscoped().Find(&chDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
@@ -88,7 +89,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		log.Error(errors.New("unable to get resource vtap-port"), v.db.LogPrefixORGID)
 		return nil, false
 	}
-	keyToItem := make(map[VtapPortKey]mysql.ChVTapPort)
+	keyToItem := make(map[VtapPortKey]mysqlmodel.ChVTapPort)
 	if len(vtapVIFs) == 0 {
 		log.Info("no data in get vtap-port response", v.db.LogPrefixORGID)
 		return keyToItem, true
@@ -166,7 +167,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 			log.Debugf("update: %+v", vTapPort, v.db.LogPrefixORGID)
 		} else {
 			if data.VTapID != 0 || tapPort != 0 {
-				keyToItem[tapMacKey] = mysql.ChVTapPort{
+				keyToItem[tapMacKey] = mysqlmodel.ChVTapPort{
 					VTapID:     data.VTapID,
 					TapPort:    tapPort,
 					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
@@ -216,7 +217,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				keyToItem[macKey] = vTapPort
 				log.Debugf("update: %+v", vTapPort, v.db.LogPrefixORGID)
 			} else {
-				keyToItem[macKey] = mysql.ChVTapPort{
+				keyToItem[macKey] = mysqlmodel.ChVTapPort{
 					VTapID:     data.VTapID,
 					TapPort:    macPort,
 					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
@@ -263,7 +264,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				log.Debugf("pass device id: %d, device type: %d, device name: %s", deviceInfo.DeviceID, deviceInfo.DeviceType, deviceInfo.DeviceName, v.db.LogPrefixORGID)
 			}
 		} else if vTapID != 0 {
-			keyToItem[key] = mysql.ChVTapPort{
+			keyToItem[key] = mysqlmodel.ChVTapPort{
 				VTapID:     vTapID,
 				TapPort:    0,
 				MacType:    0,
@@ -301,7 +302,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					}
 					if vTap.Region != "" && vTap.Region == host.Region {
 						key := VtapPortKey{VtapID: vTap.ID, TapPort: tapPort}
-						keyToItem[key] = mysql.ChVTapPort{
+						keyToItem[key] = mysqlmodel.ChVTapPort{
 							VTapID:     vTap.ID,
 							TapPort:    tapPort,
 							Name:       vInterface.Name + " " + host.Name,
@@ -323,31 +324,31 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 
 func (v *ChVTapPort) generateVtapDeviceInfo() (map[int]DeviceInfo, bool) {
 	vTapIDToDeviceInfo := make(map[int]DeviceInfo)
-	var hostChDevices []mysql.ChDevice
+	var hostChDevices []mysqlmodel.ChDevice
 	err := mysql.DefaultDB.Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&hostChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var vmChDevices []mysql.ChDevice
+	var vmChDevices []mysqlmodel.ChDevice
 	err = mysql.DefaultDB.Where("devicetype = ?", common.VIF_DEVICE_TYPE_VM).Unscoped().Find(&vmChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var podNodeChDevices []mysql.ChDevice
+	var podNodeChDevices []mysqlmodel.ChDevice
 	err = mysql.DefaultDB.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD_NODE).Unscoped().Find(&podNodeChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var podChDevices []mysql.ChDevice
+	var podChDevices []mysqlmodel.ChDevice
 	err = mysql.DefaultDB.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD).Unscoped().Find(&podChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var vTaps []mysql.VTap
+	var vTaps []mysqlmodel.VTap
 	err = mysql.DefaultDB.Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
@@ -416,11 +417,11 @@ func (v *ChVTapPort) generateVtapDeviceInfo() (map[int]DeviceInfo, bool) {
 	return vTapIDToDeviceInfo, true
 }
 
-func (v *ChVTapPort) generateKey(dbItem mysql.ChVTapPort) VtapPortKey {
+func (v *ChVTapPort) generateKey(dbItem mysqlmodel.ChVTapPort) VtapPortKey {
 	return VtapPortKey{VtapID: dbItem.VTapID, TapPort: dbItem.TapPort}
 }
 
-func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysql.ChVTapPort) (map[string]interface{}, bool) {
+func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVTapPort) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	oldItemMap := make(map[string]interface{})
 	newItemMap := make(map[string]interface{})
@@ -459,12 +460,12 @@ func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, er
 	}
 
 	controllerIPToRegionLcuuid := make(map[string]string)
-	var azCConns []*mysql.AZControllerConnection
+	var azCConns []*mysqlmodel.AZControllerConnection
 	mysql.DefaultDB.Unscoped().Find(&azCConns)
 	for _, c := range azCConns {
 		controllerIPToRegionLcuuid[c.ControllerIP] = c.Region
 	}
-	var controllers []*mysql.Controller
+	var controllers []*mysqlmodel.Controller
 	mysql.DefaultDB.Unscoped().Find(&controllers)
 	slaveRegionLcuuidToHealthyControllerIPs := make(map[string][]string)
 	for _, c := range controllers {
@@ -542,7 +543,7 @@ func formatVTapVInterfaces(vifs *simplejson.Json, filter map[string]interface{},
 
 			macVIFs := toolDS.macToVIFs[vtapVIF.MAC]
 			if len(macVIFs) > 0 {
-				var macVIF *mysql.VInterface
+				var macVIF *mysqlmodel.VInterface
 				if len(macVIFs) == 1 {
 					macVIF = macVIFs[0]
 				} else {
@@ -608,8 +609,8 @@ func formatVTapVInterfaces(vifs *simplejson.Json, filter map[string]interface{},
 }
 
 type vpToolDataSet struct {
-	idToVTap              map[int]*mysql.VTap
-	macToVIFs             map[string][]*mysql.VInterface
+	idToVTap              map[int]*mysqlmodel.VTap
+	macToVIFs             map[string][]*mysqlmodel.VInterface
 	hostIDToName          map[int]string
 	hostIPToID            map[string]int
 	vmIDToName            map[int]string
@@ -629,8 +630,8 @@ type vpToolDataSet struct {
 
 func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 	toolDS = &vpToolDataSet{
-		idToVTap:              make(map[int]*mysql.VTap),
-		macToVIFs:             make(map[string][]*mysql.VInterface),
+		idToVTap:              make(map[int]*mysqlmodel.VTap),
+		macToVIFs:             make(map[string][]*mysqlmodel.VInterface),
 		hostIDToName:          make(map[int]string),
 		hostIPToID:            make(map[string]int),
 		vmIDToName:            make(map[int]string),
@@ -648,7 +649,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		podIDToName:           make(map[int]string),
 	}
 
-	var vtaps []*mysql.VTap
+	var vtaps []*mysqlmodel.VTap
 	if err = mysql.DefaultDB.Unscoped().Find(&vtaps).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vtap", err))
 		return
@@ -657,7 +658,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.idToVTap[vtap.ID] = vtap
 	}
 
-	var vifs []*mysql.VInterface
+	var vifs []*mysqlmodel.VInterface
 	if err = mysql.DefaultDB.Select("mac", "deviceid", "devicetype").Unscoped().Find(&vifs).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vinterface", err))
 		return
@@ -666,7 +667,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.macToVIFs[vif.Mac] = append(toolDS.macToVIFs[vif.Mac], vif)
 	}
 
-	var hosts []*mysql.Host
+	var hosts []*mysqlmodel.Host
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&hosts).Error; err != nil {
 		log.Error(dbQueryResourceFailed("host_device", err))
 		return
@@ -675,7 +676,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.hostIDToName[host.ID] = host.Name
 	}
 
-	var vms []*mysql.VM
+	var vms []*mysqlmodel.VM
 	if err = mysql.DefaultDB.Select("id", "name", "launch_server").Unscoped().Find(&vms).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vm", err))
 		return
@@ -685,7 +686,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.vmIDToLaunchServer[vm.ID] = vm.LaunchServer
 	}
 
-	var podNodes []*mysql.PodNode
+	var podNodes []*mysqlmodel.PodNode
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&podNodes).Error; err != nil {
 		log.Error(dbQueryResourceFailed("pod_node", err))
 		return
@@ -694,7 +695,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.podNodeIDToName[podNode.ID] = podNode.Name
 	}
 
-	var vmPodNodeConns []*mysql.VMPodNodeConnection
+	var vmPodNodeConns []*mysqlmodel.VMPodNodeConnection
 	if err = mysql.DefaultDB.Unscoped().Find(&vmPodNodeConns).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vm_pod_node_connection", err))
 		return
@@ -704,7 +705,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.podNodeIDToVMID[conn.PodNodeID] = conn.VMID
 	}
 
-	var vrouters []*mysql.VRouter
+	var vrouters []*mysqlmodel.VRouter
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&vrouters).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vrouter", err))
 		return
@@ -713,7 +714,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.vrouterIDToName[v.ID] = v.Name
 	}
 
-	var dhcpPorts []*mysql.DHCPPort
+	var dhcpPorts []*mysqlmodel.DHCPPort
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&dhcpPorts).Error; err != nil {
 		log.Error(dbQueryResourceFailed("dhcp_port", err))
 		return
@@ -722,7 +723,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.dhcpPortIDToName[d.ID] = d.Name
 	}
 
-	var ngws []*mysql.NATGateway
+	var ngws []*mysqlmodel.NATGateway
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&ngws).Error; err != nil {
 		log.Error(dbQueryResourceFailed("nat_gateway", err))
 		return
@@ -731,7 +732,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.natGatewayIDToName[n.ID] = n.Name
 	}
 
-	var lbs []*mysql.LB
+	var lbs []*mysqlmodel.LB
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&lbs).Error; err != nil {
 		log.Error(dbQueryResourceFailed("lb", err))
 		return
@@ -740,7 +741,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.lbIDToName[lb.ID] = lb.Name
 	}
 
-	var rdsInstances []*mysql.RDSInstance
+	var rdsInstances []*mysqlmodel.RDSInstance
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&rdsInstances).Error; err != nil {
 		log.Error(dbQueryResourceFailed("rds_instance", err))
 		return
@@ -749,7 +750,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.rdsInstanceIDToName[r.ID] = r.Name
 	}
 
-	var redisInstances []*mysql.RedisInstance
+	var redisInstances []*mysqlmodel.RedisInstance
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&redisInstances).Error; err != nil {
 		log.Error(dbQueryResourceFailed("redis_instance", err))
 		return
@@ -758,7 +759,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.redisInstanceIDToName[r.ID] = r.Name
 	}
 
-	var podServices []*mysql.PodService
+	var podServices []*mysqlmodel.PodService
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&podServices).Error; err != nil {
 		log.Error(dbQueryResourceFailed("pod_service", err))
 		return
@@ -767,7 +768,7 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		toolDS.podServiceIDToName[p.ID] = p.Name
 	}
 
-	var pods []*mysql.Pod
+	var pods []*mysqlmodel.Pod
 	if err = mysql.DefaultDB.Select("id", "name").Unscoped().Find(&pods).Error; err != nil {
 		log.Error(dbQueryResourceFailed("pod", err))
 		return

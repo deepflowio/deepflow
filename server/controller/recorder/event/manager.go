@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -117,7 +117,7 @@ func (e *EventManagerBase) enqueueIfInsertIntoMySQLFailed(
 	if err != nil {
 		log.Errorf("json marshal event (detail: %#v) failed: %s", event, err.Error(), e.metadata.LogPrefixes)
 	} else {
-		dbItem := mysql.ResourceEvent{
+		dbItem := mysqlmodel.ResourceEvent{
 			Domain:  domainLcuuid,
 			Content: string(content),
 		}

@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type SubDomain struct {
 	UpdaterBase[
 		cloudmodel.SubDomain,
 		*diffbase.SubDomain,
-		*mysql.SubDomain,
-		mysql.SubDomain,
+		*mysqlmodel.SubDomain,
+		mysqlmodel.SubDomain,
 		*message.SubDomainAdd,
 		message.SubDomainAdd,
 		*message.SubDomainUpdate,
@@ -47,8 +47,8 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 		newUpdaterBase[
 			cloudmodel.SubDomain,
 			*diffbase.SubDomain,
-			*mysql.SubDomain,
-			mysql.SubDomain,
+			*mysqlmodel.SubDomain,
+			mysqlmodel.SubDomain,
 			*message.SubDomainAdd,
 			message.SubDomainAdd,
 			*message.SubDomainUpdate,
@@ -73,8 +73,8 @@ func (d *SubDomain) getDiffBaseByCloudItem(cloudItem *cloudmodel.SubDomain) (dif
 	return
 }
 
-func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysql.SubDomain, bool) {
-	dbItem := &mysql.SubDomain{
+func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*mysqlmodel.SubDomain, bool) {
+	dbItem := &mysqlmodel.SubDomain{
 		TeamID:      cloudItem.TeamID,
 		Name:        cloudItem.Name,
 		DisplayName: cloudItem.DisplayName,

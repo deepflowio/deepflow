@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodCluster struct {
-	UpdaterBase[mysql.ChPodCluster, IDKey]
+	UpdaterBase[mysqlmodel.ChPodCluster, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	updater := &ChPodCluster{
-		UpdaterBase[mysql.ChPodCluster, IDKey]{
+		UpdaterBase[mysqlmodel.ChPodCluster, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD_CLUSTER,
 		},
 		resourceTypeToIconID,
@@ -37,22 +37,22 @@ func NewChPodCluster(resourceTypeToIconID map[IconKey]int) *ChPodCluster {
 	return updater
 }
 
-func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
-	var podClusters []mysql.PodCluster
+func (p *ChPodCluster) generateNewData() (map[IDKey]mysqlmodel.ChPodCluster, bool) {
+	var podClusters []mysqlmodel.PodCluster
 	err := p.db.Unscoped().Find(&podClusters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodCluster)
+	keyToItem := make(map[IDKey]mysqlmodel.ChPodCluster)
 	for _, podCluster := range podClusters {
 		teamID, err := tagrecorder.GetTeamID(podCluster.Domain, podCluster.SubDomain)
 		if err != nil {
 			log.Errorf("resource(%s) %s, resource: %#v", p.resourceTypeName, err.Error(), podCluster, p.db.LogPrefixORGID)
 		}
 		if podCluster.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
+			keyToItem[IDKey{ID: podCluster.ID}] = mysqlmodel.ChPodCluster{
 				ID:          podCluster.ID,
 				Name:        podCluster.Name + " (deleted)",
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
@@ -61,7 +61,7 @@ func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 				SubDomainID: tagrecorder.SubDomainToSubDomainID[podCluster.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: podCluster.ID}] = mysql.ChPodCluster{
+			keyToItem[IDKey{ID: podCluster.ID}] = mysqlmodel.ChPodCluster{
 				ID:          podCluster.ID,
 				Name:        podCluster.Name,
 				IconID:      p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_CLUSTER}],
@@ -74,11 +74,11 @@ func (p *ChPodCluster) generateNewData() (map[IDKey]mysql.ChPodCluster, bool) {
 	return keyToItem, true
 }
 
-func (p *ChPodCluster) generateKey(dbItem mysql.ChPodCluster) IDKey {
+func (p *ChPodCluster) generateKey(dbItem mysqlmodel.ChPodCluster) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChPodCluster) generateUpdateInfo(oldItem, newItem mysql.ChPodCluster) (map[string]interface{}, bool) {
+func (p *ChPodCluster) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodCluster) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

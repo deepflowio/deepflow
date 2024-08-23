@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type PodReplicaSet struct {
-	OperatorBase[*mysql.PodReplicaSet, mysql.PodReplicaSet]
+	OperatorBase[*mysqlmodel.PodReplicaSet, mysqlmodel.PodReplicaSet]
 }
 
 func NewPodReplicaSet() *PodReplicaSet {
 	operater := &PodReplicaSet{
-		newOperatorBase[*mysql.PodReplicaSet](
+		newOperatorBase[*mysqlmodel.PodReplicaSet](
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			true,
 			true,

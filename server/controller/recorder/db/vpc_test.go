@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBVPC() *mysql.VPC {
-	return &mysql.VPC{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBVPC() *mysqlmodel.VPC {
+	return &mysqlmodel.VPC{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddVPCBatchSuccess() {
 	operator := NewVPC()
 	itemToAdd := newDBVPC()
 
-	_, ok := operator.AddBatch([]*mysql.VPC{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.VPC{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.VPC
+	var addedItem *mysqlmodel.VPC
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
 }
 
 func (t *SuiteTest) TestUpdateVPCSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateVPCSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysql.VPC
+	var updatedItem *mysqlmodel.VPC
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
 }
 
 func (t *SuiteTest) TestDeleteVPCBatchSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeleteVPCBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.VPC
+	var deletedItem *mysqlmodel.VPC
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

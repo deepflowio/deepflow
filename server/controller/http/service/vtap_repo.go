@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -33,13 +34,13 @@ const (
 	IMAGE_MAX_COUNT = 20
 )
 
-func CreateVtapRepo(orgID int, vtapRepoCreate *mysql.VTapRepo) (*model.VtapRepo, error) {
+func CreateVtapRepo(orgID int, vtapRepoCreate *mysqlmodel.VTapRepo) (*model.VtapRepo, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
 	}
 	db := dbInfo.DB
-	var vtapRepoFirst mysql.VTapRepo
+	var vtapRepoFirst mysqlmodel.VTapRepo
 	if err := db.Where("name = ?", vtapRepoCreate.Name).First(&vtapRepoFirst).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, NewError(httpcommon.SERVER_ERROR,
@@ -47,7 +48,7 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *mysql.VTapRepo) (*model.VtapRepo,
 		}
 
 		var count int64
-		db.Model(&mysql.VTapRepo{}).Count(&count)
+		db.Model(&mysqlmodel.VTapRepo{}).Count(&count)
 		if count >= IMAGE_MAX_COUNT {
 			return nil, fmt.Errorf("the number of image can not exceed %d", IMAGE_MAX_COUNT)
 		}
@@ -59,7 +60,7 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *mysql.VTapRepo) (*model.VtapRepo,
 	}
 
 	// update by name
-	if err := db.Model(&mysql.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).
+	if err := db.Model(&mysqlmodel.VTapRepo{}).Where("name = ?", vtapRepoCreate.Name).
 		Updates(vtapRepoCreate).Error; err != nil {
 		return nil, err
 	}
@@ -68,7 +69,7 @@ func CreateVtapRepo(orgID int, vtapRepoCreate *mysql.VTapRepo) (*model.VtapRepo,
 }
 
 func GetVtapRepo(orgID int, filter map[string]interface{}) ([]model.VtapRepo, error) {
-	var vtapRepoes []mysql.VTapRepo
+	var vtapRepoes []mysqlmodel.VTapRepo
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -103,12 +104,12 @@ func DeleteVtapRepo(orgID int, name string) error {
 		return err
 	}
 	db := dbInfo.DB
-	var vtapRepo mysql.VTapRepo
+	var vtapRepo mysqlmodel.VTapRepo
 	if err := db.Where("name = ?", name).Select("name", "id").First(&vtapRepo).Error; err != nil {
 		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_repo (name: %s) not found", name))
 	}
 
-	if err := db.Where("name = ?", name).Delete(&mysql.VTapRepo{}).Error; err != nil {
+	if err := db.Where("name = ?", name).Delete(&mysqlmodel.VTapRepo{}).Error; err != nil {
 		return NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete vtap_repo (name: %s) failed", name))
 	}
 	return nil

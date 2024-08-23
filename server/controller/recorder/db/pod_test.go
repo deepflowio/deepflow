@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBPod() *mysql.Pod {
-	return &mysql.Pod{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBPod() *mysqlmodel.Pod {
+	return &mysqlmodel.Pod{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodBatchSuccess() {
 	operator := NewPod()
 	itemToAdd := newDBPod()
 
-	_, ok := operator.AddBatch([]*mysql.Pod{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.Pod{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.Pod
+	var addedItem *mysqlmodel.Pod
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.Pod{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Pod{})
 }
 
 func (t *SuiteTest) TestUpdatePodSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysql.Pod
+	var updatedItem *mysqlmodel.Pod
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.Pod{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Pod{})
 }
 
 func (t *SuiteTest) TestDeletePodBatchSuccess() {
@@ -66,28 +66,28 @@ func (t *SuiteTest) TestDeletePodBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.Pod
+	var deletedItem *mysqlmodel.Pod
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestPodCreateAndFind() {
 	lcuuid := uuid.New().String()
-	pod := &mysql.Pod{
-		Base: mysql.Base{Lcuuid: lcuuid},
+	pod := &mysqlmodel.Pod{
+		Base: mysqlmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(pod)
-	var resultPod *mysql.Pod
+	var resultPod *mysqlmodel.Pod
 	err := t.db.Where("lcuuid = ? and name='' and alias='' and label='' and az='' and "+
 		"region='' and sub_domain=''", lcuuid).First(&resultPod).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), pod.Base.Lcuuid, resultPod.Base.Lcuuid)
 
-	resultPod = new(mysql.Pod)
+	resultPod = new(mysqlmodel.Pod)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPod)
 	assert.Equal(t.T(), pod.Base.Lcuuid, resultPod.Base.Lcuuid)
 
-	resultPod = new(mysql.Pod)
+	resultPod = new(mysqlmodel.Pod)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultPod)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

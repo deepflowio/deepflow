@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewRDSInstance(c *cache.Cache, eq *queue.OverwriteQueue) *RDSInstance {
 	return listener
 }
 
-func (r *RDSInstance) OnUpdaterAdded(addedDBItems []*mysql.RDSInstance) {
+func (r *RDSInstance) OnUpdaterAdded(addedDBItems []*mysqlmodel.RDSInstance) {
 	r.eventProducer.ProduceByAdd(addedDBItems)
 	r.cache.AddRDSInstances(addedDBItems)
 }

@@ -22,13 +22,13 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 func TestHuaWei(t *testing.T) {
 	Convey("TestHuaWei", t, func() {
-		domain := mysql.Domain{
+		domain := mysqlmodel.Domain{
 			DisplayName: "test_huawei",
 		}
 

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewDHCPPort(c *cache.Cache, eq *queue.OverwriteQueue) *DHCPPort {
 	return listener
 }
 
-func (p *DHCPPort) OnUpdaterAdded(addedDBItems []*mysql.DHCPPort) {
+func (p *DHCPPort) OnUpdaterAdded(addedDBItems []*mysqlmodel.DHCPPort) {
 	p.eventProducer.ProduceByAdd(addedDBItems)
 	p.cache.AddDHCPPorts(addedDBItems)
 }

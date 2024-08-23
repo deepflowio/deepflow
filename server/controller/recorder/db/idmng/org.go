@@ -26,6 +26,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
 )
 
@@ -119,7 +120,7 @@ func (m *IDManagers) lazyCreate(orgID int) (*IDManager, error) {
 
 	if orgID != common.DEFAULT_ORG_ID {
 		// 仅当组织中存在 domain 时，才创建组织的 IDManager，以避免内存浪费
-		var domain *mysql.Domain
+		var domain *mysqlmodel.Domain
 		result := db.Limit(1).Find(&domain)
 		if result.Error != nil {
 			log.Errorf("failed to get domain: %v", err, db.LogPrefixORGID)

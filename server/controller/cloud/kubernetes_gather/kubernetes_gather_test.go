@@ -30,12 +30,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 )
 
 func TestKubernetes(t *testing.T) {
 	Convey("TestKubernetes", t, func() {
-		k8sConfig := mysql.SubDomain{
+		k8sConfig := mysqlmodel.SubDomain{
 			Name:        "test_k8s",
 			DisplayName: "test_k8s",
 			ClusterID:   "d-01LMvvfQPZ",

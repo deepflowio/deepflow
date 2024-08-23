@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBPodServicePort() *mysql.PodServicePort {
-	return &mysql.PodServicePort{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBPodServicePort() *mysqlmodel.PodServicePort {
+	return &mysqlmodel.PodServicePort{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodServicePortBatchSuccess() {
 	operator := NewPodServicePort()
 	itemToAdd := newDBPodServicePort()
 
-	_, ok := operator.AddBatch([]*mysql.PodServicePort{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.PodServicePort{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.PodServicePort
+	var addedItem *mysqlmodel.PodServicePort
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.PodServicePort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodServicePort{})
 }
 
 func (t *SuiteTest) TestUpdatePodServicePortSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodServicePortSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysql.PodServicePort
+	var updatedItem *mysqlmodel.PodServicePort
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.PodServicePort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodServicePort{})
 }
 
 func (t *SuiteTest) TestDeletePodServicePortBatchSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeletePodServicePortBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.PodServicePort
+	var deletedItem *mysqlmodel.PodServicePort
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

@@ -18,10 +18,10 @@ package diffbase
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddLBVMConnection(dbItem *mysql.LBVMConnection, seq int) {
+func (b *DataSet) AddLBVMConnection(dbItem *mysqlmodel.LBVMConnection, seq int) {
 	b.LBVMConnections[dbItem.Lcuuid] = &LBVMConnection{
 		DiffBase: DiffBase{
 			Sequence: seq,

@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -64,14 +64,14 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 	defer ln.lock.Unlock()
 
 	resp := make([]*controller.PrometheusLabelName, 0)
-	var dbToAdd []*mysql.PrometheusLabelName
+	var dbToAdd []*mysqlmodel.PrometheusLabelName
 	for i := range strs {
 		str := strs[i]
 		if id, ok := ln.strToID.Get(str); ok {
 			resp = append(resp, &controller.PrometheusLabelName{Name: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
-		dbToAdd = append(dbToAdd, &mysql.PrometheusLabelName{Name: str})
+		dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusLabelName{Name: str})
 	}
 	if len(dbToAdd) == 0 {
 		return resp, nil
@@ -98,7 +98,7 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 }
 
 func (ln *labelName) load() (ids mapset.Set[int], err error) {
-	var items []*mysql.PrometheusLabelName
+	var items []*mysqlmodel.PrometheusLabelName
 	err = ln.org.DB.Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
@@ -113,7 +113,7 @@ func (ln *labelName) load() (ids mapset.Set[int], err error) {
 }
 
 func (ln *labelName) check(ids []int) (inUseIDs []int, err error) {
-	var dbItems []*mysql.PrometheusLabelName
+	var dbItems []*mysqlmodel.PrometheusLabelName
 	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)

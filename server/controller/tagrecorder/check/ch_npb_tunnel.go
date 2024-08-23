@@ -18,15 +18,16 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChNpbTunnel struct {
-	UpdaterBase[mysql.ChNpbTunnel, IDKey]
+	UpdaterBase[mysqlmodel.ChNpbTunnel, IDKey]
 }
 
 func NewChNpbTunnel() *ChNpbTunnel {
 	updater := &ChNpbTunnel{
-		UpdaterBase[mysql.ChNpbTunnel, IDKey]{
+		UpdaterBase[mysqlmodel.ChNpbTunnel, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_NPB_TUNNEL,
 		},
 	}
@@ -34,17 +35,17 @@ func NewChNpbTunnel() *ChNpbTunnel {
 	return updater
 }
 
-func (p *ChNpbTunnel) generateNewData() (map[IDKey]mysql.ChNpbTunnel, bool) {
-	var npbTunnels []mysql.NpbTunnel
+func (p *ChNpbTunnel) generateNewData() (map[IDKey]mysqlmodel.ChNpbTunnel, bool) {
+	var npbTunnels []mysqlmodel.NpbTunnel
 	err := mysql.DefaultDB.Unscoped().Select("id", "name").Find(&npbTunnels).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChNpbTunnel)
+	keyToItem := make(map[IDKey]mysqlmodel.ChNpbTunnel)
 	for _, npbTunnel := range npbTunnels {
-		keyToItem[IDKey{ID: npbTunnel.ID}] = mysql.ChNpbTunnel{
+		keyToItem[IDKey{ID: npbTunnel.ID}] = mysqlmodel.ChNpbTunnel{
 			ID:   npbTunnel.ID,
 			Name: npbTunnel.Name,
 		}
@@ -52,11 +53,11 @@ func (p *ChNpbTunnel) generateNewData() (map[IDKey]mysql.ChNpbTunnel, bool) {
 	return keyToItem, true
 }
 
-func (p *ChNpbTunnel) generateKey(dbItem mysql.ChNpbTunnel) IDKey {
+func (p *ChNpbTunnel) generateKey(dbItem mysqlmodel.ChNpbTunnel) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChNpbTunnel) generateUpdateInfo(oldItem, newItem mysql.ChNpbTunnel) (map[string]interface{}, bool) {
+func (p *ChNpbTunnel) generateUpdateInfo(oldItem, newItem mysqlmodel.ChNpbTunnel) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

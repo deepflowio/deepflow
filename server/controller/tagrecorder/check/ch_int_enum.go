@@ -20,18 +20,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 )
 
 type ChIntEnum struct {
-	UpdaterBase[mysql.ChIntEnum, IntEnumTagKey]
+	UpdaterBase[mysqlmodel.ChIntEnum, IntEnumTagKey]
 }
 
 func NewChIntEnum() *ChIntEnum {
 	updater := &ChIntEnum{
-		UpdaterBase[mysql.ChIntEnum, IntEnumTagKey]{
+		UpdaterBase[mysqlmodel.ChIntEnum, IntEnumTagKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_INT_ENUM,
 		},
 	}
@@ -39,11 +39,11 @@ func NewChIntEnum() *ChIntEnum {
 	return updater
 }
 
-func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) {
+func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysqlmodel.ChIntEnum, bool) {
 	sql := "show tag all_int_enum values from tagrecorder"
 	db := "tagrecorder"
 	table := "tagrecorder"
-	keyToItem := make(map[IntEnumTagKey]mysql.ChIntEnum)
+	keyToItem := make(map[IntEnumTagKey]mysqlmodel.ChIntEnum)
 	respMap, err := tag.GetEnumTagValues(db, table, sql)
 	if err != nil {
 		log.Errorf("read failed: %v", err, e.db.LogPrefixORGID)
@@ -61,7 +61,7 @@ func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) 
 					TagName:  tagName,
 					TagValue: tagValueInt,
 				}
-				keyToItem[key] = mysql.ChIntEnum{
+				keyToItem[key] = mysqlmodel.ChIntEnum{
 					TagName:     tagName,
 					Value:       tagValueInt,
 					Name:        tagDisplayName.(string),
@@ -75,11 +75,11 @@ func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) 
 	return keyToItem, true
 }
 
-func (e *ChIntEnum) generateKey(dbItem mysql.ChIntEnum) IntEnumTagKey {
+func (e *ChIntEnum) generateKey(dbItem mysqlmodel.ChIntEnum) IntEnumTagKey {
 	return IntEnumTagKey{TagName: dbItem.TagName, TagValue: dbItem.Value}
 }
 
-func (e *ChIntEnum) generateUpdateInfo(oldItem, newItem mysql.ChIntEnum) (map[string]interface{}, bool) {
+func (e *ChIntEnum) generateUpdateInfo(oldItem, newItem mysqlmodel.ChIntEnum) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.TagName != newItem.TagName {
 		updateInfo["tag_name"] = newItem.TagName

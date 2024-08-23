@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 var (
@@ -58,7 +59,7 @@ func (v *Version) Refresh() error {
 				log.Errorf("failed to get db: %v for org: %d", err, orgID)
 				continue
 			}
-			var resourceVersion mysql.ResourceVersion
+			var resourceVersion mysqlmodel.ResourceVersion
 			err = db.Where("name = ?", versionName).First(&resourceVersion).Error
 			if err != nil {
 				log.Errorf("failed to get version: %v", err, db.LogPrefixORGID)

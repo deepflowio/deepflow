@@ -18,17 +18,17 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 type PodNode struct {
-	OperatorBase[*mysql.PodNode, mysql.PodNode]
+	OperatorBase[*mysqlmodel.PodNode, mysqlmodel.PodNode]
 }
 
 func NewPodNode() *PodNode {
 	operater := &PodNode{
-		newOperatorBase[*mysql.PodNode](
+		newOperatorBase[*mysqlmodel.PodNode](
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			true,
 			true,
@@ -37,9 +37,9 @@ func NewPodNode() *PodNode {
 	return operater
 }
 
-func (n *PodNode) DeleteBatch(lcuuids []string) ([]*mysql.PodNode, bool) {
-	var vmPodNodeConns []*mysql.VMPodNodeConnection
-	err := n.metadata.DB.Model(&mysql.VMPodNodeConnection{}).Joins("JOIN pod_node On vm_pod_node_connection.pod_node_id = pod_node.id").Where("pod_node.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
+func (n *PodNode) DeleteBatch(lcuuids []string) ([]*mysqlmodel.PodNode, bool) {
+	var vmPodNodeConns []*mysqlmodel.VMPodNodeConnection
+	err := n.metadata.DB.Model(&mysqlmodel.VMPodNodeConnection{}).Joins("JOIN pod_node On vm_pod_node_connection.pod_node_id = pod_node.id").Where("pod_node.lcuuid IN ?", lcuuids).Scan(&vmPodNodeConns).Error
 	if err != nil {
 		log.Errorf("get %s (%s lcuuids: %+v) failed: %v", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuids, err.Error(), n.metadata.LogPrefixes)
 		return nil, false
@@ -54,7 +54,7 @@ func (n *PodNode) DeleteBatch(lcuuids []string) ([]*mysql.PodNode, bool) {
 		}
 	}
 
-	var dbItems []*mysql.PodNode
+	var dbItems []*mysqlmodel.PodNode
 	err = n.metadata.DB.Where("lcuuid IN ?", lcuuids).Delete(&dbItems).Error
 	if err != nil {
 		log.Errorf("%s (lcuuids: %v) failed: %v", common.LogDelete(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN), lcuuids, err.Error(), n.metadata.LogPrefixes)

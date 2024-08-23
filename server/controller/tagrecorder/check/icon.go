@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type IconData struct {
@@ -80,7 +81,7 @@ func (c *TagRecorder) UpdateIconInfo(db *mysql.DB) (map[string]int, map[IconKey]
 			domainTypeToDefaultIconID[domainType] = icon.ID
 		}
 	}
-	var domains []mysql.Domain
+	var domains []mysqlmodel.Domain
 	db.Unscoped().Find(&domains)
 	for _, domain := range domains {
 		if domain.IconID != 0 {

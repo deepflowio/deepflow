@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type NATVMConnection struct {
 	UpdaterBase[
 		cloudmodel.NATVMConnection,
 		*diffbase.NATVMConnection,
-		*mysql.NATVMConnection,
-		mysql.NATVMConnection,
+		*mysqlmodel.NATVMConnection,
+		mysqlmodel.NATVMConnection,
 		*message.NATVMConnectionAdd,
 		message.NATVMConnectionAdd,
 		*message.NATVMConnectionUpdate,
@@ -47,8 +47,8 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		newUpdaterBase[
 			cloudmodel.NATVMConnection,
 			*diffbase.NATVMConnection,
-			*mysql.NATVMConnection,
-			mysql.NATVMConnection,
+			*mysqlmodel.NATVMConnection,
+			mysqlmodel.NATVMConnection,
 			*message.NATVMConnectionAdd,
 			message.NATVMConnectionAdd,
 			*message.NATVMConnectionUpdate,
@@ -73,7 +73,7 @@ func (c *NATVMConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATVMConn
 	return
 }
 
-func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnection) (*mysql.NATVMConnection, bool) {
+func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnection) (*mysqlmodel.NATVMConnection, bool) {
 	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -91,7 +91,7 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 		return nil, false
 	}
 
-	dbItem := &mysql.NATVMConnection{
+	dbItem := &mysqlmodel.NATVMConnection{
 		Domain:       c.metadata.Domain.Lcuuid,
 		VMID:         vmID,
 		NATGatewayID: natID,

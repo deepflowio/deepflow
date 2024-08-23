@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type AZ struct {
-	OperatorBase[*mysql.AZ, mysql.AZ]
+	OperatorBase[*mysqlmodel.AZ, mysqlmodel.AZ]
 }
 
 func NewAZ() *AZ {
 	operater := &AZ{
-		newOperatorBase[*mysql.AZ](
+		newOperatorBase[*mysqlmodel.AZ](
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			true,
 			true,

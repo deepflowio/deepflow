@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/manager/config"
 	"github.com/deepflowio/deepflow/server/controller/recorder"
 	recordercfg "github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -185,7 +186,7 @@ func (m *Manager) run(ctx context.Context) {
 			continue
 		}
 		// 获取所在控制器的IP
-		var controller mysql.Controller
+		var controller mysqlmodel.Controller
 		hostName := common.GetNodeName()
 		if len(hostName) == 0 {
 			log.Error("hostname is null")
@@ -196,7 +197,7 @@ func (m *Manager) run(ctx context.Context) {
 			return
 		}
 
-		var domains []mysql.Domain
+		var domains []mysqlmodel.Domain
 		var oldDomainLcuuids = mapset.NewSet()
 		var newDomainLcuuids = mapset.NewSet()
 		var delDomainLcuuids = mapset.NewSet()
@@ -218,7 +219,7 @@ func (m *Manager) run(ctx context.Context) {
 		db.Where(
 			"enabled = ? AND controller_ip = ?", common.DOMAIN_ENABLED_TRUE, controller.IP,
 		).Find(&domains)
-		lcuuidToDomain := make(map[string]mysql.Domain)
+		lcuuidToDomain := make(map[string]mysqlmodel.Domain)
 		for _, domain := range domains {
 			lcuuidToDomain[domain.Lcuuid] = domain
 			newDomainLcuuids.Add(domain.Lcuuid)

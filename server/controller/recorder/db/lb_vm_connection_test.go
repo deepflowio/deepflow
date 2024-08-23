@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBLBVMCConnection() *mysql.LBVMConnection {
-	return &mysql.LBVMConnection{Base: mysql.Base{Lcuuid: uuid.New().String()}}
+func newDBLBVMCConnection() *mysqlmodel.LBVMConnection {
+	return &mysqlmodel.LBVMConnection{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}}
 }
 
 func (t *SuiteTest) TestAddLBVMCConnectionBatchSuccess() {
 	operator := NewLBVMConnection()
 	itemToAdd := newDBLBVMCConnection()
 
-	_, ok := operator.AddBatch([]*mysql.LBVMConnection{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.LBVMConnection{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.LBVMConnection
+	var addedItem *mysqlmodel.LBVMConnection
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.LBVMConnection{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LBVMConnection{})
 }
 
 func (t *SuiteTest) TestDeleteLBVMCConnectionBatchSuccess() {
@@ -49,7 +49,7 @@ func (t *SuiteTest) TestDeleteLBVMCConnectionBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.LBVMConnection
+	var deletedItem *mysqlmodel.LBVMConnection
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

@@ -22,10 +22,10 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/bitly/go-simplejson"
 	"gorm.io/gorm"
 
-	"github.com/bitly/go-simplejson"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 // associate sql issu 6.4.1.1
@@ -85,7 +85,7 @@ func ScriptUpdateCloudTags(db *gorm.DB) error {
 
 func updateAdditionalResourceCloudTags(db *gorm.DB) error {
 	rscResults := []map[string]interface{}{}
-	err := db.Model(&mysql.DomainAdditionalResource{}).Find(&rscResults).Error
+	err := db.Model(&model.DomainAdditionalResource{}).Find(&rscResults).Error
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func updateAdditionalResourceCloudTags(db *gorm.DB) error {
 		if err != nil {
 			continue
 		}
-		db.Model(&mysql.DomainAdditionalResource{}).Where("id = ?", resourceID).Updates(mysql.DomainAdditionalResource{CompressedContent: compressedByte})
+		db.Model(&model.DomainAdditionalResource{}).Where("id = ?", resourceID).Updates(model.DomainAdditionalResource{CompressedContent: compressedByte})
 	}
 	return nil
 }
@@ -214,7 +214,7 @@ func updateVMCloudTags(db *gorm.DB) error {
 		if err == nil {
 			continue
 		}
-		db.Unscoped().Model(&mysql.VM{}).Where("id = ?", vmID).Updates(mysql.VM{CloudTags: dataStringConvertToMap(cloudTagsString)})
+		db.Unscoped().Model(&model.VM{}).Where("id = ?", vmID).Updates(model.VM{CloudTags: dataStringConvertToMap(cloudTagsString)})
 	}
 	return nil
 }
@@ -252,7 +252,7 @@ func updatePodNamespaceCloudTags(db *gorm.DB) error {
 		if err == nil {
 			continue
 		}
-		db.Unscoped().Model(&mysql.PodNamespace{}).Where("id = ?", nsID).Updates(mysql.PodNamespace{CloudTags: dataStringConvertToMap(cloudTagsString)})
+		db.Unscoped().Model(&model.PodNamespace{}).Where("id = ?", nsID).Updates(model.PodNamespace{CloudTags: dataStringConvertToMap(cloudTagsString)})
 	}
 	return nil
 }

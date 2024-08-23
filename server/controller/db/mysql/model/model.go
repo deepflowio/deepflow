@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package mysql
+package model
 
 import (
 	"bytes"
@@ -26,7 +26,11 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
+
+var log = logger.MustGetLogger("db.mysql")
 
 type Business struct {
 	ID          int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`

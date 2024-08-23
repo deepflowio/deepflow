@@ -17,7 +17,7 @@
 package message
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 )
 
@@ -47,205 +47,205 @@ func (m *MySQLItems[T]) SetMySQLItems(items interface{}) {
 
 type RegionDelete struct {
 	Lcuuids
-	MySQLItems[mysql.Region]
+	MySQLItems[mysqlmodel.Region]
 }
 
 type AZDelete struct {
 	Lcuuids
-	MySQLItems[mysql.AZ]
+	MySQLItems[mysqlmodel.AZ]
 }
 
 type SubDomainDelete struct {
 	Lcuuids
-	MySQLItems[mysql.SubDomain]
+	MySQLItems[mysqlmodel.SubDomain]
 }
 
 type HostDelete struct {
 	Lcuuids
-	MySQLItems[mysql.Host]
+	MySQLItems[mysqlmodel.Host]
 }
 
 type VMDelete struct {
 	Lcuuids
-	MySQLItems[mysql.VM]
+	MySQLItems[mysqlmodel.VM]
 }
 
 type VMPodNodeConnectionDelete struct {
 	Lcuuids
-	MySQLItems[mysql.VMPodNodeConnection]
+	MySQLItems[mysqlmodel.VMPodNodeConnection]
 }
 
 type VPCDelete struct {
 	Lcuuids
-	MySQLItems[mysql.VPC]
+	MySQLItems[mysqlmodel.VPC]
 }
 
 type NetworkDelete struct {
 	Lcuuids
-	MySQLItems[mysql.Network]
+	MySQLItems[mysqlmodel.Network]
 }
 
 type SubnetDelete struct {
 	Lcuuids
-	MySQLItems[mysql.Subnet]
+	MySQLItems[mysqlmodel.Subnet]
 }
 
 type VRouterDelete struct {
 	Lcuuids
-	MySQLItems[mysql.VRouter]
+	MySQLItems[mysqlmodel.VRouter]
 }
 
 type RoutingTableDelete struct {
 	Lcuuids
-	MySQLItems[mysql.RoutingTable]
+	MySQLItems[mysqlmodel.RoutingTable]
 }
 
 type DHCPPortDelete struct {
 	Lcuuids
-	MySQLItems[mysql.DHCPPort]
+	MySQLItems[mysqlmodel.DHCPPort]
 }
 
 type VInterfaceDelete struct {
 	Lcuuids
-	MySQLItems[mysql.VInterface]
+	MySQLItems[mysqlmodel.VInterface]
 }
 
 type FloatingIPDelete struct {
 	Lcuuids
-	MySQLItems[mysql.FloatingIP]
+	MySQLItems[mysqlmodel.FloatingIP]
 }
 
 type LANIPDelete struct {
 	Lcuuids
-	MySQLItems[mysql.LANIP]
+	MySQLItems[mysqlmodel.LANIP]
 }
 
 type WANIPDelete struct {
 	Lcuuids
-	MySQLItems[mysql.WANIP]
+	MySQLItems[mysqlmodel.WANIP]
 }
 
 type VIPDelete struct {
 	Lcuuids
-	MySQLItems[mysql.VIP]
+	MySQLItems[mysqlmodel.VIP]
 }
 
 type NATGatewayDelete struct {
 	Lcuuids
-	MySQLItems[mysql.NATGateway]
+	MySQLItems[mysqlmodel.NATGateway]
 }
 
 type NATRuleDelete struct {
 	Lcuuids
-	MySQLItems[mysql.NATRule]
+	MySQLItems[mysqlmodel.NATRule]
 }
 
 type NATVMConnectionDelete struct {
 	Lcuuids
-	MySQLItems[mysql.NATVMConnection]
+	MySQLItems[mysqlmodel.NATVMConnection]
 }
 
 type LBDelete struct {
 	Lcuuids
-	MySQLItems[mysql.LB]
+	MySQLItems[mysqlmodel.LB]
 }
 
 type LBListenerDelete struct {
 	Lcuuids
-	MySQLItems[mysql.LBListener]
+	MySQLItems[mysqlmodel.LBListener]
 }
 
 type LBTargetServerDelete struct {
 	Lcuuids
-	MySQLItems[mysql.LBTargetServer]
+	MySQLItems[mysqlmodel.LBTargetServer]
 }
 
 type LBVMConnectionDelete struct {
 	Lcuuids
-	MySQLItems[mysql.LBVMConnection]
+	MySQLItems[mysqlmodel.LBVMConnection]
 }
 
 type PeerConnectionDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PeerConnection]
+	MySQLItems[mysqlmodel.PeerConnection]
 }
 
 type CENDelete struct {
 	Lcuuids
-	MySQLItems[mysql.CEN]
+	MySQLItems[mysqlmodel.CEN]
 }
 
 type RDSInstanceDelete struct {
 	Lcuuids
-	MySQLItems[mysql.RDSInstance]
+	MySQLItems[mysqlmodel.RDSInstance]
 }
 
 type RedisInstanceDelete struct {
 	Lcuuids
-	MySQLItems[mysql.RedisInstance]
+	MySQLItems[mysqlmodel.RedisInstance]
 }
 
 type PodClusterDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodCluster]
+	MySQLItems[mysqlmodel.PodCluster]
 }
 
 type PodNamespaceDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodNamespace]
+	MySQLItems[mysqlmodel.PodNamespace]
 }
 
 type PodNodeDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodNode]
+	MySQLItems[mysqlmodel.PodNode]
 }
 
 type PodIngressDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodIngress]
+	MySQLItems[mysqlmodel.PodIngress]
 }
 
 type PodIngressRuleDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodIngressRule]
+	MySQLItems[mysqlmodel.PodIngressRule]
 }
 
 type PodIngressRuleBackendDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodIngressRuleBackend]
+	MySQLItems[mysqlmodel.PodIngressRuleBackend]
 }
 
 type PodServiceDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodService]
+	MySQLItems[mysqlmodel.PodService]
 }
 
 type PodServicePortDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodServicePort]
+	MySQLItems[mysqlmodel.PodServicePort]
 }
 
 type PodGroupDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodGroup]
+	MySQLItems[mysqlmodel.PodGroup]
 }
 
 type PodGroupPortDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodGroupPort]
+	MySQLItems[mysqlmodel.PodGroupPort]
 }
 
 type PodReplicaSetDelete struct {
 	Lcuuids
-	MySQLItems[mysql.PodReplicaSet]
+	MySQLItems[mysqlmodel.PodReplicaSet]
 }
 
 type PodDelete struct {
 	Lcuuids
-	MySQLItems[mysql.Pod]
+	MySQLItems[mysqlmodel.Pod]
 }
 
 type ProcessDelete struct {
 	Lcuuids
-	MySQLItems[mysql.Process]
+	MySQLItems[mysqlmodel.Process]
 }

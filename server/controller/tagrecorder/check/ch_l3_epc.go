@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChVPC struct {
-	UpdaterBase[mysql.ChVPC, IDKey]
+	UpdaterBase[mysqlmodel.ChVPC, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	updater := &ChVPC{
-		UpdaterBase[mysql.ChVPC, IDKey]{
+		UpdaterBase[mysqlmodel.ChVPC, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VPC,
 		},
 		resourceTypeToIconID,
@@ -37,18 +37,18 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	return updater
 }
 
-func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
-	var vpcs []mysql.VPC
+func (v *ChVPC) generateNewData() (map[IDKey]mysqlmodel.ChVPC, bool) {
+	var vpcs []mysqlmodel.VPC
 	err := v.db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), v.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChVPC)
+	keyToItem := make(map[IDKey]mysqlmodel.ChVPC)
 	for _, vpc := range vpcs {
 		if vpc.DeletedAt.Valid {
-			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
+			keyToItem[IDKey{ID: vpc.ID}] = mysqlmodel.ChVPC{
 				ID:       vpc.ID,
 				Name:     vpc.Name + " (deleted)",
 				UID:      vpc.UID,
@@ -57,7 +57,7 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 				DomainID: tagrecorder.DomainToDomainID[vpc.Domain],
 			}
 		} else {
-			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
+			keyToItem[IDKey{ID: vpc.ID}] = mysqlmodel.ChVPC{
 				ID:       vpc.ID,
 				Name:     vpc.Name,
 				UID:      vpc.UID,
@@ -70,11 +70,11 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 	return keyToItem, true
 }
 
-func (v *ChVPC) generateKey(dbItem mysql.ChVPC) IDKey {
+func (v *ChVPC) generateKey(dbItem mysqlmodel.ChVPC) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (v *ChVPC) generateUpdateInfo(oldItem, newItem mysql.ChVPC) (map[string]interface{}, bool) {
+func (v *ChVPC) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVPC) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

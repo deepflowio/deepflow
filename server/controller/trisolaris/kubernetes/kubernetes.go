@@ -30,8 +30,8 @@ import (
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	cconfig "github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	resourceservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -188,7 +188,7 @@ func (k *KubernetesInfo) createDomain(teamUID, clusterID, clusterName string) (d
 	teamID := DEFAULT_TEAM_ID
 	orgID := DEFAULT_ORG_ID
 	if teamUID != "" {
-		var team *mysql.Team
+		var team *models.Team
 		if err := k.db.Where("short_lcuuid = ?", teamUID).First(&team).Error; err != nil {
 			log.Errorf(k.Logf("failed to get team by uid: %s", teamUID))
 			return "", err

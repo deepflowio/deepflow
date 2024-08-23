@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type Subnet struct {
-	OperatorBase[*mysql.Subnet, mysql.Subnet]
+	OperatorBase[*mysqlmodel.Subnet, mysqlmodel.Subnet]
 }
 
 func NewSubnet() *Subnet {
 	o := &Subnet{
-		newOperatorBase[*mysql.Subnet](
+		newOperatorBase[*mysqlmodel.Subnet](
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			false,
 			false,

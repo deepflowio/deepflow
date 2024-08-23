@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodNode struct {
-	UpdaterBase[mysql.ChPodNode, IDKey]
+	UpdaterBase[mysqlmodel.ChPodNode, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodNode(resourceTypeToIconID map[IconKey]int) *ChPodNode {
 	updater := &ChPodNode{
-		UpdaterBase[mysql.ChPodNode, IDKey]{
+		UpdaterBase[mysqlmodel.ChPodNode, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD_NODE,
 		},
 		resourceTypeToIconID,
@@ -37,15 +37,15 @@ func NewChPodNode(resourceTypeToIconID map[IconKey]int) *ChPodNode {
 	return updater
 }
 
-func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
-	var podNodes []mysql.PodNode
+func (p *ChPodNode) generateNewData() (map[IDKey]mysqlmodel.ChPodNode, bool) {
+	var podNodes []mysqlmodel.PodNode
 	err := p.db.Unscoped().Find(&podNodes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodNode)
+	keyToItem := make(map[IDKey]mysqlmodel.ChPodNode)
 	for _, podNode := range podNodes {
 		teamID, err := tagrecorder.GetTeamID(podNode.Domain, podNode.SubDomain)
 		if err != nil {
@@ -53,7 +53,7 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 		}
 
 		if podNode.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
+			keyToItem[IDKey{ID: podNode.ID}] = mysqlmodel.ChPodNode{
 				ID:           podNode.ID,
 				Name:         podNode.Name + " (deleted)",
 				PodClusterID: podNode.PodClusterID,
@@ -63,7 +63,7 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podNode.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
+			keyToItem[IDKey{ID: podNode.ID}] = mysqlmodel.ChPodNode{
 				ID:           podNode.ID,
 				Name:         podNode.Name,
 				PodClusterID: podNode.PodClusterID,
@@ -77,11 +77,11 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 	return keyToItem, true
 }
 
-func (p *ChPodNode) generateKey(dbItem mysql.ChPodNode) IDKey {
+func (p *ChPodNode) generateKey(dbItem mysqlmodel.ChPodNode) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChPodNode) generateUpdateInfo(oldItem, newItem mysql.ChPodNode) (map[string]interface{}, bool) {
+func (p *ChPodNode) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodNode) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

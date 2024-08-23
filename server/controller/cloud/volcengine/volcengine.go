@@ -31,7 +31,7 @@ import (
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 var log = logger.MustGetLogger("cloud.volcengine")
@@ -76,7 +76,7 @@ type VolcEngine struct {
 	httpClient     *http.Client
 }
 
-func NewVolcEngine(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*VolcEngine, error) {
+func NewVolcEngine(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*VolcEngine, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

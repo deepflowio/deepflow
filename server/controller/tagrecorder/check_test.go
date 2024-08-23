@@ -19,7 +19,7 @@ package tagrecorder
 import (
 	"testing"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 func Test_genH64(t *testing.T) {
@@ -36,14 +36,14 @@ func Test_genH64(t *testing.T) {
 			wantNewHash: 11011604902492736609,
 			wantErr:     false,
 			testFunc: func(t *testing.T) (oldHash uint64, newHash uint64, err error) {
-				oldItems := []mysql.ChAZ{
+				oldItems := []mysqlmodel.ChAZ{
 					{ID: 1, Name: "test-1"},
 				}
-				newItems := []mysql.ChAZ{
+				newItems := []mysqlmodel.ChAZ{
 					{ID: 1, Name: "test-1"},
 				}
 
-				oldHash, newHash, err = genH64[mysql.ChAZ](oldItems, newItems)
+				oldHash, newHash, err = genH64[mysqlmodel.ChAZ](oldItems, newItems)
 				return
 			},
 		},
@@ -53,14 +53,14 @@ func Test_genH64(t *testing.T) {
 			wantNewHash: 10481254369259614302,
 			wantErr:     false,
 			testFunc: func(t *testing.T) (oldHash uint64, newHash uint64, err error) {
-				oldItems := []mysql.ChAZ{
+				oldItems := []mysqlmodel.ChAZ{
 					{ID: 1, Name: "test-1"},
 				}
-				newItems := []mysql.ChAZ{
+				newItems := []mysqlmodel.ChAZ{
 					{ID: 1, Name: "test-1", IconID: 1},
 				}
 
-				oldHash, newHash, err = genH64[mysql.ChAZ](oldItems, newItems)
+				oldHash, newHash, err = genH64[mysqlmodel.ChAZ](oldItems, newItems)
 				return
 			},
 		},
@@ -70,18 +70,18 @@ func Test_genH64(t *testing.T) {
 			wantNewHash: 10836103067972662261,
 			wantErr:     false,
 			testFunc: func(t *testing.T) (oldHash uint64, newHash uint64, err error) {
-				oldItems := []mysql.ChAZ{
+				oldItems := []mysqlmodel.ChAZ{
 					{ID: 1, Name: "test-1", IconID: 1},
 					{ID: 2, Name: "test-2", IconID: 2},
 					{ID: 3, Name: "test-3", IconID: 3},
 				}
-				newItems := []mysql.ChAZ{
+				newItems := []mysqlmodel.ChAZ{
 					{ID: 2, Name: "test-2", IconID: 2},
 					{ID: 1, Name: "test-1", IconID: 1},
 					{ID: 3, Name: "test-3", IconID: 3},
 				}
 
-				oldHash, newHash, err = genH64[mysql.ChAZ](oldItems, newItems)
+				oldHash, newHash, err = genH64[mysqlmodel.ChAZ](oldItems, newItems)
 				return
 			},
 		},
