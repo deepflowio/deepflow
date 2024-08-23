@@ -123,7 +123,7 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 	}
 
 	var vms []*mysql.VM
-	if err := mysql.Db.Unscoped().Find(&vms).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&vms).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
@@ -132,7 +132,7 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 	}
 
 	var vifs []*mysql.VInterface
-	if err := mysql.Db.Where(
+	if err := mysql.DefaultDB.Where(
 		"devicetype IN ?",
 		[]int{
 			common.VIF_DEVICE_TYPE_VM,
@@ -161,12 +161,12 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 	}
 
 	var wanIPs []*mysql.WANIP
-	if err := mysql.Db.Unscoped().Find(&wanIPs).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&wanIPs).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_WANIP, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
 	var lanIPs []*mysql.LANIP
-	if err := mysql.Db.Unscoped().Find(&lanIPs).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&lanIPs).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LANIP, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
@@ -182,12 +182,12 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 
 func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
 	var natGateways []*mysql.NATGateway
-	if err := mysql.Db.Unscoped().Find(&natGateways).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&natGateways).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err), i.db.LogPrefixORGID)
 		return false
 	}
 	var natRules []*mysql.NATRule
-	if err := mysql.Db.Unscoped().Find(&natRules).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&natRules).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_RULE, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -196,7 +196,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 		natGatewayIDToNatRules[natRule.NATGatewayID] = append(natGatewayIDToNatRules[natRule.NATGatewayID], natRule)
 	}
 	var natVMConns []*mysql.NATVMConnection
-	if err := mysql.Db.Unscoped().Find(&natVMConns).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&natVMConns).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_VM_CONNECTION, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -246,12 +246,12 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 
 func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
 	var lbs []*mysql.LB
-	if err := mysql.Db.Unscoped().Find(&lbs).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&lbs).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB, err), i.db.LogPrefixORGID)
 		return false
 	}
 	var lbListeners []*mysql.LBListener
-	if err := mysql.Db.Unscoped().Find(&lbListeners).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&lbListeners).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_LISTENER, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -260,7 +260,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 		lbIDToLBListeners[lbListener.LBID] = append(lbIDToLBListeners[lbListener.LBID], lbListener)
 	}
 	var lbTargetServers []*mysql.LBTargetServer
-	if err := mysql.Db.Unscoped().Find(&lbTargetServers).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&lbTargetServers).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_TARGET_SERVER, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -271,7 +271,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 		lbListenerIDToLBTargetServers[lbTS.LBListenerID] = append(lbListenerIDToLBTargetServers[lbTS.LBListenerID], lbTS)
 	}
 	var lbVMConns []*mysql.LBVMConnection
-	if err := mysql.Db.Unscoped().Find(&lbVMConns).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&lbVMConns).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_VM_CONNECTION, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -346,7 +346,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 
 func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
 	var pods []*mysql.Pod
-	if err := mysql.Db.Unscoped().Find(&pods).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&pods).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -355,7 +355,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 		podGroupIDToPodIDs[pod.PodGroupID] = append(podGroupIDToPodIDs[pod.PodGroupID], pod.ID)
 	}
 	var podGroupPorts []*mysql.PodGroupPort
-	if err := mysql.Db.Unscoped().Find(&podGroupPorts).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&podGroupPorts).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_PORT, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -366,7 +366,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 		}
 	}
 	var podIngresses []*mysql.PodIngress
-	if err := mysql.Db.Unscoped().Find(&podIngresses).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&podIngresses).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -375,7 +375,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 		podIngressIDToName[podIngress.ID] = podIngress.Name
 	}
 	var podServices []*mysql.PodService
-	if err := mysql.Db.Unscoped().Find(&podServices).Error; err != nil {
+	if err := mysql.DefaultDB.Unscoped().Find(&podServices).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE, err), i.db.LogPrefixORGID)
 		return false
 	}

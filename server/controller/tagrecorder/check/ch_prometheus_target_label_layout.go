@@ -40,7 +40,7 @@ func NewChPrometheusTargetLabelLayout() *ChPrometheusTargetLabelLayout {
 func (l *ChPrometheusTargetLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusTargetLabelLayout, bool) {
 	var prometheusTargets []mysql.PrometheusTarget
 
-	err := mysql.Db.Unscoped().Find(&prometheusTargets).Error
+	err := mysql.DefaultDB.Unscoped().Find(&prometheusTargets).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false

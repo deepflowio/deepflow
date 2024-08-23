@@ -28,6 +28,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
+var log = logger.MustGetLogger("db.mysql")
+
 var (
 	DefaultDB *DB
 

@@ -29,11 +29,11 @@ func (t *SuiteTest) TestformatDBItemsToAdd() {
 	vif1 := vifs[0]
 	vif2 := vifs[1]
 	vifs = append(vifs, vifs[1])
-	mysql.Db.Create(&vif1)
+	mysql.DefaultDB.Create(&vif1)
 	vif1.ID += 1
-	mysql.Db.Create(&vif1)
+	mysql.DefaultDB.Create(&vif1)
 	vif1.ID += 1
-	mysql.Db.Create(&vif1)
+	mysql.DefaultDB.Create(&vif1)
 
 	vifsToAdd, lcuuidsToAdd, _, ok := operator.formatItemsToAdd(vifs)
 	assert.True(t.T(), ok)

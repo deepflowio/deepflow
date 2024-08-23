@@ -74,7 +74,7 @@ func ParseIcon(cfg config.ControllerConfig, response *simplejson.Json) (map[stri
 		}
 	}
 	var domains []mysql.Domain
-	err := mysql.Db.Unscoped().Find(&domains).Error
+	err := mysql.DefaultDB.Unscoped().Find(&domains).Error
 	if err != nil {
 		log.Error(err)
 		return domainToIconID, resourceToIconID, err
@@ -121,7 +121,7 @@ func GetIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, 
 		return UpdateIconInfo(cfg)
 	}
 	var controller mysql.Controller
-	err := mysql.Db.Where("node_type = ? AND state = ?", common.CONTROLLER_NODE_TYPE_MASTER, common.CONTROLLER_STATE_NORMAL).First(&controller).Error
+	err := mysql.DefaultDB.Where("node_type = ? AND state = ?", common.CONTROLLER_NODE_TYPE_MASTER, common.CONTROLLER_STATE_NORMAL).First(&controller).Error
 	if err != nil {
 		log.Error(err)
 		return domainToIconID, resourceToIconID, err

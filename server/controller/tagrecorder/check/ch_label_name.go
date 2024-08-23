@@ -38,7 +38,7 @@ func NewChPrometheusLabelName() *ChPrometheusLabelName {
 func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusLabelName, bool) {
 	var prometheusLabelName []mysql.PrometheusLabelName
 
-	err := mysql.Db.Unscoped().Find(&prometheusLabelName).Error
+	err := mysql.DefaultDB.Unscoped().Find(&prometheusLabelName).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false

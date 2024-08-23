@@ -44,12 +44,12 @@ func TestSuite(t *testing.T) {
 	if _, err := os.Stat(TEST_DB_FILE); err == nil {
 		os.Remove(TEST_DB_FILE)
 	}
-	mysql.Db = GetDB()
+	mysql.DefaultDB = GetDB()
 	suite.Run(t, new(SuiteTest))
 }
 
 func (t *SuiteTest) SetupSuite() {
-	t.db = mysql.Db
+	t.db = mysql.DefaultDB
 	for _, val := range getMySQLModels() {
 		t.db.AutoMigrate(val)
 	}

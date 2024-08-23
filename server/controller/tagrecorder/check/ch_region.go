@@ -44,17 +44,17 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 	var regions []mysql.Region
 	var azs []mysql.AZ
 	var vpcs []mysql.VPC
-	err := mysql.Db.Unscoped().Find(&regions).Error
+	err := mysql.DefaultDB.Unscoped().Find(&regions).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), r.db.LogPrefixORGID)
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&azs).Error
+	err = mysql.DefaultDB.Unscoped().Find(&azs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), r.db.LogPrefixORGID)
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&vpcs).Error
+	err = mysql.DefaultDB.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), r.db.LogPrefixORGID)
 		return nil, false

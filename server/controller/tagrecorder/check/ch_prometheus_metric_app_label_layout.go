@@ -38,7 +38,7 @@ func NewChPrometheusMetricAPPLabelLayout() *ChPrometheusMetricAPPLabelLayout {
 func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout, bool) {
 	var prometheusMetricAPPLabelLayout []mysql.PrometheusMetricAPPLabelLayout
 
-	err := mysql.Db.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error
+	err := mysql.DefaultDB.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
