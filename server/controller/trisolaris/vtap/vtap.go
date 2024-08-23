@@ -100,10 +100,11 @@ type VTapInfo struct {
 	chVTapRegister    chan struct{}
 	chRegisterSuccess chan struct{}
 
-	vtaps            []*mysql_model.VTap
-	db               *gorm.DB
-	region           *string
-	defaultVTapGroup *string
+	vtaps                            []*mysql_model.VTap
+	db                               *gorm.DB
+	region                           *string
+	defaultVTapGroup                 *string
+	defaultVTapGroupLicenseFunctions *string
 
 	vTapIPs *atomic.Value // []*trident.VtapIp
 
@@ -232,6 +233,7 @@ func (v *VTapInfo) loadDefaultVTapGroup() string {
 	}
 
 	v.defaultVTapGroup = proto.String(defaultVTapGroup.Lcuuid)
+	v.defaultVTapGroupLicenseFunctions = proto.String(defaultVTapGroup.LicenseFunctions)
 	return defaultVTapGroup.Lcuuid
 }
 
@@ -1191,6 +1193,17 @@ func (v *VTapInfo) getDefaultVTapGroup() string {
 	}
 	if v.defaultVTapGroup != nil {
 		return *v.defaultVTapGroup
+	}
+
+	return ""
+}
+
+func (v *VTapInfo) getDefaultVTapGroupLicenseFunctions() string {
+	if v == nil {
+		return ""
+	}
+	if v.defaultVTapGroupLicenseFunctions != nil {
+		return *v.defaultVTapGroupLicenseFunctions
 	}
 
 	return ""
