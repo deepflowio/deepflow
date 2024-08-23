@@ -98,6 +98,8 @@ func RunTLS(ctx context.Context, cfg *config.ControllerConfig) {
 	go sslServer.Serve(lis)
 	log.Infof("listening and serving SSL GRPC on: %s", cfg.SSLGrpcPort)
 
+	cfg.TrisolarisCfg.SetDataPlaneEncryption(true)
+
 	wg := utils.GetWaitGroupInCtx(ctx)
 	wg.Add(1)
 	defer wg.Done()

@@ -277,6 +277,10 @@ controller:
     ## plaform data real refresh delay time
     ## uint: s, default: 1
     #platform-data-refresh-delay-time: 1
+    
+    ##agent key aging time
+    ##unit "ns"、"us"（or"μs"）、"ms"、"s"、"m"、"h"。
+    agent-key-aging-time: "720h"
 
     ## org data refresh interval
     ## uint: s, default: 60

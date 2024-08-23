@@ -206,6 +206,11 @@ func (obj *_DBMgr[M]) DeleteBatchFromID(ids []int) (err error) {
 	return
 }
 
+func (obj *_DBMgr[M]) DeleteBatchFromAgentID(ids []int, data *M) (err error) {
+	err = obj.DB.WithContext(obj.ctx).Where("`agent_id` in (?)", ids).Delete(data).Error
+	return
+}
+
 func (obj *_DBMgr[M]) Insert(data *M) (err error) {
 	err = obj.DB.WithContext(obj.ctx).Create(data).Error
 	return
