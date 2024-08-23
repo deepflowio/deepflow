@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodReplicaSet struct {
 	UpdaterBase[
 		cloudmodel.PodReplicaSet,
 		*diffbase.PodReplicaSet,
-		*mysql.PodReplicaSet,
-		mysql.PodReplicaSet,
+		*mysqlmodel.PodReplicaSet,
+		mysqlmodel.PodReplicaSet,
 		*message.PodReplicaSetAdd,
 		message.PodReplicaSetAdd,
 		*message.PodReplicaSetUpdate,
@@ -47,8 +47,8 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 		newUpdaterBase[
 			cloudmodel.PodReplicaSet,
 			*diffbase.PodReplicaSet,
-			*mysql.PodReplicaSet,
-			mysql.PodReplicaSet,
+			*mysqlmodel.PodReplicaSet,
+			mysqlmodel.PodReplicaSet,
 			*message.PodReplicaSetAdd,
 			message.PodReplicaSetAdd,
 			*message.PodReplicaSetUpdate,
@@ -73,7 +73,7 @@ func (r *PodReplicaSet) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodReplicaS
 	return
 }
 
-func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet) (*mysql.PodReplicaSet, bool) {
+func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet) (*mysqlmodel.PodReplicaSet, bool) {
 	podNamespaceID, exists := r.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -98,7 +98,7 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 		), r.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysql.PodReplicaSet{
+	dbItem := &mysqlmodel.PodReplicaSet{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
 		PodClusterID:   podClusterID,

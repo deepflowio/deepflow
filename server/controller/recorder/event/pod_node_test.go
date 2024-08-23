@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
 )
@@ -35,7 +35,7 @@ func TestAddPodNode(t *testing.T) {
 	name := RandName()
 	eq := NewEventQueue()
 	dbItem := NewPodNode(ds, eq)
-	dbItem.ProduceByAdd([]*mysql.PodNode{{Base: mysql.Base{ID: id}, Name: name}})
+	dbItem.ProduceByAdd([]*mysqlmodel.PodNode{{Base: mysqlmodel.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
 	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_CREATE, e.Type)

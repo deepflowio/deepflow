@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewPodNamespace(c *cache.Cache) *PodNamespace {
 	return listener
 }
 
-func (n *PodNamespace) OnUpdaterAdded(addedDBItems []*mysql.PodNamespace) {
+func (n *PodNamespace) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodNamespace) {
 	n.cache.AddPodNamespaces(addedDBItems)
 }
 

@@ -22,7 +22,7 @@ import (
 	"gorm.io/gorm"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -43,7 +43,7 @@ func (t *SuiteTest) getAZMock(mockDB bool) (*cache.Cache, cloudmodel.AZ) {
 
 	wholeCache := cache.NewCache(domainLcuuid)
 	if mockDB {
-		dbItem := new(mysql.AZ)
+		dbItem := new(mysqlmodel.AZ)
 		dbItem.Lcuuid = cloudItem.Lcuuid
 		dbItem.Name = cloudItem.Name
 		t.db.Create(dbItem)
@@ -62,12 +62,12 @@ func (t *SuiteTest) TestHandleAddAZSucess() {
 	updater := NewAZ(cache, []cloudmodel.AZ{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysql.AZ
+	var addedItem *mysqlmodel.AZ
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.AZs), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.AZ{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.AZ{})
 }
 
 func (t *SuiteTest) TestHandleUpdateAZSucess() {
@@ -77,13 +77,13 @@ func (t *SuiteTest) TestHandleUpdateAZSucess() {
 	updater := NewAZ(cache, []cloudmodel.AZ{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var updatedItem *mysql.AZ
+	var updatedItem *mysqlmodel.AZ
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Name, cloudItem.Name)
 	assert.Equal(t.T(), cache.DiffBaseDataSet.AZs[cloudItem.Lcuuid].Name, cloudItem.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.AZ{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.AZ{})
 }
 
 func (t *SuiteTest) TestHandleDeleteAZSucess() {
@@ -92,9 +92,9 @@ func (t *SuiteTest) TestHandleDeleteAZSucess() {
 	updater := NewAZ(cache, []cloudmodel.AZ{})
 	updater.HandleDelete()
 
-	var addedItem *mysql.AZ
+	var addedItem *mysqlmodel.AZ
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.AZ{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.AZ{})
 }

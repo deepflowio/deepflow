@@ -18,15 +18,16 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChPrometheusMetricAPPLabelLayout struct {
-	UpdaterBase[mysql.ChPrometheusMetricAPPLabelLayout, IDKey]
+	UpdaterBase[mysqlmodel.ChPrometheusMetricAPPLabelLayout, IDKey]
 }
 
 func NewChPrometheusMetricAPPLabelLayout() *ChPrometheusMetricAPPLabelLayout {
 	updater := &ChPrometheusMetricAPPLabelLayout{
-		UpdaterBase[mysql.ChPrometheusMetricAPPLabelLayout, IDKey]{
+		UpdaterBase[mysqlmodel.ChPrometheusMetricAPPLabelLayout, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_PROMETHEUS_METRIC_APP_LABEL_LAYOUT,
 		},
 	}
@@ -35,8 +36,8 @@ func NewChPrometheusMetricAPPLabelLayout() *ChPrometheusMetricAPPLabelLayout {
 	return updater
 }
 
-func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout, bool) {
-	var prometheusMetricAPPLabelLayout []mysql.PrometheusMetricAPPLabelLayout
+func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysqlmodel.ChPrometheusMetricAPPLabelLayout, bool) {
+	var prometheusMetricAPPLabelLayout []mysqlmodel.PrometheusMetricAPPLabelLayout
 
 	err := mysql.DefaultDB.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error
 	if err != nil {
@@ -44,9 +45,9 @@ func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.Ch
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPrometheusMetricAPPLabelLayout)
+	keyToItem := make(map[IDKey]mysqlmodel.ChPrometheusMetricAPPLabelLayout)
 	for _, metricAPPLabelLayout := range prometheusMetricAPPLabelLayout {
-		keyToItem[IDKey{ID: metricAPPLabelLayout.ID}] = mysql.ChPrometheusMetricAPPLabelLayout{
+		keyToItem[IDKey{ID: metricAPPLabelLayout.ID}] = mysqlmodel.ChPrometheusMetricAPPLabelLayout{
 			ID:                  metricAPPLabelLayout.ID,
 			MetricName:          metricAPPLabelLayout.MetricName,
 			APPLabelName:        metricAPPLabelLayout.APPLabelName,
@@ -56,11 +57,11 @@ func (l *ChPrometheusMetricAPPLabelLayout) generateNewData() (map[IDKey]mysql.Ch
 	return keyToItem, true
 }
 
-func (l *ChPrometheusMetricAPPLabelLayout) generateKey(dbItem mysql.ChPrometheusMetricAPPLabelLayout) IDKey {
+func (l *ChPrometheusMetricAPPLabelLayout) generateKey(dbItem mysqlmodel.ChPrometheusMetricAPPLabelLayout) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (l *ChPrometheusMetricAPPLabelLayout) generateUpdateInfo(oldItem, newItem mysql.ChPrometheusMetricAPPLabelLayout) (map[string]interface{}, bool) {
+func (l *ChPrometheusMetricAPPLabelLayout) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPrometheusMetricAPPLabelLayout) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.MetricName != newItem.MetricName {
 		updateInfo["metric_name"] = newItem.MetricName

@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -31,8 +31,8 @@ type Subnet struct {
 	UpdaterBase[
 		cloudmodel.Subnet,
 		*diffbase.Subnet,
-		*mysql.Subnet,
-		mysql.Subnet,
+		*mysqlmodel.Subnet,
+		mysqlmodel.Subnet,
 		*message.SubnetAdd,
 		message.SubnetAdd,
 		*message.SubnetUpdate,
@@ -48,8 +48,8 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 		newUpdaterBase[
 			cloudmodel.Subnet,
 			*diffbase.Subnet,
-			*mysql.Subnet,
-			mysql.Subnet,
+			*mysqlmodel.Subnet,
+			mysqlmodel.Subnet,
 			*message.SubnetAdd,
 			message.SubnetAdd,
 			*message.SubnetUpdate,
@@ -74,7 +74,7 @@ func (s *Subnet) getDiffBaseByCloudItem(cloudItem *cloudmodel.Subnet) (diffBase 
 	return
 }
 
-func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subnet, bool) {
+func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysqlmodel.Subnet, bool) {
 	networkID, exists := s.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -89,7 +89,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysql.Subne
 		return nil, false
 	}
 
-	dbItem := &mysql.Subnet{
+	dbItem := &mysqlmodel.Subnet{
 		Name:      cloudItem.Name,
 		Label:     cloudItem.Label,
 		Prefix:    prefix,

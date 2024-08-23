@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChNetwork struct {
-	UpdaterBase[mysql.ChNetwork, IDKey]
+	UpdaterBase[mysqlmodel.ChNetwork, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 	updater := &ChNetwork{
-		UpdaterBase[mysql.ChNetwork, IDKey]{
+		UpdaterBase[mysqlmodel.ChNetwork, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_NETWORK,
 		},
 		resourceTypeToIconID,
@@ -38,15 +38,15 @@ func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 	return updater
 }
 
-func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
-	var networks []mysql.Network
+func (n *ChNetwork) generateNewData() (map[IDKey]mysqlmodel.ChNetwork, bool) {
+	var networks []mysqlmodel.Network
 	err := n.db.Unscoped().Find(&networks).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(n.resourceTypeName, err), n.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChNetwork)
+	keyToItem := make(map[IDKey]mysqlmodel.ChNetwork)
 	for _, network := range networks {
 		teamID, err := tagrecorder.GetTeamID(network.Domain, network.SubDomain)
 		if err != nil {
@@ -57,7 +57,7 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 		if network.DeletedAt.Valid {
 			networkName += " (deleted)"
 		}
-		keyToItem[IDKey{ID: network.ID}] = mysql.ChNetwork{
+		keyToItem[IDKey{ID: network.ID}] = mysqlmodel.ChNetwork{
 			ID:          network.ID,
 			Name:        networkName,
 			IconID:      n.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VL2}],
@@ -69,11 +69,11 @@ func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 	return keyToItem, true
 }
 
-func (n *ChNetwork) generateKey(dbItem mysql.ChNetwork) IDKey {
+func (n *ChNetwork) generateKey(dbItem mysqlmodel.ChNetwork) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (n *ChNetwork) generateUpdateInfo(oldItem, newItem mysql.ChNetwork) (map[string]interface{}, bool) {
+func (n *ChNetwork) generateUpdateInfo(oldItem, newItem mysqlmodel.ChNetwork) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

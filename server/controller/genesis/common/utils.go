@@ -38,6 +38,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -530,7 +531,7 @@ func GetTeamShortLcuuidToInfo() (map[string]TeamInfo, error) {
 			log.Error(err.Error())
 			continue
 		}
-		var teams []mysql.Team
+		var teams []mysqlmodel.Team
 		err = db.Find(&teams).Error
 		if err != nil {
 			log.Error(err.Error())

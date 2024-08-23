@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type VPC struct {
 	UpdaterBase[
 		cloudmodel.VPC,
 		*diffbase.VPC,
-		*mysql.VPC,
-		mysql.VPC,
+		*mysqlmodel.VPC,
+		mysqlmodel.VPC,
 		*message.VPCAdd,
 		message.VPCAdd,
 		*message.VPCUpdate,
@@ -47,8 +47,8 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		newUpdaterBase[
 			cloudmodel.VPC,
 			*diffbase.VPC,
-			*mysql.VPC,
-			mysql.VPC,
+			*mysqlmodel.VPC,
+			mysqlmodel.VPC,
 			*message.VPCAdd,
 			message.VPCAdd,
 			*message.VPCUpdate,
@@ -73,8 +73,8 @@ func (v *VPC) getDiffBaseByCloudItem(cloudItem *cloudmodel.VPC) (diffBase *diffb
 	return
 }
 
-func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysql.VPC, bool) {
-	dbItem := &mysql.VPC{
+func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysqlmodel.VPC, bool) {
+	dbItem := &mysqlmodel.VPC{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
 		UID:          cloudItem.Label,

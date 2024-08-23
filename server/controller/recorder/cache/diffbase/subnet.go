@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddSubnet(dbItem *mysql.Subnet, seq int) {
+func (b *DataSet) AddSubnet(dbItem *mysqlmodel.Subnet, seq int) {
 	b.Subnets[dbItem.Lcuuid] = &Subnet{
 		DiffBase: DiffBase{
 			Sequence: seq,

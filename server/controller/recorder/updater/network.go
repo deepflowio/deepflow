@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type Network struct {
 	UpdaterBase[
 		cloudmodel.Network,
 		*diffbase.Network,
-		*mysql.Network,
-		mysql.Network,
+		*mysqlmodel.Network,
+		mysqlmodel.Network,
 		*message.NetworkAdd,
 		message.NetworkAdd,
 		*message.NetworkUpdate,
@@ -47,8 +47,8 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 		newUpdaterBase[
 			cloudmodel.Network,
 			*diffbase.Network,
-			*mysql.Network,
-			mysql.Network,
+			*mysqlmodel.Network,
+			mysqlmodel.Network,
 			*message.NetworkAdd,
 			message.NetworkAdd,
 			*message.NetworkUpdate,
@@ -73,7 +73,7 @@ func (n *Network) getDiffBaseByCloudItem(cloudItem *cloudmodel.Network) (diffBas
 	return
 }
 
-func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Network, bool) {
+func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysqlmodel.Network, bool) {
 	vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -82,7 +82,7 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysql.Net
 		), n.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysql.Network{
+	dbItem := &mysqlmodel.Network{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
 		State:          2,

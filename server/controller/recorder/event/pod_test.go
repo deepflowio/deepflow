@@ -27,7 +27,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -39,7 +39,7 @@ func TestAddPod(t *testing.T) {
 	name := RandName()
 	eq := NewEventQueue()
 	em := NewPod(ds, eq)
-	em.ProduceByAdd([]*mysql.Pod{{Base: mysql.Base{ID: id}, Name: name}})
+	em.ProduceByAdd([]*mysqlmodel.Pod{{Base: mysqlmodel.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
 	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_CREATE, e.Type)
@@ -47,7 +47,7 @@ func TestAddPod(t *testing.T) {
 	assert.Equal(t, uint32(id), e.InstanceID)
 	assert.Equal(t, name, e.InstanceName)
 
-	em.ProduceByAdd([]*mysql.Pod{{Name: RandName()}, {Name: RandName()}})
+	em.ProduceByAdd([]*mysqlmodel.Pod{{Name: RandName()}, {Name: RandName()}})
 	assert.Equal(t, 2, eq.Len())
 }
 

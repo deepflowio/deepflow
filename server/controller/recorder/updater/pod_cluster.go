@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodCluster struct {
 	UpdaterBase[
 		cloudmodel.PodCluster,
 		*diffbase.PodCluster,
-		*mysql.PodCluster,
-		mysql.PodCluster,
+		*mysqlmodel.PodCluster,
+		mysqlmodel.PodCluster,
 		*message.PodClusterAdd,
 		message.PodClusterAdd,
 		*message.PodClusterUpdate,
@@ -47,8 +47,8 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 		newUpdaterBase[
 			cloudmodel.PodCluster,
 			*diffbase.PodCluster,
-			*mysql.PodCluster,
-			mysql.PodCluster,
+			*mysqlmodel.PodCluster,
+			mysqlmodel.PodCluster,
 			*message.PodClusterAdd,
 			message.PodClusterAdd,
 			*message.PodClusterUpdate,
@@ -73,7 +73,7 @@ func (c *PodCluster) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodCluster) (d
 	return
 }
 
-func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*mysql.PodCluster, bool) {
+func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*mysqlmodel.PodCluster, bool) {
 	vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -82,7 +82,7 @@ func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*mys
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysql.PodCluster{
+	dbItem := &mysqlmodel.PodCluster{
 		Name:        cloudItem.Name,
 		Version:     cloudItem.Version,
 		ClusterName: cloudItem.ClusterName,

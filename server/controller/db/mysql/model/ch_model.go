@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package mysql
+package model
 
 import (
 	"time"

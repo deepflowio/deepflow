@@ -22,7 +22,6 @@ import (
 	"gorm.io/gorm"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -43,7 +42,7 @@ func (t *SuiteTest) getRegionMock(mockDB bool) (*cache.Cache, cloudmodel.Region)
 	wholeCache := cache.NewCache(domainLcuuid)
 
 	if mockDB {
-		dbItem := new(mysql.Region)
+		dbItem := new(mysqlmodel.Region)
 		dbItem.Lcuuid = cloudItem.Lcuuid
 		dbItem.Name = cloudItem.Name
 		t.db.Create(dbItem)
@@ -60,11 +59,11 @@ func (t *SuiteTest) TestHandleAddRegionSucess() {
 
 	updater := NewRegion(cache, []cloudmodel.Region{cloudItem})
 	updater.HandleAddAndUpdate()
-	var addedItem *mysql.Region
+	var addedItem *mysqlmodel.Region
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
 }
 
 func (t *SuiteTest) TestHandleUpdateRegionSucess() {
@@ -73,7 +72,7 @@ func (t *SuiteTest) TestHandleUpdateRegionSucess() {
 
 	updater := NewRegion(cache, []cloudmodel.Region{cloudItem})
 	updater.HandleAddAndUpdate()
-	var updatedItem *mysql.Region
+	var updatedItem *mysqlmodel.Region
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Label, cloudItem.Label)
@@ -82,7 +81,7 @@ func (t *SuiteTest) TestHandleUpdateRegionSucess() {
 	diffBase := cache.DiffBaseDataSet.Regions[cloudItem.Lcuuid]
 	assert.Equal(t.T(), diffBase.GetSequence(), cache.GetSequence())
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
 }
 
 func (t *SuiteTest) TestHandleDeleteRegionSuccess() {
@@ -91,9 +90,9 @@ func (t *SuiteTest) TestHandleDeleteRegionSuccess() {
 	updater := NewRegion(cache, []cloudmodel.Region{})
 	updater.HandleAddAndUpdate()
 	updater.HandleDelete()
-	var deletedItem *mysql.Region
+	var deletedItem *mysqlmodel.Region
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
 }

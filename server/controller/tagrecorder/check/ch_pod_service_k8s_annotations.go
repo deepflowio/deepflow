@@ -20,17 +20,17 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sAnnotations struct {
-	UpdaterBase[mysql.ChPodServiceK8sAnnotations, K8sAnnotationsKey]
+	UpdaterBase[mysqlmodel.ChPodServiceK8sAnnotations, K8sAnnotationsKey]
 }
 
 func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 	updater := &ChPodServiceK8sAnnotations{
-		UpdaterBase[mysql.ChPodServiceK8sAnnotations, K8sAnnotationsKey]{
+		UpdaterBase[mysqlmodel.ChPodServiceK8sAnnotations, K8sAnnotationsKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_K8S_ANNOTATIONS,
 		},
 	}
@@ -38,15 +38,15 @@ func NewChPodServiceK8sAnnotations() *ChPodServiceK8sAnnotations {
 	return updater
 }
 
-func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations, bool) {
-	var podServices []mysql.PodService
+func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]mysqlmodel.ChPodServiceK8sAnnotations, bool) {
+	var podServices []mysqlmodel.PodService
 	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sAnnotationsKey]mysql.ChPodServiceK8sAnnotations)
+	keyToItem := make(map[K8sAnnotationsKey]mysqlmodel.ChPodServiceK8sAnnotations)
 	for _, podService := range podServices {
 		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
 		if err != nil {
@@ -70,7 +70,7 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 			key := K8sAnnotationsKey{
 				ID: podService.ID,
 			}
-			keyToItem[key] = mysql.ChPodServiceK8sAnnotations{
+			keyToItem[key] = mysqlmodel.ChPodServiceK8sAnnotations{
 				ID:          podService.ID,
 				Annotations: string(annotationStr),
 				L3EPCID:     podService.VPCID,
@@ -84,11 +84,11 @@ func (k *ChPodServiceK8sAnnotations) generateNewData() (map[K8sAnnotationsKey]my
 	return keyToItem, true
 }
 
-func (k *ChPodServiceK8sAnnotations) generateKey(dbItem mysql.ChPodServiceK8sAnnotations) K8sAnnotationsKey {
+func (k *ChPodServiceK8sAnnotations) generateKey(dbItem mysqlmodel.ChPodServiceK8sAnnotations) K8sAnnotationsKey {
 	return K8sAnnotationsKey{ID: dbItem.ID}
 }
 
-func (k *ChPodServiceK8sAnnotations) generateUpdateInfo(oldItem, newItem mysql.ChPodServiceK8sAnnotations) (map[string]interface{}, bool) {
+func (k *ChPodServiceK8sAnnotations) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodServiceK8sAnnotations) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Annotations != newItem.Annotations {
 		updateInfo["annotations"] = newItem.Annotations

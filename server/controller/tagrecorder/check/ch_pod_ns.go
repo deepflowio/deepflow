@@ -17,18 +17,18 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodNamespace struct {
-	UpdaterBase[mysql.ChPodNamespace, IDKey]
+	UpdaterBase[mysqlmodel.ChPodNamespace, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 	updater := &ChPodNamespace{
-		UpdaterBase[mysql.ChPodNamespace, IDKey]{
+		UpdaterBase[mysqlmodel.ChPodNamespace, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD_NAMESPACE,
 		},
 		resourceTypeToIconID,
@@ -37,15 +37,15 @@ func NewChPodNamespace(resourceTypeToIconID map[IconKey]int) *ChPodNamespace {
 	return updater
 }
 
-func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool) {
-	var podNamespaces []mysql.PodNamespace
+func (p *ChPodNamespace) generateNewData() (map[IDKey]mysqlmodel.ChPodNamespace, bool) {
+	var podNamespaces []mysqlmodel.PodNamespace
 	err := p.db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodNamespace)
+	keyToItem := make(map[IDKey]mysqlmodel.ChPodNamespace)
 	for _, podNamespace := range podNamespaces {
 		teamID, err := tagrecorder.GetTeamID(podNamespace.Domain, podNamespace.SubDomain)
 		if err != nil {
@@ -53,7 +53,7 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 		}
 
 		if podNamespace.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
+			keyToItem[IDKey{ID: podNamespace.ID}] = mysqlmodel.ChPodNamespace{
 				ID:           podNamespace.ID,
 				Name:         podNamespace.Name + " (deleted)",
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
@@ -63,7 +63,7 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podNamespace.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: podNamespace.ID}] = mysql.ChPodNamespace{
+			keyToItem[IDKey{ID: podNamespace.ID}] = mysqlmodel.ChPodNamespace{
 				ID:           podNamespace.ID,
 				Name:         podNamespace.Name,
 				IconID:       p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NAMESPACE}],
@@ -77,11 +77,11 @@ func (p *ChPodNamespace) generateNewData() (map[IDKey]mysql.ChPodNamespace, bool
 	return keyToItem, true
 }
 
-func (p *ChPodNamespace) generateKey(dbItem mysql.ChPodNamespace) IDKey {
+func (p *ChPodNamespace) generateKey(dbItem mysqlmodel.ChPodNamespace) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChPodNamespace) generateUpdateInfo(oldItem, newItem mysql.ChPodNamespace) (map[string]interface{}, bool) {
+func (p *ChPodNamespace) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodNamespace) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

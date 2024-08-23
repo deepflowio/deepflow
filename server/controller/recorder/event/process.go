@@ -25,7 +25,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
@@ -51,7 +51,7 @@ func NewProcess(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *Process {
 	return mng
 }
 
-func (p *Process) ProduceByAdd(items []*mysql.Process) {
+func (p *Process) ProduceByAdd(items []*mysqlmodel.Process) {
 	processData, err := p.GetProcessData(items)
 	if err != nil {
 		log.Error(err)
@@ -169,13 +169,13 @@ type ProcessData struct {
 	VTapName     string
 }
 
-func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessData, error) {
+func (p *Process) GetProcessData(processes []*mysqlmodel.Process) (map[int]ProcessData, error) {
 	// store vtap info
 	vtapIDs := mapset.NewSet[uint32]()
 	for _, item := range processes {
 		vtapIDs.Add(item.VTapID)
 	}
-	var vtaps []mysql.VTap
+	var vtaps []mysqlmodel.VTap
 	if err := p.metadata.DB.Where("id IN (?)", vtapIDs.ToSlice()).Find(&vtaps).Error; err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 	}
 
 	// store vm info
-	var vms []mysql.VM
+	var vms []mysqlmodel.VM
 	if err := p.metadata.DB.Where("id IN (?)", vmLaunchServerIDs.ToSlice()).Find(&vms).Error; err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 	}
 
 	// store pod node info
-	var podNodes []mysql.PodNode
+	var podNodes []mysqlmodel.PodNode
 	if err := p.metadata.DB.Where("id IN (?)", podNodeLaunchServerIDs.ToSlice()).Find(&podNodes).Error; err != nil {
 		return nil, err
 	}
@@ -221,7 +221,7 @@ func (p *Process) GetProcessData(processes []*mysql.Process) (map[int]ProcessDat
 	}
 
 	// store pod info
-	var pods []mysql.Pod
+	var pods []mysqlmodel.Pod
 	if err := p.metadata.DB.Find(&pods).Error; err != nil {
 		return nil, err
 	}

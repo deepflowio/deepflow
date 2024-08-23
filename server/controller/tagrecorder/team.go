@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 var DomainToTeamID map[string]int
@@ -29,9 +30,9 @@ var SubDomainToSubDomainID map[string]int
 var VTapIDToTeamID map[int]int
 
 func GetTeamInfo(db *mysql.DB) {
-	var domains []mysql.Domain
-	var subDomains []mysql.SubDomain
-	var vTaps []mysql.VTap
+	var domains []mysqlmodel.Domain
+	var subDomains []mysqlmodel.SubDomain
+	var vTaps []mysqlmodel.VTap
 	err := db.Unscoped().Find(&domains).Error
 	if err != nil {
 		log.Error(err, db.LogPrefixORGID)

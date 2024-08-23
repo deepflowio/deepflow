@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type LBTargetServer struct {
 	UpdaterBase[
 		cloudmodel.LBTargetServer,
 		*diffbase.LBTargetServer,
-		*mysql.LBTargetServer,
-		mysql.LBTargetServer,
+		*mysqlmodel.LBTargetServer,
+		mysqlmodel.LBTargetServer,
 		*message.LBTargetServerAdd,
 		message.LBTargetServerAdd,
 		*message.LBTargetServerUpdate,
@@ -47,8 +47,8 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 		newUpdaterBase[
 			cloudmodel.LBTargetServer,
 			*diffbase.LBTargetServer,
-			*mysql.LBTargetServer,
-			mysql.LBTargetServer,
+			*mysqlmodel.LBTargetServer,
+			mysqlmodel.LBTargetServer,
 			*message.LBTargetServerAdd,
 			message.LBTargetServerAdd,
 			*message.LBTargetServerUpdate,
@@ -73,7 +73,7 @@ func (s *LBTargetServer) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBTargetSe
 	return
 }
 
-func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServer) (*mysql.LBTargetServer, bool) {
+func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServer) (*mysqlmodel.LBTargetServer, bool) {
 	lbID, exists := s.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -109,7 +109,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 		), s.metadata.LogPrefixes)
 	}
 
-	dbItem := &mysql.LBTargetServer{
+	dbItem := &mysqlmodel.LBTargetServer{
 		LBID:         lbID,
 		LBListenerID: lbListenerID,
 		VMID:         vmID,

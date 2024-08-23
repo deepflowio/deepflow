@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
@@ -126,7 +127,7 @@ func (c *ControllerCheck) Stop() {
 var checkExceptionControllers = make(map[string]*dfHostCheck)
 
 func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
-	var controllers []mysql.Controller
+	var controllers []mysqlmodel.Controller
 	var exceptionIPs []string
 
 	log.Info("controller health check start")
@@ -225,10 +226,10 @@ func (c *ControllerCheck) healthCheck(orgDB *mysql.DB) {
 	controllerIPs := []string{}
 	for ip, dfhostCheck := range checkExceptionControllers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
-			if err := orgDB.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip).Error; err != nil {
+			if err := orgDB.Delete(mysqlmodel.AZControllerConnection{}, "controller_ip = ?", ip).Error; err != nil {
 				log.Errorf("delete az_controller_connection(ip: %s) error: %s", ip, err.Error(), orgDB.LogPrefixORGID)
 			}
-			err := mysql.DefaultDB.Delete(mysql.Controller{}, "ip = ?", ip).Error
+			err := mysql.DefaultDB.Delete(mysqlmodel.Controller{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete controller(%s) failed, err:%s", ip, err)
 			} else {
@@ -247,7 +248,7 @@ func (c *ControllerCheck) TriggerReallocController(orgDB *mysql.DB, controllerIP
 }
 
 func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
-	var vtaps []mysql.VTap
+	var vtaps []mysqlmodel.VTap
 	var noControllerVtapCount int64
 
 	log.Info("vtap controller check start", orgDB.LogPrefixORGID)
@@ -266,7 +267,7 @@ func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
 		if _, ok := ipMap[vtap.ControllerIP]; !ok {
 			log.Infof("controller ip(%s) in vtap(%s) is invalid", vtap.ControllerIP, vtap.Name, orgDB.LogPrefixORGID)
 			vtap.ControllerIP = ""
-			if err := orgDB.Model(&mysql.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "").Error; err != nil {
+			if err := orgDB.Model(&mysqlmodel.VTap{}).Where("lcuuid = ?", vtap.Lcuuid).Update("controller_ip", "").Error; err != nil {
 				log.Errorf("update vtap(lcuuid: %s, name: %s) controller ip to empty error: %v", vtap.Lcuuid, vtap.Name, err, orgDB.LogPrefixORGID)
 			}
 		}
@@ -287,10 +288,10 @@ func (c *ControllerCheck) vtapControllerCheck(orgDB *mysql.DB) {
 }
 
 func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string) {
-	var vtaps []mysql.VTap
-	var controllers []mysql.Controller
-	var azs []mysql.AZ
-	var azControllerConns []mysql.AZControllerConnection
+	var vtaps []mysqlmodel.VTap
+	var controllers []mysqlmodel.Controller
+	var azs []mysqlmodel.AZ
+	var azControllerConns []mysqlmodel.AZControllerConnection
 
 	log.Info("vtap controller alloc start")
 
@@ -305,7 +306,7 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 
 	// 获取待分配采集器对应的可用区信息
 	// 获取控制器当前已分配的采集器个数
-	azToNoControllerVTaps := make(map[string][]*mysql.VTap)
+	azToNoControllerVTaps := make(map[string][]*mysqlmodel.VTap)
 	controllerIPToUsedVTapNum := make(map[string]int)
 	azLcuuids := mapset.NewSet()
 	for i, vtap := range vtaps {
@@ -407,8 +408,8 @@ func (c *ControllerCheck) vtapControllerAlloc(orgDB *mysql.DB, excludeIP string)
 }
 
 func (c *ControllerCheck) azConnectionCheck(orgDB *mysql.DB) {
-	var azs []mysql.AZ
-	var azControllerConns []mysql.AZControllerConnection
+	var azs []mysqlmodel.AZ
+	var azControllerConns []mysqlmodel.AZControllerConnection
 
 	log.Info("az connection check start", orgDB.LogPrefixORGID)
 
@@ -458,7 +459,7 @@ func (c *ControllerCheck) cleanExceptionControllerData(orgDB *mysql.DB, controll
 var SyncControllerExcludeField = []string{"nat_ip", "state"}
 
 func (c *ControllerCheck) SyncDefaultOrgData() {
-	var controllers []mysql.Controller
+	var controllers []mysqlmodel.Controller
 	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Error(err)
 	}

@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type PodIngress struct {
-	OperatorBase[*mysql.PodIngress, mysql.PodIngress]
+	OperatorBase[*mysqlmodel.PodIngress, mysqlmodel.PodIngress]
 }
 
 func NewPodIngress() *PodIngress {
 	operater := &PodIngress{
-		newOperatorBase[*mysql.PodIngress](
+		newOperatorBase[*mysqlmodel.PodIngress](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			true,
 			true,

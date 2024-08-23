@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodIngressRuleBackend struct {
 	UpdaterBase[
 		cloudmodel.PodIngressRuleBackend,
 		*diffbase.PodIngressRuleBackend,
-		*mysql.PodIngressRuleBackend,
-		mysql.PodIngressRuleBackend,
+		*mysqlmodel.PodIngressRuleBackend,
+		mysqlmodel.PodIngressRuleBackend,
 		*message.PodIngressRuleBackendAdd,
 		message.PodIngressRuleBackendAdd,
 		*message.PodIngressRuleBackendUpdate,
@@ -47,8 +47,8 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 		newUpdaterBase[
 			cloudmodel.PodIngressRuleBackend,
 			*diffbase.PodIngressRuleBackend,
-			*mysql.PodIngressRuleBackend,
-			mysql.PodIngressRuleBackend,
+			*mysqlmodel.PodIngressRuleBackend,
+			mysqlmodel.PodIngressRuleBackend,
 			*message.PodIngressRuleBackendAdd,
 			message.PodIngressRuleBackendAdd,
 			*message.PodIngressRuleBackendUpdate,
@@ -73,7 +73,7 @@ func (b *PodIngressRuleBackend) getDiffBaseByCloudItem(cloudItem *cloudmodel.Pod
 	return
 }
 
-func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRuleBackend) (*mysql.PodIngressRuleBackend, bool) {
+func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRuleBackend) (*mysqlmodel.PodIngressRuleBackend, bool) {
 	podIngressRuleID, exists := b.cache.ToolDataSet.GetPodIngressRuleIDByLcuuid(cloudItem.PodIngressRuleLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -99,7 +99,7 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 		return nil, false
 	}
 
-	dbItem := &mysql.PodIngressRuleBackend{
+	dbItem := &mysqlmodel.PodIngressRuleBackend{
 		Path:             cloudItem.Path,
 		Port:             cloudItem.Port,
 		PodServiceID:     podServiceID,

@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -30,7 +31,7 @@ import (
 
 func GetMailServer(filter map[string]interface{}) (resp []model.MailServer, err error) {
 	var response []model.MailServer
-	var mails []mysql.MailServer
+	var mails []mysqlmodel.MailServer
 
 	Db := mysql.DefaultDB.DB
 	for _, param := range []string{"lcuuid"} {
@@ -63,7 +64,7 @@ func GetMailServer(filter map[string]interface{}) (resp []model.MailServer, err 
 }
 
 func CreateMailServer(mailCreate model.MailServerCreate) (model.MailServer, error) {
-	mailServer := mysql.MailServer{}
+	mailServer := mysqlmodel.MailServer{}
 	mailServer.Status = mailCreate.Status
 	mailServer.Host = mailCreate.Host
 	mailServer.Port = mailCreate.Port
@@ -81,7 +82,7 @@ func CreateMailServer(mailCreate model.MailServerCreate) (model.MailServer, erro
 }
 
 func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (model.MailServer, error) {
-	var mailServer mysql.MailServer
+	var mailServer mysqlmodel.MailServer
 	var dbUpdateMap = make(map[string]interface{})
 
 	if lcuuid != "" {
@@ -107,7 +108,7 @@ func UpdateMailServer(lcuuid string, mailServerUpdate map[string]interface{}) (m
 }
 
 func DeleteMailServer(lcuuid string) (map[string]string, error) {
-	var mailServer mysql.MailServer
+	var mailServer mysqlmodel.MailServer
 
 	if ret := mysql.DefaultDB.Where("lcuuid = ?", lcuuid).First(&mailServer); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("mail-server (%s) not found", lcuuid))

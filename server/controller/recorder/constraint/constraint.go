@@ -21,7 +21,7 @@ import (
 	"time"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
 
@@ -37,16 +37,16 @@ type MySQLModelPtr[T MySQLModel] interface {
 
 // 资源的MySQL orm对象
 type MySQLModel interface {
-	mysql.Region | mysql.AZ | mysql.SubDomain | mysql.Host | mysql.VM |
-		mysql.VPC | mysql.Network | mysql.Subnet | mysql.VRouter | mysql.RoutingTable |
-		mysql.DHCPPort | mysql.VInterface | mysql.WANIP | mysql.LANIP | mysql.FloatingIP |
-		mysql.NATGateway | mysql.NATRule | mysql.NATVMConnection | mysql.LB |
-		mysql.LBListener | mysql.LBTargetServer | mysql.LBVMConnection | mysql.CEN |
-		mysql.PeerConnection | mysql.RDSInstance | mysql.RedisInstance | mysql.PodCluster |
-		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
-		mysql.PodIngressRule | mysql.PodIngressRuleBackend | mysql.PodService |
-		mysql.PodServicePort | mysql.PodGroup | mysql.PodGroupPort | mysql.PodReplicaSet |
-		mysql.Pod | mysql.Process | mysql.VIP
+	mysqlmodel.Region | mysqlmodel.AZ | mysqlmodel.SubDomain | mysqlmodel.Host | mysqlmodel.VM |
+		mysqlmodel.VPC | mysqlmodel.Network | mysqlmodel.Subnet | mysqlmodel.VRouter | mysqlmodel.RoutingTable |
+		mysqlmodel.DHCPPort | mysqlmodel.VInterface | mysqlmodel.WANIP | mysqlmodel.LANIP | mysqlmodel.FloatingIP |
+		mysqlmodel.NATGateway | mysqlmodel.NATRule | mysqlmodel.NATVMConnection | mysqlmodel.LB |
+		mysqlmodel.LBListener | mysqlmodel.LBTargetServer | mysqlmodel.LBVMConnection | mysqlmodel.CEN |
+		mysqlmodel.PeerConnection | mysqlmodel.RDSInstance | mysqlmodel.RedisInstance | mysqlmodel.PodCluster |
+		mysqlmodel.PodNode | mysqlmodel.VMPodNodeConnection | mysqlmodel.PodNamespace | mysqlmodel.PodIngress |
+		mysqlmodel.PodIngressRule | mysqlmodel.PodIngressRuleBackend | mysqlmodel.PodService |
+		mysqlmodel.PodServicePort | mysqlmodel.PodGroup | mysqlmodel.PodGroupPort | mysqlmodel.PodReplicaSet |
+		mysqlmodel.Pod | mysqlmodel.Process | mysqlmodel.VIP
 
 	GetID() int
 }
@@ -85,12 +85,12 @@ type DiffBase interface {
 
 // 软删除资源的MySQL orm对象
 type MySQLSoftDeleteModel interface {
-	mysql.Region | mysql.AZ | mysql.Host | mysql.VM | mysql.VPC | mysql.Network |
-		mysql.VRouter | mysql.DHCPPort | mysql.NATGateway |
-		mysql.LB | mysql.LBListener | mysql.CEN | mysql.PeerConnection | mysql.RDSInstance |
-		mysql.RedisInstance | mysql.PodCluster | mysql.PodNode | mysql.PodNamespace |
-		mysql.PodIngress | mysql.PodService | mysql.PodGroup | mysql.PodReplicaSet | mysql.Pod |
-		mysql.Process
+	mysqlmodel.Region | mysqlmodel.AZ | mysqlmodel.Host | mysqlmodel.VM | mysqlmodel.VPC | mysqlmodel.Network |
+		mysqlmodel.VRouter | mysqlmodel.DHCPPort | mysqlmodel.NATGateway |
+		mysqlmodel.LB | mysqlmodel.LBListener | mysqlmodel.CEN | mysqlmodel.PeerConnection | mysqlmodel.RDSInstance |
+		mysqlmodel.RedisInstance | mysqlmodel.PodCluster | mysqlmodel.PodNode | mysqlmodel.PodNamespace |
+		mysqlmodel.PodIngress | mysqlmodel.PodService | mysqlmodel.PodGroup | mysqlmodel.PodReplicaSet | mysqlmodel.Pod |
+		mysqlmodel.Process
 
 	GetDomainLcuuid() string
 	GetSubDomainLcuuid() string

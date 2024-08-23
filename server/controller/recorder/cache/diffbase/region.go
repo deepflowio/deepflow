@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddRegion(dbItem *mysql.Region, seq int) {
+func (b *DataSet) AddRegion(dbItem *mysqlmodel.Region, seq int) {
 	b.Regions[dbItem.Lcuuid] = &Region{
 		DiffBase: DiffBase{
 			Sequence: seq,

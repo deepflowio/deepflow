@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -104,7 +105,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		var agent *mysql.VTap
+		var agent *mysqlmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
@@ -191,7 +192,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			return
 		}
-		var agent *mysql.VTap
+		var agent *mysqlmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			JsonResponse(c, nil, err)
 			return
@@ -241,7 +242,7 @@ func getAgentID(c *gin.Context, db *mysql.DB) (int, error) {
 	}
 	agentID, err := strconv.Atoi(agentIDentStr)
 	if err != nil {
-		var agent mysql.VTap
+		var agent mysqlmodel.VTap
 		if err := db.Where("name = ?", agentIDentStr).First(&agent).Error; err != nil {
 			return 0, fmt.Errorf("failed to get agent by name(%s), error: %s", err.Error())
 		}

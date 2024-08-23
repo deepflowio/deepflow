@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type VPC struct {
-	OperatorBase[*mysql.VPC, mysql.VPC]
+	OperatorBase[*mysqlmodel.VPC, mysqlmodel.VPC]
 }
 
 func NewVPC() *VPC {
 	operater := &VPC{
-		newOperatorBase[*mysql.VPC](
+		newOperatorBase[*mysqlmodel.VPC](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			true,
 			true,

@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBVRouter() *mysql.VRouter {
-	return &mysql.VRouter{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBVRouter() *mysqlmodel.VRouter {
+	return &mysqlmodel.VRouter{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddVRouterBatchSuccess() {
 	operator := NewVRouter()
 	itemToAdd := newDBVRouter()
 
-	_, ok := operator.AddBatch([]*mysql.VRouter{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.VRouter{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.VRouter
+	var addedItem *mysqlmodel.VRouter
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VRouter{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VRouter{})
 }
 
 func (t *SuiteTest) TestUpdateVRouterSuccess() {
@@ -52,12 +52,12 @@ func (t *SuiteTest) TestUpdateVRouterSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysql.VRouter
+	var updatedItem *mysqlmodel.VRouter
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 	assert.Equal(t.T(), updatedItem.VPCID, 123)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VRouter{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VRouter{})
 }
 
 func (t *SuiteTest) TestDeleteVRouterBatchSuccess() {
@@ -67,7 +67,7 @@ func (t *SuiteTest) TestDeleteVRouterBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.VRouter
+	var deletedItem *mysqlmodel.VRouter
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

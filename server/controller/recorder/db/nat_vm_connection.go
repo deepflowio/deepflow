@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type NATVMConnection struct {
-	OperatorBase[*mysql.NATVMConnection, mysql.NATVMConnection]
+	OperatorBase[*mysqlmodel.NATVMConnection, mysqlmodel.NATVMConnection]
 }
 
 func NewNATVMConnection() *NATVMConnection {
 	return &NATVMConnection{
-		newOperatorBase[*mysql.NATVMConnection](
+		newOperatorBase[*mysqlmodel.NATVMConnection](
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			false,
 			false,

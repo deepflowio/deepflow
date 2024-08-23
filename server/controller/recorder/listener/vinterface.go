@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -33,7 +33,7 @@ func NewVInterface(c *cache.Cache) *VInterface {
 	}
 }
 
-func (i *VInterface) OnUpdaterAdded(addedDBItems []*mysql.VInterface) {
+func (i *VInterface) OnUpdaterAdded(addedDBItems []*mysqlmodel.VInterface) {
 	i.cache.AddVInterfaces(addedDBItems)
 }
 

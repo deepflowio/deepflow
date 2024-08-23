@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type SubDomain struct {
-	OperatorBase[*mysql.SubDomain, mysql.SubDomain]
+	OperatorBase[*mysqlmodel.SubDomain, mysqlmodel.SubDomain]
 }
 
 func NewSubDomain() *SubDomain {
 	return &SubDomain{
-		newOperatorBase[*mysql.SubDomain](
+		newOperatorBase[*mysqlmodel.SubDomain](
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			false,
 			false,

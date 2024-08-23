@@ -24,7 +24,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
@@ -199,7 +199,7 @@ func (t *DataSet) GetMetadata() *rcommon.Metadata {
 	return t.metadata
 }
 
-func (t *DataSet) AddAZ(item *mysql.AZ) {
+func (t *DataSet) AddAZ(item *mysqlmodel.AZ) {
 	t.azLcuuidToID[item.Lcuuid] = item.ID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_AZ_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
@@ -215,7 +215,7 @@ func (t *DataSet) GetAZIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_AZ_EN, lcuuid), t.metadata.LogPrefixes)
-	var az mysql.AZ
+	var az mysqlmodel.AZ
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&az)
 	if result.RowsAffected == 1 {
 		t.AddAZ(&az)
@@ -226,7 +226,7 @@ func (t *DataSet) GetAZIDByLcuuid(lcuuid string) (int, bool) {
 	}
 }
 
-func (t *DataSet) AddRegion(item *mysql.Region) {
+func (t *DataSet) AddRegion(item *mysqlmodel.Region) {
 	t.regionLcuuidToID[item.Lcuuid] = item.ID
 	t.regionIDToLcuuid[item.ID] = item.Lcuuid
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_REGION_EN, item.Lcuuid), t.metadata.LogPrefixes)
@@ -239,7 +239,7 @@ func (t *DataSet) DeleteRegion(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddHost(item *mysql.Host) {
+func (t *DataSet) AddHost(item *mysqlmodel.Host) {
 	t.hostLcuuidToID[item.Lcuuid] = item.ID
 	t.hostIDToLcuuid[item.ID] = item.Lcuuid
 	t.hostIPToID[item.IP] = item.ID
@@ -278,7 +278,7 @@ func (t *DataSet) UpdateHost(cloudItem *cloudmodel.Host) {
 	}
 }
 
-func (t *DataSet) AddVM(item *mysql.VM) {
+func (t *DataSet) AddVM(item *mysqlmodel.VM) {
 	t.vmLcuuidToID[item.Lcuuid] = item.ID
 	t.vmIDToLcuuid[item.ID] = item.Lcuuid
 	t.vmIDToInfo[item.ID] = &vmInfo{
@@ -332,7 +332,7 @@ func (t *DataSet) DeleteVM(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddVPC(item *mysql.VPC) {
+func (t *DataSet) AddVPC(item *mysqlmodel.VPC) {
 	t.vpcLcuuidToID[item.Lcuuid] = item.ID
 	t.vpcIDToLcuuid[item.ID] = item.Lcuuid
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_VPC_EN, item.Lcuuid), t.metadata.LogPrefixes)
@@ -345,7 +345,7 @@ func (t *DataSet) DeleteVPC(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_VPC_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddNetwork(item *mysql.Network) {
+func (t *DataSet) AddNetwork(item *mysqlmodel.Network) {
 	t.networkLcuuidToID[item.Lcuuid] = item.ID
 	t.networkIDToLcuuid[item.ID] = item.Lcuuid
 	t.networkIDToName[item.ID] = item.Name
@@ -368,7 +368,7 @@ func (t *DataSet) DeleteNetwork(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddSubnet(item *mysql.Subnet) {
+func (t *DataSet) AddSubnet(item *mysqlmodel.Subnet) {
 	t.subnetLcuuidToID[item.Lcuuid] = item.ID
 	t.subnetIDToLcuuid[item.ID] = item.Lcuuid
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, item.Lcuuid), t.metadata.LogPrefixes)
@@ -381,7 +381,7 @@ func (t *DataSet) DeleteSubnet(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddVRouter(item *mysql.VRouter) {
+func (t *DataSet) AddVRouter(item *mysqlmodel.VRouter) {
 	t.vrouterLcuuidToID[item.Lcuuid] = item.ID
 	t.vrouterIDToLcuuid[item.ID] = item.Lcuuid
 	t.vrouterIDToInfo[item.ID] = &vrouterInfo{
@@ -421,7 +421,7 @@ func (t *DataSet) DeleteVRouter(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddDHCPPort(item *mysql.DHCPPort) {
+func (t *DataSet) AddDHCPPort(item *mysqlmodel.DHCPPort) {
 	t.dhcpPortLcuuidToID[item.Lcuuid] = item.ID
 	t.dhcpPortIDToLcuuid[item.ID] = item.Lcuuid
 	t.dhcpPortIDToInfo[item.ID] = &dhcpPortInfo{
@@ -465,7 +465,7 @@ func (t *DataSet) DeleteDHCPPort(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddVInterface(item *mysql.VInterface) {
+func (t *DataSet) AddVInterface(item *mysqlmodel.VInterface) {
 	t.vinterfaceLcuuidToID[item.Lcuuid] = item.ID
 	t.vinterfaceIDToLcuuid[item.ID] = item.Lcuuid
 	t.vinterfaceLcuuidToNetworkID[item.Lcuuid] = item.NetworkID
@@ -496,7 +496,7 @@ func (t *DataSet) DeleteVInterface(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddWANIP(item *mysql.WANIP) {
+func (t *DataSet) AddWANIP(item *mysqlmodel.WANIP) {
 	t.wanIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
 	t.wanIPLcuuidToIP[item.Lcuuid] = item.IP
 	if vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID); vifLcuuid != "" {
@@ -525,7 +525,7 @@ func (t *DataSet) DeleteWANIP(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddLANIP(item *mysql.LANIP) {
+func (t *DataSet) AddLANIP(item *mysqlmodel.LANIP) {
 	t.lanIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
 	t.lanIPLcuuidToIP[item.Lcuuid] = item.IP
 	if vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID); vifLcuuid != "" {
@@ -554,7 +554,7 @@ func (t *DataSet) DeleteLANIP(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddNATGateway(item *mysql.NATGateway) {
+func (t *DataSet) AddNATGateway(item *mysqlmodel.NATGateway) {
 	t.natGatewayLcuuidToID[item.Lcuuid] = item.ID
 	t.natGatewayIDToLcuuid[item.ID] = item.Lcuuid
 	t.natGatewayIDToInfo[item.ID] = &natGatewayInfo{
@@ -595,7 +595,7 @@ func (t *DataSet) DeleteNATGateway(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddLB(item *mysql.LB) {
+func (t *DataSet) AddLB(item *mysqlmodel.LB) {
 	t.lbLcuuidToID[item.Lcuuid] = item.ID
 	t.lbIDToLcuuid[item.ID] = item.Lcuuid
 	t.lbIDToInfo[item.ID] = &lbInfo{
@@ -633,7 +633,7 @@ func (t *DataSet) DeleteLB(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddLBListener(item *mysql.LBListener) {
+func (t *DataSet) AddLBListener(item *mysqlmodel.LBListener) {
 	t.lbListenerLcuuidToID[item.Lcuuid] = item.ID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
@@ -643,7 +643,7 @@ func (t *DataSet) DeleteLBListener(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddRDSInstance(item *mysql.RDSInstance) {
+func (t *DataSet) AddRDSInstance(item *mysqlmodel.RDSInstance) {
 	t.rdsInstanceLcuuidToID[item.Lcuuid] = item.ID
 	t.rdsInstanceIDToLcuuid[item.ID] = item.Lcuuid
 	t.rdsInstanceIDToInfo[item.ID] = &rdsInstanceInfo{
@@ -687,7 +687,7 @@ func (t *DataSet) DeleteRDSInstance(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddRedisInstance(item *mysql.RedisInstance) {
+func (t *DataSet) AddRedisInstance(item *mysqlmodel.RedisInstance) {
 	t.redisInstanceLcuuidToID[item.Lcuuid] = item.ID
 	t.redisInstanceIDToLcuuid[item.ID] = item.Lcuuid
 	t.redisInstanceIDToInfo[item.ID] = &redisInstanceInfo{
@@ -731,7 +731,7 @@ func (t *DataSet) DeleteRedisInstance(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodCluster(item *mysql.PodCluster) {
+func (t *DataSet) AddPodCluster(item *mysqlmodel.PodCluster) {
 	t.podClusterLcuuidToID[item.Lcuuid] = item.ID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
@@ -741,7 +741,7 @@ func (t *DataSet) DeletePodCluster(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodNode(item *mysql.PodNode) {
+func (t *DataSet) AddPodNode(item *mysqlmodel.PodNode) {
 	t.podNodeLcuuidToID[item.Lcuuid] = item.ID
 	t.podNodeIDToLcuuid[item.ID] = item.Lcuuid
 	t.podNodeIDToInfo[item.ID] = &podNodeInfo{
@@ -796,7 +796,7 @@ func (t *DataSet) DeletePodNode(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddVMPodNodeConnection(item *mysql.VMPodNodeConnection) {
+func (t *DataSet) AddVMPodNodeConnection(item *mysqlmodel.VMPodNodeConnection) {
 	t.vmPodNodeConnectionLcuuidToPodNodeID[item.Lcuuid] = item.PodNodeID
 	t.podNodeIDToVMID[item.PodNodeID] = item.VMID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, item.Lcuuid), t.metadata.LogPrefixes)
@@ -809,7 +809,7 @@ func (t *DataSet) DeleteVMPodNodeConnection(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodNamespace(item *mysql.PodNamespace) {
+func (t *DataSet) AddPodNamespace(item *mysqlmodel.PodNamespace) {
 	t.podNamespaceLcuuidToID[item.Lcuuid] = item.ID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
@@ -819,7 +819,7 @@ func (t *DataSet) DeletePodNamespace(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodIngress(item *mysql.PodIngress) {
+func (t *DataSet) AddPodIngress(item *mysqlmodel.PodIngress) {
 	t.podIngressLcuuidToID[item.Lcuuid] = item.ID
 	t.podIngressIDToLcuuid[item.ID] = item.Lcuuid
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, item.Lcuuid), t.metadata.LogPrefixes)
@@ -832,7 +832,7 @@ func (t *DataSet) DeletePodIngress(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodIngressRule(item *mysql.PodIngressRule) {
+func (t *DataSet) AddPodIngressRule(item *mysqlmodel.PodIngressRule) {
 	t.podIngressRuleLcuuidToID[item.Lcuuid] = item.ID
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, item.Lcuuid), t.metadata.LogPrefixes)
 }
@@ -842,7 +842,7 @@ func (t *DataSet) DeletePodIngressRule(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodService(item *mysql.PodService) {
+func (t *DataSet) AddPodService(item *mysqlmodel.PodService) {
 	t.podServiceLcuuidToID[item.Lcuuid] = item.ID
 	t.podServiceIDToLcuuid[item.ID] = item.Lcuuid
 	t.podServiceIDToInfo[item.ID] = &podServiceInfo{
@@ -894,7 +894,7 @@ func (t *DataSet) DeletePodService(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodGroup(item *mysql.PodGroup) {
+func (t *DataSet) AddPodGroup(item *mysqlmodel.PodGroup) {
 	t.podGroupLcuuidToID[item.Lcuuid] = item.ID
 	t.podGroupIDToLcuuid[item.ID] = item.Lcuuid
 	t.podGroupIDToType[item.ID] = item.Type
@@ -909,7 +909,7 @@ func (t *DataSet) DeletePodGroup(lcuuid string) {
 	log.Info(deleteFromToolMap(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid), t.metadata.LogPrefixes)
 }
 
-func (t *DataSet) AddPodReplicaSet(item *mysql.PodReplicaSet) {
+func (t *DataSet) AddPodReplicaSet(item *mysqlmodel.PodReplicaSet) {
 	t.podReplicaSetLcuuidToID[item.Lcuuid] = item.ID
 	t.podReplicaSetIDToLcuuid[item.ID] = item.Lcuuid
 	t.GetLogFunc()(addToToolMap(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, item.Lcuuid), t.metadata.LogPrefixes)
@@ -934,7 +934,7 @@ func (t *DataSet) updateContainerIDToPodID(containerID string, podID int) {
 	}
 }
 
-func (t *DataSet) AddPod(item *mysql.Pod) {
+func (t *DataSet) AddPod(item *mysqlmodel.Pod) {
 	t.podLcuuidToID[item.Lcuuid] = item.ID
 	t.podIDToLcuuid[item.ID] = item.Lcuuid
 	t.podIDToInfo[item.ID] = &podInfo{
@@ -1004,7 +1004,7 @@ func (t *DataSet) GetRegionIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid), t.metadata.LogPrefixes)
-	var region mysql.Region
+	var region mysqlmodel.Region
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&region)
 	if result.RowsAffected == 1 {
 		t.AddRegion(&region)
@@ -1021,7 +1021,7 @@ func (t *DataSet) GetRegionLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REGION_EN, id), t.metadata.LogPrefixes)
-	var region mysql.Region
+	var region mysqlmodel.Region
 	result := t.metadata.DB.Where("id = ?", id).Find(&region)
 	if result.RowsAffected == 1 {
 		t.AddRegion(&region)
@@ -1038,7 +1038,7 @@ func (t *DataSet) GetHostIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, lcuuid), t.metadata.LogPrefixes)
-	var dbItem mysql.Host
+	var dbItem mysqlmodel.Host
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddHost(&dbItem)
@@ -1055,7 +1055,7 @@ func (t *DataSet) GetHostLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.Host
+	var dbItem mysqlmodel.Host
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddHost(&dbItem)
@@ -1072,7 +1072,7 @@ func (t *DataSet) GetHostIDByIP(ip string) (int, bool) {
 		return id, true
 	}
 	log.Warningf("cache %s id (ip: %s) not found", ctrlrcommon.RESOURCE_TYPE_HOST_EN, ip, t.metadata.LogPrefixes)
-	var host mysql.Host
+	var host mysqlmodel.Host
 	result := t.metadata.DB.Where("ip = ?", ip).Find(&host)
 	if result.RowsAffected == 1 {
 		t.AddHost(&host)
@@ -1089,7 +1089,7 @@ func (t *DataSet) GetVMIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid), t.metadata.LogPrefixes)
-	var dbItem mysql.VM
+	var dbItem mysqlmodel.VM
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddVM(&dbItem)
@@ -1106,7 +1106,7 @@ func (t *DataSet) GetVMLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.VM
+	var dbItem mysqlmodel.VM
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddVM(&dbItem)
@@ -1123,7 +1123,7 @@ func (t *DataSet) GetVPCIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, lcuuid), t.metadata.LogPrefixes)
-	var vpc mysql.VPC
+	var vpc mysqlmodel.VPC
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
@@ -1140,7 +1140,7 @@ func (t *DataSet) GetVPCLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VPC_EN, id), t.metadata.LogPrefixes)
-	var vpc mysql.VPC
+	var vpc mysqlmodel.VPC
 	result := t.metadata.DB.Where("id = ?", id).Find(&vpc)
 	if result.RowsAffected == 1 {
 		t.AddVPC(&vpc)
@@ -1160,7 +1160,7 @@ func (t *DataSet) GetNetworkIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid), t.metadata.LogPrefixes)
-	var network mysql.Network
+	var network mysqlmodel.Network
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
@@ -1177,7 +1177,7 @@ func (t *DataSet) GetSubnetIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid), t.metadata.LogPrefixes)
-	var subnet mysql.Subnet
+	var subnet mysqlmodel.Subnet
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
@@ -1194,7 +1194,7 @@ func (t *DataSet) GetSubnetLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, id), t.metadata.LogPrefixes)
-	var subnet mysql.Subnet
+	var subnet mysqlmodel.Subnet
 	result := t.metadata.DB.Where("id = ?", id).Find(&subnet)
 	if result.RowsAffected == 1 {
 		t.AddSubnet(&subnet)
@@ -1211,7 +1211,7 @@ func (t *DataSet) GetNetworkIDByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
-	var vif mysql.VInterface
+	var vif mysqlmodel.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
@@ -1228,7 +1228,7 @@ func (t *DataSet) GetDeviceTypeByVInterfaceLcuuid(vifLcuuid string) (int, bool) 
 		return id, true
 	}
 	log.Warningf("cache device type (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
-	var vif mysql.VInterface
+	var vif mysqlmodel.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
@@ -1245,7 +1245,7 @@ func (t *DataSet) GetDeviceIDByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warningf("cache device id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
-	var vif mysql.VInterface
+	var vif mysqlmodel.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
@@ -1262,7 +1262,7 @@ func (t *DataSet) GetMacByVInterfaceLcuuid(vifLcuuid string) (string, bool) {
 		return mac, true
 	}
 	log.Warningf("cache mac (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, t.metadata.LogPrefixes)
-	var vif mysql.VInterface
+	var vif mysqlmodel.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
@@ -1282,7 +1282,7 @@ func (t *DataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id), t.metadata.LogPrefixes)
-	var network mysql.Network
+	var network mysqlmodel.Network
 	result := t.metadata.DB.Where("id = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
@@ -1299,7 +1299,7 @@ func (t *DataSet) GetVRouterIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid), t.metadata.LogPrefixes)
-	var dbItem mysql.VRouter
+	var dbItem mysqlmodel.VRouter
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddVRouter(&dbItem)
@@ -1316,7 +1316,7 @@ func (t *DataSet) GetVRouterLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.VRouter
+	var dbItem mysqlmodel.VRouter
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddVRouter(&dbItem)
@@ -1333,7 +1333,7 @@ func (t *DataSet) GetDHCPPortIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid), t.metadata.LogPrefixes)
-	var dbItem mysql.DHCPPort
+	var dbItem mysqlmodel.DHCPPort
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddDHCPPort(&dbItem)
@@ -1350,7 +1350,7 @@ func (t *DataSet) GetDHCPPortLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.DHCPPort
+	var dbItem mysqlmodel.DHCPPort
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddDHCPPort(&dbItem)
@@ -1367,7 +1367,7 @@ func (t *DataSet) GetVInterfaceIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid), t.metadata.LogPrefixes)
-	var vinterface mysql.VInterface
+	var vinterface mysqlmodel.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&vinterface)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vinterface)
@@ -1384,7 +1384,7 @@ func (t *DataSet) GetVInterfaceTypeByLcuuid(lcuuid string) (int, bool) {
 		return vt, true
 	}
 	log.Warningf("cache %s type (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid, t.metadata.LogPrefixes)
-	var vinterface mysql.VInterface
+	var vinterface mysqlmodel.VInterface
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&vinterface)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vinterface)
@@ -1487,7 +1487,7 @@ func (t *DataSet) GetNATGatewayIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid), t.metadata.LogPrefixes)
-	var dbItem mysql.NATGateway
+	var dbItem mysqlmodel.NATGateway
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddNATGateway(&dbItem)
@@ -1504,7 +1504,7 @@ func (t *DataSet) GetNATGatewayLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.NATGateway
+	var dbItem mysqlmodel.NATGateway
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddNATGateway(&dbItem)
@@ -1521,7 +1521,7 @@ func (t *DataSet) GetLBIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid), t.metadata.LogPrefixes)
-	var dbItem mysql.LB
+	var dbItem mysqlmodel.LB
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddLB(&dbItem)
@@ -1538,7 +1538,7 @@ func (t *DataSet) GetLBLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.LB
+	var dbItem mysqlmodel.LB
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddLB(&dbItem)
@@ -1555,7 +1555,7 @@ func (t *DataSet) GetLBListenerIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid), t.metadata.LogPrefixes)
-	var lbListener mysql.LBListener
+	var lbListener mysqlmodel.LBListener
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&lbListener)
 	if result.RowsAffected == 1 {
 		t.AddLBListener(&lbListener)
@@ -1572,7 +1572,7 @@ func (t *DataSet) GetRDSInstanceIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid), t.metadata.LogPrefixes)
-	var rdsInstance mysql.RDSInstance
+	var rdsInstance mysqlmodel.RDSInstance
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&rdsInstance)
 	if result.RowsAffected == 1 {
 		t.AddRDSInstance(&rdsInstance)
@@ -1589,7 +1589,7 @@ func (t *DataSet) GetRDSInstanceLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.RDSInstance
+	var dbItem mysqlmodel.RDSInstance
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddRDSInstance(&dbItem)
@@ -1606,7 +1606,7 @@ func (t *DataSet) GetRedisInstanceIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid), t.metadata.LogPrefixes)
-	var redisInstance mysql.RedisInstance
+	var redisInstance mysqlmodel.RedisInstance
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&redisInstance)
 	if result.RowsAffected == 1 {
 		t.AddRedisInstance(&redisInstance)
@@ -1623,7 +1623,7 @@ func (t *DataSet) GetRedisInstanceLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.RedisInstance
+	var dbItem mysqlmodel.RedisInstance
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddRedisInstance(&dbItem)
@@ -1640,7 +1640,7 @@ func (t *DataSet) GetPodClusterIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid), t.metadata.LogPrefixes)
-	var dbItem mysql.PodCluster
+	var dbItem mysqlmodel.PodCluster
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPodCluster(&dbItem)
@@ -1660,7 +1660,7 @@ func (t *DataSet) GetPodNodeIDByLcuuid(lcuuid string) int {
 		return id
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid), t.metadata.LogPrefixes)
-	var podNode mysql.PodNode
+	var podNode mysqlmodel.PodNode
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podNode)
 	if result.RowsAffected == 1 {
 		t.AddPodNode(&podNode)
@@ -1677,7 +1677,7 @@ func (t *DataSet) GetPodNodeLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, id), t.metadata.LogPrefixes)
-	var podNode mysql.PodNode
+	var podNode mysqlmodel.PodNode
 	result := t.metadata.DB.Where("id = ?", id).Find(&podNode)
 	if result.RowsAffected == 1 {
 		t.AddPodNode(&podNode)
@@ -1694,7 +1694,7 @@ func (t *DataSet) GetPodNamespaceIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid), t.metadata.LogPrefixes)
-	var podNamespace mysql.PodNamespace
+	var podNamespace mysqlmodel.PodNamespace
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podNamespace)
 	if result.RowsAffected == 1 {
 		t.AddPodNamespace(&podNamespace)
@@ -1711,7 +1711,7 @@ func (t *DataSet) GetPodIngressIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, lcuuid), t.metadata.LogPrefixes)
-	var podIngress mysql.PodIngress
+	var podIngress mysqlmodel.PodIngress
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podIngress)
 	if result.RowsAffected == 1 {
 		t.AddPodIngress(&podIngress)
@@ -1728,7 +1728,7 @@ func (t *DataSet) GetPodIngressLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, id), t.metadata.LogPrefixes)
-	var podIngress mysql.PodIngress
+	var podIngress mysqlmodel.PodIngress
 	result := t.metadata.DB.Where("id = ?", id).Find(&podIngress)
 	if result.RowsAffected == 1 {
 		t.AddPodIngress(&podIngress)
@@ -1745,7 +1745,7 @@ func (t *DataSet) GetPodIngressRuleIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid), t.metadata.LogPrefixes)
-	var podIngressRule mysql.PodIngressRule
+	var podIngressRule mysqlmodel.PodIngressRule
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podIngressRule)
 	if result.RowsAffected == 1 {
 		t.AddPodIngressRule(&podIngressRule)
@@ -1762,7 +1762,7 @@ func (t *DataSet) GetPodServiceIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid), t.metadata.LogPrefixes)
-	var podService mysql.PodService
+	var podService mysqlmodel.PodService
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podService)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&podService)
@@ -1779,7 +1779,7 @@ func (t *DataSet) GetPodServiceLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.PodService
+	var dbItem mysqlmodel.PodService
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&dbItem)
@@ -1796,7 +1796,7 @@ func (t *DataSet) GetPodGroupIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid), t.metadata.LogPrefixes)
-	var podGroup mysql.PodGroup
+	var podGroup mysqlmodel.PodGroup
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podGroup)
 	if result.RowsAffected == 1 {
 		t.AddPodGroup(&podGroup)
@@ -1813,7 +1813,7 @@ func (t *DataSet) GetPodGroupTypeByID(id int) (int, bool) {
 		return podGroupType, true
 	}
 	log.Warningf("cache %s type (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, id, t.metadata.LogPrefixes)
-	var podGroup mysql.PodGroup
+	var podGroup mysqlmodel.PodGroup
 	result := t.metadata.DB.Where("id = ?", id).Find(&podGroup)
 	if result.RowsAffected == 1 {
 		t.AddPodGroup(&podGroup)
@@ -1830,7 +1830,7 @@ func (t *DataSet) GetPodGroupLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, id), t.metadata.LogPrefixes)
-	var podGroup mysql.PodGroup
+	var podGroup mysqlmodel.PodGroup
 	result := t.metadata.DB.Where("id = ?", id).Find(&podGroup)
 	if result.RowsAffected == 1 {
 		t.AddPodGroup(&podGroup)
@@ -1847,7 +1847,7 @@ func (t *DataSet) GetPodReplicaSetIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid), t.metadata.LogPrefixes)
-	var podReplicaSet mysql.PodReplicaSet
+	var podReplicaSet mysqlmodel.PodReplicaSet
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&podReplicaSet)
 	if result.RowsAffected == 1 {
 		t.AddPodReplicaSet(&podReplicaSet)
@@ -1864,7 +1864,7 @@ func (t *DataSet) GetPodReplicaSetLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, id), t.metadata.LogPrefixes)
-	var podReplicaSet mysql.PodReplicaSet
+	var podReplicaSet mysqlmodel.PodReplicaSet
 	result := t.metadata.DB.Where("id = ?", id).Find(&podReplicaSet)
 	if result.RowsAffected == 1 {
 		t.AddPodReplicaSet(&podReplicaSet)
@@ -1881,7 +1881,7 @@ func (t *DataSet) GetPodIDByLcuuid(lcuuid string) (int, bool) {
 		return id, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid), t.metadata.LogPrefixes)
-	var pod mysql.Pod
+	var pod mysqlmodel.Pod
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&pod)
 	if result.RowsAffected == 1 {
 		t.AddPod(&pod)
@@ -1898,7 +1898,7 @@ func (t *DataSet) GetPodLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.Pod
+	var dbItem mysqlmodel.Pod
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPod(&dbItem)
@@ -1916,7 +1916,7 @@ func (t *DataSet) GetHostInfoByID(id int) (*hostInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.Host
+	var dbItem mysqlmodel.Host
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddHost(&dbItem)
@@ -1940,7 +1940,7 @@ func (t *DataSet) GetVMInfoByID(id int) (*vmInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VM_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.VM
+	var dbItem mysqlmodel.VM
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddVM(&dbItem)
@@ -1963,7 +1963,7 @@ func (t *DataSet) GetNetworkNameByID(id int) (string, bool) {
 		return name, true
 	}
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, id), t.metadata.LogPrefixes)
-	var network mysql.Network
+	var network mysqlmodel.Network
 	result := t.metadata.DB.Where("id = ?", id).Find(&network)
 	if result.RowsAffected == 1 {
 		t.AddNetwork(&network)
@@ -1981,7 +1981,7 @@ func (t *DataSet) GetVRouterInfoByID(id int) (*vrouterInfo, error) {
 	}
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, id), t.metadata.LogPrefixes)
 
-	var vRouter mysql.VRouter
+	var vRouter mysqlmodel.VRouter
 	result := t.metadata.DB.Where("id = ?", id).Find(&vRouter)
 	if result.RowsAffected == 1 {
 		t.AddVRouter(&vRouter)
@@ -2004,7 +2004,7 @@ func (t *DataSet) GetDHCPPortInfoByID(id int) (*dhcpPortInfo, error) {
 		return info, nil
 	}
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.DHCPPort
+	var dbItem mysqlmodel.DHCPPort
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddDHCPPort(&dbItem)
@@ -2028,7 +2028,7 @@ func (t *DataSet) GetLBInfoByID(id int) (*lbInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_LB_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.LB
+	var dbItem mysqlmodel.LB
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddLB(&dbItem)
@@ -2052,7 +2052,7 @@ func (t *DataSet) GetNATGatewayInfoByID(id int) (*natGatewayInfo, error) {
 	}
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, id), t.metadata.LogPrefixes)
 
-	var dbItem mysql.NATGateway
+	var dbItem mysqlmodel.NATGateway
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddNATGateway(&dbItem)
@@ -2076,7 +2076,7 @@ func (t *DataSet) GetRDSInstanceInfoByID(id int) (*rdsInstanceInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.RDSInstance
+	var dbItem mysqlmodel.RDSInstance
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddRDSInstance(&dbItem)
@@ -2100,7 +2100,7 @@ func (t *DataSet) GetRedisInstanceInfoByID(id int) (*redisInstanceInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.RedisInstance
+	var dbItem mysqlmodel.RedisInstance
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddRedisInstance(&dbItem)
@@ -2124,7 +2124,7 @@ func (t *DataSet) GetPodNodeInfoByID(id int) (*podNodeInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.PodNode
+	var dbItem mysqlmodel.PodNode
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPodNode(&dbItem)
@@ -2148,7 +2148,7 @@ func (t *DataSet) GetPodServiceInfoByID(id int) (*podServiceInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.PodService
+	var dbItem mysqlmodel.PodService
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPodService(&dbItem)
@@ -2172,7 +2172,7 @@ func (t *DataSet) GetPodInfoByID(id int) (*podInfo, error) {
 	}
 
 	log.Warning(cacheNameByIDNotFound(ctrlrcommon.RESOURCE_TYPE_POD_EN, id), t.metadata.LogPrefixes)
-	var dbItem mysql.Pod
+	var dbItem mysqlmodel.Pod
 	result := t.metadata.DB.Where("id = ?", id).Find(&dbItem)
 	if result.RowsAffected == 1 {
 		t.AddPod(&dbItem)
@@ -2195,7 +2195,7 @@ func (t *DataSet) GetVInterfaceLcuuidByID(id int) (string, bool) {
 		return lcuuid, true
 	}
 	log.Warning(cacheLcuuidByIDNotFound(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, id), t.metadata.LogPrefixes)
-	var vif mysql.VInterface
+	var vif mysqlmodel.VInterface
 	result := t.metadata.DB.Where("id = ?", id).Find(&vif)
 	if result.RowsAffected == 1 {
 		t.AddVInterface(&vif)
@@ -2212,7 +2212,7 @@ func (t *DataSet) GetVInterfaceIDByWANIPLcuuid(lcuuid string) (int, bool) {
 		return vifID, true
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid, t.metadata.LogPrefixes)
-	var wanIP mysql.WANIP
+	var wanIP mysqlmodel.WANIP
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&wanIP)
 	if result.RowsAffected == 1 {
 		t.AddWANIP(&wanIP)
@@ -2230,7 +2230,7 @@ func (t *DataSet) GetWANIPByLcuuid(lcuuid string) (string, bool) {
 		return ip, true
 	}
 	log.Warning(cacheIPByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid), t.metadata.LogPrefixes)
-	var wanIP mysql.WANIP
+	var wanIP mysqlmodel.WANIP
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&wanIP)
 	if result.RowsAffected == 1 {
 		t.AddWANIP(&wanIP)
@@ -2247,7 +2247,7 @@ func (t *DataSet) GetVInterfaceIDByLANIPLcuuid(lcuuid string) (int, bool) {
 		return vifID, true
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid, t.metadata.LogPrefixes)
-	var lanIP mysql.LANIP
+	var lanIP mysqlmodel.LANIP
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&lanIP)
 	if result.RowsAffected == 1 {
 		t.AddLANIP(&lanIP)
@@ -2265,7 +2265,7 @@ func (t *DataSet) GetLANIPByLcuuid(lcuuid string) (string, bool) {
 		return ip, true
 	}
 	log.Warning(cacheIPByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid), t.metadata.LogPrefixes)
-	var lanIP mysql.LANIP
+	var lanIP mysqlmodel.LANIP
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&lanIP)
 	if result.RowsAffected == 1 {
 		t.AddLANIP(&lanIP)
@@ -2282,7 +2282,7 @@ func (t *DataSet) GetVMIDByPodNodeID(podNodeID int) (int, bool) {
 		return id, true
 	}
 	log.Warningf("cache %s id (%s id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VM_EN, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, podNodeID, t.metadata.LogPrefixes)
-	var conn mysql.VMPodNodeConnection
+	var conn mysqlmodel.VMPodNodeConnection
 	result := t.metadata.DB.Where("pod_node_id = ?", podNodeID).Find(&conn)
 	if result.RowsAffected == 1 {
 		t.AddVMPodNodeConnection(&conn)
@@ -2297,7 +2297,7 @@ func (t *DataSet) GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid string) (int, b
 		return id, true
 	}
 	log.Warningf("cache %s id (%s lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid, t.metadata.LogPrefixes)
-	var conn mysql.VMPodNodeConnection
+	var conn mysqlmodel.VMPodNodeConnection
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&conn)
 	if result.RowsAffected == 1 {
 		t.AddVMPodNodeConnection(&conn)
@@ -2309,7 +2309,7 @@ func (t *DataSet) GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid string) (int, b
 
 }
 
-func (t *DataSet) AddProcess(item *mysql.Process) {
+func (t *DataSet) AddProcess(item *mysqlmodel.Process) {
 	t.processLcuuidToInfo[item.Lcuuid] = &processInfo{
 		ID:   item.ID,
 		Name: item.Name,
@@ -2328,7 +2328,7 @@ func (t *DataSet) GetProcessInfoByLcuuid(lcuuid string) (*processInfo, bool) {
 		return processInfo, true
 	}
 	log.Warning(cacheIDByLcuuidNotFound(ctrlrcommon.RESOURCE_TYPE_REGION_EN, lcuuid), t.metadata.LogPrefixes)
-	var process *mysql.Process
+	var process *mysqlmodel.Process
 	result := t.metadata.DB.Where("lcuuid = ?", lcuuid).Find(&process)
 	if result.RowsAffected == 1 {
 		t.AddProcess(process)
@@ -2348,7 +2348,7 @@ func (t *DataSet) GetPodIDByContainerIDWithoutLog(containerID string) (int, bool
 		return podID, true
 	}
 
-	var pod *mysql.Pod
+	var pod *mysqlmodel.Pod
 	result := t.metadata.DB.Where("container_ids like ?", "%"+containerID+"%").Find(&pod)
 	if result.RowsAffected == 1 {
 		t.AddPod(pod)
@@ -2363,7 +2363,7 @@ func (t *DataSet) GetProcessDeviceTypeAndID(containerID string, vtapID uint32) (
 		deviceType = common.VIF_DEVICE_TYPE_POD
 		deviceID = podID
 	} else {
-		var vtap *mysql.VTap
+		var vtap *mysqlmodel.VTap
 		if err := t.metadata.DB.Where("id = ?", vtapID).First(&vtap).Error; err != nil { // TODO @weiqiang 放入缓存
 			log.Error(err, t.metadata.LogPrefixes)
 		}

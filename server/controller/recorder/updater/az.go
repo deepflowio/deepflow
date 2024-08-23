@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type AZ struct {
 	UpdaterBase[
 		cloudmodel.AZ,
 		*diffbase.AZ,
-		*mysql.AZ,
-		mysql.AZ,
+		*mysqlmodel.AZ,
+		mysqlmodel.AZ,
 		*message.AZAdd,
 		message.AZAdd,
 		*message.AZUpdate,
@@ -47,8 +47,8 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 		newUpdaterBase[
 			cloudmodel.AZ,
 			*diffbase.AZ,
-			*mysql.AZ,
-			mysql.AZ,
+			*mysqlmodel.AZ,
+			mysqlmodel.AZ,
 			*message.AZAdd,
 			message.AZAdd,
 			*message.AZUpdate,
@@ -73,8 +73,8 @@ func (z *AZ) getDiffBaseByCloudItem(cloudItem *cloudmodel.AZ) (diffBase *diffbas
 	return
 }
 
-func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*mysql.AZ, bool) {
-	dbItem := &mysql.AZ{
+func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*mysqlmodel.AZ, bool) {
+	dbItem := &mysqlmodel.AZ{
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
 		Region: cloudItem.RegionLcuuid,

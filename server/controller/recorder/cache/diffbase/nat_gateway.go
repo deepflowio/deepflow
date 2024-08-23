@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddNATGateway(dbItem *mysql.NATGateway, seq int) {
+func (b *DataSet) AddNATGateway(dbItem *mysqlmodel.NATGateway, seq int) {
 	b.NATGateways[dbItem.Lcuuid] = &NATGateway{
 		DiffBase: DiffBase{
 			Sequence: seq,

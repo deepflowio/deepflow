@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -83,7 +84,7 @@ func (v *VTapCheck) Stop() {
 }
 
 func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
-	var vtaps []mysql.VTap
+	var vtaps []mysqlmodel.VTap
 	var reg = regexp.MustCompile(` |:`)
 
 	log.Debugf("vtap launch_server check start", db.LogPrefixORGID)
@@ -92,7 +93,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 	for _, vtap := range vtaps {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
-			var vm mysql.VM
+			var vm mysqlmodel.VM
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
 				log.Infof("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -125,7 +126,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 			}
 
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_HYPER_V:
-			var host mysql.Host
+			var host mysqlmodel.Host
 			if ret := db.Where("ip = ?", vtap.LaunchServer).First(&host); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -157,7 +158,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 				}
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
-			var podNode mysql.PodNode
+			var podNode mysqlmodel.PodNode
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -194,7 +195,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 				}
 			}
 		case common.VTAP_TYPE_K8S_SIDECAR:
-			var pod mysql.Pod
+			var pod mysqlmodel.Pod
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&pod); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
@@ -231,14 +232,14 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 }
 
 func (v *VTapCheck) typeCheck(db *mysql.DB) {
-	var vtaps []mysql.VTap
-	var podNodes []mysql.PodNode
-	var conns []mysql.VMPodNodeConnection
+	var vtaps []mysqlmodel.VTap
+	var podNodes []mysqlmodel.PodNode
+	var conns []mysqlmodel.VMPodNodeConnection
 
 	log.Debugf("vtap type check start", db.LogPrefixORGID)
 
 	db.Find(&podNodes)
-	idToPodNode := make(map[int]*mysql.PodNode)
+	idToPodNode := make(map[int]*mysqlmodel.PodNode)
 	for i, podNode := range podNodes {
 		idToPodNode[podNode.ID] = &podNodes[i]
 	}
@@ -251,7 +252,7 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 		podNodeIDToVMID[conn.PodNodeID] = conn.VMID
 	}
 
-	var vms []mysql.VM
+	var vms []mysqlmodel.VM
 	if err := db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms).Error; err != nil {
 		log.Error(err, db.LogPrefixORGID)
 	}
@@ -266,7 +267,7 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 	).Find(&vtaps)
 	for _, vtap := range vtaps {
 		if vtap.Type == common.VTAP_TYPE_WORKLOAD_V || vtap.Type == common.VTAP_TYPE_WORKLOAD_P {
-			var vm mysql.VM
+			var vm mysqlmodel.VM
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
 				continue
 			}
@@ -290,7 +291,7 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 				continue
 			}
 		} else {
-			var podNode mysql.PodNode
+			var podNode mysqlmodel.PodNode
 			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				continue
 			}
@@ -314,7 +315,7 @@ func (v *VTapCheck) typeCheck(db *mysql.DB) {
 }
 
 func (v *VTapCheck) deleteLostVTap(db *mysql.DB) {
-	var vtaps []*mysql.VTap
+	var vtaps []*mysqlmodel.VTap
 	db.Where("state = ? and type not in (?)",
 		common.VTAP_STATE_NOT_CONNECTED,
 		[]int{common.VTAP_TYPE_DEDICATED, common.VTAP_TYPE_TUNNEL_DECAPSULATION},

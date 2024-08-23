@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddVPC(dbItem *mysql.VPC, seq int) {
+func (b *DataSet) AddVPC(dbItem *mysqlmodel.VPC, seq int) {
 	b.VPCs[dbItem.Lcuuid] = &VPC{
 		DiffBase: DiffBase{
 			Sequence: seq,

@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type PodCluster struct {
-	OperatorBase[*mysql.PodCluster, mysql.PodCluster]
+	OperatorBase[*mysqlmodel.PodCluster, mysqlmodel.PodCluster]
 }
 
 func NewPodCluster() *PodCluster {
 	operater := &PodCluster{
-		newOperatorBase[*mysql.PodCluster](
+		newOperatorBase[*mysqlmodel.PodCluster](
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
 			true,
 			true,

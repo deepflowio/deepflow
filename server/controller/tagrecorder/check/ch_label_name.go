@@ -18,15 +18,16 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChPrometheusLabelName struct {
-	UpdaterBase[mysql.ChPrometheusLabelName, IDKey]
+	UpdaterBase[mysqlmodel.ChPrometheusLabelName, IDKey]
 }
 
 func NewChPrometheusLabelName() *ChPrometheusLabelName {
 	updater := &ChPrometheusLabelName{
-		UpdaterBase[mysql.ChPrometheusLabelName, IDKey]{
+		UpdaterBase[mysqlmodel.ChPrometheusLabelName, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_LABEL_NAME,
 		},
 	}
@@ -35,8 +36,8 @@ func NewChPrometheusLabelName() *ChPrometheusLabelName {
 	return updater
 }
 
-func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusLabelName, bool) {
-	var prometheusLabelName []mysql.PrometheusLabelName
+func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysqlmodel.ChPrometheusLabelName, bool) {
+	var prometheusLabelName []mysqlmodel.PrometheusLabelName
 
 	err := mysql.DefaultDB.Unscoped().Find(&prometheusLabelName).Error
 	if err != nil {
@@ -44,9 +45,9 @@ func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusL
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPrometheusLabelName)
+	keyToItem := make(map[IDKey]mysqlmodel.ChPrometheusLabelName)
 	for _, labelName := range prometheusLabelName {
-		keyToItem[IDKey{ID: labelName.ID}] = mysql.ChPrometheusLabelName{
+		keyToItem[IDKey{ID: labelName.ID}] = mysqlmodel.ChPrometheusLabelName{
 			ID:   labelName.ID,
 			Name: labelName.Name,
 		}
@@ -54,11 +55,11 @@ func (l *ChPrometheusLabelName) generateNewData() (map[IDKey]mysql.ChPrometheusL
 	return keyToItem, true
 }
 
-func (l *ChPrometheusLabelName) generateKey(dbItem mysql.ChPrometheusLabelName) IDKey {
+func (l *ChPrometheusLabelName) generateKey(dbItem mysqlmodel.ChPrometheusLabelName) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (l *ChPrometheusLabelName) generateUpdateInfo(oldItem, newItem mysql.ChPrometheusLabelName) (map[string]interface{}, bool) {
+func (l *ChPrometheusLabelName) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPrometheusLabelName) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

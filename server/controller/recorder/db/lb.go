@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type LB struct {
-	OperatorBase[*mysql.LB, mysql.LB]
+	OperatorBase[*mysqlmodel.LB, mysqlmodel.LB]
 }
 
 func NewLB() *LB {
 	operater := &LB{
-		newOperatorBase[*mysql.LB](
+		newOperatorBase[*mysqlmodel.LB](
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			true,
 			true,

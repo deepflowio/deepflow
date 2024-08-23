@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sLabel struct {
-	UpdaterBase[mysql.ChPodServiceK8sLabel, K8sLabelKey]
+	UpdaterBase[mysqlmodel.ChPodServiceK8sLabel, K8sLabelKey]
 }
 
 func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 	updater := &ChPodServiceK8sLabel{
-		UpdaterBase[mysql.ChPodServiceK8sLabel, K8sLabelKey]{
+		UpdaterBase[mysqlmodel.ChPodServiceK8sLabel, K8sLabelKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_K8S_LABEL,
 		},
 	}
@@ -37,10 +37,10 @@ func NewChPodServiceK8sLabel() *ChPodServiceK8sLabel {
 	return updater
 }
 
-func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodServiceK8sLabel, bool) {
-	var podServices []mysql.PodService
-	var podGroups []mysql.PodGroup
-	var podClusters []mysql.PodCluster
+func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysqlmodel.ChPodServiceK8sLabel, bool) {
+	var podServices []mysqlmodel.PodService
+	var podGroups []mysqlmodel.PodGroup
+	var podClusters []mysqlmodel.PodCluster
 	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
@@ -61,7 +61,7 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 	for _, podCluster := range podClusters {
 		podClusterIDToVPCID[podCluster.ID] = podCluster.VPCID
 	}
-	keyToItem := make(map[K8sLabelKey]mysql.ChPodServiceK8sLabel)
+	keyToItem := make(map[K8sLabelKey]mysqlmodel.ChPodServiceK8sLabel)
 	for _, podService := range podServices {
 		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
 		if err != nil {
@@ -76,7 +76,7 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 					ID:  podService.ID,
 					Key: splitSingleLabel[0],
 				}
-				keyToItem[key] = mysql.ChPodServiceK8sLabel{
+				keyToItem[key] = mysqlmodel.ChPodServiceK8sLabel{
 					ID:          podService.ID,
 					Key:         splitSingleLabel[0],
 					Value:       splitSingleLabel[1],
@@ -92,11 +92,11 @@ func (k *ChPodServiceK8sLabel) generateNewData() (map[K8sLabelKey]mysql.ChPodSer
 	return keyToItem, true
 }
 
-func (k *ChPodServiceK8sLabel) generateKey(dbItem mysql.ChPodServiceK8sLabel) K8sLabelKey {
+func (k *ChPodServiceK8sLabel) generateKey(dbItem mysqlmodel.ChPodServiceK8sLabel) K8sLabelKey {
 	return K8sLabelKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (k *ChPodServiceK8sLabel) generateUpdateInfo(oldItem, newItem mysql.ChPodServiceK8sLabel) (map[string]interface{}, bool) {
+func (k *ChPodServiceK8sLabel) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodServiceK8sLabel) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

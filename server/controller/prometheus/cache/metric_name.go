@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -72,8 +72,8 @@ func (mn *metricName) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (mn *metricName) load() ([]*mysql.PrometheusMetricName, error) {
-	var metricNames []*mysql.PrometheusMetricName
+func (mn *metricName) load() ([]*mysqlmodel.PrometheusMetricName, error) {
+	var metricNames []*mysqlmodel.PrometheusMetricName
 	err := mn.org.DB.Find(&metricNames).Error
 	return metricNames, err
 }

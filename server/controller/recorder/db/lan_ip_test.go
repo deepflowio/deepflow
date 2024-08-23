@@ -24,29 +24,29 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 func randomIP() string {
 	return "192.168." + strconv.Itoa(rand.Intn(256)) + "." + strconv.Itoa(rand.Intn(256))
 }
 
-func newDBLANIP() *mysql.LANIP {
-	return &mysql.LANIP{Base: mysql.Base{Lcuuid: uuid.New().String()}, IP: randomIP()}
+func newDBLANIP() *mysqlmodel.LANIP {
+	return &mysqlmodel.LANIP{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, IP: randomIP()}
 }
 
 func (t *SuiteTest) TestAddLANIPBatchSuccess() {
 	operator := NewLANIP()
 	itemToAdd := newDBLANIP()
 
-	_, ok := operator.AddBatch([]*mysql.LANIP{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.LANIP{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.LANIP
+	var addedItem *mysqlmodel.LANIP
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.IP, itemToAdd.IP)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.LANIP{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.LANIP{})
 }
 
 func (t *SuiteTest) TestDeleteLANIPBatchSuccess() {
@@ -56,28 +56,28 @@ func (t *SuiteTest) TestDeleteLANIPBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.LANIP
+	var deletedItem *mysqlmodel.LANIP
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestLANIPCreateAndFind() {
 	lcuuid := uuid.New().String()
-	lanIP := &mysql.LANIP{
-		Base: mysql.Base{Lcuuid: lcuuid},
+	lanIP := &mysqlmodel.LANIP{
+		Base: mysqlmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(lanIP)
-	var resultLANIP *mysql.LANIP
+	var resultLANIP *mysqlmodel.LANIP
 	err := t.db.Where("lcuuid = ? and ip='' and netmask='' and gateway=''"+
 		"and sub_domain='' and domain=''", lcuuid).First(&resultLANIP).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), lanIP.Base.Lcuuid, resultLANIP.Base.Lcuuid)
 
-	resultLANIP = new(mysql.LANIP)
+	resultLANIP = new(mysqlmodel.LANIP)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultLANIP)
 	assert.Equal(t.T(), lanIP.Base.Lcuuid, resultLANIP.Base.Lcuuid)
 
-	resultLANIP = new(mysql.LANIP)
+	resultLANIP = new(mysqlmodel.LANIP)
 	result := t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultLANIP)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

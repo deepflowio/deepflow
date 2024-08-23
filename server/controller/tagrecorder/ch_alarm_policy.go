@@ -18,15 +18,16 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChAlarmPolicy struct {
-	UpdaterComponent[mysql.ChAlarmPolicy, IDKey]
+	UpdaterComponent[mysqlmodel.ChAlarmPolicy, IDKey]
 }
 
 func NewChAlarmPolicy() *ChAlarmPolicy {
 	updater := &ChAlarmPolicy{
-		newUpdaterComponent[mysql.ChAlarmPolicy, IDKey](
+		newUpdaterComponent[mysqlmodel.ChAlarmPolicy, IDKey](
 			RESOURCE_TYPE_CH_ALARM_POLICY,
 		),
 	}
@@ -34,18 +35,18 @@ func NewChAlarmPolicy() *ChAlarmPolicy {
 	return updater
 }
 
-func (p *ChAlarmPolicy) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChAlarmPolicy, bool) {
+func (p *ChAlarmPolicy) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChAlarmPolicy, bool) {
 	log.Infof("generate data for %s", p.resourceTypeName, db.LogPrefixORGID)
-	var alarmPolicys []mysql.AlarmPolicy
+	var alarmPolicys []mysqlmodel.AlarmPolicy
 	err := db.Unscoped().Find(&alarmPolicys).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChAlarmPolicy)
+	keyToItem := make(map[IDKey]mysqlmodel.ChAlarmPolicy)
 	for _, alarmPolicy := range alarmPolicys {
-		keyToItem[IDKey{ID: alarmPolicy.ID}] = mysql.ChAlarmPolicy{
+		keyToItem[IDKey{ID: alarmPolicy.ID}] = mysqlmodel.ChAlarmPolicy{
 			ID:     alarmPolicy.ID,
 			Name:   alarmPolicy.Name,
 			UserID: alarmPolicy.UserID,
@@ -55,11 +56,11 @@ func (p *ChAlarmPolicy) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChAlarmPo
 	return keyToItem, true
 }
 
-func (p *ChAlarmPolicy) generateKey(dbItem mysql.ChAlarmPolicy) IDKey {
+func (p *ChAlarmPolicy) generateKey(dbItem mysqlmodel.ChAlarmPolicy) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChAlarmPolicy) generateUpdateInfo(oldItem, newItem mysql.ChAlarmPolicy) (map[string]interface{}, bool) {
+func (p *ChAlarmPolicy) generateUpdateInfo(oldItem, newItem mysqlmodel.ChAlarmPolicy) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

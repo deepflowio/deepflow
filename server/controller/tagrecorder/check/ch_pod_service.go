@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodService struct {
-	UpdaterBase[mysql.ChPodService, IDKey]
+	UpdaterBase[mysqlmodel.ChPodService, IDKey]
 }
 
 func NewChPodService() *ChPodService {
 	updater := &ChPodService{
-		UpdaterBase[mysql.ChPodService, IDKey]{
+		UpdaterBase[mysqlmodel.ChPodService, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD_SERVICE,
 		},
 	}
@@ -35,15 +35,15 @@ func NewChPodService() *ChPodService {
 	return updater
 }
 
-func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
-	var podServices []mysql.PodService
+func (p *ChPodService) generateNewData() (map[IDKey]mysqlmodel.ChPodService, bool) {
+	var podServices []mysqlmodel.PodService
 	err := p.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChPodService)
+	keyToItem := make(map[IDKey]mysqlmodel.ChPodService)
 	for _, podService := range podServices {
 		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
 		if err != nil {
@@ -51,7 +51,7 @@ func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
 		}
 
 		if podService.DeletedAt.Valid {
-			keyToItem[IDKey{ID: podService.ID}] = mysql.ChPodService{
+			keyToItem[IDKey{ID: podService.ID}] = mysqlmodel.ChPodService{
 				ID:           podService.ID,
 				Name:         podService.Name + " (deleted)",
 				PodClusterID: podService.PodClusterID,
@@ -61,7 +61,7 @@ func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
 				SubDomainID:  tagrecorder.SubDomainToSubDomainID[podService.SubDomain],
 			}
 		} else {
-			keyToItem[IDKey{ID: podService.ID}] = mysql.ChPodService{
+			keyToItem[IDKey{ID: podService.ID}] = mysqlmodel.ChPodService{
 				ID:           podService.ID,
 				Name:         podService.Name,
 				PodClusterID: podService.PodClusterID,
@@ -75,11 +75,11 @@ func (p *ChPodService) generateNewData() (map[IDKey]mysql.ChPodService, bool) {
 	return keyToItem, true
 }
 
-func (p *ChPodService) generateKey(dbItem mysql.ChPodService) IDKey {
+func (p *ChPodService) generateKey(dbItem mysqlmodel.ChPodService) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (p *ChPodService) generateUpdateInfo(oldItem, newItem mysql.ChPodService) (map[string]interface{}, bool) {
+func (p *ChPodService) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodService) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

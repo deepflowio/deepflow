@@ -19,17 +19,18 @@ package tagrecorder
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChRegion struct {
-	UpdaterComponent[mysql.ChRegion, IDKey]
+	UpdaterComponent[mysqlmodel.ChRegion, IDKey]
 	domainLcuuidToIconID map[string]int
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChRegion {
 	updater := &ChRegion{
-		newUpdaterComponent[mysql.ChRegion, IDKey](
+		newUpdaterComponent[mysqlmodel.ChRegion, IDKey](
 			RESOURCE_TYPE_CH_REGION,
 		),
 		domainLcuuidToIconID,
@@ -39,11 +40,11 @@ func NewChRegion(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[I
 	return updater
 }
 
-func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChRegion, bool) {
+func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChRegion, bool) {
 	log.Infof("generate data for %s", r.resourceTypeName, db.LogPrefixORGID)
-	var regions []mysql.Region
-	var azs []mysql.AZ
-	var vpcs []mysql.VPC
+	var regions []mysqlmodel.Region
+	var azs []mysqlmodel.AZ
+	var vpcs []mysqlmodel.VPC
 	err := db.Unscoped().Find(&regions).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err), db.LogPrefixORGID)
@@ -79,7 +80,7 @@ func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChRegion, bool
 			regionLcuuidToDomainLcuuids[vpc.Region][vpc.Domain] = true
 		}
 	}
-	keyToItem := make(map[IDKey]mysql.ChRegion)
+	keyToItem := make(map[IDKey]mysqlmodel.ChRegion)
 	for _, region := range regions {
 		domainLcuuids, _ := regionLcuuidToDomainLcuuids[region.Lcuuid]
 		domainIconIDs := []int{}
@@ -99,13 +100,13 @@ func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChRegion, bool
 		}
 
 		if region.DeletedAt.Valid {
-			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
+			keyToItem[IDKey{ID: region.ID}] = mysqlmodel.ChRegion{
 				ID:     region.ID,
 				Name:   region.Name + " (deleted)",
 				IconID: iconID,
 			}
 		} else {
-			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
+			keyToItem[IDKey{ID: region.ID}] = mysqlmodel.ChRegion{
 				ID:     region.ID,
 				Name:   region.Name,
 				IconID: iconID,
@@ -115,11 +116,11 @@ func (r *ChRegion) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChRegion, bool
 	return keyToItem, true
 }
 
-func (r *ChRegion) generateKey(dbItem mysql.ChRegion) IDKey {
+func (r *ChRegion) generateKey(dbItem mysqlmodel.ChRegion) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (r *ChRegion) generateUpdateInfo(oldItem, newItem mysql.ChRegion) (map[string]interface{}, bool) {
+func (r *ChRegion) generateUpdateInfo(oldItem, newItem mysqlmodel.ChRegion) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
