@@ -114,6 +114,7 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 		Annotation:       cloudItem.Annotation,
 		Type:             cloudItem.Type,
 		Selector:         cloudItem.Selector,
+		ExternalIP:       cloudItem.ExternalIP,
 		ServiceClusterIP: cloudItem.ServiceClusterIP,
 		PodIngressID:     podIngressID,
 		PodNamespaceID:   podNamespaceID,
@@ -163,6 +164,10 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 	if diffBase.Selector != cloudItem.Selector {
 		mapInfo["selector"] = cloudItem.Selector
 		structInfo.Selector.Set(diffBase.Selector, cloudItem.Selector)
+	}
+	if diffBase.ExternalIP != cloudItem.ExternalIP {
+		mapInfo["external_ip"] = cloudItem.ExternalIP
+		structInfo.ExternalIP.Set(diffBase.ExternalIP, cloudItem.ExternalIP)
 	}
 	if diffBase.ServiceClusterIP != cloudItem.ServiceClusterIP {
 		mapInfo["service_cluster_ip"] = cloudItem.ServiceClusterIP

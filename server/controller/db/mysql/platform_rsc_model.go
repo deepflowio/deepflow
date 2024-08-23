@@ -838,8 +838,9 @@ type PodService struct {
 	Label            string `gorm:"column:label;type:text;default:''" json:"LABEL" mapstructure:"LABEL"`                // separated by ,
 	Annotation       string `gorm:"column:annotation;type:text;default:''" json:"ANNOTATION" mapstructure:"ANNOTATION"` // separated by ,
 	Alias            string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
-	Type             int    `gorm:"column:type;type:int;default:null" json:"TYPE" mapstructure:"TYPE"`            // 1: ClusterIP 2: NodePort
-	Selector         string `gorm:"column:selector;type:text;default:''" json:"SELECTOR" mapstructure:"SELECTOR"` // separated by ,
+	Type             int    `gorm:"column:type;type:int;default:null" json:"TYPE" mapstructure:"TYPE"`                     // 1: ClusterIP 2: NodePort 3: LoadBalancer
+	Selector         string `gorm:"column:selector;type:text;default:''" json:"SELECTOR" mapstructure:"SELECTOR"`          // separated by ,
+	ExternalIP       string `gorm:"column:external_ip;type:text;default:''" json:"EXTERNAL_IP" mapstructure:"EXTERNAL_IP"` // separated by ,
 	ServiceClusterIP string `gorm:"column:service_cluster_ip;type:char(64);default:''" json:"SERVICE_CLUSTER_IP" mapstructure:"SERVICE_CLUSTER_IP"`
 	PodIngressID     int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID" mapstructure:"POD_INGRESS_ID"`
 	PodNamespaceID   int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`
