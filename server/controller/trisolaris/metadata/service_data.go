@@ -260,7 +260,7 @@ func (s *ServiceDataOP) generateService() {
 				protocols = append(protocols, protocol)
 				protocolToPorts[protocol] = []uint32{uint32(podServiceport.Port)}
 			}
-			if podService.Type == POD_SERVICE_TYPE_NODEPORT {
+			if podService.Type == POD_SERVICE_TYPE_NODEPORT || podService.Type == POD_SERVICE_TYPE_LOADBALANCER {
 				key := NodeKey{
 					podClusterID: podService.PodClusterID,
 					protocol:     protocol,
