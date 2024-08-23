@@ -57,6 +57,7 @@ type PodService struct {
 	Label            string `json:"label"`
 	Annotation       string `json:"annotation"`
 	Selector         string `json:"selector"`
+	ExternalIP       string `json:"external_ip"`
 	ServiceClusterIP string `json:"service_cluster_ip"`
 	PodIngressLcuuid string `json:"pod_ingress_lcuuid"`
 	RegionLcuuid     string `json:"region_lcuuid"`
