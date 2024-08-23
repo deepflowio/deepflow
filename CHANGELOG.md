@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Fix DWARF unwind entry for non PIE binaries [#7936](https://github.com/deepflowio/deepflow/pull/7936) by [rvql](https://github.com/rvql)
+* fix: Server config name mismatch [#7934](https://github.com/deepflowio/deepflow/pull/7934) by [rvql](https://github.com/rvql)
 * fix: log contents [#7920](https://github.com/deepflowio/deepflow/pull/7920) by [incoffeemonster](https://github.com/incoffeemonster)
 * fix: Profiler tries to clean non-exist map [#7905](https://github.com/deepflowio/deepflow/pull/7905) by [rvql](https://github.com/rvql)
 * fix: nil debug panic [#7904](https://github.com/deepflowio/deepflow/pull/7904) by [duandaa](https://github.com/duandaa)
@@ -149,6 +151,12 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Add load_balancer in k8s Service/ServiceRule [#7933](https://github.com/deepflowio/deepflow/pull/7933) by [rvql](https://github.com/rvql)
+* feat: service is issued to add loadbalancer [#7932](https://github.com/deepflowio/deepflow/pull/7932) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: agent - eBPF Add support for parsing 4.19.90-vhulk2211.3.0.h154… [#7930](https://github.com/deepflowio/deepflow/pull/7930) by [yinjiping](https://github.com/yinjiping)
+* feat: k8s svc support lb [#7927](https://github.com/deepflowio/deepflow/pull/7927) by [askyrie](https://github.com/askyrie)
+* feat: removes global variable mysql.Db [#7926](https://github.com/deepflowio/deepflow/pull/7926) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: add enable features to agent group [#7898](https://github.com/deepflowio/deepflow/pull/7898) by [roryye](https://github.com/roryye)
 * feat: add pseudo link field for treenode [#7917](https://github.com/deepflowio/deepflow/pull/7917) by [taloric](https://github.com/taloric)
 * feat: Update kubernetes create cli example [#7914](https://github.com/deepflowio/deepflow/pull/7914) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: support countDistinct function [#7896](https://github.com/deepflowio/deepflow/pull/7896) by [duandaa](https://github.com/duandaa)
@@ -344,6 +352,7 @@
 * refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
+* perf: remove the '-l' compilation parameter to allow inline [#7935](https://github.com/deepflowio/deepflow/pull/7935) by [lzf575](https://github.com/lzf575)
 * perf: improve the performance of ClickHouse table changes under multiple organizations [#7788](https://github.com/deepflowio/deepflow/pull/7788) by [lzf575](https://github.com/lzf575)
 * perf: speed up the update of ClickHouse table structure [#7748](https://github.com/deepflowio/deepflow/pull/7748) by [lzf575](https://github.com/lzf575)
 * perf: speed up the update of ClickHouse table structure [#7746](https://github.com/deepflowio/deepflow/pull/7746) by [lzf575](https://github.com/lzf575)
