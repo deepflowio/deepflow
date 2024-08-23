@@ -113,6 +113,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Add support for parsing 4.19.90-vhulk2211.3.0.h154 [#7928](https://github.com/deepflowio/deepflow/pull/7928) by [yinjiping](https://github.com/yinjiping)
 * feat: add pseudo link field for treenode [#7916](https://github.com/deepflowio/deepflow/pull/7916) by [taloric](https://github.com/taloric)
 * feat: agent - eBPF Optimize eBPF socket trace (#7871) [#7913](https://github.com/deepflowio/deepflow/pull/7913) by [yinjiping](https://github.com/yinjiping)
 * feat: when only exporting a single kafka data, use the 'sendMessage' interface [#7884](https://github.com/deepflowio/deepflow/pull/7884) by [lzf575](https://github.com/lzf575)
