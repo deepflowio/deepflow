@@ -14,9 +14,15 @@
  * limitations under the License.
  */
 
-package migration
+package agentlicense
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.5.1.49"
+import (
+	"gorm.io/gorm"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
+
+func UpdateAgentLicenseFunction(tx *gorm.DB, userID int, newAgentGroup *mysql.VTapGroup, agents []mysql.VTap) error {
+
+	return nil
+}

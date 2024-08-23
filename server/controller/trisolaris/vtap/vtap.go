@@ -100,7 +100,7 @@ type VTapInfo struct {
 	chVTapRegister    chan struct{}
 	chRegisterSuccess chan struct{}
 
-	vtaps                            []*mysql_model.VTap
+	vtaps                            []*models.VTap
 	db                               *gorm.DB
 	region                           *string
 	defaultVTapGroup                 *string
