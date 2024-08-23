@@ -636,6 +636,7 @@ type PodServiceFieldsUpdate struct {
 	Label            fieldDetail[string]
 	Annotation       fieldDetail[string]
 	Selector         fieldDetail[string]
+	ExternalIP       fieldDetail[string]
 	ServiceClusterIP fieldDetail[string]
 	PodIngressID     fieldDetail[int]
 	PodIngressLcuuid fieldDetail[string]
