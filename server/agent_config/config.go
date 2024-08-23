@@ -287,8 +287,8 @@ type EbpfConfig struct {
 	GoTracingTimeout                   *int                               `yaml:"go-tracing-timeout,omitempty"`
 	IOEventCollectMode                 *int                               `yaml:"io-event-collect-mode,omitempty"`
 	IOEventMinimalDuration             *string                            `yaml:"io-event-minimal-duration,omitempty"`
-	DwarfDisabled                      *bool                              `yaml:"dwarf_disabled,omitempty"`
-	DwarfRegex                         *string                            `yaml:"dwarf_regex,omitempty"`
+	DwarfDisabled                      *bool                              `yaml:"dwarf-disabled,omitempty"`
+	DwarfRegex                         *string                            `yaml:"dwarf-regex,omitempty"`
 	JavaSymbolFileRefreshDeferInterval *string                            `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
 	OnCpuProfile                       *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 	OffCpuProfile                      *OffCpuProfile                     `yaml:"off-cpu-profile,omitempty"`
