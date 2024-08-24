@@ -74,6 +74,8 @@ typedef struct {
 
 bool frame_pointer_heuristic_check(uint32_t pid);
 
+int32_t read_offset_of_stack_in_task_struct(void);
+
 int rustc_demangle(const char *mangled, char *out, size_t out_size);
 
 unwind_table_t *unwind_table_create(int32_t process_shard_list_map_fd,

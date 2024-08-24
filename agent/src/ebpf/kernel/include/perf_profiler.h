@@ -72,4 +72,8 @@ struct stack_trace_key_t {
 	} ext_data;
 };
 
+typedef struct {
+	__u32 task_struct_stack_offset;
+} unwind_sysinfo_t;
+
 #endif /* DF_BPF_PERF_PROFILER_H */

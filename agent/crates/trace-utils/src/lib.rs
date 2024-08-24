@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+pub mod btf;
 pub mod error;
 pub mod unwind;
 
@@ -82,5 +83,13 @@ pub unsafe extern "C" fn rustc_demangle(
             }
         }
         Err(_) => return 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn read_offset_of_stack_in_task_struct() -> i32 {
+    match btf::read_offset_of_stack_in_task_struct() {
+        Some(offset) => offset as i32,
+        None => -1,
     }
 }
