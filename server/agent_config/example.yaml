@@ -839,6 +839,10 @@ static_config:
   #   occurrence is used.
   consistent-timestamp-in-l7-metrics: false
 
+  # Packet segmentation reassembly
+  # NOTE: After activation, it will aggregate two consecutive TCP packets together for application log parsing
+  packet-segmentation-reassembly: []
+
   ##########
   ## PCAP ##
   ##########

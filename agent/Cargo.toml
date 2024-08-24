@@ -7,7 +7,7 @@ default-run = "deepflow-agent"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "plugins/packet_segmentation_reassembly"]
 exclude = ["src/ebpf/samples/rust/profiler", "src/ebpf/samples/rust/socket-tracer"]
 
 [dependencies]
@@ -59,6 +59,7 @@ npb_handler = { path = "plugins/npb_handler" }
 npb_pcap_policy = { path = "plugins/npb_pcap_policy" }
 num_enum = "0.5.7"
 packet_dedup = { path = "plugins/packet_dedup" }
+packet_segmentation_reassembly = { path = "plugins/packet_segmentation_reassembly" }
 packet_sequence_block = { path = "plugins/packet_sequence_block" }
 page_size = "0.4.2"
 parking_lot = "0.11"
@@ -89,6 +90,7 @@ tokio = { version = "1.20.1", features = ["full"] }
 tonic = "0.8.1"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
+
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 cgroups-rs = "0.2.9"

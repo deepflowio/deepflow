@@ -14,19 +14,14 @@
  * limitations under the License.
  */
 
-use std::any::Any;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 use std::sync::Arc;
 
+use public::packet::Downcast;
 use public::{
     counter,
     l7_protocol::{L7Protocol, L7ProtocolChecker},
 };
-
-pub trait Downcast {
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-}
 
 pub trait CacheItem: Downcast {
     // Distinguish different flows

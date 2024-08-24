@@ -32,6 +32,7 @@ use crate::common::{
 use public::{proto::common::TridentType, utils::net::MacAddr};
 
 use npb_pcap_policy::PolicyData;
+use packet_segmentation_reassembly::PacketSegmentationReassembly;
 use packet_sequence_block::PacketSequenceBlock;
 
 #[repr(u8)]
@@ -144,6 +145,9 @@ pub struct FlowNode {
 
     // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_block: Option<Box<PacketSequenceBlock>>,
+
+    // tcp segments
+    pub tcp_segments: Option<PacketSegmentationReassembly>,
 }
 
 impl FlowNode {
@@ -399,5 +403,41 @@ impl FlowNode {
             (Some(i), None) => i.contain_pcap(),
             _ => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PacketSegmentationReassembly;
+    use crate::common::MetaPacket;
+    use crate::utils::test::Capture;
+
+    #[test]
+    fn test_packet_segmentation_reassembly() {
+        let mut outputs = vec![];
+        let mut tcp_segments = PacketSegmentationReassembly::default();
+
+        let capture =
+            Capture::load_pcap("resources/test/flow_generator/tcp-segment.pcap", Some(2000));
+        let mut packets = capture.as_meta_packets();
+
+        for packet in &mut packets {
+            if let Some(mut packets) = tcp_segments.inject(packet.to_owned_segment()) {
+                outputs.append(&mut packets);
+            }
+        }
+
+        let outputs = outputs
+            .drain(..)
+            .map(|x| x.into_any().downcast::<MetaPacket>().unwrap())
+            .collect::<Vec<Box<MetaPacket>>>();
+
+        assert_eq!(outputs.len(), 2);
+        assert_eq!(outputs[0].payload_len, 2896);
+        assert_eq!(outputs[0].packet_len, 2962);
+        assert_eq!(outputs[0].get_l4_payload().as_ref().unwrap()[1447], 2);
+        assert_eq!(outputs[0].get_l4_payload().as_ref().unwrap()[1448], 0x2c);
+        assert_eq!(outputs[1].payload_len, 2896);
+        assert_eq!(outputs[1].packet_len, 2962);
     }
 }
