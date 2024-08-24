@@ -31,6 +31,14 @@
 #define KERN_STACKID_FLAGS (0)
 #define USER_STACKID_FLAGS (0 | BPF_F_USER_STACK)
 
+#ifndef __USER32_CS
+// defined in arch/x86/include/asm/segment.h
+#define GDT_ENTRY_DEFAULT_USER32_CS 4
+#define GDT_ENTRY_DEFAULT_USER_DS 5
+#define __USER32_CS (GDT_ENTRY_DEFAULT_USER32_CS * 8 + 3)
+#define __USER_DS (GDT_ENTRY_DEFAULT_USER_DS * 8 + 3)
+#endif
+
 /*
  * To keep the stack trace profiler "always on," we utilize a double
  * buffering mechanism and allocate two identical data structures.
@@ -60,19 +68,17 @@
 
 MAP_PERF_EVENT(profiler_output_a, int, __u32, MAX_CPU)
 MAP_PERF_EVENT(profiler_output_b, int, __u32, MAX_CPU)
-
 MAP_PROG_ARRAY(progs_jmp_pe_map, __u32, __u32, PROG_PE_NUM)
 
 MAP_STACK_TRACE(stack_map_a, STACK_MAP_ENTRIES)
 MAP_STACK_TRACE(stack_map_b, STACK_MAP_ENTRIES)
-
 #ifdef LINUX_VER_5_2_PLUS
-
 typedef __u64 __raw_stack[PERF_MAX_STACK_DEPTH];
+
 /*
  * Stack map for dwarf stacks.
- * Due to the limitation of the number of eBPF instruction in kernel, this feature
- * is suitable for Linux5.2+
+ * Due to the limitation of the number of eBPF instruction in kernel, this
+ * feature is suitable for Linux5.2+
  */
 MAP_HASH(custom_stack_map_a, __u32, __raw_stack, STACK_MAP_ENTRIES)
 MAP_HASH(custom_stack_map_b, __u32, __raw_stack, STACK_MAP_ENTRIES)
@@ -87,6 +93,11 @@ MAP_HASH(custom_stack_map_b, __u32, __raw_stack, STACK_MAP_ENTRIES)
  */
 MAP_HASH(process_shard_list_table, __u32, process_shard_list_t, 65536)
 MAP_HASH(unwind_entry_shard_table, __u32, unwind_entry_shard_t, 512)
+
+/*
+ * For sysinfo gathered from BTF
+ */
+MAP_ARRAY(unwind_sysinfo, __u32, unwind_sysinfo_t, 1)
 
 typedef struct {
     __u64 ip;
@@ -139,11 +150,7 @@ static inline __attribute__((always_inline)) void reset_unwind_state(unwind_stat
  * switching between buffer a and buffer b.
  */
 MAP_ARRAY(profiler_state_map, __u32, __u64, PROFILER_CNT)
-
 #ifdef LINUX_VER_5_2_PLUS
-
-static inline __attribute__((always_inline)) bool in_kernel(__u64 ip) { return ip & (1UL << 63); }
-
 static inline __attribute__((always_inline)) void add_frame(stack_t *stack, __u64 frame) {
     __u8 len = stack->len;
     if (len >= 0 && len < PERF_MAX_STACK_DEPTH) {
@@ -152,55 +159,54 @@ static inline __attribute__((always_inline)) void add_frame(stack_t *stack, __u6
     }
 }
 
-static inline __u32 rol32(__u32 word, unsigned int shift) {
-    return (word << shift) | (word >> ((-shift) & 31));
-}
+static inline __u32 rol32(__u32 word, unsigned int shift) { return (word << shift) | (word >> ((-shift) & 31)); }
 
 /* __jhash_mix -- mix 3 32-bit values reversibly. */
-#define __jhash_mix(a, b, c)                                                                       \
-    {                                                                                              \
-        a -= c;                                                                                    \
-        a ^= rol32(c, 4);                                                                          \
-        c += b;                                                                                    \
-        b -= a;                                                                                    \
-        b ^= rol32(a, 6);                                                                          \
-        a += c;                                                                                    \
-        c -= b;                                                                                    \
-        c ^= rol32(b, 8);                                                                          \
-        b += a;                                                                                    \
-        a -= c;                                                                                    \
-        a ^= rol32(c, 16);                                                                         \
-        c += b;                                                                                    \
-        b -= a;                                                                                    \
-        b ^= rol32(a, 19);                                                                         \
-        a += c;                                                                                    \
-        c -= b;                                                                                    \
-        c ^= rol32(b, 4);                                                                          \
-        b += a;                                                                                    \
+#define __jhash_mix(a, b, c)                                                                                           \
+    {                                                                                                                  \
+        a -= c;                                                                                                        \
+        a ^= rol32(c, 4);                                                                                              \
+        c += b;                                                                                                        \
+        b -= a;                                                                                                        \
+        b ^= rol32(a, 6);                                                                                              \
+        a += c;                                                                                                        \
+        c -= b;                                                                                                        \
+        c ^= rol32(b, 8);                                                                                              \
+        b += a;                                                                                                        \
+        a -= c;                                                                                                        \
+        a ^= rol32(c, 16);                                                                                             \
+        c += b;                                                                                                        \
+        b -= a;                                                                                                        \
+        b ^= rol32(a, 19);                                                                                             \
+        a += c;                                                                                                        \
+        c -= b;                                                                                                        \
+        c ^= rol32(b, 4);                                                                                              \
+        b += a;                                                                                                        \
     }
 
 /* __jhash_final - final mixing of 3 32-bit values (a,b,c) into c */
-#define __jhash_final(a, b, c)                                                                     \
-    {                                                                                              \
-        c ^= b;                                                                                    \
-        c -= rol32(b, 14);                                                                         \
-        a ^= c;                                                                                    \
-        a -= rol32(c, 11);                                                                         \
-        b ^= a;                                                                                    \
-        b -= rol32(a, 25);                                                                         \
-        c ^= b;                                                                                    \
-        c -= rol32(b, 16);                                                                         \
-        a ^= c;                                                                                    \
-        a -= rol32(c, 4);                                                                          \
-        b ^= a;                                                                                    \
-        b -= rol32(a, 14);                                                                         \
-        c ^= b;                                                                                    \
-        c -= rol32(b, 24);                                                                         \
+#define __jhash_final(a, b, c)                                                                                         \
+    {                                                                                                                  \
+        c ^= b;                                                                                                        \
+        c -= rol32(b, 14);                                                                                             \
+        a ^= c;                                                                                                        \
+        a -= rol32(c, 11);                                                                                             \
+        b ^= a;                                                                                                        \
+        b -= rol32(a, 25);                                                                                             \
+        c ^= b;                                                                                                        \
+        c -= rol32(b, 16);                                                                                             \
+        a ^= c;                                                                                                        \
+        a -= rol32(c, 4);                                                                                              \
+        b ^= a;                                                                                                        \
+        b -= rol32(a, 14);                                                                                             \
+        c ^= b;                                                                                                        \
+        c -= rol32(b, 24);                                                                                             \
     }
 
 #define JHASH_INITVAL 0xDEADBEEF
 
-// PERF_MAX_STACK_DEPTH is 127, stack->addrs has max length of 254 as u32's, and 3 * 84 = 252
+// PERF_MAX_STACK_DEPTH is 127, stack->addrs has max length of 254 as u32's, and
+// 3 * 84 = 252
 #define HASH_STACK_LOOPS 84
 
 // hash stack with jhash2
@@ -241,8 +247,7 @@ static inline __attribute__((always_inline)) __u32 hash_stack(stack_t *stack, __
     return c;
 }
 
-static inline __attribute__((always_inline)) __u32 get_stackid(struct bpf_map_def *stack_map,
-                                                               stack_t *stack) {
+static inline __attribute__((always_inline)) __u32 get_stackid(struct bpf_map_def *stack_map, stack_t *stack) {
     /*
      * Imitates the behaviour of bpf_get_stackid
      * ------------------------------------------------------
@@ -293,10 +298,67 @@ static inline __attribute__((always_inline)) __u32 get_stackid(struct bpf_map_de
     return -EEXIST;
 }
 
+static inline __attribute__((always_inline)) bool is_usermod_regs(struct pt_regs *regs) {
+#if defined(__x86_64__)
+  // On x86_64 the user mode SS should always be __USER_DS.
+  return regs->ss == __USER_DS;
+#elif defined(__aarch64__)
+  // Check if the processor state is in the EL0t what linux uses for usermode.
+  return (regs->pstate & PSR_MODE_MASK) == PSR_MODE_EL0t;
+#else
+_Pragma("GCC error \"Must specify a BPF target arch\"");
+#endif
+}
+
+// Values for x86_64 as of 6.0.18-200.
+#define TOP_OF_KERNEL_STACK_PADDING 0
+#define THREAD_SIZE_ORDER 2
+#define PAGE_SHIFT 12
+#define PAGE_SIZE (1UL << PAGE_SHIFT)
+#define THREAD_SIZE (PAGE_SIZE << THREAD_SIZE_ORDER)
+
+// from
+// https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/96717079737c688891dd431210c9d29401cc1eae/support/ebpf/native_stack_trace.ebpf.c#L698
+static inline __attribute__((always_inline)) int get_usermode_regs(struct pt_regs *regs, regs_t *dst) {
+    if (is_usermod_regs(regs)) {
+        dst->ip = PT_REGS_IP(regs);
+        dst->sp = PT_REGS_SP(regs);
+        dst->bp = PT_REGS_FP(regs);
+        return 0;
+    }
+
+    struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+
+    __u32 zero = 0;
+    unwind_sysinfo_t *sysinfo = unwind_sysinfo__lookup(&zero);
+    if (!sysinfo) {
+        return -1;
+    }
+
+    // use bpf_task_pt_regs after Linux 5.15+ instead
+    void *stack;
+    int ret = bpf_probe_read_kernel(&stack, sizeof(void *), ((void *)task) + sysinfo->task_struct_stack_offset);
+    if (ret || stack == NULL) {
+        return -1;
+    }
+
+    struct pt_regs *user_regs_addr = ((struct pt_regs *)(stack + THREAD_SIZE - TOP_OF_KERNEL_STACK_PADDING)) - 1;
+    struct pt_regs user_regs;
+    ret = bpf_probe_read_kernel(&user_regs, sizeof(user_regs), (void *)user_regs_addr);
+    if (ret) {
+        return -1;
+    }
+
+    dst->ip = PT_REGS_IP(&user_regs);
+    dst->sp = PT_REGS_SP(&user_regs);
+    dst->bp = PT_REGS_FP(&user_regs);
+    return 0;
+}
+
 #endif
 
-static inline __attribute__((always_inline)) int collect_stack_and_send_output(
-    struct bpf_perf_event_data *ctx, unwind_state_t *state) {
+static inline __attribute__((always_inline)) int collect_stack_and_send_output(struct bpf_perf_event_data *ctx,
+                                                                               unwind_state_t *state) {
     __u32 count_idx;
 
     count_idx = TRANSFER_CNT_IDX;
@@ -322,9 +384,8 @@ static inline __attribute__((always_inline)) int collect_stack_and_send_output(
     count_idx = ERROR_IDX;
     __u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
 
-    if (transfer_count_ptr == NULL || sample_count_ptrs[0] == NULL ||
-        sample_count_ptrs[1] == NULL || drop_count_ptr == NULL || iter_count_ptr == NULL ||
-        error_count_ptr == NULL || output_count_ptr == NULL) {
+    if (transfer_count_ptr == NULL || sample_count_ptrs[0] == NULL || sample_count_ptrs[1] == NULL ||
+        drop_count_ptr == NULL || iter_count_ptr == NULL || error_count_ptr == NULL || output_count_ptr == NULL) {
         count_idx = ERROR_IDX;
         __u64 err_val = 1;
         profiler_state_map__update(&count_idx, &err_val);
@@ -345,7 +406,6 @@ static inline __attribute__((always_inline)) int collect_stack_and_send_output(
     if (key->flags & STACK_TRACE_FLAGS_DWARF) {
         key->userstack = get_stackid(stack_map, stack);
     }
-
 #endif
 
     __u64 sample_count = 0;
@@ -381,8 +441,7 @@ static inline __attribute__((always_inline)) int collect_stack_and_send_output(
     sample_count = *sample_count_ptr;
     __sync_fetch_and_add(sample_count_ptr, 1);
 
-    if (bpf_perf_event_output(ctx, profiler_output, BPF_F_CURRENT_CPU, key,
-                              sizeof(struct stack_trace_key_t))) {
+    if (bpf_perf_event_output(ctx, profiler_output, BPF_F_CURRENT_CPU, key, sizeof(struct stack_trace_key_t))) {
         __sync_fetch_and_add(error_count_ptr, 1);
     } else {
         __sync_fetch_and_add(output_count_ptr, 1);
@@ -412,7 +471,10 @@ PERF_EVENT_PROG(oncpu_profile)(struct bpf_perf_event_data *ctx) {
     __u32 count_idx = ENABLE_IDX;
     __u64 *enable_ptr = profiler_state_map__lookup(&count_idx);
 
-    if (enable_ptr == NULL) {
+    count_idx = ERROR_IDX;
+    __u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
+
+    if (enable_ptr == NULL || error_count_ptr == NULL) {
         count_idx = ERROR_IDX;
         __u64 err_val = 1;
         profiler_state_map__update(&count_idx, &err_val);
@@ -454,16 +516,14 @@ PERF_EVENT_PROG(oncpu_profile)(struct bpf_perf_event_data *ctx) {
 
 #ifdef LINUX_VER_5_2_PLUS
     state->shard_list = process_shard_list_table__lookup(&key->tgid);
-    // TODO: fix "in kernel" events
-    if (state->shard_list != NULL && !in_kernel(PT_REGS_IP(&ctx->regs))) {
+    if (state->shard_list != NULL) {
         key->flags |= STACK_TRACE_FLAGS_DWARF;
 
-        bpf_user_pt_regs_t *regs = &ctx->regs;
-        state->regs.ip = PT_REGS_IP(regs);
-        state->regs.sp = PT_REGS_SP(regs);
-        state->regs.bp = PT_REGS_FP(regs);
-
-        bpf_tail_call(ctx, &NAME(progs_jmp_pe_map), PROG_DWARF_UNWIND_PE_IDX);
+        int ret = get_usermode_regs((struct pt_regs*)&ctx->regs, &state->regs);
+        if (ret == 0) {
+            bpf_tail_call(ctx, &NAME(progs_jmp_pe_map), PROG_DWARF_UNWIND_PE_IDX);
+        }
+        __sync_fetch_and_add(error_count_ptr, 1);
         return 0;
     }
 #endif
@@ -479,8 +539,7 @@ PERF_EVENT_PROG(oncpu_profile)(struct bpf_perf_event_data *ctx) {
 #define LOOP_EXHAUSTED 0xFFFFFFFF
 #define ENTRY_NOT_FOUND 0xFFFFFFFE
 
-static inline __attribute__((always_inline)) __u32 find_shard(shard_info_t *list, int left,
-                                                              int right, __u64 pc) {
+static inline __attribute__((always_inline)) __u32 find_shard(shard_info_t *list, int left, int right, __u64 pc) {
     int i = left, j = right - 1, mid;
     __u32 found = ENTRY_NOT_FOUND;
 
@@ -504,8 +563,8 @@ static inline __attribute__((always_inline)) __u32 find_shard(shard_info_t *list
     return LOOP_EXHAUSTED;
 }
 
-static inline __attribute__((always_inline)) __u32 find_unwind_entry(unwind_entry_t *list, int left,
-                                                                     int right, __u64 pc) {
+static inline
+    __attribute__((always_inline)) __u32 find_unwind_entry(unwind_entry_t *list, int left, int right, __u64 pc) {
     int i = left, j = right - 1, mid;
     __u32 found = ENTRY_NOT_FOUND;
 
@@ -588,8 +647,8 @@ PROGPE(dwarf_unwind)(struct bpf_perf_event_data *ctx) {
             goto finish;
         }
 
-        __u32 index = find_unwind_entry(shard->entries, shard_info->entry_start,
-                                        shard_info->entry_end, regs->ip - shard_info->offset);
+        __u32 index = find_unwind_entry(shard->entries, shard_info->entry_start, shard_info->entry_end,
+                                        regs->ip - shard_info->offset);
         if (index >= UNWIND_ENTRIES_PER_SHARD) {
             if (index == LOOP_EXHAUSTED) {
                 __sync_fetch_and_add(error_count_ptr, 1);
@@ -618,8 +677,7 @@ PROGPE(dwarf_unwind)(struct bpf_perf_event_data *ctx) {
             }
             break;
         default:
-            // bpf_debug("unsupported cfa_type %d tgid=%d ip=%lx", ue->cfa_type, state->key.tgid,
-            //           regs->ip);
+            // bpf_debug("unsupported cfa_type %d tgid=%d ip=%lx", ue->cfa_type, state->key.tgid, regs->ip);
             __sync_fetch_and_add(error_count_ptr, 1);
             goto finish;
         }
