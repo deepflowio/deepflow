@@ -21,11 +21,12 @@ use ahash::AHashMap;
 use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
     decapsulate::TunnelType,
+    ebpf::EbpfType,
     endpoint::EndpointDataPov,
-    enums::{EthernetType, TapType, TcpFlags},
+    enums::{EthernetType, IpProtocol, TapType, TcpFlags},
     flow::{FlowMetricsPeer, PacketDirection, SignalSource, TcpPerfStats},
     lookup_key::LookupKey,
-    meta_packet::MetaPacket,
+    meta_packet::{MetaPacket, ProtocolData},
     tagged_flow::TaggedFlow,
     TapPort, Timestamp,
 };
@@ -117,6 +118,108 @@ impl FlowMapKey {
 }
 
 #[derive(Default)]
+pub struct PacketSegmentationReassembly {
+    tcp_seq: [u32; 2],
+    packets: [Option<MetaPacket<'static>>; 2],
+    need_to_reassemble: bool,
+}
+
+impl PacketSegmentationReassembly {
+    const THRESHOLD: u16 = 3000;
+    pub fn init(&mut self, need_to_reassemble: bool) {
+        self.need_to_reassemble = need_to_reassemble;
+    }
+
+    pub fn reverse(&mut self) {
+        self.tcp_seq.swap(0, 1);
+        self.packets.swap(0, 1);
+    }
+
+    pub fn flush(&mut self) -> Option<Vec<MetaPacket<'static>>> {
+        let mut meta_packets = vec![];
+
+        if let Some(packet) = self.packets[0].take() {
+            meta_packets.push(packet);
+        }
+
+        if let Some(packet) = self.packets[1].take() {
+            meta_packets.push(packet);
+        }
+
+        if meta_packets.is_empty() {
+            return None;
+        }
+
+        Some(meta_packets)
+    }
+
+    pub fn inject(&mut self, meta_packet: &mut MetaPacket) -> Option<Vec<MetaPacket<'static>>> {
+        if !self.need_to_reassemble {
+            return None;
+        }
+
+        if meta_packet.lookup_key.proto != IpProtocol::TCP
+            || meta_packet.raw.is_none()
+            || meta_packet.ebpf_type != EbpfType::None
+        {
+            return None;
+        }
+
+        let mut meta_packets = vec![];
+
+        let (seq, segments) = if meta_packet.lookup_key.direction == PacketDirection::ClientToServer
+        {
+            // 输出另一个方向的流量
+            if let Some(packet) = self.packets[1].take() {
+                meta_packets.push(packet);
+            }
+            (&mut self.tcp_seq[0], &mut self.packets[0])
+        } else {
+            // 输出另一个方向的流量
+            if let Some(packet) = self.packets[0].take() {
+                meta_packets.push(packet);
+            }
+            (&mut self.tcp_seq[1], &mut self.packets[1])
+        };
+
+        let tcp_seq = if let ProtocolData::TcpHeader(tcp_data) = &meta_packet.protocol_data {
+            tcp_data.seq
+        } else {
+            unreachable!()
+        };
+
+        if let Some(mut packet) = segments.take() {
+            if tcp_seq != *seq {
+                // TCP Seq不连续， 输出上一个包， 保存下一个包
+                meta_packets.push(packet);
+
+                *segments = Some(meta_packet.to_owned_vec_packet());
+                *seq = tcp_seq + meta_packet.payload_len as u32;
+            } else {
+                // TCP Seq连续时：
+                // 1. 聚合在一起输出
+                // 2. 存储并等待和后续包聚合在一起
+                if packet.get_pkt_size() < Self::THRESHOLD
+                    && meta_packet.get_pkt_size() < Self::THRESHOLD
+                    && packet.l4_payload_len() > 0
+                {
+                    packet.merge(meta_packet);
+                }
+                meta_packets.push(packet);
+
+                *segments = Some(meta_packet.to_owned_vec_packet());
+                *seq = tcp_seq + meta_packet.payload_len as u32;
+            }
+        } else {
+            *segments = Some(meta_packet.to_owned_vec_packet());
+            *seq = tcp_seq + meta_packet.payload_len as u32;
+        }
+
+        Some(meta_packets)
+    }
+}
+
+#[derive(Default)]
 pub struct FlowNode {
     pub tagged_flow: TaggedFlow,
     pub min_arrived_time: Timestamp,
@@ -144,6 +247,9 @@ pub struct FlowNode {
 
     // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_block: Option<Box<PacketSequenceBlock>>,
+
+    // tcp segments
+    pub tcp_segments: PacketSegmentationReassembly,
 }
 
 impl FlowNode {
@@ -387,5 +493,38 @@ impl FlowNode {
                     && lookup_key.l2_end_1 == peers[0].is_l2_end
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PacketSegmentationReassembly;
+    use crate::utils::test::Capture;
+
+    #[test]
+    fn test_packet_segmentation_reassembly() {
+        let mut outputs = vec![];
+        let mut tcp_segments = PacketSegmentationReassembly::default();
+        tcp_segments.init(true);
+
+        let capture =
+            Capture::load_pcap("resources/test/flow_generator/tcp-segment.pcap", Some(2000));
+        let mut packets = capture.as_meta_packets();
+
+        for packet in &mut packets {
+            if let Some(mut packets) = tcp_segments.inject(packet) {
+                outputs.append(&mut packets);
+            } else {
+                outputs.push(packet.to_owned_vec_packet());
+            }
+        }
+
+        assert_eq!(outputs.len(), 2);
+        assert_eq!(outputs[0].payload_len, 2896);
+        assert_eq!(outputs[0].packet_len, 2962);
+        assert_eq!(outputs[0].get_l4_payload().as_ref().unwrap()[1447], 2);
+        assert_eq!(outputs[0].get_l4_payload().as_ref().unwrap()[1448], 0x2c);
+        assert_eq!(outputs[1].payload_len, 2896);
+        assert_eq!(outputs[1].packet_len, 2962);
     }
 }
