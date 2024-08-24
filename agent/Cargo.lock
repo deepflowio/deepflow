@@ -1028,6 +1028,7 @@ dependencies = [
  "num_enum",
  "openshift-openapi",
  "packet_dedup",
+ "packet_segmentation_reassembly",
  "packet_sequence_block",
  "page_size",
  "parking_lot 0.11.2",
@@ -2691,6 +2692,13 @@ checksum = "ceedf44fb00f2d1984b0bc98102627ce622e083e49a5bacdb3e514fa4238e267"
 [[package]]
 name = "packet_dedup"
 version = "0.1.0"
+
+[[package]]
+name = "packet_segmentation_reassembly"
+version = "0.1.0"
+dependencies = [
+ "public",
+]
 
 [[package]]
 name = "packet_sequence_block"

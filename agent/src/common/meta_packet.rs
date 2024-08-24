@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::any::Any;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
@@ -60,17 +59,20 @@ use crate::{
 };
 use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
+use packet_segmentation_reassembly::Segment;
 use public::{
     buffer::BatchedBuffer,
+    packet::Downcast,
     utils::net::{is_unicast_link_local, MacAddr},
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use reorder::{CacheItem, Downcast};
+use reorder::CacheItem;
 
 #[derive(Clone, Debug)]
 pub enum RawPacket<'a> {
     Borrowed(&'a [u8]),
     Owned(BatchedBuffer<u8>),
+    OwnedVec(Vec<u8>),
 }
 
 impl<'a> RawPacket<'a> {
@@ -78,6 +80,30 @@ impl<'a> RawPacket<'a> {
         match self {
             Self::Borrowed(b) => b.len(),
             Self::Owned(o) => o.len(),
+            Self::OwnedVec(v) => v.len(),
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        match self {
+            Self::Borrowed(b) => b.to_vec(),
+            Self::Owned(o) => o.to_vec(),
+            Self::OwnedVec(v) => v.clone(),
+        }
+    }
+
+    pub fn to_owned_vec(&mut self) {
+        match self {
+            Self::Borrowed(b) => *self = Self::OwnedVec(b.to_vec()),
+            Self::Owned(o) => *self = Self::OwnedVec(o.to_vec()),
+            _ => {}
+        }
+    }
+
+    pub fn append(&mut self, payload: &[u8]) {
+        match self {
+            Self::OwnedVec(v) => v.extend_from_slice(payload),
+            _ => unimplemented!(),
         }
     }
 }
@@ -89,6 +115,7 @@ impl<'a> Deref for RawPacket<'a> {
         match self {
             Self::Borrowed(b) => b,
             Self::Owned(o) => &o,
+            Self::OwnedVec(v) => v.as_slice(),
         }
     }
 }
@@ -96,6 +123,12 @@ impl<'a> Deref for RawPacket<'a> {
 impl<'a> From<&'a [u8]> for RawPacket<'a> {
     fn from(b: &'a [u8]) -> Self {
         Self::Borrowed(b)
+    }
+}
+
+impl<'a> From<Vec<u8>> for RawPacket<'a> {
+    fn from(b: Vec<u8>) -> Self {
+        Self::OwnedVec(b)
     }
 }
 
@@ -953,8 +986,11 @@ impl<'a> MetaPacket<'a> {
         0
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn merge(&mut self, packet: &mut MetaPacket) {
+        if self.ebpf_type == EbpfType::None {
+            return;
+        }
+
         self.raw_from_ebpf.append(&mut packet.raw_from_ebpf);
         self.sub_packets.push(SubPacket {
             cap_seq: packet.cap_start_seq,
@@ -1148,6 +1184,28 @@ impl<'a> MetaPacket<'a> {
             }
         }
     }
+
+    pub fn to_owned_segment(&self) -> Box<dyn Segment> {
+        let raw = self.raw.as_ref().unwrap().to_vec();
+
+        Box::new(MetaPacket {
+            lookup_key: self.lookup_key.clone(),
+            raw: Some(RawPacket::from(raw)),
+            packet_len: self.packet_len,
+            l3_payload_len: self.l3_payload_len,
+            l4_payload_len: self.l4_payload_len,
+            tcp_options_flag: self.tcp_options_flag,
+            protocol_data: self.protocol_data.clone(),
+            tap_port: self.tap_port,
+            signal_source: self.signal_source,
+            payload_len: self.payload_len,
+            sub_packets: self.sub_packets.clone(),
+            header_type: self.header_type,
+            l2_l3_opt_size: self.l2_l3_opt_size,
+            l4_opt_size: self.l4_opt_size,
+            ..Default::default()
+        })
+    }
 }
 
 impl<'a> Iterator for MetaPacket<'a> {
@@ -1205,7 +1263,6 @@ impl<'a> fmt::Display for MetaPacket<'a> {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
 impl Downcast for MetaPacket<'static> {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
@@ -1236,6 +1293,41 @@ impl CacheItem for MetaPacket<'static> {
 
     fn is_segment_start(&self) -> bool {
         self.segment_flags == SegmentFlags::Start
+    }
+}
+
+impl Segment for MetaPacket<'static> {
+    fn is_c2s(&self) -> bool {
+        self.lookup_key.direction == PacketDirection::ClientToServer
+    }
+
+    fn get_tcp_seq(&self) -> u32 {
+        let ProtocolData::TcpHeader(h) = &self.protocol_data else {
+            unreachable!();
+        };
+
+        h.seq
+    }
+
+    fn merge_segments(&mut self, payload: &[u8]) {
+        if let Some(raw) = self.raw.as_mut() {
+            raw.append(payload);
+            self.packet_len += payload.len() as u32;
+            self.payload_len += payload.len() as u16;
+            self.l4_payload_len += payload.len() as u16;
+        }
+    }
+
+    fn get_payload(&self) -> &[u8] {
+        self.get_l4_payload().unwrap()
+    }
+
+    fn next_tcp_seq(&self) -> u32 {
+        self.get_tcp_seq() + self.l4_payload_len as u32
+    }
+
+    fn get_payload_length(&self) -> u16 {
+        self.l4_payload_len
     }
 }
 

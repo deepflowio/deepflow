@@ -868,7 +868,7 @@ global:
       # deprecated: true
       debug_metrics_enabled: false
     # type: string
-    # name: Hostname 
+    # name: Hostname
     # unit:
     # range: []
     # enum_options: []
@@ -878,7 +878,7 @@ global:
     #   en: Override statsd host tag.
     #   ch: 覆盖 statsd 主机标签。
     # upgrade_from: host
-    hostname: ""   
+    hostname: ""
   # type: section
   # name:
   #   en: Standalone Mode
@@ -1530,7 +1530,7 @@ inputs:
       #     Cilium         lxc.*
       #     Kube-OVN       [0-9a-f]+_h$
       #     ```
-      #     When the `tap_interface_regex` is not configured, it indicates 
+      #     When the `tap_interface_regex` is not configured, it indicates
       #     that network card traffic is not being collected
       #   ch: |-
       #     需要采集流量的网络接口的正则表达式。
@@ -2042,6 +2042,23 @@ inputs:
       # upgrade_from: static_config.trim-tunnel-types
       # TODO: “虚拟网络镜像”、“物理网络镜像”是否均适用？【是的】
       tunnel_trim_protocols: []
+
+      # type: int
+      # name:
+      #   en: Packet Segmentation Reassembly
+      #   ch: TCP分段重组开关
+      # unit:
+      # range: [1, 65535]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     TODO
+      #   ch: |-
+      #     开启后会将连续的两个 TCP Packet 聚合在一起做应用日志解析
+      packet_segmentation_reassembly: []
+
     # type: section
     # name:
     #   en: Physical Mirror Traffic

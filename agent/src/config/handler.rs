@@ -472,6 +472,8 @@ pub struct FlowConfig {
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
     pub server_ports: Vec<u16>,
     pub consistent_timestamp_in_l7_metrics: bool,
+
+    pub packet_segmentation_reassembly: HashSet<u16>,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -575,7 +577,17 @@ impl From<&RuntimeConfig> for FlowConfig {
             ),
             server_ports: conf.yaml_config.server_ports.clone(),
             consistent_timestamp_in_l7_metrics: conf.yaml_config.consistent_timestamp_in_l7_metrics,
+            packet_segmentation_reassembly: HashSet::from_iter(
+                conf.yaml_config.packet_segmentation_reassembly.clone(),
+            ),
         }
+    }
+}
+
+impl FlowConfig {
+    pub fn need_to_reassemble(&self, src_port: u16, dst_port: u16) -> bool {
+        self.packet_segmentation_reassembly.contains(&src_port)
+            || self.packet_segmentation_reassembly.contains(&dst_port)
     }
 }
 
@@ -624,6 +636,10 @@ impl fmt::Debug for FlowConfig {
             // .field("l7_protocol_parse_port_bitmap", &self.l7_protocol_parse_port_bitmap)
             .field("plugins", &self.plugins)
             .field("server_ports", &self.server_ports)
+            .field(
+                "packet_segmentation_reassembly",
+                &self.packet_segmentation_reassembly,
+            )
             .finish()
     }
 }

@@ -94,6 +94,7 @@ use public::{
     utils::net::MacAddr,
 };
 
+use packet_segmentation_reassembly::PacketSegmentationReassembly;
 use packet_sequence_block::PacketSequenceBlock;
 
 const DEFAULT_SOCKET_CLOSE_TIMEOUT: Timestamp = Timestamp::from_secs(1);
@@ -524,10 +525,10 @@ impl FlowMap {
             return false;
         }
 
-        let config = &config.flow;
+        let flow_config = &config.flow;
 
         // FlowMap 时间窗口无法推动
-        if timestamp - config.packet_delay - TIME_UNIT < self.start_time {
+        if timestamp - flow_config.packet_delay - TIME_UNIT < self.start_time {
             return true;
         }
 
@@ -550,7 +551,7 @@ impl FlowMap {
         );
         // 根据包到达时间的容差调整
         let next_start_time_in_unit =
-            ((timestamp - config.packet_delay).as_nanos() / TIME_UNIT.as_nanos()) as u64;
+            ((timestamp - flow_config.packet_delay).as_nanos() / TIME_UNIT.as_nanos()) as u64;
         debug!(
             "flow_map#{} ticker flush [{:?}, {:?}) at {:?} time diff is {:?}",
             self.id,
@@ -614,7 +615,7 @@ impl FlowMap {
                         continue;
                     }
                     // 未超时Flow的统计信息发送到队列下游
-                    self.node_updated_aftercare(&config, node, timestamp, None);
+                    self.node_updated_aftercare(&flow_config, node, timestamp, None);
                     // Enterprise Edition Feature: packet-sequence
                     if self.packet_sequence_enabled {
                         if let Some(block) = node.packet_sequence_block.take() {
@@ -650,7 +651,7 @@ impl FlowMap {
         self.node_map.replace((node_map, time_set));
 
         self.start_time_in_unit = next_start_time_in_unit;
-        self.flush_queue(&config, timestamp);
+        self.flush_queue(&flow_config, timestamp);
 
         self.flush_app_protolog();
 
@@ -765,7 +766,7 @@ impl FlowMap {
                     let node = nodes.swap_remove(index);
                     self.send_socket_close_event(&node);
                     self.node_removed_aftercare(
-                        &flow_config,
+                        &config,
                         node,
                         meta_packet.lookup_key.timestamp.into(),
                         Some(meta_packet),
@@ -875,9 +876,24 @@ impl FlowMap {
         }
         let flow_config = config.flow;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
+
         if flow_config.collector_enabled {
-            let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
-            self.collect_metric(config, node, meta_packet, direction, false);
+            if let Some(tcp_segments) = node.tcp_segments.as_mut() {
+                if let Some(mut packets) = tcp_segments.inject(meta_packet.to_owned_segment()) {
+                    let mut packets = packets
+                        .drain(..)
+                        .map(|x| x.into_any().downcast::<MetaPacket>().unwrap())
+                        .collect::<Vec<Box<MetaPacket>>>();
+                    for packet in &mut packets {
+                        let direction =
+                            packet.lookup_key.direction == PacketDirection::ClientToServer;
+                        self.collect_metric(config, node, packet, direction, false);
+                    }
+                }
+            } else {
+                let direction = meta_packet.lookup_key.direction == PacketDirection::ClientToServer;
+                self.collect_metric(config, node, meta_packet, direction, false);
+            }
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
@@ -1250,6 +1266,17 @@ impl FlowMap {
         node.endpoint_data_cache = Default::default();
         node.packet_sequence_block = None; // Enterprise Edition Feature: packet-sequence
         node.residual_request = 0;
+
+        if PacketSegmentationReassembly::does_support()
+            && meta_packet.lookup_key.proto == IpProtocol::TCP
+            && meta_packet.ebpf_type == EbpfType::None
+            && config
+                .flow
+                .need_to_reassemble(lookup_key.src_port, lookup_key.dst_port)
+        {
+            node.tcp_segments = Some(PacketSegmentationReassembly::default())
+        }
+
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let local_epc_id = match config.ebpf.as_ref() {
             Some(c) => c.epc_id as i32,
@@ -1312,6 +1339,9 @@ impl FlowMap {
             );
             if need_reverse {
                 node.tagged_flow.flow.reverse(true);
+                if let Some(tcp_segments) = node.tcp_segments.as_mut() {
+                    tcp_segments.reverse()
+                }
             }
             node.tagged_flow.flow.direction_score = direction_score;
         }
@@ -1740,7 +1770,21 @@ impl FlowMap {
         }
 
         if flow_config.collector_enabled {
-            self.collect_metric(config, &mut node, meta_packet, !reverse, true);
+            if let Some(tcp_segments) = node.tcp_segments.as_mut() {
+                if let Some(mut packets) = tcp_segments.inject(meta_packet.to_owned_segment()) {
+                    let mut packets = packets
+                        .drain(..)
+                        .map(|x| x.into_any().downcast::<MetaPacket>().unwrap())
+                        .collect::<Vec<Box<MetaPacket>>>();
+                    for packet in &mut packets {
+                        let direction =
+                            packet.lookup_key.direction == PacketDirection::ClientToServer;
+                        self.collect_metric(config, &mut node, packet, direction, false);
+                    }
+                }
+            } else {
+                self.collect_metric(config, &mut node, meta_packet, !reverse, true);
+            }
         }
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
@@ -1927,11 +1971,27 @@ impl FlowMap {
     // go 版本的removeAndOutput
     fn node_removed_aftercare(
         &mut self,
-        config: &FlowConfig,
+        config: &Config,
         mut node: Box<FlowNode>,
         timeout: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
+        if config.flow.collector_enabled {
+            if let Some(tcp_segments) = node.tcp_segments.as_mut() {
+                if let Some(mut packets) = tcp_segments.flush() {
+                    let mut packets = packets
+                        .drain(..)
+                        .map(|x| x.into_any().downcast::<MetaPacket>().unwrap())
+                        .collect::<Vec<Box<MetaPacket>>>();
+                    for packet in &mut packets {
+                        let direction =
+                            packet.lookup_key.direction == PacketDirection::ClientToServer;
+                        self.collect_metric(config, &mut node, packet, direction, false);
+                    }
+                }
+            }
+        }
+
         // 统计数据输出前矫正流方向
         self.update_flow_direction(&mut node, meta_packet);
 
@@ -1958,7 +2018,7 @@ impl FlowMap {
         }
 
         let mut collect_stats = false;
-        if config.collector_enabled
+        if config.flow.collector_enabled
             && (flow.flow_key.proto == IpProtocol::TCP
                 || flow.flow_key.proto == IpProtocol::UDP
                 || flow.flow_key.proto == IpProtocol::ICMPV4
@@ -2253,6 +2313,9 @@ impl FlowMap {
         }
         node.tagged_flow.flow.reverse(is_first_packet);
         node.tagged_flow.tag.reverse();
+        if let Some(tcp_segments) = node.tcp_segments.as_mut() {
+            tcp_segments.reverse();
+        }
         // Enterprise Edition Feature: packet-sequence
         if node.packet_sequence_block.is_some() {
             node.packet_sequence_block
