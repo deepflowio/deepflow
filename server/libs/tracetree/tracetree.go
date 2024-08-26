@@ -26,7 +26,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
-const TRACE_TREE_VERSION = 0x12
+const TRACE_TREE_VERSION_0825 = 0x12
+const TRACE_TREE_VERSION = 0x13
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -75,9 +76,9 @@ type TreeNode struct {
 	NodeInfo NodeInfo
 
 	ChildIndices []int32 // helps with calculations, no need to write to Clickhouse
-	PseudoLink   uint8   // helps with calculations, no need to write to Clickhouse
-	Level        uint8   // helps with calculations, no need to write to Clickhouse
-	UID          string  // helps with calculations, no need to write to Clickhouse
+	PseudoLink   uint8
+	Level        uint8  // helps with calculations, no need to write to Clickhouse
+	UID          string // helps with calculations, no need to write to Clickhouse
 
 	Topic string
 
@@ -171,6 +172,7 @@ func (t *TraceTree) Encode() {
 			encoder.WriteIPv6(nodeInfo.IP6)
 		}
 
+		encoder.WriteU8(node.PseudoLink)
 		encoder.WriteString255(node.Topic)
 		encoder.WriteVarintU64(node.ResponseDurationSum)
 		encoder.WriteVarintU32(node.ResponseTotal)
@@ -181,7 +183,7 @@ func (t *TraceTree) Encode() {
 
 func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 	version := decoder.ReadU8()
-	if version != TRACE_TREE_VERSION {
+	if version != TRACE_TREE_VERSION && version != TRACE_TREE_VERSION_0825 {
 		return fmt.Errorf("trace tree data version is %d expect version is %d", version, TRACE_TREE_VERSION)
 	}
 	treeNodeCount := int(decoder.ReadU16())
@@ -230,7 +232,11 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		}
 		n.ChildIndices = n.ChildIndices[:0]
 		n.Level = 0
-		n.PseudoLink = 0
+		if version == TRACE_TREE_VERSION_0825 {
+			n.PseudoLink = 0
+		} else {
+			n.PseudoLink = decoder.ReadU8()
+		}
 		n.UID = ""
 		n.Topic = decoder.ReadString255()
 		n.ResponseDurationSum = decoder.ReadVarintU64()
