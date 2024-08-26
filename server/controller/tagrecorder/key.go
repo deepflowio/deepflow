@@ -138,3 +138,9 @@ type PolicyKey struct {
 	ACLGID     int
 	TunnelType int
 }
+type StatisticTagKey struct {
+	Db    string
+	Table string
+	Type  string
+	Name  string
+}

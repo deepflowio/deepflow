@@ -2826,3 +2826,13 @@ CREATE TABLE IF NOT EXISTS ch_user (
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_user;
+
+CREATE TABLE IF NOT EXISTS ch_statistic_tag (
+    `db`                      VARCHAR(128) NOT NULL,
+    `table`                   VARCHAR(256) NOT NULL,
+    `type`                    VARCHAR(128) NOT NULL,
+    `name`                    VARCHAR(256) NOT NULL,
+    `updated_at`              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    PRIMARY KEY (`db`, `table`, `type`, `name`)
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_statistic_tag;

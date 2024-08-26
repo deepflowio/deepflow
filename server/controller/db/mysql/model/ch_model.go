@@ -680,3 +680,11 @@ type ChUser struct {
 	Name      string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
+
+type ChStatisticTag struct {
+	Name      string    `gorm:"primaryKey;column:name;type:varchar(256)" json:"NAME"`
+	Db        string    `gorm:"primaryKey;column:db;type:varchar(128)" json:"DB"`
+	Table     string    `gorm:"primaryKey;column:table;type:varchar(256)" json:"TABLE"`
+	Type      string    `gorm:"primaryKey;column:type;type:varchar(128)" json:"TYPE"`
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+}
