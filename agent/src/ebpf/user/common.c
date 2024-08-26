@@ -616,7 +616,7 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 	// 4.19.90-vhulk2211.3.0.h1542r10.aarch64
 	if (strstr(sys_info.release, "vhulk")) {
 		*num = 0;
-		if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev) != 3)
+		if (sscanf(sys_info.release, "%u.%u.%u-%*s", major, minor, rev) != 3)
 			has_error = true;
 		else
 			has_error = false;

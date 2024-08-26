@@ -81,7 +81,7 @@
  */
 #define smp_wmb() dmb(ishst)
 /*
- * Yes, the `smp_rmb()` macro (and the `dmb(ishld)` instruction) is primarily
+ * The `smp_rmb()` macro (and the `dmb(ishld)` instruction) is primarily
  * used to address **runtime reordering** issues.
  *
  * In multi-core or multi-threaded systems, processors may reorder memory read
