@@ -14,35 +14,32 @@
  * limitations under the License.
  */
 
-package table
+package edition
 
 import (
-	"fmt"
-
-	"github.com/op/go-logging"
-
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/schema"
 )
-
-var log = logging.MustGetLogger("db.mysql.migrator.table")
 
 func UpgradeDatabase(cfg config.MySqlConfig) error {
 	db, err := common.GetSessionWithName(cfg)
 	if err != nil {
 		return err
 	}
-
 	dc := common.NewDBConfig(db, cfg)
-	var dbVersionTable string
-	err = db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", cfg.Database, migration.DB_VERSION_TABLE)).Scan(&dbVersionTable).Error
+
+	return upgradeCE(dc, cfg)
+}
+
+func upgradeCE(dc *common.DBConfig, cfg config.MySqlConfig) error {
+	versionTableExists, err := common.CheckCEDBVersionTableExists(dc)
 	if err != nil {
-		log.Error(common.LogDBName(dc.Config.Database, "failed to check db_version table: %s", err.Error()))
 		return err
 	}
-	if dbVersionTable == "" {
-		return initTablesWithoutRollBack(dc)
+
+	if !versionTableExists {
+		return initTablesWithoutRollBack(dc) // TODO
 	} else {
 		return upgradeIfDBVersionNotLatest(dc)
 	}
@@ -55,13 +52,13 @@ func initTablesWithoutRollBack(dc *common.DBConfig) error {
 
 func upgradeIfDBVersionNotLatest(dc *common.DBConfig) error {
 	log.Info(common.LogDBName(dc.Config.Database, "upgrade if db version is not the latest"))
-	var version string
-	err := dc.DB.Raw(fmt.Sprintf("SELECT version FROM %s", migration.DB_VERSION_TABLE)).Scan(&version).Error
+	version, err := common.GetCEDBVersion(dc)
 	if err != nil {
-		log.Error(common.LogDBName(dc.Config.Database, "failed to check db version: %s", err.Error()))
+		log.Error(common.LogDBName(dc.Config.Database, "failed to get db version: %s", err.Error()))
 		return err
 	}
-	log.Infof(common.LogDBName(dc.Config.Database, "current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED))
+
+	log.Infof(common.LogDBName(dc.Config.Database, "current db version: %s, expected db version: %s", version, schema.DB_VERSION_EXPECTED))
 	if version == "" {
 		if dc.Config.DropDatabaseEnabled {
 			return recreateDatabaseAndInitTables(dc)
@@ -69,8 +66,8 @@ func upgradeIfDBVersionNotLatest(dc *common.DBConfig) error {
 			log.Error(common.LogDBName(dc.Config.Database, "current db version is null, need manual handling"))
 			return err
 		}
-	} else if version != migration.DB_VERSION_EXPECTED {
-		return common.ExecuteIssues(dc, version)
+	} else if version != schema.DB_VERSION_EXPECTED {
+		return common.ExecuteCEIssues(dc, version)
 	}
 	return nil
 }
@@ -94,29 +91,4 @@ func recreateDatabaseAndInitTables(dc *common.DBConfig) error {
 	}
 	dc.SetDB(db)
 	return DropDatabaseIfInitTablesFailed(dc)
-}
-
-func DropDatabaseIfInitTablesFailed(dc *common.DBConfig) error {
-	log.Info(common.LogDBName(dc.Config.Database, "drop database if fails to initialize tables"))
-	err := initTables(dc)
-	if err != nil {
-		err := common.DropDatabase(dc)
-		if err != nil {
-			log.Error(common.LogDBName(dc.Config.Database, "failed to drop database: %s", err.Error()))
-		}
-		return err
-	}
-	return nil
-}
-
-func initTables(dc *common.DBConfig) error {
-	log.Info(common.LogDBName(dc.Config.Database, "initialize db tables"))
-	if err := common.InitCETables(dc); err != nil {
-		return err
-	}
-	if err := common.InitDBVersion(dc); err != nil {
-		return err
-	}
-	log.Info(common.LogDBName(dc.Config.Database, "initialized db tables successfully"))
-	return nil
 }
