@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2024 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +14,17 @@
  * limitations under the License.
  */
 
-package common
+package schema
 
-const SQL_FILE_DIR = "/etc/mysql"
+const (
+	DB_VERSION_TABLE    = "db_version"
+	DB_VERSION_EXPECTED = "6.6.1.12"
+)
+
+const (
+	CREATE_TABLE_DB_VERSION = `CREATE TABLE IF NOT EXISTS db_version (
+		version             CHAR(64) PRIMARY KEY,
+		created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)ENGINE=innodb DEFAULT CHARSET=utf8;`
+)

@@ -7,8 +7,8 @@ RUN apk update && \
     apk add tzdata
 
 COPY ./server.yaml /etc/
-RUN mkdir /etc/mysql
-COPY ./controller/db/mysql/migration/rawsql /etc/mysql
+RUN mkdir -p /etc/mysql/schema
+COPY ./controller/db/mysql/migrator/schema /etc/mysql/schema/
 COPY ./controller/cloud/filereader/manual_data_samples.yaml /etc/
 COPY ./querier/db_descriptions /etc/db_descriptions/
 COPY ./controller/cloud/kubernetes_gather/lua /bin/
