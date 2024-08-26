@@ -457,7 +457,9 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 	log.Infof("delete vtap_group (%s)", vtapGroup.Name, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if len(agents) > 0 {
-			return agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &defaultVtapGroup, agents)
+			if err = agentlicense.UpdateAgentLicenseFunction(tx, a.resourceAccess.UserInfo.ID, &defaultVtapGroup, agents); err != nil {
+				return err
+			}
 		}
 		if err = tx.Model(&mysqlmodel.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Updates(map[string]interface{}{
 			"vtap_group_lcuuid": defaultVtapGroup.Lcuuid, "team_id": defaultVtapGroup.TeamID}).Error; err != nil {
