@@ -90,7 +90,7 @@ func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
 		metricNameKey := _key.([]interface{})[0]
 		metricIDKey := _key.([]interface{})[1]
 		metricName := metricNameKey.(string)
-		metricID := metricIDKey.(int)
+		metricID := int(metricIDKey.(uint64))
 		METRIC_NAME_TO_ID[metricName] = metricID
 	}
 	prometheusMap.MetricNameToID = METRIC_NAME_TO_ID
@@ -107,7 +107,7 @@ func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
 		labelNameKey := _key.([]interface{})[0]
 		labelNameIDKey := _key.([]interface{})[1]
 		labelName := labelNameKey.(string)
-		labelNameID := labelNameIDKey.(int)
+		labelNameID := int(labelNameIDKey.(uint64))
 		LABEL_NAME_TO_ID[labelName] = labelNameID
 		LABEL_ID_TO_NAME[labelNameID] = labelName
 	}
@@ -128,7 +128,7 @@ func GenerateMap(orgID string) (prometheusMap PrometheusMap) {
 		appLabelColumnIndexKey := _key.([]interface{})[2]
 		metricName := metricNameKey.(string)
 		appLabelName := appLabelNameKey.(string)
-		appLabelColumnIndex := appLabelColumnIndexKey.(int)
+		appLabelColumnIndex := int(appLabelColumnIndexKey.(uint64))
 		appLabel := AppLabel{AppLabelName: appLabelName, AppLabelColumnIndex: appLabelColumnIndex}
 		METRIC_APP_LABEL_LAYOUT[metricName] = append(METRIC_APP_LABEL_LAYOUT[metricName], appLabel)
 	}
