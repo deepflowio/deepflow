@@ -347,6 +347,7 @@ void ring_dump(FILE * f, const struct ring *r);
 	const uint32_t size = (r)->size; \
 	uint32_t idx = prod_head & (r)->mask; \
 	obj_type *ring = (obj_type *)ring_start; \
+	smp_mb(); \
 	if (likely(idx + n < size)) { \
 		for (i = 0; i < (n & ((~(unsigned)0x3))); i+=4, idx+=4) { \
 			ring[idx] = obj_table[i]; \
@@ -368,6 +369,7 @@ void ring_dump(FILE * f, const struct ring *r);
 		for (idx = 0; i < n; i++, idx++) \
 			ring[idx] = obj_table[i]; \
 	} \
+	smp_mb(); \
 } while (0)
 
 /* the actual copy of pointers on the ring to obj_table.
@@ -378,6 +380,7 @@ void ring_dump(FILE * f, const struct ring *r);
 	uint32_t idx = cons_head & (r)->mask; \
 	const uint32_t size = (r)->size; \
 	obj_type *ring = (obj_type *)ring_start; \
+	smp_mb(); \
 	if (likely(idx + n < size)) { \
 		for (i = 0; i < (n & (~(unsigned)0x3)); i+=4, idx+=4) {\
 			obj_table[i] = ring[idx]; \
@@ -399,6 +402,7 @@ void ring_dump(FILE * f, const struct ring *r);
 		for (idx = 0; i < n; i++, idx++) \
 			obj_table[i] = ring[idx]; \
 	} \
+	smp_mb(); \
 } while (0)
 
 static_always_inline void
@@ -519,7 +523,6 @@ __ring_do_enqueue(struct ring *r, void *const *obj_table,
 		goto end;
 
 	ENQUEUE_PTRS(r, &r[1], prod_head, obj_table, n, void *);
-	smp_wmb();
 
 	update_tail(&r->prod, prod_head, prod_next, is_sp);
 end:
@@ -629,7 +632,6 @@ __ring_do_dequeue(struct ring *r, void **obj_table,
 		goto end;
 
 	DEQUEUE_PTRS(r, &r[1], cons_head, obj_table, n, void *);
-	smp_rmb();
 
 	update_tail(&r->cons, cons_head, cons_next, is_sc);
 

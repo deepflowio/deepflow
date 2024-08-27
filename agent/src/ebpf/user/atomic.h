@@ -62,21 +62,41 @@
 #define AO_AND(ptr, val)            ((void)AO_AND_F((ptr), (val)))
 #define AO_XOR(ptr, val)            ((void)AO_XOR_F((ptr), (val)))
 
-#define mb() _mm_mfence()
+#if defined(__x86_64__)
+#define smp_wmb() asm volatile ("" : : : "memory");
+#define smp_rmb() asm volatile ("" : : : "memory");
+#define smp_mb() _mm_mfence()
+#elif defined(__aarch64__)
+#define dsb(opt) asm volatile("dsb " #opt : : : "memory")
+#define dmb(opt) asm volatile("dmb " #opt : : : "memory")
+#define smp_mb() dmb(ish)
+/*
+ * Runtime reordering: In multi-core or multi-threaded systems, processors
+ * may reorder memory operations to optimize performance. This reordering
+ * can cause different processor cores or threads to observe memory operations
+ * in different orders, potentially leading to concurrency issues. To avoid this,
+ * memory barriers (such as the dmb instruction) are used to ensure that when a
+ * memory barrier instruction is executed, all prior memory operations are
+ * completed before any subsequent memory operations are executed.
+ */
+#define smp_wmb() dmb(ishst)
+/*
+ * The `smp_rmb()` macro (and the `dmb(ishld)` instruction) is primarily
+ * used to address **runtime reordering** issues.
+ *
+ * In multi-core or multi-threaded systems, processors may reorder memory read
+ * operations to optimize performance, which can cause different processor cores
+ * or threads to observe memory operations in different orders, potentially
+ * leading to concurrency issues. By using the `smp_rmb()` macro to insert a
+ * read memory barrier, you can ensure that all read operations before the barrier
+ * are completed before any subsequent read operations are executed, thus preventing
+ * runtime reordering of memory read operations.
+ */
+#define smp_rmb() dmb(ishld)
+#else
+_Pragma("GCC error \"Must specify a target arch\"");
+#endif
 
-#define wmb() _mm_sfence()
-
-#define rmb() _mm_lfence()
-
-#define smp_mb() mb()
-
-#define smp_wmb() barrier()
-
-#define smp_rmb() barrier()
-
-#define io_mb() mb()
-
-#define io_wmb() barrier()
 /**
  * The atomic counter structure.
  */
