@@ -106,7 +106,10 @@ impl UnwindTable {
                         break;
                     }
                     shard_list.entries[shard_list.len as usize] = *s;
-                    shard_list.entries[shard_list.len as usize].offset = m.m_start;
+                    // offset is 0 iff object is not PIC/PIE, otherwise set offset according to proc maps
+                    if shard_list.entries[shard_list.len as usize].offset != 0 {
+                        shard_list.entries[shard_list.len as usize].offset = m.m_start;
+                    }
                     shard_list.len += 1;
                 }
                 continue;
