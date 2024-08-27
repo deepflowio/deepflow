@@ -150,6 +150,8 @@ func (c *Cache) Refresh() {
 	c.DiffBaseDataSet = NewDiffBaseDataSet()
 	c.ToolDataSet = NewToolDataSet()
 
+	c.SetLogLevel(logging.DEBUG)
+
 	// 分类刷新资源的相关缓存
 
 	// sub domain需要使用vpc、vm的映射数据
