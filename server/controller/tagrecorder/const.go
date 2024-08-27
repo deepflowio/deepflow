@@ -119,6 +119,8 @@ const (
 	RESOURCE_TYPE_CH_LABEL_NAME                         = "ch_prometheus_label_name"
 	RESOURCE_TYPE_CH_METRIC_NAME                        = "ch_prometheus_metric_name"
 	RESOURCE_TYPE_CH_PROMETHEUS_TARGET_LABEL_LAYOUT     = "ch_prometheus_target_label_layout"
+
+	RESOURCE_TYPE_STATISTIC_TAG = "ch_statistic_tag"
 )
 
 const (
@@ -192,6 +194,8 @@ const (
 
 	CH_APP_LABEL_LIVE_VIEW    = "app_label_live_view"
 	CH_TARGET_LABEL_LIVE_VIEW = "target_label_live_view"
+
+	CH_STATISTIC_TAG = "statistic_tag"
 )
 
 const (
@@ -880,6 +884,17 @@ const (
 		SQL_SOURCE_MYSQL +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
+	CREATE_STATISTIC_TAG_SQL = SQL_CREATE_DICT +
+		"(\n" +
+		"    `db` String,\n" +
+		"    `table` String,\n" +
+		"    `type` String,\n" +
+		"    `name` String\n" +
+		")\n" +
+		"PRIMARY KEY db, table, type, name\n" +
+		SQL_SOURCE_MYSQL +
+		SQL_LIFETIME +
+		SQL_LAYOUT_FLAT
 )
 
 const (
@@ -989,6 +1004,8 @@ var CREATE_SQL_MAP = map[string]string{
 
 	CH_APP_LABEL_LIVE_VIEW:    CREATE_APP_LABEL_LIVE_VIEW_SQL,
 	CH_TARGET_LABEL_LIVE_VIEW: CREATE_TARGET_LABEL_LIVE_VIEW_SQL,
+
+	CH_STATISTIC_TAG: CREATE_STATISTIC_TAG_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
