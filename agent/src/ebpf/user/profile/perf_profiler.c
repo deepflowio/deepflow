@@ -247,7 +247,6 @@ static void oncpu_reader_work(void *arg)
 			     get_socket_tracer_state() != TRACER_RUNNING)) {
 			if (oncpu_ctx.enable_bpf_profile)
 				set_bpf_run_enabled(t, &oncpu_ctx, 0);
-			exec_proc_info_cache_update();
 			sleep(1);
 			continue;
 		}
