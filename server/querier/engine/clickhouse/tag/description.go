@@ -1061,6 +1061,78 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
+func GetEnumTags(db, table, sql string) (*common.Result, error) {
+	response := &common.Result{
+		Columns: []interface{}{
+			"name", "client_name", "server_name", "display_name", "type", "category",
+			"operators", "permissions", "description", "related_tag", "deprecated", "not_supported_operators", "table",
+		},
+		Values: []interface{}{},
+	}
+	enumTagSlice := []string{}
+
+	for _, tagDescription := range TAG_DESCRIPTIONS {
+		if (tagDescription.Type == "int_enum" || tagDescription.Type == "string_enum") && tagDescription.Name != "app_service" && tagDescription.Name != "app_instance" {
+			if !slices.Contains(enumTagSlice, tagDescription.Name) {
+				enumTagSlice = append(enumTagSlice, tagDescription.Name)
+				response.Values = append(response.Values,
+					[]interface{}{
+						tagDescription.Name, tagDescription.ClientName, tagDescription.ServerName, tagDescription.DisplayName, tagDescription.Type,
+						tagDescription.Category, tagDescription.Operators, tagDescription.Permissions, tagDescription.Description, tagDescription.RelatedTag, tagDescription.Deprecated, tagDescription.NotSupportedOperators, "",
+					})
+			}
+
+		}
+	}
+	return response, nil
+}
+
+func GetEnumTagAllValues(db, table, sql string) ([]string, error) {
+	sqlList := []string{}
+	sqlSplit := strings.Fields(sql)
+	tag := sqlSplit[2]
+	tag_name := ""
+	tag_names := []string{}
+
+	for _, tagDescription := range TAG_DESCRIPTIONS {
+		if tagDescription.Name == tag {
+			_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
+			if !isEnumOK {
+				_, isEnumOK = TAG_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
+			}
+			if !isEnumOK {
+				return sqlList, errors.New(fmt.Sprintf("tag %s is not enum", tag))
+			}
+			_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
+			if !isStringEnumOK {
+				_, isStringEnumOK = TAG_STRING_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
+			}
+			if isStringEnumOK {
+				table = "string_enum_map"
+				tag_name = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+				if !slices.Contains(tag_names, "'"+tag_name+"'") {
+					tag_names = append(tag_names, "'"+tag_name+"'")
+				}
+			}
+			_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
+			if !isIntEnumOK {
+				_, isIntEnumOK = TAG_INT_ENUMS[strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)]
+			}
+			if isIntEnumOK {
+				table = "int_enum_map"
+				tag_name = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
+				if !slices.Contains(tag_names, "'"+tag_name+"'") {
+					tag_names = append(tag_names, "'"+tag_name+"'")
+				}
+			}
+		}
+	}
+	sql = fmt.Sprintf("SELECT value,name AS display_name, description FROM %s WHERE tag_name IN (%s) GROUP BY value, display_name, description ORDER BY value ASC", table, strings.Join(tag_names, ","))
+	log.Debug(sql)
+	sqlList = append(sqlList, sql)
+	return sqlList, nil
+}
+
 func GetTagValues(db, table, sql, queryCacheTTL, orgID string, useQueryCache bool) (*common.Result, []string, error) {
 	var sqlList []string
 	// 把`1m`的反引号去掉
