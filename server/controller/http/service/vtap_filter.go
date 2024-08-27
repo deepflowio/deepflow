@@ -22,7 +22,7 @@ import (
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 )
 
-func getAgentByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtaps []mysql.VTap) ([]mysql.VTap, error) {
+func GetAgentByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtaps []mysql.VTap) ([]mysql.VTap, error) {
 	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
 		return vtaps, nil
 	}

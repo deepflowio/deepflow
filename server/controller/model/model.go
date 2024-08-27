@@ -129,48 +129,52 @@ type VtapUpdate struct {
 }
 
 type Vtap struct {
-	ID                 int     `json:"ID"`
-	Name               string  `json:"NAME"`
-	State              int     `json:"STATE"`
-	Enable             int     `json:"ENABLE"`
-	LaunchServer       string  `json:"LAUNCH_SERVER"`
-	LaunchServerID     int     `json:"LAUNCH_SERVER_ID"`
-	Type               int     `json:"TYPE"`
-	CtrlIP             string  `json:"CTRL_IP"`
-	CtrlMac            string  `json:"CTRL_MAC"`
-	ControllerIP       string  `json:"CONTROLLER_IP"`
-	AnalyzerIP         string  `json:"ANALYZER_IP"`
-	CurControllerIP    string  `json:"CUR_CONTROLLER_IP"`
-	CurAnalyzerIP      string  `json:"CUR_ANALYZER_IP"`
-	SyncedControllerAt string  `json:"SYNCED_CONTROLLER_AT"`
-	SyncedAnalyzerAt   string  `json:"SYNCED_ANALYZER_AT"`
-	BootTime           int     `json:"BOOT_TIME"`
-	Revision           string  `json:"REVISION"`
-	UpgradeRevision    string  `json:"UPGRADE_REVISION"`
-	CompleteRevision   string  `json:"COMPLETE_REVISION"`
-	Exceptions         []int64 `json:"EXCEPTIONS"`
-	VtapGroupLcuuid    string  `json:"VTAP_GROUP_LCUUID"`
-	VtapGroupName      string  `json:"VTAP_GROUP_NAME"`
-	AZ                 string  `json:"AZ"`
-	AZName             string  `json:"AZ_NAME"`
-	Region             string  `json:"REGION"`
-	RegionName         string  `json:"REGION_NAME"`
-	CPUNum             int     `json:"CPU_NUM"`
-	MemorySize         int64   `json:"MEMORY_SIZE"`
-	Arch               string  `json:"ARCH"`
-	ArchType           int     `json:"ARCH_TYPE"`
-	Os                 string  `json:"OS"`
-	OsType             int     `json:"OS_TYPE"`
-	KernelVersion      string  `json:"KERNEL_VERSION"`
-	ProcessName        string  `json:"PROCESS_NAME"`
-	CurrentK8sImage    string  `json:"CURRENT_K8S_IMAGE"`
-	LicenseType        int     `json:"LICENSE_TYPE"`
-	LicenseFunctions   []int   `json:"LICENSE_FUNCTIONS"`
-	ExpectedRevision   string  `json:"EXPECTED_REVISION"`
-	UpgradePackage     string  `json:"UPGRADE_PACKAGE"`
-	TapMode            int     `json:"TAP_MODE"`
-	Lcuuid             string  `json:"LCUUID"`
-	TeamID             int     `json:"TEAM_ID"`
+	ID                        int     `json:"ID"`
+	Name                      string  `json:"NAME"`
+	State                     int     `json:"STATE"`
+	Enable                    int     `json:"ENABLE"`
+	LaunchServer              string  `json:"LAUNCH_SERVER"`
+	LaunchServerID            int     `json:"LAUNCH_SERVER_ID"`
+	Type                      int     `json:"TYPE"`
+	CtrlIP                    string  `json:"CTRL_IP"`
+	CtrlMac                   string  `json:"CTRL_MAC"`
+	ControllerIP              string  `json:"CONTROLLER_IP"`
+	AnalyzerIP                string  `json:"ANALYZER_IP"`
+	CurControllerIP           string  `json:"CUR_CONTROLLER_IP"`
+	CurAnalyzerIP             string  `json:"CUR_ANALYZER_IP"`
+	SyncedControllerAt        string  `json:"SYNCED_CONTROLLER_AT"`
+	SyncedAnalyzerAt          string  `json:"SYNCED_ANALYZER_AT"`
+	BootTime                  int     `json:"BOOT_TIME"`
+	Revision                  string  `json:"REVISION"`
+	UpgradeRevision           string  `json:"UPGRADE_REVISION"`
+	CompleteRevision          string  `json:"COMPLETE_REVISION"`
+	Exceptions                []int64 `json:"EXCEPTIONS"`
+	VtapGroupLcuuid           string  `json:"VTAP_GROUP_LCUUID"`
+	VtapGroupName             string  `json:"VTAP_GROUP_NAME"`
+	AZ                        string  `json:"AZ"`
+	AZName                    string  `json:"AZ_NAME"`
+	Region                    string  `json:"REGION"`
+	RegionName                string  `json:"REGION_NAME"`
+	CPUNum                    int     `json:"CPU_NUM"`
+	MemorySize                int64   `json:"MEMORY_SIZE"`
+	Arch                      string  `json:"ARCH"`
+	ArchType                  int     `json:"ARCH_TYPE"`
+	Os                        string  `json:"OS"`
+	OsType                    int     `json:"OS_TYPE"`
+	KernelVersion             string  `json:"KERNEL_VERSION"`
+	ProcessName               string  `json:"PROCESS_NAME"`
+	CurrentK8sImage           string  `json:"CURRENT_K8S_IMAGE"`
+	LicenseType               int     `json:"LICENSE_TYPE"`
+	LicenseFunctions          []int   `json:"LICENSE_FUNCTIONS"`
+	EnableFeatures            []int   `json:"ENABLE_FEATURES"`
+	DisableFeatures           []int   `json:"DISABLE_FEATURES"`
+	FollowGroupFeatures       []int   `json:"FOLLOW_GROUP_FEATURES"`
+	FollowGroupEnableFeatures []int   `json:"FOLLOW_GROUP_ENABLE_FEATURES"`
+	ExpectedRevision          string  `json:"EXPECTED_REVISION"`
+	UpgradePackage            string  `json:"UPGRADE_PACKAGE"`
+	TapMode                   int     `json:"TAP_MODE"`
+	Lcuuid                    string  `json:"LCUUID"`
+	TeamID                    int     `json:"TEAM_ID"`
 	// TODO: format_state
 	// TODO: format_type
 	// TODO: format_exceptions
@@ -231,6 +235,7 @@ type VtapGroup struct {
 	VtapLcuuids        []string `json:"VTAP_LCUUIDS"`
 	DisableVtapLcuuids []string `json:"DISABLE_VTAP_LCUUIDS"`
 	PendingVtapLcuuids []string `json:"PENDING_VTAP_LCUUIDS"`
+	LicenseFunctions   []int    `json:"LICENSE_FUNCTIONS"`
 }
 
 type VtapGroupCreate struct {

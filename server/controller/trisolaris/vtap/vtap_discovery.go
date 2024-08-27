@@ -32,14 +32,16 @@ import (
 )
 
 type VTapRegister struct {
-	tapMode               int
-	vTapGroupID           string
-	defaultVTapGroup      string
-	vTapAutoRegister      bool
-	agentUniqueIdentifier int
-	teamID                int
-	vTapInfo              *VTapInfo
-	registerBy            string
+	tapMode                         int
+	vTapGroupID                     string
+	defaultVTapGroup                string
+	defaultVTapGroupLicenseFuntions string
+	vTapAutoRegister                bool
+	agentUniqueIdentifier           int
+	teamID                          int
+	vTapInfo                        *VTapInfo
+	registerBy                      string
+	groupLicenseFunctions           string
 	VTapLKData
 	ORGID
 }
@@ -122,6 +124,7 @@ func (r *VTapRegister) setRegisterBy(registerBy string) {
 }
 
 func (r *VTapRegister) getVTapGroupLcuuid(db *gorm.DB) string {
+	r.groupLicenseFunctions = r.defaultVTapGroupLicenseFuntions
 	if r.vTapGroupID != "" {
 		vtapGroup := &models.VTapGroup{}
 		ret := db.Where("short_uuid = ?", r.vTapGroupID).First(vtapGroup)
@@ -129,6 +132,7 @@ func (r *VTapRegister) getVTapGroupLcuuid(db *gorm.DB) string {
 			log.Error(r.Logf("vtap group(short_uuid=%s) not found", r.vTapGroupID))
 			return r.defaultVTapGroup
 		} else {
+			r.groupLicenseFunctions = vtapGroup.LicenseFunctions
 			return vtapGroup.Lcuuid
 		}
 	}
@@ -190,9 +194,10 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 		return false
 	}
 	dbVTap.ID = ids[0]
-	// Voucher mode turns on all features
+	// Voucher mode turns on group features
 	if r.vTapInfo.config.BillingMethod == BILLING_METHOD_VOUCHER {
-		dbVTap.LicenseFunctions = VTAP_ALL_LICENSE_FUNCTIONS
+		dbVTap.LicenseFunctions = r.groupLicenseFunctions
+		dbVTap.FollowGroupFeatures = VTAP_ALL_LICENSE_FUNCTIONS
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(dbVTap).Error; err != nil {
@@ -919,6 +924,7 @@ func (r *VTapRegister) registerVTap(done func()) {
 	}
 	r.region = v.getRegion()
 	r.defaultVTapGroup = v.getDefaultVTapGroup()
+	r.defaultVTapGroupLicenseFuntions = v.getDefaultVTapGroupLicenseFunctions()
 	r.vTapAutoRegister = v.getVTapAutoRegister()
 	log.Infof(r.Logf("register vtap: %s", r))
 	var vtap *models.VTap
