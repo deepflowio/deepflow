@@ -120,9 +120,10 @@ func (c *Cache) IncrementSequence() {
 	c.Sequence++
 }
 
-func (c *Cache) SetLogLevel(level logging.Level) {
-	c.DiffBaseDataSet.LogController.SetLogLevel(level)
-	c.ToolDataSet.LogController.SetLogLevel(level)
+func (c *Cache) SetLogLevel(level logging.Level, caller string) {
+	log.Infof("domain: %s, sub_domain: %s, set cache log level to %s (caller: %s)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid, level.String(), caller)
+	c.DiffBaseDataSet.SetLogLevel(level)
+	c.ToolDataSet.SetLogLevel(level)
 }
 
 func (c *Cache) getConditonDomainCreateMethod() map[string]interface{} {
@@ -202,10 +203,9 @@ func (c *Cache) TryRefresh() bool {
 func (c *Cache) Refresh() {
 	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
 
-	c.SetLogLevel(logging.DEBUG)
-
 	c.DiffBaseDataSet = diffbase.NewDataSet()
 	c.ToolDataSet = tool.NewDataSet(c.metadata)
+	c.SetLogLevel(logging.DEBUG, RefreshSignalCallerSelfHeal)
 
 	// 分类刷新资源的相关缓存
 
