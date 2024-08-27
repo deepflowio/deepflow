@@ -95,7 +95,7 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 	select {
 	case <-d.cache.RefreshSignal:
 		d.cache.IncrementSequence()
-		d.cache.SetLogLevel(logging.INFO)
+		d.cache.SetLogLevel(logging.INFO, cache.RefreshSignalCallerDomain)
 
 		d.refresh(cloudData)
 
