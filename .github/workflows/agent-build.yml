@@ -1,4 +1,4 @@
-on: 
+on:
   push:
     branches:
       - main
@@ -14,7 +14,7 @@ on:
     inputs:
       ref:
         description: "Why trigger?"
-        required: true 
+        required: true
         type: string
 
 name: build agent
@@ -47,15 +47,15 @@ jobs:
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
         with:
-          registry: "ghcr.io" 
+          registry: "ghcr.io"
           username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GITHUB_TOKEN }}" 
+          password: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build  deepflow agent
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: false 
+          push: false
           file: agent/docker/dockerfile-build
           platforms: linux/amd64
           outputs: type=local,dest=./agent/output/
@@ -91,8 +91,10 @@ jobs:
           cd agent
           mkdir -p pkg/debian/systemd/usr/sbin/
           mkdir -p pkg/debian/systemd/usr/bin/
+          mkdir -p pkg/debian/systemd/usr/lib/x86_64-linux-gnu/
           cp -af output/target/release/deepflow-agent pkg/debian/systemd/usr/sbin/
           cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
+          cp -af docker/require/x86_64/libpcap.so.1 pkg/debian/systemd/usr/lib/x86_64-linux-gnu/
           mkdir -p pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
@@ -101,8 +103,11 @@ jobs:
           sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
           dpkg-deb -Zxz --no-uniform-compression -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
           mkdir -p pkg/debian/upstart/usr/sbin/
+          mkdir -p pkg/debian/upstart/usr/bin/
+          mkdir -p pkg/debian/upstart/usr/lib/x86_64-linux-gnu/
           cp -af output/target/release/deepflow-agent pkg/debian/upstart/usr/sbin/
-          cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
+          cp -af output/target/release/ecapture pkg/debian/upstart/usr/bin/
+          cp -af docker/require/x86_64/libpcap.so.1 pkg/debian/upstart/usr/lib/x86_64-linux-gnu/
           mkdir -p pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
@@ -112,14 +117,14 @@ jobs:
           dpkg-deb -Zxz --no-uniform-compression -b pkg/debian/upstart x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
           zip -r -q artifacts-deb.zip x86_64/*.deb
 
-      - name: build binary package  
+      - name: build binary package
         run: |
           mkdir -p agent/bin-package
           cp -raf agent/output/target/release/deepflow-agent agent/bin-package/
           cd agent/bin-package/
           tar -czvf deepflow-agent.tar.gz *
 
-      - name: build TenCentBlueKing package  
+      - name: build TenCentBlueKing package
         run: |
           cp -raf agent/output/target/release/deepflow-agent agent/pkg/TencentBlueKing/plugins_linux_x86_64/deepflow-agent/bin/
           cd agent/pkg/TencentBlueKing/
@@ -139,7 +144,7 @@ jobs:
           ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent.tar.gz
           ossutil cp -rf agent/pkg/TencentBlueKing/deepflow-agent.tgz oss://deepflow-ce/tencentblueking/agent/${{ env.IMAGE_TAG_PREFIX }}/deepflow-agent.tgz
-          
+
       - name: upload agent stable artifacts
         if: "startsWith(github.ref, 'refs/tags/')"
         run: |
@@ -169,22 +174,22 @@ jobs:
           docker version
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
-        
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
         with:
-          registry: "ghcr.io" 
+          registry: "ghcr.io"
           username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GITHUB_TOKEN }}" 
+          password: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build  deepflow agent
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: false 
+          push: false
           file: agent/docker/dockerfile-build-aarch64
           platforms: linux/arm64
           outputs: type=local,dest=./agent/output/
@@ -220,8 +225,10 @@ jobs:
           cd agent
           mkdir -p pkg/debian/systemd/usr/sbin/
           mkdir -p pkg/debian/systemd/usr/bin/
+          mkdir -p pkg/debian/systemd/lib/aarch64-linux-gnu/
           cp -af output/target/release/deepflow-agent pkg/debian/systemd/usr/sbin/
           cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
+          cp -af docker/require/aarch64/libpcap.so.1 pkg/debian/systemd/lib/aarch64-linux-gnu/
           mkdir -p pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
@@ -230,8 +237,11 @@ jobs:
           sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
           dpkg-deb  -Zxz --no-uniform-compression -b pkg/debian/systemd aarch64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
           mkdir -p pkg/debian/upstart/usr/sbin/
+          mkdir -p pkg/debian/upstart/usr/bin/
+          mkdir -p pkg/debian/upstart/lib/aarch64-linux-gnu/
           cp -af output/target/release/deepflow-agent pkg/debian/upstart/usr/sbin/
-          cp -af output/target/release/ecapture pkg/debian/systemd/usr/bin/
+          cp -af output/target/release/ecapture pkg/debian/upstart/usr/bin/
+          cp -af docker/require/aarch64/libpcap.so.1 pkg/debian/upstart/lib/aarch64-linux-gnu/
           mkdir -p pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
           cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
@@ -241,7 +251,7 @@ jobs:
           dpkg-deb  -Zxz --no-uniform-compression -b pkg/debian/upstart aarch64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
           zip -r -q artifacts-deb.zip aarch64/*.deb
 
-      - name: build binary package  
+      - name: build binary package
         run: |
           mkdir -p agent/bin-package
           cp -raf agent/output/target/release/deepflow-agent agent/bin-package/
@@ -261,7 +271,7 @@ jobs:
 
   build_agent_image:
     name: build agent image
-    needs: 
+    needs:
     - build_agent
     - build_agent_arm64
     runs-on: ubuntu-latest
@@ -280,7 +290,7 @@ jobs:
       - name: docker version
         run: |
           docker version
-          
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -317,9 +327,9 @@ jobs:
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
         with:
-          registry: "ghcr.io" 
+          registry: "ghcr.io"
           username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
+          password: "${{ secrets.GHCR_PUSH_TOKEN }}"
 
       - name: Log in to Docker Registry
         uses: docker/login-action@v2
@@ -343,20 +353,20 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: true 
-          file: agent/docker/dockerfile 
+          push: true
+          file: agent/docker/dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
             "deepflowce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
 
-      - name: Build and push deepflow agent images to hongkong aliyun 
+      - name: Build and push deepflow agent images to hongkong aliyun
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: true 
-          file: agent/docker/dockerfile 
+          push: true
+          file: agent/docker/dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
             "registry.cn-hongkong.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
@@ -369,12 +379,12 @@ jobs:
           username: "${{ secrets.REGISTRY_ALIYUN_USER }}"
           password: "${{ secrets.REGISTRY_PASS }}"
 
-      - name: Build and push deepflow agent images to beijing aliyun 
+      - name: Build and push deepflow agent images to beijing aliyun
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: true 
-          file: agent/docker/dockerfile 
+          push: true
+          file: agent/docker/dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
@@ -392,7 +402,7 @@ jobs:
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-deb.zip
           ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent.tar.gz
-          
+
       - name: upload agent stable artifacts
         if: "startsWith(github.ref, 'refs/tags/')"
         run: |
@@ -426,15 +436,15 @@ jobs:
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
         with:
-          registry: "ghcr.io" 
+          registry: "ghcr.io"
           username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GITHUB_TOKEN }}" 
+          password: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build  deepflow agent
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: false 
+          push: false
           file: agent/docker/dockerfile-build-static-link
           platforms: linux/amd64
           outputs: type=local,dest=./agent/output/
@@ -475,14 +485,14 @@ jobs:
           dpkg-deb -Zxz --no-uniform-compression -b pkg/debian/upstart x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
           zip -r -q artifacts-deb.zip x86_64/*.deb
 
-      - name: build binary package  
+      - name: build binary package
         run: |
           mkdir -p agent/bin-package
           cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
           cd agent/bin-package/
           tar -czvf deepflow-agent.tar.gz *
 
-      - name: build TenCentBlueKing package  
+      - name: build TenCentBlueKing package
         run: |
           cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/pkg/TencentBlueKing/plugins_linux_x86_64/deepflow-agent/bin/
           cd agent/pkg/TencentBlueKing/
@@ -501,7 +511,7 @@ jobs:
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/amd64/deepflow-agent-deb.zip
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/amd64/deepflow-agent.tar.gz
           ossutil cp -rf agent/pkg/TencentBlueKing/deepflow-agent.tgz oss://deepflow-ce/tencentblueking/agent/static-link/${{ env.IMAGE_TAG_PREFIX }}/deepflow-agent.tgz
-          
+
       - name: upload agent stable artifacts
         run: |
           ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/static-link/amd64/deepflow-agent-rpm.zip
@@ -510,7 +520,7 @@ jobs:
           ossutil cp -rf agent/pkg/TencentBlueKing/deepflow-agent.tgz oss://deepflow-ce/tencentblueking/agent/static-link/stable/deepflow-agent.tgz
 
   build_agent_arm64_static_link:
-    name: build agent arm64 static link 
+    name: build agent arm64 static link
     runs-on: "cirun-aws-arm64-32c--${{ github.run_id }}"
     if: "startsWith(github.ref, 'refs/tags/')"
     steps:
@@ -530,22 +540,22 @@ jobs:
           docker version
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
-        
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
         with:
-          registry: "ghcr.io" 
+          registry: "ghcr.io"
           username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GITHUB_TOKEN }}" 
+          password: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Build  deepflow agent
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: false 
+          push: false
           file: agent/docker/dockerfile-build-aarch64-static-link
           platforms: linux/arm64
           outputs: type=local,dest=./agent/output/
@@ -586,7 +596,7 @@ jobs:
           dpkg-deb  -Zxz --no-uniform-compression -b pkg/debian/upstart aarch64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
           zip -r -q artifacts-deb.zip aarch64/*.deb
 
-      - name: build binary package  
+      - name: build binary package
         run: |
           mkdir -p agent/bin-package
           cp -raf agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
@@ -602,13 +612,13 @@ jobs:
         with:
           name: agent arm64 package results static link
           path: |
-            package-artifact-arm64.tar 
+            package-artifact-arm64.tar
 
   upload_arm64_artifact:
     name: upload arm64 artifact
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: 
+    needs:
     - build_agent_arm64_static_link
     steps:
       - name: Checkout
@@ -640,7 +650,7 @@ jobs:
           ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/arm64/deepflow-agent-rpm.zip
           ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/arm64/deepflow-agent-deb.zip
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/static-link/arm64/deepflow-agent.tar.gz
-          
+
       - name: upload agent stable artifacts
         run: |
           ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/static-link/arm64/deepflow-agent-rpm.zip
