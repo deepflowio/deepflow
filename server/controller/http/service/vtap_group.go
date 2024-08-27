@@ -444,7 +444,7 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 		return nil, err
 	}
 	var agents []mysql.VTap
-	if err = db.Where("vtap_group_lcuuid = ?", lcuuid).First(&agents).Error; err != nil {
+	if err = db.Where("vtap_group_lcuuid = ?", lcuuid).Find(&agents).Error; err != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
