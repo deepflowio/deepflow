@@ -133,7 +133,7 @@ func (s *subDomain) tryRefresh(cloudData cloudmodel.SubDomainResource) error {
 	select {
 	case <-s.cache.RefreshSignal:
 		s.cache.IncrementSequence()
-		s.cache.SetLogLevel(logging.INFO)
+		s.cache.SetLogLevel(logging.INFO, cache.RefreshSignalCallerSubDomain)
 
 		s.refresh(cloudData)
 		s.cache.ResetRefreshSignal(cache.RefreshSignalCallerSubDomain)
