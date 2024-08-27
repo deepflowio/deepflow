@@ -151,6 +151,7 @@ func (c *Cache) getConditonDomainSubDomainCreateMethod() map[string]interface{} 
 func (c *Cache) Refresh() {
 	c.DiffBaseDataSet = diffbase.NewDataSet()
 	c.ToolDataSet = tool.NewDataSet()
+	c.SetLogLevel(logging.DEBUG)
 
 	// 分类刷新资源的相关缓存
 
