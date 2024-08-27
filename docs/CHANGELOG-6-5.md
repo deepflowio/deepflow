@@ -7,6 +7,10 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Remove the handling of redundant process events [#7978](https://github.com/deepflowio/deepflow/pull/7978) by [yinjiping](https://github.com/yinjiping)
+* fix: add libpcap to deb package [#7967](https://github.com/deepflowio/deepflow/pull/7967) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: delete agent group [#7963](https://github.com/deepflowio/deepflow/pull/7963) by [roryye](https://github.com/roryye)
+* fix: agent - eBPF Modify memory barrier for ring [#7941](https://github.com/deepflowio/deepflow/pull/7941) by [yinjiping](https://github.com/yinjiping)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
