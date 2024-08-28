@@ -51,17 +51,17 @@ func InitCETables(dc *DBConfig) error {
 func InitTables(dc *DBConfig, schemaDir string) error {
 	log.Info(LogDBName(dc.Config.Database, "initialize %s tables", schemaDir)) // TODO
 
+	// 先初始化所有组织需要的 CE 表，再判断数据库是否是 default 组织，如果是 default 组织，初始化仅 default 组织所需数据。
+	err := InitORGTables(dc, schemaDir)
+	if err != nil {
+		return err
+	}
+
 	// 通过判断数据库名称后缀，判断数据库是否是 default 组织。
 	if !strings.HasSuffix(dc.Config.Database, common.NON_DEFAULT_ORG_DATABASE_SUFFIX) {
 		if err := InitDefaultORGTables(dc, schemaDir); err != nil {
 			return err
 		}
-	}
-
-	// 先初始化所有组织需要的 CE 表，再判断数据库是否是 default 组织，如果是 default 组织，初始化仅 default 组织所需数据。
-	err := InitORGTables(dc, schemaDir)
-	if err != nil {
-		return err
 	}
 
 	log.Info(LogDBName(dc.Config.Database, "initialized %s tables successfully", schemaDir))
