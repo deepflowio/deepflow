@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PeerConnection struct {
 	UpdaterBase[
 		cloudmodel.PeerConnection,
 		*diffbase.PeerConnection,
-		*mysql.PeerConnection,
-		mysql.PeerConnection,
+		*mysqlmodel.PeerConnection,
+		mysqlmodel.PeerConnection,
 		*message.PeerConnectionAdd,
 		message.PeerConnectionAdd,
 		*message.PeerConnectionUpdate,
@@ -47,8 +47,8 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		newUpdaterBase[
 			cloudmodel.PeerConnection,
 			*diffbase.PeerConnection,
-			*mysql.PeerConnection,
-			mysql.PeerConnection,
+			*mysqlmodel.PeerConnection,
+			mysqlmodel.PeerConnection,
 			*message.PeerConnectionAdd,
 			message.PeerConnectionAdd,
 			*message.PeerConnectionUpdate,
@@ -73,7 +73,7 @@ func (c *PeerConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.PeerConnec
 	return
 }
 
-func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnection) (*mysql.PeerConnection, bool) {
+func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnection) (*mysqlmodel.PeerConnection, bool) {
 	remoteVPCID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.RemoteVPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -106,7 +106,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysql.PeerConnection{
+	dbItem := &mysqlmodel.PeerConnection{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
 		Domain:         c.metadata.Domain.Lcuuid,

@@ -1858,7 +1858,7 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 static void process_data(void *queue)
 {
 	prctl(PR_SET_NAME, "queue-worker");
-	int nr;
+	volatile int nr;
 	struct queue *q = (struct queue *)queue;
 	struct ring *r = q->r;
 	void *rx_burst[MAX_PKT_BURST];

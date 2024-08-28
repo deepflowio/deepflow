@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddRDSInstance(dbItem *mysql.RDSInstance, seq int) {
+func (b *DataSet) AddRDSInstance(dbItem *mysqlmodel.RDSInstance, seq int) {
 	b.RDSInstances[dbItem.Lcuuid] = &RDSInstance{
 		DiffBase: DiffBase{
 			Sequence: seq,

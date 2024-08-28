@@ -35,6 +35,7 @@
 #include "log.h"
 
 #include "load.h"
+#include "table.h"
 #include "trace_utils.h"
 #include "profile/perf_profiler.h"
 
@@ -192,6 +193,16 @@ static int load_running_processes(struct bpf_tracer *tracer) {
 
 void unwind_tracer_init(struct bpf_tracer *tracer) {
     DWARF_KERNEL_CHECK;
+
+    int32_t offset = read_offset_of_stack_in_task_struct();
+    if (offset < 0) {
+        ebpf_warning("unwind tracer init failed: failed to get field stack offset in task struct from btf");
+        return;
+    }
+    if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
+        ebpf_warning("unwind tracer init failed: update %s error", MAP_UNWIND_SYSINFO_NAME);
+        return;
+    }
 
     struct ebpf_map *process_map =
         ebpf_obj__get_map_by_name(tracer->obj, MAP_PROCESS_SHARD_LIST_NAME);

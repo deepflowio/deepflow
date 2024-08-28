@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -46,7 +45,7 @@ func (t *SuiteTest) getPodMock(mockDB bool) (*cache.Cache, cloudmodel.Pod) {
 
 	c := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysql.Pod{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid, Label: cloudItem.Label})
+		t.db.Create(&mysqlmodel.Pod{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid, Label: cloudItem.Label})
 		c.DiffBaseDataSet.Pods[cloudItem.Lcuuid] = &diffbase.Pod{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name, Label: cloudItem.Label}
 	}
 
@@ -87,13 +86,13 @@ func (t *SuiteTest) TestHandleAddPodSucess() {
 	updater := NewPod(c, []cloudmodel.Pod{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysql.Pod
+	var addedItem *mysqlmodel.Pod
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(c.DiffBaseDataSet.Pods), 1)
 	assert.Equal(t.T(), cloudItem.Label, addedItem.Label)
 
-	test.ClearDBData[mysql.Pod](t.db)
+	test.ClearDBData[mysqlmodel.Pod](t.db)
 }
 
 func (t *SuiteTest) TestHandleUpdatePodSucess() {
@@ -104,11 +103,11 @@ func (t *SuiteTest) TestHandleUpdatePodSucess() {
 	updater := NewPod(cache, []cloudmodel.Pod{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysql.Pod
+	var addedItem *mysqlmodel.Pod
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Pods), 1)
 	assert.Equal(t.T(), addedItem.Label, cloudItem.Label)
 
-	test.ClearDBData[mysql.Pod](t.db)
+	test.ClearDBData[mysqlmodel.Pod](t.db)
 }

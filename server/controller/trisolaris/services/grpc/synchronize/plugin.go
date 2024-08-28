@@ -25,6 +25,7 @@ import (
 
 	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -54,7 +55,7 @@ func (p *PluginEvent) GetPluginData(r *api.PluginRequest, orgID int) (*PluginDat
 	if err != nil {
 		return nil, fmt.Errorf("get db failed")
 	}
-	pluginDbMgr := dbmgr.DBMgr[mysql.Plugin](db.DB)
+	pluginDbMgr := dbmgr.DBMgr[mysqlmodel.Plugin](db.DB)
 	plugin, err := pluginDbMgr.GetByOption(
 		pluginDbMgr.WithName(r.GetPluginName()),
 		pluginDbMgr.WithType(int(r.GetPluginType())),

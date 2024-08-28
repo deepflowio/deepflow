@@ -34,6 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/volcengine"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -45,7 +46,7 @@ type Platform interface {
 	ClearDebugLog()
 }
 
-func NewPlatform(domain mysql.Domain, cfg config.CloudConfig, db *mysql.DB) (Platform, error) {
+func NewPlatform(domain mysqlmodel.Domain, cfg config.CloudConfig, db *mysql.DB) (Platform, error) {
 	var platform Platform
 	var err error
 

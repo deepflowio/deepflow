@@ -21,23 +21,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBVMPodNodeConnection() *mysql.VMPodNodeConnection {
-	return &mysql.VMPodNodeConnection{Base: mysql.Base{Lcuuid: uuid.New().String()}}
+func newDBVMPodNodeConnection() *mysqlmodel.VMPodNodeConnection {
+	return &mysqlmodel.VMPodNodeConnection{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}}
 }
 
 func (t *SuiteTest) TestAddVMPodNodeConnectionBatchSuccess() {
 	operator := NewVMPodNodeConnection()
 	itemToAdd := newDBVMPodNodeConnection()
 
-	_, ok := operator.AddBatch([]*mysql.VMPodNodeConnection{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.VMPodNodeConnection{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.VMPodNodeConnection
+	var addedItem *mysqlmodel.VMPodNodeConnection
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VMPodNodeConnection{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VMPodNodeConnection{})
 }

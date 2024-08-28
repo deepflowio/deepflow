@@ -24,7 +24,7 @@ import (
 )
 
 func (a *Aliyun) getRDSInstances(region model.Region) (
-	[]model.RDSInstance, []model.VInterface, []model.IP, error,
+	[]model.RDSInstance, []model.VInterface, []model.IP,
 ) {
 	var retRDSInstances []model.RDSInstance
 	var retVInterfaces []model.VInterface
@@ -60,8 +60,8 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 	request := rds.CreateDescribeDBInstancesRequest()
 	response, err := a.getRDSResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return retRDSInstances, retVInterfaces, retIPs, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}
 	}
 
 	for _, r := range response {
@@ -108,8 +108,8 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 			attrRequest.DBInstanceId = rdsId
 			attrResponse, err := a.getRDSAttributeResponse(region.Label, attrRequest)
 			if err != nil {
-				log.Error(err, logger.NewORGPrefix(a.orgID))
-				return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
+				log.Warning(err, logger.NewORGPrefix(a.orgID))
+				return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}
 			}
 
 			rdsSeries := common.RDS_UNKNOWN
@@ -144,19 +144,16 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 			a.regionLcuuidToResourceNum[retRDSInstance.RegionLcuuid]++
 
 			// 获取接口信息
-			tmpVInterfaces, tmpIPs, err := a.getRDSPorts(region, rdsId)
-			if err != nil {
-				return []model.RDSInstance{}, []model.VInterface{}, []model.IP{}, err
-			}
+			tmpVInterfaces, tmpIPs := a.getRDSPorts(region, rdsId)
 			retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
 			retIPs = append(retIPs, tmpIPs...)
 		}
 	}
 	log.Debug("get rds_instances complete", logger.NewORGPrefix(a.orgID))
-	return retRDSInstances, retVInterfaces, retIPs, nil
+	return retRDSInstances, retVInterfaces, retIPs
 }
 
-func (a *Aliyun) getRDSPorts(region model.Region, rdsId string) ([]model.VInterface, []model.IP, error) {
+func (a *Aliyun) getRDSPorts(region model.Region, rdsId string) ([]model.VInterface, []model.IP) {
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
@@ -164,8 +161,8 @@ func (a *Aliyun) getRDSPorts(region model.Region, rdsId string) ([]model.VInterf
 	request.DBInstanceId = rdsId
 	response, err := a.getRDSVInterfaceResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return []model.VInterface{}, []model.IP{}, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.VInterface{}, []model.IP{}
 	}
 
 	rdsLcuuid := common.GenerateUUIDByOrgID(a.orgID, rdsId)
@@ -207,5 +204,5 @@ func (a *Aliyun) getRDSPorts(region model.Region, rdsId string) ([]model.VInterf
 			retIPs = append(retIPs, retIP)
 		}
 	}
-	return retVInterfaces, retIPs, nil
+	return retVInterfaces, retIPs
 }

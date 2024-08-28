@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type Network struct {
-	OperatorBase[*mysql.Network, mysql.Network]
+	OperatorBase[*mysqlmodel.Network, mysqlmodel.Network]
 }
 
 func NewNetwork() *Network {
 	operater := &Network{
-		newOperatorBase[*mysql.Network](
+		newOperatorBase[*mysqlmodel.Network](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			true,
 			true,

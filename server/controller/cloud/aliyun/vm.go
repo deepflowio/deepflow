@@ -21,13 +21,14 @@ import (
 	"time"
 
 	ecs "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+	simplejson "github.com/bitly/go-simplejson"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aliyun) getVMs(region model.Region) (
+func (a *Aliyun) getVMs(region model.Region, rgIDs []string) (
 	[]model.VM, []model.VInterface, []model.IP, []model.FloatingIP, map[string]string, error,
 ) {
 	var retVMs []model.VM
@@ -37,14 +38,36 @@ func (a *Aliyun) getVMs(region model.Region) (
 	var vmLcuuidToVPCLcuuid = make(map[string]string)
 
 	log.Debug("get vms starting", logger.NewORGPrefix(a.orgID))
-	request := ecs.CreateDescribeInstancesRequest()
-	response, err := a.getVMResponse(region.Label, request)
-	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return retVMs, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, err
+
+	var responses []*simplejson.Json
+	if len(rgIDs) == 0 {
+		request := ecs.CreateDescribeInstancesRequest()
+		vmResponses, err := a.getVMResponse(region.Label, request)
+		if err != nil {
+			log.Error(err, logger.NewORGPrefix(a.orgID))
+			return retVMs, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, err
+		}
+		responses = append(responses, vmResponses...)
+	} else {
+		// remove duplicate ResourceGroupId
+		rgIDMap := map[string]bool{}
+		for _, rgID := range rgIDs {
+			rgIDMap[rgID] = false
+		}
+		for rgID := range rgIDMap {
+			log.Debugf("get instance for regin (%s) resource (%s)", region.Label, rgID, logger.NewORGPrefix(a.orgID))
+			request := ecs.CreateDescribeInstancesRequest()
+			request.ResourceGroupId = rgID
+			vmResponses, err := a.getVMResponse(region.Label, request)
+			if err != nil {
+				log.Error(err, logger.NewORGPrefix(a.orgID))
+				return retVMs, retVInterfaces, retIPs, retFloatingIPs, vmLcuuidToVPCLcuuid, err
+			}
+			responses = append(responses, vmResponses...)
+		}
 	}
 
-	for _, r := range response {
+	for _, r := range responses {
 		vms, _ := r.Get("Instance").Array()
 		for i := range vms {
 			vm := r.Get("Instance").GetIndex(i)

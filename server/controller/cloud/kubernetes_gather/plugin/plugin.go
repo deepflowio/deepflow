@@ -26,14 +26,14 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("cloud.kubernetes_gather.plugin")
 
 func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string, string, error) {
-	var plugins []mysql.Plugin
+	var plugins []mysqlmodel.Plugin
 	err := db.Where("type = ?", common.PLUGIN_TYPE_LUA).Find(&plugins).Error
 	if err != nil {
 		return "", "", err

@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewVRouter(c *cache.Cache, eq *queue.OverwriteQueue) *VRouter {
 	return listener
 }
 
-func (r *VRouter) OnUpdaterAdded(addedDBItems []*mysql.VRouter) {
+func (r *VRouter) OnUpdaterAdded(addedDBItems []*mysqlmodel.VRouter) {
 	r.eventProducer.ProduceByAdd(addedDBItems)
 	r.cache.AddVRouters(addedDBItems)
 }

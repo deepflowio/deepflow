@@ -19,11 +19,11 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddVInterface(dbItem *mysqlmodel.VInterface, seq int, toolDataSet *tool.DataSet) {
 	var networkLcuuid string
 	if dbItem.NetworkID != 0 {
 		networkLcuuid, _ = toolDataSet.GetNetworkLcuuidByID(dbItem.NetworkID)

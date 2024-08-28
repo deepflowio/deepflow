@@ -21,7 +21,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -45,7 +45,7 @@ func NewWANIP(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *WANIP {
 	return mng
 }
 
-func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 common 逻辑
+func (i *WANIP) ProduceByAdd(items []*mysqlmodel.WANIP) { // TODO 同 lan ip 合并 common 逻辑
 	for _, item := range items {
 		var (
 			deviceType        int

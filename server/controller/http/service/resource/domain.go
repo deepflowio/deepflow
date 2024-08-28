@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	svc "github.com/deepflowio/deepflow/server/controller/http/service"
@@ -68,13 +69,13 @@ func getGrpcServerAndPort(db *mysql.DB, controllerIP string, cfg *config.Control
 	}
 
 	// get controller region
-	var localAZConn mysql.AZControllerConnection
+	var localAZConn mysqlmodel.AZControllerConnection
 	var localRegion string
 	if ret := db.Where("controller_ip = ?", localControllerIP).First(&localAZConn); ret.Error == nil {
 		localRegion = localAZConn.Region
 	}
 
-	var azConn mysql.AZControllerConnection
+	var azConn mysqlmodel.AZControllerConnection
 	var region string
 	if ret := db.Where("controller_ip = ?", controllerIP).First(&azConn); ret.Error == nil {
 		region = azConn.Region
@@ -96,10 +97,10 @@ func getGrpcServerAndPort(db *mysql.DB, controllerIP string, cfg *config.Control
 
 func GetDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interface{}) (resp []model.Domain, err error) {
 	var response []model.Domain
-	var domains []mysql.Domain
-	var azs []mysql.AZ
-	var subDomains []mysql.SubDomain
-	var controllers []mysql.Controller
+	var domains []mysqlmodel.Domain
+	var azs []mysqlmodel.AZ
+	var subDomains []mysqlmodel.SubDomain
+	var controllers []mysqlmodel.Controller
 	var domainLcuuids []string
 	var domainToAZLcuuids map[string][]string
 	var domainToRegionLcuuidsToAZLcuuids map[string](map[string][]string)
@@ -211,11 +212,11 @@ func GetDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interfa
 				domainResp.PodClusters = subDomains
 			}
 		} else {
-			var k8sCluster mysql.KubernetesCluster
+			var k8sCluster mysqlmodel.KubernetesCluster
 			if err = orgDB.Where("cluster_id = ?", domain.ClusterID).First(&k8sCluster).Error; err == nil {
 				v := strings.Split(k8sCluster.Value, "-")
 				if len(v) == 2 {
-					var vtap mysql.VTap
+					var vtap mysqlmodel.VTap
 					if err = orgDB.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
 						domainResp.VTapName = vtap.Name
 						domainResp.VTapCtrlIP = vtap.CtrlIP
@@ -248,12 +249,12 @@ func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
 func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo, db *mysql.DB, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
-	db.Model(&mysql.Domain{}).Where("binary name = ?", domainCreate.Name).Count(&count)
+	db.Model(&mysqlmodel.Domain{}).Where("binary name = ?", domainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain (%s) already exist", domainCreate.Name))
 	}
 
-	db.Model(&mysql.SubDomain{}).Where("binary name = ?", domainCreate.Name).Count(&count)
+	db.Model(&mysqlmodel.SubDomain{}).Where("binary name = ?", domainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", domainCreate.Name))
 	}
@@ -264,13 +265,13 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("domain cluster_id (%s) invalid", domainCreate.KubernetesClusterID))
 		}
 
-		var domainCheck mysql.Domain
+		var domainCheck mysqlmodel.Domain
 		count = db.Where("binary cluster_id = ?", domainCreate.KubernetesClusterID).First(&domainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in domain (%s)", domainCreate.KubernetesClusterID, domainCheck.Name))
 		}
 
-		var subDomainCheck mysql.SubDomain
+		var subDomainCheck mysqlmodel.SubDomain
 		count = db.Where("binary cluster_id = ?", domainCreate.KubernetesClusterID).First(&subDomainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist in sub_domain (%s)", domainCreate.KubernetesClusterID, subDomainCheck.Name))
@@ -283,7 +284,7 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 
 	displayName := common.GetUUID(k8sClusterIDCreate, uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
-	domain := mysql.Domain{}
+	domain := mysqlmodel.Domain{}
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
 	domain.TeamID = domainCreate.TeamID
@@ -304,7 +305,7 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 	var regionLcuuid string
 	confRegion, ok := domainCreate.Config["region_uuid"]
 	if !ok || confRegion.(string) == "" {
-		var region mysql.Region
+		var region mysqlmodel.Region
 		res := db.Find(&region)
 		if res.RowsAffected != int64(1) {
 			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("can not find region, please specify or create one"))
@@ -318,7 +319,7 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 	// only one type (agent_sync) can exist in the same region
 	// 同一区域只允许存在一个(采集器同步)类型
 	if domainCreate.Type == common.AGENT_SYNC {
-		var agentSyncDomains []mysql.Domain
+		var agentSyncDomains []mysqlmodel.Domain
 		err := db.Where("type = ?", common.AGENT_SYNC).Find(&agentSyncDomains).Error
 		if err != nil {
 			return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, err.Error())
@@ -338,7 +339,7 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 	var controllerIP string
 	confControllerIP, ok := domainCreate.Config["controller_ip"]
 	if !ok || confControllerIP.(string) == "" {
-		var azConn mysql.AZControllerConnection
+		var azConn mysqlmodel.AZControllerConnection
 		res := db.Where("region = ?", regionLcuuid).First(&azConn)
 		if res.RowsAffected != int64(1) {
 			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("can not find controller ip, please specify or create one"))
@@ -405,7 +406,7 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 }
 
 func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig, db *mysql.DB) (*model.Domain, error) {
-	var domain mysql.Domain
+	var domain mysqlmodel.Domain
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&domain); ret.Error != nil {
@@ -469,7 +470,7 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 				return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, "region lcuuid must be string")
 			}
 			if domain.Type == common.AGENT_SYNC {
-				var agentSyncDomains []mysql.Domain
+				var agentSyncDomains []mysqlmodel.Domain
 				err := db.Where("type = ? AND lcuuid != ?", common.AGENT_SYNC, domain.Lcuuid).Find(&agentSyncDomains).Error
 				if err != nil {
 					return nil, servicecommon.NewError(httpcommon.SERVER_ERROR, err.Error())
@@ -543,35 +544,35 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 func cleanSoftDeletedResource(db *mysql.DB, lcuuid string) {
 	condition := "domain = ? AND deleted_at IS NOT NULL"
 	log.Infof("clean soft deleted resources (domain = %s AND deleted_at IS NOT NULL) started", lcuuid, db.LogPrefixORGID)
-	forceDelete[mysql.CEN](db, condition, lcuuid)
-	forceDelete[mysql.PeerConnection](db, condition, lcuuid)
-	forceDelete[mysql.RedisInstance](db, condition, lcuuid)
-	forceDelete[mysql.RDSInstance](db, condition, lcuuid)
-	forceDelete[mysql.LBListener](db, condition, lcuuid)
-	forceDelete[mysql.LB](db, condition, lcuuid)
-	forceDelete[mysql.NATGateway](db, condition, lcuuid)
-	forceDelete[mysql.DHCPPort](db, condition, lcuuid)
-	forceDelete[mysql.VRouter](db, condition, lcuuid)
-	forceDelete[mysql.Pod](db, condition, lcuuid)
-	forceDelete[mysql.PodReplicaSet](db, condition, lcuuid)
-	forceDelete[mysql.PodGroup](db, condition, lcuuid)
-	forceDelete[mysql.PodService](db, condition, lcuuid)
-	forceDelete[mysql.PodIngress](db, condition, lcuuid)
-	forceDelete[mysql.PodNamespace](db, condition, lcuuid)
-	forceDelete[mysql.PodNode](db, condition, lcuuid)
-	forceDelete[mysql.PodCluster](db, condition, lcuuid)
-	forceDelete[mysql.VM](db, condition, lcuuid)
-	forceDelete[mysql.Host](db, condition, lcuuid)
-	forceDelete[mysql.Network](db, condition, lcuuid)
-	forceDelete[mysql.VPC](db, condition, lcuuid)
-	forceDelete[mysql.AZ](db, condition, lcuuid)
+	forceDelete[mysqlmodel.CEN](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PeerConnection](db, condition, lcuuid)
+	forceDelete[mysqlmodel.RedisInstance](db, condition, lcuuid)
+	forceDelete[mysqlmodel.RDSInstance](db, condition, lcuuid)
+	forceDelete[mysqlmodel.LBListener](db, condition, lcuuid)
+	forceDelete[mysqlmodel.LB](db, condition, lcuuid)
+	forceDelete[mysqlmodel.NATGateway](db, condition, lcuuid)
+	forceDelete[mysqlmodel.DHCPPort](db, condition, lcuuid)
+	forceDelete[mysqlmodel.VRouter](db, condition, lcuuid)
+	forceDelete[mysqlmodel.Pod](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PodReplicaSet](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PodGroup](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PodService](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PodIngress](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PodNamespace](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PodNode](db, condition, lcuuid)
+	forceDelete[mysqlmodel.PodCluster](db, condition, lcuuid)
+	forceDelete[mysqlmodel.VM](db, condition, lcuuid)
+	forceDelete[mysqlmodel.Host](db, condition, lcuuid)
+	forceDelete[mysqlmodel.Network](db, condition, lcuuid)
+	forceDelete[mysqlmodel.VPC](db, condition, lcuuid)
+	forceDelete[mysqlmodel.AZ](db, condition, lcuuid)
 	log.Info("clean soft deleted resources completed", db.LogPrefixORGID)
 }
 
 func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
-	var domain mysql.Domain
+	var domain mysqlmodel.Domain
 	err1 := db.Where("lcuuid = ?", nameOrUUID).First(&domain).Error
-	var domains []mysql.Domain
+	var domains []mysqlmodel.Domain
 	err2 := db.Where("name = ?", nameOrUUID).Find(&domains).Error
 	if err1 == nil && err2 == nil && len(domains) > 0 {
 		return nil, servicecommon.NewError(
@@ -598,7 +599,7 @@ func DeleteDomainByNameOrUUID(nameOrUUID string, db *mysql.DB, userInfo *httpcom
 	)
 }
 
-func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) { // TODO whether release resource ids
+func deleteDomain(domain *mysqlmodel.Domain, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) { // TODO whether release resource ids
 	log.Infof("delete domain (%s) resources started", domain.Name, db.LogPrefixORGID)
 
 	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanDeleteResource(domain.TeamID, common.SET_RESOURCE_TYPE_DOMAIN, domain.Lcuuid)
@@ -607,71 +608,71 @@ func deleteDomain(domain *mysql.Domain, db *mysql.DB, userInfo *httpcommon.UserI
 	}
 
 	lcuuid := domain.Lcuuid
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.WANIP{}) // TODO use forceDelete func
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.LANIP{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.FloatingIP{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VInterface{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.CEN{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PeerConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.RedisInstance{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.RDSInstance{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.LBVMConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.LBTargetServer{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.LBListener{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.LB{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATVMConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATRule{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATGateway{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Process{})
-	// db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VIP{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.DHCPPort{})
-	var vRouters []mysql.VRouter
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.WANIP{}) // TODO use forceDelete func
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.LANIP{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.FloatingIP{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.VInterface{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.CEN{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PeerConnection{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.RedisInstance{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.RDSInstance{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.LBVMConnection{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.LBTargetServer{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.LBListener{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.LB{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.NATVMConnection{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.NATRule{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.NATGateway{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.Process{})
+	// db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PrometheusTarget{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.VIP{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.DHCPPort{})
+	var vRouters []mysqlmodel.VRouter
 	db.Unscoped().Where("domain = ?", lcuuid).Find(&vRouters)
 	vRouterIDs := make([]int, len(vRouters))
 	for _, vRouter := range vRouters {
 		vRouterIDs = append(vRouterIDs, vRouter.ID)
 	}
-	db.Unscoped().Where("vnet_id IN ?", vRouterIDs).Delete(&mysql.RoutingTable{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VRouter{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VMPodNodeConnection{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Pod{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodReplicaSet{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodGroup{})
-	var podServices []mysql.PodService
+	db.Unscoped().Where("vnet_id IN ?", vRouterIDs).Delete(&mysqlmodel.RoutingTable{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.VRouter{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.VMPodNodeConnection{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.Pod{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PodReplicaSet{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PodGroup{})
+	var podServices []mysqlmodel.PodService
 	db.Unscoped().Where("domain = ?", lcuuid).Find(&podServices)
 	podServiceIDs := make([]int, len(podServices))
 	for _, podService := range podServices {
 		podServiceIDs = append(podServiceIDs, podService.ID)
 	}
-	db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&mysql.PodServicePort{})
-	db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&mysql.PodGroupPort{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodService{})
-	var podIngresses []mysql.PodIngress
+	db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&mysqlmodel.PodServicePort{})
+	db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&mysqlmodel.PodGroupPort{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PodService{})
+	var podIngresses []mysqlmodel.PodIngress
 	db.Unscoped().Where("domain = ?", lcuuid).Find(&podIngresses)
 	podIngressIDs := make([]int, len(podIngresses))
 	for _, podIngress := range podIngresses {
 		podIngressIDs = append(podIngressIDs, podIngress.ID)
 	}
-	db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&mysql.PodIngressRule{})
-	db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&mysql.PodIngressRuleBackend{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodIngress{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodNamespace{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodNode{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodCluster{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VM{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Host{})
-	var networks []mysql.Network
+	db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&mysqlmodel.PodIngressRule{})
+	db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&mysqlmodel.PodIngressRuleBackend{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PodIngress{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PodNamespace{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PodNode{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.PodCluster{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.VM{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.Host{})
+	var networks []mysqlmodel.Network
 	db.Unscoped().Where("domain = ?", lcuuid).Find(&networks)
 	networkIDs := make([]int, len(networks))
 	for _, network := range networks {
 		networkIDs = append(networkIDs, network.ID)
 	}
-	db.Unscoped().Where("vl2id IN ?", networkIDs).Delete(&mysql.Subnet{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Network{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VPC{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.SubDomain{})
-	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.AZ{})
+	db.Unscoped().Where("vl2id IN ?", networkIDs).Delete(&mysqlmodel.Subnet{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.Network{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.VPC{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.SubDomain{})
+	db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysqlmodel.AZ{})
 
 	db.Delete(&domain)
 
@@ -693,7 +694,7 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 	var err error
 	var clusterID, domainLcuuid, subDomainLcuuid string
 	if isSubDomain {
-		var subDomain mysql.SubDomain
+		var subDomain mysqlmodel.SubDomain
 		err = db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 		if err != nil {
 			return err
@@ -702,7 +703,7 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 		domainLcuuid = subDomain.Domain
 		subDomainLcuuid = lcuuid
 	} else {
-		var domain mysql.Domain
+		var domain mysqlmodel.Domain
 		err = db.Where("lcuuid = ?", lcuuid).First(&domain).Error
 		if err != nil {
 			return err
@@ -718,12 +719,12 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 	if len(vTapInfo) != 2 {
 		return errors.New(fmt.Sprintf("invalid kubernetes cluster value: (%s)", value))
 	}
-	var vTap mysql.VTap
+	var vTap mysqlmodel.VTap
 	err = db.Where("ctrl_ip = ? and ctrl_mac = ?", vTapInfo[0], vTapInfo[1]).First(&vTap).Error
 	if err != nil {
 		return errors.New(fmt.Sprintf("query vtap (%s) failed: (%s)", value, err.Error()))
 	}
-	var kubernetesClusters []mysql.KubernetesCluster
+	var kubernetesClusters []mysqlmodel.KubernetesCluster
 	err = db.Where("cluster_id = ? and value = ?", clusterID, value).Find(&kubernetesClusters).Error
 	if err != nil {
 		return err
@@ -732,7 +733,7 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 		return nil
 	}
 
-	var podNodes []mysql.PodNode
+	var podNodes []mysqlmodel.PodNode
 	err = db.Where("domain = ? and sub_domain = ?", domainLcuuid, subDomainLcuuid).Find(&podNodes).Error
 	if err != nil {
 		return err
@@ -744,7 +745,7 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 	for _, node := range podNodes {
 		nodeIPs = append(nodeIPs, node.IP)
 	}
-	var vTaps []mysql.VTap
+	var vTaps []mysqlmodel.VTap
 	err = db.Where("launch_server in ?", nodeIPs).Find(&vTaps).Error
 	if err != nil {
 		return err
@@ -760,8 +761,8 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 		return errors.New(fmt.Sprintf("vtap (%s) not belong to the current domain", value))
 	}
 
-	var kubernetesCluster mysql.KubernetesCluster
-	err = db.Model(&kubernetesCluster).Where("cluster_id = ?", clusterID).Updates(mysql.KubernetesCluster{Value: value, UpdatedTime: time.Now()}).Error
+	var kubernetesCluster mysqlmodel.KubernetesCluster
+	err = db.Model(&kubernetesCluster).Where("cluster_id = ?", clusterID).Updates(mysqlmodel.KubernetesCluster{Value: value, UpdatedTime: time.Now()}).Error
 	if err != nil {
 		return err
 	}
@@ -771,8 +772,8 @@ func KubernetesSetVtap(lcuuid, value string, isSubDomain bool, db *mysql.DB) err
 
 func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]interface{}) ([]*model.SubDomain, error) {
 	var response []*model.SubDomain
-	var subDomains []mysql.SubDomain
-	var vpcs []mysql.VPC
+	var subDomains []mysqlmodel.SubDomain
+	var vpcs []mysqlmodel.VPC
 
 	db := orgDB.DB
 	if fLcuuid, ok := filter["lcuuid"]; ok {
@@ -832,11 +833,11 @@ func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]inte
 			}
 		}
 
-		var k8sCluster mysql.KubernetesCluster
+		var k8sCluster mysqlmodel.KubernetesCluster
 		if err := orgDB.Where("cluster_id = ?", subDomain.ClusterID).First(&k8sCluster).Error; err == nil {
 			v := strings.Split(k8sCluster.Value, "-")
 			if len(v) == 2 {
-				var vtap mysql.VTap
+				var vtap mysqlmodel.VTap
 				if err = orgDB.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
 					subDomainResp.Config["vtap_id"] = vtap.Name
 				}
@@ -844,7 +845,7 @@ func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]inte
 		}
 
 		// get domain name
-		var domain mysql.Domain
+		var domain mysqlmodel.Domain
 		if err := orgDB.Where("lcuuid = ?", subDomain.Domain).First(&domain).Error; err != nil {
 			log.Error(err)
 		}
@@ -856,13 +857,13 @@ func GetSubDomains(orgDB *mysql.DB, excludeTeamIDs []int, filter map[string]inte
 }
 
 func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (*model.SubDomain, error) {
-	var domain mysql.Domain
-	if err := db.Model(&mysql.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).First(&domain).Error; err != nil {
+	var domain mysqlmodel.Domain
+	if err := db.Model(&mysqlmodel.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).First(&domain).Error; err != nil {
 		return nil, err
 	}
 
 	var count int64
-	db.Model(&mysql.SubDomain{}).Where("binary name = ?", subDomainCreate.Name).Count(&count)
+	db.Model(&mysqlmodel.SubDomain{}).Where("binary name = ?", subDomainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))
 	}
@@ -871,13 +872,13 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 			return nil, servicecommon.NewError(httpcommon.INVALID_PARAMETERS, fmt.Sprintf("sub_domain cluster_id (%s) invalid", subDomainCreate.ClusterID))
 		}
 
-		var domainCheck mysql.Domain
+		var domainCheck mysqlmodel.Domain
 		count = db.Where("binary cluster_id = ?", subDomainCreate.ClusterID).First(&domainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in domain (%s)", subDomainCreate.ClusterID, domainCheck.Name))
 		}
 
-		var subDomainCheck mysql.SubDomain
+		var subDomainCheck mysqlmodel.SubDomain
 		count = db.Where("binary cluster_id = ?", subDomainCreate.ClusterID).First(&subDomainCheck).RowsAffected
 		if count > 0 {
 			return nil, servicecommon.NewError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist in sub_domain (%s)", subDomainCreate.ClusterID, subDomainCheck.Name))
@@ -898,7 +899,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate, db *mysql.DB, userIn
 
 	log.Infof("create sub_domain (%v)", subDomainCreate, db.LogPrefixORGID)
 
-	subDomain := mysql.SubDomain{}
+	subDomain := mysqlmodel.SubDomain{}
 	subDomain.Lcuuid = lcuuid
 	subDomain.TeamID = subDomainCreate.TeamID
 	subDomain.UserID = domain.UserID
@@ -926,8 +927,8 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 		return nil, errors.New("domain_name field cannot be modified")
 	}
 
-	var domain mysql.Domain
-	var subDomain mysql.SubDomain
+	var domain mysqlmodel.Domain
+	var subDomain mysqlmodel.SubDomain
 	var dbUpdateMap = make(map[string]interface{})
 	var resourceUp = make(map[string]interface{})
 	// if userID, ok := subDomainUpdate["USER_ID"]; ok {
@@ -996,8 +997,8 @@ func UpdateSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 }
 
 func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) (map[string]string, error) {
-	var domain mysql.Domain
-	var subDomain mysql.SubDomain
+	var domain mysqlmodel.Domain
+	var subDomain mysqlmodel.SubDomain
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&subDomain); ret.Error != nil {
 		return nil, servicecommon.NewError(
 			httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("sub_domain (%s) not found", lcuuid),
@@ -1016,30 +1017,30 @@ func DeleteSubDomain(lcuuid string, db *mysql.DB, userInfo *httpcommon.UserInfo,
 
 	log.Infof("delete sub_domain (%s) resources started", subDomain.Name, db.LogPrefixORGID)
 
-	var podCluster mysql.PodCluster
+	var podCluster mysqlmodel.PodCluster
 	db.Unscoped().Where("sub_domain = ?", lcuuid).Find(&podCluster)
 	if podCluster.ID != 0 {
 		log.Infof("delete pod_cluster (%+v) resources", podCluster, db.LogPrefixORGID)
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.WANIP{}) // TODO use forceDelete func
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.LANIP{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.VInterface{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.Subnet{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.Network{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.VMPodNodeConnection{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.Pod{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodReplicaSet{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodGroupPort{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodGroup{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodServicePort{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodService{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodIngressRuleBackend{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodIngressRule{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodIngress{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodNamespace{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodNode{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PodCluster{})
-		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.Process{})
-		// db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.PrometheusTarget{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.WANIP{}) // TODO use forceDelete func
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.LANIP{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.VInterface{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.Subnet{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.Network{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.VMPodNodeConnection{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.Pod{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodReplicaSet{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodGroupPort{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodGroup{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodServicePort{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodService{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodIngressRuleBackend{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodIngressRule{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodIngress{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodNamespace{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodNode{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PodCluster{})
+		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.Process{})
+		// db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysqlmodel.PrometheusTarget{})
 	}
 
 	err = db.Delete(&subDomain).Error
@@ -1109,12 +1110,12 @@ func (c *DomainChecker) CheckRegularly(sCtx context.Context) {
 func (c *DomainChecker) checkAndAllocateController(db *mysql.DB) {
 	log.Info("check domain controller health started", db.LogPrefixORGID)
 	controllerIPToRegionLcuuid := make(map[string]string)
-	var azCConns []*mysql.AZControllerConnection
+	var azCConns []*mysqlmodel.AZControllerConnection
 	db.Find(&azCConns)
 	for _, c := range azCConns {
 		controllerIPToRegionLcuuid[c.ControllerIP] = c.Region
 	}
-	var controllers []*mysql.Controller
+	var controllers []*mysqlmodel.Controller
 	db.Find(&controllers)
 	regionLcuuidToHealthyControllerIPs := make(map[string][]string)
 	for _, c := range controllers {
@@ -1126,7 +1127,7 @@ func (c *DomainChecker) checkAndAllocateController(db *mysql.DB) {
 	}
 	log.Debug(regionLcuuidToHealthyControllerIPs, db.LogPrefixORGID)
 
-	var domains []*mysql.Domain
+	var domains []*mysqlmodel.Domain
 	db.Find(&domains)
 	for _, domain := range domains {
 		config := make(map[string]interface{})

@@ -17,11 +17,55 @@
 package common
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 )
+
+type Edition struct {
+	SchemeDir         string
+	DBVersionTable    string
+	DBVersionExpected string
+}
+
+func NewEdition(schemeDir string, dbVersionTable string, dbVersionExpected string) *Edition {
+	return &Edition{
+		SchemeDir:         schemeDir,
+		DBVersionTable:    dbVersionTable,
+		DBVersionExpected: dbVersionExpected,
+	}
+}
+
+type DBConfig struct {
+	DB     *gorm.DB
+	Config config.MySqlConfig
+}
+
+func NewDBConfig(db *gorm.DB, cfg config.MySqlConfig) *DBConfig {
+	return &DBConfig{
+		DB:     db,
+		Config: cfg,
+	}
+}
+
+func (dc *DBConfig) GetDatabaseName() string {
+	return dc.Config.Database
+}
+
+func (dc *DBConfig) SetDB(db *gorm.DB) {
+	dc.DB = db
+}
+
+func (dc *DBConfig) SetConfig(c config.MySqlConfig) {
+	dc.Config = c
+}
+
+func LogDBName(databaseName string, format string, a ...any) string {
+	return fmt.Sprintf("[DB-%s] ", databaseName) + fmt.Sprintf(format, a...)
+}
 
 func GetSessionWithoutName(cfg config.MySqlConfig) (*gorm.DB, error) {
 	connector, err := common.GetConnector(cfg, false, cfg.TimeOut, false)

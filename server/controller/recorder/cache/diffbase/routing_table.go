@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddRoutingTable(dbItem *mysql.RoutingTable, seq int) {
+func (b *DataSet) AddRoutingTable(dbItem *mysqlmodel.RoutingTable, seq int) {
 	b.RoutingTables[dbItem.Lcuuid] = &RoutingTable{
 		DiffBase: DiffBase{
 			Sequence: seq,

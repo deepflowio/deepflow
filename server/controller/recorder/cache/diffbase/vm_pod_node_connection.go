@@ -18,10 +18,10 @@ package diffbase
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddVMPodNodeConnection(dbItem *mysql.VMPodNodeConnection, seq int) {
+func (b *DataSet) AddVMPodNodeConnection(dbItem *mysqlmodel.VMPodNodeConnection, seq int) {
 	b.VMPodNodeConnections[dbItem.Lcuuid] = &VMPodNodeConnection{
 		DiffBase: DiffBase{
 			Sequence: seq,

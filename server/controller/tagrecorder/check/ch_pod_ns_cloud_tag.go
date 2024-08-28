@@ -17,17 +17,17 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodNSCloudTag struct {
-	UpdaterBase[mysql.ChPodNSCloudTag, CloudTagKey]
+	UpdaterBase[mysqlmodel.ChPodNSCloudTag, CloudTagKey]
 }
 
 func NewChPodNSCloudTag() *ChPodNSCloudTag {
 	updater := &ChPodNSCloudTag{
-		UpdaterBase[mysql.ChPodNSCloudTag, CloudTagKey]{
+		UpdaterBase[mysqlmodel.ChPodNSCloudTag, CloudTagKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG,
 		},
 	}
@@ -35,15 +35,15 @@ func NewChPodNSCloudTag() *ChPodNSCloudTag {
 	return updater
 }
 
-func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudTag, bool) {
-	var podNamespaces []mysql.PodNamespace
+func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysqlmodel.ChPodNSCloudTag, bool) {
+	var podNamespaces []mysqlmodel.PodNamespace
 	err := p.db.Unscoped().Find(&podNamespaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err), p.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[CloudTagKey]mysql.ChPodNSCloudTag)
+	keyToItem := make(map[CloudTagKey]mysqlmodel.ChPodNSCloudTag)
 	for _, podNamespace := range podNamespaces {
 		teamID, err := tagrecorder.GetTeamID(podNamespace.Domain, podNamespace.SubDomain)
 		if err != nil {
@@ -55,7 +55,7 @@ func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudT
 				ID:  podNamespace.ID,
 				Key: k,
 			}
-			keyToItem[key] = mysql.ChPodNSCloudTag{
+			keyToItem[key] = mysqlmodel.ChPodNSCloudTag{
 				ID:          podNamespace.ID,
 				Key:         k,
 				Value:       v,
@@ -68,11 +68,11 @@ func (p *ChPodNSCloudTag) generateNewData() (map[CloudTagKey]mysql.ChPodNSCloudT
 	return keyToItem, true
 }
 
-func (p *ChPodNSCloudTag) generateKey(dbItem mysql.ChPodNSCloudTag) CloudTagKey {
+func (p *ChPodNSCloudTag) generateKey(dbItem mysqlmodel.ChPodNSCloudTag) CloudTagKey {
 	return CloudTagKey{ID: dbItem.ID, Key: dbItem.Key}
 }
 
-func (p *ChPodNSCloudTag) generateUpdateInfo(oldItem, newItem mysql.ChPodNSCloudTag) (map[string]interface{}, bool) {
+func (p *ChPodNSCloudTag) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodNSCloudTag) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Value != newItem.Value {
 		updateInfo["value"] = newItem.Value

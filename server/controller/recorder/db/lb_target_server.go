@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type LBTargetServer struct {
-	OperatorBase[*mysql.LBTargetServer, mysql.LBTargetServer]
+	OperatorBase[*mysqlmodel.LBTargetServer, mysqlmodel.LBTargetServer]
 }
 
 func NewLBTargetServer() *LBTargetServer {
 	return &LBTargetServer{
-		newOperatorBase[*mysql.LBTargetServer](
+		newOperatorBase[*mysqlmodel.LBTargetServer](
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			false,
 			false,

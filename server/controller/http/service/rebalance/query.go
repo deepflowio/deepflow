@@ -16,7 +16,9 @@
 
 package rebalance
 
-import "github.com/deepflowio/deepflow/server/controller/db/mysql"
+import (
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+)
 
 // //go:generate mockgen -source=query.go -destination=./mocks/mock_querier.go -package=mocks Querier
 type Querier interface {

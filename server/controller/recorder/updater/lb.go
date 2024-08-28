@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type LB struct {
 	UpdaterBase[
 		cloudmodel.LB,
 		*diffbase.LB,
-		*mysql.LB,
-		mysql.LB,
+		*mysqlmodel.LB,
+		mysqlmodel.LB,
 		*message.LBAdd,
 		message.LBAdd,
 		*message.LBUpdate,
@@ -47,8 +47,8 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 		newUpdaterBase[
 			cloudmodel.LB,
 			*diffbase.LB,
-			*mysql.LB,
-			mysql.LB,
+			*mysqlmodel.LB,
+			mysqlmodel.LB,
 			*message.LBAdd,
 			message.LBAdd,
 			*message.LBUpdate,
@@ -73,7 +73,7 @@ func (l *LB) getDiffBaseByCloudItem(cloudItem *cloudmodel.LB) (diffBase *diffbas
 	return
 }
 
-func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysql.LB, bool) {
+func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysqlmodel.LB, bool) {
 	vpcID, exists := l.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -83,7 +83,7 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*mysql.LB, bool) {
 		return nil, false
 	}
 
-	dbItem := &mysql.LB{
+	dbItem := &mysqlmodel.LB{
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
 		UID:    cloudItem.Label,

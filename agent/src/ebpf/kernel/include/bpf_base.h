@@ -202,6 +202,10 @@ struct pt_regs {
 #define PT_REGS_RC(x) ((x)->regs[0])
 #define PT_REGS_SP(x) ((x)->sp)
 #define PT_REGS_IP(x) ((x)->pc)
+
+#define PSR_MODE32_BIT 0x00000010
+#define PSR_MODE_MASK  0x0000000f
+#define PSR_MODE_EL0t  0x00000000
 #else
 _Pragma("GCC error \"Must specify a BPF target arch\"");
 #endif

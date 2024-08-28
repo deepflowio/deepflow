@@ -18,16 +18,17 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChTapType struct {
-	UpdaterComponent[mysql.ChTapType, TapTypeKey]
+	UpdaterComponent[mysqlmodel.ChTapType, TapTypeKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 	updater := &ChTapType{
-		newUpdaterComponent[mysql.ChTapType, TapTypeKey](
+		newUpdaterComponent[mysqlmodel.ChTapType, TapTypeKey](
 			RESOURCE_TYPE_TAP_TYPE,
 		),
 		resourceTypeToIconID,
@@ -36,17 +37,17 @@ func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 	return updater
 }
 
-func (t *ChTapType) generateNewData(db *mysql.DB) (map[TapTypeKey]mysql.ChTapType, bool) {
-	var tapTypes []mysql.TapType
+func (t *ChTapType) generateNewData(db *mysql.DB) (map[TapTypeKey]mysqlmodel.ChTapType, bool) {
+	var tapTypes []mysqlmodel.TapType
 	err := db.Unscoped().Find(&tapTypes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(t.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[TapTypeKey]mysql.ChTapType)
+	keyToItem := make(map[TapTypeKey]mysqlmodel.ChTapType)
 	for _, tapType := range tapTypes {
-		keyToItem[TapTypeKey{Value: tapType.Value}] = mysql.ChTapType{
+		keyToItem[TapTypeKey{Value: tapType.Value}] = mysqlmodel.ChTapType{
 			Value: tapType.Value,
 			Name:  tapType.Name,
 		}
@@ -54,11 +55,11 @@ func (t *ChTapType) generateNewData(db *mysql.DB) (map[TapTypeKey]mysql.ChTapTyp
 	return keyToItem, true
 }
 
-func (t *ChTapType) generateKey(dbItem mysql.ChTapType) TapTypeKey {
+func (t *ChTapType) generateKey(dbItem mysqlmodel.ChTapType) TapTypeKey {
 	return TapTypeKey{Value: dbItem.Value}
 }
 
-func (t *ChTapType) generateUpdateInfo(oldItem, newItem mysql.ChTapType) (map[string]interface{}, bool) {
+func (t *ChTapType) generateUpdateInfo(oldItem, newItem mysqlmodel.ChTapType) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

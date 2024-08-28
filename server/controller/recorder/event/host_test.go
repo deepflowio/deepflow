@@ -19,7 +19,7 @@ package event
 import (
 	"testing"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -30,7 +30,7 @@ import (
 func TestHost_ProduceByAdd(t *testing.T) {
 	dataSet := tool.NewDataSet()
 	type args struct {
-		items []*mysql.Host
+		items []*mysqlmodel.Host
 	}
 	tests := []struct {
 		name     string
@@ -43,9 +43,9 @@ func TestHost_ProduceByAdd(t *testing.T) {
 			name: "add success",
 			h:    NewHost(dataSet, NewEventQueue()),
 			args: args{
-				items: []*mysql.Host{
+				items: []*mysqlmodel.Host{
 					{
-						Base: mysql.Base{ID: 1},
+						Base: mysqlmodel.Base{ID: 1},
 						Name: "host",
 					},
 				},
@@ -88,10 +88,10 @@ func TestHost_ProduceByDelete(t *testing.T) {
 				lcuuids: []string{"host_lcuuid"},
 			},
 			prepare: func(cache *cache.Cache) {
-				cache.AddRegion(&mysql.Region{Base: mysql.Base{ID: 1, Lcuuid: "region_lcuuid"}})
-				cache.AddAZ(&mysql.AZ{Base: mysql.Base{ID: 2, Lcuuid: "az_lcuuid"}})
-				cache.AddHost(&mysql.Host{
-					Base: mysql.Base{
+				cache.AddRegion(&mysqlmodel.Region{Base: mysqlmodel.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&mysqlmodel.AZ{Base: mysqlmodel.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddHost(&mysqlmodel.Host{
+					Base: mysqlmodel.Base{
 						ID:     1,
 						Lcuuid: "host_lcuuid",
 					},

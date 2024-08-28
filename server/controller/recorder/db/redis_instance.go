@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type RedisInstance struct {
-	OperatorBase[*mysql.RedisInstance, mysql.RedisInstance]
+	OperatorBase[*mysqlmodel.RedisInstance, mysqlmodel.RedisInstance]
 }
 
 func NewRedisInstance() *RedisInstance {
 	operater := &RedisInstance{
-		newOperatorBase[*mysql.RedisInstance](
+		newOperatorBase[*mysqlmodel.RedisInstance](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			true,
 			true,

@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBVM() *mysql.VM {
-	return &mysql.VM{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBVM() *mysqlmodel.VM {
+	return &mysqlmodel.VM{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddVMBatchSuccess() {
 	operator := NewVM()
 	itemToAdd := newDBVM()
 
-	_, ok := operator.AddBatch([]*mysql.VM{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.VM{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.VM
+	var addedItem *mysqlmodel.VM
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, itemToAdd.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VM{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VM{})
 }
 
 func (t *SuiteTest) TestUpdateVMSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdateVMSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysql.VM
+	var updatedItem *mysqlmodel.VM
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VM{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VM{})
 }
 
 func (t *SuiteTest) TestDeleteVMBatchSuccess() {
@@ -70,31 +70,31 @@ func (t *SuiteTest) TestDeleteVMBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.VM
+	var deletedItem *mysqlmodel.VM
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
-	var deletedVMPodNodeConn *mysql.VMPodNodeConnection
+	var deletedVMPodNodeConn *mysqlmodel.VMPodNodeConnection
 	result = t.db.Where("lcuuid = ?", vmPodNodeConn.Lcuuid).Find(&deletedVMPodNodeConn)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestVMCreateAndFind() {
 	lcuuid := uuid.New().String()
-	vm := &mysql.VM{
-		Base: mysql.Base{Lcuuid: lcuuid},
+	vm := &mysqlmodel.VM{
+		Base: mysqlmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(vm)
-	var resultVM *mysql.VM
+	var resultVM *mysqlmodel.VM
 	err := t.db.Where("lcuuid = ? and name='' and alias='' and label='' and launch_server='' "+
 		"and az='' and region='' and uid=''", lcuuid).First(&resultVM).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), vm.Base.Lcuuid, resultVM.Base.Lcuuid)
 
-	resultVM = new(mysql.VM)
+	resultVM = new(mysqlmodel.VM)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultVM)
 	assert.Equal(t.T(), vm.Base.Lcuuid, resultVM.Base.Lcuuid)
 
-	resultVM = new(mysql.VM)
+	resultVM = new(mysqlmodel.VM)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVM)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

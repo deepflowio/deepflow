@@ -20,15 +20,16 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChAPPLabel struct {
-	UpdaterBase[mysql.ChAPPLabel, PrometheusAPPLabelKey]
+	UpdaterBase[mysqlmodel.ChAPPLabel, PrometheusAPPLabelKey]
 }
 
 func NewChAPPLabel() *ChAPPLabel {
 	updater := &ChAPPLabel{
-		UpdaterBase[mysql.ChAPPLabel, PrometheusAPPLabelKey]{
+		UpdaterBase[mysqlmodel.ChAPPLabel, PrometheusAPPLabelKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_APP_LABEL,
 		},
 	}
@@ -37,8 +38,8 @@ func NewChAPPLabel() *ChAPPLabel {
 	return updater
 }
 
-func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLabel, bool) {
-	var prometheusLabels []mysql.PrometheusLabel
+func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysqlmodel.ChAPPLabel, bool) {
+	var prometheusLabels []mysqlmodel.PrometheusLabel
 	err := mysql.DefaultDB.Unscoped().Find(&prometheusLabels).Error
 
 	if err != nil {
@@ -53,14 +54,14 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLab
 		return nil, false
 	}
 
-	keyToItem := make(map[PrometheusAPPLabelKey]mysql.ChAPPLabel)
+	keyToItem := make(map[PrometheusAPPLabelKey]mysqlmodel.ChAPPLabel)
 	for _, prometheusLabel := range prometheusLabels {
 		labelName := prometheusLabel.Name
 		if slices.Contains(appLabelSlice, labelName) {
 			labelNameID := labelNameIDMap[labelName]
 			labelValue := prometheusLabel.Value
 			labelValueID := valueNameIDMap[labelValue]
-			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysql.ChAPPLabel{
+			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = mysqlmodel.ChAPPLabel{
 				LabelNameID:  labelNameID,
 				LabelValue:   labelValue,
 				LabelValueID: labelValueID,
@@ -71,11 +72,11 @@ func (l *ChAPPLabel) generateNewData() (map[PrometheusAPPLabelKey]mysql.ChAPPLab
 	return keyToItem, true
 }
 
-func (l *ChAPPLabel) generateKey(dbItem mysql.ChAPPLabel) PrometheusAPPLabelKey {
+func (l *ChAPPLabel) generateKey(dbItem mysqlmodel.ChAPPLabel) PrometheusAPPLabelKey {
 	return PrometheusAPPLabelKey{LabelNameID: dbItem.LabelNameID, LabelValueID: dbItem.LabelValueID}
 }
 
-func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysql.ChAPPLabel) (map[string]interface{}, bool) {
+func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysqlmodel.ChAPPLabel) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.LabelValue != newItem.LabelValue {
 		updateInfo["label_value"] = newItem.LabelValue
@@ -88,7 +89,7 @@ func (l *ChAPPLabel) generateUpdateInfo(oldItem, newItem mysql.ChAPPLabel) (map[
 
 func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
 	appLabelSlice := []string{}
-	var prometheusAPPMetricAPPLabelLayouts []mysql.ChPrometheusMetricAPPLabelLayout
+	var prometheusAPPMetricAPPLabelLayouts []mysqlmodel.ChPrometheusMetricAPPLabelLayout
 	err := mysql.DefaultDB.Unscoped().Select("app_label_name").Group("app_label_name").Find(&prometheusAPPMetricAPPLabelLayouts).Error
 
 	if err != nil {
@@ -105,8 +106,8 @@ func (l *ChAPPLabel) generateAPPLabelData() ([]string, bool) {
 func (l *ChAPPLabel) generateNameIDData() (map[string]int, map[string]int, bool) {
 	labelNameIDMap := make(map[string]int)
 	valueNameIDMap := make(map[string]int)
-	var prometheusLabelNames []mysql.PrometheusLabelName
-	var prometheusLabelValues []mysql.PrometheusLabelValue
+	var prometheusLabelNames []mysqlmodel.PrometheusLabelName
+	var prometheusLabelValues []mysqlmodel.PrometheusLabelValue
 
 	err := mysql.DefaultDB.Unscoped().Find(&prometheusLabelNames).Error
 

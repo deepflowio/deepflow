@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	"gorm.io/gorm"
 
 	servercommon "github.com/deepflowio/deepflow/server/common"
 	controllerCommon "github.com/deepflowio/deepflow/server/controller/common"
@@ -35,12 +36,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlcfg "github.com/deepflowio/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/model"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"gorm.io/gorm"
 )
 
 // CreateORGData create database and backs up the controller and analyzer tables.
@@ -59,8 +60,8 @@ func CreateORGData(dataCreate model.ORGDataCreate, mysqlCfg mysqlcfg.MySqlConfig
 		return cfg.Database, errors.New(fmt.Sprintf("database (name: %s) already exists", cfg.Database))
 	}
 
-	var controllers []mysql.Controller
-	var analyzers []mysql.Analyzer
+	var controllers []mysqlmodel.Controller
+	var analyzers []mysqlmodel.Analyzer
 	if err := mysql.DefaultDB.Unscoped().Find(&controllers).Error; err != nil {
 		return defaultDatabase, err
 	}
@@ -128,7 +129,7 @@ func GetORGData(cfg *config.ControllerConfig) (*simplejson.Json, error) {
 	body := make(map[string]interface{})
 	// master region
 	if cfg.TrisolarisCfg.NodeType != controllerCommon.TRISOLARIS_NODE_TYPE_MASTER {
-		var controller mysql.Controller
+		var controller mysqlmodel.Controller
 		err := mysql.DefaultDB.Where("node_type = ? AND state = ?", controllerCommon.CONTROLLER_NODE_TYPE_MASTER, controllerCommon.CONTROLLER_STATE_NORMAL).First(&controller).Error
 		if err != nil {
 			log.Error(err)
@@ -258,7 +259,7 @@ func (c *DeletedORGChecker) triggerAllServersToDelete(ids []int) error {
 			query += fmt.Sprintf("&org_id=%d", id)
 		}
 	}
-	var controllers []*mysql.Controller
+	var controllers []*mysqlmodel.Controller
 	if err := mysql.DefaultDB.Find(&controllers).Error; err != nil {
 		log.Errorf("failed to get controllers: %s", err.Error())
 		return err

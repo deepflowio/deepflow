@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type Host struct {
-	OperatorBase[*mysql.Host, mysql.Host]
+	OperatorBase[*mysqlmodel.Host, mysqlmodel.Host]
 }
 
 func NewHost() *Host {
 	operater := &Host{
-		newOperatorBase[*mysql.Host](
+		newOperatorBase[*mysqlmodel.Host](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			true,
 			true,

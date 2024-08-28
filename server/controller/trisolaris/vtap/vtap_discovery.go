@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db/idmng"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -197,7 +197,7 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 	// Voucher mode turns on group features
 	if r.vTapInfo.config.BillingMethod == BILLING_METHOD_VOUCHER {
 		dbVTap.LicenseFunctions = r.groupLicenseFunctions
-		dbVTap.FollowGroupFeatures = r.groupLicenseFunctions
+		dbVTap.FollowGroupFeatures = VTAP_ALL_LICENSE_FUNCTIONS
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(dbVTap).Error; err != nil {

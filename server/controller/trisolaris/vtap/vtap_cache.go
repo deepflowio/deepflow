@@ -34,7 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/agent_config"
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
@@ -246,7 +246,7 @@ func (c *VTapCache) String() string {
 		c.GetExpectedRevision(), c.GetUpgradePackage(), c.podClusterID, c.VPCID)
 }
 
-func NewVTapCache(vtap *mysql.VTap, vTapInfo *VTapInfo) *VTapCache {
+func NewVTapCache(vtap *mysqlmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache := &VTapCache{}
 	vTapCache.id = vtap.ID
 	vTapCache.name = proto.String(vtap.Name)
@@ -1106,7 +1106,7 @@ func (c *VTapCache) GetConfigTapMode() int {
 	return *config.TapMode
 }
 
-func (c *VTapCache) updateVTapCacheFromDB(vtap *mysql.VTap) {
+func (c *VTapCache) updateVTapCacheFromDB(vtap *mysqlmodel.VTap) {
 	v := c.vTapInfo
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State

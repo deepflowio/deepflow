@@ -14,9 +14,20 @@
  * limitations under the License.
  */
 
-package migration
+package common
 
-const (
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "6.6.1.12"
+import (
+	"fmt"
 )
+
+func DropDatabase(dc *DBConfig) error {
+	log.Infof(LogDBName(dc.Config.Database, "drop database"))
+	var databaseName string
+	dc.DB.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", dc.Config.Database)).Scan(&databaseName)
+	if databaseName == dc.Config.Database {
+		return dc.DB.Exec(fmt.Sprintf("DROP DATABASE %s", dc.Config.Database)).Error
+	} else {
+		log.Infof(LogDBName(dc.Config.Database, "database doesn't exist"))
+		return nil
+	}
+}

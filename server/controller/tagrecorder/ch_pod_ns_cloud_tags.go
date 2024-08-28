@@ -21,17 +21,18 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 type ChPodNSCloudTags struct {
-	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysql.PodNamespace, mysql.ChPodNSCloudTags, CloudTagsKey]
+	SubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTags, CloudTagsKey]
 }
 
 func NewChPodNSCloudTags() *ChPodNSCloudTags {
 	mng := &ChPodNSCloudTags{
-		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysql.PodNamespace, mysql.ChPodNSCloudTags, CloudTagsKey](
+		newSubscriberComponent[*message.PodNamespaceFieldsUpdate, message.PodNamespaceFieldsUpdate, mysqlmodel.PodNamespace, mysqlmodel.ChPodNSCloudTags, CloudTagsKey](
 			common.RESOURCE_TYPE_POD_NAMESPACE_EN, RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS,
 		),
 	}
@@ -52,12 +53,12 @@ func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 		updateInfo["cloud_tags"] = string(bytes)
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysql.ChPodNSCloudTags
+		var chItem mysqlmodel.ChPodNSCloudTags
 		db.Where("id = ?", sourceID).First(&chItem)
 		if chItem.ID == 0 {
 			c.SubscriberComponent.dbOperator.add(
 				[]CloudTagsKey{{ID: sourceID}},
-				[]mysql.ChPodNSCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
+				[]mysqlmodel.ChPodNSCloudTags{{ID: sourceID, CloudTags: updateInfo["cloud_tags"].(string)}},
 				db,
 			)
 		} else {
@@ -67,7 +68,7 @@ func (c *ChPodNSCloudTags) onResourceUpdated(sourceID int, fieldsUpdate *message
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, item *mysql.PodNamespace) (keys []CloudTagsKey, targets []mysql.ChPodNSCloudTags) {
+func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, item *mysqlmodel.PodNamespace) (keys []CloudTagsKey, targets []mysqlmodel.ChPodNSCloudTags) {
 	if len(item.CloudTags) == 0 {
 		return
 	}
@@ -76,7 +77,7 @@ func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, item *mysql.PodN
 		log.Error(err, logger.NewORGPrefix(md.ORGID))
 		return
 	}
-	return []CloudTagsKey{{ID: item.ID}}, []mysql.ChPodNSCloudTags{{
+	return []CloudTagsKey{{ID: item.ID}}, []mysqlmodel.ChPodNSCloudTags{{
 		ID:          item.ID,
 		CloudTags:   string(bytes),
 		TeamID:      md.TeamID,
@@ -86,6 +87,6 @@ func (c *ChPodNSCloudTags) sourceToTarget(md *message.Metadata, item *mysql.PodN
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodNSCloudTags) softDeletedTargetsUpdated(targets []mysql.ChPodNSCloudTags, db *mysql.DB) {
+func (c *ChPodNSCloudTags) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodNSCloudTags, db *mysql.DB) {
 
 }

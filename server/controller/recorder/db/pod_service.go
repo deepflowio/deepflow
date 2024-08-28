@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type PodService struct {
-	OperatorBase[*mysql.PodService, mysql.PodService]
+	OperatorBase[*mysqlmodel.PodService, mysqlmodel.PodService]
 }
 
 func NewPodService() *PodService {
 	operater := &PodService{
-		newOperatorBase[*mysql.PodService](
+		newOperatorBase[*mysqlmodel.PodService](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			true,
 			true,

@@ -11,6 +11,13 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Remove the handling of redundant process events [#7978](https://github.com/deepflowio/deepflow/pull/7978) by [yinjiping](https://github.com/yinjiping)
+* fix: add libpcap to deb package [#7967](https://github.com/deepflowio/deepflow/pull/7967) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: delete agent group [#7963](https://github.com/deepflowio/deepflow/pull/7963) by [roryye](https://github.com/roryye)
+* fix: agent - eBPF Modify memory barrier for ring [#7941](https://github.com/deepflowio/deepflow/pull/7941) by [yinjiping](https://github.com/yinjiping)
+* fix: delete agent group [#7954](https://github.com/deepflowio/deepflow/pull/7954) by [roryye](https://github.com/roryye)
+* fix: agent registration followGroupFeatures is all features [#7950](https://github.com/deepflowio/deepflow/pull/7950) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: issu sql version [#7947](https://github.com/deepflowio/deepflow/pull/7947) by [roryye](https://github.com/roryye)
 * fix: incorrect fast path map size [#7892](https://github.com/deepflowio/deepflow/pull/7892) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: abnormal stats data, causing deepflow-server to panic [#7891](https://github.com/deepflowio/deepflow/pull/7891) by [lzf575](https://github.com/lzf575)
 * fix: concurrent map read and map write [#7811](https://github.com/deepflowio/deepflow/pull/7811) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -113,6 +120,8 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: trace tree support store PseudoLink field [#7952](https://github.com/deepflowio/deepflow/pull/7952) by [lzf575](https://github.com/lzf575)
+* feat: add enable features to agent group [#7945](https://github.com/deepflowio/deepflow/pull/7945) by [roryye](https://github.com/roryye)
 * feat: agent - eBPF Add support for parsing 4.19.90-vhulk2211.3.0.h154 [#7928](https://github.com/deepflowio/deepflow/pull/7928) by [yinjiping](https://github.com/yinjiping)
 * feat: add pseudo link field for treenode [#7916](https://github.com/deepflowio/deepflow/pull/7916) by [taloric](https://github.com/taloric)
 * feat: agent - eBPF Optimize eBPF socket trace (#7871) [#7913](https://github.com/deepflowio/deepflow/pull/7913) by [yinjiping](https://github.com/yinjiping)

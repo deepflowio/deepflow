@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newNATRule() *mysql.NATRule {
-	return &mysql.NATRule{Base: mysql.Base{Lcuuid: uuid.New().String()}}
+func newNATRule() *mysqlmodel.NATRule {
+	return &mysqlmodel.NATRule{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}}
 }
 
 func (t *SuiteTest) TestAddNATRuleBatchSuccess() {
 	operator := NewNATRule()
 	itemToAdd := newNATRule()
 
-	_, ok := operator.AddBatch([]*mysql.NATRule{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.NATRule{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.NATRule
+	var addedItem *mysqlmodel.NATRule
 	result := t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.NATRule{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.NATRule{})
 }
 
 func (t *SuiteTest) TestDeleteNATRuleBatchSuccess() {
@@ -49,7 +49,7 @@ func (t *SuiteTest) TestDeleteNATRuleBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.NATRule
+	var deletedItem *mysqlmodel.NATRule
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type LBVMConnection struct {
-	OperatorBase[*mysql.LBVMConnection, mysql.LBVMConnection]
+	OperatorBase[*mysqlmodel.LBVMConnection, mysqlmodel.LBVMConnection]
 }
 
 func NewLBVMConnection() *LBVMConnection {
 	return &LBVMConnection{
-		newOperatorBase[*mysql.LBVMConnection](
+		newOperatorBase[*mysqlmodel.LBVMConnection](
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			false,
 			false,

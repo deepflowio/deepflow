@@ -18,10 +18,10 @@ package diffbase
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddNATRule(dbItem *mysql.NATRule, seq int) {
+func (b *DataSet) AddNATRule(dbItem *mysqlmodel.NATRule, seq int) {
 	b.NATRules[dbItem.Lcuuid] = &NATRule{
 		DiffBase: DiffBase{
 			Sequence: seq,

@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type FloatingIP struct {
-	OperatorBase[*mysql.FloatingIP, mysql.FloatingIP]
+	OperatorBase[*mysqlmodel.FloatingIP, mysqlmodel.FloatingIP]
 }
 
 func NewFloatingIP() *FloatingIP {
 	return &FloatingIP{
-		newOperatorBase[*mysql.FloatingIP](
+		newOperatorBase[*mysqlmodel.FloatingIP](
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			false,
 			false,

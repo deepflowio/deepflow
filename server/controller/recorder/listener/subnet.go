@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -33,7 +33,7 @@ func NewSubnet(c *cache.Cache) *Subnet {
 	}
 }
 
-func (s *Subnet) OnUpdaterAdded(addedDBItems []*mysql.Subnet) {
+func (s *Subnet) OnUpdaterAdded(addedDBItems []*mysqlmodel.Subnet) {
 	s.cache.AddSubnets(addedDBItems)
 }
 

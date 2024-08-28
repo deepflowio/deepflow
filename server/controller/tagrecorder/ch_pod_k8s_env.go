@@ -19,16 +19,17 @@ package tagrecorder
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodK8sEnv struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChPodK8sEnv, K8sEnvKey]
+	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPodK8sEnv, K8sEnvKey]
 }
 
 func NewChPodK8sEnv() *ChPodK8sEnv {
 	mng := &ChPodK8sEnv{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChPodK8sEnv, K8sEnvKey](
+		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPodK8sEnv, K8sEnvKey](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ENV,
 		),
 	}
@@ -39,10 +40,10 @@ func NewChPodK8sEnv() *ChPodK8sEnv {
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]K8sEnvKey, 0)
-	targetsToAdd := make([]mysql.ChPodK8sEnv, 0)
+	targetsToAdd := make([]mysqlmodel.ChPodK8sEnv, 0)
 	keysToDelete := make([]K8sEnvKey, 0)
-	targetsToDelete := make([]mysql.ChPodK8sEnv, 0)
-	var chItem mysql.ChPodK8sEnv
+	targetsToDelete := make([]mysqlmodel.ChPodK8sEnv, 0)
+	var chItem mysqlmodel.ChPodK8sEnv
 	var updateKey K8sEnvKey
 	updateInfo := make(map[string]interface{})
 
@@ -54,7 +55,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 			oldV, ok := old[k]
 			if !ok {
 				keysToAdd = append(keysToAdd, K8sEnvKey{ID: sourceID, Key: k})
-				targetsToAdd = append(targetsToAdd, mysql.ChPodK8sEnv{
+				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sEnv{
 					ID:    sourceID,
 					Key:   k,
 					Value: v,
@@ -66,7 +67,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, K8sEnvKey{ID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, mysql.ChPodK8sEnv{
+						targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sEnv{
 							ID:    sourceID,
 							Key:   k,
 							Value: v,
@@ -80,7 +81,7 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 		for k := range old {
 			if _, ok := new[k]; !ok {
 				keysToDelete = append(keysToDelete, K8sEnvKey{ID: sourceID, Key: k})
-				targetsToDelete = append(targetsToDelete, mysql.ChPodK8sEnv{
+				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodK8sEnv{
 					ID:  sourceID,
 					Key: k,
 				})
@@ -96,12 +97,12 @@ func (c *ChPodK8sEnv) onResourceUpdated(sourceID int, fieldsUpdate *message.PodF
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []K8sEnvKey, targets []mysql.ChPodK8sEnv) {
+func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []K8sEnvKey, targets []mysqlmodel.ChPodK8sEnv) {
 	_, envMap := common.StrToJsonAndMap(source.ENV)
 
 	for k, v := range envMap {
 		keys = append(keys, K8sEnvKey{ID: source.ID, Key: k})
-		targets = append(targets, mysql.ChPodK8sEnv{
+		targets = append(targets, mysqlmodel.ChPodK8sEnv{
 			ID:          source.ID,
 			Key:         k,
 			Value:       v,
@@ -114,6 +115,6 @@ func (c *ChPodK8sEnv) sourceToTarget(md *message.Metadata, source *mysql.Pod) (k
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sEnv) softDeletedTargetsUpdated(targets []mysql.ChPodK8sEnv, db *mysql.DB) {
+func (c *ChPodK8sEnv) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodK8sEnv, db *mysql.DB) {
 
 }

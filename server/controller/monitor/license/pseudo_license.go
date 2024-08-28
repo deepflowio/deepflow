@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -91,7 +92,7 @@ func (v *VTapLicenseAllocation) allocLicense(orgDB *mysql.DB) {
 
 	whereSQL := "license_type IS NULL OR license_functions != ?"
 	licenseFunctions := strings.Join(VTAP_LICENSE_FUNCTIONS, ",")
-	orgDB.Model(&mysql.VTap{}).Where(whereSQL, licenseFunctions).Updates(
+	orgDB.Model(&mysqlmodel.VTap{}).Where(whereSQL, licenseFunctions).Updates(
 		map[string]interface{}{
 			"license_type":      VTAP_LICENSE_TYPE_DEFAULT,
 			"license_functions": licenseFunctions,

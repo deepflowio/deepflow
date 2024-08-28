@@ -21,16 +21,17 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodIngress struct {
-	SubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, mysql.PodIngress, mysql.ChPodIngress, IDKey]
+	SubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, mysqlmodel.PodIngress, mysqlmodel.ChPodIngress, IDKey]
 }
 
 func NewChPodIngress() *ChPodIngress {
 	mng := &ChPodIngress{
-		newSubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, mysql.PodIngress, mysql.ChPodIngress, IDKey](
+		newSubscriberComponent[*message.PodIngressFieldsUpdate, message.PodIngressFieldsUpdate, mysqlmodel.PodIngress, mysqlmodel.ChPodIngress, IDKey](
 			common.RESOURCE_TYPE_POD_INGRESS_EN, RESOURCE_TYPE_CH_POD_INGRESS,
 		),
 	}
@@ -39,14 +40,14 @@ func NewChPodIngress() *ChPodIngress {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *mysql.PodIngress) (keys []IDKey, targets []mysql.ChPodIngress) {
+func (c *ChPodIngress) sourceToTarget(md *message.Metadata, source *mysqlmodel.PodIngress) (keys []IDKey, targets []mysqlmodel.ChPodIngress) {
 	sourceName := source.Name
 	if source.DeletedAt.Valid {
 		sourceName += " (deleted)"
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysql.ChPodIngress{
+	targets = append(targets, mysqlmodel.ChPodIngress{
 		ID:           source.ID,
 		Name:         sourceName,
 		PodClusterID: source.PodClusterID,
@@ -65,14 +66,14 @@ func (c *ChPodIngress) onResourceUpdated(sourceID int, fieldsUpdate *message.Pod
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysql.ChPodIngress
+		var chItem mysqlmodel.ChPodIngress
 		db.Where("id = ?", sourceID).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodIngress) softDeletedTargetsUpdated(targets []mysql.ChPodIngress, db *mysql.DB) {
+func (c *ChPodIngress) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodIngress, db *mysql.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

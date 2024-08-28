@@ -19,6 +19,7 @@ package rebalance
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 // //go:generate mockgen -source=analyzer.go -destination=./mocks/mock_analyzer.go -package=mocks DB
@@ -27,15 +28,15 @@ type DB interface {
 }
 
 type DBInfo struct {
-	Regions         []mysql.Region
-	AZs             []mysql.AZ
-	Analyzers       []mysql.Analyzer
-	AZAnalyzerConns []mysql.AZAnalyzerConnection
-	VTaps           []mysql.VTap
+	Regions         []mysqlmodel.Region
+	AZs             []mysqlmodel.AZ
+	Analyzers       []mysqlmodel.Analyzer
+	AZAnalyzerConns []mysqlmodel.AZAnalyzerConnection
+	VTaps           []mysqlmodel.VTap
 
 	// get query data
-	Controllers       []mysql.Controller
-	AZControllerConns []mysql.AZControllerConnection
+	Controllers       []mysqlmodel.Controller
+	AZControllerConns []mysqlmodel.AZControllerConnection
 }
 
 type AnalyzerInfo struct {
@@ -49,11 +50,11 @@ type AnalyzerInfo struct {
 }
 
 type RebalanceData struct {
-	RegionToVTapNameToTraffic map[string]map[string]int64  `json:"RegionToVTapNameToTraffic"`
-	RegionToAZLcuuids         map[string][]string          `json:"RegionToAZLcuuids"`
-	AZToRegion                map[string]string            `json:"AZToRegion"`
-	AZToVTaps                 map[string][]*mysql.VTap     `json:"AZToVTaps"`
-	AZToAnalyzers             map[string][]*mysql.Analyzer `json:"AZToAnalyzers"`
+	RegionToVTapNameToTraffic map[string]map[string]int64       `json:"RegionToVTapNameToTraffic"`
+	RegionToAZLcuuids         map[string][]string               `json:"RegionToAZLcuuids"`
+	AZToRegion                map[string]string                 `json:"AZToRegion"`
+	AZToVTaps                 map[string][]*mysqlmodel.VTap     `json:"AZToVTaps"`
+	AZToAnalyzers             map[string][]*mysqlmodel.Analyzer `json:"AZToAnalyzers"`
 }
 
 func NewAnalyzerInfo(onlyWeight bool) *AnalyzerInfo {
@@ -92,10 +93,10 @@ func (r *DBInfo) Get(db *mysql.DB) error {
 	return nil
 }
 
-func GetAZToAnalyzers(azAnalyzerConns []mysql.AZAnalyzerConnection, regionToAZLcuuids map[string][]string,
-	ipToAnalyzer map[string]*mysql.Analyzer) map[string][]*mysql.Analyzer {
+func GetAZToAnalyzers(azAnalyzerConns []mysqlmodel.AZAnalyzerConnection, regionToAZLcuuids map[string][]string,
+	ipToAnalyzer map[string]*mysqlmodel.Analyzer) map[string][]*mysqlmodel.Analyzer {
 
-	azToAnalyzers := make(map[string][]*mysql.Analyzer)
+	azToAnalyzers := make(map[string][]*mysqlmodel.Analyzer)
 	for _, conn := range azAnalyzerConns {
 		if conn.AZ == "ALL" {
 			if azLcuuids, ok := regionToAZLcuuids[conn.Region]; ok {

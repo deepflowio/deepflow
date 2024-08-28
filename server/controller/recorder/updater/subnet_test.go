@@ -25,7 +25,6 @@ import (
 	"gorm.io/gorm"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -46,7 +45,7 @@ func (t *SuiteTest) getSubnetMock(mockDB bool) (*cache.Cache, cloudmodel.Subnet)
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysql.Subnet{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}})
+		t.db.Create(&mysqlmodel.Subnet{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}})
 		cache_.DiffBaseDataSet.Subnets[cloudItem.Lcuuid] = &diffbase.Subnet{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
@@ -67,12 +66,12 @@ func (t *SuiteTest) TestHandleAddSubnetSucess() {
 	updater := NewSubnet(cache_, []cloudmodel.Subnet{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysql.Subnet
+	var addedItem *mysqlmodel.Subnet
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), int64(1), result.RowsAffected)
 	assert.Equal(t.T(), 1, len(cache_.DiffBaseDataSet.Subnets))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.Subnet{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Subnet{})
 }
 
 func (t *SuiteTest) TestHandleUpdateSubnetSucess() {
@@ -82,13 +81,13 @@ func (t *SuiteTest) TestHandleUpdateSubnetSucess() {
 	updater := NewSubnet(cache, []cloudmodel.Subnet{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysql.Subnet
+	var addedItem *mysqlmodel.Subnet
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Subnets), 1)
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.Subnet{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Subnet{})
 }
 
 func (t *SuiteTest) TestHandleDeleteSubnetSucess() {
@@ -97,7 +96,7 @@ func (t *SuiteTest) TestHandleDeleteSubnetSucess() {
 	updater := NewSubnet(cache, []cloudmodel.Subnet{cloudItem})
 	updater.HandleDelete()
 
-	var addedItem *mysql.Subnet
+	var addedItem *mysqlmodel.Subnet
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Subnets), 0)

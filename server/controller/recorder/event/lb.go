@@ -19,7 +19,7 @@ package event
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -43,7 +43,7 @@ func NewLB(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *LB {
 	return mng
 }
 
-func (l *LB) ProduceByAdd(items []*mysql.LB) {
+func (l *LB) ProduceByAdd(items []*mysqlmodel.LB) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
 		info, err := l.ToolDataSet.GetLBInfoByID(item.ID)

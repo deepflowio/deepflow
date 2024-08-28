@@ -26,7 +26,6 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -53,7 +52,7 @@ func (t *SuiteTest) getVMMock(mockDB bool) (*cache.Cache, cloudmodel.VM) {
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysql.VM{Name: cloudItem.Name, Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, CreateMethod: common.CREATE_METHOD_LEARN, Domain: domainLcuuid})
+		t.db.Create(&mysqlmodel.VM{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, CreateMethod: common.CREATE_METHOD_LEARN, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.VMs[cloudItem.Lcuuid] = &diffbase.VM{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name, VPCLcuuid: cloudItem.VPCLcuuid}
 	}
 
@@ -74,13 +73,13 @@ func (t *SuiteTest) TestHandleAddVMSucess() {
 	updater := NewVM(cache_, []cloudmodel.VM{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysql.VM
+	var addedItem *mysqlmodel.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.VMs), 1)
 	assert.Equal(t.T(), addedItem.VPCID, vpcID)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VM{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VM{})
 }
 
 func (t *SuiteTest) TestHandleUpdateVMSucess() {
@@ -90,7 +89,7 @@ func (t *SuiteTest) TestHandleUpdateVMSucess() {
 	updater := NewVM(cache, []cloudmodel.VM{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var updatedItem *mysql.VM
+	var updatedItem *mysqlmodel.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), updatedItem.Name, cloudItem.Name)
@@ -98,7 +97,7 @@ func (t *SuiteTest) TestHandleUpdateVMSucess() {
 	diffBase := cache.DiffBaseDataSet.VMs[cloudItem.Lcuuid]
 	assert.Equal(t.T(), cache.GetSequence(), diffBase.GetSequence())
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VM{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VM{})
 }
 
 func (t *SuiteTest) TestHandleDeleteVMSuccess() {
@@ -108,9 +107,9 @@ func (t *SuiteTest) TestHandleDeleteVMSuccess() {
 	updater.HandleAddAndUpdate()
 	updater.HandleDelete()
 
-	var deletedItem *mysql.VM
+	var deletedItem *mysqlmodel.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
 }

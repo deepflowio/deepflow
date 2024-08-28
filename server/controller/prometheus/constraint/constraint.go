@@ -17,10 +17,10 @@
 package constraint
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type OperateBatchModel interface {
-	mysql.PrometheusMetricName | mysql.PrometheusLabelName | mysql.PrometheusLabelValue | mysql.PrometheusMetricAPPLabelLayout |
-		mysql.PrometheusLabel | mysql.PrometheusMetricLabelName | mysql.PrometheusMetricTarget | mysql.PrometheusTarget
+	mysqlmodel.PrometheusMetricName | mysqlmodel.PrometheusLabelName | mysqlmodel.PrometheusLabelValue | mysqlmodel.PrometheusMetricAPPLabelLayout |
+		mysqlmodel.PrometheusLabel | mysqlmodel.PrometheusMetricLabelName | mysqlmodel.PrometheusMetricTarget | mysqlmodel.PrometheusTarget
 }

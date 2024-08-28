@@ -25,7 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -208,7 +208,7 @@ func (t *target) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
+func (t *target) getTargetLabelNames(tg *mysqlmodel.PrometheusTarget) []string {
 	lns := []string{common.TargetLabelInstance, common.TargetLabelJob}
 	for _, l := range strings.Split(tg.OtherLabels, labelJoiner) {
 		if l == "" {
@@ -224,15 +224,15 @@ func (t *target) getTargetLabelNames(tg *mysql.PrometheusTarget) []string {
 	return lns
 }
 
-func (t *target) load() (recorderTargets, selfTargets []*mysql.PrometheusTarget, err error) {
-	err = t.org.DB.Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
+func (t *target) load() (recorderTargets, selfTargets []*mysqlmodel.PrometheusTarget, err error) {
+	err = t.org.DB.Where(&mysqlmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
 	if err != nil {
 		return
 	}
-	err = t.org.DB.Where(&mysql.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
+	err = t.org.DB.Where(&mysqlmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
 	return
 }
 
 func (t *target) dedup(ids []int) error {
-	return t.org.DB.Where("id in (?)", ids).Delete(&mysql.PrometheusTarget{}).Error
+	return t.org.DB.Where("id in (?)", ids).Delete(&mysqlmodel.PrometheusTarget{}).Error
 }

@@ -30,6 +30,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	prometheuscommon "github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	prometheuscfg "github.com/deepflowio/deepflow/server/controller/prometheus/config"
@@ -162,7 +163,7 @@ func (d *deleter) refreshRelatedData() error {
 	} else {
 		en.Refresh()
 	}
-	return d.org.GetDB().Model(&mysql.ResourceVersion{}).Where("name = ?", versionName).Update("version", uint32(time.Now().Unix())).Error
+	return d.org.GetDB().Model(&mysqlmodel.ResourceVersion{}).Where("name = ?", versionName).Update("version", uint32(time.Now().Unix())).Error
 }
 
 func (d *deleter) prepareData() error {
@@ -217,7 +218,7 @@ func (d *deleter) whetherDeleted(resourceCountToDelete int) bool {
 }
 
 func (d *deleter) deleteExpiredMetricName() error {
-	toDelete := make([]mysql.PrometheusMetricName, 0)
+	toDelete := make([]mysqlmodel.PrometheusMetricName, 0)
 	for _, item := range d.dataToCheck.metricNames {
 		if !d.activeData.getMetricName(item.Name) {
 			toDelete = append(toDelete, item)
@@ -230,7 +231,7 @@ func (d *deleter) deleteExpiredMetricName() error {
 }
 
 func (d *deleter) deleteExpiredLabel() error {
-	toDelete := make([]mysql.PrometheusLabel, 0)
+	toDelete := make([]mysqlmodel.PrometheusLabel, 0)
 	for _, item := range d.dataToCheck.labels {
 		if !d.activeData.getLabel(item.Name, item.Value) {
 			toDelete = append(toDelete, item)
@@ -243,7 +244,7 @@ func (d *deleter) deleteExpiredLabel() error {
 }
 
 func (d *deleter) deleteExpiredLabelName() error {
-	toDelete := make([]mysql.PrometheusLabelName, 0)
+	toDelete := make([]mysqlmodel.PrometheusLabelName, 0)
 	for _, item := range d.dataToCheck.labelNames {
 		if !d.activeData.getLabelName(item.Name) {
 			toDelete = append(toDelete, item)
@@ -256,7 +257,7 @@ func (d *deleter) deleteExpiredLabelName() error {
 }
 
 func (d *deleter) deleteExpiredLabelValue() error {
-	toDelete := make([]mysql.PrometheusLabelValue, 0)
+	toDelete := make([]mysqlmodel.PrometheusLabelValue, 0)
 	for _, item := range d.dataToCheck.labelValues {
 		if !d.activeData.getLabelValue(item.Value) {
 			toDelete = append(toDelete, item)
@@ -269,7 +270,7 @@ func (d *deleter) deleteExpiredLabelValue() error {
 }
 
 func (d *deleter) deleteExpiredMetricAPPLabelLayout() error {
-	toDelete := make([]mysql.PrometheusMetricAPPLabelLayout, 0)
+	toDelete := make([]mysqlmodel.PrometheusMetricAPPLabelLayout, 0)
 	for _, item := range d.dataToCheck.metricAPPLabelLayouts {
 		if !d.activeData.getMetricLabelName(item.MetricName, item.APPLabelName) {
 			toDelete = append(toDelete, item)
@@ -444,7 +445,7 @@ func (q *querier) getByRegion(domainNamePrefix string, resourceType string) (*si
 }
 
 func (q *querier) getRegionToDomainNamePrefix() (map[string]string, error) {
-	var controllers []*mysql.Controller
+	var controllers []*mysqlmodel.Controller
 	if err := q.org.DB.Find(&controllers).Error; err != nil {
 		log.Errorf("failed to query %s: %v", "controller", err, q.org.LogPrefix)
 		return nil, err
@@ -458,7 +459,7 @@ func (q *querier) getRegionToDomainNamePrefix() (map[string]string, error) {
 		ipToControllerDomainPrefix[controller.IP] = controller.RegionDomainPrefix
 	}
 
-	var azControllerConns []*mysql.AZControllerConnection
+	var azControllerConns []*mysqlmodel.AZControllerConnection
 	if err := q.org.DB.Find(&azControllerConns).Error; err != nil {
 		log.Errorf("failed to query %s: %v", "az_controller_connection", err, q.org.LogPrefix)
 		return nil, err
@@ -571,25 +572,25 @@ func newLabelKey(name, value string) labelKey {
 }
 
 type dataToCheck struct {
-	metricNames           []mysql.PrometheusMetricName
-	labelNames            []mysql.PrometheusLabelName
-	labelValues           []mysql.PrometheusLabelValue
-	labels                []mysql.PrometheusLabel
-	metricAPPLabelLayouts []mysql.PrometheusMetricAPPLabelLayout
+	metricNames           []mysqlmodel.PrometheusMetricName
+	labelNames            []mysqlmodel.PrometheusLabelName
+	labelValues           []mysqlmodel.PrometheusLabelValue
+	labels                []mysqlmodel.PrometheusLabel
+	metricAPPLabelLayouts []mysqlmodel.PrometheusMetricAPPLabelLayout
 }
 
 func newDataToCheck() *dataToCheck {
 	return &dataToCheck{
-		metricNames:           make([]mysql.PrometheusMetricName, 0),
-		labelNames:            make([]mysql.PrometheusLabelName, 0),
-		labelValues:           make([]mysql.PrometheusLabelValue, 0),
-		labels:                make([]mysql.PrometheusLabel, 0),
-		metricAPPLabelLayouts: make([]mysql.PrometheusMetricAPPLabelLayout, 0),
+		metricNames:           make([]mysqlmodel.PrometheusMetricName, 0),
+		labelNames:            make([]mysqlmodel.PrometheusLabelName, 0),
+		labelValues:           make([]mysqlmodel.PrometheusLabelValue, 0),
+		labels:                make([]mysqlmodel.PrometheusLabel, 0),
+		metricAPPLabelLayouts: make([]mysqlmodel.PrometheusMetricAPPLabelLayout, 0),
 	}
 }
 
 func (c *dataToCheck) getRetentionTime(db *mysql.DB) time.Time {
-	var dataSource *mysql.DataSource
+	var dataSource *mysqlmodel.DataSource
 	db.Where("display_name = ?", "Prometheus 数据").Find(&dataSource)
 	dataSourceRetentionHours := 7 * 24
 	if dataSource != nil {
@@ -602,19 +603,19 @@ func (c *dataToCheck) getRetentionTime(db *mysql.DB) time.Time {
 func (d *dataToCheck) load(db *mysql.DB) error {
 	var err error
 	retentionTime := d.getRetentionTime(db)
-	if d.metricNames, err = prometheuscommon.WhereFind[mysql.PrometheusMetricName](db, "created_at < ?", retentionTime); err != nil {
+	if d.metricNames, err = prometheuscommon.WhereFind[mysqlmodel.PrometheusMetricName](db, "created_at < ?", retentionTime); err != nil {
 		return err
 	}
-	if d.labelNames, err = prometheuscommon.WhereFind[mysql.PrometheusLabelName](db, "created_at < ?", retentionTime); err != nil {
+	if d.labelNames, err = prometheuscommon.WhereFind[mysqlmodel.PrometheusLabelName](db, "created_at < ?", retentionTime); err != nil {
 		return err
 	}
-	if d.labelValues, err = prometheuscommon.WhereFind[mysql.PrometheusLabelValue](db, "created_at < ?", retentionTime); err != nil {
+	if d.labelValues, err = prometheuscommon.WhereFind[mysqlmodel.PrometheusLabelValue](db, "created_at < ?", retentionTime); err != nil {
 		return err
 	}
-	if d.labels, err = prometheuscommon.WhereFind[mysql.PrometheusLabel](db, "created_at < ?", retentionTime); err != nil {
+	if d.labels, err = prometheuscommon.WhereFind[mysqlmodel.PrometheusLabel](db, "created_at < ?", retentionTime); err != nil {
 		return err
 	}
-	if d.metricAPPLabelLayouts, err = prometheuscommon.WhereFind[mysql.PrometheusMetricAPPLabelLayout](db, "created_at < ?", retentionTime); err != nil {
+	if d.metricAPPLabelLayouts, err = prometheuscommon.WhereFind[mysqlmodel.PrometheusMetricAPPLabelLayout](db, "created_at < ?", retentionTime); err != nil {
 		return err
 	}
 	return nil

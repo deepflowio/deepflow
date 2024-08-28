@@ -25,6 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -65,7 +66,7 @@ func createPlugin(c *gin.Context) {
 		JsonResponse(c, nil, err)
 		return
 	}
-	plugin := &mysql.Plugin{
+	plugin := &mysqlmodel.Plugin{
 		Name: c.PostForm("NAME"),
 		Type: t,
 		User: u,

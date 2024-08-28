@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type IconData struct {
@@ -73,7 +74,7 @@ func ParseIcon(cfg config.ControllerConfig, response *simplejson.Json) (map[stri
 			domainTypeToDefaultIconID[domainType] = icon.ID
 		}
 	}
-	var domains []mysql.Domain
+	var domains []mysqlmodel.Domain
 	err := mysql.DefaultDB.Unscoped().Find(&domains).Error
 	if err != nil {
 		log.Error(err)
@@ -120,7 +121,7 @@ func GetIconInfo(cfg config.ControllerConfig) (map[string]int, map[IconKey]int, 
 	if cfg.TrisolarisCfg.NodeType == TrisolarisNodeTypeMaster {
 		return UpdateIconInfo(cfg)
 	}
-	var controller mysql.Controller
+	var controller mysqlmodel.Controller
 	err := mysql.DefaultDB.Where("node_type = ? AND state = ?", common.CONTROLLER_NODE_TYPE_MASTER, common.CONTROLLER_STATE_NORMAL).First(&controller).Error
 	if err != nil {
 		log.Error(err)

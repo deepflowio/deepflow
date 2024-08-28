@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddAZ(dbItem *mysql.AZ, seq int) {
+func (b *DataSet) AddAZ(dbItem *mysqlmodel.AZ, seq int) {
 	b.AZs[dbItem.Lcuuid] = &AZ{
 		DiffBase: DiffBase{
 			Sequence: seq,

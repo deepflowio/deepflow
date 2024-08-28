@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	gconfig "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -143,8 +144,8 @@ func (g *Genesis) GetGenesisSyncResponse(orgID int) (GenesisSyncDataResponse, er
 		return retGenesisSyncData, err
 	}
 
-	var controllers []mysql.Controller
-	var azControllerConns []mysql.AZControllerConnection
+	var controllers []mysqlmodel.Controller
+	var azControllerConns []mysqlmodel.AZControllerConnection
 	var currentRegion string
 
 	db.Where("state <> ?", common.CONTROLLER_STATE_EXCEPTION).Find(&controllers)
@@ -449,8 +450,8 @@ func (g *Genesis) getServerIPs(orgID int) ([]string, error) {
 	}
 
 	var serverIPs []string
-	var controllers []mysql.Controller
-	var azControllerConns []mysql.AZControllerConnection
+	var controllers []mysqlmodel.Controller
+	var azControllerConns []mysqlmodel.AZControllerConnection
 	var currentRegion string
 
 	nodeIP := os.Getenv(common.NODE_IP_KEY)

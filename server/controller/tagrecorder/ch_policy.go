@@ -18,15 +18,16 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChPolicy struct {
-	UpdaterComponent[mysql.ChPolicy, PolicyKey]
+	UpdaterComponent[mysqlmodel.ChPolicy, PolicyKey]
 }
 
 func NewChPolicy() *ChPolicy {
 	updater := &ChPolicy{
-		newUpdaterComponent[mysql.ChPolicy, PolicyKey](
+		newUpdaterComponent[mysqlmodel.ChPolicy, PolicyKey](
 			RESOURCE_TYPE_CH_POLICY,
 		),
 	}
@@ -34,10 +35,10 @@ func NewChPolicy() *ChPolicy {
 	return updater
 }
 
-func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, bool) {
+func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysqlmodel.ChPolicy, bool) {
 	var (
-		pcapPolicys []mysql.PcapPolicy
-		npbPolicys  []mysql.NpbPolicy
+		pcapPolicys []mysqlmodel.PcapPolicy
+		npbPolicys  []mysqlmodel.NpbPolicy
 	)
 	err := db.Unscoped().Select("id", "name", "policy_acl_group_id", "team_id").Find(&pcapPolicys).Error
 	if err != nil {
@@ -50,9 +51,9 @@ func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, 
 		return nil, false
 	}
 
-	keyToItem := make(map[PolicyKey]mysql.ChPolicy)
+	keyToItem := make(map[PolicyKey]mysqlmodel.ChPolicy)
 	for _, pcapPolicy := range pcapPolicys {
-		keyToItem[PolicyKey{ACLGID: pcapPolicy.PolicyACLGroupID, TunnelType: 0}] = mysql.ChPolicy{
+		keyToItem[PolicyKey{ACLGID: pcapPolicy.PolicyACLGroupID, TunnelType: 0}] = mysqlmodel.ChPolicy{
 			ACLGID:     pcapPolicy.PolicyACLGroupID,
 			TunnelType: 0, // Pcap
 			ID:         pcapPolicy.ID,
@@ -61,7 +62,7 @@ func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, 
 		}
 	}
 	for _, npbPolicy := range npbPolicys {
-		keyToItem[PolicyKey{ACLGID: npbPolicy.PolicyACLGroupID, TunnelType: 1}] = mysql.ChPolicy{
+		keyToItem[PolicyKey{ACLGID: npbPolicy.PolicyACLGroupID, TunnelType: 1}] = mysqlmodel.ChPolicy{
 			ACLGID:     npbPolicy.PolicyACLGroupID,
 			TunnelType: 1, // Npb
 			ID:         npbPolicy.ID,
@@ -72,11 +73,11 @@ func (p *ChPolicy) generateNewData(db *mysql.DB) (map[PolicyKey]mysql.ChPolicy, 
 	return keyToItem, true
 }
 
-func (p *ChPolicy) generateKey(dbItem mysql.ChPolicy) PolicyKey {
+func (p *ChPolicy) generateKey(dbItem mysqlmodel.ChPolicy) PolicyKey {
 	return PolicyKey{ACLGID: dbItem.ACLGID, TunnelType: dbItem.TunnelType}
 }
 
-func (p *ChPolicy) generateUpdateInfo(oldItem, newItem mysql.ChPolicy) (map[string]interface{}, bool) {
+func (p *ChPolicy) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPolicy) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.ID != newItem.ID {
 		updateInfo["id"] = newItem.ID
