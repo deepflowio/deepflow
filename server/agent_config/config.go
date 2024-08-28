@@ -290,6 +290,8 @@ type EbpfConfig struct {
 	IOEventMinimalDuration             *string                            `yaml:"io-event-minimal-duration,omitempty"`
 	DwarfDisabled                      *bool                              `yaml:"dwarf-disabled,omitempty"`
 	DwarfRegex                         *string                            `yaml:"dwarf-regex,omitempty"`
+	DwarfProcessMapSize                *int                               `yaml:"dwarf-process-map-size,omitempty"`
+	DwarfShardMapSize                  *int                               `yaml:"dwarf-shard-map-size,omitempty"`
 	JavaSymbolFileRefreshDeferInterval *string                            `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
 	OnCpuProfile                       *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 	OffCpuProfile                      *OffCpuProfile                     `yaml:"off-cpu-profile,omitempty"`

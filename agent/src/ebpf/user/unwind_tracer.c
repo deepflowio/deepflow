@@ -57,31 +57,43 @@ static unwind_table_t *g_unwind_table = NULL;
 
 static int load_running_processes(struct bpf_tracer *tracer);
 
-static bool g_dwarf_enabled = false;
-
 static struct {
-    pthread_mutex_t m;
-    bool exists;
-    regex_t regex;
-} g_dwarf_regex = {
-    .m = PTHREAD_MUTEX_INITIALIZER,
-    .exists = false,
+    bool dwarf_enabled;
+    struct {
+        pthread_mutex_t m;
+        bool exists;
+        regex_t regex;
+    } dwarf_regex;
+    int dwarf_process_map_size;
+    int dwarf_shard_map_size;
+} g_unwind_config = {
+    .dwarf_enabled = false,
+    .dwarf_regex = {
+        .m = PTHREAD_MUTEX_INITIALIZER,
+        .exists = false,
+    },
+    .dwarf_process_map_size = 1024,
+    .dwarf_shard_map_size = 128,
 };
+
+bool get_dwarf_enabled(void) {
+    return g_unwind_config.dwarf_enabled;
+}
 
 void set_dwarf_enabled(bool enabled) {
     DWARF_KERNEL_CHECK;
 
-    if (g_dwarf_enabled == enabled) {
+    if (g_unwind_config.dwarf_enabled == enabled) {
         return;
     }
-    g_dwarf_enabled = enabled;
-    ebpf_info(LOG_CP_TAG "%s dwarf unwinding.\n", enabled ? "Enabled" : "Disabled");
+    g_unwind_config.dwarf_enabled = enabled;
+    ebpf_info(LOG_CP_TAG "%s DWARF unwinding.\n", enabled ? "Enabled" : "Disabled");
 
     if (!g_unwind_table) {
         return;
     }
 
-    if (g_dwarf_enabled) {
+    if (g_unwind_config.dwarf_enabled) {
 
         struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
         if (tracer == NULL) {
@@ -100,61 +112,96 @@ void set_dwarf_enabled(bool enabled) {
 }
 
 int set_dwarf_regex(const char *pattern) {
-    pthread_mutex_lock(&g_dwarf_regex.m);
+    pthread_mutex_lock(&g_unwind_config.dwarf_regex.m);
 
-    if (g_dwarf_regex.exists) {
-        regfree(&g_dwarf_regex.regex);
+    if (g_unwind_config.dwarf_regex.exists) {
+        regfree(&g_unwind_config.dwarf_regex.regex);
     }
 
     if (*pattern == '\0') {
-        if (g_dwarf_regex.exists) {
+        if (g_unwind_config.dwarf_regex.exists) {
             ebpf_info("DWARF regex cleared, will use heuristic check");
-            g_dwarf_regex.exists = false;
+            g_unwind_config.dwarf_regex.exists = false;
         }
-        pthread_mutex_unlock(&g_dwarf_regex.m);
+        pthread_mutex_unlock(&g_unwind_config.dwarf_regex.m);
         return 0;
     }
 
-    g_dwarf_regex.exists = false;
+    g_unwind_config.dwarf_regex.exists = false;
 
-    int ret = regcomp(&g_dwarf_regex.regex, pattern, REG_EXTENDED);
+    int ret = regcomp(&g_unwind_config.dwarf_regex.regex, pattern, REG_EXTENDED);
     if (ret != 0) {
         char error_buffer[128];
-        regerror(ret, &g_dwarf_regex.regex, error_buffer,
+        regerror(ret, &g_unwind_config.dwarf_regex.regex, error_buffer,
                  sizeof(error_buffer));
         ebpf_warning("DWARF regex %s is invalid: %s", pattern, error_buffer);
-        pthread_mutex_unlock(&g_dwarf_regex.m);
+        pthread_mutex_unlock(&g_unwind_config.dwarf_regex.m);
         return -1;
     }
 
     ebpf_info("DWARF regex updated to /%s/", pattern);
-    g_dwarf_regex.exists = true;
-    pthread_mutex_unlock(&g_dwarf_regex.m);
+    g_unwind_config.dwarf_regex.exists = true;
+    pthread_mutex_unlock(&g_unwind_config.dwarf_regex.m);
     return 0;
 }
 
+int get_dwarf_process_map_size(void) {
+    return g_unwind_config.dwarf_process_map_size;
+}
+
+void set_dwarf_process_map_size(int size) {
+    if (g_unwind_config.dwarf_process_map_size == size) {
+        return;
+    }
+    g_unwind_config.dwarf_process_map_size = size;
+    ebpf_info(LOG_CP_TAG "DWARF process map size set to %d.\n", size);
+}
+
+int get_dwarf_shard_map_size(void) {
+    return g_unwind_config.dwarf_shard_map_size;
+}
+
+void set_dwarf_shard_map_size(int size) {
+    if (g_unwind_config.dwarf_shard_map_size == size) {
+        return;
+    }
+    g_unwind_config.dwarf_shard_map_size = size;
+    ebpf_info(LOG_CP_TAG "DWARF shard map size set to %d.\n", size);
+}
+
 static bool requires_dwarf_unwind_table(int pid) {
-    if (!g_dwarf_enabled) {
+    if (!g_unwind_config.dwarf_enabled) {
         return false;
     }
 
-    pthread_mutex_lock(&g_dwarf_regex.m);
-    if (g_dwarf_regex.exists) {
-        char *path = get_elf_path_by_pid(pid);
-        if (path == NULL) {
-            pthread_mutex_unlock(&g_dwarf_regex.m);
-            return false;
-        }
-        char *exe_name = path + strlen(path) - 1;
-        while (exe_name > path && *(exe_name - 1) != '/') {
-            exe_name--;
-        }
-        bool matched = !regexec(&g_dwarf_regex.regex, exe_name, 0, NULL, 0);
+    char *path = get_elf_path_by_pid(pid);
+    if (path == NULL) {
+        return false;
+    }
+    char *exe_name = path + strlen(path) - 1;
+    while (exe_name > path && *(exe_name - 1) != '/') {
+        exe_name--;
+    }
+    // Java has JIT compiled code without DWARF info, not supported at the moment
+    if (strcmp(exe_name, "java") == 0) {
         free(path);
-        pthread_mutex_unlock(&g_dwarf_regex.m);
+        return false;
+    }
+
+    if (!match_profiler_regex(exe_name)) {
+        free(path);
+        return false;
+    }
+
+    pthread_mutex_lock(&g_unwind_config.dwarf_regex.m);
+    if (g_unwind_config.dwarf_regex.exists) {
+        bool matched = !regexec(&g_unwind_config.dwarf_regex.regex, exe_name, 0, NULL, 0);
+        pthread_mutex_unlock(&g_unwind_config.dwarf_regex.m);
+        free(path);
         return matched;
     }
-    pthread_mutex_unlock(&g_dwarf_regex.m);
+    pthread_mutex_unlock(&g_unwind_config.dwarf_regex.m);
+    free(path);
 
     return !frame_pointer_heuristic_check(pid);
 }
@@ -229,6 +276,7 @@ void unwind_tracer_drop() {
 
     pthread_mutex_lock(&g_unwind_table_lock);
     if (g_unwind_table) {
+        unwind_table_unload_all(g_unwind_table);
         unwind_table_destroy(g_unwind_table);
         g_unwind_table = NULL;
     }
@@ -269,7 +317,7 @@ void unwind_events_handle(void) {
             break;
         }
 
-        if (g_dwarf_enabled && g_unwind_table) {
+        if (g_unwind_config.dwarf_enabled && g_unwind_table) {
             unwind_table_load(g_unwind_table, event->pid);
         }
 

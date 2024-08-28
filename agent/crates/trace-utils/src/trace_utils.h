@@ -46,11 +46,11 @@ typedef struct unwind_table_t unwind_table_t;
 
 typedef struct {
     uint32_t id;
+    uint16_t entry_start;
+    uint16_t entry_end;
     uint64_t offset;
     uint64_t pc_min;
     uint64_t pc_max;
-    uint32_t entry_start;
-    uint32_t entry_end;
 } shard_info_t;
 
 typedef struct {

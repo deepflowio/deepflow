@@ -2527,6 +2527,48 @@ inputs:
         #     如设置为合法正则表达式，采集器将不再自行推断进程是否包含帧指针，改用该正则表达式对进程名进行匹配，仅对匹配的进程使用 DWARF 帧回溯。
         # upgrade_from: static_config.ebpf.dwarf_regex
         dwarf_regex: ""
+        # type: int
+        # name:
+        #   en: DWARF unwinding process map size
+        #   ch: DWARF 回溯进程表容量
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Each process using DWARF unwind has an entry in this map, relating process id to DWARF unwind entries.
+        #     The size of each one of these entries is arount 8K, the default setting will allocate around 8M kernel memory.
+        #     This is a hash map, so size can be lower than max process id.
+        #     The configuration is only effective if DWARF is enabled.
+        #   ch: |-
+        #     每个需要进行 DWARF 回溯的进程在该表中有一条记录，用于关联进程和回溯记录分片。
+        #     每条记录大约占 8K 内存，默认配置大约需要分配 8M 内核内存。
+        #     由于是哈希表，配置可以比最大进程号低。
+        #     该配置只在 DWARF 功能开启时生效。
+        # upgrade_from: static_config.ebpf.dwarf_process_map_size
+        dwarf_process_map_size: 1024
+        # type: int
+        # name:
+        #   en: DWARF unwinding shard map size
+        #   ch: DWARF 回溯分片表容量
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     The number of unwind entry shards for DWARF unwinding.
+        #     The size of each one of these entries is 1M, the default setting will allocate around 128M kernel memory.
+        #     The configuration is only effective if DWARF is enabled.
+        #   ch: |-
+        #     DWARF 回溯记录分片数量。
+        #     每条记录大约占 1M 内存，默认配置大约需要分配 128M 内核内存。
+        #     该配置只在 DWARF 功能开启时生效。
+        # upgrade_from: static_config.ebpf.dwarf_shard_map_size
+        dwarf_shard_map_size: 128
       # type: section
       # name: On-CPU
       # description:
