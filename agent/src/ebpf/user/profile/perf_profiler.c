@@ -332,12 +332,20 @@ static int create_profiler(struct bpf_tracer *tracer)
 	if ((ret = maps_config(tracer, MAP_STACK_B_NAME, cap)))
 		return ret;
 
-	if (major > 5 || (major == 5 && minor >= 2)) {
+	if (get_dwarf_enabled() && (major > 5 || (major == 5 && minor >= 2))) {
 		if ((ret = maps_config(tracer, MAP_CUSTOM_STACK_A_NAME, cap))) {
 			return ret;
 		}
 
 		if ((ret = maps_config(tracer, MAP_CUSTOM_STACK_B_NAME, cap))) {
+			return ret;
+		}
+
+		if ((ret = maps_config(tracer, MAP_PROCESS_SHARD_LIST_NAME, get_dwarf_process_map_size()))) {
+			return ret;
+		}
+
+		if ((ret = maps_config(tracer, MAP_UNWIND_ENTRY_SHARD_NAME, get_dwarf_shard_map_size()))) {
 			return ret;
 		}
 	}
@@ -440,6 +448,48 @@ static inline bool all_perf_workers_exit(struct bpf_tracer *t)
 	return true;
 }
 
+static int cpdbg_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
+			     void **out, size_t * outsize)
+{
+	return 0;
+}
+
+static int cpdbg_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
+{
+	struct cpdbg_msg *msg = (struct cpdbg_msg *)conf;
+	pthread_mutex_lock(&cpdbg_mutex);
+	if (msg->enable) {
+		cpdbg_start_time = get_sys_uptime();
+		cpdbg_timeout = msg->timeout;
+	}
+
+	if (cpdbg_enable && !msg->enable) {
+		cpdbg_timeout = 0;
+		cpdbg_start_time = 0;
+	}
+
+	cpdbg_enable = msg->enable;
+	if (cpdbg_enable) {
+		ebpf_info("cpdbg enable timeout %ds\n", cpdbg_timeout);
+	} else {
+		ebpf_info("cpdbg disable");
+	}
+
+	pthread_mutex_unlock(&cpdbg_mutex);
+
+	return 0;
+}
+
+static struct tracer_sockopts cpdbg_sockopts = {
+	.version = SOCKOPT_VERSION,
+	.set_opt_min = SOCKOPT_SET_CPDBG_ADD,
+	.set_opt_max = SOCKOPT_SET_CPDBG_OFF,
+	.set = cpdbg_sockopt_set,
+	.get_opt_min = SOCKOPT_GET_CPDBG_SHOW,
+	.get_opt_max = SOCKOPT_GET_CPDBG_SHOW,
+	.get = cpdbg_sockopt_get,
+};
+
 int stop_continuous_profiler(void)
 {
 	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
@@ -450,6 +500,8 @@ int stop_continuous_profiler(void)
 
 	if (profiler_tracer == NULL)
 		return (0);
+
+	sockopt_unregister(&cpdbg_sockopts);
 
 	// Wait for all reader threads to exit.
 	while (!all_perf_workers_exit(profiler_tracer))
@@ -536,48 +588,6 @@ static void print_cp_tracer_status(struct bpf_tracer *t,
 		  alloc_b - free_b, output_count, sample_drop_cnt,
 		  output_err_cnt, iter_max_cnt);
 }
-
-static int cpdbg_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			     void **out, size_t * outsize)
-{
-	return 0;
-}
-
-static int cpdbg_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
-{
-	struct cpdbg_msg *msg = (struct cpdbg_msg *)conf;
-	pthread_mutex_lock(&cpdbg_mutex);
-	if (msg->enable) {
-		cpdbg_start_time = get_sys_uptime();
-		cpdbg_timeout = msg->timeout;
-	}
-
-	if (cpdbg_enable && !msg->enable) {
-		cpdbg_timeout = 0;
-		cpdbg_start_time = 0;
-	}
-
-	cpdbg_enable = msg->enable;
-	if (cpdbg_enable) {
-		ebpf_info("cpdbg enable timeout %ds\n", cpdbg_timeout);
-	} else {
-		ebpf_info("cpdbg disable");
-	}
-
-	pthread_mutex_unlock(&cpdbg_mutex);
-
-	return 0;
-}
-
-static struct tracer_sockopts cpdbg_sockopts = {
-	.version = SOCKOPT_VERSION,
-	.set_opt_min = SOCKOPT_SET_CPDBG_ADD,
-	.set_opt_max = SOCKOPT_SET_CPDBG_OFF,
-	.set = cpdbg_sockopt_set,
-	.get_opt_min = SOCKOPT_GET_CPDBG_SHOW,
-	.get_opt_max = SOCKOPT_GET_CPDBG_SHOW,
-	.get = cpdbg_sockopt_get,
-};
 
 // Function to check if the recorded PID and its start time are correct
 int check_profiler_running_pid(int pid)
@@ -783,6 +793,14 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	return (0);
 }
 
+/*
+ * Get running state of continuous profiler
+ */
+bool continuous_profiler_running() {
+    struct bpf_tracer *t = get_profiler_tracer();
+    return t && t->state == TRACER_RUNNING;
+}
+
 static u64 test_add_count, stack_count;
 static u64 test_hit_count, msg_ptr_zero_count;
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * msg)
@@ -891,6 +909,16 @@ int set_profiler_cpu_aggregation(int flag)
 	return (0);
 }
 
+bool match_profiler_regex(const char *name) {
+	bool matched = false;
+	if (oncpu_ctx.regex_existed) {
+		profile_regex_lock(&oncpu_ctx);
+		matched = regexec(&oncpu_ctx.profiler_regex, name, 0, NULL, 0) == 0;
+		profile_regex_unlock(&oncpu_ctx);
+	}
+	return matched;
+}
+
 struct bpf_tracer *get_profiler_tracer(void)
 {
 	return profiler_tracer;
@@ -956,6 +984,13 @@ int start_continuous_profiler(int freq,
 			      tracer_callback_t callback)
 {
 	return (-1);
+}
+
+/*
+ * Get running state of continuous profiler
+ */
+bool continuous_profiler_running() {
+	return false;
 }
 
 int stop_continuous_profiler(void)

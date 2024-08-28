@@ -79,9 +79,11 @@ typedef __u64 __raw_stack[PERF_MAX_STACK_DEPTH];
  * Stack map for dwarf stacks.
  * Due to the limitation of the number of eBPF instruction in kernel, this
  * feature is suitable for Linux5.2+
+ *
+ * Map sizes are configured in user space program
  */
-MAP_HASH(custom_stack_map_a, __u32, __raw_stack, STACK_MAP_ENTRIES)
-MAP_HASH(custom_stack_map_b, __u32, __raw_stack, STACK_MAP_ENTRIES)
+MAP_HASH(custom_stack_map_a, __u32, __raw_stack, 1)
+MAP_HASH(custom_stack_map_b, __u32, __raw_stack, 1)
 
 /*
  * The following maps are used for DWARF based unwinding
@@ -90,9 +92,11 @@ MAP_HASH(custom_stack_map_b, __u32, __raw_stack, STACK_MAP_ENTRIES)
  * unwind_entry_shard_table stores unwind entry shards in hash table instead of array to save memory
  *
  * These two maps are populated by rust code in trace_utils::unwind::UnwindTable
+ *
+ * Map sizes are configured in user space program
  */
-MAP_HASH(process_shard_list_table, __u32, process_shard_list_t, 65536)
-MAP_HASH(unwind_entry_shard_table, __u32, unwind_entry_shard_t, 512)
+MAP_HASH(process_shard_list_table, __u32, process_shard_list_t, 1)
+MAP_HASH(unwind_entry_shard_table, __u32, unwind_entry_shard_t, 1)
 
 /*
  * For sysinfo gathered from BTF
@@ -564,7 +568,7 @@ static inline __attribute__((always_inline)) __u32 find_shard(shard_info_t *list
 }
 
 static inline
-    __attribute__((always_inline)) __u32 find_unwind_entry(unwind_entry_t *list, int left, int right, __u64 pc) {
+    __attribute__((always_inline)) __u32 find_unwind_entry(unwind_entry_t *list, __u16 left, __u16 right, __u64 pc) {
     int i = left, j = right - 1, mid;
     __u32 found = ENTRY_NOT_FOUND;
 

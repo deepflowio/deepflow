@@ -34,4 +34,9 @@ void unwind_events_handle(void);
 // Process exit, reclaim resources
 void unwind_process_exit(int pid);
 
+// Configuration related functions
+bool get_dwarf_enabled(void);
+int get_dwarf_process_map_size(void);
+int get_dwarf_shard_map_size(void);
+
 #endif
