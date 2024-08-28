@@ -745,6 +745,8 @@ impl EbpfCollector {
                         .as_c_str()
                         .as_ptr(),
                 );
+                ebpf::set_dwarf_process_map_size(config.ebpf.dwarf_process_map_size as i32);
+                ebpf::set_dwarf_shard_map_size(config.ebpf.dwarf_shard_map_size as i32);
 
                 #[cfg(feature = "extended_profile")]
                 {
@@ -767,7 +769,7 @@ impl EbpfCollector {
                     Self::ebpf_profiler_callback,
                 ) != 0
                 {
-                    info!("ebpf start_continuous_profiler error.");
+                    warn!("ebpf start_continuous_profiler error.");
                     return Err(Error::EbpfInitError);
                 }
 
@@ -973,13 +975,31 @@ impl EbpfCollector {
             self.stop();
         }
         unsafe {
-            ebpf::set_dwarf_enabled(!config.ebpf.dwarf_disabled);
+            let ecfg = &config.ebpf;
+            let restart_cprofiler = ebpf::continuous_profiler_running()
+                && (ebpf::get_dwarf_enabled() != !ecfg.dwarf_disabled
+                    || ebpf::get_dwarf_process_map_size() as usize != ecfg.dwarf_process_map_size
+                    || ebpf::get_dwarf_shard_map_size() as usize != ecfg.dwarf_shard_map_size);
+            ebpf::set_dwarf_enabled(!ecfg.dwarf_disabled);
             ebpf::set_dwarf_regex(
-                CString::new(config.ebpf.dwarf_regex.as_bytes())
+                CString::new(ecfg.dwarf_regex.as_bytes())
                     .unwrap()
                     .as_c_str()
                     .as_ptr(),
             );
+            ebpf::set_dwarf_process_map_size(ecfg.dwarf_process_map_size as i32);
+            ebpf::set_dwarf_shard_map_size(ecfg.dwarf_shard_map_size as i32);
+            if restart_cprofiler {
+                ebpf::stop_continuous_profiler();
+                if ebpf::start_continuous_profiler(
+                    ecfg.on_cpu_profile.frequency as i32,
+                    ecfg.java_symbol_file_refresh_defer_interval.as_secs() as i32,
+                    Self::ebpf_profiler_callback,
+                ) != 0
+                {
+                    warn!("ebpf start_continuous_profiler error.");
+                }
+            }
         }
     }
 
