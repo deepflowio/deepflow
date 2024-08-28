@@ -19,6 +19,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"golang.org/x/exp/slices"
 
@@ -55,6 +56,7 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 		if where != "" {
 			whereSql = fmt.Sprintf("AND (%s)", where)
 		}
+		whereSql = strings.ReplaceAll(whereSql, " name ", " field_name ")
 		externalMetricSql = fmt.Sprintf(externalMetricSql, db, tableFilter, whereSql)
 
 		externalMetricFloatRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalMetricSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
