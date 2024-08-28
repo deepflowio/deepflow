@@ -595,6 +595,11 @@ extern "C" {
     pub fn stop_continuous_profiler() -> c_int;
 
     /*
+     * Continuous profiler running state
+     */
+    pub fn continuous_profiler_running() -> bool;
+
+    /*
      * To set the regex matching for the profiler.
      *
      * Perform regular expression matching on process names.
@@ -706,8 +711,19 @@ extern "C" {
     pub fn disable_oncpu_profiler() -> c_int;
     pub fn show_collect_pool();
     pub fn disable_syscall_trace_id() -> c_int;
+
+    /*
+     * DWARF unwinding related settings.
+     * Be advised that these settings are only effective before
+     * calling `start_continuous_profiler` except for `set_dwarf_regex`.
+     */
+    pub fn get_dwarf_enabled() -> bool;
     pub fn set_dwarf_enabled(enabled: bool) -> c_void;
     pub fn set_dwarf_regex(pattern: *const c_char) -> c_int;
+    pub fn get_dwarf_process_map_size() -> c_int;
+    pub fn set_dwarf_process_map_size(size: c_int) -> c_void;
+    pub fn get_dwarf_shard_map_size() -> c_int;
+    pub fn set_dwarf_shard_map_size(size: c_int) -> c_void;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_profile")] {
