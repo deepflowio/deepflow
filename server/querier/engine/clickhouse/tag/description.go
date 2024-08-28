@@ -975,8 +975,12 @@ func GetAlertEventTagDescriptions(staticTag, dynamicTag *common.Result) (respons
 	return response, nil
 }
 
-func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
+func GetTagDescriptions(db, table, visibilityFilter, rawSql, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (response *common.Result, err error) {
 	// 把`1m`的反引号去掉
+	var visibilityFilterRegexp *regexp.Regexp
+	if len(visibilityFilter) > 0 {
+		visibilityFilterRegexp = regexp.MustCompile(visibilityFilter)
+	}
 	table = strings.Trim(table, "`")
 	response = &common.Result{
 		Columns: []interface{}{
@@ -990,10 +994,34 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return
 	}
+	visibilityStaticFilterValues := []interface{}{}
+	for _, value := range staticResponse.Values {
+		name := value.([]interface{})[0].(string)
+		if len(visibilityFilter) > 0 {
+			if !visibilityFilterRegexp.MatchString(name) {
+				visibilityStaticFilterValues = append(visibilityStaticFilterValues, value)
+			}
+		} else {
+			visibilityStaticFilterValues = append(visibilityStaticFilterValues, value)
+		}
+	}
+	staticResponse.Values = visibilityStaticFilterValues
 	DynamicResponse, err := GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)
 	if err != nil {
 		return
 	}
+	visibilityDynamicFilterValues := []interface{}{}
+	for _, value := range DynamicResponse.Values {
+		name := value.([]interface{})[0].(string)
+		if len(visibilityFilter) > 0 {
+			if !visibilityFilterRegexp.MatchString(name) {
+				visibilityDynamicFilterValues = append(visibilityDynamicFilterValues, value)
+			}
+		} else {
+			visibilityDynamicFilterValues = append(visibilityDynamicFilterValues, value)
+		}
+	}
+	DynamicResponse.Values = visibilityDynamicFilterValues
 	if table == "alert_event" {
 		return GetAlertEventTagDescriptions(staticResponse, DynamicResponse)
 	}

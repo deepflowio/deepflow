@@ -413,6 +413,19 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 			sql = visibilitySql
 		}
 		result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
+		var visibilityMetricsFilterValues []interface{}
+		for _, value := range result.Values {
+			metricName := value.([]interface{})[0].(string)
+			if len(visibilityFilter) > 0 {
+				if !visibilityFilterRegexp.MatchString(metricName) {
+					visibilityMetricsFilterValues = append(visibilityMetricsFilterValues, value)
+				}
+			} else {
+				visibilityMetricsFilterValues = append(visibilityMetricsFilterValues, value)
+			}
+
+		}
+		result.Values = visibilityMetricsFilterValues
 		if err != nil {
 			return nil, []string{}, true, err
 		}
@@ -420,7 +433,7 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
 		}
 		// tag metrics
-		tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, e.ORGID, args.UseQueryCache, e.Context, DebugInfo)
+		tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, visibilityFilter, sql, args.QueryCacheTTL, e.ORGID, args.UseQueryCache, e.Context, DebugInfo)
 		if err != nil {
 			log.Error("Failed to get tag type metrics")
 			return nil, []string{}, true, err

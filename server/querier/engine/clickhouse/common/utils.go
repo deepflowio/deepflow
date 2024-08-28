@@ -202,6 +202,7 @@ func GetDatasourceInterval(db string, table string, name string, orgID string) (
 	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
 }
 
+func GetExtTables(db, visibilityFilter, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
 func GetExtTables(db, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
@@ -212,6 +213,22 @@ func GetExtTables(db, where, queryCacheTTL, orgID string, useQueryCache bool, ct
 		Context:  ctx,
 	}
 	sql := ""
+	if slices.Contains([]string{DB_NAME_EXT_METRICS, DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT}, db) {
+		if len(visibilityFilter) > 0 {
+			// table
+			sql = fmt.Sprintf("SELECT table FROM flow_tag.%s_custom_field ", db) + " WHERE " + strings.Replace(where, "name", "table", -1) + " GROUP BY table"
+			chClient.DB = "flow_tag"
+		} else {
+			sql = fmt.Sprintf("SELECT table FROM flow_tag.%s_custom_field GROUP BY table", db)
+			chClient.DB = "flow_tag"
+		}
+	} else {
+		if len(visibilityFilter) > 0 {
+			// name
+			sql = "SHOW TABLES FROM " + db + " WHERE " + where
+		} else {
+			sql = "SHOW TABLES FROM " + db
+		}
 	if slices.Contains([]string{DB_NAME_EXT_METRICS, DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT, DB_NAME_PROMETHEUS}, db) {
 		if where != "" {
 			sql = fmt.Sprintf("SELECT table FROM flow_tag.%s_custom_field ", db) + " WHERE " + strings.Replace(where, " name ", " table ", -1) + " GROUP BY table"

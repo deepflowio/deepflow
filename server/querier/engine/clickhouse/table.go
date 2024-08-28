@@ -18,6 +18,7 @@ package clickhouse
 
 import (
 	"context"
+	"regexp"
 
 	"golang.org/x/exp/slices"
 
@@ -26,8 +27,12 @@ import (
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
-func GetDatabases() *common.Result {
+func GetDatabases(visibilityFilter string) *common.Result {
 	var values []interface{}
+	var visibilityFilterRegexp *regexp.Regexp
+	if len(visibilityFilter) > 0 {
+		visibilityFilterRegexp = regexp.MustCompile(visibilityFilter)
+	}
 	for db := range chCommon.DB_TABLE_MAP {
 		values = append(values, []interface{}{db})
 	}
@@ -39,6 +44,10 @@ func GetDatabases() *common.Result {
 
 func GetTables(db, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) *common.Result {
 	var values []interface{}
+	var visibilityFilterRegexp *regexp.Regexp
+	if len(visibilityFilter) > 0 {
+		visibilityFilterRegexp = regexp.MustCompile(visibilityFilter)
+	}
 	tables, ok := chCommon.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
@@ -47,11 +56,23 @@ func GetTables(db, where, queryCacheTTL, orgID string, useQueryCache bool, ctx c
 		values = append(values, chCommon.GetExtTables(db, where, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
 	} else {
 		for _, table := range tables {
-			datasource, err := chCommon.GetDatasources(db, table, orgID)
-			if err != nil {
-				log.Error(err)
+			if len(visibilityFilter) > 0 {
+				if !visibilityFilterRegexp.MatchString(table) {
+					log.Infof("filter is %s, table is %s", visibilityFilter, table)
+					log.Info("通过正则匹配")
+					datasource, err := chCommon.GetDatasources(db, table, orgID)
+					if err != nil {
+						log.Error(err)
+					}
+					values = append(values, []interface{}{table, datasource})
+				}
+			} else {
+				datasource, err := chCommon.GetDatasources(db, table, orgID)
+				if err != nil {
+					log.Error(err)
+				}
+				values = append(values, []interface{}{table, datasource})
 			}
-			values = append(values, []interface{}{table, datasource})
 		}
 	}
 	return &common.Result{
