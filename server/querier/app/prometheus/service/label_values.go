@@ -88,7 +88,7 @@ func getMetrics(ctx context.Context, args *model.PromMetaParams) (resp []string)
 			}
 		} else {
 			for _, table := range tables {
-				tableMetrics, _ := metrics.GetMetricsByDBTable(db, table, where, "", args.OrgID, false, args.Context)
+				tableMetrics, _, _ := metrics.FormatMetricsToResult(db, table, where, "", args.OrgID, false, args.Context)
 				for field, v := range tableMetrics {
 					if v.Category == METRICS_CATEGORY_TAG {
 						continue
