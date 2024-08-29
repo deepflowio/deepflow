@@ -105,6 +105,7 @@ var (
 	DefaultBandwidthProbeInterval        = 10
 	DefaultTapInterfaceRegex             = "^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$"
 	DefaultMaxEscapeSeconds              = 3600
+	DefaultMaxEscapeSecondsStr           = "3600s"
 	DefaultMtu                           = 1500
 	DefaultOutputVlan                    = 0
 	DefaultCollectorSocketType           = "TCP"
