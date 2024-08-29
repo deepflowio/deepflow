@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package metadata
+package agentmetadata
 
 import (
 	"errors"
@@ -24,21 +24,12 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
 
-	"github.com/deepflowio/deepflow/message/trident"
+	"github.com/deepflowio/deepflow/message/agent"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/dbcache"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 )
-
-var PodGroupTypeMap = map[int]uint32{
-	POD_GROUP_DEPLOYMENT:            uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_DEPLOYMENT),
-	POD_GROUP_STATEFULSET:           uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_STATEFULSET),
-	POD_GROUP_RC:                    uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_RC),
-	POD_GROUP_DAEMON_SET:            uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_DAEMON_SET),
-	POD_GROUP_REPLICASET_CONTROLLER: uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER),
-	POD_GROUP_CLONESET:              uint32(trident.AutoServiceType_AUTO_SERVICE_TYPE_POD_GROUP_CLONESET),
-}
 
 type TypeIDData struct {
 	LaunchServer   string
@@ -70,16 +61,16 @@ type TypeIDKey struct {
 }
 
 type IpResourceData struct {
-	ipResources       []*trident.IpResource
-	simpleIpResources []*trident.IpResource
+	ipResources       []*agent.IpResource
+	simpleIpResources []*agent.IpResource
 	isVipInterface    bool
 }
 
 type PlatformRawData struct {
 	networkIDToSubnets     map[int][]*models.Subnet
 	idToNetwork            map[int]*models.Network
-	vInterfaceIDToIP       map[int][]*trident.IpResource
-	vInterfaceIDToSimpleIP map[int][]*trident.IpResource
+	vInterfaceIDToIP       map[int][]*agent.IpResource
+	vInterfaceIDToSimpleIP map[int][]*agent.IpResource
 	noVInterfaceIDIPs      []*IPData
 	typeIDToDevice         map[TypeIDKey]*TypeIDData
 	vipDomainLcuuids       mapset.Set
@@ -117,7 +108,7 @@ type PlatformRawData struct {
 	processIDs        mapset.Set
 	vipIDs            mapset.Set
 
-	vtapIdToVtap                  map[int]*models.VTap
+	agentIDToAgent                map[int]*models.VTap
 	isVifofVip                    map[int]struct{}
 	vipIDToNetwork                map[int]*models.Network
 	subnetPrefix                  []string
@@ -156,11 +147,11 @@ type PlatformRawData struct {
 
 	deviceTypeAndIDToVInterfaceID map[TypeIDKey][]int
 
-	launchServerToSkipInterface map[string][]*trident.SkipInterface
+	launchServerToSkipInterface map[string][]*agent.SkipInterface
 
-	vtapIDToContainer    map[int][]*trident.Container
-	launchServerIDToVTap map[int]*models.VTap
-	containerIdToPodId   map[string]int
+	agetIDToContainer     map[int][]*agent.Container
+	launchServerIDToAgent map[int]*models.VTap
+	containerIdToPodId    map[string]int
 
 	launchServerToVRouterIDs map[string][]int
 
@@ -197,7 +188,7 @@ func NewPlatformRawData(orgID ORGID) *PlatformRawData {
 		processIDs:        mapset.NewSet(),
 		vipIDs:            mapset.NewSet(),
 
-		vtapIdToVtap:                  make(map[int]*models.VTap),
+		agentIDToAgent:                make(map[int]*models.VTap),
 		isVifofVip:                    make(map[int]struct{}),
 		vipIDToNetwork:                make(map[int]*models.Network),
 		serverToVmIDs:                 make(map[string]mapset.Set),
@@ -222,8 +213,8 @@ func NewPlatformRawData(orgID ORGID) *PlatformRawData {
 		vmIDToPodNodeID:        make(map[int]int),
 		podNodeIDToVmID:        make(map[int]int),
 		vipDomainLcuuids:       mapset.NewSet(),
-		vInterfaceIDToIP:       make(map[int][]*trident.IpResource),
-		vInterfaceIDToSimpleIP: make(map[int][]*trident.IpResource),
+		vInterfaceIDToIP:       make(map[int][]*agent.IpResource),
+		vInterfaceIDToSimpleIP: make(map[int][]*agent.IpResource),
 		idToPodNode:            make(map[int]*models.PodNode),
 		idToPod:                make(map[int]*models.Pod),
 		idToPodService:         make(map[int]*models.PodService),
@@ -245,11 +236,11 @@ func NewPlatformRawData(orgID ORGID) *PlatformRawData {
 		deviceVifs:                    []*models.VInterface{},
 		deviceTypeAndIDToVInterfaceID: make(map[TypeIDKey][]int),
 		typeIDToDevice:                make(map[TypeIDKey]*TypeIDData),
-		launchServerToSkipInterface:   make(map[string][]*trident.SkipInterface),
+		launchServerToSkipInterface:   make(map[string][]*agent.SkipInterface),
 
-		vtapIDToContainer:    make(map[int][]*trident.Container),
-		launchServerIDToVTap: make(map[int]*models.VTap),
-		containerIdToPodId:   make(map[string]int),
+		agetIDToContainer:     make(map[int][]*agent.Container),
+		launchServerIDToAgent: make(map[int]*models.VTap),
+		containerIdToPodId:    make(map[string]int),
 
 		launchServerToVRouterIDs: make(map[string][]int),
 
@@ -472,23 +463,23 @@ func (r *PlatformRawData) ConvertDBDHCPPort(dbDataCache *DBDataCache) {
 	}
 }
 
-func (r *PlatformRawData) GetContainers(vtapID int) []*trident.Container {
-	return r.vtapIDToContainer[vtapID]
+func (r *PlatformRawData) GetContainers(agentID int) []*agent.Container {
+	return r.agetIDToContainer[agentID]
 }
 
 func (r *PlatformRawData) addContainers(pod *models.Pod) {
 	if pod.ContainerIDs == "" {
 		return
 	}
-	vtap, ok := r.launchServerIDToVTap[pod.PodNodeID]
+	agentDB, ok := r.launchServerIDToAgent[pod.PodNodeID]
 	for _, cid := range strings.Split(pod.ContainerIDs, ", ") {
 		r.containerIdToPodId[cid] = pod.ID
 		if ok {
-			container := &trident.Container{
+			container := &agent.Container{
 				PodId:       proto.Uint32(uint32(pod.ID)),
 				ContainerId: proto.String(cid),
 			}
-			r.vtapIDToContainer[vtap.ID] = append(r.vtapIDToContainer[vtap.ID], container)
+			r.agetIDToContainer[agentDB.ID] = append(r.agetIDToContainer[agentDB.ID], container)
 		}
 	}
 }
@@ -565,13 +556,13 @@ func (r *PlatformRawData) ConvertDBIPs(dbDataCache *DBDataCache) {
 			if _, ok := r.vInterfaceIDToIP[wanIP.VInterfaceID]; ok {
 				r.vInterfaceIDToIP[wanIP.VInterfaceID] = append(r.vInterfaceIDToIP[wanIP.VInterfaceID], ipReource)
 			} else {
-				r.vInterfaceIDToIP[wanIP.VInterfaceID] = []*trident.IpResource{ipReource}
+				r.vInterfaceIDToIP[wanIP.VInterfaceID] = []*agent.IpResource{ipReource}
 			}
 			sipReource := ipReource
 			if _, ok := r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID]; ok {
 				r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID] = append(r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID], sipReource)
 			} else {
-				r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID] = []*trident.IpResource{sipReource}
+				r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID] = []*agent.IpResource{sipReource}
 			}
 		}
 	}
@@ -593,14 +584,14 @@ func (r *PlatformRawData) ConvertDBIPs(dbDataCache *DBDataCache) {
 			if _, ok := r.vInterfaceIDToIP[lanIP.VInterfaceID]; ok {
 				r.vInterfaceIDToIP[lanIP.VInterfaceID] = append(r.vInterfaceIDToIP[lanIP.VInterfaceID], ipReource)
 			} else {
-				r.vInterfaceIDToIP[lanIP.VInterfaceID] = []*trident.IpResource{ipReource}
+				r.vInterfaceIDToIP[lanIP.VInterfaceID] = []*agent.IpResource{ipReource}
 			}
 
 			sipReource := generateProtoIpResource(lanIP.IP, 0, 0)
 			if _, ok := r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID]; ok {
 				r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID] = append(r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID], sipReource)
 			} else {
-				r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID] = []*trident.IpResource{sipReource}
+				r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID] = []*agent.IpResource{sipReource}
 			}
 		}
 	}
@@ -948,29 +939,29 @@ func (r *PlatformRawData) ConvertDBVipDomain(dbDataCache *DBDataCache) {
 	}
 }
 
-func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
+func (r *PlatformRawData) ConvertSkipAgentVIfIDs(dbDataCache *DBDataCache) {
 	kvmLaunchServer := mapset.NewSet()
-	vtapLaunchServer := make(map[string][]int)
-	skipVTaps := dbDataCache.GetSkipVTaps()
-	for _, vtap := range skipVTaps {
-		switch vtap.Type {
+	agentLaunchServer := make(map[string][]int)
+	skipAgents := dbDataCache.GetSkipVTaps()
+	for _, skipAgent := range skipAgents {
+		switch skipAgent.Type {
 		case VTAP_TYPE_KVM:
-			kvmLaunchServer.Add(vtap.LaunchServer)
+			kvmLaunchServer.Add(skipAgent.LaunchServer)
 		case VTAP_TYPE_WORKLOAD_V:
-			vm, ok := r.idToVM[vtap.LaunchServerID]
+			vm, ok := r.idToVM[skipAgent.LaunchServerID]
 			if ok == false {
 				break
 			}
 			if vm.LaunchServer != "" {
-				if _, ok := vtapLaunchServer[vm.LaunchServer]; ok {
-					vtapLaunchServer[vm.LaunchServer] = append(
-						vtapLaunchServer[vm.LaunchServer], vm.ID)
+				if _, ok := agentLaunchServer[vm.LaunchServer]; ok {
+					agentLaunchServer[vm.LaunchServer] = append(
+						agentLaunchServer[vm.LaunchServer], vm.ID)
 				} else {
-					vtapLaunchServer[vm.LaunchServer] = []int{vm.ID}
+					agentLaunchServer[vm.LaunchServer] = []int{vm.ID}
 				}
 			}
 		case VTAP_TYPE_POD_VM:
-			vmid, ok := r.podNodeIDToVmID[vtap.LaunchServerID]
+			vmid, ok := r.podNodeIDToVmID[skipAgent.LaunchServerID]
 			if ok == false {
 				break
 			}
@@ -979,11 +970,11 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 				break
 			}
 			if vm.LaunchServer != "" {
-				if _, ok := vtapLaunchServer[vm.LaunchServer]; ok {
-					vtapLaunchServer[vm.LaunchServer] = append(
-						vtapLaunchServer[vm.LaunchServer], vm.ID)
+				if _, ok := agentLaunchServer[vm.LaunchServer]; ok {
+					agentLaunchServer[vm.LaunchServer] = append(
+						agentLaunchServer[vm.LaunchServer], vm.ID)
 				} else {
-					vtapLaunchServer[vm.LaunchServer] = []int{vm.ID}
+					agentLaunchServer[vm.LaunchServer] = []int{vm.ID}
 				}
 			}
 		}
@@ -991,7 +982,7 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 
 	skipLaunchServerToVMIDs := make(map[string][]int)
 	skipVMIDs := []int{}
-	for launchServer, vmIDs := range vtapLaunchServer {
+	for launchServer, vmIDs := range agentLaunchServer {
 		if kvmLaunchServer.Contains(launchServer) {
 			if _, ok := skipLaunchServerToVMIDs[launchServer]; ok {
 				skipLaunchServerToVMIDs[launchServer] = append(
@@ -1080,11 +1071,11 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 		}
 	}
 
-	launchServerToSkipInterface := make(map[string][]*trident.SkipInterface)
+	launchServerToSkipInterface := make(map[string][]*agent.SkipInterface)
 	for launchServer, skipVifMacs := range launchServerToSkipVifMacs {
 		for mac := range skipVifMacs.Iter() {
 			macU64 := mac.(uint64)
-			skipInterface := &trident.SkipInterface{
+			skipInterface := &agent.SkipInterface{
 				Mac: proto.Uint64(macU64),
 			}
 			launchServerToSkipInterface[launchServer] = append(
@@ -1113,11 +1104,11 @@ func (r *PlatformRawData) ConvertDBVIPs(dbDataCache *DBDataCache) {
 	for _, vip := range vips {
 		r.vipIDs.Add(vip.ID)
 
-		vtap := r.GetVTap(int(vip.VTapID))
-		if vtap == nil {
+		agentDB := r.GetAgent(int(vip.VTapID))
+		if agentDB == nil {
 			continue
 		}
-		vifs, ok := r.vmIDToVifs[vtap.LaunchServerID]
+		vifs, ok := r.vmIDToVifs[agentDB.LaunchServerID]
 		if ok == false {
 			continue
 		}
@@ -1132,18 +1123,18 @@ func (r *PlatformRawData) ConvertDBVIPs(dbDataCache *DBDataCache) {
 	}
 }
 
-func (r *PlatformRawData) ConvertDBVTaps(dbDataCache *DBDataCache) {
-	for _, vtap := range dbDataCache.GetVTapsIDAndName() {
-		if vtap.Type == VTAP_TYPE_POD_HOST || vtap.Type == VTAP_TYPE_POD_VM {
-			r.launchServerIDToVTap[vtap.LaunchServerID] = vtap
+func (r *PlatformRawData) ConvertDBAgents(dbDataCache *DBDataCache) {
+	for _, agentDB := range dbDataCache.GetVTapsIDAndName() {
+		if agentDB.Type == VTAP_TYPE_POD_HOST || agentDB.Type == VTAP_TYPE_POD_VM {
+			r.launchServerIDToAgent[agentDB.LaunchServerID] = agentDB
 		}
-		r.vtapIdToVtap[vtap.ID] = vtap
+		r.agentIDToAgent[agentDB.ID] = agentDB
 	}
 }
 
 // 有依赖 需要按顺序convert
 func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
-	r.ConvertDBVTaps(dbDataCache)
+	r.ConvertDBAgents(dbDataCache)
 	r.ConvertDBVIPs(dbDataCache)
 	r.ConvertHost(dbDataCache)
 	r.ConvertDBVPC(dbDataCache)
@@ -1169,7 +1160,7 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertDBNat(dbDataCache)
 	r.ConvertDBVmPodNodeConn(dbDataCache)
 	r.ConvertDBVipDomain(dbDataCache)
-	r.ConvertSkipVTapVIfIDs(dbDataCache)
+	r.ConvertSkipAgentVIfIDs(dbDataCache)
 	r.ConvertDBProcesses(dbDataCache)
 }
 
@@ -1209,10 +1200,6 @@ func (r *PlatformRawData) vInterfaceToProto(
 	if region, ok := r.uuidToRegion[vif.Region]; ok {
 		regionID = region.ID
 	}
-	azID := 0
-	if az, ok := r.uuidToAZ[device.AZ]; ok {
-		azID = az.ID
-	}
 	vpcID := 0
 	if vif.DeviceType != VIF_DEVICE_TYPE_HOST {
 		vpcID = device.VPCID
@@ -1228,35 +1215,11 @@ func (r *PlatformRawData) vInterfaceToProto(
 	if err != nil {
 		log.Error(r.Logf("%s %s", err, vif.Mac))
 	}
-	podGroupType := uint32(0)
-	podGroup := r.idToPodGroup[device.PodGroupID]
-	if podGroup != nil {
-		podGroupType = PodGroupTypeMap[podGroup.Type]
-	}
-	aInterface := &trident.Interface{
+	deviceType := agent.DeviceType(vif.DeviceType)
+	sInterface := &agent.Interface{
 		Id:             proto.Uint32(uint32(vif.ID)),
 		Mac:            proto.Uint64(macU64),
-		DeviceType:     proto.Uint32(uint32(vif.DeviceType)),
-		DeviceId:       proto.Uint32(uint32(vif.DeviceID)),
-		IfType:         proto.Uint32(uint32(vif.Type)),
-		EpcId:          proto.Uint32(uint32(vpcID)),
-		LaunchServer:   proto.String(device.LaunchServer),
-		LaunchServerId: proto.Uint32(uint32(device.LaunchServerID)),
-		IpResources:    ipResourceData.ipResources,
-		RegionId:       proto.Uint32(uint32(regionID)),
-		AzId:           proto.Uint32(uint32(azID)),
-		PodGroupId:     proto.Uint32(uint32(device.PodGroupID)),
-		PodNsId:        proto.Uint32(uint32(device.PodNamespaceID)),
-		PodClusterId:   proto.Uint32(uint32(device.PodClusterID)),
-		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
-		PodId:          proto.Uint32(uint32(device.PodID)),
-		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
-		PodGroupType:   proto.Uint32(podGroupType),
-	}
-	sInterface := &trident.Interface{
-		Id:             proto.Uint32(uint32(vif.ID)),
-		Mac:            proto.Uint64(macU64),
-		DeviceType:     proto.Uint32(uint32(vif.DeviceType)),
+		DeviceType:     &deviceType,
 		EpcId:          proto.Uint32(uint32(vpcID)),
 		IfType:         proto.Uint32(uint32(vif.Type)),
 		IpResources:    ipResourceData.simpleIpResources,
@@ -1266,36 +1229,14 @@ func (r *PlatformRawData) vInterfaceToProto(
 		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
 	}
 
-	return &InterfaceProto{aInterface: aInterface, sInterface: sInterface}, nil
+	return &InterfaceProto{sInterface: sInterface}, nil
 }
 
 func (r *PlatformRawData) modifyInterfaceProto(
 	vif *models.VInterface, interfaceProto *InterfaceProto, device *TypeIDData) error {
 
-	aInterface := interfaceProto.aInterface
 	sInterface := interfaceProto.sInterface
 	switch vif.DeviceType {
-	case VIF_DEVICE_TYPE_POD, VIF_DEVICE_TYPE_POD_NODE:
-		if vmID, ok := r.podNodeIDToVmID[device.PodNodeID]; ok {
-			aInterface.DeviceType = proto.Uint32(uint32(VIF_DEVICE_TYPE_VM))
-			aInterface.DeviceId = proto.Uint32(uint32(vmID))
-			typeIDKey := TypeIDKey{
-				Type: VIF_DEVICE_TYPE_VM,
-				ID:   vmID,
-			}
-			vmDevice, ok := r.typeIDToDevice[typeIDKey]
-			if ok == false {
-				errorInfo := fmt.Sprintf("VIF(%s %s) not found vm", vif.Lcuuid, vif.Mac)
-				return errors.New(errorInfo)
-			}
-			aInterface.LaunchServer = proto.String(vmDevice.LaunchServer)
-			aInterface.LaunchServerId = proto.Uint32(uint32(vmDevice.LaunchServerID))
-		} else {
-			aInterface.DeviceType = proto.Uint32(uint32(0))
-			aInterface.DeviceId = proto.Uint32(uint32(0))
-			aInterface.LaunchServer = proto.String("")
-			aInterface.LaunchServerId = proto.Uint32(uint32(0))
-		}
 	case VIF_DEVICE_TYPE_VM:
 		if PodNodeID, ok := r.vmIDToPodNodeID[vif.DeviceID]; ok {
 			typeIDKey := TypeIDKey{
@@ -1309,8 +1250,6 @@ func (r *PlatformRawData) modifyInterfaceProto(
 			}
 			sInterface.PodNodeId = proto.Uint32(uint32(PodNodeID))
 			sInterface.PodClusterId = proto.Uint32(uint32(podNodeDeivce.PodClusterID))
-			aInterface.PodNodeId = proto.Uint32(uint32(PodNodeID))
-			aInterface.PodClusterId = proto.Uint32(uint32(podNodeDeivce.PodClusterID))
 		}
 	}
 
@@ -1320,8 +1259,8 @@ func (r *PlatformRawData) modifyInterfaceProto(
 func (r *PlatformRawData) generateIpResoureceData(
 	vif *models.VInterface, vifPubIps []string, platformVips []string) (*IpResourceData, []string) {
 
-	ipResources := []*trident.IpResource{}
-	simpleIpResources := []*trident.IpResource{}
+	ipResources := []*agent.IpResource{}
+	simpleIpResources := []*agent.IpResource{}
 	isVipInterface := false
 
 	// 云私有云中虚拟机上用于容器的hostnic网卡也会返回IP，在此将其忽略避免一个IP对应两块网卡
@@ -1383,7 +1322,7 @@ func (r *PlatformRawData) GetPod(podID int) *models.Pod {
 	return r.idToPod[podID]
 }
 
-func (r *PlatformRawData) GetSkipInterface(server string) []*trident.SkipInterface {
+func (r *PlatformRawData) GetSkipInterface(server string) []*agent.SkipInterface {
 	if result, ok := r.launchServerToSkipInterface[server]; ok {
 		return result
 	}
@@ -1391,8 +1330,8 @@ func (r *PlatformRawData) GetSkipInterface(server string) []*trident.SkipInterfa
 	return nil
 }
 
-func (r *PlatformRawData) GetVTap(vtapID int) *models.VTap {
-	return r.vtapIdToVtap[vtapID]
+func (r *PlatformRawData) GetAgent(agentID int) *models.VTap {
+	return r.agentIDToAgent[agentID]
 }
 
 func (r *PlatformRawData) equal(o *PlatformRawData) bool {

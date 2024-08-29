@@ -2234,7 +2234,7 @@ inputs:
           #     配置样例: `ports: 80,1000-2000`
           # upgrade_from: static_config.ebpf.kprobe-whitelist.port-list
           # TODO: 未列入黑名单、白名单的端口是否用 kprobe 做采集？
-          port: ""
+          ports: ""
       # type: section
       # name:
       #   en: Tunning
@@ -4625,7 +4625,7 @@ processors:
       #   en: Extra Tolerable Flow Delay
       #   ch: 额外可容忍的 Flow 延迟
       # unit:
-      # range: [1s, 10s]
+      # range: [0s, 10s]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false
