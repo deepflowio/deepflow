@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package metadata
+package dbcache
 
 import (
 	"gorm.io/gorm"
@@ -25,7 +25,10 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	dbmgr "github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
+
+var log = logger.MustGetLogger("trisolaris.dbcache")
 
 type DBDataCache struct {
 	networks                []*models.Network
@@ -83,7 +86,7 @@ type DBDataCache struct {
 	ORGID
 }
 
-func newDBDataCache(orgID ORGID, cfg *config.Config) *DBDataCache {
+func NewDBDataCache(orgID ORGID, cfg *config.Config) *DBDataCache {
 	return &DBDataCache{
 		config: cfg,
 		ORGID:  orgID,
@@ -172,6 +175,14 @@ func (d *DBDataCache) GetVipDomains() []*models.Domain {
 
 func (d *DBDataCache) GetAgentGroupConfigsFromDB(db *gorm.DB) []*agent_config.AgentGroupConfigModel {
 	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigModel](db).Gets()
+	if err != nil {
+		log.Error(d.Log(err.Error()))
+	}
+	return agentGroupConfigs
+}
+
+func (d *DBDataCache) GetAgentGroupUserConfigsFromDB(db *gorm.DB) []*agent_config.AgentGroupConfigYaml {
+	agentGroupConfigs, err := dbmgr.DBMgr[agent_config.AgentGroupConfigYaml](db).Gets()
 	if err != nil {
 		log.Error(d.Log(err.Error()))
 	}

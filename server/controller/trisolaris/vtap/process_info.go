@@ -1056,6 +1056,5 @@ func (p *ProcessInfo) getDBData() {
 
 func (p *ProcessInfo) generateData() {
 	p.sendLocalShareEntryData()
-	p.getDBData()
 	p.generateGlobalLocalEntries()
 }
