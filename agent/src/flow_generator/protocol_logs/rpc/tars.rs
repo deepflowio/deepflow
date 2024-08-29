@@ -253,6 +253,8 @@ impl TarsInfo {
                     }
                     info.req_method_name =
                         Some(str::from_utf8(&payload[len..len + size]).ok()?.to_string());
+                    
+                    info.endpoint = info.get_endpoint();
                 }
                 _ => {
                     info.msg_type = LogMessageType::Response;
@@ -290,7 +292,6 @@ impl TarsInfo {
                             info.resp_status = L7ResponseStatus::Ok;
                         }
                     }
-                    info.endpoint = info.get_endpoint();
                 }
             },
             _ => return None,
