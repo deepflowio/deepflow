@@ -30,6 +30,7 @@ import (
 	"time"
 
 	. "encoding/binary"
+
 	"github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/golang/protobuf/proto"
@@ -182,7 +183,7 @@ func regiterCommand() []*cobra.Command {
 		Use:   "agent-cache",
 		Short: "get agent-cache from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			agentCache(cmd)
+			agentCache(paramData.TeamID, paramData.CtrlIP, paramData.CtrlMac, cmd)
 		},
 	}
 
@@ -490,18 +491,18 @@ func ripToVip(cmd *cobra.Command) {
 	}
 }
 
-func agentCache(cmd *cobra.Command) {
+func agentCache(teamID, ctrlIP, ctrlMAC string, cmd *cobra.Command) {
 	conn := getConn(cmd)
 	if conn == nil {
 		return
 	}
 	defer conn.Close()
-	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
+	fmt.Printf("request trisolaris(%s) ,team(%s) ctrl ip(%s) mac(%s)\n", conn.Target(), teamID, ctrlIP, ctrlMAC)
 	c := trident.NewDebugClient(conn)
 	reqData := &trident.AgentCacheRequest{
-		CtrlIp:  &paramData.CtrlIP,
-		CtrlMac: &paramData.CtrlMac,
-		TeamId:  &paramData.TeamID,
+		TeamId:  &teamID,
+		CtrlIp:  &ctrlIP,
+		CtrlMac: &ctrlMAC,
 	}
 	response, err := c.DebugAgentCache(context.Background(), reqData)
 	if err != nil {

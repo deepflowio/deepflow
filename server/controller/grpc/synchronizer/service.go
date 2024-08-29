@@ -154,7 +154,7 @@ func (s *service) GetPrometheusTargets(ctx context.Context, in *api.PrometheusTa
 	return &api.PrometheusTargetResponse{}, nil
 	// startTime := time.Now()
 	// defer func() {
-	// 	statsd.AddGrpcCostStatsd(statsd.GetPrometheusTargets, int(time.Now().Sub(startTime).Milliseconds()))
+	//	statsd.AddGrpcCostStatsd(statsd.GetPrometheusTargets, int(time.Now().Sub(startTime).Milliseconds()))
 	// }()
 	// resp, err := s.prometheusEvent.GetPrometheusTargets(ctx, in)
 	// return resp, err

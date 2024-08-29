@@ -182,3 +182,11 @@ func (o ORGID) Log(logStr string) (string, logger.Prefix) {
 func (o ORGID) GetORGID() int {
 	return int(o)
 }
+
+func Int2Bool(i int) bool {
+	if i == 0 {
+		return false
+	}
+
+	return true
+}

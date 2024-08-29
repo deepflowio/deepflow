@@ -116,6 +116,20 @@ const (
 	ENABLED  = 1
 )
 
+const (
+	CONFIG_KEY_ENABLED                     = "global.common.enabled"
+	CONFIG_KEY_HOSTNAME                    = "global.self_monitoring.hostname"
+	CONFIG_KEY_AGENT_TYPE                  = "global.common.agent_type"
+	CONFIG_KEY_MAX_MEMORY                  = "global.limits.max_memory"
+	CONFIG_KEY_MAX_ESCAPE_DURATION         = "global.communication.max_escape_duration"
+	CONFIG_KEY_INGESTER_IP                 = "global.communication.ingester_ip"
+	CONFIG_KEY_INGESTER_PORT               = "global.communication.ingester_port"
+	CONFIG_KEY_PROXY_CONTROLLER_IP         = "global.communication.proxy_controller_ip"
+	CONFIG_KEY_PROXY_CONTROLLER_PORT       = "global.communication.proxy_controller_port"
+	CONFIG_KEY_DOMAIN_FILTER               = "inputs.resources.pull_resource_from_controller.domain_filter"
+	CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED = "inputs.resources.private_cloud.hypervisor_resource_enabled"
+)
+
 var (
 	KWP_NORMAL         = api.KubernetesWatchPolicy_KWP_NORMAL
 	KWP_WATCH_ONLY     = api.KubernetesWatchPolicy_KWP_WATCH_ONLY
