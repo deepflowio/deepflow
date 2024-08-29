@@ -16,7 +16,6 @@
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::mem::drop;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::process::Command;
@@ -36,7 +35,7 @@ use nix::{
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
 use super::error::Result;
-use super::local_mode_dispatcher::{LocalModeDispatcherListener, MacRewriter};
+use super::local_mode_dispatcher::{skip_by_blacklist, LocalModeDispatcherListener, MacRewriter};
 use super::Packet;
 
 #[cfg(target_os = "linux")]
@@ -519,28 +518,6 @@ impl LocalPlusModeDispatcherListener {
         blacklist: &Vec<u64>,
     ) {
         let mut interfaces = interfaces.to_vec();
-        if !blacklist.is_empty() {
-            // 当虚拟机内的容器节点已部署采集器时，宿主机采集器需要排除容器节点的接口，避免采集双份重复流量
-            let mut blackset = HashSet::with_capacity(blacklist.len());
-            for mac in blacklist {
-                blackset.insert(*mac & 0xffffffff);
-            }
-            let mut rejected = vec![];
-            interfaces.retain(|iface| {
-                if blackset.contains(&(u64::from(iface.mac_addr) & 0xffffffff)) {
-                    rejected.push(iface.mac_addr);
-                    false
-                } else {
-                    true
-                }
-            });
-            if !rejected.is_empty() {
-                debug!(
-                    "Dispatcher{} Tap interfaces {:?} rejected by blacklist",
-                    self.base.log_id, rejected
-                );
-            }
-        }
         // interfaces为实际TAP口的集合，macs为TAP口对应主机的MAC地址集合
         interfaces.sort_by_key(|link| link.if_index);
         let keys = interfaces
@@ -554,6 +531,7 @@ impl LocalPlusModeDispatcherListener {
             #[cfg(target_os = "linux")]
             &self.base.options.lock().unwrap().tap_mac_script,
         );
+        let (keys, macs) = skip_by_blacklist(&self.base.log_id, keys, macs, blacklist);
         self.base.on_vm_change(&keys, &macs);
         self.base.on_tap_interface_change(interfaces, if_mac_source);
     }
