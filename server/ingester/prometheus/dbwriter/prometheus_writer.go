@@ -210,8 +210,12 @@ func (w *PrometheusWriter) addAppLabelColumnsOnCluster(startIndex, endIndex int,
 }
 
 func (w *PrometheusWriter) addAppLabelColumns(conn common.DBs, startIndex, endIndex int, orgDatabase string) error {
+	prometheusTables := []string{PROMETHEUS_TABLE, PROMETHEUS_TABLE + ckdb.LOCAL_SUBFFIX}
+	if w.ckdbType == ckdb.CKDBTypeByconity {
+		prometheusTables = []string{PROMETHEUS_TABLE}
+	}
 	for i := startIndex; i <= endIndex; i++ {
-		for _, table := range []string{PROMETHEUS_TABLE + "_local", PROMETHEUS_TABLE} {
+		for _, table := range prometheusTables {
 			_, err := conn.Exec(fmt.Sprintf("ALTER TABLE %s.`%s` ADD COLUMN app_label_value_id_%d %s",
 				orgDatabase, table, i, ckdb.UInt32))
 			if err != nil {
