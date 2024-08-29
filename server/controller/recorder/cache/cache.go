@@ -155,16 +155,17 @@ func (c *Cache) Refresh() {
 
 	// 分类刷新资源的相关缓存
 
+	// TODO refactor
 	// sub domain需要使用vpc、vm的映射数据
+	c.refreshRegions()
+	c.refreshAZs()
 	c.refreshVPCs()
+	c.refreshHosts()
 	c.refreshVMs()
 
 	// 仅domain缓存需要刷新的资源
 	if c.SubDomainLcuuid == "" {
-		c.refreshRegions()
-		c.refreshAZs()
 		c.refreshSubDomains()
-		c.refreshHosts()
 		vrouterIDs := c.refreshVRouters()
 		c.refreshRoutingTables(vrouterIDs)
 		c.refreshDHCPPorts()
@@ -215,6 +216,13 @@ func (c *Cache) AddRegion(item *mysql.Region) {
 func (c *Cache) AddRegions(items []*mysql.Region) {
 	for _, item := range items {
 		c.AddRegion(item)
+	}
+	var defaultRegion *mysql.Region
+	err := mysql.Db.Where("lcuuid = ?", ctrlrcommon.DEFAULT_REGION).First(&defaultRegion).Error
+	if defaultRegion != nil {
+		c.ToolDataSet.AddRegion(defaultRegion)
+	} else {
+		log.Errorf("default region not found, %v", err)
 	}
 }
 
