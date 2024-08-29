@@ -310,6 +310,42 @@ pub struct LocalModeDispatcherListener {
     rewriter: MacRewriter,
 }
 
+pub fn skip_by_blacklist(
+    id: &String,
+    keys: Vec<u32>,
+    macs: Vec<MacAddr>,
+    blacklist: &Vec<u64>,
+) -> (Vec<u32>, Vec<MacAddr>) {
+    if blacklist.is_empty() {
+        return (keys, macs);
+    }
+
+    // 当虚拟机内的容器节点已部署采集器时，宿主机采集器需要排除容器节点的接口，避免采集双份重复流量
+    let mut blackset = HashSet::with_capacity(blacklist.len());
+    for mac in blacklist {
+        blackset.insert(*mac & 0xffffff);
+    }
+    let mut inject_keys = vec![];
+    let mut inject_macs = vec![];
+    let mut rejected = vec![];
+    for (i, mac) in macs.iter().enumerate() {
+        if blackset.contains(&(u64::from(mac.clone()) & 0xffffff)) {
+            rejected.push(mac);
+        } else {
+            inject_keys.push(keys[i]);
+            inject_macs.push(macs[i]);
+        }
+    }
+
+    if !rejected.is_empty() {
+        debug!(
+            "Dispatcher{} Tap interfaces {:?} rejected by blacklist",
+            id, rejected
+        );
+    }
+    (inject_keys, inject_macs)
+}
+
 impl LocalModeDispatcherListener {
     pub(super) fn new(
         base: BaseDispatcherListener,
@@ -352,28 +388,6 @@ impl LocalModeDispatcherListener {
         blacklist: &Vec<u64>,
     ) {
         let mut interfaces = interfaces.to_vec();
-        if !blacklist.is_empty() {
-            // 当虚拟机内的容器节点已部署采集器时，宿主机采集器需要排除容器节点的接口，避免采集双份重复流量
-            let mut blackset = HashSet::with_capacity(blacklist.len());
-            for mac in blacklist {
-                blackset.insert(*mac & 0xffffffff);
-            }
-            let mut rejected = vec![];
-            interfaces.retain(|iface| {
-                if blackset.contains(&(u64::from(iface.mac_addr) & 0xffffffff)) {
-                    rejected.push(iface.mac_addr);
-                    false
-                } else {
-                    true
-                }
-            });
-            if !rejected.is_empty() {
-                debug!(
-                    "Dispatcher{} Tap interfaces {:?} rejected by blacklist",
-                    self.base.log_id, rejected
-                );
-            }
-        }
         // interfaces为实际TAP口的集合，macs为TAP口对应主机的MAC地址集合
         interfaces.sort_by_key(|link| link.if_index);
         let keys = interfaces
@@ -387,6 +401,7 @@ impl LocalModeDispatcherListener {
             #[cfg(target_os = "linux")]
             &self.base.options.lock().unwrap().tap_mac_script,
         );
+        let (keys, macs) = skip_by_blacklist(&self.base.log_id, keys, macs, blacklist);
         self.base.on_vm_change(&keys, &macs);
         self.base.on_tap_interface_change(interfaces, if_mac_source);
     }
