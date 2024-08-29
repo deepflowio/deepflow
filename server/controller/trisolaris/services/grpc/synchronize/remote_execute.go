@@ -66,7 +66,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				if resp == nil {
 					continue
 				}
-				log.Debugf("agent command response: %s", resp.String())
+				log.Infof("agent command response: %s", resp.String())
 				if resp.AgentId == nil {
 					log.Warningf("recevie agent info from remote command is nil")
 					continue
@@ -78,10 +78,16 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				}
 				if ok := service.AddToCMDManagerIfNotExist(key, uint64(1)); !ok {
 					log.Infof("add agent(key:%s) to cmd manager", key)
+					manager = service.GetAgentCMDManager(key)
+					if manager == nil {
+						log.Errorf("agent(key: %s) remote exec map not found", key)
+						continue
+					}
 					initDone <- struct{}{}
 				}
 
 				service.AgentCommandLock()
+				log.Infof("agent(key: %s) command lock", key)
 				manager = service.GetAgentCMDManagerWithoutLock(key)
 				if manager == nil {
 					log.Errorf("agent(key: %s) remote exec map not found", key)
@@ -118,7 +124,9 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 		}
 	}()
 
+	log.Infof("waiting for init done, agent(key: %s)", key)
 	<-initDone
+	log.Infof("agent commands init done, agent(key: %s)", key)
 	if manager == nil {
 		err := fmt.Errorf("get agent(key: %s) remote exec manager nil", key)
 		log.Error(err)
