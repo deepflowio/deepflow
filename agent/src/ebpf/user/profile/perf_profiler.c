@@ -1018,6 +1018,11 @@ int set_profiler_cpu_aggregation(int flag)
 	return (-1);
 }
 
+bool match_profiler_regex(const char *name)
+{
+	return false;
+}
+
 struct bpf_tracer *get_profiler_tracer(void)
 {
 	return NULL;
