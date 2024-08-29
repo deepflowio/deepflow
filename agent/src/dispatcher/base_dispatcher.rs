@@ -806,8 +806,11 @@ impl BaseDispatcherListener {
                 }
             }
         });
-        if deleted.len() > 0 {
-            info!("Dispatcher{} Removing VMs: {:?}", self.log_id, deleted);
+        if !deleted.is_empty() {
+            info!(
+                "Dispatcher{} Removing VMs: {:?} by {:?} + {:?}",
+                self.log_id, deleted, keys, vm_macs
+            );
         }
         if pipelines.len() == keys.len() {
             return;
@@ -845,8 +848,11 @@ impl BaseDispatcherListener {
                 })),
             );
         }
-        if added.len() > 0 {
-            info!("Dispatcher{} Adding VMs: {:?}", self.log_id, added);
+        if !added.is_empty() {
+            info!(
+                "Dispatcher{} Adding VMs: {:?} by {:?} + {:?}",
+                self.log_id, added, keys, vm_macs
+            );
         }
     }
 
