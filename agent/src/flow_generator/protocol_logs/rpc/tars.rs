@@ -292,7 +292,6 @@ impl TarsInfo {
                             info.resp_status = L7ResponseStatus::Ok;
                         }
                     }
-                    info.endpoint = info.get_endpoint();
                 }
             },
             _ => return None,
