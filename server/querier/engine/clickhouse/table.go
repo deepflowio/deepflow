@@ -43,10 +43,8 @@ func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.
 	if !ok {
 		return nil
 	}
-	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_EXT_METRICS, chCommon.DB_NAME_DEEPFLOW_TENANT}, db) {
+	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_EXT_METRICS, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS}, db) {
 		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
-	} else if db == chCommon.DB_NAME_PROMETHEUS {
-		values = append(values, chCommon.GetPrometheusTables(db, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
 	} else {
 		for _, table := range tables {
 			datasource, err := chCommon.GetDatasources(db, table, orgID)

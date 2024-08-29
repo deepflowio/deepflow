@@ -19,8 +19,6 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"golang.org/x/exp/slices"
 
@@ -76,63 +74,6 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 				"metrics", []bool{true, true, true}, "", tableName, "", "",
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
-		}
-	}
-	return loadMetrics, err
-}
-
-func GetPrometheusMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
-	loadMetrics := make(map[string]*Metrics)
-	allMetrics := GetSamplesMetrics()
-	var err error
-	if config.Cfg == nil {
-		return nil, nil
-	}
-	externalChClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       "flow_tag",
-		Context:  ctx,
-	}
-	var prometheusTableSql string
-	var tableFilter string
-	var whereSql string
-	prometheusTableSql = "SELECT table FROM flow_tag.%s_custom_field WHERE %s field_type!='' %s GROUP BY table ORDER BY table ASC"
-	if table != "" {
-		tableFilter = fmt.Sprintf("table='%s' AND", table)
-	}
-	if where != "" {
-		whereSql = fmt.Sprintf("AND (%s)", where)
-	}
-	prometheusTableSql = fmt.Sprintf(prometheusTableSql, db, tableFilter, whereSql)
-
-	prometheusTableRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: prometheusTableSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	index := 0
-	for field, metric := range allMetrics {
-		metricType := METRICS_TYPE_COUNTER
-		isAgg := false
-		if field == COUNT_METRICS_NAME {
-			metricType = METRICS_TYPE_OTHER
-			isAgg = true
-		}
-		for _, value := range prometheusTableRst.Values {
-			tableName := value.([]interface{})[0].(string)
-			if tableName == "" {
-				continue
-			}
-			lm := NewMetrics(
-				index, metric.DBField, metric.DisplayName, "", metricType,
-				"metrics", []bool{true, true, true}, "", tableName, "", "",
-			)
-			lm.IsAgg = isAgg
-			loadMetrics[strings.Join([]string{field, strconv.Itoa(index)}, "-")] = lm
-			index++
 		}
 	}
 	return loadMetrics, err

@@ -212,48 +212,14 @@ func GetExtTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx conte
 		Context:  ctx,
 	}
 	sql := ""
-	if slices.Contains([]string{DB_NAME_EXT_METRICS, DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT}, db) {
+	if slices.Contains([]string{DB_NAME_EXT_METRICS, DB_NAME_DEEPFLOW_ADMIN, DB_NAME_DEEPFLOW_TENANT, DB_NAME_PROMETHEUS}, db) {
 		sql = fmt.Sprintf("SELECT table FROM flow_tag.%s_custom_field GROUP BY table", db)
 		chClient.DB = "flow_tag"
 	} else {
+		// there is currently no such scene
 		sql = "SHOW TABLES FROM " + db
 	}
 	// for debug
-	chClient.Debug = client.NewDebug(sql)
-	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
-	if err != nil {
-		log.Error(err)
-		return nil
-	}
-	if DebugInfo != nil {
-		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
-	}
-	for _, _table := range rst.Values {
-		table := _table.([]interface{})[0].(string)
-		if !strings.HasSuffix(table, "_local") {
-			datasources, _ := GetDatasources(db, table, orgID)
-			values = append(values, []interface{}{table, datasources})
-		}
-	}
-	return values
-}
-
-func GetPrometheusTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) (values []interface{}) {
-	chClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       db,
-		Context:  ctx,
-	}
-	sql := ""
-	if db == "prometheus" {
-		sql = "SELECT table FROM flow_tag.prometheus_custom_field GROUP BY table"
-		chClient.DB = "flow_tag"
-	} else {
-		sql = "SHOW TABLES FROM " + db
-	}
 	chClient.Debug = client.NewDebug(sql)
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
 	if err != nil {
