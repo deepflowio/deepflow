@@ -127,13 +127,13 @@ func GetPrometheusGroup(name string, e *CHEngine) string {
 			for _, appLabel := range appLabels {
 				if appLabel.AppLabelName == nameNoPreffix {
 					isAppLabel = true
-					tagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (%d, app_label_value_id_%d))", labelNameID, appLabel.AppLabelColumnIndex)
+					tagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (%d, toUInt64(app_label_value_id_%d)))", labelNameID, appLabel.AppLabelColumnIndex)
 					break
 				}
 			}
 		}
 		if !isAppLabel {
-			tagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.target_label_map', 'label_value', (%d, %d, target_id))", metricID, labelNameID)
+			tagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.target_label_map', 'label_value', (%d, %d, toUInt64(target_id)))", metricID, labelNameID)
 		}
 	} else {
 		tagTranslatorStr = name
