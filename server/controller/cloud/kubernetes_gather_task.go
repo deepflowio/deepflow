@@ -26,6 +26,7 @@ import (
 	kmodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/queue"
 )
@@ -43,7 +44,7 @@ type KubernetesGatherTask struct {
 }
 
 func NewKubernetesGatherTask(
-	ctx context.Context, db *mysql.DB, domain *mysql.Domain, subDomain *mysql.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGatherTask {
+	ctx context.Context, db *mysql.DB, domain *mysqlmodel.Domain, subDomain *mysqlmodel.SubDomain, cfg config.CloudConfig, isSubDomain bool) *KubernetesGatherTask {
 	kubernetesGather := kubernetes_gather.NewKubernetesGather(db, domain, subDomain, cfg, isSubDomain)
 	if kubernetesGather == nil {
 		log.Errorf("kubernetes_gather task (%s) init faild", domain.Name, db.LogPrefixORGID)

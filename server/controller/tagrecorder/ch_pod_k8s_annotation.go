@@ -19,16 +19,17 @@ package tagrecorder
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChPodK8sAnnotation struct {
-	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChPodK8sAnnotation, K8sAnnotationKey]
+	SubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPodK8sAnnotation, K8sAnnotationKey]
 }
 
 func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 	mng := &ChPodK8sAnnotation{
-		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysql.Pod, mysql.ChPodK8sAnnotation, K8sAnnotationKey](
+		newSubscriberComponent[*message.PodFieldsUpdate, message.PodFieldsUpdate, mysqlmodel.Pod, mysqlmodel.ChPodK8sAnnotation, K8sAnnotationKey](
 			common.RESOURCE_TYPE_POD_EN, RESOURCE_TYPE_CH_K8S_ANNOTATION,
 		),
 	}
@@ -39,10 +40,10 @@ func NewChPodK8sAnnotation() *ChPodK8sAnnotation {
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *message.PodFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]K8sAnnotationKey, 0)
-	targetsToAdd := make([]mysql.ChPodK8sAnnotation, 0)
+	targetsToAdd := make([]mysqlmodel.ChPodK8sAnnotation, 0)
 	keysToDelete := make([]K8sAnnotationKey, 0)
-	targetsToDelete := make([]mysql.ChPodK8sAnnotation, 0)
-	var chItem mysql.ChPodK8sAnnotation
+	targetsToDelete := make([]mysqlmodel.ChPodK8sAnnotation, 0)
+	var chItem mysqlmodel.ChPodK8sAnnotation
 	var updateKey K8sAnnotationKey
 	updateInfo := make(map[string]interface{})
 
@@ -54,7 +55,7 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 			oldV, ok := old[k]
 			if !ok {
 				keysToAdd = append(keysToAdd, K8sAnnotationKey{ID: sourceID, Key: k})
-				targetsToAdd = append(targetsToAdd, mysql.ChPodK8sAnnotation{
+				targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sAnnotation{
 					ID:    sourceID,
 					Key:   k,
 					Value: v,
@@ -66,7 +67,7 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 					db.Where("id = ? and `key` = ?", sourceID, k).First(&chItem)
 					if chItem.ID == 0 {
 						keysToAdd = append(keysToAdd, K8sAnnotationKey{ID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, mysql.ChPodK8sAnnotation{
+						targetsToAdd = append(targetsToAdd, mysqlmodel.ChPodK8sAnnotation{
 							ID:    sourceID,
 							Key:   k,
 							Value: v,
@@ -80,7 +81,7 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 		for k := range old {
 			if _, ok := new[k]; !ok {
 				keysToDelete = append(keysToDelete, K8sAnnotationKey{ID: sourceID, Key: k})
-				targetsToDelete = append(targetsToDelete, mysql.ChPodK8sAnnotation{
+				targetsToDelete = append(targetsToDelete, mysqlmodel.ChPodK8sAnnotation{
 					ID:  sourceID,
 					Key: k,
 				})
@@ -96,12 +97,12 @@ func (c *ChPodK8sAnnotation) onResourceUpdated(sourceID int, fieldsUpdate *messa
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysql.Pod) (keys []K8sAnnotationKey, targets []mysql.ChPodK8sAnnotation) {
+func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysqlmodel.Pod) (keys []K8sAnnotationKey, targets []mysqlmodel.ChPodK8sAnnotation) {
 	_, annotationMap := common.StrToJsonAndMap(source.Annotation)
 
 	for k, v := range annotationMap {
 		keys = append(keys, K8sAnnotationKey{ID: source.ID, Key: k})
-		targets = append(targets, mysql.ChPodK8sAnnotation{
+		targets = append(targets, mysqlmodel.ChPodK8sAnnotation{
 			ID:          source.ID,
 			Key:         k,
 			Value:       v,
@@ -114,6 +115,6 @@ func (c *ChPodK8sAnnotation) sourceToTarget(md *message.Metadata, source *mysql.
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChPodK8sAnnotation) softDeletedTargetsUpdated(targets []mysql.ChPodK8sAnnotation, db *mysql.DB) {
+func (c *ChPodK8sAnnotation) softDeletedTargetsUpdated(targets []mysqlmodel.ChPodK8sAnnotation, db *mysql.DB) {
 
 }

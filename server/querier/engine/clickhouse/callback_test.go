@@ -17,10 +17,6 @@
 package clickhouse
 
 import (
-	//"github.com/k0kubun/pp"
-	//"github.com/deepflowio/deepflow/server/querier/common"
-	//"github.com/deepflowio/deepflow/server/querier/parse"
-	//"github.com/deepflowio/deepflow/server/querier/querier"
 	"reflect"
 	"testing"
 
@@ -41,77 +37,84 @@ func TestTimeFill(t *testing.T) {
 		"field_0",
 		"field_1",
 	}
+	t1 := uint32(1645092000)
+	t2 := uint32(1645113600)
+	v1, v2, v3, v4 := 2, 3, 1, 4
+	s1, s2 := "1", "0"
 	values := []interface{}{
 		[]interface{}{
-			1645092000,
-			"1",
-			2,
+			t1,
+			s1,
+			v1,
 		},
 		[]interface{}{
-			1645092000,
-			"0",
-			3,
+			t1,
+			s2,
+			v2,
 		},
 		[]interface{}{
-			1645113600,
-			"1",
-			1,
+			t2,
+			s1,
+			v3,
 		},
 		[]interface{}{
-			1645113600,
-			"0",
-			4,
+			t2,
+			s2,
+			v4,
 		},
 	}
+	wt1 := uint32(1645070400)
+	wt2 := uint32(1645135200)
+	wt3 := uint32(1645156800)
 	want := []interface{}{
 		[]interface{}{
-			1645070400,
-			"0",
+			wt1,
+			s1,
 			0,
 		},
 		[]interface{}{
-			1645092000,
-			"0",
-			3,
+			t1,
+			s1,
+			v1,
 		},
 		[]interface{}{
-			1645113600,
-			"0",
-			4,
+			t2,
+			s1,
+			v3,
 		},
 		[]interface{}{
-			1645135200,
-			"0",
+			wt2,
+			s1,
 			0,
 		},
 		[]interface{}{
-			1645156800,
-			"0",
+			wt3,
+			s1,
 			0,
 		},
 		[]interface{}{
-			1645070400,
-			"1",
+			wt1,
+			s2,
 			0,
 		},
 		[]interface{}{
-			1645092000,
-			"1",
-			2,
+			t1,
+			s2,
+			v2,
 		},
 		[]interface{}{
-			1645113600,
-			"1",
-			1,
+			t2,
+			s2,
+			v4,
 		},
 		[]interface{}{
-			1645135200,
-			"1",
+			wt2,
+			s2,
 			0,
 		},
 		[]interface{}{
-			1645156800,
-			"1",
+			wt3,
+			s2,
 			0,
 		},
 	}
@@ -120,13 +123,13 @@ func TestTimeFill(t *testing.T) {
 		Values:  values,
 		Schemas: common.ColumnSchemas{&common.ColumnSchema{
 			Type:      common.COLUMN_SCHEMA_TYPE_TAG,
-			ValueType: "Int",
+			ValueType: "UInt32",
 		}, &common.ColumnSchema{
 			Type:      common.COLUMN_SCHEMA_TYPE_TAG,
 			ValueType: "String",
 		}, &common.ColumnSchema{
 			Type:      common.COLUMN_SCHEMA_TYPE_METRICS,
-			ValueType: "Int",
+			ValueType: "Float64",
 		},
 		},
 	}

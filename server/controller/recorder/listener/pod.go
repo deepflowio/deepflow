@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/event"
@@ -38,7 +38,7 @@ func NewPod(c *cache.Cache, eq *queue.OverwriteQueue) *Pod {
 	return listener
 }
 
-func (p *Pod) OnUpdaterAdded(addedDBItems []*mysql.Pod) {
+func (p *Pod) OnUpdaterAdded(addedDBItems []*mysqlmodel.Pod) {
 	p.eventProducer.ProduceByAdd(addedDBItems)
 	p.cache.AddPods(addedDBItems)
 }

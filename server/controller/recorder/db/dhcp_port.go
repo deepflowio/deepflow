@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type DHCPPort struct {
-	OperatorBase[*mysql.DHCPPort, mysql.DHCPPort]
+	OperatorBase[*mysqlmodel.DHCPPort, mysqlmodel.DHCPPort]
 }
 
 func NewDHCPPort() *DHCPPort {
 	operater := &DHCPPort{
-		newOperatorBase[*mysql.DHCPPort](
+		newOperatorBase[*mysqlmodel.DHCPPort](
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			true,
 			true,

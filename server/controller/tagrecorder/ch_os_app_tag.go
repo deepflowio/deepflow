@@ -19,16 +19,17 @@ package tagrecorder
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChOSAppTag struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChOSAppTag, OSAPPTagKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTag, OSAPPTagKey]
 }
 
 func NewChOSAppTag() *ChOSAppTag {
 	mng := &ChOSAppTag{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChOSAppTag, OSAPPTagKey](
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChOSAppTag, OSAPPTagKey](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_OS_APP_TAG,
 		),
 	}
@@ -39,10 +40,10 @@ func NewChOSAppTag() *ChOSAppTag {
 // onResourceUpdated implements SubscriberDataGenerator
 func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.ProcessFieldsUpdate, db *mysql.DB) {
 	keysToAdd := make([]OSAPPTagKey, 0)
-	targetsToAdd := make([]mysql.ChOSAppTag, 0)
+	targetsToAdd := make([]mysqlmodel.ChOSAppTag, 0)
 	keysToDelete := make([]OSAPPTagKey, 0)
-	targetsToDelete := make([]mysql.ChOSAppTag, 0)
-	var chItem mysql.ChOSAppTag
+	targetsToDelete := make([]mysqlmodel.ChOSAppTag, 0)
+	var chItem mysqlmodel.ChOSAppTag
 	var updateKey OSAPPTagKey
 	updateInfo := make(map[string]interface{})
 
@@ -54,7 +55,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 			oldV, ok := old[k]
 			if !ok {
 				keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
-				targetsToAdd = append(targetsToAdd, mysql.ChOSAppTag{
+				targetsToAdd = append(targetsToAdd, mysqlmodel.ChOSAppTag{
 					PID:   sourceID,
 					Key:   k,
 					Value: v,
@@ -66,7 +67,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 					db.Where("pid = ? and `key` = ?", sourceID, k).First(&chItem) // TODO common
 					if chItem.PID == 0 {
 						keysToAdd = append(keysToAdd, OSAPPTagKey{PID: sourceID, Key: k})
-						targetsToAdd = append(targetsToAdd, mysql.ChOSAppTag{
+						targetsToAdd = append(targetsToAdd, mysqlmodel.ChOSAppTag{
 							PID:   sourceID,
 							Key:   k,
 							Value: v,
@@ -80,7 +81,7 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 		for k := range old {
 			if _, ok := new[k]; !ok {
 				keysToDelete = append(keysToDelete, OSAPPTagKey{PID: sourceID, Key: k})
-				targetsToDelete = append(targetsToDelete, mysql.ChOSAppTag{
+				targetsToDelete = append(targetsToDelete, mysqlmodel.ChOSAppTag{
 					PID: sourceID,
 					Key: k,
 				})
@@ -96,12 +97,12 @@ func (c *ChOSAppTag) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysql.Process) (keys []OSAPPTagKey, targets []mysql.ChOSAppTag) {
+func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysqlmodel.Process) (keys []OSAPPTagKey, targets []mysqlmodel.ChOSAppTag) {
 	_, osAppTagsMap := common.StrToJsonAndMap(source.OSAPPTags)
 
 	for k, v := range osAppTagsMap {
 		keys = append(keys, OSAPPTagKey{PID: source.ID, Key: k})
-		targets = append(targets, mysql.ChOSAppTag{
+		targets = append(targets, mysqlmodel.ChOSAppTag{
 			PID:         source.ID,
 			Key:         k,
 			Value:       v,
@@ -114,6 +115,6 @@ func (c *ChOSAppTag) sourceToTarget(md *message.Metadata, source *mysql.Process)
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChOSAppTag) softDeletedTargetsUpdated(targets []mysql.ChOSAppTag, db *mysql.DB) {
+func (c *ChOSAppTag) softDeletedTargetsUpdated(targets []mysqlmodel.ChOSAppTag, db *mysql.DB) {
 
 }

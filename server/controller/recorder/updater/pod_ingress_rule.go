@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodIngressRule struct {
 	UpdaterBase[
 		cloudmodel.PodIngressRule,
 		*diffbase.PodIngressRule,
-		*mysql.PodIngressRule,
-		mysql.PodIngressRule,
+		*mysqlmodel.PodIngressRule,
+		mysqlmodel.PodIngressRule,
 		*message.PodIngressRuleAdd,
 		message.PodIngressRuleAdd,
 		*message.PodIngressRuleUpdate,
@@ -47,8 +47,8 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 		newUpdaterBase[
 			cloudmodel.PodIngressRule,
 			*diffbase.PodIngressRule,
-			*mysql.PodIngressRule,
-			mysql.PodIngressRule,
+			*mysqlmodel.PodIngressRule,
+			mysqlmodel.PodIngressRule,
 			*message.PodIngressRuleAdd,
 			message.PodIngressRuleAdd,
 			*message.PodIngressRuleUpdate,
@@ -73,7 +73,7 @@ func (r *PodIngressRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngress
 	return
 }
 
-func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRule) (*mysql.PodIngressRule, bool) {
+func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRule) (*mysqlmodel.PodIngressRule, bool) {
 	podIngressID, exists := r.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -83,7 +83,7 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 		return nil, false
 	}
 
-	dbItem := &mysql.PodIngressRule{
+	dbItem := &mysqlmodel.PodIngressRule{
 		Name:         cloudItem.Name,
 		Protocol:     cloudItem.Protocol,
 		Host:         cloudItem.Host,

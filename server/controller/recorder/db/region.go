@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type Region struct {
-	OperatorBase[*mysql.Region, mysql.Region]
+	OperatorBase[*mysqlmodel.Region, mysqlmodel.Region]
 }
 
 func NewRegion() *Region {
 	operater := &Region{
-		newOperatorBase[*mysql.Region](
+		newOperatorBase[*mysqlmodel.Region](
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			true,
 			true,

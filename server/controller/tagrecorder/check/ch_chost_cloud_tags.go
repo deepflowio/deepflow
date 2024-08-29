@@ -19,17 +19,17 @@ package tagrecorder
 import (
 	"encoding/json"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChChostCloudTags struct {
-	UpdaterBase[mysql.ChChostCloudTags, CloudTagsKey]
+	UpdaterBase[mysqlmodel.ChChostCloudTags, CloudTagsKey]
 }
 
 func NewChChostCloudTags() *ChChostCloudTags {
 	updater := &ChChostCloudTags{
-		UpdaterBase[mysql.ChChostCloudTags, CloudTagsKey]{
+		UpdaterBase[mysqlmodel.ChChostCloudTags, CloudTagsKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_VM_CLOUD_TAGS,
 		},
 	}
@@ -37,15 +37,15 @@ func NewChChostCloudTags() *ChChostCloudTags {
 	return updater
 }
 
-func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostCloudTags, bool) {
-	var vms []mysql.VM
+func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysqlmodel.ChChostCloudTags, bool) {
+	var vms []mysqlmodel.VM
 	err := c.db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(c.resourceTypeName, err), c.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[CloudTagsKey]mysql.ChChostCloudTags)
+	keyToItem := make(map[CloudTagsKey]mysqlmodel.ChChostCloudTags)
 	for _, vm := range vms {
 		cloudTagsMap := map[string]string{}
 		for k, v := range vm.CloudTags {
@@ -60,7 +60,7 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 			key := CloudTagsKey{
 				ID: vm.ID,
 			}
-			keyToItem[key] = mysql.ChChostCloudTags{
+			keyToItem[key] = mysqlmodel.ChChostCloudTags{
 				ID:        vm.ID,
 				CloudTags: string(cloudTagsStr),
 				TeamID:    tagrecorder.DomainToTeamID[vm.Domain],
@@ -71,11 +71,11 @@ func (c *ChChostCloudTags) generateNewData() (map[CloudTagsKey]mysql.ChChostClou
 	return keyToItem, true
 }
 
-func (c *ChChostCloudTags) generateKey(dbItem mysql.ChChostCloudTags) CloudTagsKey {
+func (c *ChChostCloudTags) generateKey(dbItem mysqlmodel.ChChostCloudTags) CloudTagsKey {
 	return CloudTagsKey{ID: dbItem.ID}
 }
 
-func (c *ChChostCloudTags) generateUpdateInfo(oldItem, newItem mysql.ChChostCloudTags) (map[string]interface{}, bool) {
+func (c *ChChostCloudTags) generateUpdateInfo(oldItem, newItem mysqlmodel.ChChostCloudTags) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.CloudTags != newItem.CloudTags {
 		updateInfo["cloud_tags"] = newItem.CloudTags

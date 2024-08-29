@@ -1259,8 +1259,8 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 				valueIDs := []string{}
 				for _, v := range appLabelRst.Values {
 					valueID := v.([]interface{})[0]
-					valueIDInt := valueID.(int)
-					valueIDString := fmt.Sprintf("%d", valueIDInt)
+					valueIDUInt64 := valueID.(uint64)
+					valueIDString := fmt.Sprintf("%d", valueIDUInt64)
 					valueIDs = append(valueIDs, valueIDString)
 				}
 				valueIDFilter := strings.Join(valueIDs, ",")

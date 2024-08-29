@@ -36,7 +36,7 @@ import (
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -82,7 +82,7 @@ type QingCloud struct {
 	debugger *cloudcommon.Debugger
 }
 
-func NewQingCloud(orgID int, domain mysql.Domain, cfg cloudconfig.CloudConfig) (*QingCloud, error) {
+func NewQingCloud(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*QingCloud, error) {
 	config, err := simplejson.NewJson([]byte(domain.Config))
 	if err != nil {
 		log.Error(err, logger.NewORGPrefix(orgID))

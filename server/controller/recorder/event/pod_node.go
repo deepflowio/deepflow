@@ -19,7 +19,7 @@ package event
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -45,7 +45,7 @@ func NewPodNode(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *PodNode {
 	return mng
 }
 
-func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
+func (p *PodNode) ProduceByAdd(items []*mysqlmodel.PodNode) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
 		var domainLcuuid string

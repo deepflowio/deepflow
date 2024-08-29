@@ -18,12 +18,10 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
-
-	//"database/sql"
-	"fmt"
 	"time"
 	"unsafe"
 
@@ -162,6 +160,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 	columnValues := make([]interface{}, len(columns))
 	for i := range columns {
 		columnValues[i] = reflect.New(columns[i].ScanType()).Interface()
+		columnSchemas[i].ValueType = columns[i].DatabaseTypeName()
 	}
 	resSize := 0
 	for rows.Next() {
@@ -170,15 +169,10 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 			return nil, err
 		}
 		record := make([]interface{}, 0, len(columns))
-		for i, rawValue := range columnValues {
-			value, valueType, err := TransType(rawValue, columns[i].Name(), columns[i].DatabaseTypeName())
-			if err != nil {
-				c.Debug.Error = fmt.Sprintf("%s", err)
-				return nil, err
-			}
+		for _, rawValue := range columnValues {
+			value := TransType(rawValue)
 			resSize += int(unsafe.Sizeof(value))
 			record = append(record, value)
-			columnSchemas[i].ValueType = valueType
 		}
 		values = append(values, record)
 	}

@@ -2177,6 +2177,8 @@ pub struct EbpfYamlConfig {
     pub go_tracing_timeout: usize,
     pub dwarf_disabled: bool,
     pub dwarf_regex: String,
+    pub dwarf_process_map_size: usize,
+    pub dwarf_shard_map_size: usize,
     pub io_event_collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub io_event_minimal_duration: Duration,
@@ -2209,8 +2211,10 @@ impl Default for EbpfYamlConfig {
             go_tracing_timeout: 120,
             io_event_collect_mode: 1,
             io_event_minimal_duration: Duration::from_millis(1),
-            dwarf_disabled: false,
+            dwarf_disabled: true,
             dwarf_regex: "".to_owned(),
+            dwarf_process_map_size: 1024,
+            dwarf_shard_map_size: 128,
             java_symbol_file_refresh_defer_interval: Duration::from_secs(60),
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),
@@ -2452,6 +2456,7 @@ pub struct YamlConfig {
     pub oracle_parse_config: OracleParseConfig,
     pub server_ports: Vec<u16>,
     pub consistent_timestamp_in_l7_metrics: bool,
+    pub packet_segmentation_reassembly: Vec<u16>,
 }
 
 impl YamlConfig {
@@ -2881,6 +2886,7 @@ impl Default for YamlConfig {
             ebpf_collector_queue_size: 65535,
             server_ports: vec![],
             consistent_timestamp_in_l7_metrics: false,
+            packet_segmentation_reassembly: vec![],
         }
     }
 }

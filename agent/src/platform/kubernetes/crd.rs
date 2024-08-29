@@ -25,14 +25,15 @@ use super::resource_watcher::Trimmable;
 pub mod pingan_cloud {
     use super::*;
 
-    use k8s_openapi::api::core::v1::ServicePort;
+    use k8s_openapi::api::core::v1::{ServicePort, ServiceStatus};
 
     #[derive(CustomResource, Clone, Debug, Serialize, Deserialize, JsonSchema)]
     #[kube(
         group = "crd.pingan.org",
         version = "v1alpha1",
         kind = "ServiceRule",
-        namespaced
+        namespaced,
+        status = "ServiceStatus"
     )]
     #[serde(rename_all = "camelCase")]
     pub struct ServiceRuleSpec {
@@ -59,6 +60,12 @@ pub mod pingan_cloud {
                 labels: self.metadata.labels.take(),
                 ..Default::default()
             };
+            if let Some(svc_status) = self.status.take() {
+                sr.status = Some(ServiceStatus {
+                    load_balancer: svc_status.load_balancer,
+                    ..Default::default()
+                });
+            }
             sr
         }
     }

@@ -18,11 +18,11 @@ package service
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 )
 
-func getAgentByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtaps []mysql.VTap) ([]mysql.VTap, error) {
+func GetAgentByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtaps []mysqlmodel.VTap) ([]mysqlmodel.VTap, error) {
 	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
 		return vtaps, nil
 	}
@@ -31,7 +31,7 @@ func getAgentByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, v
 		return nil, err
 	}
 
-	var results []mysql.VTap
+	var results []mysqlmodel.VTap
 	for _, vtap := range vtaps {
 		if fpermitCfg.Enabled {
 			if _, ok := teamIDMap[vtap.TeamID]; !ok {
@@ -47,7 +47,7 @@ func getAgentByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, v
 	return results, nil
 }
 
-func GetAgentGroupByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtapGroups []*mysql.VTapGroup) ([]*mysql.VTapGroup, error) {
+func GetAgentGroupByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPermit, vtapGroups []*mysqlmodel.VTapGroup) ([]*mysqlmodel.VTapGroup, error) {
 	if userInfo.Type == common.DEFAULT_USER_TYPE && userInfo.ID == common.DEFAULT_USER_ID {
 		return vtapGroups, nil
 	}
@@ -56,7 +56,7 @@ func GetAgentGroupByUser(userInfo *httpcommon.UserInfo, fpermitCfg *common.FPerm
 		return nil, err
 	}
 
-	var results []*mysql.VTapGroup
+	var results []*mysqlmodel.VTapGroup
 	for _, vtapGroup := range vtapGroups {
 		if fpermitCfg.Enabled {
 			if _, ok := teamIDMap[vtapGroup.TeamID]; !ok {

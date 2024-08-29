@@ -18,6 +18,7 @@ package common
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -62,13 +63,13 @@ func (m *Metadata) GetTeamID() int {
 	}
 }
 
-func (m *Metadata) SetDomain(domain mysql.Domain) {
+func (m *Metadata) SetDomain(domain mysqlmodel.Domain) {
 	m.Domain = &DomainInfo{domain}
 	m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(domain.TeamID))
 	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name))
 }
 
-func (m *Metadata) SetSubDomain(subDomain mysql.SubDomain) {
+func (m *Metadata) SetSubDomain(subDomain mysqlmodel.SubDomain) {
 	m.SubDomain = &SubDomainInfo{subDomain}
 	if subDomain.TeamID != 0 {
 		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(subDomain.TeamID))
@@ -77,9 +78,9 @@ func (m *Metadata) SetSubDomain(subDomain mysql.SubDomain) {
 }
 
 type DomainInfo struct {
-	mysql.Domain
+	mysqlmodel.Domain
 }
 
 type SubDomainInfo struct {
-	mysql.SubDomain
+	mysqlmodel.SubDomain
 }

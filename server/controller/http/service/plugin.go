@@ -22,14 +22,15 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"gorm.io/gorm"
 )
 
-func CreatePlugin(db *mysql.DB, pluginCreate *mysql.Plugin) (*model.Plugin, error) {
-	var pluginFirst mysql.Plugin
+func CreatePlugin(db *mysql.DB, pluginCreate *mysqlmodel.Plugin) (*model.Plugin, error) {
+	var pluginFirst mysqlmodel.Plugin
 	if err := db.Where("name = ?", pluginCreate.Name).First(&pluginFirst).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, NewError(httpcommon.SERVER_ERROR,
@@ -44,7 +45,7 @@ func CreatePlugin(db *mysql.DB, pluginCreate *mysql.Plugin) (*model.Plugin, erro
 	}
 
 	// update by name and type
-	if err := db.Model(&mysql.Plugin{}).Where("name = ?", pluginCreate.Name).
+	if err := db.Model(&mysqlmodel.Plugin{}).Where("name = ?", pluginCreate.Name).
 		Updates(pluginCreate).Error; err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func CreatePlugin(db *mysql.DB, pluginCreate *mysql.Plugin) (*model.Plugin, erro
 }
 
 func GetPlugin(db *mysql.DB, filter map[string]interface{}) ([]model.Plugin, error) {
-	var plugins []mysql.Plugin
+	var plugins []mysqlmodel.Plugin
 	queryDB := db.DB
 	if _, ok := filter["name"]; ok {
 		queryDB = queryDB.Where("name = ?", filter["name"])
@@ -84,7 +85,7 @@ func DeletePlugin(db *mysql.DB, name string) error {
 		return NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("plugin (name: %s) not found", name))
 	}
 
-	if err := db.Where("name = ?", name).Delete(&mysql.Plugin{}).Error; err != nil {
+	if err := db.Where("name = ?", name).Delete(&mysqlmodel.Plugin{}).Error; err != nil {
 		return NewError(httpcommon.SERVER_ERROR, fmt.Sprintf("delete plugin (name: %s) failed, err: %v", name, err))
 	}
 	return nil

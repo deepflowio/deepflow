@@ -18,16 +18,17 @@ package tagrecorder
 
 import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChLbListener struct {
-	UpdaterBase[mysql.ChLBListener, IDKey]
+	UpdaterBase[mysqlmodel.ChLBListener, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 	updater := &ChLbListener{
-		UpdaterBase[mysql.ChLBListener, IDKey]{
+		UpdaterBase[mysqlmodel.ChLBListener, IDKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_LB_LISTENER,
 		},
 		resourceTypeToIconID,
@@ -37,15 +38,15 @@ func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 	return updater
 }
 
-func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
-	var lbListeners []mysql.LBListener
-	var lbTargetServers []mysql.LBTargetServer
-	err := mysql.Db.Unscoped().Find(&lbListeners).Error
+func (l *ChLbListener) generateNewData() (map[IDKey]mysqlmodel.ChLBListener, bool) {
+	var lbListeners []mysqlmodel.LBListener
+	var lbTargetServers []mysqlmodel.LBTargetServer
+	err := mysql.DefaultDB.Unscoped().Find(&lbListeners).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
 	}
-	err = mysql.Db.Unscoped().Find(&lbTargetServers).Error
+	err = mysql.DefaultDB.Unscoped().Find(&lbTargetServers).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), l.db.LogPrefixORGID)
 		return nil, false
@@ -56,18 +57,18 @@ func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
 		lbTargetSertverMap[lbTargetServer.LBListenerID] += 1
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChLBListener)
+	keyToItem := make(map[IDKey]mysqlmodel.ChLBListener)
 	for _, lbListener := range lbListeners {
 		if lbTargetSertverMap[lbListener.ID] == 0 {
 			continue
 		}
 		if lbListener.DeletedAt.Valid {
-			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
+			keyToItem[IDKey{ID: lbListener.ID}] = mysqlmodel.ChLBListener{
 				ID:   lbListener.ID,
 				Name: lbListener.Name + " (deleted)",
 			}
 		} else {
-			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
+			keyToItem[IDKey{ID: lbListener.ID}] = mysqlmodel.ChLBListener{
 				ID:   lbListener.ID,
 				Name: lbListener.Name,
 			}
@@ -76,11 +77,11 @@ func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
 	return keyToItem, true
 }
 
-func (l *ChLbListener) generateKey(dbItem mysql.ChLBListener) IDKey {
+func (l *ChLbListener) generateKey(dbItem mysqlmodel.ChLBListener) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (l *ChLbListener) generateUpdateInfo(oldItem, newItem mysql.ChLBListener) (map[string]interface{}, bool) {
+func (l *ChLbListener) generateUpdateInfo(oldItem, newItem mysqlmodel.ChLBListener) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

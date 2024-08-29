@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type CEN struct {
-	OperatorBase[*mysql.CEN, mysql.CEN]
+	OperatorBase[*mysqlmodel.CEN, mysqlmodel.CEN]
 }
 
 func NewCEN() *CEN {
 	operater := &CEN{
-		newOperatorBase[*mysql.CEN](
+		newOperatorBase[*mysqlmodel.CEN](
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			true,
 			false,

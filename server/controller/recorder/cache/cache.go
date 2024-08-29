@@ -24,7 +24,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/query"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -54,7 +54,7 @@ func NewCacheManager(ctx context.Context, cfg config.RecorderConfig, md *rcommon
 	}
 	mng.DomainCache = NewCache(ctx, md, mng.cacheSetSelfHealInterval)
 
-	var subDomains []*mysql.SubDomain
+	var subDomains []*mysqlmodel.SubDomain
 	err := mng.metadata.DB.Where("domain = ?", mng.metadata.Domain.Lcuuid).Find(&subDomains).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, err), mng.metadata.LogPrefixes)
@@ -120,9 +120,10 @@ func (c *Cache) IncrementSequence() {
 	c.Sequence++
 }
 
-func (c *Cache) SetLogLevel(level logging.Level) {
-	c.DiffBaseDataSet.LogController.SetLogLevel(level)
-	c.ToolDataSet.LogController.SetLogLevel(level)
+func (c *Cache) SetLogLevel(level logging.Level, caller string) {
+	log.Infof("set cache log level to %s (caller: %s)", level.String(), caller, c.metadata.LogPrefixes)
+	c.DiffBaseDataSet.SetLogLevel(level)
+	c.ToolDataSet.SetLogLevel(level)
 }
 
 func (c *Cache) getConditonDomainCreateMethod() map[string]interface{} {
@@ -202,10 +203,9 @@ func (c *Cache) TryRefresh() bool {
 func (c *Cache) Refresh() {
 	defer c.ResetRefreshSignal(RefreshSignalCallerSelfHeal)
 
-	c.SetLogLevel(logging.DEBUG)
-
 	c.DiffBaseDataSet = diffbase.NewDataSet(c.metadata)
 	c.ToolDataSet = tool.NewDataSet(c.metadata)
+	c.SetLogLevel(logging.DEBUG, RefreshSignalCallerSelfHeal)
 
 	// 分类刷新资源的相关缓存
 
@@ -257,12 +257,12 @@ func (c *Cache) Refresh() {
 	c.refreshProcesses()
 }
 
-func (c *Cache) AddRegion(item *mysql.Region) {
+func (c *Cache) AddRegion(item *mysqlmodel.Region) {
 	c.DiffBaseDataSet.AddRegion(item, c.Sequence)
 	c.ToolDataSet.AddRegion(item)
 }
 
-func (c *Cache) AddRegions(items []*mysql.Region) {
+func (c *Cache) AddRegions(items []*mysqlmodel.Region) {
 	for _, item := range items {
 		c.AddRegion(item)
 	}
@@ -281,10 +281,10 @@ func (c *Cache) DeleteRegions(lcuuids []string) {
 
 func (c *Cache) refreshRegions() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_REGION_EN), c.metadata.LogPrefixes)
-	var regions []*mysql.Region
+	var regions []*mysqlmodel.Region
 
 	// 使用az获取domain关联的region数据，排除“系统默认”region
-	var azs []*mysql.AZ
+	var azs []*mysqlmodel.AZ
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&azs).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_AZ_EN, err), c.metadata.LogPrefixes)
@@ -307,12 +307,12 @@ func (c *Cache) refreshRegions() {
 	c.AddRegions(regions)
 }
 
-func (c *Cache) AddAZ(item *mysql.AZ) {
+func (c *Cache) AddAZ(item *mysqlmodel.AZ) {
 	c.DiffBaseDataSet.AddAZ(item, c.Sequence)
 	c.ToolDataSet.AddAZ(item)
 }
 
-func (c *Cache) AddAZs(items []*mysql.AZ) {
+func (c *Cache) AddAZs(items []*mysqlmodel.AZ) {
 	for _, item := range items {
 		c.AddAZ(item)
 	}
@@ -331,7 +331,7 @@ func (c *Cache) DeleteAZs(lcuuids []string) {
 
 func (c *Cache) refreshAZs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_AZ_EN), c.metadata.LogPrefixes)
-	var azs []*mysql.AZ
+	var azs []*mysqlmodel.AZ
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&azs).Error
 	if err != nil {
@@ -342,11 +342,11 @@ func (c *Cache) refreshAZs() {
 	c.AddAZs(azs)
 }
 
-func (c *Cache) AddSubDomain(item *mysql.SubDomain) {
+func (c *Cache) AddSubDomain(item *mysqlmodel.SubDomain) {
 	c.DiffBaseDataSet.AddSubDomain(item, c.Sequence)
 }
 
-func (c *Cache) AddSubDomains(items []*mysql.SubDomain) {
+func (c *Cache) AddSubDomains(items []*mysqlmodel.SubDomain) {
 	for _, item := range items {
 		c.AddSubDomain(item)
 	}
@@ -364,7 +364,7 @@ func (c *Cache) DeleteSubDomains(lcuuids []string) {
 
 func (c *Cache) refreshSubDomains() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN), c.metadata.LogPrefixes)
-	var subDomains []*mysql.SubDomain
+	var subDomains []*mysqlmodel.SubDomain
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&subDomains).Error
 	if err != nil {
@@ -375,12 +375,12 @@ func (c *Cache) refreshSubDomains() {
 	c.AddSubDomains(subDomains)
 }
 
-func (c *Cache) AddHost(item *mysql.Host) {
+func (c *Cache) AddHost(item *mysqlmodel.Host) {
 	c.DiffBaseDataSet.AddHost(item, c.Sequence)
 	c.ToolDataSet.AddHost(item)
 }
 
-func (c *Cache) AddHosts(items []*mysql.Host) {
+func (c *Cache) AddHosts(items []*mysqlmodel.Host) {
 	for _, item := range items {
 		c.AddHost(item)
 	}
@@ -403,7 +403,7 @@ func (c *Cache) UpdateHost(cloudItem *cloudmodel.Host) {
 
 func (c *Cache) refreshHosts() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_HOST_EN), c.metadata.LogPrefixes)
-	var hosts []*mysql.Host
+	var hosts []*mysqlmodel.Host
 
 	err := c.metadata.DB.Where(
 		map[string]interface{}{
@@ -423,12 +423,12 @@ func (c *Cache) refreshHosts() {
 	c.AddHosts(hosts)
 }
 
-func (c *Cache) AddVM(item *mysql.VM) {
+func (c *Cache) AddVM(item *mysqlmodel.VM) {
 	c.DiffBaseDataSet.AddVM(item, c.Sequence, c.ToolDataSet)
 	c.ToolDataSet.AddVM(item)
 }
 
-func (c *Cache) AddVMs(items []*mysql.VM) {
+func (c *Cache) AddVMs(items []*mysqlmodel.VM) {
 	for _, item := range items {
 		c.AddVM(item)
 	}
@@ -451,7 +451,7 @@ func (c *Cache) DeleteVMs(lcuuids []string) {
 
 func (c *Cache) refreshVMs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_EN), c.metadata.LogPrefixes)
-	var vms []*mysql.VM
+	var vms []*mysqlmodel.VM
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&vms).Error
 	if err != nil {
@@ -462,7 +462,7 @@ func (c *Cache) refreshVMs() {
 	c.AddVMs(vms)
 }
 
-func (c *Cache) AddVPCs(items []*mysql.VPC) {
+func (c *Cache) AddVPCs(items []*mysqlmodel.VPC) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddVPC(item, c.Sequence)
 		c.ToolDataSet.AddVPC(item)
@@ -478,7 +478,7 @@ func (c *Cache) DeleteVPCs(lcuuids []string) {
 
 func (c *Cache) refreshVPCs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VPC_EN), c.metadata.LogPrefixes)
-	var vpcs []*mysql.VPC
+	var vpcs []*mysqlmodel.VPC
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&vpcs).Error
 	if err != nil {
@@ -489,12 +489,12 @@ func (c *Cache) refreshVPCs() {
 	c.AddVPCs(vpcs)
 }
 
-func (c *Cache) AddNetwork(item *mysql.Network) {
+func (c *Cache) AddNetwork(item *mysqlmodel.Network) {
 	c.DiffBaseDataSet.AddNetwork(item, c.Sequence, c.ToolDataSet)
 	c.ToolDataSet.AddNetwork(item)
 }
 
-func (c *Cache) AddNetworks(items []*mysql.Network) {
+func (c *Cache) AddNetworks(items []*mysqlmodel.Network) {
 	for _, item := range items {
 		c.AddNetwork(item)
 	}
@@ -513,7 +513,7 @@ func (c *Cache) DeleteNetworks(lcuuids []string) {
 
 func (c *Cache) refreshNetworks() []int {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN), c.metadata.LogPrefixes)
-	var networks []*mysql.Network
+	var networks []*mysqlmodel.Network
 	networkIDs := []int{}
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&networks).Error
@@ -527,7 +527,7 @@ func (c *Cache) refreshNetworks() []int {
 		c.AddNetwork(item)
 	}
 
-	var publicNetwork *mysql.Network
+	var publicNetwork *mysqlmodel.Network
 	err = c.metadata.DB.Where("lcuuid = ?", rcommon.PUBLIC_NETWORK_LCUUID).First(&publicNetwork).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, err), c.metadata.LogPrefixes)
@@ -538,7 +538,7 @@ func (c *Cache) refreshNetworks() []int {
 	return networkIDs
 }
 
-func (c *Cache) AddSubnets(items []*mysql.Subnet) {
+func (c *Cache) AddSubnets(items []*mysqlmodel.Subnet) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddSubnet(item, c.Sequence)
 		c.ToolDataSet.AddSubnet(item)
@@ -554,7 +554,7 @@ func (c *Cache) DeleteSubnets(lcuuids []string) {
 
 func (c *Cache) refreshSubnets(networkIDs []int) {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN), c.metadata.LogPrefixes)
-	var subnets []*mysql.Subnet
+	var subnets []*mysqlmodel.Subnet
 
 	err := c.metadata.DB.Where(map[string]interface{}{"vl2id": networkIDs}).Find(&subnets).Error
 	if err != nil {
@@ -565,12 +565,12 @@ func (c *Cache) refreshSubnets(networkIDs []int) {
 	c.AddSubnets(subnets)
 }
 
-func (c *Cache) AddVRouter(item *mysql.VRouter) {
+func (c *Cache) AddVRouter(item *mysqlmodel.VRouter) {
 	c.DiffBaseDataSet.AddVRouter(item, c.Sequence, c.ToolDataSet)
 	c.ToolDataSet.AddVRouter(item)
 }
 
-func (c *Cache) AddVRouters(items []*mysql.VRouter) {
+func (c *Cache) AddVRouters(items []*mysqlmodel.VRouter) {
 	for _, item := range items {
 		c.AddVRouter(item)
 	}
@@ -589,7 +589,7 @@ func (c *Cache) DeleteVRouters(lcuuids []string) {
 
 func (c *Cache) refreshVRouters() []int {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN), c.metadata.LogPrefixes)
-	var vrouters []*mysql.VRouter
+	var vrouters []*mysqlmodel.VRouter
 	vrouterIDs := []int{}
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&vrouters).Error
@@ -605,7 +605,7 @@ func (c *Cache) refreshVRouters() []int {
 	return vrouterIDs
 }
 
-func (c *Cache) AddRoutingTables(items []*mysql.RoutingTable) {
+func (c *Cache) AddRoutingTables(items []*mysqlmodel.RoutingTable) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddRoutingTable(item, c.Sequence)
 	}
@@ -619,7 +619,7 @@ func (c *Cache) DeleteRoutingTables(lcuuids []string) {
 
 func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN), c.metadata.LogPrefixes)
-	var routingTables []*mysql.RoutingTable
+	var routingTables []*mysqlmodel.RoutingTable
 
 	err := c.metadata.DB.Where(map[string]interface{}{"vnet_id": vrouterIDs}).Find(&routingTables).Error
 	if err != nil {
@@ -630,7 +630,7 @@ func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
 	c.AddRoutingTables(routingTables)
 }
 
-func (c *Cache) AddDHCPPorts(items []*mysql.DHCPPort) {
+func (c *Cache) AddDHCPPorts(items []*mysqlmodel.DHCPPort) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddDHCPPort(item, c.Sequence, c.ToolDataSet)
 		c.ToolDataSet.AddDHCPPort(item)
@@ -650,7 +650,7 @@ func (c *Cache) DeleteDHCPPorts(lcuuids []string) {
 
 func (c *Cache) refreshDHCPPorts() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN), c.metadata.LogPrefixes)
-	var dhcpPorts []*mysql.DHCPPort
+	var dhcpPorts []*mysqlmodel.DHCPPort
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&dhcpPorts).Error
 	if err != nil {
@@ -661,7 +661,7 @@ func (c *Cache) refreshDHCPPorts() {
 	c.AddDHCPPorts(dhcpPorts)
 }
 
-func (c *Cache) AddVInterfaces(items []*mysql.VInterface) {
+func (c *Cache) AddVInterfaces(items []*mysqlmodel.VInterface) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddVInterface(item, c.Sequence, c.ToolDataSet)
 		c.ToolDataSet.AddVInterface(item)
@@ -681,7 +681,7 @@ func (c *Cache) DeleteVInterfaces(lcuuids []string) {
 
 func (c *Cache) refreshVInterfaces() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN), c.metadata.LogPrefixes)
-	var vifs []*mysql.VInterface
+	var vifs []*mysqlmodel.VInterface
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&vifs).Error
 	if err != nil {
@@ -692,7 +692,7 @@ func (c *Cache) refreshVInterfaces() {
 	c.AddVInterfaces(vifs)
 }
 
-func (c *Cache) AddWANIPs(items []*mysql.WANIP) {
+func (c *Cache) AddWANIPs(items []*mysqlmodel.WANIP) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddWANIP(item, c.Sequence, c.ToolDataSet)
 		c.ToolDataSet.AddWANIP(item)
@@ -708,7 +708,7 @@ func (c *Cache) DeleteWANIPs(lcuuids []string) {
 
 func (c *Cache) refreshWANIPs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN), c.metadata.LogPrefixes)
-	var wanIPs []*mysql.WANIP
+	var wanIPs []*mysqlmodel.WANIP
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&wanIPs).Error
 	if err != nil {
@@ -719,7 +719,7 @@ func (c *Cache) refreshWANIPs() {
 	c.AddWANIPs(wanIPs)
 }
 
-func (c *Cache) AddLANIPs(items []*mysql.LANIP) {
+func (c *Cache) AddLANIPs(items []*mysqlmodel.LANIP) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddLANIP(item, c.Sequence, c.ToolDataSet)
 		c.ToolDataSet.AddLANIP(item)
@@ -735,7 +735,7 @@ func (c *Cache) DeleteLANIPs(lcuuids []string) {
 
 func (c *Cache) refreshLANIPs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN), c.metadata.LogPrefixes)
-	var lanIPs []*mysql.LANIP
+	var lanIPs []*mysqlmodel.LANIP
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid, ctrlrcommon.CREATE_METHOD_LEARN).Find(&lanIPs).Error
 	if err != nil {
@@ -746,7 +746,7 @@ func (c *Cache) refreshLANIPs() {
 	c.AddLANIPs(lanIPs)
 }
 
-func (c *Cache) AddFloatingIPs(items []*mysql.FloatingIP) {
+func (c *Cache) AddFloatingIPs(items []*mysqlmodel.FloatingIP) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddFloatingIP(item, c.Sequence, c.ToolDataSet)
 	}
@@ -760,7 +760,7 @@ func (c *Cache) DeleteFloatingIPs(lcuuids []string) {
 
 func (c *Cache) refreshFloatingIPs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN), c.metadata.LogPrefixes)
-	var floatingIPs []*mysql.FloatingIP
+	var floatingIPs []*mysqlmodel.FloatingIP
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&floatingIPs).Error
 	if err != nil {
@@ -771,7 +771,7 @@ func (c *Cache) refreshFloatingIPs() {
 	c.AddFloatingIPs(floatingIPs)
 }
 
-func (c *Cache) AddNATGateways(items []*mysql.NATGateway) {
+func (c *Cache) AddNATGateways(items []*mysqlmodel.NATGateway) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddNATGateway(item, c.Sequence)
 		c.ToolDataSet.AddNATGateway(item)
@@ -791,7 +791,7 @@ func (c *Cache) DeleteNATGateways(lcuuids []string) {
 
 func (c *Cache) refreshNATGateways() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN), c.metadata.LogPrefixes)
-	var natGateways []*mysql.NATGateway
+	var natGateways []*mysqlmodel.NATGateway
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&natGateways).Error
 	if err != nil {
@@ -802,7 +802,7 @@ func (c *Cache) refreshNATGateways() {
 	c.AddNATGateways(natGateways)
 }
 
-func (c *Cache) AddNATVMConnections(items []*mysql.NATVMConnection) {
+func (c *Cache) AddNATVMConnections(items []*mysqlmodel.NATVMConnection) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddNATVMConnection(item, c.Sequence)
 	}
@@ -816,7 +816,7 @@ func (c *Cache) DeleteNATVMConnections(lcuuids []string) {
 
 func (c *Cache) refreshNATVMConnections() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN), c.metadata.LogPrefixes)
-	var natVMConnections []*mysql.NATVMConnection
+	var natVMConnections []*mysqlmodel.NATVMConnection
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&natVMConnections).Error
 	if err != nil {
@@ -827,7 +827,7 @@ func (c *Cache) refreshNATVMConnections() {
 	c.AddNATVMConnections(natVMConnections)
 }
 
-func (c *Cache) AddNATRules(items []*mysql.NATRule) {
+func (c *Cache) AddNATRules(items []*mysqlmodel.NATRule) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddNATRule(item, c.Sequence)
 	}
@@ -841,7 +841,7 @@ func (c *Cache) DeleteNATRules(lcuuids []string) {
 
 func (c *Cache) refreshNATRules() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN), c.metadata.LogPrefixes)
-	var natRules []*mysql.NATRule
+	var natRules []*mysqlmodel.NATRule
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&natRules).Error
 	if err != nil {
@@ -852,7 +852,7 @@ func (c *Cache) refreshNATRules() {
 	c.AddNATRules(natRules)
 }
 
-func (c *Cache) AddLBs(items []*mysql.LB) {
+func (c *Cache) AddLBs(items []*mysqlmodel.LB) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddLB(item, c.Sequence)
 		c.ToolDataSet.AddLB(item)
@@ -872,7 +872,7 @@ func (c *Cache) DeleteLBs(lcuuids []string) {
 
 func (c *Cache) refreshLBs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_EN), c.metadata.LogPrefixes)
-	var lbs []*mysql.LB
+	var lbs []*mysqlmodel.LB
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&lbs).Error
 	if err != nil {
@@ -883,7 +883,7 @@ func (c *Cache) refreshLBs() {
 	c.AddLBs(lbs)
 }
 
-func (c *Cache) AddLBVMConnections(items []*mysql.LBVMConnection) {
+func (c *Cache) AddLBVMConnections(items []*mysqlmodel.LBVMConnection) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddLBVMConnection(item, c.Sequence)
 	}
@@ -897,7 +897,7 @@ func (c *Cache) DeleteLBVMConnections(lcuuids []string) {
 
 func (c *Cache) refreshLBVMConnections() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN), c.metadata.LogPrefixes)
-	var lbVMConnections []*mysql.LBVMConnection
+	var lbVMConnections []*mysqlmodel.LBVMConnection
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&lbVMConnections).Error
 	if err != nil {
@@ -908,7 +908,7 @@ func (c *Cache) refreshLBVMConnections() {
 	c.AddLBVMConnections(lbVMConnections)
 }
 
-func (c *Cache) AddLBListeners(items []*mysql.LBListener) {
+func (c *Cache) AddLBListeners(items []*mysqlmodel.LBListener) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddLBListener(item, c.Sequence)
 		c.ToolDataSet.AddLBListener(item)
@@ -924,7 +924,7 @@ func (c *Cache) DeleteLBListeners(lcuuids []string) {
 
 func (c *Cache) refreshLBListeners() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN), c.metadata.LogPrefixes)
-	var listeners []*mysql.LBListener
+	var listeners []*mysqlmodel.LBListener
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&listeners).Error
 	if err != nil {
@@ -935,7 +935,7 @@ func (c *Cache) refreshLBListeners() {
 	c.AddLBListeners(listeners)
 }
 
-func (c *Cache) AddLBTargetServers(items []*mysql.LBTargetServer) {
+func (c *Cache) AddLBTargetServers(items []*mysqlmodel.LBTargetServer) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddLBTargetServer(item, c.Sequence)
 	}
@@ -949,7 +949,7 @@ func (c *Cache) DeleteLBTargetServers(lcuuids []string) {
 
 func (c *Cache) refreshLBTargetServers() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN), c.metadata.LogPrefixes)
-	var servers []*mysql.LBTargetServer
+	var servers []*mysqlmodel.LBTargetServer
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&servers).Error
 	if err != nil {
@@ -960,7 +960,7 @@ func (c *Cache) refreshLBTargetServers() {
 	c.AddLBTargetServers(servers)
 }
 
-func (c *Cache) AddPeerConnections(items []*mysql.PeerConnection) {
+func (c *Cache) AddPeerConnections(items []*mysqlmodel.PeerConnection) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPeerConnection(item, c.Sequence, c.ToolDataSet)
 	}
@@ -974,7 +974,7 @@ func (c *Cache) DeletePeerConnections(lcuuids []string) {
 
 func (c *Cache) refreshPeeConnections() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN), c.metadata.LogPrefixes)
-	var peerConnections []*mysql.PeerConnection
+	var peerConnections []*mysqlmodel.PeerConnection
 
 	err := c.metadata.DB.Where(c.getConditonDomainCreateMethod()).Find(&peerConnections).Error
 	if err != nil {
@@ -985,7 +985,7 @@ func (c *Cache) refreshPeeConnections() {
 	c.AddPeerConnections(peerConnections)
 }
 
-func (c *Cache) AddCENs(items []*mysql.CEN) {
+func (c *Cache) AddCENs(items []*mysqlmodel.CEN) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddCEN(item, c.Sequence, c.ToolDataSet)
 	}
@@ -999,7 +999,7 @@ func (c *Cache) DeleteCENs(lcuuids []string) {
 
 func (c *Cache) refreshCENs() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_CEN_EN), c.metadata.LogPrefixes)
-	var cens []*mysql.CEN
+	var cens []*mysqlmodel.CEN
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&cens).Error
 	if err != nil {
@@ -1010,7 +1010,7 @@ func (c *Cache) refreshCENs() {
 	c.AddCENs(cens)
 }
 
-func (c *Cache) AddRDSInstances(items []*mysql.RDSInstance) {
+func (c *Cache) AddRDSInstances(items []*mysqlmodel.RDSInstance) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddRDSInstance(item, c.Sequence)
 		c.ToolDataSet.AddRDSInstance(item)
@@ -1030,7 +1030,7 @@ func (c *Cache) DeleteRDSInstances(lcuuids []string) {
 
 func (c *Cache) refreshRDSInstances() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN), c.metadata.LogPrefixes)
-	var instances []*mysql.RDSInstance
+	var instances []*mysqlmodel.RDSInstance
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&instances).Error
 	if err != nil {
@@ -1041,7 +1041,7 @@ func (c *Cache) refreshRDSInstances() {
 	c.AddRDSInstances(instances)
 }
 
-func (c *Cache) AddRedisInstances(items []*mysql.RedisInstance) {
+func (c *Cache) AddRedisInstances(items []*mysqlmodel.RedisInstance) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddRedisInstance(item, c.Sequence)
 		c.ToolDataSet.AddRedisInstance(item)
@@ -1061,7 +1061,7 @@ func (c *Cache) DeleteRedisInstances(lcuuids []string) {
 
 func (c *Cache) refreshRedisInstances() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN), c.metadata.LogPrefixes)
-	var instances []*mysql.RedisInstance
+	var instances []*mysqlmodel.RedisInstance
 
 	err := c.metadata.DB.Where(c.getConditionDomain()).Find(&instances).Error
 	if err != nil {
@@ -1072,7 +1072,7 @@ func (c *Cache) refreshRedisInstances() {
 	c.AddRedisInstances(instances)
 }
 
-func (c *Cache) AddPodClusters(items []*mysql.PodCluster) {
+func (c *Cache) AddPodClusters(items []*mysqlmodel.PodCluster) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodCluster(item, c.Sequence)
 		c.ToolDataSet.AddPodCluster(item)
@@ -1088,7 +1088,7 @@ func (c *Cache) DeletePodClusters(lcuuids []string) {
 
 func (c *Cache) refreshPodClusters() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN), c.metadata.LogPrefixes)
-	var podClusters []*mysql.PodCluster
+	var podClusters []*mysqlmodel.PodCluster
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podClusters).Error
 	if err != nil {
@@ -1099,7 +1099,7 @@ func (c *Cache) refreshPodClusters() {
 	c.AddPodClusters(podClusters)
 }
 
-func (c *Cache) AddPodNodes(items []*mysql.PodNode) {
+func (c *Cache) AddPodNodes(items []*mysqlmodel.PodNode) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodNode(item, c.Sequence)
 		c.ToolDataSet.AddPodNode(item)
@@ -1119,7 +1119,7 @@ func (c *Cache) DeletePodNodes(lcuuids []string) {
 
 func (c *Cache) refreshPodNodes() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN), c.metadata.LogPrefixes)
-	var podNodes []*mysql.PodNode
+	var podNodes []*mysqlmodel.PodNode
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podNodes).Error
 	if err != nil {
@@ -1130,7 +1130,7 @@ func (c *Cache) refreshPodNodes() {
 	c.AddPodNodes(podNodes)
 }
 
-func (c *Cache) AddVMPodNodeConnections(items []*mysql.VMPodNodeConnection) {
+func (c *Cache) AddVMPodNodeConnections(items []*mysqlmodel.VMPodNodeConnection) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddVMPodNodeConnection(item, c.Sequence)
 	}
@@ -1144,7 +1144,7 @@ func (c *Cache) DeleteVMPodNodeConnections(lcuuids []string) {
 
 func (c *Cache) refreshVMPodNodeConnections() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN), c.metadata.LogPrefixes)
-	var connections []*mysql.VMPodNodeConnection
+	var connections []*mysqlmodel.VMPodNodeConnection
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&connections).Error
 	if err != nil {
@@ -1155,7 +1155,7 @@ func (c *Cache) refreshVMPodNodeConnections() {
 	c.AddVMPodNodeConnections(connections)
 }
 
-func (c *Cache) AddPodNamespaces(items []*mysql.PodNamespace) {
+func (c *Cache) AddPodNamespaces(items []*mysqlmodel.PodNamespace) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodNamespace(item, c.Sequence)
 		c.ToolDataSet.AddPodNamespace(item)
@@ -1171,7 +1171,7 @@ func (c *Cache) DeletePodNamespaces(lcuuids []string) {
 
 func (c *Cache) refreshPodNamespaces() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN), c.metadata.LogPrefixes)
-	var podNamespaces []*mysql.PodNamespace
+	var podNamespaces []*mysqlmodel.PodNamespace
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podNamespaces).Error
 	if err != nil {
@@ -1182,12 +1182,12 @@ func (c *Cache) refreshPodNamespaces() {
 	c.AddPodNamespaces(podNamespaces)
 }
 
-func (c *Cache) AddPodIngress(item *mysql.PodIngress) {
+func (c *Cache) AddPodIngress(item *mysqlmodel.PodIngress) {
 	c.DiffBaseDataSet.AddPodIngress(item, c.Sequence)
 	c.ToolDataSet.AddPodIngress(item)
 }
 
-func (c *Cache) AddPodIngresses(items []*mysql.PodIngress) {
+func (c *Cache) AddPodIngresses(items []*mysqlmodel.PodIngress) {
 	for _, item := range items {
 		c.AddPodIngress(item)
 	}
@@ -1202,7 +1202,7 @@ func (c *Cache) DeletePodIngresses(lcuuids []string) {
 
 func (c *Cache) refreshPodIngresses() []int {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN), c.metadata.LogPrefixes)
-	var podIngresses []*mysql.PodIngress
+	var podIngresses []*mysqlmodel.PodIngress
 	podIngressIDs := []int{}
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podIngresses).Error
@@ -1218,7 +1218,7 @@ func (c *Cache) refreshPodIngresses() []int {
 	return podIngressIDs
 }
 
-func (c *Cache) AddPodIngressRules(items []*mysql.PodIngressRule) {
+func (c *Cache) AddPodIngressRules(items []*mysqlmodel.PodIngressRule) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodIngressRule(item, c.Sequence)
 		c.ToolDataSet.AddPodIngressRule(item)
@@ -1237,7 +1237,7 @@ func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
 	if len(podIngressIDs) == 0 {
 		return
 	}
-	var podIngressRules []*mysql.PodIngressRule
+	var podIngressRules []*mysqlmodel.PodIngressRule
 
 	err := c.metadata.DB.Where("pod_ingress_id IN ?", podIngressIDs).Find(&podIngressRules).Error
 	if err != nil {
@@ -1248,7 +1248,7 @@ func (c *Cache) refreshPodIngressRules(podIngressIDs []int) {
 	c.AddPodIngressRules(podIngressRules)
 }
 
-func (c *Cache) AddPodIngressRuleBackends(items []*mysql.PodIngressRuleBackend) {
+func (c *Cache) AddPodIngressRuleBackends(items []*mysqlmodel.PodIngressRuleBackend) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodIngressRuleBackend(item, c.Sequence)
 	}
@@ -1265,7 +1265,7 @@ func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
 	if len(podIngressIDs) == 0 {
 		return
 	}
-	var podIngressRuleBackends []*mysql.PodIngressRuleBackend
+	var podIngressRuleBackends []*mysqlmodel.PodIngressRuleBackend
 
 	err := c.metadata.DB.Where("pod_ingress_id IN ?", podIngressIDs).Find(&podIngressRuleBackends).Error
 	if err != nil {
@@ -1276,12 +1276,12 @@ func (c *Cache) refreshPodIngresseRuleBackends(podIngressIDs []int) {
 	c.AddPodIngressRuleBackends(podIngressRuleBackends)
 }
 
-func (c *Cache) AddPodService(item *mysql.PodService) {
+func (c *Cache) AddPodService(item *mysqlmodel.PodService) {
 	c.DiffBaseDataSet.AddPodService(item, c.Sequence, c.ToolDataSet)
 	c.ToolDataSet.AddPodService(item)
 }
 
-func (c *Cache) AddPodServices(items []*mysql.PodService) {
+func (c *Cache) AddPodServices(items []*mysqlmodel.PodService) {
 	for _, item := range items {
 		c.AddPodService(item)
 	}
@@ -1300,7 +1300,7 @@ func (c *Cache) DeletePodServices(lcuuids []string) {
 
 func (c *Cache) refreshPodServices() []int {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN), c.metadata.LogPrefixes)
-	var podServices []*mysql.PodService
+	var podServices []*mysqlmodel.PodService
 	podServiceIDs := []int{}
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podServices).Error
@@ -1316,7 +1316,7 @@ func (c *Cache) refreshPodServices() []int {
 	return podServiceIDs
 }
 
-func (c *Cache) AddPodServicePorts(items []*mysql.PodServicePort) {
+func (c *Cache) AddPodServicePorts(items []*mysqlmodel.PodServicePort) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodServicePort(item, c.Sequence)
 	}
@@ -1333,7 +1333,7 @@ func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
 	if len(podServiceIDs) == 0 {
 		return
 	}
-	var podServicePorts []*mysql.PodServicePort
+	var podServicePorts []*mysqlmodel.PodServicePort
 
 	err := c.metadata.DB.Where("pod_service_id IN ?", podServiceIDs).Find(&podServicePorts).Error
 	if err != nil {
@@ -1344,7 +1344,7 @@ func (c *Cache) refreshPodServicePorts(podServiceIDs []int) {
 	c.AddPodServicePorts(podServicePorts)
 }
 
-func (c *Cache) AddPodGroups(items []*mysql.PodGroup) {
+func (c *Cache) AddPodGroups(items []*mysqlmodel.PodGroup) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodGroup(item, c.Sequence)
 		c.ToolDataSet.AddPodGroup(item)
@@ -1360,7 +1360,7 @@ func (c *Cache) DeletePodGroups(lcuuids []string) {
 
 func (c *Cache) refreshPodGroups() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN), c.metadata.LogPrefixes)
-	var podGroups []*mysql.PodGroup
+	var podGroups []*mysqlmodel.PodGroup
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podGroups).Error
 	if err != nil {
@@ -1371,7 +1371,7 @@ func (c *Cache) refreshPodGroups() {
 	c.AddPodGroups(podGroups)
 }
 
-func (c *Cache) AddPodGroupPorts(items []*mysql.PodGroupPort) {
+func (c *Cache) AddPodGroupPorts(items []*mysqlmodel.PodGroupPort) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodGroupPort(item, c.Sequence)
 	}
@@ -1388,7 +1388,7 @@ func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
 	if len(podServiceIDs) == 0 {
 		return
 	}
-	var podGroupPorts []*mysql.PodGroupPort
+	var podGroupPorts []*mysqlmodel.PodGroupPort
 
 	err := c.metadata.DB.Where("pod_service_id IN ?", podServiceIDs).Find(&podGroupPorts).Error
 	if err != nil {
@@ -1399,7 +1399,7 @@ func (c *Cache) refreshPodGroupPorts(podServiceIDs []int) {
 	c.AddPodGroupPorts(podGroupPorts)
 }
 
-func (c *Cache) AddPodReplicaSets(items []*mysql.PodReplicaSet) {
+func (c *Cache) AddPodReplicaSets(items []*mysqlmodel.PodReplicaSet) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPodReplicaSet(item, c.Sequence)
 		c.ToolDataSet.AddPodReplicaSet(item)
@@ -1415,7 +1415,7 @@ func (c *Cache) DeletePodReplicaSets(lcuuids []string) {
 
 func (c *Cache) refreshPodReplicaSets() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN), c.metadata.LogPrefixes)
-	var podReplicaSets []*mysql.PodReplicaSet
+	var podReplicaSets []*mysqlmodel.PodReplicaSet
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&podReplicaSets).Error
 	if err != nil {
@@ -1426,7 +1426,7 @@ func (c *Cache) refreshPodReplicaSets() {
 	c.AddPodReplicaSets(podReplicaSets)
 }
 
-func (c *Cache) AddPods(items []*mysql.Pod) {
+func (c *Cache) AddPods(items []*mysqlmodel.Pod) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddPod(item, c.Sequence, c.ToolDataSet)
 		c.ToolDataSet.AddPod(item)
@@ -1446,7 +1446,7 @@ func (c *Cache) DeletePods(lcuuids []string) {
 
 func (c *Cache) refreshPods() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_POD_EN), c.metadata.LogPrefixes)
-	var pods []*mysql.Pod
+	var pods []*mysqlmodel.Pod
 
 	err := c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid).Find(&pods).Error
 	if err != nil {
@@ -1457,7 +1457,7 @@ func (c *Cache) refreshPods() {
 	c.AddPods(pods)
 }
 
-func (c *Cache) AddProcesses(items []*mysql.Process) {
+func (c *Cache) AddProcesses(items []*mysqlmodel.Process) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddProcess(item, c.Sequence)
 		c.ToolDataSet.AddProcess(item)
@@ -1473,8 +1473,8 @@ func (c *Cache) DeleteProcesses(lcuuids []string) {
 
 func (c *Cache) refreshProcesses() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN), c.metadata.LogPrefixes)
-	var processes []*mysql.Process
-	processes, err := query.FindInBatches[mysql.Process](c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid))
+	var processes []*mysqlmodel.Process
+	processes, err := query.FindInBatches[mysqlmodel.Process](c.metadata.DB.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.metadata.Domain.Lcuuid, c.metadata.SubDomain.Lcuuid))
 	if err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, err), c.metadata.LogPrefixes)
 		return
@@ -1483,7 +1483,7 @@ func (c *Cache) refreshProcesses() {
 	c.AddProcesses(processes)
 }
 
-func (c *Cache) AddVIPs(items []*mysql.VIP) {
+func (c *Cache) AddVIPs(items []*mysqlmodel.VIP) {
 	for _, item := range items {
 		c.DiffBaseDataSet.AddVIP(item, c.Sequence)
 	}
@@ -1497,7 +1497,7 @@ func (c *Cache) DeleteVIPs(lcuuids []string) {
 
 func (c *Cache) refreshVIP() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_VIP_EN), c.metadata.LogPrefixes)
-	var vips []*mysql.VIP
+	var vips []*mysqlmodel.VIP
 	if err := c.metadata.DB.Where("domain = ?", c.metadata.Domain.Lcuuid).Find(&vips).Error; err != nil {
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_VIP_EN, err), c.metadata.LogPrefixes)
 		return

@@ -24,9 +24,11 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/migration"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/edition"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
+
+var log = logger.MustGetLogger("db.mysql")
 
 var (
 	DefaultDB *DB
@@ -58,6 +60,8 @@ type DB struct {
 	Name           string
 	LogPrefixORGID logger.Prefix
 	LogPrefixName  logger.Prefix
+
+	Config config.MySqlConfig
 }
 
 func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
@@ -82,23 +86,12 @@ func NewDB(cfg config.MySqlConfig, orgID int) (*DB, error) {
 		copiedCfg.Database,
 		logger.NewORGPrefix(orgID),
 		NewDBNameLogPrefix(copiedCfg.Database),
+		copiedCfg,
 	}, nil
 }
 
 func (d *DB) GetGORMDB() *gorm.DB {
 	return d.DB
-}
-
-func (d *DB) Logf(format string, a ...any) string { // TODO remove
-	return d.addLogPre(fmt.Sprintf(format, a...))
-}
-
-func (d *DB) Log(format string) string {
-	return d.addLogPre(format)
-}
-
-func (d *DB) addLogPre(msg string) string {
-	return fmt.Sprintf("[OID-%d] ", d.ORGID) + msg
 }
 
 func (d *DB) GetORGID() int {
@@ -202,17 +195,7 @@ func (c *DBs) check(db *DB) error {
 	if db.ORGID != common.DEFAULT_ORG_ID {
 		return nil
 	}
-	var version string
-	err := db.Raw("SELECT version FROM db_version").Scan(&version).Error
-	if err != nil {
-		log.Errorf("db: %s, failed to check db version: %s", db.Name, err.Error())
-		return err
-	}
-	if version != migration.DB_VERSION_EXPECTED {
-		log.Errorf("db: %s, current db version: %s != expected db version: %s", db.Name, version, migration.DB_VERSION_EXPECTED)
-		return err
-	}
-	return nil
+	return edition.CheckDBVersion(db.DB, db.Config)
 }
 
 func (c *DBs) DoOnAllDBs(execFunc func(db *DB) error) error {

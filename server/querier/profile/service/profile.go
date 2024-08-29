@@ -139,8 +139,11 @@ func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string
 			if profileLocationCompress, ok = valueSlice[profileLocationStrIndex].(string); !ok {
 				continue
 			}
-			if profileValue, ok = valueSlice[profileValueIndex].(int); !ok {
+			profileValuePtr, ok := valueSlice[profileValueIndex].(int64)
+			if !ok {
 				continue
+			} else {
+				profileValue = int(profileValuePtr)
 			}
 		}
 

@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 )
 
@@ -40,7 +39,7 @@ func (t *SuiteTest) TestHandleAddProcessSuccess() {
 	updater := NewProcess(c, []cloudmodel.Process{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var result *mysql.Process
+	var result *mysqlmodel.Process
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(1))
 	assert.Equal(t.T(), cloudItem.Name, result.Name)
@@ -57,7 +56,7 @@ func (t *SuiteTest) TestHandleUpdateProcessSuccess() {
 	updater.cloudData = []cloudmodel.Process{cloudItem}
 	updater.HandleAddAndUpdate()
 
-	var result *mysql.Process
+	var result *mysqlmodel.Process
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(1))
 	assert.Equal(t.T(), wantName, result.Name)
@@ -72,7 +71,7 @@ func (t *SuiteTest) TestHandleDeleteProcessSuccess() {
 	updater.cache.SetSequence(updater.cache.GetSequence() + 1)
 	updater.HandleDelete()
 
-	var result *mysql.Process
+	var result *mysqlmodel.Process
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(0))
 	if updater.cache.DiffBaseDataSet.Process[cloudItem.Lcuuid] != nil {

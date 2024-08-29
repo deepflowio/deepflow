@@ -20,17 +20,17 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
 type ChPodServiceK8sLabels struct {
-	UpdaterBase[mysql.ChPodServiceK8sLabels, K8sLabelsKey]
+	UpdaterBase[mysqlmodel.ChPodServiceK8sLabels, K8sLabelsKey]
 }
 
 func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 	updater := &ChPodServiceK8sLabels{
-		UpdaterBase[mysql.ChPodServiceK8sLabels, K8sLabelsKey]{
+		UpdaterBase[mysqlmodel.ChPodServiceK8sLabels, K8sLabelsKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_K8S_LABELS,
 		},
 	}
@@ -38,15 +38,15 @@ func NewChPodServiceK8sLabels() *ChPodServiceK8sLabels {
 	return updater
 }
 
-func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodServiceK8sLabels, bool) {
-	var podServices []mysql.PodService
+func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysqlmodel.ChPodServiceK8sLabels, bool) {
+	var podServices []mysqlmodel.PodService
 	err := k.db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(k.resourceTypeName, err), k.db.LogPrefixORGID)
 		return nil, false
 	}
 
-	keyToItem := make(map[K8sLabelsKey]mysql.ChPodServiceK8sLabels)
+	keyToItem := make(map[K8sLabelsKey]mysqlmodel.ChPodServiceK8sLabels)
 	for _, podService := range podServices {
 		teamID, err := tagrecorder.GetTeamID(podService.Domain, podService.SubDomain)
 		if err != nil {
@@ -70,7 +70,7 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 			key := K8sLabelsKey{
 				ID: podService.ID,
 			}
-			keyToItem[key] = mysql.ChPodServiceK8sLabels{
+			keyToItem[key] = mysqlmodel.ChPodServiceK8sLabels{
 				ID:          podService.ID,
 				Labels:      string(labelsStr),
 				L3EPCID:     podService.VPCID,
@@ -84,11 +84,11 @@ func (k *ChPodServiceK8sLabels) generateNewData() (map[K8sLabelsKey]mysql.ChPodS
 	return keyToItem, true
 }
 
-func (k *ChPodServiceK8sLabels) generateKey(dbItem mysql.ChPodServiceK8sLabels) K8sLabelsKey {
+func (k *ChPodServiceK8sLabels) generateKey(dbItem mysqlmodel.ChPodServiceK8sLabels) K8sLabelsKey {
 	return K8sLabelsKey{ID: dbItem.ID}
 }
 
-func (k *ChPodServiceK8sLabels) generateUpdateInfo(oldItem, newItem mysql.ChPodServiceK8sLabels) (map[string]interface{}, bool) {
+func (k *ChPodServiceK8sLabels) generateUpdateInfo(oldItem, newItem mysqlmodel.ChPodServiceK8sLabels) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Labels != newItem.Labels {
 		updateInfo["labels"] = newItem.Labels

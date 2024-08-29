@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type RedisInstance struct {
 	UpdaterBase[
 		cloudmodel.RedisInstance,
 		*diffbase.RedisInstance,
-		*mysql.RedisInstance,
-		mysql.RedisInstance,
+		*mysqlmodel.RedisInstance,
+		mysqlmodel.RedisInstance,
 		*message.RedisInstanceAdd,
 		message.RedisInstanceAdd,
 		*message.RedisInstanceUpdate,
@@ -47,8 +47,8 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 		newUpdaterBase[
 			cloudmodel.RedisInstance,
 			*diffbase.RedisInstance,
-			*mysql.RedisInstance,
-			mysql.RedisInstance,
+			*mysqlmodel.RedisInstance,
+			mysqlmodel.RedisInstance,
 			*message.RedisInstanceAdd,
 			message.RedisInstanceAdd,
 			*message.RedisInstanceUpdate,
@@ -73,7 +73,7 @@ func (r *RedisInstance) getDiffBaseByCloudItem(cloudItem *cloudmodel.RedisInstan
 	return
 }
 
-func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance) (*mysql.RedisInstance, bool) {
+func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance) (*mysqlmodel.RedisInstance, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		resourceAForResourceBNotFound(
@@ -82,7 +82,7 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 		)
 		return nil, false
 	}
-	dbItem := &mysql.RedisInstance{
+	dbItem := &mysqlmodel.RedisInstance{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
 		UID:          cloudItem.Label,

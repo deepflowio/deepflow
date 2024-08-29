@@ -17,16 +17,16 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChNodeType struct {
-	UpdaterBase[mysql.ChNodeType, NodeTypeKey]
+	UpdaterBase[mysqlmodel.ChNodeType, NodeTypeKey]
 }
 
 func NewChNodeType() *ChNodeType {
 	updater := &ChNodeType{
-		UpdaterBase[mysql.ChNodeType, NodeTypeKey]{
+		UpdaterBase[mysqlmodel.ChNodeType, NodeTypeKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_NODE_TYPE,
 		},
 	}
@@ -34,10 +34,10 @@ func NewChNodeType() *ChNodeType {
 	return updater
 }
 
-func (n *ChNodeType) generateNewData() (map[NodeTypeKey]mysql.ChNodeType, bool) {
-	keyToItem := make(map[NodeTypeKey]mysql.ChNodeType)
+func (n *ChNodeType) generateNewData() (map[NodeTypeKey]mysqlmodel.ChNodeType, bool) {
+	keyToItem := make(map[NodeTypeKey]mysqlmodel.ChNodeType)
 	for resourceType, nodeType := range RESOURCE_TYPE_TO_NODE_TYPE {
-		keyToItem[NodeTypeKey{ResourceType: resourceType}] = mysql.ChNodeType{
+		keyToItem[NodeTypeKey{ResourceType: resourceType}] = mysqlmodel.ChNodeType{
 			ResourceType: resourceType,
 			NodeType:     nodeType,
 		}
@@ -45,11 +45,11 @@ func (n *ChNodeType) generateNewData() (map[NodeTypeKey]mysql.ChNodeType, bool) 
 	return keyToItem, true
 }
 
-func (n *ChNodeType) generateKey(dbItem mysql.ChNodeType) NodeTypeKey {
+func (n *ChNodeType) generateKey(dbItem mysqlmodel.ChNodeType) NodeTypeKey {
 	return NodeTypeKey{ResourceType: dbItem.ResourceType}
 }
 
-func (n *ChNodeType) generateUpdateInfo(oldItem, newItem mysql.ChNodeType) (map[string]interface{}, bool) {
+func (n *ChNodeType) generateUpdateInfo(oldItem, newItem mysqlmodel.ChNodeType) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.NodeType != newItem.NodeType {
 		updateInfo["node_type"] = newItem.NodeType

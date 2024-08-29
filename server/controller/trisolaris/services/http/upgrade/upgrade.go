@@ -22,7 +22,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	. "github.com/deepflowio/deepflow/server/controller/common"
-	models "github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	models "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/server/http"
@@ -55,7 +56,7 @@ func Upgrade(c *gin.Context) {
 	}
 	orgID, _ := c.Get(HEADER_KEY_X_ORG_ID)
 	orgIDInt := orgID.(int)
-	db, err := models.GetDB(orgIDInt)
+	db, err := mysql.GetDB(orgIDInt)
 	if err != nil {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, err.Error()))
 		return

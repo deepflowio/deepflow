@@ -27,6 +27,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -274,7 +275,7 @@ func convertToUpperMap(data map[string]interface{}, v reflect.Value) {
 }
 
 func getResourceFromDB(orgDB *mysql.DB) (map[string]*cloudmodel.AdditionalResource, error) {
-	var items []mysql.DomainAdditionalResource
+	var items []mysqlmodel.DomainAdditionalResource
 	orgDB.Select("domain", "content").Where("content!=''").Find(&items)
 	if len(items) == 0 {
 		orgDB.Select("domain", "compressed_content").Find(&items)
@@ -328,14 +329,14 @@ func getClouTags(orgDB *mysql.DB, resource *cloudmodel.AdditionalResource, domai
 	podNSUUIDToName := make(map[string]string)
 	podNSUUIDToSubdomain := make(map[string]string)
 
-	var vms []mysql.VM
+	var vms []mysqlmodel.VM
 	if err := orgDB.Find(&vms).Error; err != nil {
 		return nil, err
 	}
 	for _, vm := range vms {
 		chostUUIDToName[vm.Lcuuid] = vm.Name
 	}
-	var podNamespaces []mysql.PodNamespace
+	var podNamespaces []mysqlmodel.PodNamespace
 	if err := orgDB.Find(&podNamespaces).Error; err != nil {
 		return nil, err
 	}

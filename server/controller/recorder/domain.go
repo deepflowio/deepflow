@@ -27,7 +27,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -95,7 +95,7 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 	select {
 	case <-d.cache.RefreshSignal:
 		d.cache.IncrementSequence()
-		d.cache.SetLogLevel(logging.INFO)
+		d.cache.SetLogLevel(logging.INFO, cache.RefreshSignalCallerDomain)
 
 		d.refresh(cloudData)
 
@@ -260,7 +260,7 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	if syncAt.IsZero() {
 		return
 	}
-	var domain mysql.Domain
+	var domain mysqlmodel.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
@@ -272,7 +272,7 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 }
 
 func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
-	var domain mysql.Domain
+	var domain mysqlmodel.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.Domain.Lcuuid).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
@@ -283,7 +283,7 @@ func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
 	log.Debugf("update domain (%+v)", domain, d.metadata.LogPrefixes)
 
 	for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
-		var subDomain mysql.SubDomain
+		var subDomain mysqlmodel.SubDomain
 		err := d.metadata.DB.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
 			log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", subDomainLcuuid, err, d.metadata.LogPrefixes)

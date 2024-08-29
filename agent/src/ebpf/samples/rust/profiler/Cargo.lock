@@ -31,6 +31,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.86"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -46,6 +52,16 @@ name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
+
+[[package]]
+name = "btf-rs"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe86bb5e4b3b6428b947ecfd9bef6c504c000c0174200dc52a2df432d5fd88fc"
+dependencies = [
+ "anyhow",
+ "byteorder",
+]
 
 [[package]]
 name = "byteorder"
@@ -427,6 +443,7 @@ name = "trace-utils"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "btf-rs",
  "cc",
  "gimli",
  "libc",

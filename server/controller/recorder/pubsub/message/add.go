@@ -16,168 +16,170 @@
 
 package message
 
-import "github.com/deepflowio/deepflow/server/controller/db/mysql"
+import (
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+)
 
 type RegionAdd struct {
-	MySQLItems[mysql.Region]
+	MySQLItems[mysqlmodel.Region]
 }
 
 type AZAdd struct {
-	MySQLItems[mysql.AZ]
+	MySQLItems[mysqlmodel.AZ]
 }
 
 type SubDomainAdd struct {
-	MySQLItems[mysql.SubDomain]
+	MySQLItems[mysqlmodel.SubDomain]
 }
 
 type HostAdd struct {
-	MySQLItems[mysql.Host]
+	MySQLItems[mysqlmodel.Host]
 }
 
 type VMAdd struct {
-	MySQLItems[mysql.VM]
+	MySQLItems[mysqlmodel.VM]
 }
 
 type VMPodNodeConnectionAdd struct {
-	MySQLItems[mysql.VMPodNodeConnection]
+	MySQLItems[mysqlmodel.VMPodNodeConnection]
 }
 
 type VPCAdd struct {
-	MySQLItems[mysql.VPC]
+	MySQLItems[mysqlmodel.VPC]
 }
 
 type NetworkAdd struct {
-	MySQLItems[mysql.Network]
+	MySQLItems[mysqlmodel.Network]
 }
 
 type SubnetAdd struct {
-	MySQLItems[mysql.Subnet]
+	MySQLItems[mysqlmodel.Subnet]
 }
 
 type VRouterAdd struct {
-	MySQLItems[mysql.VRouter]
+	MySQLItems[mysqlmodel.VRouter]
 }
 
 type RoutingTableAdd struct {
-	MySQLItems[mysql.RoutingTable]
+	MySQLItems[mysqlmodel.RoutingTable]
 }
 
 type DHCPPortAdd struct {
-	MySQLItems[mysql.DHCPPort]
+	MySQLItems[mysqlmodel.DHCPPort]
 }
 
 type VInterfaceAdd struct {
-	MySQLItems[mysql.VInterface]
+	MySQLItems[mysqlmodel.VInterface]
 }
 
 type FloatingIPAdd struct {
-	MySQLItems[mysql.FloatingIP]
+	MySQLItems[mysqlmodel.FloatingIP]
 }
 
 type LANIPAdd struct {
-	MySQLItems[mysql.LANIP]
+	MySQLItems[mysqlmodel.LANIP]
 }
 
 type WANIPAdd struct {
-	MySQLItems[mysql.WANIP]
+	MySQLItems[mysqlmodel.WANIP]
 }
 
 type VIPAdd struct {
-	MySQLItems[mysql.VIP]
+	MySQLItems[mysqlmodel.VIP]
 }
 
 type NATGatewayAdd struct {
-	MySQLItems[mysql.NATGateway]
+	MySQLItems[mysqlmodel.NATGateway]
 }
 
 type NATRuleAdd struct {
-	MySQLItems[mysql.NATRule]
+	MySQLItems[mysqlmodel.NATRule]
 }
 
 type NATVMConnectionAdd struct {
-	MySQLItems[mysql.NATVMConnection]
+	MySQLItems[mysqlmodel.NATVMConnection]
 }
 
 type LBAdd struct {
-	MySQLItems[mysql.LB]
+	MySQLItems[mysqlmodel.LB]
 }
 
 type LBListenerAdd struct {
-	MySQLItems[mysql.LBListener]
+	MySQLItems[mysqlmodel.LBListener]
 }
 
 type LBTargetServerAdd struct {
-	MySQLItems[mysql.LBTargetServer]
+	MySQLItems[mysqlmodel.LBTargetServer]
 }
 
 type LBVMConnectionAdd struct {
-	MySQLItems[mysql.LBVMConnection]
+	MySQLItems[mysqlmodel.LBVMConnection]
 }
 
 type PeerConnectionAdd struct {
-	MySQLItems[mysql.PeerConnection]
+	MySQLItems[mysqlmodel.PeerConnection]
 }
 
 type CENAdd struct {
-	MySQLItems[mysql.CEN]
+	MySQLItems[mysqlmodel.CEN]
 }
 
 type RDSInstanceAdd struct {
-	MySQLItems[mysql.RDSInstance]
+	MySQLItems[mysqlmodel.RDSInstance]
 }
 
 type RedisInstanceAdd struct {
-	MySQLItems[mysql.RedisInstance]
+	MySQLItems[mysqlmodel.RedisInstance]
 }
 
 type PodClusterAdd struct {
-	MySQLItems[mysql.PodCluster]
+	MySQLItems[mysqlmodel.PodCluster]
 }
 
 type PodNamespaceAdd struct {
-	MySQLItems[mysql.PodNamespace]
+	MySQLItems[mysqlmodel.PodNamespace]
 }
 
 type PodNodeAdd struct {
-	MySQLItems[mysql.PodNode]
+	MySQLItems[mysqlmodel.PodNode]
 }
 
 type PodIngressAdd struct {
-	MySQLItems[mysql.PodIngress]
+	MySQLItems[mysqlmodel.PodIngress]
 }
 
 type PodIngressRuleAdd struct {
-	MySQLItems[mysql.PodIngressRule]
+	MySQLItems[mysqlmodel.PodIngressRule]
 }
 
 type PodIngressRuleBackendAdd struct {
-	MySQLItems[mysql.PodIngressRuleBackend]
+	MySQLItems[mysqlmodel.PodIngressRuleBackend]
 }
 
 type PodServiceAdd struct {
-	MySQLItems[mysql.PodService]
+	MySQLItems[mysqlmodel.PodService]
 }
 
 type PodServicePortAdd struct {
-	MySQLItems[mysql.PodServicePort]
+	MySQLItems[mysqlmodel.PodServicePort]
 }
 
 type PodGroupAdd struct {
-	MySQLItems[mysql.PodGroup]
+	MySQLItems[mysqlmodel.PodGroup]
 }
 
 type PodGroupPortAdd struct {
-	MySQLItems[mysql.PodGroupPort]
+	MySQLItems[mysqlmodel.PodGroupPort]
 }
 
 type PodReplicaSetAdd struct {
-	MySQLItems[mysql.PodReplicaSet]
+	MySQLItems[mysqlmodel.PodReplicaSet]
 }
 
 type PodAdd struct {
-	MySQLItems[mysql.Pod]
+	MySQLItems[mysqlmodel.Pod]
 }
 
 type ProcessAdd struct {
-	MySQLItems[mysql.Process]
+	MySQLItems[mysqlmodel.Process]
 }

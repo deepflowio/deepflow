@@ -21,18 +21,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 )
 
-func Find[T any]() ([]*T, error) {
-	return FindInBatches[T](mysql.Db)
-}
-
-func FindWhere[T any](query interface{}, args ...interface{}) ([]*T, error) {
-	return FindInBatches[T](mysql.Db.Where(query, args...))
-}
-
-func FindUnscopedWhere[T any](query interface{}, args ...interface{}) ([]*T, error) {
-	return FindInBatches[T](mysql.Db.Unscoped().Where(query, args...))
-}
-
 // FindInBatches gets all data that meets the query conditions in batches
 func FindInBatches[T any](query *gorm.DB) ([]*T, error) {
 	data := make([]*T, 0)

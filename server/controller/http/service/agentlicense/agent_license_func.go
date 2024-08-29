@@ -17,12 +17,11 @@
 package agentlicense
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/config"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	"gorm.io/gorm"
+
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func GetAgentLicenseFunctions(cfg *config.ControllerConfig, userID int, agent *mysql.VTap,
-	licenseFunctions []interface{}) (string, []mysql.LicenseFuncLog, error) {
-
-	return "", nil, nil
+func UpdateAgentLicenseFunction(tx *gorm.DB, userID int, newAgentGroup *mysqlmodel.VTapGroup, agents []mysqlmodel.VTap) error {
+	return nil
 }

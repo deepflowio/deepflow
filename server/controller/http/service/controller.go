@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -38,11 +39,11 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 	}
 	db := dbInfo.DB
 	var response []model.Controller
-	var controllers []mysql.Controller
-	var regions []mysql.Region
-	var azs []mysql.AZ
-	var azControllerconns []mysql.AZControllerConnection
-	var vtaps []mysql.VTap
+	var controllers []mysqlmodel.Controller
+	var regions []mysqlmodel.Region
+	var azs []mysqlmodel.AZ
+	var azControllerconns []mysqlmodel.AZControllerConnection
+	var vtaps []mysqlmodel.VTap
 
 	analyzerName, analyzerNameOK := filter["analyzer_name"]
 	analyzerIP, analyzerIpOK := filter["analyzer_ip"]
@@ -53,7 +54,7 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 	} else if name, ok := filter["name"]; ok && name != "" {
 		db = db.Where("name = ? OR ip = ?", name, name)
 	} else if analyzerNameOK || analyzerIpOK {
-		analyzer := mysql.Analyzer{}
+		analyzer := mysqlmodel.Analyzer{}
 		if analyzerNameOK {
 			db.Where("name = ?", analyzerName).First(&analyzer)
 			if ret := db.Where("name = ?", analyzerName).First(&analyzer); ret.Error != nil {
@@ -65,13 +66,13 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 				return []model.Controller{}, nil
 			}
 		}
-		azAnalyzerConns := []mysql.AZAnalyzerConnection{}
+		azAnalyzerConns := []mysqlmodel.AZAnalyzerConnection{}
 		db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
 		region := ""
 		if len(azAnalyzerConns) > 0 {
 			region = azAnalyzerConns[0].Region
 		}
-		azConns := []mysql.AZControllerConnection{}
+		azConns := []mysqlmodel.AZControllerConnection{}
 		ips := []string{}
 		db.Where("region = ?", region).Find(&azConns)
 		for _, conn := range azConns {
@@ -79,15 +80,15 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 		}
 		db = db.Where("ip IN (?)", ips)
 	} else if vtapName, ok := filter["vtap_name"]; ok {
-		vtap := mysql.VTap{}
+		vtap := mysqlmodel.VTap{}
 		if ret := db.Where("name = ?", vtapName).First(&vtap); ret.Error != nil {
 			return []model.Controller{}, nil
 		}
-		az := mysql.AZ{}
+		az := mysqlmodel.AZ{}
 		if ret := db.Where("lcuuid = ?", vtap.AZ).First(&az); ret.Error != nil {
 			return []model.Controller{}, nil
 		}
-		azConns := []mysql.AZControllerConnection{}
+		azConns := []mysqlmodel.AZControllerConnection{}
 		ips := []string{}
 		db.Where("region = ?", az.Region).Find(&azConns)
 		for _, conn := range azConns {
@@ -95,7 +96,7 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 		}
 		db = db.Where("ip IN (?)", ips)
 	} else if region, ok := filter["region"]; ok {
-		azConns := []mysql.AZControllerConnection{}
+		azConns := []mysqlmodel.AZControllerConnection{}
 		ips := []string{}
 		db.Where("region = ?", region).Find(&azConns)
 		for _, conn := range azConns {
@@ -109,19 +110,19 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 	db.Find(&azControllerconns)
 	db.Find(&vtaps)
 
-	lcuuidToRegion := make(map[string]*mysql.Region)
+	lcuuidToRegion := make(map[string]*mysqlmodel.Region)
 	for i, region := range regions {
 		lcuuidToRegion[region.Lcuuid] = &regions[i]
 	}
 
-	lcuuidToAz := make(map[string]*mysql.AZ)
-	regionToAz := make(map[string][]*mysql.AZ)
+	lcuuidToAz := make(map[string]*mysqlmodel.AZ)
+	regionToAz := make(map[string][]*mysqlmodel.AZ)
 	for i, az := range azs {
 		lcuuidToAz[az.Lcuuid] = &azs[i]
 		regionToAz[az.Region] = append(regionToAz[az.Region], &azs[i])
 	}
 
-	ipToAzControllerCon := make(map[string][]*mysql.AZControllerConnection)
+	ipToAzControllerCon := make(map[string][]*mysqlmodel.AZControllerConnection)
 	for i, conn := range azControllerconns {
 		ipToAzControllerCon[conn.ControllerIP] = append(
 			ipToAzControllerCon[conn.ControllerIP],
@@ -174,7 +175,7 @@ func GetControllers(orgID int, filter map[string]string) (resp []model.Controlle
 			controllerResp.CurVtapCount = vtapCount
 		}
 		// region
-		var azConns []*mysql.AZControllerConnection
+		var azConns []*mysqlmodel.AZControllerConnection
 		azConns, in := ipToAzControllerCon[controller.IP]
 		if in {
 			if region, ok := lcuuidToRegion[azConns[0].Region]; ok {
@@ -223,7 +224,7 @@ func UpdateController(
 		return nil, err
 	}
 	db := dbInfo.DB
-	var controller mysql.Controller
+	var controller mysqlmodel.Controller
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
@@ -248,7 +249,7 @@ func UpdateController(
 
 		// 如果小于当前的最大采集器个数，则触发部分采集器的控制器切换操作
 		if vtapMax < controller.VTapMax {
-			vtaps := []mysql.VTap{}
+			vtaps := []mysqlmodel.VTap{}
 			updateVTapLcuuids := []string{}
 			tx.Where("controller_ip = ?", controller.IP).Find(&vtaps)
 			if len(vtaps) > vtapMax {
@@ -261,7 +262,7 @@ func UpdateController(
 						updateVTapLcuuids = append(updateVTapLcuuids, vtaps[i].Lcuuid)
 					}
 				}
-				if err = tx.Model(&mysql.VTap{}).Where("lcuuid IN (?)", updateVTapLcuuids).Update("controller_ip", "").Error; err != nil {
+				if err = tx.Model(&mysqlmodel.VTap{}).Where("lcuuid IN (?)", updateVTapLcuuids).Update("controller_ip", "").Error; err != nil {
 					tx.Rollback()
 					return nil, err
 				}
@@ -290,7 +291,7 @@ func UpdateController(
 			delVTapAzs             = mapset.NewSet()
 		)
 		var controllerRegion string
-		var azControllerConns []mysql.AZControllerConnection
+		var azControllerConns []mysqlmodel.AZControllerConnection
 		tx.Where("controller_ip = ?", controller.IP).Find(&azControllerConns)
 		if len(azControllerConns) > 0 {
 			controllerRegion = azControllerConns[0].Region
@@ -301,7 +302,7 @@ func UpdateController(
 		for _, conn := range azControllerConns {
 			oldConnAzs.Add(conn.AZ)
 		}
-		var dbAzs []mysql.AZ
+		var dbAzs []mysqlmodel.AZ
 		tx.Where("region = ?", controllerRegion).Find(&dbAzs)
 
 		// - 存在区域修改时
@@ -362,7 +363,7 @@ func UpdateController(
 				oldVTapAzs = oldConnAzs.Clone()
 			}
 
-			var dbAzs []mysql.AZ
+			var dbAzs []mysqlmodel.AZ
 			tx.Where("region = ?", controllerRegion).Find(&dbAzs)
 			if _, ok := controllerUpdate["IS_ALL_AZ"]; ok {
 				newConnAzs.Add("ALL")
@@ -389,17 +390,17 @@ func UpdateController(
 			for _, az := range delConnAzs.ToSlice() {
 				azCondition = append(azCondition, az.(string))
 			}
-			if err = tx.Delete(mysql.AZControllerConnection{},
+			if err = tx.Delete(mysqlmodel.AZControllerConnection{},
 				"region = ? AND controller_ip = ? AND az IN (?)", oldControllerRegion, controller.IP, azCondition).Error; err != nil {
 				tx.Rollback()
 				return nil, err
 			}
 		}
 
-		var addConns []mysql.AZControllerConnection
+		var addConns []mysqlmodel.AZControllerConnection
 		if len(addConnAzs.ToSlice()) > 0 {
 			for _, az := range addConnAzs.ToSlice() {
-				aConn := mysql.AZControllerConnection{}
+				aConn := mysqlmodel.AZControllerConnection{}
 				aConn.Region = controllerRegion
 				aConn.AZ = az.(string)
 				aConn.ControllerIP = controller.IP
@@ -414,7 +415,7 @@ func UpdateController(
 
 		// 针对 delVTap 中的采集器, 更新控制器IP为空，触发重新分配控制器
 		if len(delVTapAzs.ToSlice()) > 0 {
-			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVTapAzs.ToSlice()).Where("controller_ip = ?",
+			if err = tx.Model(&mysqlmodel.VTap{}).Where("az IN (?)", delVTapAzs.ToSlice()).Where("controller_ip = ?",
 				controller.IP).Update("controller_ip", "").Error; err != nil {
 				tx.Rollback()
 				return nil, err
@@ -466,7 +467,7 @@ func DeleteController(orgID int, lcuuid string, m *monitor.ControllerCheck) (res
 		return nil, err
 	}
 	db := dbInfo.DB
-	var controller mysql.Controller
+	var controller mysqlmodel.Controller
 	var vtapCount int64
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&controller); ret.Error != nil {
@@ -480,7 +481,7 @@ func DeleteController(orgID int, lcuuid string, m *monitor.ControllerCheck) (res
 		return map[string]string{}, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("controller (%s) is being used by vtap", lcuuid))
 	}
 
-	db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", controller.IP)
+	db.Delete(mysqlmodel.AZControllerConnection{}, "controller_ip = ?", controller.IP)
 	db.Delete(&controller)
 
 	// 触发对应的采集器重新分配控制器

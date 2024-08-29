@@ -21,17 +21,18 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChNetwork struct {
-	SubscriberComponent[*message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, mysql.Network, mysql.ChNetwork, IDKey]
+	SubscriberComponent[*message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, mysqlmodel.Network, mysqlmodel.ChNetwork, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 	mng := &ChNetwork{
-		newSubscriberComponent[*message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, mysql.Network, mysql.ChNetwork, IDKey](
+		newSubscriberComponent[*message.NetworkFieldsUpdate, message.NetworkFieldsUpdate, mysqlmodel.Network, mysqlmodel.ChNetwork, IDKey](
 			common.RESOURCE_TYPE_NETWORK_EN, RESOURCE_TYPE_CH_NETWORK,
 		),
 		resourceTypeToIconID,
@@ -42,14 +43,14 @@ func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *mysql.Network) (keys []IDKey, targets []mysql.ChNetwork) {
+func (c *ChNetwork) sourceToTarget(md *message.Metadata, source *mysqlmodel.Network) (keys []IDKey, targets []mysqlmodel.ChNetwork) {
 	networkName := source.Name
 	if source.DeletedAt.Valid {
 		networkName += " (deleted)"
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysql.ChNetwork{
+	targets = append(targets, mysqlmodel.ChNetwork{
 		ID:   source.ID,
 		Name: networkName,
 		IconID: c.resourceTypeToIconID[IconKey{
@@ -70,14 +71,14 @@ func (c *ChNetwork) onResourceUpdated(sourceID int, fieldsUpdate *message.Networ
 		updateInfo["name"] = fieldsUpdate.Name.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysql.ChNetwork
+		var chItem mysqlmodel.ChNetwork
 		db.Where("id = ?", sourceID).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChNetwork) softDeletedTargetsUpdated(targets []mysql.ChNetwork, db *mysql.DB) {
+func (c *ChNetwork) softDeletedTargetsUpdated(targets []mysqlmodel.ChNetwork, db *mysql.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

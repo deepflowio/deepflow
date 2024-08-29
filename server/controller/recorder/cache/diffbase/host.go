@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddHost(dbItem *mysql.Host, seq int) {
+func (b *DataSet) AddHost(dbItem *mysqlmodel.Host, seq int) {
 	b.Hosts[dbItem.Lcuuid] = &Host{
 		DiffBase: DiffBase{
 			Sequence: seq,

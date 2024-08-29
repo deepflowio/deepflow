@@ -76,6 +76,8 @@ var showPatterns = []string{
 	`^show\s+tables$`,    // 6. show tables
 	`^show\s+databases$`, // 7. show databases
 	`^show\s+tag-values(?: where .+)?(?: limit\s+\d+(,\s+\d+)?)?$`, // 8. show tag-values
+	`^show all_enum_tags$`,
+	`^show\s+enum\s+\S+\s+values`,
 }
 var res []*regexp.Regexp
 
@@ -403,6 +405,12 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		return GetDatabases(), []string{}, true, nil
 	case 8: // show tag-values...
 		sqlList, err := tagdescription.GetTagValuesDescriptions(e.DB, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
+		return nil, sqlList, true, err
+	case 9:
+		result, err := tagdescription.GetEnumTags(e.DB, table, sql)
+		return result, []string{}, true, err
+	case 10:
+		sqlList, err := tagdescription.GetEnumTagAllValues(e.DB, table, sql)
 		return nil, sqlList, true, err
 	}
 	return nil, []string{}, true, fmt.Errorf("parse show sql error, sql: '%s' not support", sql)
@@ -1019,8 +1027,8 @@ func (e *CHEngine) TransPrometheusTargetIDFilter(expr view.Node) (view.Node, err
 		targetIDs := []string{}
 		for _, v := range targetLabelRst.Values {
 			targetID := v.([]interface{})[0]
-			targetIDInt := targetID.(int)
-			targetIDString := fmt.Sprintf("%d", targetIDInt)
+			targetIDUInt64 := targetID.(uint64)
+			targetIDString := fmt.Sprintf("%d", targetIDUInt64)
 			targetIDs = append(targetIDs, targetIDString)
 		}
 

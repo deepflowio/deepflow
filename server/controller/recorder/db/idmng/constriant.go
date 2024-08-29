@@ -16,20 +16,22 @@
 
 package idmng
 
-import "github.com/deepflowio/deepflow/server/controller/db/mysql"
+import (
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+)
 
 // 资源的MySQL orm对象
 type MySQLModel interface {
-	mysql.Region | mysql.AZ | mysql.SubDomain | mysql.Host | mysql.VM |
-		mysql.VPC | mysql.Network | mysql.VRouter |
-		mysql.DHCPPort |
-		mysql.NATGateway | mysql.LB |
-		mysql.CEN |
-		mysql.PeerConnection | mysql.RDSInstance | mysql.RedisInstance | mysql.PodCluster |
-		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
-		mysql.PodService |
-		mysql.PodGroup | mysql.PodReplicaSet |
-		mysql.Pod | mysql.Process | mysql.VTap | mysql.ORG
+	mysqlmodel.Region | mysqlmodel.AZ | mysqlmodel.SubDomain | mysqlmodel.Host | mysqlmodel.VM |
+		mysqlmodel.VPC | mysqlmodel.Network | mysqlmodel.VRouter |
+		mysqlmodel.DHCPPort |
+		mysqlmodel.NATGateway | mysqlmodel.LB |
+		mysqlmodel.CEN |
+		mysqlmodel.PeerConnection | mysqlmodel.RDSInstance | mysqlmodel.RedisInstance | mysqlmodel.PodCluster |
+		mysqlmodel.PodNode | mysqlmodel.VMPodNodeConnection | mysqlmodel.PodNamespace | mysqlmodel.PodIngress |
+		mysqlmodel.PodService |
+		mysqlmodel.PodGroup | mysqlmodel.PodReplicaSet |
+		mysqlmodel.Pod | mysqlmodel.Process | mysqlmodel.VTap | mysqlmodel.ORG
 
 	GetID() int
 }

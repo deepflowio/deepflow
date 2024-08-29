@@ -22,9 +22,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	"github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 const ORG_TABLE = "org"
@@ -48,7 +50,7 @@ func GetNonDefaultORGIDs() ([]int, error) {
 		return ids, err
 	}
 
-	var orgs []*ORG
+	var orgs []*model.ORG
 	if err := DefaultDB.Where("org_id != ?", common.DEFAULT_ORG_ID).Find(&orgs).Error; err != nil {
 		log.Errorf("failed to get org ids: %v", err.Error())
 		return ids, err
@@ -62,7 +64,7 @@ func GetNonDefaultORGIDs() ([]int, error) {
 
 func GetDeletedORGIDs() ([]int, error) {
 	ids := make([]int, 0)
-	var orgs []*ORG
+	var orgs []*model.ORG
 	if err := DefaultDB.Unscoped().Find(&orgs).Error; err != nil {
 		log.Errorf("failed to get orgs: %s", err.Error())
 		return ids, err

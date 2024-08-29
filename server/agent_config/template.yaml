@@ -868,7 +868,7 @@ global:
       # deprecated: true
       debug_metrics_enabled: false
     # type: string
-    # name: Hostname 
+    # name: Hostname
     # unit:
     # range: []
     # enum_options: []
@@ -878,7 +878,7 @@ global:
     #   en: Override statsd host tag.
     #   ch: 覆盖 statsd 主机标签。
     # upgrade_from: host
-    hostname: ""   
+    hostname: ""
   # type: section
   # name:
   #   en: Standalone Mode
@@ -1530,7 +1530,7 @@ inputs:
       #     Cilium         lxc.*
       #     Kube-OVN       [0-9a-f]+_h$
       #     ```
-      #     When the `tap_interface_regex` is not configured, it indicates 
+      #     When the `tap_interface_regex` is not configured, it indicates
       #     that network card traffic is not being collected
       #   ch: |-
       #     需要采集流量的网络接口的正则表达式。
@@ -2042,6 +2042,23 @@ inputs:
       # upgrade_from: static_config.trim-tunnel-types
       # TODO: “虚拟网络镜像”、“物理网络镜像”是否均适用？【是的】
       tunnel_trim_protocols: []
+
+      # type: int
+      # name:
+      #   en: Packet Segmentation Reassembly
+      #   ch: TCP分段重组开关
+      # unit:
+      # range: [1, 65535]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     TODO
+      #   ch: |-
+      #     开启后会将连续的两个 TCP Packet 聚合在一起做应用日志解析
+      packet_segmentation_reassembly: []
+
     # type: section
     # name:
     #   en: Physical Mirror Traffic
@@ -2460,38 +2477,98 @@ inputs:
     # name: Profile
     # description:
     profile:
-      # type: bool
+      # type: section
       # name:
-      #   en: dwarf unwinding disabled
-      #   ch: 禁用 DWARF 栈回溯
-      # unit:
-      # range: []
-      # enum_options: []
-      # modification: hot_update
-      # ee_feature: false
+      #   en: Unwinding
+      #   ch: 栈回溯
       # description:
-      #   en: |-
-      #     disable stack unwinding with DWARF, forcing frame pointer based unwinding.
-      #   ch: |-
-      #     禁用 DWARF 栈回溯，强制使用帧指针。
-      # upgrade_from: static_config.ebpf.dwarf_disabled
-      dwarf_disabled: false
-      # type: string
-      # name:
-      #   en: dwarf unwinding string
-      #   ch: DWARF 回溯正则表达式
-      # unit:
-      # range: []
-      # enum_options: []
-      # modification: hot_update
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     use DWARF unwinding for matched processes instead of inferring.
-      #   ch: |-
-      #     对匹配进程使用 DWARF 栈回溯，取代自动推断。
-      # upgrade_from: static_config.ebpf.dwarf_regex
-      dwarf_regex: ""
+      unwinding:
+        # type: bool
+        # name:
+        #   en: DWARF unwinding disabled
+        #   ch: 禁用 DWARF 栈回溯
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     The default setting is "false", which enables DWARF based stack unwinding for
+        #     all processes that do not contain frame pointers. Agent uses a heuristic algorithm
+        #     to determine whether the process being analyzed contains frame pointers.
+        #     Setting it to "true" will disable DWARF based stack unwinding, using frame pointer
+        #     based unwinding for all processes. If a process does not contain frame pointers,
+        #     the stack cannot be displayed correctly.
+        #   ch: |-
+        #     默认设置为“false”，将对所有不包含帧指针的进程启用 DWARF 回溯。采集器使用启发式算法判断待剖析进程是否包含帧指针。
+        #     设置为“true”将禁用 DWARF 栈回溯，对所有进程使用基于帧指针的回溯，如果进程不包含帧指针将无法显示正常的栈。
+        # upgrade_from: static_config.ebpf.dwarf-disabled
+        dwarf_disabled: false
+        # type: string
+        # name:
+        #   en: DWARF unwinding process matching regular expression
+        #   ch: DWARF 回溯进程匹配正则表达式
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     If set to empty, agennt will use a heuristic algorithm to determine whether the process
+        #     being analyzed contains frame pointers, and will use DWARF based stack unwinding for
+        #     processes that do not contain frame pointers.
+        #     If set to a valid regular expression, agent will no longer infer whether a process contains
+        #     frame pointers but will instead use the provided regular expression to match process names,
+        #     applying DWARF based stack unwinding only to the matching processes.
+        #   ch: |-
+        #     如设置为空，采集器将使用启发式算法判断待剖析进程是否包含帧指针，并对不包含帧指针的进程使用 DWARF 栈回溯。
+        #     如设置为合法正则表达式，采集器将不再自行推断进程是否包含帧指针，改用该正则表达式对进程名进行匹配，仅对匹配的进程使用 DWARF 帧回溯。
+        # upgrade_from: static_config.ebpf.dwarf-regex
+        dwarf_regex: ""
+        # type: int
+        # name:
+        #   en: DWARF unwinding process map size
+        #   ch: DWARF 回溯进程表容量
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Each process using DWARF unwind has an entry in this map, relating process id to DWARF unwind entries.
+        #     The size of each one of these entries is arount 8K, the default setting will allocate around 8M kernel memory.
+        #     This is a hash map, so size can be lower than max process id.
+        #     The configuration is only effective if DWARF is enabled.
+        #   ch: |-
+        #     每个需要进行 DWARF 回溯的进程在该表中有一条记录，用于关联进程和回溯记录分片。
+        #     每条记录大约占 8K 内存，默认配置大约需要分配 8M 内核内存。
+        #     由于是哈希表，配置可以比最大进程号低。
+        #     该配置只在 DWARF 功能开启时生效。
+        # upgrade_from: static_config.ebpf.dwarf-process-map-size
+        dwarf_process_map_size: 1024
+        # type: int
+        # name:
+        #   en: DWARF unwinding shard map size
+        #   ch: DWARF 回溯分片表容量
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     The number of unwind entry shards for DWARF unwinding.
+        #     The size of each one of these entries is 1M, the default setting will allocate around 128M kernel memory.
+        #     The configuration is only effective if DWARF is enabled.
+        #   ch: |-
+        #     DWARF 回溯记录分片数量。
+        #     每条记录大约占 1M 内存，默认配置大约需要分配 128M 内核内存。
+        #     该配置只在 DWARF 功能开启时生效。
+        # upgrade_from: static_config.ebpf.dwarf-shard-map-size
+        dwarf_shard_map_size: 128
       # type: section
       # name: On-CPU
       # description:

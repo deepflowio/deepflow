@@ -422,7 +422,7 @@ func TraceSearch(args *common.TempoParams) (resp map[string]interface{}, debug m
 			"durationMs":        value[4],
 			"rootServiceName":   value[1],
 			"rootTraceName":     value[2],
-			"startTimeUnixNano": strconv.Itoa(value[3].(int) * 1000),
+			"startTimeUnixNano": strconv.Itoa(int(value[3].(int64)) * 1000),
 			"traceID":           value[0],
 		})
 	}

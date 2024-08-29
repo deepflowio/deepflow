@@ -7,7 +7,7 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand => ./controller/cloud/kubernetes_gather/expand
 	github.com/deepflowio/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand => ./controller/cloud/tencent/expand
-	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table => ./controller/db/mysql/migrator/table
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/edition => ./controller/db/mysql/migrator/edition
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense => ./controller/http/service/agentlicense
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
@@ -44,7 +44,7 @@ require (
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/table v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/edition v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/ingester/config/configdefaults v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
@@ -103,7 +103,7 @@ require (
 	github.com/bytedance/sonic v1.11.8
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/libs/logger/blocker v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/libs/logger/blocker v0.0.0-20240822020041-cdaf0f82ce6f
 	github.com/deepflowio/deepflow/server/querier/app/distributed_tracing/service/tracemap v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/router/packet_adapter v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/querier/app/prometheus/service/packet_wrapper v0.0.0-00010101000000-000000000000

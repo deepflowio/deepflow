@@ -20,15 +20,16 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type ChTargetLabel struct {
-	UpdaterComponent[mysql.ChTargetLabel, PrometheusTargetLabelKey]
+	UpdaterComponent[mysqlmodel.ChTargetLabel, PrometheusTargetLabelKey]
 }
 
 func NewChTargetLabel() *ChTargetLabel {
 	updater := &ChTargetLabel{
-		newUpdaterComponent[mysql.ChTargetLabel, PrometheusTargetLabelKey](
+		newUpdaterComponent[mysqlmodel.ChTargetLabel, PrometheusTargetLabelKey](
 			RESOURCE_TYPE_CH_TARGET_LABEL,
 		),
 	}
@@ -37,8 +38,8 @@ func NewChTargetLabel() *ChTargetLabel {
 	return updater
 }
 
-func (l *ChTargetLabel) generateNewData(db *mysql.DB) (map[PrometheusTargetLabelKey]mysql.ChTargetLabel, bool) {
-	var prometheusMetricNames []mysql.PrometheusMetricName
+func (l *ChTargetLabel) generateNewData(db *mysql.DB) (map[PrometheusTargetLabelKey]mysqlmodel.ChTargetLabel, bool) {
+	var prometheusMetricNames []mysqlmodel.PrometheusMetricName
 	err := db.Unscoped().Find(&prometheusMetricNames).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
@@ -60,7 +61,7 @@ func (l *ChTargetLabel) generateNewData(db *mysql.DB) (map[PrometheusTargetLabel
 		return nil, false
 	}
 
-	keyToItem := make(map[PrometheusTargetLabelKey]mysql.ChTargetLabel)
+	keyToItem := make(map[PrometheusTargetLabelKey]mysqlmodel.ChTargetLabel)
 	for _, prometheusMetricName := range prometheusMetricNames {
 		metricID := prometheusMetricName.ID
 		metricName := prometheusMetricName.Name
@@ -72,7 +73,7 @@ func (l *ChTargetLabel) generateNewData(db *mysql.DB) (map[PrometheusTargetLabel
 					targetLabelItem := strings.SplitN(targetLabel, ":", 2)
 					labelNameID := metricLabelNameIDMap[targetLabelItem[0]]
 					labelValue := targetLabelItem[1]
-					keyToItem[PrometheusTargetLabelKey{MetricID: metricID, LabelNameID: labelNameID, TargetID: targetID}] = mysql.ChTargetLabel{
+					keyToItem[PrometheusTargetLabelKey{MetricID: metricID, LabelNameID: labelNameID, TargetID: targetID}] = mysqlmodel.ChTargetLabel{
 						MetricID:    metricID,
 						LabelNameID: labelNameID,
 						LabelValue:  labelValue,
@@ -85,11 +86,11 @@ func (l *ChTargetLabel) generateNewData(db *mysql.DB) (map[PrometheusTargetLabel
 	return keyToItem, true
 }
 
-func (l *ChTargetLabel) generateKey(dbItem mysql.ChTargetLabel) PrometheusTargetLabelKey {
+func (l *ChTargetLabel) generateKey(dbItem mysqlmodel.ChTargetLabel) PrometheusTargetLabelKey {
 	return PrometheusTargetLabelKey{MetricID: dbItem.MetricID, LabelNameID: dbItem.LabelNameID, TargetID: dbItem.TargetID}
 }
 
-func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel) (map[string]interface{}, bool) {
+func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysqlmodel.ChTargetLabel) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.LabelValue != newItem.LabelValue {
 		updateInfo["label_value"] = newItem.LabelValue
@@ -102,7 +103,7 @@ func (l *ChTargetLabel) generateUpdateInfo(oldItem, newItem mysql.ChTargetLabel)
 
 func (l *ChTargetLabel) generateMetricTargetData(db *mysql.DB) (map[string][]int, bool) {
 	metricNameTargetIDMap := make(map[string][]int)
-	var prometheusMetricTargets []mysql.PrometheusMetricTarget
+	var prometheusMetricTargets []mysqlmodel.PrometheusMetricTarget
 	err := db.Unscoped().Find(&prometheusMetricTargets).Error
 
 	if err != nil {
@@ -119,7 +120,7 @@ func (l *ChTargetLabel) generateMetricTargetData(db *mysql.DB) (map[string][]int
 
 func (l *ChTargetLabel) generateTargetData(db *mysql.DB) (map[int]string, bool) {
 	targetLabelNameValueMap := make(map[int]string)
-	var prometheusTargets []mysql.PrometheusTarget
+	var prometheusTargets []mysqlmodel.PrometheusTarget
 	err := db.Unscoped().Find(&prometheusTargets).Error
 
 	if err != nil {
@@ -137,7 +138,7 @@ func (l *ChTargetLabel) generateTargetData(db *mysql.DB) (map[int]string, bool) 
 
 func (l *ChTargetLabel) generateLabelNameIDData(db *mysql.DB) (map[string]int, bool) {
 	metricLabelNameIDMap := make(map[string]int)
-	var prometheusLabelNames []mysql.PrometheusLabelName
+	var prometheusLabelNames []mysqlmodel.PrometheusLabelName
 	err := db.Unscoped().Find(&prometheusLabelNames).Error
 
 	if err != nil {

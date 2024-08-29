@@ -46,11 +46,11 @@ typedef struct unwind_table_t unwind_table_t;
 
 typedef struct {
     uint32_t id;
+    uint16_t entry_start;
+    uint16_t entry_end;
     uint64_t offset;
     uint64_t pc_min;
     uint64_t pc_max;
-    uint32_t entry_start;
-    uint32_t entry_end;
 } shard_info_t;
 
 typedef struct {
@@ -73,6 +73,8 @@ typedef struct {
 } unwind_entry_shard_t;
 
 bool frame_pointer_heuristic_check(uint32_t pid);
+
+int32_t read_offset_of_stack_in_task_struct(void);
 
 int rustc_demangle(const char *mangled, char *out, size_t out_size);
 

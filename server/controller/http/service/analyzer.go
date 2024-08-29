@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -38,12 +39,12 @@ func GetAnalyzers(orgID int, filter map[string]interface{}) (resp []model.Analyz
 	}
 	db := dbInfo.DB
 	var response []model.Analyzer
-	var analyzers []mysql.Analyzer
-	var controllers []mysql.Controller
-	var regions []mysql.Region
-	var azs []mysql.AZ
-	var azAnalyzerconns []mysql.AZAnalyzerConnection
-	var vtaps []mysql.VTap
+	var analyzers []mysqlmodel.Analyzer
+	var controllers []mysqlmodel.Controller
+	var regions []mysqlmodel.Region
+	var azs []mysqlmodel.AZ
+	var azAnalyzerconns []mysqlmodel.AZAnalyzerConnection
+	var vtaps []mysqlmodel.VTap
 
 	if lcuuid, ok := filter["lcuuid"]; ok {
 		db = db.Where("lcuuid = ?", lcuuid)
@@ -52,7 +53,7 @@ func GetAnalyzers(orgID int, filter map[string]interface{}) (resp []model.Analyz
 	} else if name, ok := filter["name"]; ok && name != "" {
 		db = db.Where("name = ? OR ip = ?", name, name)
 	} else if region, ok := filter["region"]; ok {
-		azConns := []mysql.AZAnalyzerConnection{}
+		azConns := []mysqlmodel.AZAnalyzerConnection{}
 		ips := []string{}
 		db.Where("region = ?", region).Find(&azConns)
 		for _, conn := range azConns {
@@ -70,19 +71,19 @@ func GetAnalyzers(orgID int, filter map[string]interface{}) (resp []model.Analyz
 	db.Find(&azAnalyzerconns)
 	db.Find(&vtaps)
 
-	lcuuidToRegion := make(map[string]*mysql.Region)
+	lcuuidToRegion := make(map[string]*mysqlmodel.Region)
 	for i, region := range regions {
 		lcuuidToRegion[region.Lcuuid] = &regions[i]
 	}
 
-	lcuuidToAz := make(map[string]*mysql.AZ)
-	regionToAz := make(map[string][]*mysql.AZ)
+	lcuuidToAz := make(map[string]*mysqlmodel.AZ)
+	regionToAz := make(map[string][]*mysqlmodel.AZ)
 	for i, az := range azs {
 		lcuuidToAz[az.Lcuuid] = &azs[i]
 		regionToAz[az.Region] = append(regionToAz[az.Region], &azs[i])
 	}
 
-	ipToAzAnalyzerCon := make(map[string][]*mysql.AZAnalyzerConnection)
+	ipToAzAnalyzerCon := make(map[string][]*mysqlmodel.AZAnalyzerConnection)
 	for i, conn := range azAnalyzerconns {
 		ipToAzAnalyzerCon[conn.AnalyzerIP] = append(
 			ipToAzAnalyzerCon[conn.AnalyzerIP],
@@ -135,7 +136,7 @@ func GetAnalyzers(orgID int, filter map[string]interface{}) (resp []model.Analyz
 			analyzerResp.CurVtapCount = vtapCount
 		}
 		// region
-		var azConns []*mysql.AZAnalyzerConnection
+		var azConns []*mysqlmodel.AZAnalyzerConnection
 		azConns, in := ipToAzAnalyzerCon[analyzer.IP]
 		if in {
 			if region, ok := lcuuidToRegion[azConns[0].Region]; ok {
@@ -184,7 +185,7 @@ func UpdateAnalyzer(
 		return nil, err
 	}
 	db := dbInfo.DB
-	var analyzer mysql.Analyzer
+	var analyzer mysqlmodel.Analyzer
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
@@ -209,7 +210,7 @@ func UpdateAnalyzer(
 
 		// TODO: 如果小于当前的最大采集器个数，则触发部分采集器的数据节点切换操作
 		if vtapMax < analyzer.VTapMax {
-			vtaps := []mysql.VTap{}
+			vtaps := []mysqlmodel.VTap{}
 			updateVTapLcuuids := []string{}
 			db.Where("analyzer_ip = ?", analyzer.IP).Find(&vtaps)
 			if len(vtaps) > vtapMax {
@@ -222,7 +223,7 @@ func UpdateAnalyzer(
 						updateVTapLcuuids = append(updateVTapLcuuids, vtaps[i].Lcuuid)
 					}
 				}
-				if err = tx.Model(&mysql.VTap{}).Where("lcuuid IN (?)", updateVTapLcuuids).Update("analyzer_ip", "").Error; err != nil {
+				if err = tx.Model(&mysqlmodel.VTap{}).Where("lcuuid IN (?)", updateVTapLcuuids).Update("analyzer_ip", "").Error; err != nil {
 					tx.Rollback()
 					return nil, err
 				}
@@ -233,7 +234,7 @@ func UpdateAnalyzer(
 
 	// 检查: 如果区域内没有控制器，禁止将数据节点修改至该区域
 	if _, ok := analyzerUpdate["REGION"]; ok {
-		var azControllerConns []mysql.AZControllerConnection
+		var azControllerConns []mysqlmodel.AZControllerConnection
 		db.Where("region = ?", analyzerUpdate["REGION"]).Find(&azControllerConns)
 		if len(azControllerConns) == 0 {
 			return nil, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("no controller in region(%s)", analyzerUpdate["REGION"]))
@@ -258,7 +259,7 @@ func UpdateAnalyzer(
 			delVTapAzs             = mapset.NewSet()
 		)
 		var analyzerRegion string
-		var azAnalyzerConns []mysql.AZAnalyzerConnection
+		var azAnalyzerConns []mysqlmodel.AZAnalyzerConnection
 		db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
 		if len(azAnalyzerConns) > 0 {
 			analyzerRegion = azAnalyzerConns[0].Region
@@ -269,7 +270,7 @@ func UpdateAnalyzer(
 		for _, conn := range azAnalyzerConns {
 			oldConnAzs.Add(conn.AZ)
 		}
-		var dbAzs []mysql.AZ
+		var dbAzs []mysqlmodel.AZ
 		tx.Where("region = ?", analyzerRegion).Find(&dbAzs)
 
 		// - 存在区域修改时
@@ -330,7 +331,7 @@ func UpdateAnalyzer(
 				oldVTapAzs = oldConnAzs.Clone()
 			}
 
-			var dbAzs []mysql.AZ
+			var dbAzs []mysqlmodel.AZ
 			tx.Where("region = ?", analyzerRegion).Find(&dbAzs)
 			if _, ok := analyzerUpdate["IS_ALL_AZ"]; ok {
 				newConnAzs.Add("ALL")
@@ -354,17 +355,17 @@ func UpdateAnalyzer(
 			for _, az := range delConnAzs.ToSlice() {
 				azCondition = append(azCondition, az.(string))
 			}
-			if err = tx.Delete(mysql.AZAnalyzerConnection{},
+			if err = tx.Delete(mysqlmodel.AZAnalyzerConnection{},
 				"region = ? AND analyzer_ip = ? AND az IN (?)", oldAnalyzerRegion, analyzer.IP, azCondition).Error; err != nil {
 				tx.Rollback()
 				return nil, err
 			}
 		}
 
-		var addConnAzss []mysql.AZAnalyzerConnection
+		var addConnAzss []mysqlmodel.AZAnalyzerConnection
 		if len(addConnAzs.ToSlice()) > 0 {
 			for _, az := range addConnAzs.ToSlice() {
-				aConn := mysql.AZAnalyzerConnection{}
+				aConn := mysqlmodel.AZAnalyzerConnection{}
 				aConn.Region = analyzerRegion
 				aConn.AZ = az.(string)
 				aConn.AnalyzerIP = analyzer.IP
@@ -379,7 +380,7 @@ func UpdateAnalyzer(
 
 		// 针对 delVTapAzs 中的采集器, 更新控制器IP为空，触发重新分配控制器
 		if len(delVTapAzs.ToSlice()) > 0 {
-			if err = tx.Model(&mysql.VTap{}).Where("az IN (?)", delVTapAzs.ToSlice()).Where("analyzer_ip = ?",
+			if err = tx.Model(&mysqlmodel.VTap{}).Where("az IN (?)", delVTapAzs.ToSlice()).Where("analyzer_ip = ?",
 				analyzer.IP).Update("analyzer_ip", "").Error; err != nil {
 				tx.Rollback()
 				return nil, err
@@ -434,7 +435,7 @@ func DeleteAnalyzer(orgID int, lcuuid string, m *monitor.AnalyzerCheck) (resp ma
 		return nil, err
 	}
 	db := dbInfo.DB
-	var analyzer mysql.Analyzer
+	var analyzer mysqlmodel.Analyzer
 	var vtapCount int64
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&analyzer); ret.Error != nil {
@@ -448,7 +449,7 @@ func DeleteAnalyzer(orgID int, lcuuid string, m *monitor.AnalyzerCheck) (resp ma
 		return map[string]string{}, NewError(httpcommon.INVALID_POST_DATA, fmt.Sprintf("analyzer (%s) is being used by vtap", lcuuid))
 	}
 
-	db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", analyzer.IP)
+	db.Delete(mysqlmodel.AZAnalyzerConnection{}, "analyzer_ip = ?", analyzer.IP)
 	db.Delete(&analyzer)
 
 	// 触发对应的采集器重新分配数据节点

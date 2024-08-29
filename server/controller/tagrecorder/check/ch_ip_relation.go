@@ -21,16 +21,17 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 // 以VPCID和IP为key，获取IP关联的NAT网关、负载均衡、负载均衡监听器、容器Ingress和容器服务数据
 type ChIPRelation struct {
-	UpdaterBase[mysql.ChIPRelation, IPRelationKey]
+	UpdaterBase[mysqlmodel.ChIPRelation, IPRelationKey]
 }
 
 func NewChIPRelation() *ChIPRelation {
 	updater := &ChIPRelation{
-		UpdaterBase[mysql.ChIPRelation, IPRelationKey]{
+		UpdaterBase[mysqlmodel.ChIPRelation, IPRelationKey]{
 			resourceTypeName: RESOURCE_TYPE_CH_IP_RELATION,
 		},
 	}
@@ -38,12 +39,12 @@ func NewChIPRelation() *ChIPRelation {
 	return updater
 }
 
-func (i *ChIPRelation) generateNewData() (map[IPRelationKey]mysql.ChIPRelation, bool) {
+func (i *ChIPRelation) generateNewData() (map[IPRelationKey]mysqlmodel.ChIPRelation, bool) {
 	toolDS, ok := i.newToolDataSet()
 	if !ok {
 		return nil, false
 	}
-	keyToDBItem := make(map[IPRelationKey]mysql.ChIPRelation)
+	keyToDBItem := make(map[IPRelationKey]mysqlmodel.ChIPRelation)
 	if ok := i.generateFromNATGateway(keyToDBItem, toolDS); !ok {
 		return nil, false
 	}
@@ -56,14 +57,14 @@ func (i *ChIPRelation) generateNewData() (map[IPRelationKey]mysql.ChIPRelation, 
 	return keyToDBItem, true
 }
 
-func (i *ChIPRelation) generateKey(dbItem mysql.ChIPRelation) IPRelationKey {
+func (i *ChIPRelation) generateKey(dbItem mysqlmodel.ChIPRelation) IPRelationKey {
 	return IPRelationKey{
 		L3EPCID: dbItem.L3EPCID,
 		IP:      dbItem.IP,
 	}
 }
 
-func (i *ChIPRelation) generateUpdateInfo(oldItem, newItem mysql.ChIPRelation) (map[string]interface{}, bool) {
+func (i *ChIPRelation) generateUpdateInfo(oldItem, newItem mysqlmodel.ChIPRelation) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.NATGWID != newItem.NATGWID {
 		updateInfo["natgw_id"] = newItem.NATGWID
@@ -122,8 +123,8 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 		vifIDToIPs:           make(map[int][]string),
 	}
 
-	var vms []*mysql.VM
-	if err := mysql.Db.Unscoped().Find(&vms).Error; err != nil {
+	var vms []*mysqlmodel.VM
+	if err := mysql.DefaultDB.Unscoped().Find(&vms).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_VM, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
@@ -131,8 +132,8 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 		toolDS.vmIDToVPCID[vm.ID] = vm.VPCID
 	}
 
-	var vifs []*mysql.VInterface
-	if err := mysql.Db.Where(
+	var vifs []*mysqlmodel.VInterface
+	if err := mysql.DefaultDB.Where(
 		"devicetype IN ?",
 		[]int{
 			common.VIF_DEVICE_TYPE_VM,
@@ -160,13 +161,13 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 		}
 	}
 
-	var wanIPs []*mysql.WANIP
-	if err := mysql.Db.Unscoped().Find(&wanIPs).Error; err != nil {
+	var wanIPs []*mysqlmodel.WANIP
+	if err := mysql.DefaultDB.Unscoped().Find(&wanIPs).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_WANIP, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
-	var lanIPs []*mysql.LANIP
-	if err := mysql.Db.Unscoped().Find(&lanIPs).Error; err != nil {
+	var lanIPs []*mysqlmodel.LANIP
+	if err := mysql.DefaultDB.Unscoped().Find(&lanIPs).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LANIP, err), i.db.LogPrefixORGID)
 		return nil, false
 	}
@@ -180,23 +181,23 @@ func (i *ChIPRelation) newToolDataSet() (*toolDataSet, bool) {
 	return toolDS, true
 }
 
-func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
-	var natGateways []*mysql.NATGateway
-	if err := mysql.Db.Unscoped().Find(&natGateways).Error; err != nil {
+func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysqlmodel.ChIPRelation, toolDS *toolDataSet) bool {
+	var natGateways []*mysqlmodel.NATGateway
+	if err := mysql.DefaultDB.Unscoped().Find(&natGateways).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err), i.db.LogPrefixORGID)
 		return false
 	}
-	var natRules []*mysql.NATRule
-	if err := mysql.Db.Unscoped().Find(&natRules).Error; err != nil {
+	var natRules []*mysqlmodel.NATRule
+	if err := mysql.DefaultDB.Unscoped().Find(&natRules).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_RULE, err), i.db.LogPrefixORGID)
 		return false
 	}
-	natGatewayIDToNatRules := make(map[int][]*mysql.NATRule)
+	natGatewayIDToNatRules := make(map[int][]*mysqlmodel.NATRule)
 	for _, natRule := range natRules {
 		natGatewayIDToNatRules[natRule.NATGatewayID] = append(natGatewayIDToNatRules[natRule.NATGatewayID], natRule)
 	}
-	var natVMConns []*mysql.NATVMConnection
-	if err := mysql.Db.Unscoped().Find(&natVMConns).Error; err != nil {
+	var natVMConns []*mysqlmodel.NATVMConnection
+	if err := mysql.DefaultDB.Unscoped().Find(&natVMConns).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NAT_VM_CONNECTION, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -205,7 +206,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 		// IP：网关自身IP
 		for _, vif := range toolDS.natGatewayIDToVIFIDs[natGateway.ID] {
 			for _, ip := range toolDS.vifIDToIPs[vif] {
-				keyToDBItem[IPRelationKey{L3EPCID: natGateway.VPCID, IP: ip}] = mysql.ChIPRelation{
+				keyToDBItem[IPRelationKey{L3EPCID: natGateway.VPCID, IP: ip}] = mysqlmodel.ChIPRelation{
 					L3EPCID:   natGateway.VPCID,
 					IP:        ip,
 					NATGWID:   natGateway.ID,
@@ -221,7 +222,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 			}
 			for _, vifID := range toolDS.vmIDToVIFIDs[natVMConn.VMID] {
 				for _, ip := range toolDS.vifIDToIPs[vifID] {
-					keyToDBItem[IPRelationKey{L3EPCID: natGateway.VPCID, IP: ip}] = mysql.ChIPRelation{
+					keyToDBItem[IPRelationKey{L3EPCID: natGateway.VPCID, IP: ip}] = mysqlmodel.ChIPRelation{
 						L3EPCID:   natGateway.VPCID,
 						IP:        ip,
 						NATGWID:   natGateway.ID,
@@ -233,7 +234,7 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 		// VPCID：网关VPC
 		// IP：SNAT前IP、DNAT后IP
 		for _, natRule := range natGatewayIDToNatRules[natGateway.ID] {
-			keyToDBItem[IPRelationKey{L3EPCID: natGateway.VPCID, IP: natRule.FixedIP}] = mysql.ChIPRelation{
+			keyToDBItem[IPRelationKey{L3EPCID: natGateway.VPCID, IP: natRule.FixedIP}] = mysqlmodel.ChIPRelation{
 				L3EPCID:   natGateway.VPCID,
 				IP:        natRule.FixedIP,
 				NATGWID:   natGateway.ID,
@@ -244,34 +245,34 @@ func (i *ChIPRelation) generateFromNATGateway(keyToDBItem map[IPRelationKey]mysq
 	return true
 }
 
-func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
-	var lbs []*mysql.LB
-	if err := mysql.Db.Unscoped().Find(&lbs).Error; err != nil {
+func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysqlmodel.ChIPRelation, toolDS *toolDataSet) bool {
+	var lbs []*mysqlmodel.LB
+	if err := mysql.DefaultDB.Unscoped().Find(&lbs).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB, err), i.db.LogPrefixORGID)
 		return false
 	}
-	var lbListeners []*mysql.LBListener
-	if err := mysql.Db.Unscoped().Find(&lbListeners).Error; err != nil {
+	var lbListeners []*mysqlmodel.LBListener
+	if err := mysql.DefaultDB.Unscoped().Find(&lbListeners).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_LISTENER, err), i.db.LogPrefixORGID)
 		return false
 	}
-	lbIDToLBListeners := make(map[int][]*mysql.LBListener)
+	lbIDToLBListeners := make(map[int][]*mysqlmodel.LBListener)
 	for _, lbListener := range lbListeners {
 		lbIDToLBListeners[lbListener.LBID] = append(lbIDToLBListeners[lbListener.LBID], lbListener)
 	}
-	var lbTargetServers []*mysql.LBTargetServer
-	if err := mysql.Db.Unscoped().Find(&lbTargetServers).Error; err != nil {
+	var lbTargetServers []*mysqlmodel.LBTargetServer
+	if err := mysql.DefaultDB.Unscoped().Find(&lbTargetServers).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_TARGET_SERVER, err), i.db.LogPrefixORGID)
 		return false
 	}
-	lbIDToLBTargetServers := make(map[int][]*mysql.LBTargetServer)
-	lbListenerIDToLBTargetServers := make(map[int][]*mysql.LBTargetServer)
+	lbIDToLBTargetServers := make(map[int][]*mysqlmodel.LBTargetServer)
+	lbListenerIDToLBTargetServers := make(map[int][]*mysqlmodel.LBTargetServer)
 	for _, lbTS := range lbTargetServers {
 		lbIDToLBTargetServers[lbTS.LBID] = append(lbIDToLBTargetServers[lbTS.LBID], lbTS)
 		lbListenerIDToLBTargetServers[lbTS.LBListenerID] = append(lbListenerIDToLBTargetServers[lbTS.LBListenerID], lbTS)
 	}
-	var lbVMConns []*mysql.LBVMConnection
-	if err := mysql.Db.Unscoped().Find(&lbVMConns).Error; err != nil {
+	var lbVMConns []*mysqlmodel.LBVMConnection
+	if err := mysql.DefaultDB.Unscoped().Find(&lbVMConns).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_LB_VM_CONNECTION, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -280,7 +281,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 		// IP：负载均衡器自身IP
 		for _, vif := range toolDS.lbIDToVIFIDs[lb.ID] {
 			for _, ip := range toolDS.vifIDToIPs[vif] {
-				keyToDBItem[IPRelationKey{L3EPCID: lb.VPCID, IP: ip}] = mysql.ChIPRelation{
+				keyToDBItem[IPRelationKey{L3EPCID: lb.VPCID, IP: ip}] = mysqlmodel.ChIPRelation{
 					L3EPCID: lb.VPCID,
 					IP:      ip,
 					LBID:    lb.ID,
@@ -296,7 +297,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 			}
 			for _, vifID := range toolDS.vmIDToVIFIDs[lbVMConn.VMID] {
 				for _, ip := range toolDS.vifIDToIPs[vifID] {
-					keyToDBItem[IPRelationKey{L3EPCID: lb.VPCID, IP: ip}] = mysql.ChIPRelation{
+					keyToDBItem[IPRelationKey{L3EPCID: lb.VPCID, IP: ip}] = mysqlmodel.ChIPRelation{
 						L3EPCID: lb.VPCID,
 						IP:      ip,
 						LBID:    lb.ID,
@@ -309,7 +310,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 			// VPCID：负载均衡器VPC
 			// IP：负载均衡监听器自身IP
 			for _, ip := range strings.Split(lbListener.IPs, ",") {
-				keyToDBItem[IPRelationKey{L3EPCID: lb.VPCID, IP: ip}] = mysql.ChIPRelation{
+				keyToDBItem[IPRelationKey{L3EPCID: lb.VPCID, IP: ip}] = mysqlmodel.ChIPRelation{
 					L3EPCID:        lb.VPCID,
 					IP:             ip,
 					LBID:           lb.ID,
@@ -330,7 +331,7 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 				if vpcID == 0 {
 					continue
 				}
-				keyToDBItem[IPRelationKey{L3EPCID: vpcID, IP: lbTS.IP}] = mysql.ChIPRelation{
+				keyToDBItem[IPRelationKey{L3EPCID: vpcID, IP: lbTS.IP}] = mysqlmodel.ChIPRelation{
 					L3EPCID:        vpcID,
 					IP:             lbTS.IP,
 					LBID:           lb.ID,
@@ -344,9 +345,9 @@ func (i *ChIPRelation) generateFromLB(keyToDBItem map[IPRelationKey]mysql.ChIPRe
 	return true
 }
 
-func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysql.ChIPRelation, toolDS *toolDataSet) bool {
-	var pods []*mysql.Pod
-	if err := mysql.Db.Unscoped().Find(&pods).Error; err != nil {
+func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysqlmodel.ChIPRelation, toolDS *toolDataSet) bool {
+	var pods []*mysqlmodel.Pod
+	if err := mysql.DefaultDB.Unscoped().Find(&pods).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -354,8 +355,8 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	for _, pod := range pods {
 		podGroupIDToPodIDs[pod.PodGroupID] = append(podGroupIDToPodIDs[pod.PodGroupID], pod.ID)
 	}
-	var podGroupPorts []*mysql.PodGroupPort
-	if err := mysql.Db.Unscoped().Find(&podGroupPorts).Error; err != nil {
+	var podGroupPorts []*mysqlmodel.PodGroupPort
+	if err := mysql.DefaultDB.Unscoped().Find(&podGroupPorts).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_GROUP_PORT, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -365,8 +366,8 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 			podServiceIDToPodIDs[podGroupPort.PodServiceID] = append(podServiceIDToPodIDs[podGroupPort.PodServiceID], podID)
 		}
 	}
-	var podIngresses []*mysql.PodIngress
-	if err := mysql.Db.Unscoped().Find(&podIngresses).Error; err != nil {
+	var podIngresses []*mysqlmodel.PodIngress
+	if err := mysql.DefaultDB.Unscoped().Find(&podIngresses).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_INGRESS, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -374,8 +375,8 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 	for _, podIngress := range podIngresses {
 		podIngressIDToName[podIngress.ID] = podIngress.Name
 	}
-	var podServices []*mysql.PodService
-	if err := mysql.Db.Unscoped().Find(&podServices).Error; err != nil {
+	var podServices []*mysqlmodel.PodService
+	if err := mysql.DefaultDB.Unscoped().Find(&podServices).Error; err != nil {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_POD_SERVICE, err), i.db.LogPrefixORGID)
 		return false
 	}
@@ -384,7 +385,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 		// IP：容器服务自身IP
 		for _, vifID := range toolDS.podServiceIDToVIFIDs[podService.ID] {
 			for _, ip := range toolDS.vifIDToIPs[vifID] {
-				dbItem := mysql.ChIPRelation{
+				dbItem := mysqlmodel.ChIPRelation{
 					L3EPCID:        podService.VPCID,
 					IP:             ip,
 					PodServiceID:   podService.ID,
@@ -402,7 +403,7 @@ func (i *ChIPRelation) generateFromPodService(keyToDBItem map[IPRelationKey]mysq
 		for _, podID := range podServiceIDToPodIDs[podService.ID] {
 			for _, vifID := range toolDS.podIDToVIFIDs[podID] {
 				for _, ip := range toolDS.vifIDToIPs[vifID] {
-					dbItem := mysql.ChIPRelation{
+					dbItem := mysqlmodel.ChIPRelation{
 						L3EPCID:        podService.VPCID,
 						IP:             ip,
 						PodServiceID:   podService.ID,

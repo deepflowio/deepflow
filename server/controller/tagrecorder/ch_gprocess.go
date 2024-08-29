@@ -21,17 +21,18 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 )
 
 type ChGProcess struct {
-	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChGProcess, IDKey]
+	SubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChGProcess, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 	mng := &ChGProcess{
-		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysql.Process, mysql.ChGProcess, IDKey](
+		newSubscriberComponent[*message.ProcessFieldsUpdate, message.ProcessFieldsUpdate, mysqlmodel.Process, mysqlmodel.ChGProcess, IDKey](
 			common.RESOURCE_TYPE_PROCESS_EN, RESOURCE_TYPE_CH_GPROCESS,
 		),
 		resourceTypeToIconID,
@@ -41,7 +42,7 @@ func NewChGProcess(resourceTypeToIconID map[IconKey]int) *ChGProcess {
 }
 
 // sourceToTarget implements SubscriberDataGenerator
-func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysql.Process) (keys []IDKey, targets []mysql.ChGProcess) {
+func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysqlmodel.Process) (keys []IDKey, targets []mysqlmodel.ChGProcess) {
 	iconID := c.resourceTypeToIconID[IconKey{
 		NodeType: RESOURCE_TYPE_GPROCESS,
 	}]
@@ -51,7 +52,7 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *mysql.Process)
 	}
 
 	keys = append(keys, IDKey{ID: source.ID})
-	targets = append(targets, mysql.ChGProcess{
+	targets = append(targets, mysqlmodel.ChGProcess{
 		ID:          source.ID,
 		Name:        sourceName,
 		CHostID:     source.VMID,
@@ -78,14 +79,14 @@ func (c *ChGProcess) onResourceUpdated(sourceID int, fieldsUpdate *message.Proce
 		updateInfo["l3_epc_id"] = fieldsUpdate.VPCID.GetNew()
 	}
 	if len(updateInfo) > 0 {
-		var chItem mysql.ChGProcess
+		var chItem mysqlmodel.ChGProcess
 		db.Where("id = ?", sourceID).First(&chItem)
 		c.SubscriberComponent.dbOperator.update(chItem, updateInfo, IDKey{ID: sourceID}, db)
 	}
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
-func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysql.ChGProcess, db *mysql.DB) {
+func (c *ChGProcess) softDeletedTargetsUpdated(targets []mysqlmodel.ChGProcess, db *mysql.DB) {
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),

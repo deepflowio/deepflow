@@ -839,6 +839,10 @@ static_config:
   #   occurrence is used.
   consistent-timestamp-in-l7-metrics: false
 
+  # Packet segmentation reassembly
+  # NOTE: After activation, it will aggregate two consecutive TCP packets together for application log parsing
+  packet-segmentation-reassembly: []
+
   ##########
   ## PCAP ##
   ##########
@@ -1429,11 +1433,11 @@ static_config:
     io-event-minimal-duration: 1ms
 
     # Disable DWARF unwinding
-    # Default: false
+    # Default: true
     # Note:
     #   Processes without frame pointers will be unwinded with DWARF, which will consume more system resources
-    #   Set to "true" to disable DWARF
-    dwarf_disabled: false
+    #   Set to "false" to enable DWARF
+    dwarf-disabled: true
 
     # DWARF unwinding regex
     # Default: ""
@@ -1441,7 +1445,24 @@ static_config:
     #   Only processes that match this regex will use DWARF unwinding.
     #   Agent will use heuristic methods to determine whether a process needs to be unwinded with DWARF,
     #   i.e., the process does not have frame pointer, if this setting is left blank
-    dwarf_regex: ""
+    dwarf-regex: ""
+
+    # DWARF unwind process hash map size
+    # Default: 1024. Range: [1, u32max]
+    # Note:
+    #   Each process using DWARF unwind has an entry in this map, relating process id to DWARF unwind entries.
+    #   The size of each one of these entries is arount 8K, the default setting will allocate around 8M kernel memory.
+    #   This is a hash map, so size can be lower than max process id.
+    #   The configuration is only effective if DWARF is enabled.
+    dwarf-process-map-size: 1024
+
+    # DWARF unwind entry shard size
+    # Default: 128. Range: [1, u32max]
+    # Note:
+    #   The number of unwind entry shards for DWARF unwinding
+    #   The size of each one of these entries is 1M, the default setting will allocate around 128M kernel memory.
+    #   The configuration is only effective if DWARF is enabled.
+    dwarf-shard-map-size: 128
 
     # Java compliant update latency time
     # Default: 60s. Range: [5, 3600]s

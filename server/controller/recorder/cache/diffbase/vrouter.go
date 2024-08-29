@@ -19,11 +19,11 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddVRouter(dbItem *mysql.VRouter, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddVRouter(dbItem *mysqlmodel.VRouter, seq int, toolDataSet *tool.DataSet) {
 	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
 	b.VRouters[dbItem.Lcuuid] = &VRouter{
 		DiffBase: DiffBase{

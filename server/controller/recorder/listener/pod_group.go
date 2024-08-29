@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewPodGroup(c *cache.Cache) *PodGroup {
 	return listener
 }
 
-func (p *PodGroup) OnUpdaterAdded(addedDBItems []*mysql.PodGroup) {
+func (p *PodGroup) OnUpdaterAdded(addedDBItems []*mysqlmodel.PodGroup) {
 	p.cache.AddPodGroups(addedDBItems)
 }
 

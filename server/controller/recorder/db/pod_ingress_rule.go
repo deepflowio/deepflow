@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type PodIngressRule struct {
-	OperatorBase[*mysql.PodIngressRule, mysql.PodIngressRule]
+	OperatorBase[*mysqlmodel.PodIngressRule, mysqlmodel.PodIngressRule]
 }
 
 func NewPodIngressRule() *PodIngressRule {
 	o := &PodIngressRule{
-		newOperatorBase[*mysql.PodIngressRule](
+		newOperatorBase[*mysqlmodel.PodIngressRule](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			false,
 			false,

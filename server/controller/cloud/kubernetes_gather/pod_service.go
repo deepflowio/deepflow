@@ -33,8 +33,9 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 	log.Debug("get services starting", logger.NewORGPrefix(k.orgID))
 	serviceLcuuidToClusterIP := map[string]string{}
 	serviceTypes := map[string]int{
-		"NodePort":  common.POD_SERVICE_TYPE_NODEPORT,
-		"ClusterIP": common.POD_SERVICE_TYPE_CLUSTERIP,
+		"NodePort":     common.POD_SERVICE_TYPE_NODEPORT,
+		"ClusterIP":    common.POD_SERVICE_TYPE_CLUSTERIP,
+		"LoadBalancer": common.POD_SERVICE_TYPE_LOADBALANCER,
 	}
 	servicesArrays := [][]string{k.k8sInfo["*v1.Service"]}
 	servicesArrays = append(servicesArrays, k.k8sInfo["*v1.ServiceRule"])
@@ -95,6 +96,13 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			annotations := metaData.Get("annotations")
 			annotationString := expand.GetAnnotation(annotations, k.annotationRegex, k.customTagLenMax)
 
+			externalIPs := []string{}
+			svcIngress := sData.GetPath("status", "loadBalancer", "ingress")
+			for i := range svcIngress.MustArray() {
+				ingress := svcIngress.GetIndex(i)
+				externalIPs = append(externalIPs, ingress.Get("ip").MustString())
+			}
+
 			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 			service := model.PodService{
 				Lcuuid:             uLcuuid,
@@ -103,6 +111,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				Annotation:         annotationString,
 				Type:               specType,
 				Selector:           strings.Join(selectorSlice, ", "),
+				ExternalIP:         strings.Join(externalIPs, ", "),
 				ServiceClusterIP:   clusterIP,
 				PodNamespaceLcuuid: namespaceLcuuid,
 				VPCLcuuid:          k.VPCUUID,

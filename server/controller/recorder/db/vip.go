@@ -18,16 +18,16 @@ package db
 
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 type VIP struct {
-	OperatorBase[*mysql.VIP, mysql.VIP]
+	OperatorBase[*mysqlmodel.VIP, mysqlmodel.VIP]
 }
 
 func NewVIP() *VIP {
 	operator := &VIP{
-		newOperatorBase[*mysql.VIP](
+		newOperatorBase[*mysqlmodel.VIP](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			false,
 			false,

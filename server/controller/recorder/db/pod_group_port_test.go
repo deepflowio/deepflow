@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBPodGroupPort() *mysql.PodGroupPort {
-	return &mysql.PodGroupPort{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBPodGroupPort() *mysqlmodel.PodGroupPort {
+	return &mysqlmodel.PodGroupPort{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodGroupPortBatchSuccess() {
 	operator := NewPodGroupPort()
 	itemToAdd := newDBPodGroupPort()
 
-	_, ok := operator.AddBatch([]*mysql.PodGroupPort{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.PodGroupPort{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.PodGroupPort
+	var addedItem *mysqlmodel.PodGroupPort
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.PodGroupPort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodGroupPort{})
 }
 
 func (t *SuiteTest) TestUpdatePodGroupPortSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodGroupPortSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysql.PodGroupPort
+	var updatedItem *mysqlmodel.PodGroupPort
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.PodGroupPort{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodGroupPort{})
 }
 
 func (t *SuiteTest) TestDeletePodGroupPortBatchSuccess() {
@@ -66,7 +66,7 @@ func (t *SuiteTest) TestDeletePodGroupPortBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.PodGroupPort
+	var deletedItem *mysqlmodel.PodGroupPort
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }

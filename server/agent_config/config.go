@@ -174,6 +174,7 @@ type StaticConfig struct {
 	L7LogBlacklist                     map[string][]*L7LogBlacklist `yaml:"l7-log-blacklist,omitempty"`
 	L7ProtocolAdvancedFeatures         *L7ProtocolAdvancedFeatures  `yaml:"l7-protocol-advanced-features,omitempty"`
 	ConsistentTimestampInL7Metrics     *bool                        `yaml:"consistent-timestamp-in-l7-metrics,omitempty"`
+	packetSegmentationReassembly       []uint16                     `yaml:"packet-segmentation-reassembly,omitempty"`
 	ServerPorts                        []uint16                     `yaml:"server-ports,omitempty"`
 	Ebpf                               *EbpfConfig                  `yaml:"ebpf,omitempty"`
 	OsAppTagExecUser                   *string                      `yaml:"os-app-tag-exec-user,omitempty"`
@@ -287,8 +288,10 @@ type EbpfConfig struct {
 	GoTracingTimeout                   *int                               `yaml:"go-tracing-timeout,omitempty"`
 	IOEventCollectMode                 *int                               `yaml:"io-event-collect-mode,omitempty"`
 	IOEventMinimalDuration             *string                            `yaml:"io-event-minimal-duration,omitempty"`
-	DwarfDisabled                      *bool                              `yaml:"dwarf_disabled,omitempty"`
-	DwarfRegex                         *string                            `yaml:"dwarf_regex,omitempty"`
+	DwarfDisabled                      *bool                              `yaml:"dwarf-disabled,omitempty"`
+	DwarfRegex                         *string                            `yaml:"dwarf-regex,omitempty"`
+	DwarfProcessMapSize                *int                               `yaml:"dwarf-process-map-size,omitempty"`
+	DwarfShardMapSize                  *int                               `yaml:"dwarf-shard-map-size,omitempty"`
 	JavaSymbolFileRefreshDeferInterval *string                            `yaml:"java-symbol-file-refresh-defer-interval,omitempty"`
 	OnCpuProfile                       *OnCpuProfile                      `yaml:"on-cpu-profile,omitempty"`
 	OffCpuProfile                      *OffCpuProfile                     `yaml:"off-cpu-profile,omitempty"`

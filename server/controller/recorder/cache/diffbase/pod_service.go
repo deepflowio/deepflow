@@ -19,11 +19,11 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodService(dbItem *mysql.PodService, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddPodService(dbItem *mysqlmodel.PodService, seq int, toolDataSet *tool.DataSet) {
 	var podIngressLcuuid string
 	if dbItem.PodIngressID != 0 {
 		podIngressLcuuid, _ = toolDataSet.GetPodIngressLcuuidByID(dbItem.PodIngressID)
@@ -57,6 +57,7 @@ type PodService struct {
 	Label            string `json:"label"`
 	Annotation       string `json:"annotation"`
 	Selector         string `json:"selector"`
+	ExternalIP       string `json:"external_ip"`
 	ServiceClusterIP string `json:"service_cluster_ip"`
 	PodIngressLcuuid string `json:"pod_ingress_lcuuid"`
 	RegionLcuuid     string `json:"region_lcuuid"`

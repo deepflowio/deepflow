@@ -18,7 +18,7 @@ package listener
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 )
@@ -34,7 +34,7 @@ func NewAZ(c *cache.Cache) *AZ {
 	return listener
 }
 
-func (a *AZ) OnUpdaterAdded(addedDBItems []*mysql.AZ) {
+func (a *AZ) OnUpdaterAdded(addedDBItems []*mysqlmodel.AZ) {
 	a.cache.AddAZs(addedDBItems)
 }
 

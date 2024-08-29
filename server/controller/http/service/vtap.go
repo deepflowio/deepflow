@@ -31,8 +31,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
-	"github.com/deepflowio/deepflow/server/controller/http/service/agentlicense"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -61,11 +61,14 @@ const (
 
 func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error) {
 	var response []model.Vtap
-	var allVTaps []mysql.VTap
-	var vtapGroups []mysql.VTapGroup
-	var regions []mysql.Region
-	var azs []mysql.AZ
-	var vtapRepos []mysql.VTapRepo
+	var allVTaps []mysqlmodel.VTap
+	var vtapGroups []mysqlmodel.VTapGroup
+	var regions []mysqlmodel.Region
+	var azs []mysqlmodel.AZ
+	var podClusters []mysqlmodel.PodCluster
+	var podNodes []mysqlmodel.PodNode
+	var pods []mysqlmodel.Pod
+	var vtapRepos []mysqlmodel.VTapRepo
 
 	userInfo := a.resourceAccess.UserInfo
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
@@ -99,6 +102,15 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	if err := Db.Find(&azs).Error; err != nil {
 		return nil, err
 	}
+	if err := Db.Find(&podClusters).Error; err != nil {
+		return nil, err
+	}
+	if err := Db.Select("id", "pod_cluster_id").Find(&pods).Error; err != nil {
+		return nil, err
+	}
+	if err := Db.Select("id", "pod_cluster_id").Find(&podNodes).Error; err != nil {
+		return nil, err
+	}
 	if err := Db.Select("name", "branch", "rev_count").Find(&vtapRepos).Error; err != nil {
 		return nil, err
 	}
@@ -115,9 +127,26 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 		azToRegion[az.Lcuuid] = az.Region
 	}
 
+	idToPodCluster := make(map[int]string)
+	for _, podCluster := range podClusters {
+		idToPodCluster[podCluster.ID] = podCluster.Name
+	}
+
+	podIDToPodClusterID := make(map[int]int)
+	for _, pod := range pods {
+		podIDToPodClusterID[pod.ID] = pod.PodClusterID
+	}
+
+	podNodeIDToPodClusterID := make(map[int]int)
+	for _, podNode := range podNodes {
+		podNodeIDToPodClusterID[podNode.ID] = podNode.PodClusterID
+	}
+
 	lcuuidToGroup := make(map[string]string)
+	lcuuidToGroupLicenseFunc := make(map[string]string)
 	for _, group := range vtapGroups {
 		lcuuidToGroup[group.Lcuuid] = group.Name
+		lcuuidToGroupLicenseFunc[group.Lcuuid] = group.LicenseFunctions
 	}
 
 	vtapRepoNameToRevision := make(map[string]string, len(vtapRepos))
@@ -125,7 +154,7 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 		vtapRepoNameToRevision[item.Name] = item.Branch + " " + item.RevCount
 	}
 
-	agents, err := getAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
+	agents, err := GetAgentByUser(userInfo, &a.cfg.FPermit, allVTaps)
 	if err != nil {
 		return nil, err
 	}
@@ -192,13 +221,27 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			bitNum += 1
 		}
 		// license_functions
-		functions := strings.Split(vtap.LicenseFunctions, ",")
-		for _, function := range functions {
-			functionInt, err := strconv.Atoi(function)
-			if err != nil {
-				continue
+		vtapResp.LicenseFunctions, _ = ConvertStrToIntList(vtap.LicenseFunctions)
+		vtapResp.EnableFeatures, _ = ConvertStrToIntList(vtap.EnableFeatures)
+		vtapResp.DisableFeatures, _ = ConvertStrToIntList(vtap.DisableFeatures)
+		vtapResp.FollowGroupFeatures, _ = ConvertStrToIntList(vtap.FollowGroupFeatures)
+		if groupLicenseFunc, ok := lcuuidToGroupLicenseFunc[vtap.VtapGroupLcuuid]; ok {
+			m1, m2, m3 := mapset.NewSet(), mapset.NewSet(), mapset.NewSet()
+			for _, item := range vtapResp.FollowGroupFeatures {
+				m1.Add(item)
 			}
-			vtapResp.LicenseFunctions = append(vtapResp.LicenseFunctions, functionInt)
+			for _, item := range vtapResp.LicenseFunctions {
+				m2.Add(item)
+			}
+			groupLicenseFunctions, _ := ConvertStrToIntList(groupLicenseFunc)
+			for _, item := range groupLicenseFunctions {
+				m3.Add(item)
+			}
+			var licenseFunc []int
+			for _, item := range m1.Intersect(m2).Intersect(m3).ToSlice() {
+				licenseFunc = append(licenseFunc, item.(int))
+			}
+			vtapResp.FollowGroupEnableFeatures = licenseFunc
 		}
 		// az
 		vtapResp.AZ = vtap.AZ
@@ -229,6 +272,23 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 			vtapResp.LaunchServerID = vtap.LaunchServerID
 			vtapResp.SyncedControllerAt = vtap.SyncedControllerAt.Format(common.GO_BIRTHDAY)
 			vtapResp.SyncedAnalyzerAt = vtap.SyncedAnalyzerAt.Format(common.GO_BIRTHDAY)
+
+			// return pod_cluster_id/name for pod_host/pod_vm/k8s_sidecar
+			if vtap.Type == common.VTAP_TYPE_POD_HOST || vtap.Type == common.VTAP_TYPE_POD_VM {
+				if podClusterID, ok := podNodeIDToPodClusterID[vtap.LaunchServerID]; ok {
+					vtapResp.PodClusterID = podClusterID
+					if podClusterName, _ok := idToPodCluster[podClusterID]; _ok {
+						vtapResp.PodClusterName = podClusterName
+					}
+				}
+			} else if vtap.Type == common.VTAP_TYPE_K8S_SIDECAR {
+				if podClusterID, ok := podNodeIDToPodClusterID[vtap.LaunchServerID]; ok {
+					vtapResp.PodClusterID = podClusterID
+					if podClusterName, _ok := idToPodCluster[podClusterID]; _ok {
+						vtapResp.PodClusterName = podClusterName
+					}
+				}
+			}
 		default:
 			if vtap.CreatedAt.Before(vtap.SyncedControllerAt) {
 				vtapResp.SyncedControllerAt = vtap.SyncedControllerAt.Format(common.GO_BIRTHDAY)
@@ -253,7 +313,7 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 	}
 	db := dbInfo.DB
 
-	var vtap mysql.VTap
+	var vtap mysqlmodel.VTap
 	if ret := db.Where("ctrl_ip = ?", vtapCreate.CtrlIP).First(&vtap); ret.Error == nil {
 		return model.Vtap{}, NewError(
 			httpcommon.RESOURCE_ALREADY_EXIST,
@@ -273,7 +333,7 @@ func (a *Agent) Create(vtapCreate model.VtapCreate) (model.Vtap, error) {
 	strings.Replace(vtapName, ":", "-", -1)
 	strings.Replace(vtapName, " ", "-", -1)
 
-	vtap = mysql.VTap{}
+	vtap = mysqlmodel.VTap{}
 	lcuuid := uuid.New().String()
 	vtap.Lcuuid = lcuuid
 	vtap.Name = vtapName
@@ -306,7 +366,7 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 	}
 	db := dbInfo.DB
 
-	var vtap mysql.VTap
+	var vtap mysqlmodel.VTap
 	var dbUpdateMap = make(map[string]interface{})
 
 	if lcuuid != "" {
@@ -333,32 +393,15 @@ func (a *Agent) Update(lcuuid, name string, vtapUpdate map[string]interface{}) (
 		}
 	}
 
-	var operateLogs []mysql.LicenseFuncLog
-	if _, ok := vtapUpdate["ENABLED_FEATURES"]; ok {
-		if _, ok = vtapUpdate["ENABLED_FEATURES"].([]interface{}); !ok {
-			return model.Vtap{}, fmt.Errorf("param(ENABLED_FEATURES) must be slice")
-		}
-		var licenseFunctionStr string
-		licenseFunctionStr, operateLogs, err = agentlicense.GetAgentLicenseFunctions(
-			a.cfg, a.resourceAccess.UserInfo.ID, &vtap, vtapUpdate["ENABLED_FEATURES"].([]interface{}))
-		if err != nil {
-			return model.Vtap{}, err
-		}
-		dbUpdateMap["license_functions"] = licenseFunctionStr
-	}
-
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&vtap).Updates(dbUpdateMap).Error; err != nil {
 			return err
 		}
 		if value, ok := vtapUpdate["ENABLE"]; ok && value == float64(0) {
 			key := vtap.CtrlIP + "-" + vtap.CtrlMac
-			if err := tx.Delete(&mysql.KubernetesCluster{}, "value = ?", key).Error; err != nil {
+			if err := tx.Delete(&mysqlmodel.KubernetesCluster{}, "value = ?", key).Error; err != nil {
 				log.Errorf("error: %v", err, dbInfo.LogPrefixORGID, dbInfo.LogPrefixName)
 			}
-		}
-		if len(operateLogs) > 0 {
-			return tx.CreateInBatches(operateLogs, len(operateLogs)).Error
 		}
 		return nil
 	})
@@ -408,7 +451,7 @@ func (a *Agent) BatchUpdate(updateMap []map[string]interface{}) (map[string][]st
 	}
 }
 
-func (a *Agent) checkLicenseType(vtap mysql.VTap, licenseType int) (err error) {
+func (a *Agent) checkLicenseType(vtap mysqlmodel.VTap, licenseType int) (err error) {
 	// check current vtap if support wanted licenseType
 	supportedLicenseTypes := license.GetSupportedLicenseType(vtap.Type)
 	if len(supportedLicenseTypes) > 0 {
@@ -430,7 +473,7 @@ func (a *Agent) UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]inter
 	}
 	db := dbInfo.DB
 
-	var vtap mysql.VTap
+	var vtap mysqlmodel.VTap
 	var dbUpdateMap = make(map[string]interface{})
 
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
@@ -482,7 +525,7 @@ func (a *Agent) BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (
 	for _, vtapUpdate := range updateMap {
 		if lcuuid, ok := vtapUpdate["LCUUID"].(string); ok {
 			var _err error
-			var vtap mysql.VTap
+			var vtap mysqlmodel.VTap
 			var dbUpdateMap = make(map[string]interface{})
 
 			if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
@@ -536,7 +579,7 @@ func (a *Agent) Delete(lcuuid string) (resp map[string]string, err error) {
 	}
 	db := dbInfo.DB
 
-	var vtap mysql.VTap
+	var vtap mysqlmodel.VTap
 	if ret := db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
 		return map[string]string{}, NewError(httpcommon.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
@@ -580,7 +623,7 @@ func (a *Agent) BatchDelete(deleteMap []map[string]string) (resp map[string][]st
 }
 
 func execAZRebalance(
-	db *mysql.DB, azLcuuid string, vtapNum int, hostType string, hostIPToVTaps map[string][]*mysql.VTap,
+	db *mysql.DB, azLcuuid string, vtapNum int, hostType string, hostIPToVTaps map[string][]*mysqlmodel.VTap,
 	hostIPToAvailableVTapNum map[string]int, hostIPToUsedVTapNum map[string]int,
 	hostIPToState map[string]int, ifCheck bool,
 ) model.AZVTapRebalanceResult {
@@ -688,17 +731,17 @@ func execAZRebalance(
 	return response
 }
 
-func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
-	var controllers []mysql.Controller
-	var azControllerConns []mysql.AZControllerConnection
-	var vtaps []mysql.VTap
+func vtapControllerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
+	var controllers []mysqlmodel.Controller
+	var azControllerConns []mysqlmodel.AZControllerConnection
+	var vtaps []mysqlmodel.VTap
 	response := &model.VTapRebalanceResult{}
 
 	db.Find(&controllers)
 	db.Find(&azControllerConns)
 	db.Where("controller_ip != ''").Find(&vtaps)
 
-	azToVTaps := make(map[string][]*mysql.VTap)
+	azToVTaps := make(map[string][]*mysqlmodel.VTap)
 	for i, vtap := range vtaps {
 		azToVTaps[vtap.AZ] = append(azToVTaps[vtap.AZ], &vtaps[i])
 	}
@@ -709,7 +752,7 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model
 	}
 
 	normalControllerNum := 0
-	ipToController := make(map[string]*mysql.Controller)
+	ipToController := make(map[string]*mysqlmodel.Controller)
 	for i, controller := range controllers {
 		ipToController[controller.IP] = &controllers[i]
 		if controller.State == common.HOST_STATE_COMPLETE && controller.VTapMax > 0 {
@@ -722,7 +765,7 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model
 	}
 
 	// 获取各可用区中的控制列表
-	azToControllers := make(map[string][]*mysql.Controller)
+	azToControllers := make(map[string][]*mysqlmodel.Controller)
 	for _, conn := range azControllerConns {
 		if conn.AZ == "ALL" {
 			if azLcuuids, ok := regionToAZLcuuids[conn.Region]; ok {
@@ -753,7 +796,7 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model
 		}
 
 		// 获取控制器当前已分配的采集器信息
-		controllerIPToVTaps := make(map[string][]*mysql.VTap)
+		controllerIPToVTaps := make(map[string][]*mysqlmodel.VTap)
 		for _, vtap := range azVTaps {
 			controllerIPToVTaps[vtap.ControllerIP] = append(
 				controllerIPToVTaps[vtap.ControllerIP], vtap,
@@ -785,17 +828,17 @@ func vtapControllerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model
 	return response, nil
 }
 
-func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
-	var analyzers []mysql.Analyzer
-	var azAnalyzerConns []mysql.AZAnalyzerConnection
-	var vtaps []mysql.VTap
+func vtapAnalyzerRebalance(db *mysql.DB, azs []mysqlmodel.AZ, ifCheck bool) (*model.VTapRebalanceResult, error) {
+	var analyzers []mysqlmodel.Analyzer
+	var azAnalyzerConns []mysqlmodel.AZAnalyzerConnection
+	var vtaps []mysqlmodel.VTap
 	response := &model.VTapRebalanceResult{}
 
 	db.Find(&analyzers)
 	db.Find(&azAnalyzerConns)
 	db.Where("analyzer_ip != ''").Find(&vtaps)
 
-	azToVTaps := make(map[string][]*mysql.VTap)
+	azToVTaps := make(map[string][]*mysqlmodel.VTap)
 	for i, vtap := range vtaps {
 		azToVTaps[vtap.AZ] = append(azToVTaps[vtap.AZ], &vtaps[i])
 	}
@@ -806,7 +849,7 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 	}
 
 	normalAnalyzerNum := 0
-	ipToAnalyzer := make(map[string]*mysql.Analyzer)
+	ipToAnalyzer := make(map[string]*mysqlmodel.Analyzer)
 	for i, analyzer := range analyzers {
 		ipToAnalyzer[analyzer.IP] = &analyzers[i]
 		if analyzer.State == common.HOST_STATE_COMPLETE && analyzer.VTapMax > 0 {
@@ -831,7 +874,7 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 			continue
 		}
 		// 获取数据节点当前已分配的采集器信息
-		analyzerIPToVTaps := make(map[string][]*mysql.VTap)
+		analyzerIPToVTaps := make(map[string][]*mysqlmodel.VTap)
 		for _, vtap := range azVTaps {
 			analyzerIPToVTaps[vtap.AnalyzerIP] = append(
 				analyzerIPToVTaps[vtap.AnalyzerIP], vtap,
@@ -864,7 +907,7 @@ func vtapAnalyzerRebalance(db *mysql.DB, azs []mysql.AZ, ifCheck bool) (*model.V
 }
 
 func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.IngesterLoadBalancingStrategy) (interface{}, error) {
-	var azs []mysql.AZ
+	var azs []mysqlmodel.AZ
 
 	hostType := "controller"
 	if argsType, ok := args["type"]; ok {
@@ -912,7 +955,7 @@ func VTapRebalance(db *mysql.DB, args map[string]interface{}, cfg monitorconf.In
 // GetVTapPortsCount gets the number of virtual network cards covered by the deployed vtap,
 // and virtual network type is VIF_DEVICE_TYPE_VM or VIF_DEVICE_TYPE_POD.
 func GetVTapPortsCount() (int, error) {
-	var vtaps []mysql.VTap
+	var vtaps []mysqlmodel.VTap
 	if err := mysql.DefaultDB.Find(&vtaps).Error; err != nil {
 		return 0, err
 	}
@@ -930,7 +973,7 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var vms []mysql.VM
+	var vms []mysqlmodel.VM
 	if err := mysql.DefaultDB.Find(&vms).Error; err != nil {
 		return 0, err
 	}
@@ -941,7 +984,7 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var podNodes []mysql.PodNode
+	var podNodes []mysqlmodel.PodNode
 	if err := mysql.DefaultDB.Find(&podNodes).Error; err != nil {
 		return 0, err
 	}
@@ -952,7 +995,7 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var pods []mysql.Pod
+	var pods []mysqlmodel.Pod
 	if err := mysql.DefaultDB.Find(&pods).Error; err != nil {
 		return 0, err
 	}
@@ -963,7 +1006,7 @@ func GetVTapPortsCount() (int, error) {
 		}
 	}
 
-	var lanIPs []mysql.LANIP
+	var lanIPs []mysqlmodel.LANIP
 	if err := mysql.DefaultDB.Find(&lanIPs).Error; err != nil {
 		return 0, err
 	}
@@ -975,7 +1018,7 @@ func GetVTapPortsCount() (int, error) {
 	}
 
 	vtapVifCount := 0
-	var vinterfaces []mysql.VInterface
+	var vinterfaces []mysqlmodel.VInterface
 	if err := mysql.DefaultDB.Where("devicetype = ? or devicetype = ?", common.VIF_DEVICE_TYPE_VM, common.VIF_DEVICE_TYPE_POD).
 		Find(&vinterfaces).Error; err != nil {
 		return 0, err

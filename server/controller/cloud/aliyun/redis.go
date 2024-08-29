@@ -24,7 +24,7 @@ import (
 )
 
 func (a *Aliyun) getRedisInstances(region model.Region) (
-	[]model.RedisInstance, []model.VInterface, []model.IP, error,
+	[]model.RedisInstance, []model.VInterface, []model.IP,
 ) {
 	var retRedisInstances []model.RedisInstance
 	var retVInterfaces []model.VInterface
@@ -34,8 +34,8 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 	request := r_kvstore.CreateDescribeInstancesRequest()
 	response, err := a.getRedisResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return retRedisInstances, retVInterfaces, retIPs, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.RedisInstance{}, []model.VInterface{}, []model.IP{}
 	}
 
 	for _, r := range response {
@@ -71,8 +71,8 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 			attrRequest.InstanceId = redisId
 			attrResponse, err := a.getRedisAttributeResponse(region.Label, attrRequest)
 			if err != nil {
-				log.Error(err, logger.NewORGPrefix(a.orgID))
-				return []model.RedisInstance{}, []model.VInterface{}, []model.IP{}, err
+				log.Warning(err, logger.NewORGPrefix(a.orgID))
+				return []model.RedisInstance{}, []model.VInterface{}, []model.IP{}
 			}
 
 			internalHost := ""
@@ -107,19 +107,16 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 			a.regionLcuuidToResourceNum[retRedisInstance.RegionLcuuid]++
 
 			// 获取接口信息
-			tmpVInterfaces, tmpIPs, err := a.getRedisPorts(region, redisId)
-			if err != nil {
-				return []model.RedisInstance{}, []model.VInterface{}, []model.IP{}, err
-			}
+			tmpVInterfaces, tmpIPs := a.getRedisPorts(region, redisId)
 			retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
 			retIPs = append(retIPs, tmpIPs...)
 		}
 	}
 	log.Debug("get redis_instances complete", logger.NewORGPrefix(a.orgID))
-	return retRedisInstances, retVInterfaces, retIPs, nil
+	return retRedisInstances, retVInterfaces, retIPs
 }
 
-func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VInterface, []model.IP, error) {
+func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VInterface, []model.IP) {
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
@@ -127,8 +124,8 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 	request.InstanceId = redisId
 	response, err := a.getRedisVInterfaceResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return []model.VInterface{}, []model.IP{}, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.VInterface{}, []model.IP{}
 	}
 
 	redisLcuuid := common.GenerateUUIDByOrgID(a.orgID, redisId)
@@ -170,5 +167,5 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 			retIPs = append(retIPs, retIP)
 		}
 	}
-	return retVInterfaces, retIPs, nil
+	return retVInterfaces, retIPs
 }

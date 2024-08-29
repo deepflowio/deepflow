@@ -8,6 +8,20 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: add libpcap to deb package [#7979](https://github.com/deepflowio/deepflow/pull/7979) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - eBPF Remove the handling of redundant process events [#7977](https://github.com/deepflowio/deepflow/pull/7977) by [yinjiping](https://github.com/yinjiping)
+* fix: Non-PIC executable DWARF entry problem [#7971](https://github.com/deepflowio/deepflow/pull/7971) by [rvql](https://github.com/rvql)
+* fix: delete agent group [#7962](https://github.com/deepflowio/deepflow/pull/7962) by [roryye](https://github.com/roryye)
+* fix: agent - eBPF Modify memory barrier for ring [#7959](https://github.com/deepflowio/deepflow/pull/7959) by [yinjiping](https://github.com/yinjiping)
+* fix: delete agent group [#7953](https://github.com/deepflowio/deepflow/pull/7953) by [roryye](https://github.com/roryye)
+* fix: agent registration followGroupFeatures is all features [#7949](https://github.com/deepflowio/deepflow/pull/7949) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* fix: license_func_log sql [#7943](https://github.com/deepflowio/deepflow/pull/7943) by [roryye](https://github.com/roryye)
+* fix: Fix DWARF unwind entry for non PIE binaries [#7936](https://github.com/deepflowio/deepflow/pull/7936) by [rvql](https://github.com/rvql)
+* fix: Server config name mismatch [#7934](https://github.com/deepflowio/deepflow/pull/7934) by [rvql](https://github.com/rvql)
+* fix: log contents [#7920](https://github.com/deepflowio/deepflow/pull/7920) by [incoffeemonster](https://github.com/incoffeemonster)
+* fix: Profiler tries to clean non-exist map [#7905](https://github.com/deepflowio/deepflow/pull/7905) by [rvql](https://github.com/rvql)
+* fix: nil debug panic [#7904](https://github.com/deepflowio/deepflow/pull/7904) by [duandaa](https://github.com/duandaa)
+* fix: uses wrong host when request server http service [#7902](https://github.com/deepflowio/deepflow/pull/7902) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: Fix windows compile [#7897](https://github.com/deepflowio/deepflow/pull/7897) by [rvql](https://github.com/rvql)
 * fix: abnormal stats data, causing deepflow-server to panic [#7894](https://github.com/deepflowio/deepflow/pull/7894) by [lzf575](https://github.com/lzf575)
 * fix: fixes invalid controller formatted logs [#7890](https://github.com/deepflowio/deepflow/pull/7890) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
@@ -145,6 +159,23 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Show API support all enum tags and values [#7976](https://github.com/deepflowio/deepflow/pull/7976) by [Ericsssss](https://github.com/Ericsssss)
+* feat: trace tree support store PseudoLink field [#7956](https://github.com/deepflowio/deepflow/pull/7956) by [lzf575](https://github.com/lzf575)
+* feat: refactors mysql migrator [#7951](https://github.com/deepflowio/deepflow/pull/7951) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: describe instance support resource group [#7922](https://github.com/deepflowio/deepflow/pull/7922) by [askyrie](https://github.com/askyrie)
+* feat: Support DWARF unwinding from kernel context [#7940](https://github.com/deepflowio/deepflow/pull/7940) by [rvql](https://github.com/rvql)
+* feat: moves mysql models to independent directory [#7929](https://github.com/deepflowio/deepflow/pull/7929) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: Add load_balancer in k8s Service/ServiceRule [#7933](https://github.com/deepflowio/deepflow/pull/7933) by [rvql](https://github.com/rvql)
+* feat: service is issued to add loadbalancer [#7932](https://github.com/deepflowio/deepflow/pull/7932) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
+* feat: agent - eBPF Add support for parsing 4.19.90-vhulk2211.3.0.h154… [#7930](https://github.com/deepflowio/deepflow/pull/7930) by [yinjiping](https://github.com/yinjiping)
+* feat: k8s svc support lb [#7927](https://github.com/deepflowio/deepflow/pull/7927) by [askyrie](https://github.com/askyrie)
+* feat: removes global variable mysql.Db [#7926](https://github.com/deepflowio/deepflow/pull/7926) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
+* feat: add enable features to agent group [#7898](https://github.com/deepflowio/deepflow/pull/7898) by [roryye](https://github.com/roryye)
+* feat: add pseudo link field for treenode [#7917](https://github.com/deepflowio/deepflow/pull/7917) by [taloric](https://github.com/taloric)
+* feat: Update kubernetes create cli example [#7914](https://github.com/deepflowio/deepflow/pull/7914) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: support countDistinct function [#7896](https://github.com/deepflowio/deepflow/pull/7896) by [duandaa](https://github.com/duandaa)
+* feat: agent - eBPF Optimize eBPF socket trace [#7871](https://github.com/deepflowio/deepflow/pull/7871) by [yinjiping](https://github.com/yinjiping)
+* feat: ch_vtap add resource [#7901](https://github.com/deepflowio/deepflow/pull/7901) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: when only exporting a single kafka data, use the 'sendMessage' interface [#7885](https://github.com/deepflowio/deepflow/pull/7885) by [lzf575](https://github.com/lzf575)
 * feat: querier support simple sql [#7883](https://github.com/deepflowio/deepflow/pull/7883) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: update domain daily trigger [#7850](https://github.com/deepflowio/deepflow/pull/7850) by [askyrie](https://github.com/askyrie)
@@ -311,6 +342,8 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: Adjust agent profile configurations [#7918](https://github.com/deepflowio/deepflow/pull/7918) by [rvql](https://github.com/rvql)
+* refactor: update trace_tree debug info [#7915](https://github.com/deepflowio/deepflow/pull/7915) by [lzf575](https://github.com/lzf575)
 * refactor: agent divides the config into dynamic_config and user_config [#7872](https://github.com/deepflowio/deepflow/pull/7872) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: add configuration structures [#7804](https://github.com/deepflowio/deepflow/pull/7804) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: modify the default batch write size for metrics and flow logs [#7789](https://github.com/deepflowio/deepflow/pull/7789) by [lzf575](https://github.com/lzf575)
@@ -333,6 +366,7 @@
 * refactor: trace_tree add encoding respose statistics [#7430](https://github.com/deepflowio/deepflow/pull/7430) by [lzf575](https://github.com/lzf575)
 
 #### Performance
+* perf: remove the '-l' compilation parameter to allow inline [#7935](https://github.com/deepflowio/deepflow/pull/7935) by [lzf575](https://github.com/lzf575)
 * perf: improve the performance of ClickHouse table changes under multiple organizations [#7788](https://github.com/deepflowio/deepflow/pull/7788) by [lzf575](https://github.com/lzf575)
 * perf: speed up the update of ClickHouse table structure [#7748](https://github.com/deepflowio/deepflow/pull/7748) by [lzf575](https://github.com/lzf575)
 * perf: speed up the update of ClickHouse table structure [#7746](https://github.com/deepflowio/deepflow/pull/7746) by [lzf575](https://github.com/lzf575)
@@ -351,6 +385,7 @@
 
 
 #### OTHER
+* Relaxing regular expression restrictions for the ClusterID [#7907](https://github.com/deepflowio/deepflow/pull/7907) by [Hyzhou](https://github.com/Hyzhou)
 * use .env to config docker-compose.yaml [#7729](https://github.com/deepflowio/deepflow/pull/7729) by [asdfsx](https://github.com/asdfsx)
 * refector: add agent.proto [#7695](https://github.com/deepflowio/deepflow/pull/7695) by [yuanchaoa](https://github.com/yuanchaoa)
 * Update changelog [#7660](https://github.com/deepflowio/deepflow/pull/7660) by [lzf575](https://github.com/lzf575)

@@ -21,25 +21,25 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func newDBPodService() *mysql.PodService {
-	return &mysql.PodService{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+func newDBPodService() *mysqlmodel.PodService {
+	return &mysqlmodel.PodService{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
 }
 
 func (t *SuiteTest) TestAddPodServiceBatchSuccess() {
 	operator := NewPodService()
 	itemToAdd := newDBPodService()
 
-	_, ok := operator.AddBatch([]*mysql.PodService{itemToAdd})
+	_, ok := operator.AddBatch([]*mysqlmodel.PodService{itemToAdd})
 	assert.True(t.T(), ok)
 
-	var addedItem *mysql.PodService
+	var addedItem *mysqlmodel.PodService
 	t.db.Where("lcuuid = ?", itemToAdd.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Lcuuid, itemToAdd.Lcuuid)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.PodService{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodService{})
 }
 
 func (t *SuiteTest) TestUpdatePodServiceSuccess() {
@@ -52,11 +52,11 @@ func (t *SuiteTest) TestUpdatePodServiceSuccess() {
 	_, ok := operator.Update(addedItem.Lcuuid, updateInfo)
 	assert.True(t.T(), ok)
 
-	var updatedItem *mysql.PodService
+	var updatedItem *mysqlmodel.PodService
 	t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, updateInfo["name"])
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.PodService{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.PodService{})
 }
 
 func (t *SuiteTest) TestDeletePodServiceBatchSuccess() {
@@ -66,28 +66,28 @@ func (t *SuiteTest) TestDeletePodServiceBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 
 	assert.True(t.T(), operator.DeleteBatch([]string{addedItem.Lcuuid}))
-	var deletedItem *mysql.PodService
+	var deletedItem *mysqlmodel.PodService
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
 func (t *SuiteTest) TestPodServiceCreateAndFind() {
 	lcuuid := uuid.New().String()
-	ps := &mysql.PodService{
-		Base: mysql.Base{Lcuuid: lcuuid},
+	ps := &mysqlmodel.PodService{
+		Base: mysqlmodel.Base{Lcuuid: lcuuid},
 	}
 	t.db.Create(ps)
-	var resultPodService *mysql.PodService
+	var resultPodService *mysqlmodel.PodService
 	err := t.db.Where("lcuuid = ? and name='' and alias='' and selector='' and service_cluster_ip='' "+
 		"and az='' and region='' and sub_domain=''", lcuuid).First(&resultPodService).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), ps.Base.Lcuuid, resultPodService.Base.Lcuuid)
 
-	resultPodService = new(mysql.PodService)
+	resultPodService = new(mysqlmodel.PodService)
 	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodService)
 	assert.Equal(t.T(), ps.Base.Lcuuid, resultPodService.Base.Lcuuid)
 
-	resultPodService = new(mysql.PodService)
+	resultPodService = new(mysqlmodel.PodService)
 	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultPodService)
 	assert.Equal(t.T(), nil, result.Error)
 	assert.Equal(t.T(), int64(0), result.RowsAffected)

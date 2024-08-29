@@ -30,6 +30,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql/common"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 const (
@@ -55,7 +56,7 @@ func GetDB(dbFile string) *gorm.DB {
 
 func GetModels() []interface{} {
 	return []interface{}{
-		&mysql.Domain{}, &mysql.SubDomain{},
+		&mysqlmodel.Domain{}, &mysqlmodel.SubDomain{},
 	}
 }
 
@@ -67,15 +68,15 @@ func ClearDBFile(f string) {
 
 func TestRefresh(t *testing.T) {
 	ClearDBFile(TEST_DB_FILE)
-	mysql.Db = GetDB(TEST_DB_FILE)
+	mysql.DefaultDB = GetDB(TEST_DB_FILE)
 	for _, val := range GetModels() {
-		mysql.Db.AutoMigrate(val)
+		mysql.DefaultDB.AutoMigrate(val)
 	}
-	domain := mysql.Domain{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Type: 11}
-	mysql.Db.Create(&domain)
-	subDomain := mysql.SubDomain{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
-	mysql.Db.Create(&subDomain)
-	k8sInfo := NewKubernetesInfo(mysql.Db, nil, common.DEFAULT_ORG_ID, context.Background())
+	domain := mysqlmodel.Domain{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Type: 11}
+	mysql.DefaultDB.Create(&domain)
+	subDomain := mysqlmodel.SubDomain{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String()}
+	mysql.DefaultDB.Create(&subDomain)
+	k8sInfo := NewKubernetesInfo(mysql.DefaultDB, nil, common.DEFAULT_ORG_ID, context.Background())
 	k8sInfo.refresh()
 	if len(k8sInfo.clusterIDToDomain) != 1 {
 		fmt.Println("cluster id domain map is not expected.")
@@ -88,11 +89,11 @@ func TestRefresh(t *testing.T) {
 
 func TestCheckDomainSubDomainByClusterID(t *testing.T) {
 	ClearDBFile(TEST_DB_FILE)
-	mysql.Db = GetDB(TEST_DB_FILE)
+	mysql.DefaultDB = GetDB(TEST_DB_FILE)
 	for _, val := range GetModels() {
-		mysql.Db.AutoMigrate(val)
+		mysql.DefaultDB.AutoMigrate(val)
 	}
-	k8sInfo := NewKubernetesInfo(mysql.Db, nil, common.DEFAULT_ORG_ID, context.Background())
+	k8sInfo := NewKubernetesInfo(mysql.DefaultDB, nil, common.DEFAULT_ORG_ID, context.Background())
 	k8sInfo.clusterIDToDomain = map[string]string{"a": "b"}
 	k8sInfo.clusterIDToSubDomain = map[string]string{"b": "c"}
 	if ok, _ := k8sInfo.checkClusterID("a"); !ok {
@@ -102,9 +103,9 @@ func TestCheckDomainSubDomainByClusterID(t *testing.T) {
 		fmt.Printf("check cluster id: %s should be ok\n", "b")
 	}
 	k8sInfo.clusterIDToDomain = make(map[string]string)
-	k8sInfo.clusterIDToSubDomain = make(map[string]string)
-	domain := mysql.Domain{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Type: 11, ClusterID: "d"}
-	mysql.Db.Create(&domain)
+	k8sInfo.clmysqlmodel.DomainomainDomain = make(map[string]string)
+	domain := mysqlmodel.Domain{Base: mysqlmodel.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Type: 11, ClusterID: "d"}
+	mysql.DefaultDB.Create(&domain)
 	if ok, _ := k8sInfo.checkClusterID("d"); !ok {
 		fmt.Printf("check cluster id: %s should be ok\n", "a")
 	}

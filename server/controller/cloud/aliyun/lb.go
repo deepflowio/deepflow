@@ -27,7 +27,7 @@ import (
 )
 
 func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[string]string) (
-	[]model.LB, []model.LBListener, []model.LBTargetServer, []model.VInterface, []model.IP, error,
+	[]model.LB, []model.LBListener, []model.LBTargetServer, []model.VInterface, []model.IP,
 ) {
 	var retLBs []model.LB
 	var retLBListeners []model.LBListener
@@ -36,15 +36,15 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 	var retIPs []model.IP
 
 	if region.Label == "cn-wulanchabu" || region.Label == "cn-nanjing" {
-		return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs, nil
+		return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}
 	}
 
 	log.Debug("get lbs starting", logger.NewORGPrefix(a.orgID))
 	request := slb.CreateDescribeLoadBalancersRequest()
 	response, err := a.getLBResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}
 	}
 
 	for _, r := range response {
@@ -79,10 +79,7 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 			}
 
 			// 获取后端server信息并补充vpcLcuuid
-			tmpLBTargetServers, tmpVPCLcuuid, err := a.getLBTargetServers(region, lbId, vmLcuuidToVPCLcuuid)
-			if err != nil {
-				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
-			}
+			tmpLBTargetServers, tmpVPCLcuuid := a.getLBTargetServers(region, lbId, vmLcuuidToVPCLcuuid)
 			// lb API本身没有返回vpc信息且后端主机无法补充时，跳过该lb
 			if vpcLcuuid == "" {
 				if tmpVPCLcuuid == "" {
@@ -105,11 +102,7 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 			a.regionLcuuidToResourceNum[retLB.RegionLcuuid]++
 
 			// 监听器信息
-			tmpLBListeners, err := a.getLBListeners(region, lbId, lb.Get("Address").MustString())
-			if err != nil {
-				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
-			}
-			retLBListeners = append(retLBListeners, tmpLBListeners...)
+			retLBListeners = append(retLBListeners, a.getLBListeners(region, lbId, lb.Get("Address").MustString())...)
 
 			// 接口信息
 			portLcuuid := common.GenerateUUIDByOrgID(a.orgID, lbLcuuid)
@@ -143,18 +136,18 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 		}
 	}
 	log.Debug("get lbs complete", logger.NewORGPrefix(a.orgID))
-	return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs, nil
+	return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs
 }
 
-func (a *Aliyun) getLBListeners(region model.Region, lbId, lbIP string) ([]model.LBListener, error) {
+func (a *Aliyun) getLBListeners(region model.Region, lbId, lbIP string) []model.LBListener {
 	var retLBListeners []model.LBListener
 
 	request := slb.CreateDescribeLoadBalancerAttributeRequest()
 	request.LoadBalancerId = lbId
 	response, err := a.getLBListenerResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return []model.LBListener{}, err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.LBListener{}
 	}
 
 	lbLcuuid := common.GenerateUUIDByOrgID(a.orgID, lbId)
@@ -189,18 +182,18 @@ func (a *Aliyun) getLBListeners(region model.Region, lbId, lbIP string) ([]model
 			retLBListeners = append(retLBListeners, retLBListener)
 		}
 	}
-	return retLBListeners, nil
+	return retLBListeners
 }
 
-func (a *Aliyun) getLBTargetServers(region model.Region, lbId string, vmLcuuidToVPCLcuuid map[string]string) ([]model.LBTargetServer, string, error) {
+func (a *Aliyun) getLBTargetServers(region model.Region, lbId string, vmLcuuidToVPCLcuuid map[string]string) ([]model.LBTargetServer, string) {
 	var retLBTargetServers []model.LBTargetServer
 
 	request := slb.CreateDescribeHealthStatusRequest()
 	request.LoadBalancerId = lbId
 	response, err := a.getLBTargetServerResponse(region.Label, request)
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(a.orgID))
-		return []model.LBTargetServer{}, "", err
+		log.Warning(err, logger.NewORGPrefix(a.orgID))
+		return []model.LBTargetServer{}, ""
 	}
 
 	lbLcuuid := common.GenerateUUIDByOrgID(a.orgID, lbId)
@@ -246,5 +239,5 @@ func (a *Aliyun) getLBTargetServers(region model.Region, lbId string, vmLcuuidTo
 			retLBTargetServers = append(retLBTargetServers, retLBTargetServer)
 		}
 	}
-	return retLBTargetServers, vpcLcuuid, nil
+	return retLBTargetServers, vpcLcuuid
 }

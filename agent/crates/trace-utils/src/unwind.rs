@@ -27,6 +27,10 @@ use std::slice;
 use ahash::AHasher;
 use libc::{__u64, c_int, c_void};
 use log::{debug, trace, warn};
+use object::{
+    elf::{self, FileHeader64},
+    read::elf::FileHeader,
+};
 
 use dwarf::UnwindEntry;
 use maps::MemoryArea;
@@ -102,11 +106,37 @@ impl UnwindTable {
                         break;
                     }
                     shard_list.entries[shard_list.len as usize] = *s;
-                    shard_list.entries[shard_list.len as usize].offset = m.m_start;
+                    // offset is 0 iff object is not PIC/PIE, otherwise set offset according to proc maps
+                    if shard_list.entries[shard_list.len as usize].offset != 0 {
+                        shard_list.entries[shard_list.len as usize].offset = m.m_start;
+                    }
                     shard_list.len += 1;
                 }
                 continue;
             }
+
+            // for binaries compiled without "-fPIE" or "-pie", the symbols will not get relocated
+            // so shard offset should be set to 0
+            let is_pic = match FileHeader64::<object::Endianness>::parse(&*data) {
+                Ok(header) => match header.endian() {
+                    Ok(endian) => header.e_type(endian) != elf::ET_EXEC,
+                    Err(e) => {
+                        debug!(
+                            "read elf header endian for process#{pid} in {} failed: {e}",
+                            path.display()
+                        );
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    debug!(
+                        "read elf header for process#{pid} in {} failed: {e}",
+                        path.display()
+                    );
+                    continue;
+                }
+            };
+            trace!("object {} is_pic={is_pic}", path.display());
 
             trace!("load object {} dwarf entries", path.display());
             let entries = match dwarf::read_unwind_entries(&data) {
@@ -132,7 +162,7 @@ impl UnwindTable {
                     entries.len()
                 );
                 let object_info =
-                    self.split_into_shards(pid, &m, &entries, max_pc, &mut shard_list);
+                    self.split_into_shards(pid, &m, &entries, max_pc, &mut shard_list, is_pic);
                 shard_count += object_info.shards.len();
                 self.object_cache.insert(digest, object_info);
                 continue;
@@ -179,11 +209,11 @@ impl UnwindTable {
             }
             let shard_info = &mut shard_list.entries[shard_list.len as usize];
             shard_info.id = shard.id;
-            shard_info.offset = m.m_start;
+            shard_info.offset = if is_pic { m.m_start } else { 0 };
             shard_info.pc_min = entries[0].pc;
             shard_info.pc_max = max_pc;
-            shard_info.entry_start = shard.len - entries.len() as u32;
-            shard_info.entry_end = shard.len;
+            shard_info.entry_start = shard.len as u16 - entries.len() as u16;
+            shard_info.entry_end = shard.len as u16;
 
             self.object_cache.insert(
                 digest,
@@ -309,6 +339,7 @@ impl UnwindTable {
         entries: &[UnwindEntry],
         max_pc: u64,
         shard_list: &mut ProcessShardList,
+        is_pic: bool,
     ) -> ObjectInfo {
         let mut object_info = ObjectInfo {
             pids: vec![pid],
@@ -337,11 +368,11 @@ impl UnwindTable {
             }
             let shard_info = &mut shard_list.entries[shard_list.len as usize];
             shard_info.id = shard_id;
-            shard_info.offset = m.m_start;
+            shard_info.offset = if is_pic { m.m_start } else { 0 };
             shard_info.pc_min = chunk[0].pc;
             shard_info.pc_max = max_pc;
             shard_info.entry_start = 0;
-            shard_info.entry_end = chunk.len() as u32;
+            shard_info.entry_end = chunk.len() as u16;
             if !first_shard {
                 // set max pc of last shard to min pc of this shard
                 shard_info.pc_max = chunk[0].pc;
@@ -375,10 +406,11 @@ impl UnwindTable {
                 BPF_ANY,
             );
             if ret != 0 {
-                warn!(
-                    "update process#{pid} shard list failed: bpf_update_elem() returned {}",
-                    *libc::__errno_location()
-                );
+                match *libc::__errno_location() {
+                    libc::E2BIG => warn!("update process#{pid} shard list failed: try increasing dwarf_process_map_size"),
+                    libc::ENOMEM => warn!("update process#{pid} shard list failed: cannot allocate memory"),
+                    _ => warn!("update process#{pid} shard list failed: bpf_update_elem() returned {}", *libc::__errno_location()),
+                }
             }
         }
     }
@@ -391,10 +423,14 @@ impl UnwindTable {
                 &pid as *const u32 as *const c_void,
             );
             if ret != 0 {
-                warn!(
-                    "delete process#{pid} shard list failed: bpf_delete_elem() returned {}",
-                    *libc::__errno_location()
-                );
+                let errno = libc::__errno_location();
+                // ignoring non exist error
+                if *errno != libc::ENOENT {
+                    warn!(
+                        "delete process#{pid} shard list failed: bpf_delete_elem() returned {}",
+                        *libc::__errno_location()
+                    );
+                }
             }
         }
     }
@@ -413,10 +449,16 @@ impl UnwindTable {
                 BPF_ANY,
             );
             if ret != 0 {
-                warn!(
-                    "update shard#{shard_id} failed: bpf_update_elem() returned {}",
-                    *libc::__errno_location()
-                );
+                match *libc::__errno_location() {
+                    libc::E2BIG => {
+                        warn!("update shard#{shard_id} failed: try increasing dwarf_shard_map_size")
+                    }
+                    libc::ENOMEM => warn!("update shard#{shard_id} failed: cannot allocate memory"),
+                    _ => warn!(
+                        "update shard#{shard_id} failed: bpf_update_elem() returned {}",
+                        *libc::__errno_location()
+                    ),
+                }
             }
         }
     }
@@ -429,10 +471,14 @@ impl UnwindTable {
                 &shard_id as *const u32 as *const c_void,
             );
             if ret != 0 {
-                warn!(
-                    "delete shard#{shard_id} failed: bpf_delete_elem() returned {}",
-                    *libc::__errno_location()
-                );
+                let errno = libc::__errno_location();
+                // ignoring non exist error
+                if *errno != libc::ENOENT {
+                    warn!(
+                        "delete shard#{shard_id} failed: bpf_delete_elem() returned {}",
+                        *libc::__errno_location()
+                    );
+                }
             }
         }
     }
@@ -482,22 +528,23 @@ pub const UNWIND_ENTRIES_PER_SHARD: usize = 65535;
 #[derive(Clone, Copy, Debug)]
 pub struct ShardInfo {
     pub id: u32,
+    // entry index is larger than UNWIND_ENTRIES_PER_SHARD
+    pub entry_start: u16,
+    pub entry_end: u16,
     pub offset: u64,
     pub pc_min: u64,
     pub pc_max: u64,
-    pub entry_start: u32,
-    pub entry_end: u32,
 }
 
 impl Default for ShardInfo {
     fn default() -> Self {
         Self {
             id: 0,
+            entry_start: 0,
+            entry_end: UNWIND_ENTRIES_PER_SHARD as u16,
             offset: 0,
             pc_min: u64::MAX,
             pc_max: 0,
-            entry_start: 0,
-            entry_end: UNWIND_ENTRIES_PER_SHARD as u32,
         }
     }
 }

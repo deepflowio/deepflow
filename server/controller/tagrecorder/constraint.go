@@ -18,20 +18,20 @@
 package tagrecorder
 
 import (
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 // 资源的MySQL orm对象
 type MySQLChModel interface {
-	mysql.ChUser | mysql.ChAlarmPolicy | mysql.ChPrometheusTargetLabelLayout | mysql.ChTargetLabel | mysql.ChAPPLabel | mysql.ChPrometheusMetricName | mysql.ChPrometheusLabelName |
-		mysql.ChPrometheusMetricAPPLabelLayout | mysql.ChPodServiceK8sLabels | mysql.ChPodServiceK8sLabel | mysql.ChOSAppTags |
-		mysql.ChOSAppTag | mysql.ChPodNSCloudTags | mysql.ChChostCloudTags | mysql.ChPodNSCloudTag | mysql.ChChostCloudTag | mysql.ChIntEnum |
-		mysql.ChStringEnum | mysql.ChPodIngress | mysql.ChPodGroupPort | mysql.ChPodPort | mysql.ChVTapPort | mysql.ChAZ | mysql.ChIPResource | mysql.ChPodK8sLabel |
-		mysql.ChLBListener | mysql.ChPodNodePort | mysql.ChIPPort | mysql.ChDevicePort | mysql.ChRegion | mysql.ChVPC |
-		mysql.ChDevice | mysql.ChIPRelation | mysql.ChPodGroup | mysql.ChNetwork | mysql.ChPod | mysql.ChPodCluster |
-		mysql.ChPodNode | mysql.ChPodNamespace | mysql.ChTapType | mysql.ChVTap | mysql.ChPodK8sLabels | mysql.ChNodeType | mysql.ChGProcess | mysql.ChPodK8sAnnotation | mysql.ChPodK8sAnnotations |
-		mysql.ChPodServiceK8sAnnotation | mysql.ChPodServiceK8sAnnotations |
-		mysql.ChPodK8sEnv | mysql.ChPodK8sEnvs | mysql.ChPodService | mysql.ChChost | mysql.ChPolicy | mysql.ChNpbTunnel
+	mysqlmodel.ChUser | mysqlmodel.ChAlarmPolicy | mysqlmodel.ChPrometheusTargetLabelLayout | mysqlmodel.ChTargetLabel | mysqlmodel.ChAPPLabel | mysqlmodel.ChPrometheusMetricName | mysqlmodel.ChPrometheusLabelName |
+		mysqlmodel.ChPrometheusMetricAPPLabelLayout | mysqlmodel.ChPodServiceK8sLabels | mysqlmodel.ChPodServiceK8sLabel | mysqlmodel.ChOSAppTags |
+		mysqlmodel.ChOSAppTag | mysqlmodel.ChPodNSCloudTags | mysqlmodel.ChChostCloudTags | mysqlmodel.ChPodNSCloudTag | mysqlmodel.ChChostCloudTag | mysqlmodel.ChIntEnum |
+		mysqlmodel.ChStringEnum | mysqlmodel.ChPodIngress | mysqlmodel.ChVTapPort | mysqlmodel.ChAZ | mysqlmodel.ChIPResource | mysqlmodel.ChPodK8sLabel |
+		mysqlmodel.ChLBListener | mysqlmodel.ChRegion | mysqlmodel.ChVPC |
+		mysqlmodel.ChDevice | mysqlmodel.ChIPRelation | mysqlmodel.ChPodGroup | mysqlmodel.ChNetwork | mysqlmodel.ChPod | mysqlmodel.ChPodCluster |
+		mysqlmodel.ChPodNode | mysqlmodel.ChPodNamespace | mysqlmodel.ChTapType | mysqlmodel.ChVTap | mysqlmodel.ChPodK8sLabels | mysqlmodel.ChNodeType | mysqlmodel.ChGProcess | mysqlmodel.ChPodK8sAnnotation | mysqlmodel.ChPodK8sAnnotations |
+		mysqlmodel.ChPodServiceK8sAnnotation | mysqlmodel.ChPodServiceK8sAnnotations |
+		mysqlmodel.ChPodK8sEnv | mysqlmodel.ChPodK8sEnvs | mysqlmodel.ChPodService | mysqlmodel.ChChost | mysqlmodel.ChPolicy | mysqlmodel.ChNpbTunnel
 }
 
 // ch资源的组合key

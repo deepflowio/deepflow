@@ -19,19 +19,20 @@ package tagrecorder
 import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
 type ChVTap struct {
-	UpdaterComponent[mysql.ChVTap, IDKey]
+	UpdaterComponent[mysqlmodel.ChVTap, IDKey]
 	resourceTypeToIconID map[IconKey]int
 }
 
 func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	updater := &ChVTap{
-		newUpdaterComponent[mysql.ChVTap, IDKey](
+		newUpdaterComponent[mysqlmodel.ChVTap, IDKey](
 			RESOURCE_TYPE_CH_VTAP,
 		),
 		resourceTypeToIconID,
@@ -40,8 +41,8 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	return updater
 }
 
-func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChVTap, bool) {
-	var vTaps []mysql.VTap
+func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChVTap, bool) {
+	var vTaps []mysqlmodel.VTap
 	err := db.Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
@@ -69,9 +70,9 @@ func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChVTap, bool) {
 		vTapIDToResourceName[vTapID] = resourceName
 	}
 
-	keyToItem := make(map[IDKey]mysql.ChVTap)
+	keyToItem := make(map[IDKey]mysqlmodel.ChVTap)
 	for _, vTap := range vTaps {
-		keyToItem[IDKey{ID: vTap.ID}] = mysql.ChVTap{
+		keyToItem[IDKey{ID: vTap.ID}] = mysqlmodel.ChVTap{
 			ID:          vTap.ID,
 			Name:        vTap.Name,
 			Type:        vTap.Type,
@@ -87,11 +88,11 @@ func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysql.ChVTap, bool) {
 	return keyToItem, true
 }
 
-func (v *ChVTap) generateKey(dbItem mysql.ChVTap) IDKey {
+func (v *ChVTap) generateKey(dbItem mysqlmodel.ChVTap) IDKey {
 	return IDKey{ID: dbItem.ID}
 }
 
-func (v *ChVTap) generateUpdateInfo(oldItem, newItem mysql.ChVTap) (map[string]interface{}, bool) {
+func (v *ChVTap) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVTap) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name

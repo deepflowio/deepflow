@@ -20,7 +20,7 @@ import (
 	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -83,8 +83,8 @@ func (l *label) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (l *label) load() ([]*mysql.PrometheusLabel, error) {
-	var labels []*mysql.PrometheusLabel
+func (l *label) load() ([]*mysqlmodel.PrometheusLabel, error) {
+	var labels []*mysqlmodel.PrometheusLabel
 	err := l.org.DB.Find(&labels).Error
 	return labels, err
 }

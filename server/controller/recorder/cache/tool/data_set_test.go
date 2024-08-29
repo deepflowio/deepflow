@@ -23,6 +23,7 @@ import (
 	"github.com/bxcodec/faker/v3"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -44,7 +45,7 @@ func RandName() string {
 func (t *SuiteTest) TestAddNetworkInTDS() {
 	id := RandID()
 	name := RandName()
-	dbItem := &mysql.Network{Base: mysql.Base{ID: id, Lcuuid: RandLcuuid()}, Name: name}
+	dbItem := &mysqlmodel.Network{Base: mysqlmodel.Base{ID: id, Lcuuid: RandLcuuid()}, Name: name}
 	ds := NewDataSet()
 	ds.AddNetwork(dbItem)
 	assert.Equal(t.T(), name, ds.networkIDToName[id])
@@ -77,7 +78,7 @@ func (t *SuiteTest) TestAddWANIPInTDS() {
 	lcuuid := RandLcuuid()
 	vifID := RandID()
 	ip := faker.IPv4()
-	dbItem := &mysql.WANIP{Base: mysql.Base{ID: RandID(), Lcuuid: lcuuid}, VInterfaceID: vifID, IP: ip}
+	dbItem := &mysqlmodel.WANIP{Base: mysqlmodel.Base{ID: RandID(), Lcuuid: lcuuid}, VInterfaceID: vifID, IP: ip}
 	ds := NewDataSet()
 	ds.AddWANIP(dbItem)
 	assert.Equal(t.T(), ip, ds.wanIPLcuuidToIP[lcuuid])
@@ -106,8 +107,8 @@ func (t *SuiteTest) TestGetNetworkNameByID() {
 
 	id2 := RandID()
 	name2 := RandName()
-	dbItem := &mysql.Network{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
-	mysql.Db.Create(&dbItem)
+	dbItem := &mysqlmodel.Network{Base: mysqlmodel.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
+	mysql.DefaultDB.Create(&dbItem)
 	rname2, _ := ds.GetNetworkNameByID(id2)
 	assert.Equal(t.T(), name2, rname2)
 }
@@ -122,8 +123,8 @@ func (t *SuiteTest) TestGetVInterfaceLcuuidByID() {
 
 	id2 := RandID()
 	lcuuid2 := RandLcuuid()
-	dbItem := &mysql.VInterface{Base: mysql.Base{ID: id2, Lcuuid: lcuuid2}}
-	mysql.Db.Create(&dbItem)
+	dbItem := &mysqlmodel.VInterface{Base: mysqlmodel.Base{ID: id2, Lcuuid: lcuuid2}}
+	mysql.DefaultDB.Create(&dbItem)
 	rlcuuid2, _ := ds.GetVInterfaceLcuuidByID(id2)
 	assert.Equal(t.T(), lcuuid2, rlcuuid2)
 }
@@ -138,8 +139,8 @@ func (t *SuiteTest) TestGetVInterfaceIDByWANIPLcuuid() {
 
 	vifID2 := RandID()
 	lcuuid2 := RandLcuuid()
-	dbItem := &mysql.WANIP{Base: mysql.Base{Lcuuid: lcuuid2}, VInterfaceID: vifID2}
-	mysql.Db.Create(&dbItem)
+	dbItem := &mysqlmodel.WANIP{Base: mysqlmodel.Base{Lcuuid: lcuuid2}, VInterfaceID: vifID2}
+	mysql.DefaultDB.Create(&dbItem)
 	rvifID2, _ := ds.GetVInterfaceIDByWANIPLcuuid(lcuuid2)
 	assert.Equal(t.T(), vifID2, rvifID2)
 }
@@ -154,8 +155,8 @@ func (t *SuiteTest) TestGetWANIPByLcuuid() {
 
 	ip2 := faker.IPv4()
 	lcuuid2 := RandLcuuid()
-	dbItem := &mysql.WANIP{Base: mysql.Base{Lcuuid: lcuuid2}, IP: ip2}
-	mysql.Db.Create(&dbItem)
+	dbItem := &mysqlmodel.WANIP{Base: mysqlmodel.Base{Lcuuid: lcuuid2}, IP: ip2}
+	mysql.DefaultDB.Create(&dbItem)
 	rip2, _ := ds.GetWANIPByLcuuid(lcuuid2)
 	assert.Equal(t.T(), ip2, rip2)
 }

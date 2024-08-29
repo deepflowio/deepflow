@@ -28,6 +28,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -69,27 +70,27 @@ func BenchmarkAdd(b *testing.B) {
 
 func TestMain(m *testing.M) {
 	clearDBFile()
-	mysql.Db = test.GetDB(TEST_DB_FILE)
+	mysql.DefaultDB = test.GetDB(TEST_DB_FILE)
 	for _, val := range test.GetModels() {
-		mysql.Db.AutoMigrate(val)
+		mysql.DefaultDB.AutoMigrate(val)
 	}
 
 	for i := 0; i < 1; i++ {
-		domain := new(mysql.Domain)
+		domain := new(mysqlmodel.Domain)
 		domain.Lcuuid = uuid.NewString()
 		domain.Name = fmt.Sprintf("第 %d 次性能测试", i)
-		mysql.Db.Create(&domain)
+		mysql.DefaultDB.Create(&domain)
 		domainLcuuids = append(domainLcuuids, domain.Lcuuid)
 		domainNames = append(domainNames, domain.Name)
 		cloudData = append(cloudData, test.NewCloudResource(1))
 	}
-	publicNetwork := new(mysql.Network)
+	publicNetwork := new(mysqlmodel.Network)
 	publicNetwork.Lcuuid = rcommon.PUBLIC_NETWORK_LCUUID
-	mysql.Db.Create(&publicNetwork)
+	mysql.DefaultDB.Create(&publicNetwork)
 
 	exitCode := m.Run()
 
-	sqlDB, _ := mysql.Db.DB()
+	sqlDB, _ := mysql.DefaultDB.DB()
 	defer sqlDB.Close()
 	clearDBFile()
 	os.Exit(exitCode)

@@ -186,6 +186,7 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val);
 void release_flame_graph_hash(void);
 int set_profiler_regex(const char *pattern);
 int set_profiler_cpu_aggregation(int flag);
+bool match_profiler_regex(const char *name);
 struct bpf_tracer *get_profiler_tracer(void);
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
 void cpdbg_process(stack_trace_msg_t * msg);

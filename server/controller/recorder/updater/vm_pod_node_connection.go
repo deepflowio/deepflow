@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type VMPodNodeConnection struct {
 	UpdaterBase[
 		cloudmodel.VMPodNodeConnection,
 		*diffbase.VMPodNodeConnection,
-		*mysql.VMPodNodeConnection,
-		mysql.VMPodNodeConnection,
+		*mysqlmodel.VMPodNodeConnection,
+		mysqlmodel.VMPodNodeConnection,
 		*message.VMPodNodeConnectionAdd,
 		message.VMPodNodeConnectionAdd,
 		*message.VMPodNodeConnectionUpdate,
@@ -47,8 +47,8 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 		newUpdaterBase[
 			cloudmodel.VMPodNodeConnection,
 			*diffbase.VMPodNodeConnection,
-			*mysql.VMPodNodeConnection,
-			mysql.VMPodNodeConnection,
+			*mysqlmodel.VMPodNodeConnection,
+			mysqlmodel.VMPodNodeConnection,
 			*message.VMPodNodeConnectionAdd,
 			message.VMPodNodeConnectionAdd,
 			*message.VMPodNodeConnectionUpdate,
@@ -73,7 +73,7 @@ func (c *VMPodNodeConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.VMPod
 	return
 }
 
-func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNodeConnection) (*mysql.VMPodNodeConnection, bool) {
+func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNodeConnection) (*mysqlmodel.VMPodNodeConnection, bool) {
 	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -83,7 +83,7 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 		return nil, false
 	}
 
-	dbItem := &mysql.VMPodNodeConnection{
+	dbItem := &mysqlmodel.VMPodNodeConnection{
 		Domain:    c.metadata.Domain.Lcuuid,
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,

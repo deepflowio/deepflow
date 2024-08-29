@@ -23,7 +23,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
@@ -110,7 +110,7 @@ func getSubDomainResource(m *manager.Manager) gin.HandlerFunc {
 			return
 		}
 		subDomainLcuuid := c.Param("lcuuid")
-		var subDomain mysql.SubDomain
+		var subDomain mysqlmodel.SubDomain
 		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
@@ -129,7 +129,7 @@ func getKubernetesGatherResource(m *manager.Manager) gin.HandlerFunc {
 			return
 		}
 		subDomainLcuuid := c.Param("lcuuid")
-		var subDomain mysql.SubDomain
+		var subDomain mysqlmodel.SubDomain
 		err = db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())

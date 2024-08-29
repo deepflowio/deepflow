@@ -21,7 +21,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/libs/eventapi"
@@ -45,7 +45,7 @@ func NewLANIP(toolDS *tool.DataSet, eq *queue.OverwriteQueue) *LANIP {
 	return mng
 }
 
-func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
+func (i *LANIP) ProduceByAdd(items []*mysqlmodel.LANIP) {
 	for _, item := range items {
 		var (
 			deviceType        int

@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodService struct {
 	UpdaterBase[
 		cloudmodel.PodService,
 		*diffbase.PodService,
-		*mysql.PodService,
-		mysql.PodService,
+		*mysqlmodel.PodService,
+		mysqlmodel.PodService,
 		*message.PodServiceAdd,
 		message.PodServiceAdd,
 		*message.PodServiceUpdate,
@@ -47,8 +47,8 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 		newUpdaterBase[
 			cloudmodel.PodService,
 			*diffbase.PodService,
-			*mysql.PodService,
-			mysql.PodService,
+			*mysqlmodel.PodService,
+			mysqlmodel.PodService,
 			*message.PodServiceAdd,
 			message.PodServiceAdd,
 			*message.PodServiceUpdate,
@@ -73,7 +73,7 @@ func (s *PodService) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodService) (d
 	return
 }
 
-func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mysql.PodService, bool) {
+func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mysqlmodel.PodService, bool) {
 	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -108,12 +108,13 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 			return nil, false
 		}
 	}
-	dbItem := &mysql.PodService{
+	dbItem := &mysqlmodel.PodService{
 		Name:             cloudItem.Name,
 		Label:            cloudItem.Label,
 		Annotation:       cloudItem.Annotation,
 		Type:             cloudItem.Type,
 		Selector:         cloudItem.Selector,
+		ExternalIP:       cloudItem.ExternalIP,
 		ServiceClusterIP: cloudItem.ServiceClusterIP,
 		PodIngressID:     podIngressID,
 		PodNamespaceID:   podNamespaceID,
@@ -163,6 +164,10 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 	if diffBase.Selector != cloudItem.Selector {
 		mapInfo["selector"] = cloudItem.Selector
 		structInfo.Selector.Set(diffBase.Selector, cloudItem.Selector)
+	}
+	if diffBase.ExternalIP != cloudItem.ExternalIP {
+		mapInfo["external_ip"] = cloudItem.ExternalIP
+		structInfo.ExternalIP.Set(diffBase.ExternalIP, cloudItem.ExternalIP)
 	}
 	if diffBase.ServiceClusterIP != cloudItem.ServiceClusterIP {
 		mapInfo["service_cluster_ip"] = cloudItem.ServiceClusterIP

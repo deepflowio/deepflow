@@ -21,23 +21,24 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
 func (t *SuiteTest) TestformatDBItemsToAdd() {
 	operator := NewVInterface()
-	vifs := []*mysql.VInterface{newDBVInterface(), newDBVInterface()}
+	vifs := []*mysqlmodel.VInterface{newDBVInterface(), newDBVInterface()}
 	vif1 := vifs[0]
 	vif2 := vifs[1]
 	vifs = append(vifs, vifs[1])
-	mysql.Db.Create(&vif1)
+	mysql.DefaultDB.Create(&vif1)
 	vif1.ID += 1
-	mysql.Db.Create(&vif1)
+	mysql.DefaultDB.Create(&vif1)
 	vif1.ID += 1
-	mysql.Db.Create(&vif1)
+	mysql.DefaultDB.Create(&vif1)
 
 	vifsToAdd, lcuuidsToAdd, _, ok := operator.formatItemsToAdd(vifs)
 	assert.True(t.T(), ok)
 	assert.Equal(t.T(), 1, len(vifsToAdd))
 	assert.Equal(t.T(), vif2.Lcuuid, lcuuidsToAdd[0])
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.VInterface{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VInterface{})
 }

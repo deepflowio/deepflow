@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -104,7 +105,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		var agent *mysql.VTap
+		var agent *mysqlmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			log.Error(err, db.LogPrefixORGID)
 			BadRequestResponse(c, httpcommon.SERVER_ERROR, err.Error())
@@ -124,10 +125,10 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			}
 			forwardTimes = v
 		} else {
-			log.Infof("node ip(%s) init %s to 0", common.NodeIP, ForwardControllerTimes, db.LogPrefixORGID)
+			log.Infof("agent(key: %s), node ip(%s) init %s to 0", key, common.NodeIP, ForwardControllerTimes, db.LogPrefixORGID)
 			c.Request.Header.Set(ForwardControllerTimes, "0")
 		}
-		log.Infof("node ip(%s) forward times: %d", common.NodeIP, forwardTimes, db.LogPrefixORGID)
+		log.Infof("agent(key: %s), node ip(%s) forward times: %d", key, common.NodeIP, forwardTimes, db.LogPrefixORGID)
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
 			log.Error(err, db.LogPrefixORGID)
@@ -136,6 +137,8 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			return
 		}
 
+		log.Infof("agent(key: %s), node ip(%s), agent cur controller ip(%s), controller ip(%s)",
+			key, common.NodeIP, agent.CurControllerIP, agent.ControllerIP)
 		// get reverse proxy host
 		newHost := common.NodeIP
 		if common.NodeIP == agent.CurControllerIP {
@@ -162,8 +165,8 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		}
 
 		reverseProxy := fmt.Sprintf("http://%s:%d", newHost, common.GConfig.HTTPNodePort)
-		log.Infof("node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
-			common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP, db.LogPrefixORGID)
+		log.Infof("agnet(key: %s), node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
+			key, common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP, db.LogPrefixORGID)
 
 		proxyURL, err := url.Parse(reverseProxy)
 		if err != nil {
@@ -191,7 +194,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 			BadRequestResponse(c, httpcommon.INVALID_PARAMETERS, err.Error())
 			return
 		}
-		var agent *mysql.VTap
+		var agent *mysqlmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			JsonResponse(c, nil, err)
 			return
@@ -241,7 +244,7 @@ func getAgentID(c *gin.Context, db *mysql.DB) (int, error) {
 	}
 	agentID, err := strconv.Atoi(agentIDentStr)
 	if err != nil {
-		var agent mysql.VTap
+		var agent mysqlmodel.VTap
 		if err := db.Where("name = ?", agentIDentStr).First(&agent).Error; err != nil {
 			return 0, fmt.Errorf("failed to get agent by name(%s), error: %s", err.Error())
 		}

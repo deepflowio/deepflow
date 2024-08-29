@@ -21,11 +21,11 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPod(dbItem *mysql.Pod, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddPod(dbItem *mysqlmodel.Pod, seq int, toolDataSet *tool.DataSet) {
 	var podNodeLcuuid string
 	if dbItem.PodNodeID != 0 {
 		podNodeLcuuid, _ = toolDataSet.GetPodNodeLcuuidByID(dbItem.PodNodeID)

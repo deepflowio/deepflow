@@ -51,6 +51,7 @@
 #define MAP_PERF_PROFILER_BUF_B_NAME    "__profiler_output_b"
 #define MAP_PROCESS_SHARD_LIST_NAME     "__process_shard_list_table"
 #define MAP_UNWIND_ENTRY_SHARD_NAME     "__unwind_entry_shard_table"
+#define MAP_UNWIND_SYSINFO_NAME         "__unwind_sysinfo"
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
 
 #define MAP_PROGS_JMP_PE_NAME		"__progs_jmp_pe_map"

@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/message/trident"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -407,7 +408,7 @@ func (m *TrisolarisManager) getTeamData(orgIDs []int) {
 			log.Error(err)
 			continue
 		}
-		teams, err := dbmgr.DBMgr[mysql.Team](db.DB).Gets()
+		teams, err := dbmgr.DBMgr[mysqlmodel.Team](db.DB).Gets()
 		if err != nil {
 			log.Errorf("get org(id=%d) team failed, err(%s)", orgID, err)
 			continue

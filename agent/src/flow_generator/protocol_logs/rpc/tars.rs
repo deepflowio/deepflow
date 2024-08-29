@@ -24,7 +24,7 @@ use crate::{
     flow_generator::{
         error::Result,
         protocol_logs::{
-            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, ExtendedInfo},
+            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
             AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
@@ -282,7 +282,7 @@ impl TarsInfo {
                         | TARS_SERVER_NO_SERVANT_ERR
                         | TARS_SERVER_RESET_GRID
                         | TARS_SERVER_QUEUE_TIMEOUT
-                        | TARS_ASYNC_CALL_OR_INVOKE_TIMEOUT 
+                        | TARS_ASYNC_CALL_OR_INVOKE_TIMEOUT
                         | TARS_PROXY_CONNECT_ERR
                         | TARS_SERVER_UNKNOWN_ERR => {
                             info.resp_status = L7ResponseStatus::ServerError;
@@ -292,7 +292,7 @@ impl TarsInfo {
                             info.resp_status = L7ResponseStatus::Ok;
                         }
                     }
-                    
+                    info.endpoint = info.get_endpoint();
                 }
             },
             _ => return None,

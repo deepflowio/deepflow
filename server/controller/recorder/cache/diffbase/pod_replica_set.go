@@ -19,10 +19,10 @@ package diffbase
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 )
 
-func (b *DataSet) AddPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int) {
+func (b *DataSet) AddPodReplicaSet(dbItem *mysqlmodel.PodReplicaSet, seq int) {
 	b.PodReplicaSets[dbItem.Lcuuid] = &PodReplicaSet{
 		DiffBase: DiffBase{
 			Sequence: seq,

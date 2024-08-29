@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	controllercommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	servicecommon "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -54,9 +55,9 @@ type addtionalResourceToolDataSet struct {
 	additionalSubnets         []model.AdditionalResourceSubnet
 	additionalHosts           []model.AdditionalResourceHost
 	additionalCHosts          []model.AdditionalResourceChost
-	cloudTagCHosts            []mysql.VM
-	cloudTagPodNamespaces     []mysql.PodNamespace
-	subdomainPodNamespaces    []mysql.PodNamespace
+	cloudTagCHosts            []mysqlmodel.VM
+	cloudTagPodNamespaces     []mysqlmodel.PodNamespace
+	subdomainPodNamespaces    []mysqlmodel.PodNamespace
 	additionalLBs             []model.AdditionalResourceLB
 	peerConnectionRegionUUIDs []string
 	vpcUUIDToRegionUUID       map[string]string
@@ -91,10 +92,10 @@ func ApplyDomainAddtionalResource(reqData model.AdditionalResource, orgDB *mysql
 	return err
 }
 
-func fullUpdateDB(orgDB *mysql.DB, dbItems []mysql.DomainAdditionalResource) error {
+func fullUpdateDB(orgDB *mysql.DB, dbItems []mysqlmodel.DomainAdditionalResource) error {
 	err := orgDB.Transaction(func(tx *gorm.DB) error {
 		// Full update, delete all data before inserting
-		err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.DomainAdditionalResource{}).Error
+		err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.DomainAdditionalResource{}).Error
 		if err != nil {
 			return err
 		}
@@ -111,8 +112,8 @@ func fullUpdateDB(orgDB *mysql.DB, dbItems []mysql.DomainAdditionalResource) err
 	return nil
 }
 
-func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.AdditionalResource) ([]mysql.DomainAdditionalResource, error) {
-	var dbItems []mysql.DomainAdditionalResource
+func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.AdditionalResource) ([]mysqlmodel.DomainAdditionalResource, error) {
+	var dbItems []mysqlmodel.DomainAdditionalResource
 	for domainUUID, cloudMD := range domainUUIDToCloudModelData {
 		content, err := json.Marshal(cloudMD)
 		if err != nil {
@@ -122,7 +123,7 @@ func generateDataToInsertDB(domainUUIDToCloudModelData map[string]*cloudmodel.Ad
 			)
 		}
 
-		dbItem := mysql.DomainAdditionalResource{
+		dbItem := mysqlmodel.DomainAdditionalResource{
 			Domain:            domainUUID,
 			CompressedContent: content,
 		}
@@ -871,7 +872,7 @@ func generateCloudModelData(orgID int, domainUUIDToToolDataSet map[string]*addti
 }
 
 func getRegionDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]string, error) {
-	var dbItems []mysql.Domain
+	var dbItems []mysqlmodel.Domain
 	err := orgDB.Where("lcuuid IN (?)", domainUUIDs).Find(&dbItems).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -895,7 +896,7 @@ func getRegionDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]stri
 }
 
 func getAZDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string, error) {
-	var azs []mysql.AZ
+	var azs []mysqlmodel.AZ
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -911,7 +912,7 @@ func getAZDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string
 }
 
 func getVPCDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string, error) {
-	var vpcs []mysql.VPC
+	var vpcs []mysqlmodel.VPC
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -927,7 +928,7 @@ func getVPCDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string][]strin
 }
 
 func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]int, map[string]map[string]map[string]string, error) {
-	var subnets []mysql.Network
+	var subnets []mysqlmodel.Network
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&subnets).Error
 	if err != nil {
 		return nil, nil, servicecommon.NewError(
@@ -946,7 +947,7 @@ func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[
 		domainUUIDToSubnetInfoMap[subnet.Domain][subnet.Lcuuid] = subnet.NetType
 
 		subnetCIDRToUUID := make(map[string]string)
-		var subnetCIDRs []mysql.Subnet
+		var subnetCIDRs []mysqlmodel.Subnet
 		err := orgDB.Where("vl2id = ?", subnet.ID).Find(&subnetCIDRs).Error
 		if err != nil {
 			return nil, nil, servicecommon.NewError(
@@ -970,7 +971,7 @@ func getSubnetDataFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[
 }
 
 func getDataInfoFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]string, error) {
-	var hosts []mysql.Host
+	var hosts []mysqlmodel.Host
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&hosts).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -1023,8 +1024,8 @@ func isIPInCIDR(cidr, ip string) bool {
 	return c.Contains(i)
 }
 
-func getCHostsFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysql.VM, error) {
-	var chosts []mysql.VM
+func getCHostsFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysqlmodel.VM, error) {
+	var chosts []mysqlmodel.VM
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&chosts).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -1032,18 +1033,18 @@ func getCHostsFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[stri
 			fmt.Sprintf("db query vm failed: %s", err.Error()),
 		)
 	}
-	domainUUIDToCHostNameToInfo := make(map[string]map[string]mysql.VM)
+	domainUUIDToCHostNameToInfo := make(map[string]map[string]mysqlmodel.VM)
 	for _, chost := range chosts {
 		if _, ok := domainUUIDToCHostNameToInfo[chost.Domain]; !ok {
-			domainUUIDToCHostNameToInfo[chost.Domain] = make(map[string]mysql.VM)
+			domainUUIDToCHostNameToInfo[chost.Domain] = make(map[string]mysqlmodel.VM)
 		}
 		domainUUIDToCHostNameToInfo[chost.Domain][chost.Name] = chost
 	}
 	return domainUUIDToCHostNameToInfo, nil
 }
 
-func getPodNamespaceFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysql.PodNamespace, error) {
-	var podNamespaces []mysql.PodNamespace
+func getPodNamespaceFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysqlmodel.PodNamespace, error) {
+	var podNamespaces []mysqlmodel.PodNamespace
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&podNamespaces).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -1051,18 +1052,18 @@ func getPodNamespaceFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]ma
 			fmt.Sprintf("db query pod_namespace failed: %s", err),
 		)
 	}
-	domainUUIDToPodNSNameToInfo := make(map[string]map[string]mysql.PodNamespace)
+	domainUUIDToPodNSNameToInfo := make(map[string]map[string]mysqlmodel.PodNamespace)
 	for _, podNamespace := range podNamespaces {
 		if _, ok := domainUUIDToPodNSNameToInfo[podNamespace.Domain]; !ok {
-			domainUUIDToPodNSNameToInfo[podNamespace.Domain] = make(map[string]mysql.PodNamespace)
+			domainUUIDToPodNSNameToInfo[podNamespace.Domain] = make(map[string]mysqlmodel.PodNamespace)
 		}
 		domainUUIDToPodNSNameToInfo[podNamespace.Domain][podNamespace.Name] = podNamespace
 	}
 	return domainUUIDToPodNSNameToInfo, nil
 }
 
-func getPodNamespaceInSubdomainFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysql.PodNamespace, error) {
-	var podNamespaces []mysql.PodNamespace
+func getPodNamespaceInSubdomainFromDB(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]mysqlmodel.PodNamespace, error) {
+	var podNamespaces []mysqlmodel.PodNamespace
 	err := orgDB.Where("domain IN (?) and sub_domain != ''", domainUUIDs).Find(&podNamespaces).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -1070,10 +1071,10 @@ func getPodNamespaceInSubdomainFromDB(orgDB *mysql.DB, domainUUIDs []string) (ma
 			fmt.Sprintf("db query pod_namespace failed: %s", err),
 		)
 	}
-	subdomainUUIDToPodNSNameToInfo := make(map[string]map[string]mysql.PodNamespace)
+	subdomainUUIDToPodNSNameToInfo := make(map[string]map[string]mysqlmodel.PodNamespace)
 	for _, podNamespace := range podNamespaces {
 		if _, ok := subdomainUUIDToPodNSNameToInfo[podNamespace.SubDomain]; !ok {
-			subdomainUUIDToPodNSNameToInfo[podNamespace.SubDomain] = make(map[string]mysql.PodNamespace)
+			subdomainUUIDToPodNSNameToInfo[podNamespace.SubDomain] = make(map[string]mysqlmodel.PodNamespace)
 		}
 		subdomainUUIDToPodNSNameToInfo[podNamespace.SubDomain][podNamespace.Name] = podNamespace
 	}
@@ -1129,7 +1130,7 @@ func GetDomainAdditionalResourceExample() (string, error) {
 }
 
 func getPeerConnectionDomainToRegionUUIDs(orgDB *mysql.DB, domainUUIDs []string) (map[string][]string, error) {
-	var azs []mysql.AZ
+	var azs []mysqlmodel.AZ
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&azs).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
@@ -1147,7 +1148,7 @@ func getPeerConnectionDomainToRegionUUIDs(orgDB *mysql.DB, domainUUIDs []string)
 }
 
 func getVPCUUIDToRegionUUID(orgDB *mysql.DB, domainUUIDs []string) (map[string]map[string]string, error) {
-	var vpcs []mysql.VPC
+	var vpcs []mysqlmodel.VPC
 	err := orgDB.Where("domain IN (?)", domainUUIDs).Find(&vpcs).Error
 	if err != nil {
 		return nil, servicecommon.NewError(
