@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: fixes recorder cache log level error [#7974](https://github.com/deepflowio/deepflow/pull/7974) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: agent - eBPF Remove the handling of redundant process events [#7978](https://github.com/deepflowio/deepflow/pull/7978) by [yinjiping](https://github.com/yinjiping)
 * fix: add libpcap to deb package [#7967](https://github.com/deepflowio/deepflow/pull/7967) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: delete agent group [#7963](https://github.com/deepflowio/deepflow/pull/7963) by [roryye](https://github.com/roryye)
