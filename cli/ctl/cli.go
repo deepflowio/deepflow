@@ -69,6 +69,7 @@ func Execute(version string) {
 	root.AddCommand(RegisterPluginCommand())
 	root.AddCommand(RegisterPrometheusCommand())
 	root.AddCommand(RegisterPromQLCommand())
+	//root.AddCommand(AgentCheckRegisterCommand())
 
 	cmd.RegisterIngesterCommand(root)
 
