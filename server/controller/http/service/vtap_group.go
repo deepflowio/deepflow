@@ -468,7 +468,11 @@ func (a *AgentGroup) Delete(lcuuid string) (resp map[string]string, err error) {
 		if err = db.Delete(&vtapGroup).Error; err != nil {
 			return err
 		}
-		return db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agentconf.AgentGroupConfigModel{}).Error
+		// TODO remove after vtap_group_config is deprecated
+		if err = db.Where("vtap_group_lcuuid = ?", lcuuid).Delete(&agentconf.AgentGroupConfigModel{}).Error; err != nil {
+			return err
+		}
+		return db.Where("agent_group_lcuuid = ?", lcuuid).Delete(&agentconf.MySQLAgentGroupConfiguration{}).Error
 	})
 	if err != nil {
 		return nil, err
