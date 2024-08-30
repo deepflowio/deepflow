@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - eBPF fentry/fexit Check for '__sys_recvmmsg' [#8014](https://github.com/deepflowio/deepflow/pull/8014) by [yinjiping](https://github.com/yinjiping)
+* fix: resource label errors for non-default organization resource change events [#8008](https://github.com/deepflowio/deepflow/pull/8008) by [lzf575](https://github.com/lzf575)
+* fix: controller records unnecessary error logs [#7995](https://github.com/deepflowio/deepflow/pull/7995) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: querier converts types when using dictget [#7997](https://github.com/deepflowio/deepflow/pull/7997) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: if using ByConity database storage, no need to deal with _local tables [#7993](https://github.com/deepflowio/deepflow/pull/7993) by [lzf575](https://github.com/lzf575)
 * fix: aarch64 musl compilation [#7992](https://github.com/deepflowio/deepflow/pull/7992) by [rvql](https://github.com/rvql)
@@ -168,6 +171,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: querier converts types when using dictget [#8012](https://github.com/deepflowio/deepflow/pull/8012) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: switch ClickHouse endpoint without restart [#7969](https://github.com/deepflowio/deepflow/pull/7969) by [lzf575](https://github.com/lzf575)
 * feat: add pod_cluster info in vtap api [#7984](https://github.com/deepflowio/deepflow/pull/7984) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: Support configuring DWARF memory consumption [#7983](https://github.com/deepflowio/deepflow/pull/7983) by [rvql](https://github.com/rvql)
 * feat: support tcp packet reassembly [#7939](https://github.com/deepflowio/deepflow/pull/7939) by [yuanchaoa](https://github.com/yuanchaoa)
