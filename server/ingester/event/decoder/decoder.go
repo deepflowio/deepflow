@@ -57,15 +57,14 @@ type Counter struct {
 }
 
 type Decoder struct {
-	index             int
-	eventType         common.EventType
-	resourceInfoTable *ResourceInfoTable
-	platformData      *grpc.PlatformInfoTable
-	inQueue           queue.QueueReader
-	eventWriter       *dbwriter.EventWriter
-	exporters         *exporters.Exporters
-	debugEnabled      bool
-	config            *config.Config
+	index        int
+	eventType    common.EventType
+	platformData *grpc.PlatformInfoTable
+	inQueue      queue.QueueReader
+	eventWriter  *dbwriter.EventWriter
+	exporters    *exporters.Exporters
+	debugEnabled bool
+	config       *config.Config
 
 	orgId, teamId uint16
 
@@ -89,20 +88,15 @@ func NewDecoder(
 			controllers[i] = controllers[i].To4()
 		}
 	}
-	var resourceInfoTable *ResourceInfoTable
-	if eventType == common.RESOURCE_EVENT {
-		resourceInfoTable = NewResourceInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize)
-	}
 	return &Decoder{
-		eventType:         eventType,
-		resourceInfoTable: resourceInfoTable,
-		platformData:      platformData,
-		inQueue:           inQueue,
-		debugEnabled:      log.IsEnabledFor(logging.DEBUG),
-		eventWriter:       eventWriter,
-		exporters:         exporters,
-		config:            config,
-		counter:           &Counter{},
+		eventType:    eventType,
+		platformData: platformData,
+		inQueue:      inQueue,
+		debugEnabled: log.IsEnabledFor(logging.DEBUG),
+		eventWriter:  eventWriter,
+		exporters:    exporters,
+		config:       config,
+		counter:      &Counter{},
 	}
 }
 
@@ -114,9 +108,6 @@ func (d *Decoder) GetCounter() interface{} {
 
 func (d *Decoder) Run() {
 	log.Infof("event (%s) decoder run", d.eventType)
-	if d.resourceInfoTable != nil {
-		d.resourceInfoTable.Start()
-	}
 	ingestercommon.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"event_type": d.eventType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
@@ -343,11 +334,11 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	podGroupType := uint8(0)
 	if event.IfNeedTagged {
 		s.Tagged = 1
-		resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.InstanceType, event.InstanceID)
+		resourceInfo := d.platformData.QueryResourceInfo(s.OrgId, event.InstanceType, event.InstanceID)
 		if resourceInfo != nil {
 			s.RegionID = uint16(resourceInfo.RegionID)
 			s.AZID = uint16(resourceInfo.AZID)
-			s.L3EpcID = resourceInfo.L3EpcID
+			s.L3EpcID = resourceInfo.EpcID
 			s.HostID = uint16(resourceInfo.HostID)
 			s.PodID = resourceInfo.PodID
 			s.PodNodeID = resourceInfo.PodNodeID
@@ -355,8 +346,8 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 			s.PodClusterID = uint16(resourceInfo.PodClusterID)
 			s.PodGroupID = resourceInfo.PodGroupID
 			podGroupType = resourceInfo.PodGroupType
-			s.L3DeviceType = uint8(resourceInfo.L3DeviceType)
-			s.L3DeviceID = resourceInfo.L3DeviceID
+			s.L3DeviceType = uint8(resourceInfo.DeviceType)
+			s.L3DeviceID = resourceInfo.DeviceID
 		}
 	} else {
 		s.Tagged = 0
