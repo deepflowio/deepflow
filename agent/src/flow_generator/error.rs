@@ -105,6 +105,10 @@ pub enum Error {
     SoParseFail,
     #[error("{proto:?} log parse failed: {reason}")]
     L7LogParseFailed { proto: L7Protocol, reason: String },
+    #[error("insufficient payload length")]
+    InsufficientPayloadLength,
+    #[error("unsupported SOME/IP message type")]
+    SomeIpUnsupportedMessageType,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

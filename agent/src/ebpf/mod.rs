@@ -63,6 +63,8 @@ pub const SOCK_DATA_FASTCGI: u16 = 44;
 #[allow(dead_code)]
 pub const SOCK_DATA_BRPC: u16 = 45;
 #[allow(dead_code)]
+pub const SOCK_DATA_SOME_IP: u16 = 47;
+#[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
 pub const SOCK_DATA_POSTGRESQL: u16 = 61;

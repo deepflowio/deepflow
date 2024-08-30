@@ -264,6 +264,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "Dubbo";
 	case PROTO_SOFARPC:
 		return "SofaRPC";
+	case PROTO_SOME_IP:
+		return "Some/IP";
 	case PROTO_POSTGRESQL:
 		return "PgSQL";
 	case PROTO_ORACLE:

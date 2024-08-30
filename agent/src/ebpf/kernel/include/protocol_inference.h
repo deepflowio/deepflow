@@ -63,7 +63,7 @@ static __inline bool is_nginx_process(void)
 
 static __inline bool is_set_ports_bitmap(ports_bitmap_t * ports, __u16 port)
 {
-	/* 
+	/*
 	 * Avoid using the form `ports->bitmap[port >> 3]` to index the
 	 * bitmap, as it may lead to the following error:
 	 *
@@ -535,7 +535,7 @@ static __inline enum message_type parse_http2_headers_frame(const char
 			continue;
 
 		/*
-		 * ref : https://datatracker.ietf.org/doc/html/rfc7541#appendix-A 
+		 * ref : https://datatracker.ietf.org/doc/html/rfc7541#appendix-A
 		 * Static Table Entries:
 		 * +-------+-----------------------------+---------------+
 		 * | Index | Header Name                 | Header Value  |
@@ -669,7 +669,7 @@ static __inline void check_and_fetch_prev_data(struct conn_info_s *conn_info)
 			 * When data is merged, that is, when two or more data with the same
 			 * direction are merged together and processed as one data, the previously
 			 * saved direction needs to be restored.
-			 * 
+			 *
 			 * At the beginning of the inference stage, 'socket_info_ptr->direction'
 			 * represents the direction of the previously sent data. During the final
 			 * data transmission stage, it will be updated to reflect the direction of
@@ -773,7 +773,7 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	 *       - Command: Query (3)
 	 *       - Statement: show databases
 	 */
-	
+
 	if (count != (len + 4))
 		return MSG_UNKNOWN;
 
@@ -1125,7 +1125,7 @@ static __inline enum message_type infer_sofarpc_message(const char *buf,
 	 * source code, it is found that the configuration value of
 	 * SerializerManager is Hessian2 = 1, meaning Hessian2 is used by
 	 * default for serialization and deserialization.
-	 * 
+	 *
 	 * 0 -- "hessian", 1 -- "hessian2", 11 -- "protobuf", 12 -- "json"
 	 */
 	__u8 codec = infer_buf[9];
@@ -1397,7 +1397,7 @@ static __inline enum message_type infer_redis_message(const char *buf,
 
 	// The redis message must contain /r/n.
 	// Due to the limitation of eBPF, only the first 20 bytes are checked.
-	// The position where the error type /r/n appears may exceed 20 bytes. 
+	// The position where the error type /r/n appears may exceed 20 bytes.
 	// Therefore, the error type is not checked
 	if (first_byte != '-' && !is_include_crlf(buf))
 		return MSG_UNKNOWN;
@@ -1414,11 +1414,11 @@ static __inline enum message_type infer_redis_message(const char *buf,
 // 伪代码参考自
 // http://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html?spm=a2c4g.11186623.0.0.76157c1cveWwvz
 //
-// multiplier = 1 
-// value = 0 
-// do 
-//   digit = 'next digit from stream' 
-//   value += (digit AND 127) * multiplier 
+// multiplier = 1
+// value = 0
+// do
+//   digit = 'next digit from stream'
+//   value += (digit AND 127) * multiplier
 //   multiplier *= 128
 // while ((digit AND 128) != 0)
 static __inline bool mqtt_decoding_length(const __u8 * buffer, int *length,
@@ -2815,6 +2815,92 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+/*
+ * Reference: https://www.autosar.org/fileadmin/standards/R22-11/FO/AUTOSAR_PRS_SOMEIPProtocol.pdf
+ *
+ * 0                                                                   32
+ * +-------------------------------------------------------------------+
+ * |              Message ID (Service ID / Method ID)                  |
+ * +-------------------------------------------------------------------+
+ * |                             Length                                |
+ * +-------------------------------------------------------------------+
+ * |             Request ID (Client ID / Session ID)                   |
+ * +------------------+-------------------+--------------+-------------+
+ * | Protocol Version | Interface Version | Message Type | Return Code |
+ * +------------------+-------------------+--------------+-------------+
+ * | Payload ...                                                       |
+ * +-------------------------------------------------------------------+
+ *
+ * If the following conditions are met, it will be judged as Some/IP protocol:
+ * - Protocol Version must be 1
+ * - Message Type must be REQUEST
+ * - Return Code must be 0
+ * - Length Must be equal to payload length - 8
+ *
+ */
+static __inline enum message_type infer_some_ip_request(const char *buf, size_t count,
+						      struct conn_info_s *conn_info)
+{
+#define MESSAGE_TYPE_REQUEST 0
+#define MESSAGE_TYPE_REQUEST_NO_RETURN 1
+#define MESSAGE_TYPE_TP_REQUEST 0x20
+#define MESSAGE_TYPE_TP_REQUEST_NO_RETURN 0x21
+
+	const __s32 length = __bpf_ntohl(*(__s32 *) (buf + 4));
+	const __s32 message_type = buf[14];
+	const __s32 return_code = buf[15];
+
+	if (message_type != MESSAGE_TYPE_REQUEST && message_type != MESSAGE_TYPE_REQUEST &&
+		message_type != MESSAGE_TYPE_TP_REQUEST && message_type != MESSAGE_TYPE_TP_REQUEST_NO_RETURN) {
+		return MSG_UNKNOWN;
+	}
+
+	if (return_code == 0 && length == count - 8) {
+		conn_info->role =
+			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+		return MSG_REQUEST;
+	}
+
+	return MSG_UNKNOWN;
+}
+
+static __inline enum message_type infer_some_ip_message(const char *buf,
+						      size_t count,
+						      struct conn_info_s
+						      *conn_info)
+{
+#define SOME_IP_HEADER_SIZE 16
+	if (!protocol_port_check_2(PROTO_SOME_IP, conn_info))
+		return MSG_UNKNOWN;
+
+	if (count < SOME_IP_HEADER_SIZE)
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_SOME_IP)
+			return MSG_UNKNOWN;
+
+		conn_info->role = conn_info->socket_info_ptr->role;
+
+		if ((conn_info->role == ROLE_CLIENT
+			&& conn_info->direction == T_EGRESS)
+			|| (conn_info->role == ROLE_SERVER
+			&& conn_info->direction == T_INGRESS)) {
+			return MSG_REQUEST;
+		}
+
+		return MSG_RESPONSE;
+	}
+
+	enum message_type msg_type =
+	    infer_some_ip_request(buf, count, conn_info);
+	if (msg_type == MSG_REQUEST) {
+		return MSG_REQUEST;
+	}
+
+	return MSG_UNKNOWN;
+}
+
 struct fastcgi_header {
 	__u8 version;
 	__u8 type;
@@ -3015,7 +3101,7 @@ infer_mongo_message(const char *buf, size_t count,
  *    1 bytes content_type: 0x16
  *    2 bytes version: 0x0301 for TLS 1.0; 0x0303 for TLS 1.2
  *    2 bytes Length
- * 
+ *
  * This header may be followed by another TLS header, such as a TLS Handshake header.
  * Handshake Protocol:
  *    1 bytes   handshake_type:
@@ -3063,7 +3149,7 @@ infer_mongo_message(const char *buf, size_t count,
  *
  * 9.The server sends a Change Cipher Spec (ontent_Type:0x14, length; 0x01)
  * 10.The server sends a Encrypted Handshake Message (content_type 0x16)
- *    The TLS handshake is concluded with the two parties sending a hash of the complete handshake exchange, 
+ *    The TLS handshake is concluded with the two parties sending a hash of the complete handshake exchange,
  * 11.The client and the server can communicate by exchanging encrypted Application Data messages (content_type 0x17)
  *
  * client test data:
@@ -3176,7 +3262,7 @@ check:
 	      handshake.content_type == 0x14 || handshake.content_type == 0x15))
 		return MSG_UNKNOWN;
 
-	/* 
+	/*
 	 * version check:
 	 *   0x0301 for TLS 1.0;
 	 *   0x0302 for TLS 1.1;
@@ -3213,7 +3299,7 @@ check:
 	 * (4) handshake_type 0xc (server key exchange message)
 	 * (5) handshake_type 0xe (server hello done message)
 	 *
-	 * We want to merge (1) and (2) to obtain the desired data. 
+	 * We want to merge (1) and (2) to obtain the desired data.
 	 * (3), (4), and (5) are only the server's responses and are
 	 * not involved in aggregation; they are not the data we need.
 	 */
@@ -3383,6 +3469,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_BRPC;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_SOME_IP && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_some_ip_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_SOME_IP;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_POSTGRESQL && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -3536,7 +3630,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 	/*
 	 * If the current port number is configured for the TLS protocol.
 	 * If the data source comes from kernel system calls, it is discarded
-	 * directly because some kernel probes do not handle TLS data. 
+	 * directly because some kernel probes do not handle TLS data.
 	 */
 	if (protocol_port_check_1(PROTO_TLS, conn_info) &&
 	    extra->source == DATA_SOURCE_SYSCALL) {
@@ -3671,6 +3765,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 				if (inferred_message.type == MSG_PRESTORE)
 					return inferred_message;
 				inferred_message.protocol = PROTO_KAFKA;
+				return inferred_message;
+			}
+			break;
+		case PROTO_SOME_IP:
+			if ((inferred_message.type =
+			     infer_some_ip_message(infer_buf, count,
+						 conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_SOME_IP;
 				return inferred_message;
 			}
 			break;

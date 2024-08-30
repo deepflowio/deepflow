@@ -2267,7 +2267,6 @@ name = "l7"
 version = "0.1.0"
 dependencies = [
  "bitflags 1.3.2",
- "public",
  "serde",
 ]
 

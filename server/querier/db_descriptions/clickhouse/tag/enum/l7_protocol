@@ -8,6 +8,7 @@
 44      , FastCGI         ,
 45      , bRPC            ,
 46      , Tars            ,
+47      , Some/IP         ,
 60      , MySQL           ,
 61      , PostgreSQL      ,
 62      , Oracle          ,
