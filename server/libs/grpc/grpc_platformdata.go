@@ -194,6 +194,12 @@ type PlatformInfoTable struct {
 
 	peerConnections [MAX_ORG_COUNT]map[int32][]int32
 
+	// resource event infos
+	resourceInfos [MAX_ORG_COUNT]map[uint64]*Info
+	podNodeInfos  [MAX_ORG_COUNT]map[uint32]*Info
+	hostInfos     [MAX_ORG_COUNT]map[uint32]*Info
+	vmInfos       [MAX_ORG_COUNT]map[uint32]*Info
+
 	*GrpcSession
 
 	counter *Counter
@@ -377,6 +383,21 @@ func (t *PlatformInfoTable) QueryService(orgId uint16, podID, podNodeID, podClus
 	return t.ServiceTable[orgId].QueryService(podID, podNodeID, podClusterID, podGroupID, epcID, isIPv6, ipv4, ipv6, protocol, serverPort)
 }
 
+func (t *PlatformInfoTable) QueryResourceInfo(orgId uint16, resourceType uint32, resourceID uint32) *Info {
+	switch trident.DeviceType(resourceType) {
+	case trident.DeviceType_DEVICE_TYPE_POD:
+		return t.podIDInfos[orgId][resourceID]
+	case trident.DeviceType_DEVICE_TYPE_POD_NODE:
+		return t.podNodeInfos[orgId][resourceID]
+	case trident.DeviceType_DEVICE_TYPE_HOST_DEVICE:
+		return t.hostInfos[orgId][resourceID]
+	case trident.DeviceType_DEVICE_TYPE_VM:
+		return t.vmInfos[orgId][resourceID]
+	default:
+		return t.resourceInfos[orgId][uint64(resourceType)<<32|uint64(resourceID)]
+	}
+}
+
 type PlatformDataManager struct {
 	masterTable       *PlatformInfoTable
 	tableLock         sync.Mutex
@@ -478,6 +499,11 @@ func NewPlatformInfoTable(ips []net.IP, port, index, rpcMaxMsgSize int, moduleNa
 		table.containerMissCount[i] = make(map[string]*uint64)
 		table.containerHitCount[i] = make(map[string]*uint64)
 		table.peerConnections[i] = make(map[int32][]int32)
+
+		table.resourceInfos[i] = make(map[uint64]*Info)
+		table.podNodeInfos[i] = make(map[uint32]*Info)
+		table.hostInfos[i] = make(map[uint32]*Info)
+		table.vmInfos[i] = make(map[uint32]*Info)
 	}
 
 	runOnce := func() {
@@ -1040,8 +1066,17 @@ func (t *PlatformInfoTable) updatePlatformData(orgId uint16, platformData *tride
 	newEpcIDIPV6CidrInfos := make(map[int32][]*CidrInfo)
 	newEpcIDPodInfos := make(map[uint32]*Info)
 
+	newResourceInfos := make(map[uint64]*Info)
+	newPodNodeInfos := make(map[uint32]*Info)
+	newHostInfos := make(map[uint32]*Info)
+	newVmInfos := make(map[uint32]*Info)
+
 	for _, intf := range platformData.GetInterfaces() {
-		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos, newMacInfos, newEpcIDBaseInfos, newEpcIDPodInfos, intf)
+		updateInterfaceInfos(newEpcIDIPV4Infos, newEpcIDIPV6Infos,
+			newMacInfos, newResourceInfos,
+			newEpcIDBaseInfos,
+			newEpcIDPodInfos, newPodNodeInfos, newHostInfos, newVmInfos,
+			intf)
 	}
 	for _, cidr := range platformData.GetCidrs() {
 		updateCidrInfos(newEpcIDIPV4CidrInfos, newEpcIDIPV6CidrInfos, newEpcIDBaseInfos, cidr)
@@ -1072,6 +1107,11 @@ func (t *PlatformInfoTable) updatePlatformData(orgId uint16, platformData *tride
 	t.containerMissCount[orgId] = make(map[string]*uint64)
 
 	t.podIDInfosPlatformData[orgId] = newEpcIDPodInfos
+
+	t.resourceInfos[orgId] = newResourceInfos
+	t.podNodeInfos[orgId] = newPodNodeInfos
+	t.hostInfos[orgId] = newHostInfos
+	t.vmInfos[orgId] = newVmInfos
 }
 
 func (t *PlatformInfoTable) updateOthers(orgId uint16, response *trident.SyncResponse) {
@@ -1139,6 +1179,11 @@ func (t *PlatformInfoTable) ReloadSlave(orgId uint16) error {
 
 		t.versionPlatformData[orgId] = newVersion
 		t.otherRegionCount[orgId] = 0
+
+		t.resourceInfos[orgId] = masterTable.resourceInfos[orgId]
+		t.podNodeInfos[orgId] = masterTable.podNodeInfos[orgId]
+		t.hostInfos[orgId] = masterTable.hostInfos[orgId]
+		t.vmInfos[orgId] = masterTable.vmInfos[orgId]
 	}
 	t.vtapIdInfos[orgId] = masterTable.vtapIdInfos[orgId]
 	t.orgIds = masterTable.orgIds
@@ -1413,7 +1458,7 @@ func updateCidrInfos(IPV4CidrInfos, IPV6CidrInfos map[int32][]*CidrInfo, epcIDBa
 	}
 }
 
-func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, podIDInfos map[uint32]*Info, intf *trident.Interface) {
+func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[EpcIDIPV6_LEN]byte]*Info, macInfos, resourceInfos map[uint64]*Info, epcIDBaseInfos map[int32]*BaseInfo, podIDInfos, podNodeInfos, hostInfos, vmInfos map[uint32]*Info, intf *trident.Interface) {
 	// intf.GetEpcId() in range (0,64000], when convert to int32, 0 need convert to datatype.EPC_FROM_INTERNET
 	epcID := int32(intf.GetEpcId())
 	// 由于doc中epcID为-2，对应trisolaris的epcID为0.故在此统一将收到epcID为0的，修改为-2，便于doc数据查找
@@ -1557,6 +1602,47 @@ func updateInterfaceInfos(epcIDIPV4Infos map[uint64]*Info, epcIDIPV6Infos map[[E
 			VtapID:       vtapId,
 			HitCount:     new(uint64),
 		}
+	}
+
+	resourceInfo := &Info{
+		EpcID:        epcID,
+		HostID:       hostID,
+		RegionID:     regionID,
+		DeviceType:   deviceType,
+		DeviceID:     deviceID,
+		PodNodeID:    podNodeID,
+		PodNSID:      podNSID,
+		PodGroupID:   podGroupID,
+		PodGroupType: podGroupType,
+		PodID:        podID,
+		PodClusterID: podClusterID,
+		AZID:         azID,
+	}
+	resourceInfos[uint64(deviceType)<<32|uint64(deviceID)] = resourceInfo
+
+	podNodeInfo := &Info{
+		EpcID:      epcID,
+		HostID:     hostID,
+		RegionID:   regionID,
+		DeviceType: deviceType,
+		DeviceID:   deviceID,
+		PodNodeID:  podNodeID,
+		AZID:       azID,
+	}
+	podNodeInfos[podNodeID] = podNodeInfo
+
+	hostInfo := &Info{
+		EpcID:      epcID,
+		HostID:     hostID,
+		RegionID:   regionID,
+		DeviceType: deviceType,
+		DeviceID:   deviceID,
+		AZID:       azID,
+	}
+	hostInfos[hostID] = hostInfo
+
+	if deviceType == uint32(trident.DeviceType_DEVICE_TYPE_VM) {
+		vmInfos[deviceID] = hostInfo
 	}
 }
 
