@@ -35,14 +35,14 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 )
 
-type AgentGroupConfig struct {
+type VtapGroupConfig struct {
 	cfg *config.ControllerConfig
 
 	resourceAccess *ResourceAccess
 }
 
-func NewAgentGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *AgentGroupConfig {
-	return &AgentGroupConfig{
+func NewVTapGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerConfig) *VtapGroupConfig {
+	return &VtapGroupConfig{
 		cfg:            cfg,
 		resourceAccess: &ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
 	}
@@ -506,7 +506,7 @@ func convertToDb(sData *agent_config.AgentGroupConfig, tData *agent_config.Agent
 	}
 }
 
-func (a *AgentGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
+func (a *VtapGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -543,7 +543,7 @@ func (a *AgentGroupConfig) CreateVTapGroupConfig(orgID int, createData *agent_co
 	return dbData, nil
 }
 
-func (a *AgentGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*agent_config.AgentGroupConfigModel, error) {
+func (a *VtapGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*agent_config.AgentGroupConfigModel, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -571,7 +571,7 @@ func (a *AgentGroupConfig) DeleteVTapGroupConfig(orgID int, lcuuid string) (*age
 	return dbConfig, nil
 }
 
-func (a *AgentGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updateData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
+func (a *VtapGroupConfig) UpdateVTapGroupConfig(orgID int, lcuuid string, updateData *agent_config.AgentGroupConfig) (*agent_config.AgentGroupConfigModel, error) {
 	dbInfo, err := mysql.GetDB(orgID)
 	if err != nil {
 		return nil, err
