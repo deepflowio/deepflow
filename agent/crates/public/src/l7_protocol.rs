@@ -49,6 +49,7 @@ pub enum L7Protocol {
     FastCGI = 44,
     Brpc = 45,
     Tars = 46,
+    SomeIp = 47,
 
     // SQL
     MySQL = 60,
@@ -87,6 +88,7 @@ impl L7Protocol {
             | Self::Kafka
             | Self::Dubbo
             | Self::SofaRPC
+            | Self::SomeIp
             | Self::Custom => true,
             _ => false,
         }
@@ -121,6 +123,7 @@ impl From<String> for L7Protocol {
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
             "tls" => Self::TLS,
+            "some/ip" | "someip" => Self::SomeIp,
             _ => Self::Unknown,
         }
     }

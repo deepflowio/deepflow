@@ -17,6 +17,7 @@
 mod brpc;
 mod dubbo;
 mod sofa_rpc;
+mod some_ip;
 mod tars;
 
 pub use brpc::{BrpcInfo, BrpcLog};
@@ -24,4 +25,5 @@ pub use dubbo::{DubboInfo, DubboLog};
 pub use sofa_rpc::{
     decode_new_rpc_trace_context_with_type, SofaRpcInfo, SofaRpcLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
+pub use some_ip::{SomeIpInfo, SomeIpLog};
 pub use tars::{TarsInfo, TarsLog};
