@@ -3027,7 +3027,7 @@ inputs:
       # description:
       #   en: |-
       #     Used when deepflow-agent has only one k8s namespace query permission.
-      #   en: |-
+      #   ch: |-
       #     TODO
       # upgrade_from: static_config.kubernetes-namespace
       # TODO: 英文释义待明确。
@@ -4339,7 +4339,7 @@ processors:
         #     Used to extract the SpanID field in HTTP and RPC headers, supports filling
         #     in multiple values separated by commas. This feature can be turned off by
         #     setting it to empty.
-         #   ch: |-
+        #   ch: |-
         #     配置该参数后，deepflow-agent 会尝试从 HTTP 和 RPC header 中匹配特征字段，并将匹配到
         #     的结果填充到应用调用日志的`span_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
         #     特征字段，中间用`,`分隔。

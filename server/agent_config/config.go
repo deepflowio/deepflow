@@ -21,6 +21,9 @@ import _ "embed"
 //go:embed example.yaml
 var YamlAgentGroupConfig []byte
 
+//go:embed template.yaml
+var YamlAgentGroupConfigTemplate []byte
+
 type AgentGroupConfig struct {
 	VTapGroupID                       *string       `json:"VTAP_GROUP_ID" yaml:"vtap_group_id,omitempty"`
 	VTapGroupLcuuid                   *string       `json:"VTAP_GROUP_LCUUID" yaml:"vtap_group_lcuuid,omitempty"`
