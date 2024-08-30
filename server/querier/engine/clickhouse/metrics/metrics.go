@@ -522,14 +522,14 @@ func GetPrometheusSingleTagTranslator(tag, table, orgID string) (string, string,
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				labelType = "app"
-				TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (%d, toUInt64(app_label_value_id_%d)))", labelNameID, appLabel.AppLabelColumnIndex)
+				TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (toUInt64(%d), toUInt64(app_label_value_id_%d)))", labelNameID, appLabel.AppLabelColumnIndex)
 				break
 			}
 		}
 	}
 	if !isAppLabel {
 		labelType = "target"
-		TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.target_label_map', 'label_value', (%d, %d, toUInt64(target_id)))", metricID, labelNameID)
+		TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.target_label_map', 'label_value', (toUInt64(%d), toUInt64(%d), toUInt64(target_id)))", metricID, labelNameID)
 	}
 	return TagTranslatorStr, labelType, nil
 }
@@ -542,7 +542,7 @@ func GetPrometheusAllTagTranslator(table, orgID string) (string, error) {
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
 			if labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[appLabel.AppLabelName]; ok {
-				appLabelTranslator := fmt.Sprintf("'%s',dictGet('flow_tag.app_label_map', 'label_value', (%d, toUInt64(app_label_value_id_%d)))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
+				appLabelTranslator := fmt.Sprintf("'%s',dictGet('flow_tag.app_label_map', 'label_value', (toUInt64(%d), toUInt64(app_label_value_id_%d)))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 			}
 		}
