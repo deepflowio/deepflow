@@ -18,6 +18,7 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -79,6 +80,11 @@ func StatusForbiddenResponse(c *gin.Context, description string) {
 }
 
 func JsonResponse(c *gin.Context, data interface{}, err error) {
+	if _, ok := data.([]byte); ok {
+		bytesResponse(c, data, err)
+		return
+	}
+
 	if err != nil {
 		switch t := err.(type) {
 		case *servicecommon.ServiceError:
@@ -105,5 +111,46 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 		}
 	} else {
 		HttpResponse(c, 200, data, httpcommon.SUCCESS, "")
+	}
+}
+
+func bytesResponse(c *gin.Context, data interface{}, err error) {
+	if err != nil {
+		switch t := err.(type) {
+		case *servicecommon.ServiceError:
+			switch t.Status {
+			case httpcommon.NO_PERMISSIONS:
+				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
+				c.Data(http.StatusForbidden, gin.MIMEJSON, []byte(d))
+			case httpcommon.RESOURCE_NOT_FOUND, httpcommon.INVALID_POST_DATA, httpcommon.RESOURCE_NUM_EXCEEDED,
+				httpcommon.SELECTED_RESOURCES_NUM_EXCEEDED, httpcommon.RESOURCE_ALREADY_EXIST,
+				httpcommon.PARAMETER_ILLEGAL, httpcommon.INVALID_PARAMETERS:
+				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
+				c.Data(http.StatusBadRequest, gin.MIMEJSON, []byte(d))
+			case httpcommon.SERVER_ERROR, httpcommon.CONFIG_PENDING:
+				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
+				c.Data(http.StatusInternalServerError, gin.MIMEJSON, []byte(d))
+			case httpcommon.SERVICE_UNAVAILABLE:
+				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
+				c.Data(http.StatusServiceUnavailable, gin.MIMEJSON, []byte(d))
+			case httpcommon.STATUES_PARTIAL_CONTENT:
+				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
+				c.Data(http.StatusPartialContent, gin.MIMEJSON, []byte(d))
+			default:
+				if errors.Is(err, httpcommon.ERR_NO_PERMISSIONS) {
+					d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
+					c.Data(http.StatusForbidden, gin.MIMEJSON, []byte(d))
+					return
+				}
+				d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, t.Status, t.Message, string(data.([]byte)))
+				c.Data(http.StatusBadRequest, gin.MIMEJSON, []byte(d))
+			}
+		default:
+			d := fmt.Sprintf(`{"OPT_STATUS":%s,"DESCRIPTION":%s,"DATA":%s}`, httpcommon.FAIL, err.Error(), string(data.([]byte)))
+			c.Data(http.StatusInternalServerError, gin.MIMEJSON, []byte(d))
+		}
+	} else {
+		d := fmt.Sprintf(`{"OPT_STATUS":"SUCCESS","DESCRIPTION":"","DATA": %v}`, string(data.([]byte)))
+		c.Data(http.StatusOK, gin.MIMEJSON, []byte(d))
 	}
 }
