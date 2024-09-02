@@ -460,6 +460,13 @@ func (c *VTapCache) modifyVTapConfigByLicense(configure *VTapConfig) {
 		} else {
 			yamlConfig.Ebpf.OnCpuProfile.Disabled = proto.Bool(true)
 		}
+		if yamlConfig.Ebpf.OffCpuProfile == nil {
+			yamlConfig.Ebpf.OffCpuProfile = &agent_config.OffCpuProfile{
+				Disabled: proto.Bool(true),
+			}
+		} else {
+			yamlConfig.Ebpf.OffCpuProfile.Disabled = proto.Bool(true)
+		}
 
 		yamlConfig.ExternalProfileIntegrationDisabled = proto.Bool(true)
 	}
