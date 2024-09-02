@@ -37,14 +37,24 @@ import (
 
 var log = logging.MustGetLogger("monitor")
 
+const (
+	CLICKHOUSE_TABLE_PARTS_NAME = "parts"
+	BYCONITY_TABLE_PARTS_NAME   = "cnch_parts"
+	BYCONITY_DISK_TYPE_HDFS     = "bytehdfs"
+	BYCONITY_DISK_TYPE_S3       = "bytes3"
+)
+
 type Monitor struct {
 	cfg           *config.Config
 	checkInterval int
 
 	Conns              common.DBs
+	ckdbType           string
 	Addrs              *[]string
 	CurrentAddrs       []string
 	username, password string
+	tablePartsName     string
+	storagePolicy      string
 	exit               bool
 
 	statsClient  *stats.UDPClient
@@ -52,7 +62,7 @@ type Monitor struct {
 }
 
 type DiskInfo struct {
-	name, path                                      string
+	name, path, diskType                            string
 	freeSpace, totalSpace, keepFreeSpace, usedSpace uint64
 }
 
@@ -63,14 +73,22 @@ type Partition struct {
 }
 
 func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
+	tablePartsName := CLICKHOUSE_TABLE_PARTS_NAME
+	ckdbType := cfg.CKDB.Type
+	if ckdbType == ckdb.CKDBTypeByconity {
+		tablePartsName = BYCONITY_TABLE_PARTS_NAME
+	}
 	m := &Monitor{
-		cfg:           cfg,
-		checkInterval: cfg.CKDiskMonitor.CheckInterval,
-		Addrs:         cfg.CKDB.ActualAddrs,
-		CurrentAddrs:  utils.CloneStringSlice(*cfg.CKDB.ActualAddrs),
-		username:      cfg.CKDBAuth.Username,
-		password:      cfg.CKDBAuth.Password,
-		statsEncoder:  &codec.SimpleEncoder{},
+		cfg:            cfg,
+		checkInterval:  cfg.CKDiskMonitor.CheckInterval,
+		ckdbType:       ckdbType,
+		Addrs:          cfg.CKDB.ActualAddrs,
+		CurrentAddrs:   utils.CloneStringSlice(*cfg.CKDB.ActualAddrs),
+		username:       cfg.CKDBAuth.Username,
+		password:       cfg.CKDBAuth.Password,
+		tablePartsName: tablePartsName,
+		storagePolicy:  cfg.CKDB.StoragePolicy,
+		statsEncoder:   &codec.SimpleEncoder{},
 	}
 	statsClient, err := stats.NewUDPClient(
 		stats.UDPConfig{
@@ -151,7 +169,7 @@ func (m *Monitor) updateConnections() {
 }
 
 func (m *Monitor) getDiskInfos(connect *sql.DB) ([]*DiskInfo, error) {
-	rows, err := connect.Query("SELECT name,path,free_space,total_space,keep_free_space FROM system.disks")
+	rows, err := connect.Query("SELECT name,path,type,free_space,total_space,keep_free_space FROM system.disks")
 	if err != nil {
 		return nil, err
 	}
@@ -159,19 +177,19 @@ func (m *Monitor) getDiskInfos(connect *sql.DB) ([]*DiskInfo, error) {
 	diskInfos := []*DiskInfo{}
 	for rows.Next() {
 		var (
-			name, path                           string
+			name, path, diskType                 string
 			freeSpace, totalSpace, keepFreeSpace uint64
 		)
-		err := rows.Scan(&name, &path, &freeSpace, &totalSpace, &keepFreeSpace)
+		err := rows.Scan(&name, &path, &diskType, &freeSpace, &totalSpace, &keepFreeSpace)
 		if err != nil {
 			return nil, nil
 		}
-		log.Debugf("name: %s, path: %s, freeSpace: %d, totalSpace: %d, keepFreeSpace: %d", name, path, freeSpace, totalSpace, keepFreeSpace)
+		log.Debugf("name: %s, path: %s, type: %s, freeSpace: %d, totalSpace: %d, keepFreeSpace: %d", name, path, diskType, freeSpace, totalSpace, keepFreeSpace)
 		for _, cleans := range m.cfg.CKDiskMonitor.DiskCleanups {
 			diskPrefix := cleans.DiskNamePrefix
 			if strings.HasPrefix(name, diskPrefix) {
 				usedSpace := totalSpace - freeSpace
-				diskInfos = append(diskInfos, &DiskInfo{name, path, freeSpace, totalSpace, keepFreeSpace, usedSpace})
+				diskInfos = append(diskInfos, &DiskInfo{name, path, diskType, freeSpace, totalSpace, keepFreeSpace, usedSpace})
 			}
 		}
 	}
@@ -244,6 +262,10 @@ func (m *Monitor) isPriorityDrop(database, table string) bool {
 func (m *Monitor) getMinPartitions(connect *sql.DB, diskInfo *DiskInfo) ([]Partition, error) {
 	sql := fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,min(min_time),max(max_time),argMin(rows,partition),argMin(bytes_on_disk,partition) FROM system.parts WHERE disk_name='%s' and active=1 GROUP BY database,table ORDER BY database,table ASC",
 		diskInfo.name)
+	if diskInfo.diskType == BYCONITY_DISK_TYPE_HDFS || diskInfo.diskType == BYCONITY_DISK_TYPE_S3 {
+		sql = fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,argMin(rows,partition),argMin(bytes_on_disk,partition) FROM system.%s WHERE active=1 GROUP BY database,table ORDER BY database,table ASC",
+			m.tablePartsName)
+	}
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -254,8 +276,14 @@ func (m *Monitor) getMinPartitions(connect *sql.DB, diskInfo *DiskInfo) ([]Parti
 			partition, database, table   string
 			minTime, maxTime             time.Time
 			rowCount, bytesOnDisk, count uint64
+			err                          error
 		)
-		err := rows.Scan(&partition, &count, &database, &table, &minTime, &maxTime, &rowCount, &bytesOnDisk)
+
+		if diskInfo.diskType == BYCONITY_DISK_TYPE_HDFS || diskInfo.diskType == BYCONITY_DISK_TYPE_S3 {
+			err = rows.Scan(&partition, &count, &database, &table, &rowCount, &bytesOnDisk)
+		} else {
+			err = rows.Scan(&partition, &count, &database, &table, &minTime, &maxTime, &rowCount, &bytesOnDisk)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -283,11 +311,14 @@ func (m *Monitor) dropMinPartitions(connect *sql.DB, diskInfo *DiskInfo) error {
 	}
 
 	for _, p := range partitions {
-		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP PARTITION '%s'", p.database, p.table, p.partition)
+		// some partition names in ByConity have extra ' symbols
+		partition := strings.Trim(p.partition, "'")
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP PARTITION '%s'", p.database, p.table, partition)
 		log.Warningf("drop partition: %s, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", p.partition, p.database, p.table, p.minTime, p.maxTime, p.rows, p.bytesOnDisk)
 		_, err := connect.Exec(sql)
 		if err != nil {
-			return err
+			log.Warningf("drop partiton: %s, database: %s, table: %s failed: %s", p.partition, p.database, p.table, err)
+			continue
 		}
 		m.sendStatsForceDeleteData(p.database, p.table, p.partition, p.bytesOnDisk, p.rows)
 	}

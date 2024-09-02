@@ -40,14 +40,16 @@ const (
 	DefaultCheckInterval            = 180 // clickhouse是异步删除
 	DefaultDiskUsedPercent          = 80
 	DefaultDiskFreeSpace            = 300
-	DefaultDFDiskPrefix             = "path_"   // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
-	DefaultSystemDiskPrefix         = "default" // In the config.xml of ClickHouse, the disk name of default storage policy 'default'
+	DefaultDFDiskPrefix             = "path_"           // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
+	DefaultSystemDiskPrefix         = "default"         // In the config.xml of ClickHouse, the disk name of default storage policy 'default'
+	DefaultByconityLocalDiskPrefix  = "server_local_"   // In the config.xml of ByConity, the disk name of the storage policy 'default'
+	DefaultBycontiyS3DiskPrefix     = "server_s3_disk_" // In the config.xml of ByConity, the disk name of the storage policy 'cnch_default_s3'
 	EnvK8sNodeIP                    = "K8S_NODE_IP_FOR_DEEPFLOW"
 	EnvK8sPodName                   = "K8S_POD_NAME_FOR_DEEPFLOW"
 	EnvK8sNodeName                  = "K8S_NODE_NAME_FOR_DEEPFLOW"
 	EnvK8sNamespace                 = "K8S_NAMESPACE_FOR_DEEPFLOW"
 	DefaultCKDBService              = "deepflow-clickhouse"
-	DefaultByconityService          = "byconity-server"
+	DefaultByconityService          = "deepflow-byconity-server"
 	DefaultCKDBServicePort          = 9000
 	DefaultListenPort               = 20033
 	DefaultGrpcBufferSize           = 41943040
@@ -85,6 +87,21 @@ type CKDiskMonitor struct {
 	TTLCheckDisabled bool            `yaml:"ttl-check-disabled"`
 	DiskCleanups     []DiskCleanup   `yaml:"disk-cleanups"`
 	PriorityDrops    []DatabaseTable `yaml:"priority-drops"`
+}
+
+func (m *CKDiskMonitor) Validate() {
+	if m.CheckInterval == 0 {
+		m.CheckInterval = DefaultCheckInterval
+	}
+	for i := range m.DiskCleanups {
+		clean := &m.DiskCleanups[i]
+		if clean.FreeSpace == 0 {
+			clean.FreeSpace = DefaultDiskFreeSpace
+		}
+		if clean.UsedPercent == 0 || clean.UsedPercent > 100 {
+			clean.UsedPercent = DefaultDiskUsedPercent
+		}
+	}
 }
 
 type Disk struct {
@@ -319,6 +336,7 @@ func (c *Config) Validate() error {
 	if c.StorageDisabled {
 		return nil
 	}
+	c.CKDiskMonitor.Validate()
 
 	if c.CKDB.Type == "" {
 		c.CKDB.Type = ckdb.CKDBTypeClickhouse
@@ -490,6 +508,18 @@ func Load(path string) *Config {
 					},
 					{
 						DefaultDFDiskPrefix,
+						DefaultDiskUsedPercent,
+						DefaultDiskFreeSpace,
+						0,
+					},
+					{
+						DefaultByconityLocalDiskPrefix,
+						DefaultDiskUsedPercent,
+						DefaultDiskFreeSpace,
+						0,
+					},
+					{
+						DefaultBycontiyS3DiskPrefix,
 						DefaultDiskUsedPercent,
 						DefaultDiskFreeSpace,
 						0,
