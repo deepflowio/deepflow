@@ -202,6 +202,9 @@ func (t *ToolDataSet) deleteAZ(lcuuid string) {
 }
 
 func (t *ToolDataSet) GetAZIDByLcuuid(lcuuid string) (int, bool) {
+	if lcuuid == "" {
+		return 0, false
+	}
 	id, exists := t.azLcuuidToID[lcuuid]
 	if exists {
 		return id, true
