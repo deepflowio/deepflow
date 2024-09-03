@@ -26,7 +26,10 @@ import (
 )
 
 func (b *DataSet) AddPod(dbItem *mysql.Pod, seq int, toolDataSet *tool.DataSet) {
-	podNodeLcuuid, _ := toolDataSet.GetPodNodeLcuuidByID(dbItem.PodNodeID)
+	var podNodeLcuuid string
+	if dbItem.PodNodeID != 0 {
+		podNodeLcuuid, _ = toolDataSet.GetPodNodeLcuuidByID(dbItem.PodNodeID)
+	}
 	var podReplicaSetLcuuid string
 	if dbItem.PodReplicaSetID != 0 {
 		podReplicaSetLcuuid, _ = toolDataSet.GetPodReplicaSetLcuuidByID(dbItem.PodReplicaSetID)
