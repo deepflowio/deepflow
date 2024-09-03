@@ -211,6 +211,7 @@ message Profile {
     string format = 9;
     bytes content_type = 10;
     bytes data = 11;
+    uint32 data_compressed = 12; // Whether to compress `data` (0: no compression, 1: compression)
 
     uint64 timestamp = 20;
     ProfileEventType event_type = 21;

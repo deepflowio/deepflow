@@ -26,6 +26,7 @@ use ahash::HashSet;
 use arc_swap::access::Access;
 use libc::{c_int, c_ulonglong};
 use log::{debug, error, info, warn};
+use zstd::bulk::compress;
 
 use super::{Error, Result};
 use crate::common::ebpf::EbpfType;
@@ -408,6 +409,7 @@ static mut PROC_EVENT_SENDER: Option<DebugSender<BoxedProcEvents>> = None;
 static mut EBPF_PROFILE_SENDER: Option<DebugSender<Profile>> = None;
 static mut POLICY_GETTER: Option<PolicyGetter> = None;
 static mut ON_CPU_PROFILE_FREQUENCY: u32 = 0;
+static mut PROFILE_STACK_COMPRESSION: bool = false;
 static mut TIME_DIFF: Option<Arc<AtomicI64>> = None;
 
 impl EbpfCollector {
@@ -520,6 +522,15 @@ impl EbpfCollector {
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
+            if PROFILE_STACK_COMPRESSION {
+                match compress(&profile.data, 0) {
+                    Ok(compressed_data) => {
+                        profile.data_compressed = 1;
+                        profile.data = compressed_data;
+                    }
+                    Err(e) => debug!("failed to compress ebpf profile: {:?}", e),
+                }
+            }
             let container_id = Self::convert_to_string(data.container_id.as_ptr());
             if let Some(policy_getter) = POLICY_GETTER.as_ref() {
                 profile.pod_id = policy_getter.lookup_pod_id(&container_id);
@@ -820,6 +831,7 @@ impl EbpfCollector {
             EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
             POLICY_GETTER = Some(policy_getter);
             ON_CPU_PROFILE_FREQUENCY = config.ebpf.on_cpu_profile.frequency as u32;
+            PROFILE_STACK_COMPRESSION = config.ebpf.profile_stack_compression;
             TIME_DIFF = Some(time_diff);
         }
 

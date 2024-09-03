@@ -1383,6 +1383,7 @@ pub struct MetricServerConfig {
     pub enabled: bool,
     pub port: u16,
     pub compressed: bool,
+    pub profile_compressed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1823,6 +1824,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
                 port: conf.external_agent_http_proxy_port as u16,
                 compressed: conf.yaml_config.external_agent_http_proxy_compressed,
+                profile_compressed: conf
+                    .yaml_config
+                    .external_agent_http_proxy_profile_compressed,
             },
             trident_type: conf.trident_type,
             port_config: PortConfig {
@@ -2977,6 +2981,22 @@ impl ConfigHandler {
                         .metrics_server_component
                         .external_metrics_server
                         .enable_compressed(handler.candidate_config.metric_server.compressed);
+                }
+                callbacks.push(metric_server_callback);
+            }
+            if candidate_config.metric_server.profile_compressed
+                != new_config.metric_server.profile_compressed
+            {
+                fn metric_server_callback(
+                    handler: &ConfigHandler,
+                    components: &mut AgentComponents,
+                ) {
+                    components
+                        .metrics_server_component
+                        .external_metrics_server
+                        .enable_profile_compressed(
+                            handler.candidate_config.metric_server.profile_compressed,
+                        );
                 }
                 callbacks.push(metric_server_callback);
             }

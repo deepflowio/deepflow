@@ -2187,6 +2187,7 @@ pub struct EbpfYamlConfig {
     pub on_cpu_profile: OnCpuProfile,
     pub off_cpu_profile: OffCpuProfile,
     pub memory_profile: MemoryProfile,
+    pub profile_stack_compression: bool,
     pub syscall_out_of_order_cache_size: usize,
     pub syscall_out_of_order_reassembly: Vec<String>,
     pub syscall_segmentation_reassembly: Vec<String>,
@@ -2219,6 +2220,7 @@ impl Default for EbpfYamlConfig {
             on_cpu_profile: OnCpuProfile::default(),
             off_cpu_profile: OffCpuProfile::default(),
             memory_profile: MemoryProfile::default(),
+            profile_stack_compression: true,
             syscall_out_of_order_reassembly: vec![],
             syscall_segmentation_reassembly: vec![],
             syscall_out_of_order_cache_size: 16,
@@ -2410,6 +2412,7 @@ pub struct YamlConfig {
     pub l7_protocol_enabled: Vec<String>,
     pub ebpf: EbpfYamlConfig,
     pub external_agent_http_proxy_compressed: bool,
+    pub external_agent_http_proxy_profile_compressed: bool,
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
     pub log_file: String,
@@ -2830,6 +2833,7 @@ impl Default for YamlConfig {
                 protos
             },
             external_agent_http_proxy_compressed: false,
+            external_agent_http_proxy_profile_compressed: true,
             standalone_data_file_size: 200,
             standalone_data_file_dir: Path::new(DEFAULT_LOG_FILE)
                 .parent()
