@@ -196,6 +196,9 @@ func (t *DataSet) DeleteAZ(lcuuid string) {
 }
 
 func (t *DataSet) GetAZIDByLcuuid(lcuuid string) (int, bool) {
+	if lcuuid == "" {
+		return 0, false
+	}
 	id, exists := t.azLcuuidToID[lcuuid]
 	if exists {
 		return id, true
