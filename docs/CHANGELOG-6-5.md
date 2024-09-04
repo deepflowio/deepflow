@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Fix the issue with loading '__sys_recvmmsg' [#8052](https://github.com/deepflowio/deepflow/pull/8052) by [yinjiping](https://github.com/yinjiping)
 * fix: controller records unnecessary error logs [#8025](https://github.com/deepflowio/deepflow/pull/8025) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: agent - eBPF fentry/fexit Check for '__sys_recvmmsg' [#8011](https://github.com/deepflowio/deepflow/pull/8011) by [yinjiping](https://github.com/yinjiping)
 * fix: resource label errors for non-default organization resource chan… [#8009](https://github.com/deepflowio/deepflow/pull/8009) by [lzf575](https://github.com/lzf575)
@@ -125,6 +126,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: support multi target port [#8032](https://github.com/deepflowio/deepflow/pull/8032) by [askyrie](https://github.com/askyrie)
 * feat: trace tree support store PseudoLink field [#7952](https://github.com/deepflowio/deepflow/pull/7952) by [lzf575](https://github.com/lzf575)
 * feat: add enable features to agent group [#7945](https://github.com/deepflowio/deepflow/pull/7945) by [roryye](https://github.com/roryye)
 * feat: agent - eBPF Add support for parsing 4.19.90-vhulk2211.3.0.h154 [#7928](https://github.com/deepflowio/deepflow/pull/7928) by [yinjiping](https://github.com/yinjiping)
@@ -208,6 +210,7 @@
 * chore: update cli dependencies [#7250](https://github.com/deepflowio/deepflow/pull/7250) by [lzf575](https://github.com/lzf575)
 
 #### OTHER
+* [Controller] get data error from mysql and return directly [#8043](https://github.com/deepflowio/deepflow/pull/8043) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * Cp 66 lo to v65 [#7716](https://github.com/deepflowio/deepflow/pull/7716) by [lzf575](https://github.com/lzf575)
 * support consistent timestamp in l7metrics [#7626](https://github.com/deepflowio/deepflow/pull/7626) by [yuanchaoa](https://github.com/yuanchaoa)
 * V65 trace map [#7445](https://github.com/deepflowio/deepflow/pull/7445) by [taloric](https://github.com/taloric)
