@@ -61,20 +61,21 @@ func GetAgentCMDManagerWithoutLock(key string) *CMDManager {
 	return nil
 }
 
-func AddToCMDManagerIfNotExist(key string, requestID uint64) (exist bool) {
+func AddToCMDManagerIfNotExist(key string, requestID uint64) *CMDManager {
 	agentCMDMutex.Lock()
 	defer agentCMDMutex.Unlock()
 	if _, ok := agentCMDManager[key]; ok {
-		return true
+		return agentCMDManager[key]
 	}
 
+	log.Infof("add agent(key:%s) to cmd manager", key)
 	agentCMDManager[key] = &CMDManager{
 		requestID: requestID,
 		ExecCH:    make(chan *trident.RemoteExecRequest, 1),
 
 		requestIDToResp: make(map[uint64]*CMDResp),
 	}
-	return false
+	return agentCMDManager[key]
 }
 
 func RemoveFromCMDManager(key string, requestID uint64) {
