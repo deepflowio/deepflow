@@ -378,6 +378,7 @@ func (v *VTapInfo) loadVTaps() {
 	vtaps, err := dbmgr.DBMgr[models.VTap](v.db).Gets()
 	if err != nil {
 		log.Error(err)
+		return
 	}
 	v.vtaps = vtaps
 }
