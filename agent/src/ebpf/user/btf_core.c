@@ -42,6 +42,7 @@ extern __s32 btf__find_by_name_kind(const struct btf *btf,
 extern struct btf *btf__parse_elf(const char *path, struct btf_ext **btf_ext);
 extern struct btf *btf__parse_raw(const char *path);
 extern const char *btf__name_by_offset(const struct btf *btf, uint32_t offset);
+extern void btf__free(struct btf *btf);
 extern const struct btf_type *btf__type_by_id(const struct btf *btf,
 					      __u32 type_id);
 extern const char *btf_kind_str(const struct btf_type *t);
@@ -83,8 +84,7 @@ const char *btf_name_by_offset(const struct btf *btf, __u32 offset)
 	return btf__name_by_offset(btf, offset);
 }
 
-static struct bpf_core_cand_list *bpf_core_find_cands(struct ebpf_object *obj,
-						      const struct btf
+static struct bpf_core_cand_list *bpf_core_find_cands(struct ebpf_object *obj, const struct btf
 						      *local_btf,
 						      __u32 local_type_id)
 {
@@ -171,7 +171,6 @@ static int bpf_core_resolve_relo(struct ebpf_prog *prog,
 			return err;
 		}
 	}
-
 	// check_core_relo(btf, rec);
 
 	//// prog 'kfunc__do_unlinkat': relo #0: <byte_off> [101] struct filename.name (0:1 @ offset 8)
@@ -183,7 +182,7 @@ static int bpf_core_resolve_relo(struct ebpf_prog *prog,
 
 static size_t bpf_core_hash_fn(const void *key, void *ctx)
 {
-	return (size_t)key;
+	return (size_t) key;
 }
 
 static bool bpf_core_equal_fn(const void *k1, const void *k2, void *ctx)
@@ -285,7 +284,7 @@ out:
 	return err;
 }
 
-int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj)
+static struct btf *ebpf__load_vmlinux_btf(void)
 {
 	/*
 	 * If a raw btf file is provided, it can be loaded in the specified
@@ -308,7 +307,6 @@ int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj)
 	struct btf *btf;
 	uname(&sysinfo);
 	int i;
-	obj->btf_vmlinux = NULL;
 
 	for (i = 0; i < ARRAY_SIZE(path_fmt_array); i++) {
 		snprintf(path, PATH_MAX, path_fmt_array[i], sysinfo.release);
@@ -324,12 +322,21 @@ int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj)
 
 		if (!DF_IS_ERR_OR_NULL(btf)) {
 			ebpf_info("BTF vmlinux file: %s\n", path);
-			obj->btf_vmlinux = btf;
-			return ETR_OK;
+			return btf;
 		}
 	}
 
-	return ETR_INVAL;
+	return NULL;
+}
+
+int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj)
+{
+	obj->btf_vmlinux = NULL;
+	struct btf *btf = ebpf__load_vmlinux_btf();
+	if (btf == NULL)
+		return ETR_INVAL;
+	obj->btf_vmlinux = btf;
+	return ETR_OK;
 }
 
 static int kernel_struct_field_offset_helper(struct btf *btf, int btf_id,
@@ -347,10 +354,10 @@ static int kernel_struct_field_offset_helper(struct btf *btf, int btf_id,
 					      btf_member->offset) / 8;
 		}
 		if (!strcmp(btf__name_by_offset(btf, btf_member->name_off), "")) {
-			int retval =
-			    kernel_struct_field_offset_helper(btf,
-							      btf_member->type,
-							      field_name);
+			int retval = kernel_struct_field_offset_helper(btf,
+								       btf_member->
+								       type,
+								       field_name);
 			if (retval >= 0) {
 				return (BTF_MEM_OFFSET(btf_type->info,
 						       btf_member->offset) /
@@ -386,4 +393,34 @@ int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
 	}
 
 	return retval;
+}
+
+int get_kfunc_params_num(const char *func_name)
+{
+	struct btf *btf = ebpf__load_vmlinux_btf();
+	if (!btf) {
+		ebpf_info("Failed to load vmlinux BTF\n");
+		return -1;
+	}
+
+	int type_id = btf__find_by_name_kind(btf, func_name, BTF_KIND_FUNC);
+	if (type_id < 0) {
+		ebpf_warning("Failed to find BTF type for %s\n", func_name);
+		return -1;
+	}
+	const struct btf_type *t = btf__type_by_id(btf, type_id);
+	if (!t) {
+		ebpf_warning
+		    ("Invalid BTF type or not a function prototype for %s\n",
+		     func_name);
+		return -1;
+	}
+	if ((((t->info) >> 24) & 0x1f) != BTF_KIND_FUNC)
+		return -1;
+	t = btf__type_by_id(btf, t->type);
+	if (!t || (((t->info) >> 24) & 0x1f) != BTF_KIND_FUNC_PROTO)
+		return -1;
+	int num = ((t->info) & 0xffff);
+	btf__free(btf);
+	return num;
 }
