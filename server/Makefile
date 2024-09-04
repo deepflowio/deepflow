@@ -103,6 +103,8 @@ vendor:
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/nullable.patch
 	# optimize write datatime
 	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/datetime_uint32.patch
+	# reduce connection memory
+	patch -p1 -d vendor/github.com/ClickHouse/clickhouse-go/v2/ < patch/clickhouse-go/reduce_connection_memory.patch
 	# optimize the performance of hashmap when writing a large amount of data
 	patch -p1 -d vendor/github.com/cornelk/hashmap < patch/cornelk_hashmap/perf.patch
 	# hashmap support key [2]uint64
