@@ -99,5 +99,5 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    struct symbol *sym,
 						    const uint64_t addr,
 						    int pid);
-uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname);
+uint64_t get_symbol_addr_from_binary(int pid, const char *bin, const char *symname);
 #endif /* _USER_SYMBOL_H_ */

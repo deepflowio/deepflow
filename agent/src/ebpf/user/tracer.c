@@ -33,6 +33,7 @@
 #include "common.h"
 #include "log.h"
 #include "symbol.h"
+#include "bihash_8_8.h"
 #include "tracer.h"
 #include "elf.h"
 #include "load.h"
@@ -98,13 +99,29 @@ bool *cpu_online;		// 用于判断CPU是否是online
 // 所有tracer成功完成启动，会被应用设置为1
 static volatile uint64_t all_probes_ready;
 
+extern __thread uword thread_index;
+// Thread ID and thread index correspondence
+struct thread_index_array thread_ids;
+// Record the current maximum thread index value.
+u64 thread_index_max;
+
 // Number of period timer ticks.
 static uint64_t period_event_ticks;
+
+// Store the data of the last matched process ID list.
+struct match_pid_s {
+	int *pids;
+	int count;
+};
+static struct match_pid_s prev_match_pids[FEATURE_MAX];
+// Used to store process IDs for matching various features
+pids_metch_hash_t pids_metch_hash;
 
 static int tracepoint_attach(struct tracepoint *tp);
 static int perf_reader_setup(struct bpf_perf_reader *perf_readerm,
 			     int thread_nr);
 static void perf_reader_release(struct bpf_perf_reader *perf_reader);
+static void print_match_pids_hash(void);
 
 /*
  * 内核版本依赖检查
@@ -969,9 +986,9 @@ static int kfunc_detach(struct kfunc *p)
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_handle)(struct probe * p) = NULL;
-	int (*tracepoint_handle)(struct tracepoint * p) = NULL;
-	int (*kfunc_handle)(struct kfunc * p) = NULL;
+	int (*probe_handle) (struct probe * p) = NULL;
+	int (*tracepoint_handle) (struct tracepoint * p) = NULL;
+	int (*kfunc_handle) (struct kfunc * p) = NULL;
 	if (type == HOOK_ATTACH) {
 		probe_handle = probe_attach;
 		tracepoint_handle = tracepoint_attach;
@@ -1099,21 +1116,18 @@ perf_event:
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
 				errno = 0;
 				int ret =
-				    program__attach_perf_event(obj->progs[i].
-							       prog_fd,
+				    program__attach_perf_event(obj->
+							       progs[i].prog_fd,
 							       PERF_TYPE_SOFTWARE,
 							       PERF_COUNT_SW_CPU_CLOCK,
 							       0,	/* sample_period */
-							       tracer->
-							       sample_freq,
+							       tracer->sample_freq,
 							       -1,	/* pid, current process */
 							       -1,	/* cpu, no binding */
 							       -1,	/* new event group is created */
-							       tracer->
-							       per_cpu_fds,
+							       tracer->per_cpu_fds,
 							       ARRAY_SIZE
-							       (tracer->
-								per_cpu_fds));
+							       (tracer->per_cpu_fds));
 				if (!ret) {
 					ebpf_info
 					    ("tracer \"%s\" attach perf event prog successful.\n",
@@ -1554,7 +1568,7 @@ static int tracer_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 }
 
 static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
-			      void **out, size_t *outsize)
+			      void **out, size_t * outsize)
 {
 	*outsize = sizeof(struct bpf_tracer_param_array) +
 	    sizeof(struct bpf_tracer_param) * tracers_count;
@@ -1628,6 +1642,21 @@ static struct tracer_sockopts trace_sockopts = {
 	.get = tracer_sockopt_get,
 };
 
+static int match_pids_sockopt_set(sockoptid_t opt, const void *conf,
+				  size_t size)
+{
+	print_match_pids_hash();
+	return ETR_OK;
+}
+
+static struct tracer_sockopts match_pids_sockopts = {
+	.version = SOCKOPT_VERSION,
+	.get = NULL,
+	.set_opt_min = SOCKOPT_PRINT_MATCH_PIDS,
+	.set_opt_max = SOCKOPT_PRINT_MATCH_PIDS,
+	.set = match_pids_sockopt_set,
+};
+
 int enable_ebpf_protocol(int protocol)
 {
 	if (protocol < PROTO_NUM) {
@@ -1682,8 +1711,11 @@ bool is_feature_enabled(int feature)
 	return cfg_feature_regex_array[feature].ok;
 }
 
-bool is_feature_matched(int feature, const char *path)
+bool is_feature_matched(int feature, int pid, const char *path)
 {
+	if (pid > 0)
+		return is_pid_match(feature, pid);
+	
 	int error = 0;
 	char *path_for_basename = NULL;
 	char *process_name = NULL;
@@ -1707,6 +1739,183 @@ bool is_feature_matched(int feature, const char *path)
 			NULL, 0);
 	free(path_for_basename);
 	return !error;
+}
+
+static void init_thread_ids(void)
+{
+	thread_ids.entries = NULL;
+	pthread_mutex_init(&thread_ids.lock, NULL);
+}
+
+static int print_match_pids_kvp_cb(pids_metch_hash_kv * kv, void *arg)
+{
+	ebpf_info("  PID %lu flags 0x%lx (%s %s %s %s %s %s %s)\n",
+		  kv->key, kv->value,
+		  (kv->
+		   value & (1 << FEATURE_UPROBE_GOLANG_SYMBOL)) ? "GOSYMBOL" :
+		  "",
+		  (kv->value & (1 << FEATURE_UPROBE_GOLANG)) ? "GOLANG" : "",
+		  (kv->value & (1 << FEATURE_UPROBE_OPENSSL)) ? "OPENSSL" : "",
+		  (kv->value & (1 << FEATURE_UPROBE_JAVA)) ? "JAVA" : "",
+		  (kv->value & (1 << FEATURE_PROFILE_ONCPU)) ? "ONCPU" : "",
+		  (kv->value & (1 << FEATURE_PROFILE_OFFCPU)) ? "OFFCPU" : "",
+		  (kv->value & (1 << FEATURE_PROFILE_MEMORY)) ? "OFFCPU" : "");
+	return BIHASH_WALK_CONTINUE;
+}
+
+static void print_match_pids_hash(void)
+{
+	pids_metch_hash_t *h = &pids_metch_hash;
+	pids_metch_hash_foreach_key_value_pair(h, print_match_pids_kvp_cb,
+					       NULL);
+	print_hash_pids_metch(&pids_metch_hash);
+}
+
+static void add_thread_ids_entry(pthread_t thread, int index)
+{
+	pthread_mutex_lock(&thread_ids.lock);
+	struct thread_index_entry v;
+	v.thread = thread;
+	v.index = index;
+	int ret = VEC_OK;
+	vec_add1(thread_ids.entries, v, ret);
+	if (ret != VEC_OK) {
+		ebpf_warning("vec add failed.\n");
+	}
+	pthread_mutex_unlock(&thread_ids.lock);
+}
+
+static int add_pid_to_match_hash(int feature, int pid)
+{
+	pids_metch_hash_t *h = &pids_metch_hash;
+	pids_metch_hash_kv kv = {};
+	kv.key = (u64) pid;
+	pids_metch_hash_search(h, &kv, &kv);
+	kv.value |= (1 << feature);
+	if (pids_metch_hash_add_del(h, &kv, 1)) {
+		ebpf_warning("Add hash failed.(key %lu value %lu)\n",
+			     kv.key, kv.value);
+		return -1;
+	}
+
+	return 0;
+}
+
+bool is_pid_match(int feature, int pid)
+{
+	pids_metch_hash_t *h = &pids_metch_hash;
+	pids_metch_hash_kv kv = {};
+	kv.key = (u64) pid;
+	pids_metch_hash_search(h, &kv, &kv);
+	return kv.value & (1UL << feature);
+}
+
+static int clear_pid_from_match_hash(int feature, int pid)
+{
+	pids_metch_hash_t *h = &pids_metch_hash;
+	pids_metch_hash_kv kv = {};
+	kv.key = (u64) pid;
+	pids_metch_hash_search(h, &kv, &kv);
+	kv.value &= ~(1 << feature);
+	if (kv.value == 0) {
+		if (pids_metch_hash_add_del(h, &kv, 0)) {
+			ebpf_warning("delete hash failed.(key %lu)\n", kv.key);
+			return -1;
+		}
+	} else {
+		if (pids_metch_hash_add_del(h, &kv, 1)) {
+			ebpf_warning("clear hash failed.(key %lu value %lu)\n",
+				     kv.key, kv.value);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static void del_stale_match_pids(int feature, const int *pids, int num)
+{
+	int i, j;
+	bool existed;
+	struct match_pid_s *prev_pids = &prev_match_pids[feature];
+	for (i = 0; i < prev_pids->count; i++) {
+		existed = false;
+		for (j = 0; j < num; j++) {
+			if (pids[j] == prev_pids->pids[i]) {
+				existed = true;
+				break;
+			}
+		}
+
+		if (existed)
+			continue;
+		else
+			clear_pid_from_match_hash(feature, prev_pids->pids[i]);
+	}
+}
+
+static void add_new_match_pids(int feature, const int *pids, int num)
+{
+	int i, j;
+	bool existed;
+	struct match_pid_s *prev_pids = &prev_match_pids[feature];
+	for (i = 0; i < num; i++) {
+		existed = false;
+		for (j = 0; j < prev_pids->count; j++) {
+			if (pids[i] == prev_pids->pids[j]) {
+				existed = true;
+				break;
+			}
+		}
+
+		if (existed)
+			continue;
+		else
+			add_pid_to_match_hash(feature, pids[i]);
+	}
+}
+
+int set_feature_pids(int feature, const int *pids, int num)
+{
+	if (feature < 0 || feature >= FEATURE_MAX) {
+		return -1;
+	}
+	// Set the thread ID, which will be used in `pids_metch_hash`.
+	pthread_t tid = pthread_self();
+	struct thread_index_entry *v;
+	bool found = false;
+	vec_foreach(v, thread_ids.entries) {
+		if (v->thread == tid)
+			found = true;
+		break;
+	}
+
+	if (!found) {
+		u64 idx = AO_ADD_F(&thread_index_max, 1);
+		add_thread_ids_entry(tid, idx);
+		thread_index = idx;
+		ebpf_info("thread %ld index %ld\n", tid, thread_index);
+	}
+
+	del_stale_match_pids(feature, pids, num);
+	add_new_match_pids(feature, pids, num);
+
+	if (prev_match_pids[feature].pids != NULL)
+		free(prev_match_pids[feature].pids);
+	prev_match_pids[feature].pids = malloc(sizeof(int) * num);
+	memcpy(prev_match_pids[feature].pids, pids, sizeof(int) * num);
+	prev_match_pids[feature].count = num;
+	return 0;
+}
+
+int init_match_pids_hash(void)
+{
+	pids_metch_hash_t *h = &pids_metch_hash;
+	memset(h, 0, sizeof(*h));
+	u32 nbuckets = PIDS_METCH_HASH_BUCKETS_NUM;
+	u64 hash_memory_size = PIDS_METCH_HASH_MEM_SZ;
+	return pids_metch_hash_init(h, (char *)"match-pids", nbuckets,
+				    hash_memory_size);
 }
 
 int bpf_tracer_init(const char *log_file, bool is_stdout)
@@ -1774,6 +1983,8 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	prev_sys_boot_time_ns = sys_boot_time_ns;
 	ebpf_info("sys_boot_time_ns : %llu\n", sys_boot_time_ns);
 
+	init_thread_ids();
+
 	/*
 	 * Set up the lock now, so we can use it to make the first add
 	 * thread-safe for tracer alloc.
@@ -1792,8 +2003,14 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	if (ctrl_init()) {
 		return ETR_INVAL;
 	}
+	// Process matching hash initialization
+	if (init_match_pids_hash() != 0)
+		return ETR_INVAL;
 
 	if ((err = sockopt_register(&trace_sockopts)) != ETR_OK)
+		return err;
+
+	if ((err = sockopt_register(&match_pids_sockopts)) != ETR_OK)
 		return err;
 
 	err = pthread_create(&ctrl_pthread, NULL, (void *)&ctrl_main, NULL);

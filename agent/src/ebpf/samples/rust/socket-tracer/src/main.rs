@@ -17,6 +17,7 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
+use std::env;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
 use std::ffi::CString;
@@ -383,6 +384,7 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
+    env::set_var("RUST_LOG", "INFO");
     env_logger::builder()
         .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
         .init();
@@ -600,6 +602,12 @@ fn main() {
             println!("running_socket_tracer() error.");
             ::std::process::exit(1);
         }
+
+        let feature: c_int = FEATURE_PROFILE_ONCPU;
+        let pids: [c_int; 3] = [101, 202, 303];
+        let num: c_int = pids.len() as c_int;
+        let result = set_feature_pids(feature, pids.as_ptr(), num);
+        println!("Result {}", result);
 
         // test data limit max
         set_data_limit_max(10000);

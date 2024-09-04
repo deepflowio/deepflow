@@ -136,7 +136,7 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 		if (!process_probing_check(pid))
 			continue;
 		path = get_elf_path_by_pid(pid);
-		if (is_feature_matched(FEATURE_UPROBE_OPENSSL, path)) {
+		if (is_feature_matched(FEATURE_UPROBE_OPENSSL, pid, path)) {
 			openssl_parse_and_register(pid, conf);
 		}
 		free(path);
@@ -154,7 +154,7 @@ void ssl_process_exec(int pid)
 	if (!kernel_version_check())
 		return;
 	path = get_elf_path_by_pid(pid);
-	matched = is_feature_matched(FEATURE_UPROBE_OPENSSL, path);
+	matched = is_feature_matched(FEATURE_UPROBE_OPENSSL, pid, path);
 	free(path);
 	if (!matched)
 		return;
