@@ -124,10 +124,10 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			}
 			forwardTimes = v
 		} else {
-			log.Infof("node ip(%s) init %s to 0", common.NodeIP, ForwardControllerTimes)
+			log.Infof("agent(key: %s), node ip(%s) init %s to 0", key, common.NodeIP, ForwardControllerTimes)
 			c.Request.Header.Set(ForwardControllerTimes, "0")
 		}
-		log.Infof("node ip(%s) forward times: %d", common.NodeIP, forwardTimes)
+		log.Infof("agent(key: %s), node ip(%s) forward times: %d", key, common.NodeIP, forwardTimes)
 		if forwardTimes > DefaultForwardControllerTimes {
 			err := fmt.Errorf("get agent(name: %s, key: %s) commands forward times > %d", agent.Name, key, DefaultForwardControllerTimes)
 			log.Error(err)
@@ -136,6 +136,8 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			return
 		}
 
+		log.Infof("agent(key: %s), node ip(%s), agent cur controller ip(%s), controller ip(%s)",
+			key, common.NodeIP, agent.CurControllerIP, agent.ControllerIP)
 		// get reverse proxy host
 		newHost := common.NodeIP
 		if common.NodeIP == agent.CurControllerIP {
@@ -162,8 +164,8 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 		}
 
 		reverseProxy := fmt.Sprintf("http://%s:%d", newHost, common.GConfig.HTTPNodePort)
-		log.Infof("node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
-			common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP)
+		log.Infof("agnet(key: %s), node ip(%s), reverse proxy(%s), agent current controller ip(%s), controller ip(%s)",
+			key, common.NodeIP, reverseProxy, agent.CurControllerIP, agent.ControllerIP)
 
 		proxyURL, err := url.Parse(reverseProxy)
 		if err != nil {
