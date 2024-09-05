@@ -18,6 +18,11 @@ log-level: info
 #  block-rate: 5 # valid when ProfileTypes contains 'block_count' or 'block_duration'
 #  log-enabled: true # whether record profile debug logs
 
+## every `interval`, call debug.FreeOSMemory()(https://pkg.go.dev/runtime/debug#FreeOSMemory) to release OS memory.
+#free-os-memory-manager:
+#  enabled: false
+#  interval: 3600  # uint: second
+
 ## extract an integer (generally used timestamp) from traceId as an additional index to speed up traceId queries.
 #trace-id-with-index:
 #  disabled: false

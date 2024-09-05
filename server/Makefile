@@ -117,7 +117,7 @@ test: vendor $(proto) $(generated_libs)
 
 .PHONY: server
 server: vendor $(proto) $(generated_libs)
-	go build -mod vendor ${FLAGS} -o bin/deepflow-server${BINARY_SUFFIX} cmd/server/main.go cmd/server/config.go
+	go build -mod vendor ${FLAGS} -o bin/deepflow-server${BINARY_SUFFIX} cmd/server/main.go cmd/server/config.go cmd/server/free_os_memory_handler.go
 
 .PHONY: querier
 querier: vendor $(proto) $(generated_libs)

@@ -31,12 +31,18 @@ import (
 )
 
 type Config struct {
-	LogFile           string            `default:"/var/log/deepflow/server.log" yaml:"log-file"`
-	LogLevel          string            `default:"info" yaml:"log-level"`
-	ContinuousProfile ContinuousProfile `yaml:"continuous-profile"`
-	Profiler          bool              `yaml:"profiler"`
-	MaxCPUs           int               `yaml:"max-cpus"`
-	MonitorPaths      []string          `yaml:"monitor-paths"`
+	LogFile             string              `default:"/var/log/deepflow/server.log" yaml:"log-file"`
+	LogLevel            string              `default:"info" yaml:"log-level"`
+	ContinuousProfile   ContinuousProfile   `yaml:"continuous-profile"`
+	Profiler            bool                `yaml:"profiler"`
+	MaxCPUs             int                 `yaml:"max-cpus"`
+	MonitorPaths        []string            `yaml:"monitor-paths"`
+	FreeOSMemoryManager FreeOSMemoryManager `yaml:"free-os-memory-manager"`
+}
+
+type FreeOSMemoryManager struct {
+	Enabled  bool `yaml:"enabled"`
+	Interval int  `yaml:"interval"`
 }
 
 type ContinuousProfile struct {
@@ -60,7 +66,8 @@ func loadConfig(path string) *Config {
 			BlockRate:     5,
 			LogEnabled:    true,
 		},
-		MonitorPaths: []string{"/", "/mnt", "/var/log"},
+		MonitorPaths:        []string{"/", "/mnt", "/var/log"},
+		FreeOSMemoryManager: FreeOSMemoryManager{false, DEFAULT_FREE_INTERVAL_SECOND},
 	}
 	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
