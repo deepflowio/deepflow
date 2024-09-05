@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"reflect"
 	"regexp"
 	"sort"
@@ -1165,16 +1166,79 @@ func appendRegexRules(v string) string {
 
 func getValue(value interface{}) string {
 	switch val := value.(type) {
-	case int:
-		return strconv.Itoa(val)
+	case int8, int16, int32, int64, uint8, uint16, uint32, uint64, time.Time, net.IP:
+		return fmt.Sprintf("%v", val)
+	case *int8:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case *int16:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case *int32:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case *int64:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case *uint8:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case *uint16:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case *uint32:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case *uint64:
+		if val == nil {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", *val)
+		}
+	case float32:
+		return strconv.FormatFloat(float64(val), 'f', -1, 64)
 	case float64:
 		return strconv.FormatFloat(val, 'f', -1, 64)
-	case time.Time:
-		return val.String()
-	case nil:
-		return ""
+	case *float32:
+		if val == nil {
+			return ""
+		} else {
+			return strconv.FormatFloat(float64(*val), 'f', -1, 64)
+		}
+	case *float64:
+		if val == nil {
+			return ""
+		} else {
+			return strconv.FormatFloat(*val, 'f', -1, 64)
+		}
+	case string:
+		return val
+	case *string:
+		return *val
 	default:
-		return val.(string)
+		// unkown type field
+		return fmt.Sprintf("%v", val)
 	}
 }
 
@@ -1182,10 +1246,76 @@ func isZero(value interface{}) bool {
 	switch val := value.(type) {
 	case string:
 		return val == "" || val == "{}"
-	case int:
-		return val == 0
-	case nil:
-		return true
+	case *string:
+		if val == nil {
+			return true
+		} else {
+			return *val == "" || *val == "{}"
+		}
+	case int8:
+		return val == int8(0)
+	case int16:
+		return val == int16(0)
+	case int32:
+		return val == int32(0)
+	case int64:
+		return val == int64(0)
+	case uint8:
+		return val == uint8(0)
+	case uint16:
+		return val == uint16(0)
+	case uint32:
+		return val == uint32(0)
+	case uint64:
+		return val == uint64(0)
+	case *int8:
+		if val == nil {
+			return true
+		} else {
+			return *val == int8(0)
+		}
+	case *int16:
+		if val == nil {
+			return true
+		} else {
+			return *val == int16(0)
+		}
+	case *int32:
+		if val == nil {
+			return true
+		} else {
+			return *val == int32(0)
+		}
+	case *int64:
+		if val == nil {
+			return true
+		} else {
+			return *val == int64(0)
+		}
+	case *uint8:
+		if val == nil {
+			return true
+		} else {
+			return *val == uint8(0)
+		}
+	case *uint16:
+		if val == nil {
+			return true
+		} else {
+			return *val == uint16(0)
+		}
+	case *uint32:
+		if val == nil {
+			return true
+		} else {
+			return *val == uint32(0)
+		}
+	case *uint64:
+		if val == nil {
+			return true
+		} else {
+			return *val == uint64(0)
+		}
 	default:
 		return false
 	}
