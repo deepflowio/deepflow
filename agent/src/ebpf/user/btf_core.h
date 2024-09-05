@@ -94,4 +94,5 @@ int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
 			       const char *field_name);
 const char *btf_name_by_offset(const struct btf *btf, __u32 offset);
 int obj_relocate_core(struct ebpf_prog *prog);
+int get_kfunc_params_num(const char *func_name);
 #endif /* DF_BTF_CORE_H_ */
