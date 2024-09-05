@@ -645,11 +645,11 @@ func (v *VTapInfo) GetSelfUpdateUrl() string {
 	return v.config.SelfUpdateUrl
 }
 
-func (v *VTapInfo) GetTridentTypeForUnkonwVTap() uint16 {
+func (v *VTapInfo) GetTridentTypeForUnknowVTap() uint16 {
 	if v == nil {
 		return 0
 	}
-	return v.config.TridentTypeForUnkonwVtap
+	return v.config.TridentTypeForUnknowVtap
 }
 
 func (v *VTapInfo) GetGroupData() []byte {

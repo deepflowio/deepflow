@@ -33,6 +33,8 @@
  * that supports `fentry/fexit`.
  */
 #define TEST_KFUNC_NAME "__sys_recvmmsg"
+#define TEST_KFUNC_PARAMS_NUM 6
+
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
 #define OFFSET_INFER_SERVER_PORT 54583
@@ -361,7 +363,7 @@ prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 			 * time precision is in microseconds.
 			 */
 			sd->timestamp = (sd->timestamp + boot_time) / NS_IN_USEC;
-			callback(sd);
+			callback(NULL, sd);
 		}
 
 		if (block_head->is_last == 1)

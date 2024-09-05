@@ -418,7 +418,7 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 	if table == "" {
 		var tables []interface{}
 		if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_EXT_METRICS}, db) {
-			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, nil) {
+			for _, extTables := range ckcommon.GetExtTables(db, where, queryCacheTTL, orgID, useQueryCache, ctx, nil) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)

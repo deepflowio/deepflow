@@ -475,7 +475,8 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 {
 	if (addr_str != NULL) {
 		int ret = VEC_OK;
-		java_unload_addr_str_t java_addr = { 0 };
+		java_unload_addr_str_t java_addr;
+		memset(&java_addr, 0, sizeof(java_addr));
 		snprintf(java_addr.addr, sizeof(java_addr.addr), "%s",
 			 addr_str);
 		vec_add1(unload_addrs, java_addr, ret);

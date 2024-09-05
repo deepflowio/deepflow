@@ -490,16 +490,22 @@ static struct tracer_sockopts cpdbg_sockopts = {
 	.get = cpdbg_sockopt_get,
 };
 
-int stop_continuous_profiler(void)
+int stop_continuous_profiler(void *cb_ctx[PROFILER_CTX_NUM])
 {
+	if (cb_ctx) {
+		memset(cb_ctx, 0, sizeof(void *) * PROFILER_CTX_NUM);
+	}
 	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
 		if (g_ctx_array[i] == NULL)
 			continue;
 		g_ctx_array[i]->profiler_stop = 1;
+		if (cb_ctx) {
+			cb_ctx[i] = g_ctx_array[i]->callback_ctx;
+		}
 	}
 
 	if (profiler_tracer == NULL)
-		return (0);
+		return 0;
 
 	sockopt_unregister(&cpdbg_sockopts);
 
@@ -525,7 +531,7 @@ int stop_continuous_profiler(void)
 
 	ebpf_info(LOG_CP_TAG "== alloc_b %lu bytes, free_b %lu bytes, "
 		  "use %lu bytes ==\n", alloc_b, free_b, alloc_b - free_b);
-	return (0);
+	return 0;
 }
 
 static void print_cp_tracer_status(struct bpf_tracer *t,
@@ -676,9 +682,14 @@ int write_profiler_running_pid(void)
 
 void build_prog_jump_tables(struct bpf_tracer *tracer) {
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_PE_NAME,
+				    MAP_CP_PROGS_JMP_PE_NAME,
 				    PROG_DWARF_UNWIND_FOR_PE,
 				    PROG_DWARF_UNWIND_PE_IDX);
+	insert_prog_to_map(tracer,
+				    MAP_CP_PROGS_JMP_PE_NAME,
+				    PROG_ONCPU_OUTPUT_FOR_PE,
+				    PROG_ONCPU_OUTPUT_PE_IDX);
+	extended_prog_jump_tables(tracer);
 }
 
 /*
@@ -694,7 +705,7 @@ void build_prog_jump_tables(struct bpf_tracer *tracer) {
  */
 
 int start_continuous_profiler(int freq, int java_syms_update_delay,
-			      tracer_callback_t callback)
+			      tracer_callback_t callback, void *cb_ctx[PROFILER_CTX_NUM])
 {
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
@@ -711,6 +722,10 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	if (!run_conditions_check())
 		exit(EXIT_FAILURE);
 
+	if (!cb_ctx) {
+		exit(EXIT_FAILURE);
+	}
+
 	memset(g_ctx_array, 0, sizeof(g_ctx_array));
 	profiler_context_init(&oncpu_ctx, ONCPU_PROFILER_NAME, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
@@ -718,7 +733,8 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      MAP_STACK_A_NAME, MAP_STACK_B_NAME,
 			      MAP_CUSTOM_STACK_A_NAME, MAP_CUSTOM_STACK_B_NAME,
 			      false, true,
-			      NANOSEC_PER_SEC / freq);
+			      NANOSEC_PER_SEC / freq,
+			      cb_ctx[PROFILER_CTX_ONCPU_IDX]);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
 
 	if ((java_syms_update_delay < JAVA_SYMS_UPDATE_DELAY_MIN) ||
@@ -771,12 +787,14 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	    setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, tps, 0,
 			     release_profiler, create_profiler,
-			     (void *)callback, freq);
+			     (void *)callback, cb_ctx, freq);
 	if (tracer == NULL)
 		return (-1);
 
 	if (k_type == K_TYPE_VER_5_2_PLUS) {
-		unwind_tracer_init(tracer);
+		if (unwind_tracer_init(tracer) != 0) {
+			return -1;
+		}
 		build_prog_jump_tables(tracer);
 	} else {
 		ebpf_info("This kernel version does not support DWARF unwinding.");
@@ -889,9 +907,16 @@ int set_profiler_regex(const char *pattern)
 	profile_regex_lock(&oncpu_ctx);
 	do_profiler_regex_config(pattern, &oncpu_ctx);
 	profile_regex_unlock(&oncpu_ctx);
+
+	unwind_process_reload();
+
 	ebpf_info(LOG_CP_TAG "Set 'profiler_regex' successful, pattern : '%s'",
 		  pattern);
 	return (0);
+}
+
+bool check_oncpu_profiler_regex(const char *name) {
+	return check_profiler_regex(&oncpu_ctx, name);
 }
 
 int set_profiler_cpu_aggregation(int flag)
@@ -907,16 +932,6 @@ int set_profiler_cpu_aggregation(int flag)
 	ebpf_info(LOG_CP_TAG
 		  "Set 'cpu_aggregation_flag' successful, value %d\n", flag);
 	return (0);
-}
-
-bool match_profiler_regex(const char *name) {
-	bool matched = false;
-	if (oncpu_ctx.regex_existed) {
-		profile_regex_lock(&oncpu_ctx);
-		matched = regexec(&oncpu_ctx.profiler_regex, name, 0, NULL, 0) == 0;
-		profile_regex_unlock(&oncpu_ctx);
-	}
-	return matched;
 }
 
 struct bpf_tracer *get_profiler_tracer(void)
@@ -971,8 +986,12 @@ int enable_oncpu_profiler(void)
 int disable_oncpu_profiler(void)
 {
 	g_enable_oncpu = false;
-	ebpf_info(LOG_CP_TAG "Set oncpu profiler distable.\n");
+	ebpf_info(LOG_CP_TAG "Set oncpu profiler disable.\n");
 	return 0;
+}
+
+bool oncpu_profiler_enabled(void) {
+	return g_enable_oncpu;
 }
 
 #else /* defined AARCH64_MUSL */
@@ -981,7 +1000,7 @@ int disable_oncpu_profiler(void)
 
 int start_continuous_profiler(int freq,
 			      int java_syms_update_delay,
-			      tracer_callback_t callback)
+			      tracer_callback_t callback, void *cb_ctx[PROFILER_CTX_NUM])
 {
 	return (-1);
 }
@@ -993,7 +1012,7 @@ bool continuous_profiler_running() {
 	return false;
 }
 
-int stop_continuous_profiler(void)
+int stop_continuous_profiler(void *cb_ctx[PROFILER_CTX_NUM])
 {
 	return (0);
 }
@@ -1018,8 +1037,7 @@ int set_profiler_cpu_aggregation(int flag)
 	return (-1);
 }
 
-bool match_profiler_regex(const char *name)
-{
+bool check_oncpu_profiler_regex(const char *name) {
 	return false;
 }
 
@@ -1045,6 +1063,10 @@ int enable_oncpu_profiler(void)
 int disable_oncpu_profiler(void)
 {
 	return 0;
+}
+
+bool oncpu_profiler_enabled(void) {
+	return false;
 }
 
 #endif /* AARCH64_MUSL */

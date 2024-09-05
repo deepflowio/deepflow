@@ -615,9 +615,9 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest, orgID int) *api.SyncResp
 		}
 	}
 
-	tridentTypeForUnkonwVTap := gVTapInfo.GetTridentTypeForUnkonwVTap()
-	if tridentTypeForUnkonwVTap != 0 {
-		tridentType := common.TridentType(tridentTypeForUnkonwVTap)
+	tridentTypeForUnknowVTap := gVTapInfo.GetTridentTypeForUnknowVTap()
+	if tridentTypeForUnknowVTap != 0 {
+		tridentType := common.TridentType(tridentTypeForUnknowVTap)
 		if configInfo == nil {
 			configInfo = &api.Config{
 				MaxEscapeSeconds: proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),

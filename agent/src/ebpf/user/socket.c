@@ -2119,7 +2119,8 @@ int running_socket_tracer(tracer_callback_t handle,
 		ebpf_warning("Fetch system type faild.\n");
 	}
 
-	if (fentry_can_attach(TEST_KFUNC_NAME)) {
+	if (fentry_can_attach(TEST_KFUNC_NAME)
+	    && get_kfunc_params_num(TEST_KFUNC_NAME) == TEST_KFUNC_PARAMS_NUM) {
 		g_k_type = K_TYPE_KFUNC;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-kfunc");
@@ -2180,7 +2181,7 @@ int running_socket_tracer(tracer_callback_t handle,
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
 			     bpf_bin_buffer, buffer_sz, tps,
-			     thread_nr, NULL, NULL, (void *)handle,
+			     thread_nr, NULL, NULL, (void *)handle, NULL,
 			     MS_IN_SEC / KICK_KERN_PERIOD);
 	if (tracer == NULL)
 		return -EINVAL;

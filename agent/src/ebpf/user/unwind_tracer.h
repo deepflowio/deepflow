@@ -21,7 +21,7 @@
 #include "profile/profile_common.h"
 
 // Scan /proc/ to get all processes when the agent starts
-void unwind_tracer_init(struct bpf_tracer *tracer);
+int unwind_tracer_init(struct bpf_tracer *tracer);
 
 void unwind_tracer_drop();
 
@@ -33,6 +33,9 @@ void unwind_events_handle(void);
 
 // Process exit, reclaim resources
 void unwind_process_exit(int pid);
+
+// Trigger a unwind table reload, used on enabling DWARF or setting matching regular expressions
+void unwind_process_reload();
 
 // Configuration related functions
 bool get_dwarf_enabled(void);
