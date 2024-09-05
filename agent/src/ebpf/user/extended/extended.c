@@ -53,3 +53,5 @@ void __attribute__ ((weak)) extended_process_exec(int pid) {}
 void __attribute__ ((weak)) extended_events_handle(void) {}
 
 void __attribute__ ((weak)) extended_process_exit(int pid) {}
+
+void __attribute__ ((weak)) extended_match_pid_handle(int feat, int pid, enum match_pids_act act) {}

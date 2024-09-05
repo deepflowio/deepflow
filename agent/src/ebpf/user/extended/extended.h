@@ -71,4 +71,11 @@ void extended_events_handle(void);
  */
 void extended_process_exit(int pid);
 
+/**
+ * @brief **extended_match_pid_handle()** Perform extended processing on matching PIDs
+ * @param feat Feature identifiers, such as: off-cpu/memory profiler
+ * @param pid Matching process ID
+ * @param act Is MATCH_PID_ADD or MATCH_PID_DEL 
+ */
+void extended_match_pid_handle(int feat, int pid, enum match_pids_act act);
 #endif /* DF_EXTENDED_H */

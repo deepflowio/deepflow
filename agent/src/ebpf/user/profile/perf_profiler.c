@@ -243,8 +243,7 @@ static void oncpu_reader_work(void *arg)
 		 * exit events. We want to ensure that everything is ready
 		 * before the profiler performs address translation.
 		 */
-		if (unlikely(!oncpu_ctx.regex_existed ||
-			     get_socket_tracer_state() != TRACER_RUNNING)) {
+		if (unlikely(get_socket_tracer_state() != TRACER_RUNNING)) {
 			if (oncpu_ctx.enable_bpf_profile)
 				set_bpf_run_enabled(t, &oncpu_ctx, 0);
 			sleep(1);

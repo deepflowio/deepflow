@@ -1787,6 +1787,7 @@ static void add_thread_ids_entry(pthread_t thread, int index)
 
 static int add_pid_to_match_hash(int feature, int pid)
 {
+	int ret = 0;
 	pids_metch_hash_t *h = &pids_metch_hash;
 	pids_metch_hash_kv kv = {};
 	kv.key = (u64) pid;
@@ -1795,10 +1796,11 @@ static int add_pid_to_match_hash(int feature, int pid)
 	if (pids_metch_hash_add_del(h, &kv, 1)) {
 		ebpf_warning("Add hash failed.(key %lu value %lu)\n",
 			     kv.key, kv.value);
-		return -1;
+		ret = -1;
 	}
 
-	return 0;
+	extended_match_pid_handle(feature, pid, MATCH_PID_ADD);
+	return ret;
 }
 
 bool is_pid_match(int feature, int pid)
@@ -1812,6 +1814,7 @@ bool is_pid_match(int feature, int pid)
 
 static int clear_pid_from_match_hash(int feature, int pid)
 {
+	int ret = 0;
 	pids_metch_hash_t *h = &pids_metch_hash;
 	pids_metch_hash_kv kv = {};
 	kv.key = (u64) pid;
@@ -1820,17 +1823,18 @@ static int clear_pid_from_match_hash(int feature, int pid)
 	if (kv.value == 0) {
 		if (pids_metch_hash_add_del(h, &kv, 0)) {
 			ebpf_warning("delete hash failed.(key %lu)\n", kv.key);
-			return -1;
+			ret = -1;
 		}
 	} else {
 		if (pids_metch_hash_add_del(h, &kv, 1)) {
 			ebpf_warning("clear hash failed.(key %lu value %lu)\n",
 				     kv.key, kv.value);
-			return -1;
+			ret = -1;
 		}
 	}
 
-	return 0;
+	extended_match_pid_handle(feature, pid, MATCH_PID_DEL);
+	return ret;
 }
 
 static void del_stale_match_pids(int feature, const int *pids, int num)

@@ -153,6 +153,11 @@ enum cfg_feature_idx {
 	FEATURE_MAX,
 };
 
+enum match_pids_act {
+	MATCH_PID_ADD,
+	MATCH_PID_DEL,
+};
+
 struct cfg_feature_regex {
 	regex_t preg;
 	int ok;
