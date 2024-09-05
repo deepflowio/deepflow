@@ -23,6 +23,7 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	api "github.com/deepflowio/deepflow/message/trident"
@@ -62,7 +63,12 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				log.Infof("context done, agent(key: %s)", key)
 				return
 			default:
+				time.Sleep(time.Millisecond * 500)
 				resp, err := stream.Recv()
+				if err != nil {
+					log.Errorf("agent(key: %s) remote exec stream error: %v", key, err)
+				}
+				log.Infof("resp: %v", resp)
 				if resp == nil {
 					continue
 				}
