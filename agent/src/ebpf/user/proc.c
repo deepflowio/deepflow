@@ -315,11 +315,6 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 
 static inline int del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 {
-	if (kv->v.proc_info_p) {
-		struct symbolizer_proc_info *p;
-		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
-	}
-
 	free_symbolizer_cache_kvp(kv);
 	return 0;
 }

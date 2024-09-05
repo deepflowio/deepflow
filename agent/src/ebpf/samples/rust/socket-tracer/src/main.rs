@@ -200,7 +200,7 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
     }
 }
 
-extern "C" fn socket_trace_callback(_: *mut c_void, _sd: *mut SK_BPF_DATA) {
+extern "C" fn socket_trace_callback(_: *mut c_void, sd: *mut SK_BPF_DATA) {
     unsafe {
         let mut proto_tag = String::from("");
         if sk_proto_safe(sd) == SOCK_DATA_OTHER {
@@ -599,7 +599,7 @@ fn main() {
             ::std::process::exit(1);
         }
 
-        let feature: c_int = FEATURE_PROFILE_ONCPU;
+        let feature: c_int = FEATURE_UPROBE_GOLANG;
         let pids: [c_int; 3] = [101, 202, 303];
         let num: c_int = pids.len() as c_int;
         let result = set_feature_pids(feature, pids.as_ptr(), num);

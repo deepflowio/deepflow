@@ -50,7 +50,7 @@ int main(void)
 	if (write_profiler_running_pid() != ETR_OK)
 		return (-1);
 
-	char buf[1024];
+	char buf[2048];
 	exec_command("./test_pid_check", "", buf, sizeof(buf));
 	ebpf_info("--- %s\n", buf);
 	if (strstr(buf, "is already running")) {

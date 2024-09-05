@@ -38,6 +38,7 @@
 #include "elf.h"
 #include "load.h"
 #include "mem.h"
+#include "extended/extended.h"
 
 uint32_t k_version;
 // Linux kernel major version, minor version, revision version, and revision number.
@@ -115,7 +116,7 @@ struct match_pid_s {
 };
 static struct match_pid_s prev_match_pids[FEATURE_MAX];
 // Used to store process IDs for matching various features
-pids_metch_hash_t pids_metch_hash;
+pids_match_hash_t pids_match_hash;
 
 static int tracepoint_attach(struct tracepoint *tp);
 static int perf_reader_setup(struct bpf_perf_reader *perf_readerm,
@@ -1754,7 +1755,7 @@ static void init_thread_ids(void)
 	pthread_mutex_init(&thread_ids.lock, NULL);
 }
 
-static int print_match_pids_kvp_cb(pids_metch_hash_kv * kv, void *arg)
+static int print_match_pids_kvp_cb(pids_match_hash_kv * kv, void *arg)
 {
 	ebpf_info("  PID %lu flags 0x%lx (%s %s %s %s %s %s %s)\n",
 		  kv->key, kv->value,
@@ -1763,7 +1764,6 @@ static int print_match_pids_kvp_cb(pids_metch_hash_kv * kv, void *arg)
 		  "",
 		  (kv->value & (1 << FEATURE_UPROBE_GOLANG)) ? "GOLANG" : "",
 		  (kv->value & (1 << FEATURE_UPROBE_OPENSSL)) ? "OPENSSL" : "",
-		  (kv->value & (1 << FEATURE_UPROBE_JAVA)) ? "JAVA" : "",
 		  (kv->value & (1 << FEATURE_PROFILE_ONCPU)) ? "ONCPU" : "",
 		  (kv->value & (1 << FEATURE_PROFILE_OFFCPU)) ? "OFFCPU" : "",
 		  (kv->value & (1 << FEATURE_PROFILE_MEMORY)) ? "OFFCPU" : "");
@@ -1772,10 +1772,10 @@ static int print_match_pids_kvp_cb(pids_metch_hash_kv * kv, void *arg)
 
 static void print_match_pids_hash(void)
 {
-	pids_metch_hash_t *h = &pids_metch_hash;
-	pids_metch_hash_foreach_key_value_pair(h, print_match_pids_kvp_cb,
+	pids_match_hash_t *h = &pids_match_hash;
+	pids_match_hash_foreach_key_value_pair(h, print_match_pids_kvp_cb,
 					       NULL);
-	print_hash_pids_metch(&pids_metch_hash);
+	print_hash_pids_match(&pids_match_hash);
 }
 
 static void add_thread_ids_entry(pthread_t thread, int index)
@@ -1795,12 +1795,12 @@ static void add_thread_ids_entry(pthread_t thread, int index)
 static int add_pid_to_match_hash(int feature, int pid)
 {
 	int ret = 0;
-	pids_metch_hash_t *h = &pids_metch_hash;
-	pids_metch_hash_kv kv = {};
+	pids_match_hash_t *h = &pids_match_hash;
+	pids_match_hash_kv kv = {};
 	kv.key = (u64) pid;
-	pids_metch_hash_search(h, &kv, &kv);
+	pids_match_hash_search(h, &kv, &kv);
 	kv.value |= (1 << feature);
-	if (pids_metch_hash_add_del(h, &kv, 1)) {
+	if (pids_match_hash_add_del(h, &kv, 1)) {
 		ebpf_warning("Add hash failed.(key %lu value %lu)\n",
 			     kv.key, kv.value);
 		ret = -1;
@@ -1812,28 +1812,28 @@ static int add_pid_to_match_hash(int feature, int pid)
 
 bool is_pid_match(int feature, int pid)
 {
-	pids_metch_hash_t *h = &pids_metch_hash;
-	pids_metch_hash_kv kv = {};
+	pids_match_hash_t *h = &pids_match_hash;
+	pids_match_hash_kv kv = {};
 	kv.key = (u64) pid;
-	pids_metch_hash_search(h, &kv, &kv);
+	pids_match_hash_search(h, &kv, &kv);
 	return kv.value & (1UL << feature);
 }
 
 static int clear_pid_from_match_hash(int feature, int pid)
 {
 	int ret = 0;
-	pids_metch_hash_t *h = &pids_metch_hash;
-	pids_metch_hash_kv kv = {};
+	pids_match_hash_t *h = &pids_match_hash;
+	pids_match_hash_kv kv = {};
 	kv.key = (u64) pid;
-	pids_metch_hash_search(h, &kv, &kv);
+	pids_match_hash_search(h, &kv, &kv);
 	kv.value &= ~(1 << feature);
 	if (kv.value == 0) {
-		if (pids_metch_hash_add_del(h, &kv, 0)) {
+		if (pids_match_hash_add_del(h, &kv, 0)) {
 			ebpf_warning("delete hash failed.(key %lu)\n", kv.key);
 			ret = -1;
 		}
 	} else {
-		if (pids_metch_hash_add_del(h, &kv, 1)) {
+		if (pids_match_hash_add_del(h, &kv, 1)) {
 			ebpf_warning("clear hash failed.(key %lu value %lu)\n",
 				     kv.key, kv.value);
 			ret = -1;
@@ -1891,7 +1891,7 @@ int set_feature_pids(int feature, const int *pids, int num)
 	if (feature < 0 || feature >= FEATURE_MAX) {
 		return -1;
 	}
-	// Set the thread ID, which will be used in `pids_metch_hash`.
+	// Set the thread ID, which will be used in `pids_match_hash`.
 	pthread_t tid = pthread_self();
 	struct thread_index_entry *v;
 	bool found = false;
@@ -1921,11 +1921,11 @@ int set_feature_pids(int feature, const int *pids, int num)
 
 int init_match_pids_hash(void)
 {
-	pids_metch_hash_t *h = &pids_metch_hash;
+	pids_match_hash_t *h = &pids_match_hash;
 	memset(h, 0, sizeof(*h));
-	u32 nbuckets = PIDS_METCH_HASH_BUCKETS_NUM;
-	u64 hash_memory_size = PIDS_METCH_HASH_MEM_SZ;
-	return pids_metch_hash_init(h, (char *)"match-pids", nbuckets,
+	u32 nbuckets = PIDS_MATCH_HASH_BUCKETS_NUM;
+	u64 hash_memory_size = PIDS_MATCH_HASH_MEM_SZ;
+	return pids_match_hash_init(h, (char *)"match-pids", nbuckets,
 				    hash_memory_size);
 }
 

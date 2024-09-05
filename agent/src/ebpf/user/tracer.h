@@ -128,15 +128,15 @@ struct thread_index_array {
 };
 
 // PID management for feature-matching processes
-#define pids_metch_hash_t        clib_bihash_8_8_t
-#define pids_metch_hash_init     clib_bihash_init_8_8
-#define pids_metch_hash_kv       clib_bihash_kv_8_8_t
-#define print_hash_pids_metch    print_bihash_8_8
-#define pids_metch_hash_search   clib_bihash_search_8_8
-#define pids_metch_hash_add_del  clib_bihash_add_del_8_8
-#define pids_metch_hash_free     clib_bihash_free_8_8
-#define pids_metch_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
-#define pids_metch_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
+#define pids_match_hash_t        clib_bihash_8_8_t
+#define pids_match_hash_init     clib_bihash_init_8_8
+#define pids_match_hash_kv       clib_bihash_kv_8_8_t
+#define print_hash_pids_match    print_bihash_8_8
+#define pids_match_hash_search   clib_bihash_search_8_8
+#define pids_match_hash_add_del  clib_bihash_add_del_8_8
+#define pids_match_hash_free     clib_bihash_free_8_8
+#define pids_match_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
+#define pids_match_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
 
 // index number of feature.
 enum cfg_feature_idx {
