@@ -314,8 +314,16 @@ func (n *NodeInfo) initTSDBInfo() {
 }
 
 func (n *NodeInfo) generateTSDBRegion() {
-	dbAZTSDBConns, _ := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).Gets()
-	dbRegions, _ := dbmgr.DBMgr[models.Region](n.db).Gets()
+	dbAZTSDBConns, err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).Gets()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	dbRegions, err := dbmgr.DBMgr[models.Region](n.db).Gets()
+	if err != nil {
+		log.Error(err)
+		return
+	}
 	lcuuidToRegionID := make(map[string]int)
 	ipToRegionID := make(map[string]uint32)
 	for _, region := range dbRegions {
@@ -330,7 +338,11 @@ func (n *NodeInfo) generateTSDBRegion() {
 }
 
 func (n *NodeInfo) generatesysConfiguration() {
-	dbSysConfigurations, _ := dbmgr.DBMgr[models.SysConfiguration](n.db).Gets()
+	dbSysConfigurations, err := dbmgr.DBMgr[models.SysConfiguration](n.db).Gets()
+	if err != nil {
+		log.Error(err)
+		return
+	}
 	sysConfigurationToValue := make(map[string]string)
 	if dbSysConfigurations != nil {
 		for _, sysConfig := range dbSysConfigurations {
@@ -408,7 +420,11 @@ func (n *NodeInfo) GetLocalControllers() []*trident.DeepFlowServerInstanceInfo {
 func (n *NodeInfo) updateTSDBInfo() {
 	n.generateTSDBRegion()
 	n.generatesysConfiguration()
-	dbTSDBs, _ := dbmgr.DBMgr[models.Analyzer](n.db).Gets()
+	dbTSDBs, err := dbmgr.DBMgr[models.Analyzer](n.db).Gets()
+	if err != nil {
+		log.Error(err)
+		return
+	}
 	dbKeys := mapset.NewSet()
 	ipToTSDB := make(map[string]*models.Analyzer)
 	tsdbToNATIP := make(map[string]string)
