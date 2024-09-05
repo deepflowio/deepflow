@@ -29,7 +29,7 @@ import (
 func GetDatabases() *common.Result {
 	var values []interface{}
 	for db := range chCommon.DB_TABLE_MAP {
-		values = append(values, []string{db})
+		values = append(values, []interface{}{db})
 	}
 	return &common.Result{
 		Columns: []interface{}{"name"},
@@ -37,14 +37,14 @@ func GetDatabases() *common.Result {
 	}
 }
 
-func GetTables(db, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) *common.Result {
+func GetTables(db, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context, DebugInfo *client.DebugInfo) *common.Result {
 	var values []interface{}
 	tables, ok := chCommon.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
 	}
 	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_EXT_METRICS, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS}, db) {
-		values = append(values, chCommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
+		values = append(values, chCommon.GetExtTables(db, where, queryCacheTTL, orgID, useQueryCache, ctx, DebugInfo)...)
 	} else {
 		for _, table := range tables {
 			datasource, err := chCommon.GetDatasources(db, table, orgID)
