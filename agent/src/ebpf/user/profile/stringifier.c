@@ -183,12 +183,16 @@ static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	int len = 0;
 	char *ptr = (char *)sym->demangle_name;
 
+	// According to https://github.com/rust-lang/rustc-demangle/blob/f053741061bd1686873a467a7d9ef22d2f1fb876/src/lib.rs#L93,
+	// rust symbols may contain a ".llvm." suffix, handle this first
+	bool maybe_rust_symbol = strstr(sym->demangle_name, ".llvm.") != NULL;
 	// rust symbols ends with "::h0123456789abcdef", which is "::h" followed by 16 hex digits
 	// for example:
 	//     std::sys_common::backtrace::__rust_begin_short_backtrace::h4385d813972dd7eb
 	// try rustc_demangle if we see this pattern
 	int offset = strlen(sym->demangle_name) - strlen(RUST_SYM_SUFFIX);
-	if (offset > 0 && strncmp(sym->demangle_name + offset, "::h", 3) == 0) {
+	maybe_rust_symbol |= offset > 0 && strncmp(sym->demangle_name + offset, "::h", 3) == 0;
+	if (maybe_rust_symbol) {
 		// likely a rust name
 		char rust_name[RUST_SYM_MAX_LEN];
 		memset(rust_name, 0, sizeof(rust_name));
@@ -214,14 +218,15 @@ static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 
 // Demangle with
 // https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3
-char *rewrite_java_symbol(char *sym) {
+char *rewrite_java_symbol(char *sym)
+{
 	int len = strlen(sym);
 	if (len == 0) {
 		return NULL;
 	}
 
 	int i = 0, j = 0;
-	for (i = 0; i < len && sym[i] == '['; i++) {}
+	for (i = 0; i < len && sym[i] == '['; i++);
 	int array_dims = i;
 
 	// make room for array ']'s and base type name expension
@@ -321,7 +326,8 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 				*sym_ptr = proc_symbol_name_fetch(pid, sym);
 				if (p->is_java) {
 					// handle java encoded symbols
-					char *new_sym = rewrite_java_symbol(*sym_ptr);
+					char *new_sym =
+					    rewrite_java_symbol(*sym_ptr);
 					if (new_sym != NULL) {
 						clib_mem_free(*sym_ptr);
 						*sym_ptr = new_sym;
@@ -433,7 +439,8 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      int stack_id,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      int *ret_val, void *info_p, u64 ts, bool ignore_libs)
+				      int *ret_val, void *info_p, u64 ts,
+				      bool ignore_libs)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -448,6 +455,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 
 	u64 ips[PERF_MAX_STACK_DEPTH];
 	memset(ips, 0, sizeof(ips));
+
 	int ret;
 	if ((ret = get_stack_ips(t, stack_map_name, stack_id, ips, ts))) {
 		stack_table_data_miss++;
@@ -475,7 +483,9 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				 info_p);
 		if (str) {
 			// ignore frames in library for memory profiling
-			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix) && strncmp(str, lib_sym_prefix, strlen(lib_sym_prefix)) == 0) {
+			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix)
+			    && strncmp(str, lib_sym_prefix,
+				       strlen(lib_sym_prefix)) == 0) {
 				clib_mem_free(str);
 				continue;
 			}
@@ -525,7 +535,8 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       pid_t pid,
 				       const char *stack_map_name,
 				       stack_str_hash_t * h,
-				       bool new_cache, void *info_p, u64 ts, bool ignore_libs)
+				       bool new_cache, void *info_p, u64 ts,
+				       bool ignore_libs)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
@@ -544,7 +555,8 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 	char *str = NULL;
 	int ret_val = 0;
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val, info_p, ts, ignore_libs);
+				       h, new_cache, &ret_val, info_p, ts,
+				       ignore_libs);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
@@ -594,7 +606,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      const char *custom_stack_map_name,
 				      stack_str_hash_t * h,
 				      bool new_cache,
-				      char *process_name, void *info_p, bool ignore_libs)
+				      char *process_name, void *info_p,
+				      bool ignore_libs)
 {
 	/*
 	 * We need to prepare a hashtable (stack_trace_strs) to record the results
@@ -613,8 +626,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 
 	/* add separator and '\0' */
 	int len = 2;
-	char *k_trace_str, *u_trace_str, *trace_str;
-	k_trace_str = u_trace_str = trace_str = NULL;
+	char *k_trace_str, *u_trace_str, *trace_str, *uprobe_str;
+	k_trace_str = u_trace_str = trace_str = uprobe_str = NULL;
 
 	/* For processes without configuration, the stack string is in the format
 	   'process name;thread name'. */
@@ -650,7 +663,8 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
 							h, new_cache, info_p,
-							v->timestamp, ignore_libs);
+							v->timestamp,
+							ignore_libs);
 		if (k_trace_str == NULL)
 			return NULL;
 	}
@@ -658,11 +672,24 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->userstack >= 0) {
 		u_trace_str = folded_stack_trace_string(t, v->userstack,
 							v->tgid,
-							v->flags & STACK_TRACE_FLAGS_DWARF ? custom_stack_map_name : stack_map_name,
-							h, new_cache, info_p,
-							v->timestamp, ignore_libs);
+							v->flags &
+							STACK_TRACE_FLAGS_DWARF
+							? custom_stack_map_name
+							: stack_map_name, h,
+							new_cache, info_p,
+							v->timestamp,
+							ignore_libs);
 		if (u_trace_str == NULL)
 			return NULL;
+	}
+
+	if (v->flags & STACK_TRACE_FLAGS_URETPROBE && v->uprobe_addr != 0) {
+		uprobe_str =
+		    resolve_addr(t, v->tgid, false, v->uprobe_addr, new_cache,
+				 info_p);
+		if (uprobe_str == NULL) {
+			return NULL;
+		}
 	}
 
 	/* trace_str = u_stack_str_fn() + ";" + k_stack_str_fn(); */
@@ -682,7 +709,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		trace_str = alloc_stack_trace_str(len);
 		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
-			return NULL;
+			goto error;
 		}
 		snprintf(trace_str, len, "%s;%s",
 			 u_trace_str ? u_trace_str : u_err_tag,
@@ -698,7 +725,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		trace_str = alloc_stack_trace_str(len);
 		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
-			return NULL;
+			goto error;
 		}
 
 		snprintf(trace_str, len, "%s",
@@ -706,6 +733,9 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	} else if (v->userstack >= 0) {
 		if (u_trace_str) {
 			len += strlen(u_trace_str);
+			if (uprobe_str) {
+				len += strlen(uprobe_str) + 1;
+			}
 		} else {
 			len += strlen(u_err_tag);
 		}
@@ -713,11 +743,16 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		trace_str = alloc_stack_trace_str(len);
 		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
-			return NULL;
+			goto error;
 		}
 
-		snprintf(trace_str, len, "%s",
-			 u_trace_str ? u_trace_str : u_err_tag);
+		if (u_trace_str && uprobe_str) {
+			snprintf(trace_str, len, "%s;%s", u_trace_str,
+				 uprobe_str);
+		} else {
+			snprintf(trace_str, len, "%s",
+				 u_trace_str ? u_trace_str : u_err_tag);
+		}
 	} else {
 		/* 
 		 * The kernel can indicate the invalidity of a stack ID in two
@@ -738,12 +773,23 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		trace_str = alloc_stack_trace_str(len);
 		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
-			return NULL;
+			goto error;
 		}
 
 		snprintf(trace_str, len, "%s", lost_tag);
 	}
 
+	if (uprobe_str) {
+		clib_mem_free(uprobe_str);
+	}
+
 	return trace_str;
+
+error:
+	if (uprobe_str) {
+		clib_mem_free(uprobe_str);
+	}
+
+	return NULL;
 }
 #endif /* AARCH64_MUSL */

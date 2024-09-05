@@ -697,14 +697,15 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		DB:       "flow_tag",
 		Context:  ctx,
 	}
+
 	k8sLabelSql := "SELECT key FROM (SELECT key FROM flow_tag.pod_service_k8s_label_map UNION ALL SELECT key FROM flow_tag.pod_k8s_label_map) GROUP BY key"
 	chClient.Debug = client.NewDebug(k8sLabelSql)
 	k8sLabelRst, err := chClient.DoQuery(&client.QueryParams{Sql: k8sLabelSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
-	if err != nil {
-		return
-	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
+	}
+	if err != nil {
+		return
 	}
 	for _, _key := range k8sLabelRst.Values {
 		key := _key.([]interface{})[0]
@@ -721,7 +722,6 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			})
 		}
 	}
-
 	// 查询 k8s_annotation
 	k8sAnnotationSql := "SELECT key FROM (SELECT key FROM flow_tag.pod_k8s_annotation_map UNION ALL SELECT key FROM flow_tag.pod_service_k8s_annotation_map) GROUP BY key"
 	chClient.Debug = client.NewDebug(k8sAnnotationSql)
@@ -731,11 +731,11 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		QueryCacheTTL: queryCacheTTL,
 		ORGID:         orgID,
 	})
-	if err != nil {
-		return
-	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
+	}
+	if err != nil {
+		return
 	}
 	for _, _key := range k8sAnnotationRst.Values {
 		key := _key.([]interface{})[0]
@@ -758,11 +758,11 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	chClient.Debug = client.NewDebug(podK8senvSql)
 	podK8senvRst, err := chClient.DoQuery(&client.QueryParams{
 		Sql: podK8senvSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
-	if err != nil {
-		return
-	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
+	}
+	if err != nil {
+		return
 	}
 	for _, _key := range podK8senvRst.Values {
 		key := _key.([]interface{})[0]
@@ -784,11 +784,11 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	cloudTagSql := "SELECT key FROM (SELECT key FROM flow_tag.chost_cloud_tag_map UNION ALL SELECT key FROM flow_tag.pod_ns_cloud_tag_map) GROUP BY key"
 	chClient.Debug = client.NewDebug(cloudTagSql)
 	cloudTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: cloudTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
-	if err != nil {
-		return
-	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
+	}
+	if err != nil {
+		return
 	}
 	for _, _key := range cloudTagRst.Values {
 		key := _key.([]interface{})[0]
@@ -810,11 +810,11 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	osAPPTagSql := "SELECT key FROM flow_tag.os_app_tag_map GROUP BY key"
 	chClient.Debug = client.NewDebug(osAPPTagSql)
 	osAPPTagRst, err := chClient.DoQuery(&client.QueryParams{Sql: osAPPTagSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
-	if err != nil {
-		return
-	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *chClient.Debug)
+	}
+	if err != nil {
+		return
 	}
 	for _, _key := range osAPPTagRst.Values {
 		key := _key.([]interface{})[0]
@@ -864,6 +864,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	}
 	externalSql := ""
 	if whereSql != "" {
+		whereSql = strings.ReplaceAll(whereSql, " name ", " field_name ")
 		if db == "_prometheus" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", whereSql, limit)
 		} else if table == "" {
@@ -886,11 +887,11 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	}
 	externalChClient.Debug = client.NewDebug(externalSql)
 	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql, UseQueryCache: useQueryCache, QueryCacheTTL: queryCacheTTL, ORGID: orgID})
-	if err != nil {
-		return
-	}
 	if DebugInfo != nil {
 		DebugInfo.Debug = append(DebugInfo.Debug, *externalChClient.Debug)
+	}
+	if err != nil {
+		return
 	}
 	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]

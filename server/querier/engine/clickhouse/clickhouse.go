@@ -52,6 +52,8 @@ var checkWithSqlRegexp = regexp.MustCompile(`WITH\s+\S+\s+AS\s+\(`)
 var letterRegexp = regexp.MustCompile("^[a-zA-Z]")
 var fromRegexp = regexp.MustCompile(`(?i)from\s+(\S+)`)
 var whereRegexp = regexp.MustCompile(`(?i)where\s+(\S.*)`)
+var visibilityRegexp = regexp.MustCompile(`(?i)regexp\s+(\S+)`)
+var notRegexp = regexp.MustCompile(`(?i)(\S+)\s+not regexp\s+(\S+)`)
 
 var Lock sync.Mutex
 
@@ -73,8 +75,8 @@ var showPatterns = []string{
 	`(^show\s+metrics(?: from [^\s]+)?(?: where .+)?$)|(^show\s+metrics on db$)`,                                          // 3. show metrics or show metrics on db
 	`^show\s+tag\s+\S+\s+values\s+from\s+\S+(?: where .+)?(?: order by \w+)?(?: limit\s+\d+(,\s+\d+)?)?(?: offset \d+)?$`, // 4. show tag X values Y, X,Y not nil
 	`^show\s+tags(?: from ([^\s]+))?(?: where .+)?(?: limit\s+\d+(,\s+\d+)?)?$`,                                           // 5. show tags ...
-	`^show\s+tables$`,    // 6. show tables
-	`^show\s+databases$`, // 7. show databases
+	`^show\s+tables(?: where .+)?$`,                                // 6. show tables
+	`^show\s+databases(?: where .+)?$`,                             // 7. show databases
 	`^show\s+tag-values(?: where .+)?(?: limit\s+\d+(,\s+\d+)?)?$`, // 8. show tag-values
 	`^show all_enum_tags$`,
 	`^show\s+enum\s+\S+\s+values`,
@@ -320,7 +322,7 @@ func ShowTagTypeMetrics(tagDescriptions, result *common.Result, db, table string
 }
 
 // extractFromWhere extracts the first string after 'from' and all strings after 'where'.
-func ExtractFromWhere(s string) (table string, whereClause string) {
+func ExtractFromWhereAndvisibilityFilter(s string) (table string, whereClause string, visibilityFilter string) {
 	// Regex to capture the first string after 'from' and all strings after 'where'
 	// Extract from part
 	fromMatch := fromRegexp.FindStringSubmatch(s)
@@ -331,6 +333,10 @@ func ExtractFromWhere(s string) (table string, whereClause string) {
 	whereMatch := whereRegexp.FindStringSubmatch(s)
 	if len(whereMatch) > 1 {
 		whereClause = whereMatch[1]
+	}
+	visibilityFilterMatch := visibilityRegexp.FindStringSubmatch(s)
+	if len(visibilityFilterMatch) > 1 {
+		visibilityFilter = visibilityFilterMatch[1]
 	}
 	return
 }
@@ -343,8 +349,19 @@ func MatchPattern(s string) (int, bool) {
 	}
 	return 0, false
 }
+func dataVisibilityfiltering(visibilityFilterRegexp *regexp.Regexp, values []interface{}) []interface{} {
+	var visibilityFilterValues []interface{}
+	for _, value := range values {
+		name := value.([]interface{})[0].(string)
+		if !visibilityFilterRegexp.MatchString(name) {
+			visibilityFilterValues = append(visibilityFilterValues, value)
+		}
+	}
+	return visibilityFilterValues
+}
 
 func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInfo *client.DebugInfo) (*common.Result, []string, bool, error) {
+	var visibilityFilterRegexp *regexp.Regexp
 	sqlSplit := strings.Fields(sql)
 	// Not showSql, return
 	if strings.ToLower(sqlSplit[0]) != "show" {
@@ -356,7 +373,18 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		err := fmt.Errorf("not support sql: '%s', please check", sql)
 		return nil, []string{}, true, err
 	}
-	table, where := ExtractFromWhere(sql)
+	table, where, visibilityFilter := ExtractFromWhereAndvisibilityFilter(sql)
+	visibilityWhere := ""
+	visibilitySql := ""
+	if len(visibilityFilter) > 0 {
+		visibilitySql = notRegexp.ReplaceAllString(sql, "not match( $1 ,$2 )")
+		sql = notRegexp.ReplaceAllString(sql, " 1=1 ")
+		_, where, _ = ExtractFromWhereAndvisibilityFilter(sql)
+		_, visibilityWhere, _ = ExtractFromWhereAndvisibilityFilter(visibilitySql)
+		visibilityFilter = strings.Trim(visibilityFilter, "'")
+		visibilityFilterRegexp = regexp.MustCompile(visibilityFilter)
+	}
+
 	switch table {
 	case "vtap_app_port":
 		table = "application"
@@ -380,15 +408,25 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		funcs, err := metrics.GetFunctionDescriptions()
 		return funcs, []string{}, true, err
 	case 3: // show metrics ...
+		if e.DB == chCommon.DB_NAME_DEEPFLOW_TENANT && len(visibilityFilter) > 0 {
+			where = visibilityWhere
+			sql = visibilitySql
+		}
 		result, err := metrics.GetMetricsDescriptions(e.DB, table, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 		if err != nil {
 			return nil, []string{}, true, err
+		}
+		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
+			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
 		}
 		// tag metrics
 		tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, e.ORGID, args.UseQueryCache, e.Context, DebugInfo)
 		if err != nil {
 			log.Error("Failed to get tag type metrics")
 			return nil, []string{}, true, err
+		}
+		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
+			tagDescriptions.Values = dataVisibilityfiltering(visibilityFilterRegexp, tagDescriptions.Values)
 		}
 		ShowTagTypeMetrics(tagDescriptions, result, e.DB, table)
 		return result, []string{}, true, err
@@ -397,12 +435,29 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		e.DB = "flow_tag"
 		return result, sqlList, true, err
 	case 5: // show tags ...
+		if e.DB == chCommon.DB_NAME_DEEPFLOW_TENANT && len(visibilityFilter) > 0 {
+			sql = visibilitySql
+		}
 		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, DebugInfo)
+		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
+			data.Values = dataVisibilityfiltering(visibilityFilterRegexp, data.Values)
+		}
 		return data, []string{}, true, err
 	case 6: // show  tables...
-		return GetTables(e.DB, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, DebugInfo), []string{}, true, nil
+		if e.DB == chCommon.DB_NAME_DEEPFLOW_TENANT && len(visibilityFilter) > 0 {
+			where = visibilityWhere
+		}
+		result := GetTables(e.DB, where, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context, DebugInfo)
+		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
+			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
+		}
+		return result, []string{}, true, nil
 	case 7: // show  databases...
-		return GetDatabases(), []string{}, true, nil
+		result := GetDatabases()
+		if len(visibilityFilter) > 0 {
+			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
+		}
+		return result, []string{}, true, nil
 	case 8: // show tag-values...
 		sqlList, err := tagdescription.GetTagValuesDescriptions(e.DB, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache, e.Context)
 		return nil, sqlList, true, err

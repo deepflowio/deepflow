@@ -430,7 +430,7 @@ impl Policy {
         (endpoints, entry)
     }
 
-    pub fn lookup_pod_id(&self, container_id: &String) -> u32 {
+    pub fn lookup_pod_id(&self, container_id: &str) -> u32 {
         self.labeler.lookup_pod_id(container_id)
     }
 
@@ -600,7 +600,7 @@ impl PolicyGetter {
         self.policy().lookup_epc_by_epc(src, dst, l3_epc_id_src)
     }
 
-    pub fn lookup_pod_id(&self, container_id: &String) -> u32 {
+    pub fn lookup_pod_id(&self, container_id: &str) -> u32 {
         self.policy().lookup_pod_id(container_id)
     }
 }

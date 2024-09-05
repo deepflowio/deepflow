@@ -20,10 +20,10 @@
 #include "../extended/extended.h"
 #include "../bihash_32_8.h"
 #include "../../kernel/include/perf_profiler.h"
+#include "../tracer.h"
 
 #define LOG_CP_TAG	"[CP] "
 
-#define PROFILER_CTX_NUM 3
 // For storing information about continuously running profiling processes.
 #define DEEPFLOW_RUNNING_PID_PATH "/tmp/.deepflow-agent-running-pid"
 
@@ -89,6 +89,29 @@ typedef struct {
 			 */
 			u64 padding;
 		} c_k;
+
+		// key for memory profile
+		struct {
+			/*
+			 * tgid:
+			 *   The tgid (Thread Group ID) in kernel space
+			 *   is equivalent to the process ID in user space.
+			 * pid:
+			 *   The process ID or thread ID in kernel space.
+			 * cpu:
+			 *   Which CPU core does the perf event occur on?
+			 */
+			u64 tgid:24, pid:32, cpu:8;
+
+			/*
+			 * process start time(the number of millisecond
+			 * elapsed since January 1, 1970 00:00:00).
+			 */
+			u64 stime;
+			u32 u_stack_id;
+			u32 uprobe_addr; // low 32B of uprobe function address which is not in uretprobe stack
+			u64 mem_addr; // address of allocated/free'd memory
+		} m_k;
 	};
 
 	/* Store perf profiler data */
@@ -101,13 +124,6 @@ enum {
 	PROFILER_TYPE_OFFCPU,
 	PROFILER_TYPE_MEMORY,
 	PROFILER_TYPE_NUM,
-};
-
-enum {
-	PROFILE_EVENT_UNKNOWN,
-	PROFILE_EVENT_MEM_ALLOC,
-	PROFILE_EVENT_MEM_IN_USE,
-	PROFILE_EVENT_NUM,
 };
 
 /*
@@ -156,7 +172,6 @@ enum {
  */
 typedef struct {
 	u8 profiler_type;
-	u8 event_type;
 	u64 time_stamp;
 	u32 pid;
 	u32 tid;
@@ -165,6 +180,7 @@ typedef struct {
 	u32 u_stack_id;
 	u32 k_stack_id;
 	u32 cpu;
+	u64 mem_addr;
 	u64 count;
 	u8 comm[TASK_COMM_LEN];
 	u8 process_name[TASK_COMM_LEN];
@@ -179,18 +195,19 @@ struct stack_ids_bitmap {
 	u8 bitmap[STACK_MAP_ENTRIES / 8];
 } __attribute__((packed));
 
-int stop_continuous_profiler(void);
+int stop_continuous_profiler(void *cb_ctx[PROFILER_CTX_NUM]);
 int start_continuous_profiler(int freq, int java_syms_update_delay,
-			      tracer_callback_t callback);
+			      tracer_callback_t callback, void *cb_ctx[PROFILER_CTX_NUM]);
 void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val);
 void release_flame_graph_hash(void);
 int set_profiler_regex(const char *pattern);
 int set_profiler_cpu_aggregation(int flag);
-bool match_profiler_regex(const char *name);
+bool check_oncpu_profiler_regex(const char *name);
 struct bpf_tracer *get_profiler_tracer(void);
 void set_enable_perf_sample(struct bpf_tracer *t, u64 enable_flag);
 void cpdbg_process(stack_trace_msg_t * msg);
 int check_profiler_running_pid(int pid);
 int check_profiler_is_running(void);
 int write_profiler_running_pid(void);
+bool oncpu_profiler_enabled(void);
 #endif /* DF_USER_PERF_PROFILER_H */

@@ -14,6 +14,32 @@
  * limitations under the License.
  */
 
+/* example
+
+```
+use trident::common::protocol_logs::AppProtoLogsData;
+use trident::ebpf_collector::ebpf_collector::EbpfCollector;
+use trident::utils::queue::bounded;
+
+fn main() {
+    let (s, r, _) = bounded::<Box<AppProtoLogsData>>(1024);
+    let mut collector = EbpfCollector::new(s).unwrap();
+
+    collector.start();
+
+    loop {
+        if let Ok(msg) = r.recv(None) {
+            println!("{}", msg);
+        }
+    }
+}
+```
+
+ */
+
+#[cfg(feature = "extended_profile")]
+pub mod memory_profile;
+
 use std::ffi::{CStr, CString};
 use std::ptr::{self, null_mut};
 use std::slice;
@@ -24,10 +50,10 @@ use std::time::Duration;
 
 use ahash::HashSet;
 use arc_swap::access::Access;
-use libc::{c_int, c_ulonglong};
+use libc::{c_int, c_ulonglong, c_void};
 use log::{debug, error, info, warn};
+use thiserror::Error;
 
-use super::{Error, Result};
 use crate::common::ebpf::EbpfType;
 use crate::common::flow::L7Stats;
 use crate::common::l7_protocol_log::{
@@ -57,6 +83,22 @@ use public::{
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
 use reorder::{Reorder, ReorderCounter, StatsReorderCounter};
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("ebpf init error.")]
+    EbpfInitError,
+    #[error("ebpf running error.")]
+    EbpfRunningError,
+    #[error("l7 parse error.")]
+    EbpfL7ParseError,
+    #[error("l7 get log info error.")]
+    EbpfL7GetLogInfoError,
+    #[error("ebpf disabled.")]
+    EbpfDisabled,
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct EbpfCounter {
     rx: AtomicU64,
@@ -410,27 +452,22 @@ static mut POLICY_GETTER: Option<PolicyGetter> = None;
 static mut ON_CPU_PROFILE_FREQUENCY: u32 = 0;
 static mut TIME_DIFF: Option<Arc<AtomicI64>> = None;
 
+pub unsafe fn string_from_null_terminated_c_str(ptr: *const u8) -> String {
+    CStr::from_ptr(ptr as *const libc::c_char)
+        .to_string_lossy()
+        .into_owned()
+}
+
 impl EbpfCollector {
-    #[cfg(target_arch = "x86_64")]
-    unsafe fn convert_to_string(ptr: *const u8) -> String {
-        CStr::from_ptr(ptr as *const i8)
-            .to_string_lossy()
-            .into_owned()
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn convert_to_string(ptr: *const u8) -> String {
-        CStr::from_ptr(ptr).to_string_lossy().into_owned()
-    }
-
-    extern "C" fn ebpf_l7_callback(sd: *mut ebpf::SK_BPF_DATA) {
+    extern "C" fn ebpf_l7_callback(_: *mut c_void, sd: *mut ebpf::SK_BPF_DATA) {
         unsafe {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
 
             let container_id =
-                Self::convert_to_string(ptr::addr_of!((*sd).container_id) as *const u8);
+                CStr::from_ptr(ptr::addr_of!((*sd).container_id) as *const libc::c_char)
+                    .to_string_lossy();
             let event_type = EventType::from(ptr::addr_of!((*sd).source).read_unaligned());
             if event_type != EventType::OtherEvent {
                 // EbpfType like TracePoint, TlsUprobe, GoHttp2Uprobe belong to other events
@@ -463,39 +500,39 @@ impl EbpfCollector {
         }
     }
 
-    #[cfg(not(feature = "extended_profile"))]
-    fn get_event_type(_: u8, _: u8) -> i32 {
-        metric::ProfileEventType::EbpfOnCpu.into()
-    }
-
-    #[cfg(feature = "extended_profile")]
-    fn get_event_type(profiler_type: u8, event_type: u8) -> i32 {
-        match profiler_type {
-            ebpf::PROFILER_TYPE_ONCPU => metric::ProfileEventType::EbpfOnCpu.into(),
-            ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
-            ebpf::PROFILER_TYPE_MEMORY if event_type == ebpf::PROFILE_EVENT_MEM_ALLOC => {
-                metric::ProfileEventType::EbpfMemAlloc.into()
-            }
-            ebpf::PROFILER_TYPE_MEMORY if event_type == ebpf::PROFILE_EVENT_MEM_IN_USE => {
-                metric::ProfileEventType::EbpfMemInUse.into()
-            }
-            _ => {
-                warn!(
-                    "ebpf profile data with invalid profiler type: {}, event type: {}",
-                    profiler_type, event_type
-                );
-                metric::ProfileEventType::EbpfOnCpu.into()
-            }
-        }
-    }
-
-    extern "C" fn ebpf_profiler_callback(data: *mut ebpf::stack_profile_data) {
+    extern "C" fn ebpf_profiler_callback(
+        #[allow(unused)] ctx: *mut c_void,
+        data: *mut ebpf::stack_profile_data,
+    ) {
         unsafe {
             if !SWITCH || EBPF_PROFILE_SENDER.is_none() {
                 return;
             }
-            let mut profile = metric::Profile::default();
             let data = &mut *data;
+
+            #[cfg(feature = "extended_profile")]
+            if data.profiler_type == ebpf::PROFILER_TYPE_MEMORY {
+                let mut ts_millis = data.timestamp;
+                if let Some(time_diff) = TIME_DIFF.as_ref() {
+                    let diff = time_diff.load(Ordering::Relaxed);
+                    if diff > 0 {
+                        ts_millis += diff as u64;
+                    } else {
+                        ts_millis -= (-diff) as u64;
+                    }
+                }
+                let Some(m_ctx) = (ctx as *mut memory_profile::MemoryContext).as_mut() else {
+                    return;
+                };
+                m_ctx.update(data);
+                m_ctx.report(
+                    Duration::from_millis(ts_millis),
+                    EBPF_PROFILE_SENDER.as_mut().unwrap(),
+                );
+                return;
+            }
+
+            let mut profile = metric::Profile::default();
             profile.sample_rate = ON_CPU_PROFILE_FREQUENCY;
             profile.timestamp = data.timestamp;
             if let Some(time_diff) = TIME_DIFF.as_ref() {
@@ -506,12 +543,12 @@ impl EbpfCollector {
                     profile.timestamp -= (-diff) as u64;
                 }
             }
-            profile.event_type = Self::get_event_type(data.profiler_type, data.event_type);
+            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
-            profile.thread_name = Self::convert_to_string(data.comm.as_ptr());
-            profile.process_name = Self::convert_to_string(data.process_name.as_ptr());
+            profile.thread_name = string_from_null_terminated_c_str(data.comm.as_ptr());
+            profile.process_name = string_from_null_terminated_c_str(data.process_name.as_ptr());
             profile.u_stack_id = data.u_stack_id;
             profile.k_stack_id = data.k_stack_id;
             profile.cpu = data.cpu;
@@ -520,7 +557,8 @@ impl EbpfCollector {
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
-            let container_id = Self::convert_to_string(data.container_id.as_ptr());
+            let container_id =
+                CStr::from_ptr(data.container_id.as_ptr() as *const libc::c_char).to_string_lossy();
             if let Some(policy_getter) = POLICY_GETTER.as_ref() {
                 profile.pod_id = policy_getter.lookup_pod_id(&container_id);
             }
@@ -594,23 +632,6 @@ impl EbpfCollector {
                 );
             } else {
                 info!("ebpf golang symbol proc regexp is empty, skip set")
-            }
-
-            // ONLY java memory profile is supported at the moment
-            // configuration structure revision is required to support more languages (maybe one regex for each language)
-            #[cfg(feature = "extended_profile")]
-            if !config.ebpf.memory_profile.disabled {
-                info!(
-                    "ebpf set java symbol uprobe proc regexp: {}",
-                    config.ebpf.memory_profile.regex.as_str()
-                );
-                ebpf::set_feature_regex(
-                    ebpf::FEATURE_UPROBE_JAVA,
-                    CString::new(config.ebpf.memory_profile.regex.as_str().as_bytes())
-                        .unwrap()
-                        .as_c_str()
-                        .as_ptr(),
-                );
             }
 
             for i in get_all_protocol().into_iter() {
@@ -763,10 +784,20 @@ impl EbpfCollector {
                     }
                 }
 
+                #[allow(unused_mut)]
+                let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
+                #[cfg(feature = "extended_profile")]
+                {
+                    contexts[ebpf::PROFILER_CTX_MEMORY_IDX] =
+                        Box::into_raw(Box::new(memory_profile::MemoryContext::default()))
+                            as *mut c_void;
+                }
+
                 if ebpf::start_continuous_profiler(
                     on_cpu.frequency as i32,
                     ebpf_conf.java_symbol_file_refresh_defer_interval.as_secs() as i32,
                     Self::ebpf_profiler_callback,
+                    &contexts as *const [*mut c_void; ebpf::PROFILER_CTX_NUM],
                 ) != 0
                 {
                     warn!("ebpf start_continuous_profiler error.");
@@ -990,11 +1021,15 @@ impl EbpfCollector {
             ebpf::set_dwarf_process_map_size(ecfg.dwarf_process_map_size as i32);
             ebpf::set_dwarf_shard_map_size(ecfg.dwarf_shard_map_size as i32);
             if restart_cprofiler {
-                ebpf::stop_continuous_profiler();
+                let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
+                ebpf::stop_continuous_profiler(
+                    &mut contexts as *mut [*mut c_void; ebpf::PROFILER_CTX_NUM],
+                );
                 if ebpf::start_continuous_profiler(
                     ecfg.on_cpu_profile.frequency as i32,
                     ecfg.java_symbol_file_refresh_defer_interval.as_secs() as i32,
                     Self::ebpf_profiler_callback,
+                    &contexts as *const [*mut c_void; ebpf::PROFILER_CTX_NUM],
                 ) != 0
                 {
                     warn!("ebpf start_continuous_profiler error.");
