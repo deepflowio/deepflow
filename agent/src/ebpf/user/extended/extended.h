@@ -31,6 +31,7 @@
  */
 int extended_reader_create(struct bpf_tracer *tracer);
 int extended_maps_set(struct bpf_tracer *tracer);
+void extended_prog_jump_tables(struct bpf_tracer *tracer);
 
 /**
  * @brief **extended_proc_event_handler()** extend the handling of process
@@ -78,4 +79,12 @@ void extended_process_exit(int pid);
  * @param act Is MATCH_PID_ADD or MATCH_PID_DEL 
  */
 void extended_match_pid_handle(int feat, int pid, enum match_pids_act act);
+
+/**
+ * @brief **extended_requires_dwarf()** whether extended profilers require DWARF unwinding
+ * @param pid Process ID
+ * @param name Process executable name
+ */
+bool extended_require_dwarf(int pid, const char *name);
+
 #endif /* DF_EXTENDED_H */

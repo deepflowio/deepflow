@@ -36,8 +36,11 @@
 
 #include "load.h"
 #include "table.h"
-#include "trace_utils.h"
+#include "tracer.h"
+#include "extended/extended.h"
 #include "profile/perf_profiler.h"
+
+#include "trace_utils.h"
 
 extern int major, minor;
 
@@ -55,7 +58,7 @@ static proc_event_list_t proc_events = { .head = { .prev = &proc_events.head,
 static pthread_mutex_t g_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static unwind_table_t *g_unwind_table = NULL;
 
-static int load_running_processes(struct bpf_tracer *tracer);
+static int load_running_processes(struct bpf_tracer *tracer, unwind_table_t *unwind_table);
 
 static struct {
     bool dwarf_enabled;
@@ -94,16 +97,7 @@ void set_dwarf_enabled(bool enabled) {
     }
 
     if (g_unwind_config.dwarf_enabled) {
-
-        struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
-        if (tracer == NULL) {
-            return;
-        }
-        if (tracer->state != TRACER_RUNNING) {
-            return;
-        }
-        load_running_processes(tracer);
-
+        unwind_process_reload();
     } else {
         pthread_mutex_lock(&g_unwind_table_lock);
         unwind_table_unload_all(g_unwind_table);
@@ -142,6 +136,9 @@ int set_dwarf_regex(const char *pattern) {
     ebpf_info("DWARF regex updated to /%s/", pattern);
     g_unwind_config.dwarf_regex.exists = true;
     pthread_mutex_unlock(&g_unwind_config.dwarf_regex.m);
+
+    unwind_process_reload();
+
     return 0;
 }
 
@@ -170,7 +167,7 @@ void set_dwarf_shard_map_size(int size) {
 }
 
 static bool requires_dwarf_unwind_table(int pid) {
-    if (!g_unwind_config.dwarf_enabled) {
+    if (!get_dwarf_enabled()) {
         return false;
     }
 
@@ -178,17 +175,16 @@ static bool requires_dwarf_unwind_table(int pid) {
     if (path == NULL) {
         return false;
     }
-    char *exe_name = path + strlen(path) - 1;
-    while (exe_name > path && *(exe_name - 1) != '/') {
-        exe_name--;
-    }
+    char *exe_name = basename(path);
     // Java has JIT compiled code without DWARF info, not supported at the moment
     if (strcmp(exe_name, "java") == 0) {
         free(path);
         return false;
     }
 
-    if (!match_profiler_regex(exe_name)) {
+    // TBD: offcpu
+    bool need_unwind = (oncpu_profiler_enabled() && check_oncpu_profiler_regex(exe_name)) || extended_require_dwarf(pid, exe_name);
+    if (!need_unwind) {
         free(path);
         return false;
     }
@@ -206,7 +202,8 @@ static bool requires_dwarf_unwind_table(int pid) {
     return !frame_pointer_heuristic_check(pid);
 }
 
-static int load_running_processes(struct bpf_tracer *tracer) {
+// Ensure exclusive access to *unwind_table before calling this function
+static int load_running_processes(struct bpf_tracer *tracer, unwind_table_t *unwind_table) {
     struct dirent *entry = NULL;
     DIR *fddir = NULL;
     int pid = 0;
@@ -230,7 +227,7 @@ static int load_running_processes(struct bpf_tracer *tracer) {
         if (!process_probing_check(pid))
             continue;
         if (requires_dwarf_unwind_table(pid)) {
-            add_event_to_proc_list(&proc_events, tracer, pid);
+            unwind_table_load(unwind_table, pid);
         }
     }
 
@@ -238,17 +235,14 @@ static int load_running_processes(struct bpf_tracer *tracer) {
     return ETR_OK;
 }
 
-void unwind_tracer_init(struct bpf_tracer *tracer) {
-    DWARF_KERNEL_CHECK;
-
+int unwind_tracer_init(struct bpf_tracer *tracer) {
     int32_t offset = read_offset_of_stack_in_task_struct();
     if (offset < 0) {
-        ebpf_warning("unwind tracer init failed: failed to get field stack offset in task struct from btf");
-        return;
-    }
-    if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
-        ebpf_warning("unwind tracer init failed: update %s error", MAP_UNWIND_SYSINFO_NAME);
-        return;
+        ebpf_warning("unwind tracer init: failed to get field stack offset in task struct from btf");
+        ebpf_warning("unwinder may not handle in kernel perf events correctly");
+    } else if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
+        ebpf_warning("unwind tracer init: update %s error", MAP_UNWIND_SYSINFO_NAME);
+        ebpf_warning("unwinder may not handle in kernel perf events correctly");
     }
 
     struct ebpf_map *process_map =
@@ -257,18 +251,20 @@ void unwind_tracer_init(struct bpf_tracer *tracer) {
         ebpf_obj__get_map_by_name(tracer->obj, MAP_UNWIND_ENTRY_SHARD_NAME);
     if (!process_map) {
         ebpf_warning("create unwind table failed: map %s not found", MAP_PROCESS_SHARD_LIST_NAME);
-        return;
+        return -1;
     }
     if (!shard_map) {
         ebpf_warning("create unwind table failed: map %s not found", MAP_UNWIND_ENTRY_SHARD_NAME);
-        return;
+        return -1;
     }
 
     unwind_table_t *table = unwind_table_create(process_map->fd, shard_map->fd);
-    load_running_processes(tracer);
+    load_running_processes(tracer, table);
     pthread_mutex_lock(&g_unwind_table_lock);
     g_unwind_table = table;
     pthread_mutex_unlock(&g_unwind_table_lock);
+
+    return 0;
 }
 
 void unwind_tracer_drop() {
@@ -317,7 +313,7 @@ void unwind_events_handle(void) {
             break;
         }
 
-        if (g_unwind_config.dwarf_enabled && g_unwind_table) {
+        if (get_dwarf_enabled() && g_unwind_table) {
             unwind_table_load(g_unwind_table, event->pid);
         }
 
@@ -348,5 +344,25 @@ void unwind_process_exit(int pid) {
     if (g_unwind_table) {
         unwind_table_unload(g_unwind_table, pid);
     }
+    pthread_mutex_unlock(&g_unwind_table_lock);
+}
+
+void unwind_process_reload() {
+    DWARF_KERNEL_CHECK;
+
+    if (!get_dwarf_enabled()) {
+        return;
+    }
+
+    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
+    if (tracer == NULL || tracer->state != TRACER_RUNNING) {
+        return;
+    }
+
+    pthread_mutex_lock(&g_unwind_table_lock);
+    // Unload everything for the moment
+    // Maybe preserve some data on regex changes
+    unwind_table_unload_all(g_unwind_table);
+    load_running_processes(tracer, g_unwind_table);
     pthread_mutex_unlock(&g_unwind_table_lock);
 }

@@ -557,6 +557,7 @@ func (c *Cloud) getSubDomainPodServices(
 			Annotation:         podService.Annotation,
 			Type:               podService.Type,
 			Selector:           podService.Selector,
+			ExternalIP:         podService.ExternalIP,
 			ServiceClusterIP:   podService.ServiceClusterIP,
 			PodIngressLcuuid:   podService.PodIngressLcuuid,
 			PodNamespaceLcuuid: podService.PodNamespaceLcuuid,

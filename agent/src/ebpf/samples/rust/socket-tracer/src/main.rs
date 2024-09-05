@@ -200,7 +200,7 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
     }
 }
 
-extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
+extern "C" fn socket_trace_callback(_: *mut c_void, _sd: *mut SK_BPF_DATA) {
     unsafe {
         let mut proto_tag = String::from("");
         if sk_proto_safe(sd) == SOCK_DATA_OTHER {
@@ -420,10 +420,6 @@ fn main() {
         //    FEATURE_UPROBE_GOLANG,
         //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
         //);
-        set_feature_regex(
-            FEATURE_UPROBE_JAVA,
-            CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-        );
 
         //set_io_event_collect_mode(1);
 

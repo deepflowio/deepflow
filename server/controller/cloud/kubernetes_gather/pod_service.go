@@ -188,68 +188,78 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				}
 				hasPodGroup = true
 
-				podTargetPorts := map[string]int{}
-				for _, pgLcuuid := range podGroupLcuuids.ToSlice() {
-					pgLcuuidString, ok := pgLcuuid.(string)
+				// 在service确定有pod group的时候添加pod service port
+				targetNameToPorts := map[string][]int{}
+				for _, lcuuid := range podGroupLcuuids.ToSlice() {
+					podGroupLcuuid, ok := lcuuid.(string)
 					if !ok {
-						log.Warningf("sercice (%s) pod group lcuuid interface conversion failed", name, logger.NewORGPrefix(k.orgID))
 						continue
 					}
-					targetPorts, ok := k.pgLcuuidTopodTargetPorts[pgLcuuidString]
+					targetPorts, ok := k.pgLcuuidTopodTargetPorts[podGroupLcuuid]
 					if !ok {
 						continue
 					}
 					for name, port := range targetPorts {
-						podTargetPorts[name] = port
+						targetNameToPorts[name] = append(targetNameToPorts[name], port)
 					}
 				}
-				ports := specPorts.GetIndex(i)
-				var targetPort int
-				if targetPortString := ports.Get("targetPort").MustString(); targetPortString != "" {
-					targetPort = podTargetPorts[targetPortString]
-				}
-				if targetPort == 0 {
-					targetPort = ports.Get("targetPort").MustInt()
-					if targetPort == 0 {
-						log.Infof("service (%s) target_port not match", name, logger.NewORGPrefix(k.orgID))
+				port := specPorts.GetIndex(i)
+				targetPorts := []int{}
+				targetPortTBD := port.Get("targetPort")
+				targetPorts = targetNameToPorts[targetPortTBD.MustString()]
+				if len(targetPorts) == 0 {
+					if targetPortTBD.MustInt() == 0 {
+						log.Infof("service (%s) targetPort not match", name, logger.NewORGPrefix(k.orgID))
 						continue
 					}
+					targetPorts = append(targetPorts, targetPortTBD.MustInt())
 				}
 				nameToPort := map[string]int{}
-				nameToPort[ports.Get("name").MustString()] = ports.Get("port").MustInt()
+				portName := port.Get("name").MustString()
+				portInt := port.Get("port").MustInt()
+				portProtocol := port.Get("protocol").MustString()
+				portNodePort := port.Get("nodePort").MustInt()
+				nameToPort[portName] = portInt
 				uidToName := map[string]map[string]int{}
 				uidToName[uLcuuid] = nameToPort
 				k.nsServiceNameToService[namespace+name] = uidToName
-				key := strconv.Itoa(ports.Get("port").MustInt()) + ports.Get("protocol").MustString() + strconv.Itoa(ports.Get("nodePort").MustInt()) + strconv.Itoa(targetPort)
-				servicePort := model.PodServicePort{
-					Lcuuid:           common.GetUUIDByOrgID(k.orgID, uLcuuid+key),
-					Name:             ports.Get("name").MustString(),
-					Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
-					Port:             ports.Get("port").MustInt(),
-					TargetPort:       targetPort,
-					NodePort:         ports.Get("nodePort").MustInt(),
-					PodServiceLcuuid: uLcuuid,
+				// remove duplicates
+				targetPortsMap := map[int]bool{}
+				for _, tPort := range targetPorts {
+					targetPortsMap[tPort] = false
 				}
-
-				// 在service确定有pod group的时候添加pod service port
-				servicePorts = append(servicePorts, servicePort)
-				for _, Lcuuid := range podGroupLcuuids.ToSlice() {
-					pgLcuuid, ok := Lcuuid.(string)
-					if !ok {
-						log.Warningf("pod group lcuuid (%v) assert failed", Lcuuid, logger.NewORGPrefix(k.orgID))
-						continue
-					}
-					key := ports.Get("protocol").MustString() + strconv.Itoa(targetPort)
-					podGroupPort := model.PodGroupPort{
-						Lcuuid:           common.GetUUIDByOrgID(k.orgID, uLcuuid+pgLcuuid+key),
-						Name:             ports.Get("name").MustString(),
-						Port:             targetPort,
-						Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
-						PodGroupLcuuid:   pgLcuuid,
+				for targetPort := range targetPortsMap {
+					key := strconv.Itoa(portInt) + portProtocol + strconv.Itoa(portNodePort) + strconv.Itoa(targetPort)
+					servicePort := model.PodServicePort{
+						Lcuuid:           common.GetUUIDByOrgID(k.orgID, uLcuuid+key),
+						Name:             portName,
+						Protocol:         strings.ToUpper(portProtocol),
+						Port:             portInt,
+						TargetPort:       targetPort,
+						NodePort:         portNodePort,
 						PodServiceLcuuid: uLcuuid,
 					}
-					podGroupPorts = append(podGroupPorts, podGroupPort)
-					k.pgLcuuidToPSLcuuids[pgLcuuid] = append(k.pgLcuuidToPSLcuuids[pgLcuuid], uLcuuid)
+					servicePorts = append(servicePorts, servicePort)
+				}
+
+				for _, lcuuid := range podGroupLcuuids.ToSlice() {
+					podGroupLcuuid, ok := lcuuid.(string)
+					if !ok {
+						continue
+					}
+					for targetPort := range targetPortsMap {
+						key := portProtocol + strconv.Itoa(targetPort)
+						podGroupPort := model.PodGroupPort{
+							Lcuuid:           common.GetUUIDByOrgID(k.orgID, uLcuuid+podGroupLcuuid+key),
+							Name:             portName,
+							Port:             targetPort,
+							Protocol:         strings.ToUpper(portProtocol),
+							PodGroupLcuuid:   podGroupLcuuid,
+							PodServiceLcuuid: uLcuuid,
+						}
+						podGroupPorts = append(podGroupPorts, podGroupPort)
+					}
+					k.pgLcuuidToPSLcuuids[podGroupLcuuid] = append(k.pgLcuuidToPSLcuuids[podGroupLcuuid], uLcuuid)
 				}
 			}
 			if !hasPodGroup {

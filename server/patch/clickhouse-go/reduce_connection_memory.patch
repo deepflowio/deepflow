@@ -1,0 +1,75 @@
+diff --git a/conn.go b/conn.go
+index a38548d..f93e0e5 100644
+--- a/conn.go
++++ b/conn.go
+@@ -63,7 +63,7 @@ func dial(ctx context.Context, addr string, num int, opt *Options) (*connect, er
+ 		compression = opt.Compression.Method == CompressionLZ4
+ 	}
+ 	var (
+-		stream  = io.NewStream(conn)
++		stream  = io.NewStream(conn, compression)
+ 		connect = &connect{
+ 			opt:         opt,
+ 			conn:        conn,
+diff --git a/lib/io/stream.go b/lib/io/stream.go
+index ead3ce2..f0ee30c 100644
+--- a/lib/io/stream.go
++++ b/lib/io/stream.go
+@@ -29,13 +29,15 @@ const (
+ 	maxWriterSize = 1 << 20
+ )
+ 
+-func NewStream(rw io.ReadWriter) *Stream {
++func NewStream(rw io.ReadWriter, compression bool) *Stream {
+ 	stream := Stream{
+ 		r: bufio.NewReaderSize(rw, maxReaderSize),
+ 		w: bufio.NewWriterSize(rw, maxWriterSize),
+ 	}
+-	stream.compress.r = compress.NewReader(stream.r)
+-	stream.compress.w = compress.NewWriter(stream.w)
++	if compression {
++		stream.compress.r = compress.NewReader(stream.r)
++		stream.compress.w = compress.NewWriter(stream.w)
++	}
+ 	return &stream
+ }
+ 
+@@ -51,6 +53,12 @@ type Stream struct {
+ 
+ func (s *Stream) Compress(v bool) {
+ 	s.compress.enable = v
++	if v && s.compress.r == nil {
++		s.compress.r = compress.NewReader(s.r)
++	}
++	if v && s.compress.w == nil {
++		s.compress.w = compress.NewWriter(s.w)
++	}
+ }
+ 
+ func (s *Stream) Read(p []byte) (int, error) {
+@@ -68,15 +76,21 @@ func (s *Stream) Write(p []byte) (int, error) {
+ }
+ 
+ func (s *Stream) Flush() error {
+-	if err := s.compress.w.Flush(); err != nil {
+-		return err
++	if s.compress.enable {
++		if err := s.compress.w.Flush(); err != nil {
++			return err
++		}
+ 	}
+ 	return s.w.Flush()
+ }
+ 
+ func (s *Stream) Close() error {
+ 	s.r, s.w = nil, nil
+-	s.compress.r.Close()
+-	s.compress.w.Close()
++	if s.compress.r != nil {
++		s.compress.r.Close()
++	}
++	if s.compress.w != nil {
++		s.compress.w.Close()
++	}
+ 	return nil
+ }

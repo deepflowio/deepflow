@@ -25,7 +25,16 @@
 #define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
 #define FTRACE_SYSCALLS_PATH "/sys/kernel/debug/tracing/events/syscalls"
-#define TEST_KFUNC_NAME "__sys_sendmsg"
+/*
+ * The `__sys_recvmmsg` interface underwent a change in its parameter list starting
+ * from Linux kernel version 5.0. If earlier kernel versions support the `fentry/fexit`
+ * feature, attempting to load BPF programs on this interface may fail. Therefore, we
+ * use this interface to check whether to load a version of the BPF bytecode binary
+ * that supports `fentry/fexit`.
+ */
+#define TEST_KFUNC_NAME "__sys_recvmmsg"
+#define TEST_KFUNC_PARAMS_NUM 6
+
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_ADDR "127.0.0.1"
 #define OFFSET_INFER_SERVER_PORT 54583
@@ -354,7 +363,7 @@ prefetch_and_process_data(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 			 * time precision is in microseconds.
 			 */
 			sd->timestamp = (sd->timestamp + boot_time) / NS_IN_USEC;
-			callback(sd);
+			callback(NULL, sd);
 		}
 
 		if (block_head->is_last == 1)

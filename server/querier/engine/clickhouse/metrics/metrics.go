@@ -233,24 +233,11 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 				newAllMetrics[field] = metric
 			}
 		}
-	} else if db == ckcommon.DB_NAME_PROMETHEUS && field == "value" {
-		metric := NewMetrics(
-			0, field,
-			field, "", METRICS_TYPE_COUNTER,
-			"metrics", []bool{true, true, true}, "", table, "", "",
-		)
-		newAllMetrics[field] = metric
 	}
-	allMetrics, err := GetMetricsByDBTableStatic(db, table, "")
-	if err != nil {
-		return nil, false
-	}
+	allMetrics := GetMetricsByDBTableStatic(db, table)
 	// deep copy map
 	for k, v := range allMetrics {
 		newAllMetrics[k] = v
-	}
-	if err != nil {
-		return nil, false
 	}
 
 	// tag metrics
@@ -285,80 +272,67 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	}
 }
 
-func GetMetricsByDBTableStatic(db string, table string, where string) (map[string]*Metrics, error) {
-	var err error
+func GetMetricsByDBTableStatic(db string, table string) map[string]*Metrics {
 	switch db {
 	case "flow_log":
 		switch table {
 		case "l4_flow_log":
-			return GetL4FlowLogMetrics(), err
+			return GetL4FlowLogMetrics()
 		case "l4_packet":
-			return GetL4PacketMetrics(), err
+			return GetL4PacketMetrics()
 		case "l7_flow_log":
-			return GetL7FlowLogMetrics(), err
+			return GetL7FlowLogMetrics()
 		case "l7_packet":
-			return GetL7PacketMetrics(), err
+			return GetL7PacketMetrics()
 		}
 	case "flow_metrics":
 		switch table {
 		case "network":
-			return GetVtapFlowPortMetrics(), err
+			return GetVtapFlowPortMetrics()
 		case "network_map":
-			return GetVtapFlowEdgePortMetrics(), err
+			return GetVtapFlowEdgePortMetrics()
 		case "application":
-			return GetVtapAppPortMetrics(), err
+			return GetVtapAppPortMetrics()
 		case "application_map":
-			return GetVtapAppEdgePortMetrics(), err
+			return GetVtapAppEdgePortMetrics()
 		case "traffic_policy":
-			return GetVtapAclMetrics(), err
+			return GetVtapAclMetrics()
 		}
 	case "event":
 		switch table {
 		case "event":
-			return GetResourceEventMetrics(), err
+			return GetResourceEventMetrics()
 		case "perf_event":
-			return GetResourcePerfEventMetrics(), err
+			return GetResourcePerfEventMetrics()
 		case "alert_event":
-			return GetAlarmEventMetrics(), err
+			return GetAlarmEventMetrics()
 		}
 	case ckcommon.DB_NAME_PROFILE:
 		switch table {
 		case "in_process":
-			return GetInProcessMetrics(), err
+			return GetInProcessMetrics()
 		}
 	case ckcommon.DB_NAME_APPLICATION_LOG:
 		switch table {
 		case "log":
-			return GetLogMetrics(), err
+			return GetLogMetrics()
 		}
+	case ckcommon.DB_NAME_PROMETHEUS:
+		return GetSamplesMetrics()
 	}
-	return map[string]*Metrics{}, err
+	return map[string]*Metrics{}
 }
 
-func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
+func GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	var err error
 	switch db {
 	case "flow_log":
 		switch table {
-		case "l4_flow_log":
-			return GetL4FlowLogMetrics(), err
-		case "l4_packet":
-			return GetL4PacketMetrics(), err
-		case "l7_packet":
-			return GetL7PacketMetrics(), err
 		case "l7_flow_log":
 			metrics := make(map[string]*Metrics)
-			loads := GetL7FlowLogMetrics()
 			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
-			for k, v := range loads {
-				if _, ok := metrics[k]; !ok {
-					metrics[k] = v
-				}
-			}
-			loadsLen := len(loads)
 			for k, v := range exts {
 				if _, ok := metrics[k]; !ok {
-					v.Index += loadsLen
 					metrics[k] = v
 				}
 			}
@@ -369,48 +343,13 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQuery
 			)
 			return metrics, err
 		}
-	case "flow_metrics":
-		switch table {
-		case "network":
-			return GetVtapFlowPortMetrics(), err
-		case "network_map":
-			return GetVtapFlowEdgePortMetrics(), err
-		case "application":
-			return GetVtapAppPortMetrics(), err
-		case "application_map":
-			return GetVtapAppEdgePortMetrics(), err
-		case "traffic_policy":
-			return GetVtapAclMetrics(), err
-		}
-	case "event":
-		switch table {
-		case "event":
-			return GetResourceEventMetrics(), err
-		case "perf_event":
-			return GetResourcePerfEventMetrics(), err
-		case "alert_event":
-			return GetAlarmEventMetrics(), err
-		}
-	case ckcommon.DB_NAME_PROFILE:
-		switch table {
-		case "in_process":
-			return GetInProcessMetrics(), err
-		}
 	case ckcommon.DB_NAME_APPLICATION_LOG:
 		switch table {
 		case "log":
 			metrics := make(map[string]*Metrics)
-			loads := GetLogMetrics()
 			exts, err := GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
-			for k, v := range loads {
-				if _, ok := metrics[k]; !ok {
-					metrics[k] = v
-				}
-			}
-			loadsLen := len(loads)
 			for k, v := range exts {
 				if _, ok := metrics[k]; !ok {
-					v.Index += loadsLen
 					metrics[k] = v
 				}
 			}
@@ -423,25 +362,16 @@ func GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID string, useQuery
 		}
 	case ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT:
 		return GetExtMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
-	case ckcommon.DB_NAME_PROMETHEUS:
-		return GetPrometheusMetrics(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 	}
-
 	return nil, err
 }
 
-func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) ([]interface{}, error) {
-	allMetrics, err := GetMetricsByDBTable(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
-	if allMetrics == nil || err != nil {
-		// TODO: metrics not found
-		return nil, err
-	}
+func GetMetricsDescriptionsByDBTable(db, table string, allMetrics map[string]*Metrics) []interface{} {
 	/* columns := []interface{}{
 		 "name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table"
 	 } */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
-
 		if slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
 			field = metrics.DisplayName
 		} else if db == ckcommon.DB_NAME_PROMETHEUS {
@@ -456,17 +386,39 @@ func GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID stri
 			metrics.Description,
 		}
 	}
-	return values, nil
+	return values
+}
+
+func FormatMetricsToResult(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, []interface{}, error) {
+	allMetrics := map[string]*Metrics{}
+	values := []interface{}{}
+	// static
+	staticMetrics := GetMetricsByDBTableStatic(db, table)
+	for metricName, staticMetric := range staticMetrics {
+		allMetrics[metricName] = staticMetric
+	}
+	staticMetricsValues := GetMetricsDescriptionsByDBTable(db, table, staticMetrics)
+	values = append(values, staticMetricsValues...)
+	// dynamic
+	dynamicMetrics, err := GetMetricsByDBTableDynamic(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
+	if err != nil {
+		return allMetrics, values, err
+	}
+	for metricName, dynamicMetric := range dynamicMetrics {
+		allMetrics[metricName] = dynamicMetric
+	}
+	dynamicMetricsValues := GetMetricsDescriptionsByDBTable(db, table, dynamicMetrics)
+	values = append(values, dynamicMetricsValues...)
+	return allMetrics, values, nil
 }
 
 func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (*common.Result, error) {
 	var values []interface{}
-	if table == "" && db != ckcommon.DB_NAME_PROMETHEUS {
+	// show metrics on db
+	if table == "" {
 		var tables []interface{}
-		if db == "ext_metrics" {
-			tables = append(tables, table)
-		} else if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}, db) {
-			for _, extTables := range ckcommon.GetExtTables(db, queryCacheTTL, orgID, useQueryCache, ctx, nil) {
+		if slices.Contains([]string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_EXT_METRICS}, db) {
+			for _, extTables := range ckcommon.GetExtTables(db, where, queryCacheTTL, orgID, useQueryCache, ctx, nil) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
@@ -479,18 +431,19 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 			}
 		}
 		for _, dbTable := range tables {
-			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, queryCacheTTL, orgID, useQueryCache, ctx)
+			tb := dbTable.(string)
+			_, metricValues, err := FormatMetricsToResult(db, tb, where, queryCacheTTL, orgID, useQueryCache, ctx)
 			if err != nil {
 				return nil, err
 			}
-			values = append(values, metrics...)
+			values = append(values, metricValues...)
 		}
 	} else {
-		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
+		_, metricValues, err := FormatMetricsToResult(db, table, where, queryCacheTTL, orgID, useQueryCache, ctx)
 		if err != nil {
 			return nil, err
 		}
-		values = append(values, metrics...)
+		values = append(values, metricValues...)
 	}
 	columns := []interface{}{
 		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table", "description",
@@ -522,14 +475,14 @@ func GetPrometheusSingleTagTranslator(tag, table, orgID string) (string, string,
 			if appLabel.AppLabelName == nameNoPreffix {
 				isAppLabel = true
 				labelType = "app"
-				TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (%d, toUInt64(app_label_value_id_%d)))", labelNameID, appLabel.AppLabelColumnIndex)
+				TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (toUInt64(%d), toUInt64(app_label_value_id_%d)))", labelNameID, appLabel.AppLabelColumnIndex)
 				break
 			}
 		}
 	}
 	if !isAppLabel {
 		labelType = "target"
-		TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.target_label_map', 'label_value', (%d, %d, toUInt64(target_id)))", metricID, labelNameID)
+		TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.target_label_map', 'label_value', (toUInt64(%d), toUInt64(%d), toUInt64(target_id)))", metricID, labelNameID)
 	}
 	return TagTranslatorStr, labelType, nil
 }
@@ -542,7 +495,7 @@ func GetPrometheusAllTagTranslator(table, orgID string) (string, error) {
 		appLabelTranslatorSlice := []string{}
 		for _, appLabel := range appLabels {
 			if labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[appLabel.AppLabelName]; ok {
-				appLabelTranslator := fmt.Sprintf("'%s',dictGet('flow_tag.app_label_map', 'label_value', (%d, toUInt64(app_label_value_id_%d)))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
+				appLabelTranslator := fmt.Sprintf("'%s',dictGet('flow_tag.app_label_map', 'label_value', (toUInt64(%d), toUInt64(app_label_value_id_%d)))", appLabel.AppLabelName, labelNameID, appLabel.AppLabelColumnIndex)
 				appLabelTranslatorSlice = append(appLabelTranslatorSlice, appLabelTranslator)
 			}
 		}

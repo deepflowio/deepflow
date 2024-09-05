@@ -327,7 +327,9 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    int workers_nr,
 				    tracer_op_fun_t free_cb,
 				    tracer_op_fun_t create_cb,
-				    void *handle, int sample_freq)
+				    void *handle,
+				    void *profiler_callback_ctx[PROFILER_CTX_NUM],
+				    int sample_freq)
 {
 	int ret;
 	/*
@@ -371,6 +373,10 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 
 	bt->dispatch_workers_nr = workers_nr;
 	bt->process_fn = handle;
+	if (profiler_callback_ctx) {
+		memcpy(bt->profiler_callback_ctx, profiler_callback_ctx,
+		       PROFILER_CTX_NUM * sizeof(void *));
+	}
 
 	init_list_head(&bt->probes_head);
 	init_list_head(&bt->maps_conf_head);
@@ -986,9 +992,10 @@ static int kfunc_detach(struct kfunc *p)
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_handle) (struct probe * p) = NULL;
-	int (*tracepoint_handle) (struct tracepoint * p) = NULL;
-	int (*kfunc_handle) (struct kfunc * p) = NULL;
+	int (*probe_handle) (struct probe *p) = NULL;
+	int (*tracepoint_handle) (struct tracepoint *p) = NULL;
+	int (*kfunc_handle) (struct kfunc *p) = NULL;
+
 	if (type == HOOK_ATTACH) {
 		probe_handle = probe_attach;
 		tracepoint_handle = tracepoint_attach;

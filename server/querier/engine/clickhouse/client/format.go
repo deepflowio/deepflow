@@ -64,13 +64,15 @@ func TransType(value interface{}) interface{} {
 	case **float64: // Nullable(float64)
 		// NaN, Inf
 		if *v == nil || math.IsNaN(**v) || **v == math.Inf(1) || **v == math.Inf(-1) {
-			return nil
+			var val *float64
+			return val
 		}
 		return *v
 	case *float64:
 		// NaN, Inf
 		if math.IsNaN(*v) || *v == math.Inf(1) || *v == math.Inf(-1) {
-			return nil
+			var val float64
+			return val
 		}
 		return *v
 	case *string:

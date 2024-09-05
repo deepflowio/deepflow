@@ -30,7 +30,7 @@ struct tracer_probes_conf;
 enum uprobe_type {
 	GO_UPROBE = 0,
 	OPENSSL_UPROBE,
-	JAVA_UPROBE,
+	MEMPROF_UPROBE,
 	OTHER_UPROBE
 };
 

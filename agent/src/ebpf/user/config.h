@@ -54,8 +54,14 @@
 #define MAP_UNWIND_SYSINFO_NAME         "__unwind_sysinfo"
 #define PROFILE_PG_CNT_DEF		16	// perf ring-buffer page count
 
-#define MAP_PROGS_JMP_PE_NAME		"__progs_jmp_pe_map"
+#define MAP_CP_PROGS_JMP_PE_NAME	"__cp_progs_jmp_pe_map"
 #define PROG_DWARF_UNWIND_FOR_PE    "df_PE_dwarf_unwind"
+#define PROG_ONCPU_OUTPUT_FOR_PE    "df_PE_oncpu_output"
+#define PROG_OFFCPU_OUTPUT_FOR_PE   "df_PE_offcpu_output"
+
+#define MAP_CP_PROGS_JMP_KP_NAME	"__cp_progs_jmp_kp_map"
+#define PROG_DWARF_UNWIND_FOR_KP    "df_KP_dwarf_unwind"
+#define PROG_MEMORY_OUTPUT_FOR_KP   "df_KP_memory_output"
 
 enum {
 	PROG_PROTO_INFER_TP_IDX,
@@ -74,8 +80,19 @@ enum {
 
 enum {
 	PROG_DWARF_UNWIND_PE_IDX,
-	PROG_PE_NUM
+	PROG_ONCPU_OUTPUT_PE_IDX,
+	// TBD: PROG_OFFCPU_OUTPUT_PE_IDX,
+	PROG_MEMORY_OUTPUT_PE_IDX,
+	CP_PROG_PE_NUM
 };
+
+enum {
+	PROG_DWARF_UNWIND_KP_IDX,
+	PROG_MEMORY_OUTPUT_KP_IDX,
+	CP_PROG_KP_NUM
+};
+
+#define PROFILER_CTX_NUM 3
 
 //thread index for bihash
 enum {
