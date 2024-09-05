@@ -46,7 +46,6 @@ pub enum Operator {
     Regex,     // ~*
 
     At,                 // @
-    Backtick,           // `
     Caret,              // ^
     Colon,              // :
     Dash,               // -
@@ -102,7 +101,6 @@ impl Operator {
             Operator::Percent => b"%",
             Operator::Pipe => b"|",
             Operator::Tilde => b"~",
-            Operator::Backtick => b"`",
             Operator::At => b"@",
             Operator::LeftCurlyBrace => b"{",
             Operator::RightCurlyBrace => b"}",
@@ -466,10 +464,6 @@ fn obfuscate(input: &[u8]) -> Vec<u8> {
                 forward(&mut iteration, 1);
                 Token::Operator(Operator::Pipe)
             }
-            b'`' => {
-                forward(&mut iteration, 1);
-                Token::Operator(Operator::Backtick)
-            }
             b'{' => {
                 forward(&mut iteration, 1);
                 Token::Operator(Operator::LeftCurlyBrace)
@@ -748,6 +742,10 @@ mod tests {
                 (
                     "DELETE FROM table WHERE id = 1;",
                     Some("DELETE FROM table WHERE id = ?;"),
+                ),
+                (
+                    "SELECT `id` FROM `database.table` WHERE id = 1;",
+                    Some("SELECT `id` FROM `database.table` WHERE id = ?;"),
                 ),
                 (
                     "UPDATE table SET column1 = value1, column2 = value2, column3 = value3 WHERE id = 1;",
