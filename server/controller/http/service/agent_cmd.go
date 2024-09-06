@@ -93,6 +93,7 @@ func RemoveAllFromCMDManager(key string) {
 	manager, ok := agentCMDManager[key]
 	if !ok {
 		log.Error("can not find agent command manager(key: %s)", key)
+		return
 	}
 
 	for requestID, cmdResp := range manager.requestIDToResp {
