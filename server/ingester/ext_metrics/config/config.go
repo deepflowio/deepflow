@@ -30,7 +30,7 @@ var log = logging.MustGetLogger("ext_metrics.config")
 
 const (
 	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 1 << 17
+	DefaultDecoderQueueSize  = 4096
 	DefaultExtMetricsTTL     = 168 // hour
 )
 

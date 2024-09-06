@@ -44,7 +44,7 @@ type ProfileConfig struct {
 const (
 	DefaultProfileTTL                 = 72 // hour
 	DefaultDecoderQueueCount          = 2
-	DefaultDecoderQueueSize           = 1 << 14
+	DefaultDecoderQueueSize           = 4096
 	DefaultOffCpuSplittingGranularity = 1
 )
 
@@ -75,7 +75,7 @@ func Load(base *config.Config, path string) *Config {
 	config := &ProfileConfig{
 		Profile: Config{
 			Base:                       base,
-			CKWriterConfig:             config.CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 5},
+			CKWriterConfig:             config.CKWriterConfig{QueueCount: 2, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 5},
 			ProfileTTL:                 DefaultProfileTTL,
 			DecoderQueueCount:          DefaultDecoderQueueCount,
 			DecoderQueueSize:           DefaultDecoderQueueSize,

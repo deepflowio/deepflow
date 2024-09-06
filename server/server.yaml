@@ -560,11 +560,11 @@ ingester:
 
   ## pcap decoder queue count/size
   #pcap-queue-count: 2
-  #pcap-queue-size: 10000
+  #pcap-queue-size: 4096
 
   ## profile process data write config
   #profile-ck-writer:
-  #  queue-count: 1      # parallelism of table writing
+  #  queue-count: 2      # parallelism of table writing
   #  queue-size: 100000  # size of writing queue
   #  batch-size: 51200   # size of batch writing
   #  flush-timeout: 5    # timeout of table writing
@@ -591,7 +591,7 @@ ingester:
 
   ## prometheus decoder queue count/size
   #prometheus-decoder-queue-count: 1
-  #prometheus-decoder-queue-size: 16384
+  #prometheus-decoder-queue-size: 4096
 
   ## prometheus database data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
@@ -620,7 +620,7 @@ ingester:
 
   ## app log decoder queue count/size
   #application-log-decoder-queue-count: 2
-  #application-log-decoder-queue-size: 16384
+  #application-log-decoder-queue-size: 4096
 
   ## app log database data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
@@ -692,22 +692,22 @@ ingester:
   #l7-throttle: 0
 
   #flow-log-decoder-queue-count: 2
-  #flow-log-decoder-queue-size: 10000
+  #flow-log-decoder-queue-size: 4096
 
   #ext-metrics-decoder-queue-count: 2
-  #ext-metrics-decoder-queue-size: 10000
+  #ext-metrics-decoder-queue-size: 4096
 
   #profile-decoder-queue-count: 2
-  #profile-decoder-queue-size: 10000
+  #profile-decoder-queue-size: 4096
 
   #event-decoder-queue-count: 1
-  #event-decoder-queue-size: 10000
+  #event-decoder-queue-size: 4096
 
   #k8s-event-decoder-queue-count: 1
-  #k8s-event-decoder-queue-size: 10000
+  #k8s-event-decoder-queue-size: 4096
 
   #perf-event-decoder-queue-count: 2
-  #perf-event-decoder-queue-size: 100000
+  #perf-event-decoder-queue-size: 4096
 
   ## unit: byte
   #flow-tag-cache-max-size: 262144
