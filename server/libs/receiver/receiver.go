@@ -43,12 +43,13 @@ import (
 )
 
 const (
-	RECV_BUFSIZE_2K           = 1 << 11 // 2k for UDP
-	RECV_BUFSIZE_8K           = 1 << 13 // 8k
-	RECV_BUFSIZE_64K          = 1 << 16 // 64k
-	RECV_BUFSIZE_256K         = 1 << 18 // 256k
-	RECV_BUFSIZE_512K         = 1 << 19 // 512k
-	RECV_BUFSIZE_MAX          = 1 << 24 // 16M, the maximum size of the PCAP packet will be greater than 8M
+	RECV_BUFSIZE_2K           = 1 << 11       // 2k for UDP
+	RECV_BUFSIZE_8K           = 1 << 13       // 8k
+	RECV_BUFSIZE_64K          = 1 << 16       // 64k
+	RECV_BUFSIZE_256K         = 1 << 18       // 256k
+	RECV_BUFSIZE_320K         = 1<<18 + 1<<16 // 320k
+	RECV_BUFSIZE_512K         = 1 << 19       // 512k
+	RECV_BUFSIZE_MAX          = 1 << 24       // 16M, the maximum size of the PCAP packet will be greater than 8M
 	RECV_TIMEOUT              = 30 * time.Second
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	DROP_DETECT_WINDOW_SIZE   = 1024
@@ -102,13 +103,14 @@ var recvBufferPools = []*pool.LockFreePool{
 	newBufferPool(RECV_BUFSIZE_8K, 32),
 	newBufferPool(RECV_BUFSIZE_64K, 8),
 	newBufferPool(RECV_BUFSIZE_256K, 8),
+	newBufferPool(RECV_BUFSIZE_320K, 8),
 	newBufferPool(RECV_BUFSIZE_512K, 8),
 	// if the required buffer > 512k, the memory will not be pre-allocated, and the memory will be allocated when it is used
 	newBufferPool(0, 8),
 }
 
 func getBufferPoolIndex(length int) int {
-	for i, v := range []int{RECV_BUFSIZE_2K, RECV_BUFSIZE_8K, RECV_BUFSIZE_64K, RECV_BUFSIZE_256K, RECV_BUFSIZE_512K} {
+	for i, v := range []int{RECV_BUFSIZE_2K, RECV_BUFSIZE_8K, RECV_BUFSIZE_64K, RECV_BUFSIZE_256K, RECV_BUFSIZE_320K, RECV_BUFSIZE_512K} {
 		if length <= v {
 			return i
 		}

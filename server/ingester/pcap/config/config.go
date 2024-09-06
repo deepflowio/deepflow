@@ -31,7 +31,7 @@ var log = logging.MustGetLogger("pcap.config")
 const (
 	DefaultPcapTTL        = 72
 	DefaultPcapQueueCount = 2
-	DefaultPcapQueueSize  = 10000
+	DefaultPcapQueueSize  = 4096
 )
 
 type Config struct {
