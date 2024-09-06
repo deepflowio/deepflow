@@ -7,6 +7,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent desensitizes the content in backticks [#8073](https://github.com/deepflowio/deepflow/pull/8073) by [TomatoMr](https://github.com/TomatoMr)
+* fix: agent command panic [#8070](https://github.com/deepflowio/deepflow/pull/8070) by [roryye](https://github.com/roryye)
+* fix: add timeout to receive agent command heart beat [#8048](https://github.com/deepflowio/deepflow/pull/8048) by [roryye](https://github.com/roryye)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
