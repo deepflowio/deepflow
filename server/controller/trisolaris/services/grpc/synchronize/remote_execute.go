@@ -23,11 +23,16 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/deepflowio/deepflow/message/trident"
 	api "github.com/deepflowio/deepflow/message/trident"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	CMD_INACTIVITY_TIMEOUT = 1 * time.Minute
 )
 
 func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) error {
@@ -46,23 +51,52 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
+	errCH := make(chan error, 1)
+
 	go func() {
 		defer func() {
+			log.Infof("agent(key: %s) remote exec stream receive goroutine done", key)
 			wg.Done()
 			if r := recover(); r != nil {
 				buf := make([]byte, 2048)
 				n := runtime.Stack(buf, false)
-				log.Errorf("recovered in RemoteExecute: %s", buf[:n])
+				errMsg := fmt.Sprintf("recovered in RemoteExecute: %s", buf[:n])
+				log.Errorf(errMsg)
+				errCH <- fmt.Errorf(errMsg)
 			}
 		}()
+
+		inactivityTimer := time.NewTimer(CMD_INACTIVITY_TIMEOUT)
+		defer inactivityTimer.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
-				log.Infof("context done, agent(key: %s)", key)
+				log.Infof("context done, agent(key: %s), context err: %v", key, ctx.Err())
+				return
+			case <-inactivityTimer.C:
+				errMsg := fmt.Errorf("no message received for %vs, closing connection for agent(key: %s)",
+					CMD_INACTIVITY_TIMEOUT.Seconds(), key)
+				log.Error(errMsg)
+				errCH <- errMsg
 				return
 			default:
 				resp, err := stream.Recv()
+				// Handle any errors that occur during stream reception
+				// if server restart, an io.EOF error may be received
+				if err == io.EOF {
+					log.Errorf("agent(key: %s) command stream error: %v", key, err)
+					errCH <- err
+					return
+				}
+				// Attempt to stop the inactivity timer
+				if !inactivityTimer.Stop() {
+					// If the timer has already expired, drain the channel
+					<-inactivityTimer.C
+				}
+				// Reset the inactivity timer to its original duration
+				inactivityTimer.Reset(CMD_INACTIVITY_TIMEOUT)
+
 				if resp == nil {
 					continue
 				}
@@ -76,8 +110,9 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 					isFisrtRecv = true
 					log.Infof("agent(key: %s) call RemoteExecute", key)
 				}
-				if ok := service.AddToCMDManagerIfNotExist(key, uint64(1)); !ok {
-					log.Infof("add agent(key:%s) to cmd manager", key)
+				if manager == nil {
+					log.Infof("agent(key: %s) remote exec map not found, add to cmd manager", key)
+					manager = service.AddToCMDManagerIfNotExist(key, uint64(1))
 					initDone <- struct{}{}
 				}
 
@@ -99,13 +134,6 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 				}
 
 				if err != nil {
-					if err == io.EOF {
-						handleResponse(resp)
-						log.Infof("agent(key: %s) command exec get response finish", key)
-						service.AgentCommandUnlock()
-						continue
-					}
-
 					err := fmt.Errorf("agent(key: %s) command stream error: %v", key, err)
 					log.Error(err)
 					service.AgentCommandUnlock()
@@ -119,6 +147,7 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	}()
 
 	<-initDone
+	log.Infof("agent(key: %s) init done", key)
 	if manager == nil {
 		err := fmt.Errorf("get agent(key: %s) remote exec manager nil", key)
 		log.Error(err)
@@ -127,8 +156,11 @@ func (e *VTapEvent) RemoteExecute(stream api.Synchronizer_RemoteExecuteServer) e
 	for {
 		select {
 		case <-ctx.Done():
-			log.Infof("context done, agent(key: %s)", key)
-			return nil
+			log.Infof("context done, agent(key: %s), context err: %v", key, ctx.Err())
+			return ctx.Err()
+		case err := <-errCH:
+			log.Error(err)
+			return err
 		case req, ok := <-manager.ExecCH:
 			if !ok {
 				err := fmt.Errorf("agent(key: %s) exec channel is closed", key)

@@ -16,6 +16,7 @@
 
 use std::str::Utf8Error;
 
+use public::l7_protocol::L7Protocol;
 use thiserror::Error;
 
 use super::MetaAppProto;
@@ -102,6 +103,8 @@ pub enum Error {
     SoReturnUnexpectVal,
     #[error("so plugin parse fail")]
     SoParseFail,
+    #[error("{proto:?} log parse failed: {reason}")]
+    L7LogParseFailed { proto: L7Protocol, reason: String },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
