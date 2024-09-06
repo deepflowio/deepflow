@@ -41,7 +41,6 @@ import (
 	logging "github.com/op/go-logging"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/jfr"
 	"github.com/pyroscope-io/pyroscope/pkg/convert/pprof"
-	pprofile "github.com/pyroscope-io/pyroscope/pkg/convert/profile"
 	"github.com/pyroscope-io/pyroscope/pkg/ingestion"
 	"github.com/pyroscope-io/pyroscope/pkg/storage/metadata"
 	"github.com/pyroscope-io/pyroscope/pkg/storage/segment"
@@ -91,6 +90,13 @@ var eBPFEventType = []string{
 	pb.ProfileEventType_EbpfMemInUse: "mem-inuse",
 }
 
+const (
+	// when agent(sender) compress data by `profile.DataCompress` flag, should parse _ZSTD_COMPRESS_FLAG to decompress
+	_ZSTD_COMPRESS_FLAG uint8 = 1 // 0x1
+	// when profiler(java-sdk) send data to agent with gzip compress, should parse _GZIP_COMPRESS_FLAG to decompress
+	_GZIP_COMPRESS_FLAG uint8 = 1 << 1 // 0x2
+)
+
 type Decoder struct {
 	index               int
 	msgType             datatype.MessageType
@@ -102,7 +108,8 @@ type Decoder struct {
 
 	offCpuSplittingGranularity int
 
-	orgId, teamId uint16
+	orgId, teamId    uint16
+	decompressBuffer []byte
 
 	counter *Counter
 	utils.Closable
@@ -204,19 +211,20 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 		}
 		copy(parser.IP, profile.Ip[:len(profile.Ip)])
 
+		// for jfr/pprof format, no matter compress or not, it requires decompress to parse profile data
 		switch profile.Format {
 		case "jfr":
 			atomic.AddInt64(&d.counter.JavaProfileCount, 1)
 			metadata := d.buildMetaData(profile)
 			parser.profileName = metadata.Key.AppName()
-			decompressJfr, err := profile_common.GzipDecompress(profile.Data)
-			if err != nil {
-				log.Errorf("decompress java profile data failed, offset=%d, len=%d, err=%s", decoder.Offset(), len(decoder.Bytes()), err)
-				return
+			compressFlag := _GZIP_COMPRESS_FLAG
+			if profile.DataCompressed {
+				compressFlag |= _ZSTD_COMPRESS_FLAG
 			}
-			err = d.sendProfileData(&jfr.RawProfile{
+			log.Debugf("decode java profile data, compression: %d, data: %v", compressFlag, profile.Data)
+			err := d.sendProfileData(&jfr.RawProfile{
 				FormDataContentType: string(profile.ContentType),
-				RawData:             decompressJfr,
+				RawData:             d.decompressData(profile.Data, compressFlag),
 			}, profile.Format, parser, metadata)
 
 			if err != nil {
@@ -227,9 +235,14 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 			atomic.AddInt64(&d.counter.GolangProfileCount, 1)
 			metadata := d.buildMetaData(profile)
 			parser.profileName = metadata.Key.AppName()
+			var compressFlag uint8 = 0
+			if profile.DataCompressed {
+				compressFlag = _ZSTD_COMPRESS_FLAG
+			}
+			log.Debugf("decode golang profile data, compression: %d, data: %v", compressFlag, profile.Data)
 			err := d.sendProfileData(&pprof.RawProfile{
 				FormDataContentType: string(profile.ContentType),
-				RawData:             profile.Data,
+				RawData:             d.decompressData(profile.Data, compressFlag),
 			}, profile.Format, parser, metadata)
 			if err != nil {
 				log.Errorf("decode golang profile data failed, offset=%d, len=%d, err=%s", decoder.Offset(), len(decoder.Bytes()), err)
@@ -242,9 +255,14 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 				atomic.AddInt64(&d.counter.GolangProfileCount, 1)
 				metadata := d.buildMetaData(profile)
 				parser.profileName = metadata.Key.AppName()
+				var compressFlag uint8 = 0
+				if profile.DataCompressed {
+					compressFlag = _ZSTD_COMPRESS_FLAG
+				}
+				log.Debugf("decode golang profile data, compression: %d, data: %v", compressFlag, profile.Data)
 				err := d.sendProfileData(&pprof.RawProfile{
 					FormDataContentType: string(profile.ContentType),
-					RawData:             profile.Data,
+					RawData:             d.decompressData(profile.Data, compressFlag),
 					StreamingParser:     true,
 					PoolStreamingParser: true,
 				}, profile.Format, parser, metadata)
@@ -262,10 +280,17 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 					// adapt agent version before v6.6
 					parser.processTracer.value = uint64(profile.Count)
 				}
-				err := d.sendProfileData(&pprofile.RawProfile{
-					Format:  ingestion.FormatLines,
-					RawData: profile.Data,
-				}, profile.Format, parser, metadata)
+				// for ebpf profiling data, directly write, no need to parse
+				log.Debugf("decode ebpf profile data, compression: %d, data: %v", profile.DataCompressed, profile.Data)
+				err := parser.rawStackToInProcess(
+					profile.Data,
+					parser.value,
+					metadata.StartTime,
+					metadata.Units.String(),
+					metadata.SpyName,
+					metadata.Key.Labels(),
+					profile.DataCompressed,
+				)
 				if err != nil {
 					log.Errorf("decode ebpf profile data failed, offset=%d, len=%d, err=%s", decoder.Offset(), len(decoder.Bytes()), err)
 					return
@@ -327,6 +352,28 @@ func (d *Decoder) buildMetaData(profile *pb.Profile) ingestion.Metadata {
 		Units:           metadata.Units(profile.Units),
 		AggregationType: metadata.AggregationType(profile.AggregationType),
 	}
+}
+
+func (d *Decoder) decompressData(data []byte, compressFlag uint8) []byte {
+	// zstdCompress comes from agent-sender
+	if compressFlag&_ZSTD_COMPRESS_FLAG == _ZSTD_COMPRESS_FLAG {
+		var err error
+		data, err = profile_common.ZstdDecompress(d.decompressBuffer[:0], data)
+		if err != nil {
+			log.Errorf("decompress profile data failed, decompressType=%d, len=%d, err=%s", _ZSTD_COMPRESS_FLAG, len(data), err)
+			return data
+		}
+	}
+	// gzipCompress comes from application-profiler
+	if compressFlag&_GZIP_COMPRESS_FLAG == _GZIP_COMPRESS_FLAG {
+		var err error
+		data, err = profile_common.GzipDecompress(data)
+		if err != nil {
+			log.Errorf("decompress profile data failed, decompressType=%d, len=%d, err=%s", _GZIP_COMPRESS_FLAG, len(data), err)
+			return data
+		}
+	}
+	return data
 }
 
 func (d *Decoder) sendProfileData(profile ingestion.RawProfile, format string, parser *Parser, metadata ingestion.Metadata) error {

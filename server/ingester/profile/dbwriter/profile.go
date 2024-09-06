@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
-	"github.com/pyroscope-io/pyroscope/pkg/storage"
 
 	basecommon "github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
@@ -40,6 +39,7 @@ const (
 	LabelAppService   = "app_service"
 	LabelAppInstance  = "app_instance"
 	LabelLanguageType = "profile_language_type"
+	LabelProfileID    = "profile_id"
 )
 
 var InProcessCounter uint32
@@ -299,7 +299,9 @@ func (p *InProcessProfile) Clone() *InProcessProfile {
 	return c
 }
 
-func (p *InProcessProfile) FillProfile(input *storage.PutInput,
+func (p *InProcessProfile) FillProfile(createTime time.Time,
+	profileUnit string,
+	profileLabels map[string]string,
 	platformData *grpc.PlatformInfoTable,
 	vtapID, orgId, teamId uint16,
 	podID uint32,
@@ -315,8 +317,8 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	tagNames []string,
 	tagValues []string) {
 
-	p.Time = uint32(input.StartTime.Unix())
-	p._id = genID(uint32(input.StartTime.UnixNano()/int64(time.Second)), &InProcessCounter, vtapID)
+	p.Time = uint32(createTime.Unix())
+	p._id = genID(uint32(createTime.UnixNano()/int64(time.Second)), &InProcessCounter, vtapID)
 	p.VtapID = vtapID
 	p.PodID = podID
 	p.AppService = profileName
@@ -324,13 +326,13 @@ func (p *InProcessProfile) FillProfile(input *storage.PutInput,
 	p.CompressionAlgo = compressionAlgo
 	p.ProfileEventType = eventType
 	p.ProfileValue = self
-	p.ProfileValueUnit = input.Units.String()
-	p.ProfileCreateTimestamp = input.StartTime.UnixMicro()
+	p.ProfileValueUnit = profileUnit
+	p.ProfileCreateTimestamp = createTime.UnixMicro()
 	p.ProfileInTimestamp = inTimeStamp.UnixMicro()
 	p.ProfileLanguageType = languageType
-	p.ProfileID, _ = input.Key.ProfileID()
-	if input.Key.Labels() != nil {
-		p.SpanName = input.Key.Labels()[LabelSpanName]
+	if profileLabels != nil {
+		p.ProfileID = profileLabels[LabelProfileID]
+		p.SpanName = profileLabels[LabelSpanName]
 	}
 	// app_instance should upload by user with label, if empty use app_service
 	if p.AppInstance == "" {
