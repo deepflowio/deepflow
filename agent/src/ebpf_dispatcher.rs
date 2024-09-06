@@ -551,7 +551,11 @@ impl EbpfCollector {
                     profile.timestamp -= (-diff) as u64;
                 }
             }
-            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
+            profile.event_type = match data.profiler_type {
+                #[cfg(feature = "extended_profile")]
+                ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
+                _ => metric::ProfileEventType::EbpfOnCpu.into(),
+            };
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
