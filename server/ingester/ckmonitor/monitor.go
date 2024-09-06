@@ -117,7 +117,8 @@ func (m *Monitor) updateConnections() {
 	if len(*m.Addrs) == 0 {
 		return
 	}
-	if !reflect.DeepEqual(m.CurrentAddrs, *m.Addrs) {
+	if len(m.Conns) == 0 || !reflect.DeepEqual(m.CurrentAddrs, *m.Addrs) {
+		log.Infof("clickhouse endponts change from %v to %v", m.CurrentAddrs, *m.Addrs)
 		m.CurrentAddrs = utils.CloneStringSlice(*m.Addrs)
 		for _, connect := range m.Conns {
 			if connect != nil {
