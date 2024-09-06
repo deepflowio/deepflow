@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: target port associated to controller [#8057](https://github.com/deepflowio/deepflow/pull/8057) by [askyrie](https://github.com/askyrie)
+* fix: OffCpuProfile adds authorization control [#8022](https://github.com/deepflowio/deepflow/pull/8022) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: agent - eBPF Fix the issue with loading '__sys_recvmmsg' [#8052](https://github.com/deepflowio/deepflow/pull/8052) by [yinjiping](https://github.com/yinjiping)
 * fix: controller records unnecessary error logs [#8025](https://github.com/deepflowio/deepflow/pull/8025) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * fix: agent - eBPF fentry/fexit Check for '__sys_recvmmsg' [#8011](https://github.com/deepflowio/deepflow/pull/8011) by [yinjiping](https://github.com/yinjiping)

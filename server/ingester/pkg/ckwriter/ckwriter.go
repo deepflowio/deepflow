@@ -80,7 +80,7 @@ func (m *CKWriterManager) EndpointsChange(addrs []string) {
 	ckwriterManager.Lock()
 	for _, ckwriter := range m.ckwriters {
 		log.Infof("ckwriter %s addrs change from %s to %s ", ckwriter.name, ckwriter.addrs, addrs)
-		ckwriter.addrs = addrs
+		ckwriter.addrs = utils.CloneStringSlice(addrs)
 		ckwriter.endpointsChange(addrs)
 	}
 	ckwriterManager.Unlock()
@@ -325,7 +325,7 @@ func NewCKWriter(addrs []string, user, password, counterName, timeZone string, t
 		common.QUEUE_STATS_MODULE_INGESTER)
 
 	w := &CKWriter{
-		addrs:         addrs,
+		addrs:         utils.CloneStringSlice(addrs),
 		user:          user,
 		password:      password,
 		timeZone:      timeZone,
