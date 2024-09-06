@@ -36,6 +36,7 @@ import (
 const (
 	// the maximum duration of off-cpu profile is 1h + <1s
 	MAX_OFF_CPU_PROFILE_SPLIT_COUNT = 4000
+	DEFAULT_COMPRESSION_ALGO        = "zstd"
 )
 
 type Parser struct {
@@ -68,11 +69,23 @@ type processTracer struct {
 // implement storage.Putter
 // triggered by input.Profile.Parse
 func (p *Parser) Put(ctx context.Context, i *storage.PutInput) error {
+	// for application profiling, appName like : application.cpu, e.g.:<appName>.<eventType>
+	eventType := strings.TrimPrefix(i.Key.AppName(), fmt.Sprintf("%s.", p.profileName))
+	if p.processTracer != nil {
+		// for ebpf profiling event type
+		eventType = p.processTracer.eventType
+	}
+
 	i.Val.IterateStacks(func(name string, self uint64, stack []string) {
 		for i, j := 0, len(stack)-1; i < j; i, j = i+1, j-1 {
 			stack[i], stack[j] = stack[j], stack[i]
 		}
-		inProcesses := p.stackToInProcess(i, stack, self)
+		onelineStack := strings.Join(stack, ";")
+		atomic.AddInt64(&p.Counter.UncompressSize, int64(len(stack)))
+		location := compress(onelineStack, p.compressionAlgo)
+		atomic.AddInt64(&p.Counter.CompressedSize, int64(len(location)))
+
+		inProcesses := p.stackToInProcess(location, self, i.StartTime, i.Units.String(), eventType, i.SpyName, i.Key.Labels())
 		p.profileWriterCallback(inProcesses)
 		// in the same batch, app_service is the same and only needs to be written once.
 		p.appServiceTagWriterCallback(inProcesses[0].(*dbwriter.InProcessProfile))
@@ -86,8 +99,28 @@ func (p *Parser) Evaluate(i *storage.PutInput) (storage.SampleObserver, bool) {
 	return p.observer, true
 }
 
-func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value uint64) []interface{} {
-	labels := input.Key.Labels()
+// eBPF profiling direct write into db
+func (p *Parser) rawStackToInProcess(stack []byte, value uint64, startTime time.Time, units, spyName string, labels map[string]string, srcCompressed bool) error {
+	data := string(stack)
+	// sender require compressed, but ingester require not compressed, should decompressed
+	if srcCompressed && p.compressionAlgo == "" {
+		data = deCompress(stack, DEFAULT_COMPRESSION_ALGO)
+	}
+	// sender require not compressed, but ingester require compressed, should compress
+	if !srcCompressed && p.compressionAlgo == DEFAULT_COMPRESSION_ALGO {
+		data = compress(data, p.compressionAlgo)
+	}
+	if len(data) == 0 {
+		return fmt.Errorf("stack parsing failed, startTime: %d, spy: %s", startTime.Unix(), spyName)
+	}
+	// otherwise, do nothing, directly write into db
+	inProcess := p.stackToInProcess(data, value, startTime, units, p.processTracer.eventType, spyName, labels)
+	p.profileWriterCallback(inProcess)
+	p.appServiceTagWriterCallback(inProcess[0].(*dbwriter.InProcessProfile))
+	return nil
+}
+
+func (p *Parser) stackToInProcess(location string, value uint64, startTime time.Time, units, eventType, spyName string, labels map[string]string) []interface{} {
 	tagNames := make([]string, 0, len(labels))
 	tagValues := make([]string, 0, len(labels))
 	for k, v := range labels {
@@ -108,24 +141,18 @@ func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value
 
 	var pid uint32
 	var stime int64
-	var eventType string
-
-	onelineStack := strings.Join(stack, ";")
-	atomic.AddInt64(&p.Counter.UncompressSize, int64(len(onelineStack)))
-
-	location := compress(onelineStack, p.compressionAlgo)
-	atomic.AddInt64(&p.Counter.CompressedSize, int64(len(location)))
 
 	profileValueUs := int64(value)
 	if p.processTracer != nil {
+		// only for eBPF profiling
 		profileValueUs = int64(p.value)
 		pid = p.processTracer.pid
 		stime = p.processTracer.stime
-		eventType = p.processTracer.eventType
-	} else {
-		eventType = strings.TrimPrefix(input.Key.AppName(), fmt.Sprintf("%s.", p.profileName))
 	}
-	ret.FillProfile(input,
+
+	ret.FillProfile(startTime,
+		units,
+		labels,
 		p.platformData,
 		p.vtapID,
 		p.orgId, p.teamId,
@@ -136,7 +163,7 @@ func (p *Parser) stackToInProcess(input *storage.PutInput, stack []string, value
 		p.compressionAlgo,
 		profileValueUs,
 		p.inTimestamp,
-		spyMap[input.SpyName],
+		spyMap[spyName],
 		pid,
 		stime,
 		tagNames,
@@ -194,7 +221,7 @@ func compress(src string, algo string) string {
 	switch algo {
 	case "":
 		return src
-	case "zstd":
+	case DEFAULT_COMPRESSION_ALGO:
 		dst := make([]byte, 0, len(src))
 		result, err := common.ZstdCompress(dst, []byte(src), zstd.SpeedDefault)
 		if err != nil {
@@ -212,7 +239,7 @@ func deCompress(str []byte, algo string) string {
 	switch algo {
 	case "":
 		return string(str)
-	case "zstd":
+	case DEFAULT_COMPRESSION_ALGO:
 		dst := make([]byte, 0, len(str))
 		result, err := common.ZstdDecompress(dst, str)
 		if err != nil {
