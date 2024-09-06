@@ -22,7 +22,7 @@ use crate::{
     },
     config::handler::LogParserConfig,
     flow_generator::{
-        error::Result,
+        error::{Error, Result},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
             AppProtoHead, L7ResponseStatus, LogMessageType,
@@ -362,7 +362,12 @@ impl L7ProtocolParserInterface for TarsLog {
         if self.perf_stats.is_none() {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        let mut info = TarsInfo::parse(payload, param).unwrap().1;
+        let mut info = TarsInfo::parse(payload, param)
+            .ok_or(Error::L7LogParseFailed {
+                proto: L7Protocol::Tars,
+                reason: "parse result empty".to_owned(),
+            })?
+            .1;
 
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
