@@ -2705,7 +2705,7 @@ inputs:
         # unit:
         # range: []
         # enum_options: []
-        # modification: agent_restart
+        # modification: hot_update
         # ee_feature: true
         # description:
         #   en: |-
@@ -2714,6 +2714,22 @@ inputs:
         #     eBPF memory profile 数据的采集开关。
         # upgrade_from: static_config.ebpf.memory-profile.disabled
         disabled: true
+        # type: duration
+        # name:
+        #   en: Memory profile report interval
+        #   ch: 内存剖析上报间隔
+        # unit:
+        # range: [1s, 60s]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     The interval at which deepflow-agent aggregates and reports memory profile data.
+        #   ch: |-
+        #     deepflow-agent 聚合和上报内存剖析数据的间隔。
+        # upgrade_from: static_config.ebpf.memory-profile.report-interval
+        report_interval: 10s
       # type: section
       # name:
       #   en: Preprocess

@@ -2147,6 +2147,8 @@ impl Default for OffCpuProfile {
 pub struct MemoryProfile {
     pub disabled: bool,
     pub regex: String,
+    #[serde(with = "humantime_serde")]
+    pub report_interval: Duration,
 }
 
 impl Default for MemoryProfile {
@@ -2154,6 +2156,7 @@ impl Default for MemoryProfile {
         MemoryProfile {
             disabled: true,
             regex: "^java".to_string(),
+            report_interval: Duration::from_secs(10),
         }
     }
 }
@@ -2626,6 +2629,11 @@ impl YamlConfig {
             .off_cpu_profile
             .min_block
             .clamp(Duration::from_micros(0), Duration::from_micros(3600000000));
+        c.ebpf.memory_profile.report_interval = c
+            .ebpf
+            .memory_profile
+            .report_interval
+            .clamp(Duration::from_secs(1), Duration::from_secs(60));
         if !(8..=1024).contains(&c.ebpf.syscall_out_of_order_cache_size) {
             c.ebpf.syscall_out_of_order_cache_size = 16;
         }

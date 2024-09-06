@@ -269,8 +269,9 @@ type OffCpuProfile struct {
 }
 
 type MemoryProfile struct {
-	Disabled *bool   `yaml:"disabled,omitempty"`
-	Regex    *string `yaml:"regex,omitempty"`
+	Disabled       *bool   `yaml:"disabled,omitempty"`
+	Regex          *string `yaml:"regex,omitempty"`
+	ReportInterval *string `yaml:"report-interval,omitempty"`
 }
 
 type EbpfConfig struct {
