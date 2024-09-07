@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Bad event type for offcpu profile [#8078](https://github.com/deepflowio/deepflow/pull/8078) by [rvql](https://github.com/rvql)
 * fix: agent command panic [#8071](https://github.com/deepflowio/deepflow/pull/8071) by [roryye](https://github.com/roryye)
 * fix: clickhouse disk monitoring failure [#8069](https://github.com/deepflowio/deepflow/pull/8069) by [lzf575](https://github.com/lzf575)
 * fix: Tars parse failure cause agent exit [#8068](https://github.com/deepflowio/deepflow/pull/8068) by [rvql](https://github.com/rvql)
