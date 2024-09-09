@@ -522,7 +522,7 @@ impl EbpfCollector {
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
-            if PROFILE_STACK_COMPRESSION {
+            if PROFILE_STACK_COMPRESSION || true {
                 match compress(&profile.data, 0) {
                     Ok(compressed_data) => {
                         profile.data_compressed = 1;

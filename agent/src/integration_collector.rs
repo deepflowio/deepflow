@@ -772,7 +772,7 @@ async fn handler(
                 }
             };
             profile.data = decode_metric(whole_body, &part.headers)?;
-            if profile_compressed {
+            if profile_compressed || true {
                 match compress(&profile.data, 0) {
                     Ok(compressed_data) => {
                         profile.data_compressed = 1;
