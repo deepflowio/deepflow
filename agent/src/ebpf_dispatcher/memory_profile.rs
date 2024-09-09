@@ -209,7 +209,7 @@ impl MemoryContext {
                     }
                 }
                 p.event_type = metric::ProfileEventType::EbpfMemAlloc.into();
-                p.timestamp = (timestamp - report_interval).as_millis() as u64;
+                p.timestamp = (timestamp - report_interval).as_nanos() as u64;
                 p.count = p.wide_count as u32;
                 batch.push(Profile(p));
             }
@@ -225,7 +225,7 @@ impl MemoryContext {
                 }
                 let mut p = rp.clone();
                 p.event_type = metric::ProfileEventType::EbpfMemInUse.into();
-                p.timestamp = (timestamp - report_interval).as_millis() as u64;
+                p.timestamp = (timestamp - report_interval).as_nanos() as u64;
                 p.count = p.wide_count as u32;
                 batch.push(Profile(p));
             }

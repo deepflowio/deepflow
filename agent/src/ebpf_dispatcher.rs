@@ -520,13 +520,13 @@ impl EbpfCollector {
 
             #[cfg(feature = "extended_profile")]
             if data.profiler_type == ebpf::PROFILER_TYPE_MEMORY {
-                let mut ts_millis = data.timestamp;
+                let mut ts_nanos = data.timestamp;
                 if let Some(time_diff) = TIME_DIFF.as_ref() {
                     let diff = time_diff.load(Ordering::Relaxed);
                     if diff > 0 {
-                        ts_millis += diff as u64;
+                        ts_nanos += diff as u64;
                     } else {
-                        ts_millis -= (-diff) as u64;
+                        ts_nanos -= (-diff) as u64;
                     }
                 }
                 let Some(m_ctx) = (ctx as *mut memory_profile::MemoryContext).as_mut() else {
@@ -534,7 +534,7 @@ impl EbpfCollector {
                 };
                 m_ctx.update(data);
                 m_ctx.report(
-                    Duration::from_millis(ts_millis),
+                    Duration::from_nanos(ts_nanos),
                     EBPF_PROFILE_SENDER.as_mut().unwrap(),
                 );
                 return;
