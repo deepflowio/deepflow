@@ -728,14 +728,14 @@ mod tests {
         EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET,
     };
     use crate::common::flow::{CloseType, PacketDirection};
-    use crate::config::RuntimeConfig;
+    use crate::config::UserConfig;
     use crate::flow_generator::flow_map::{Config, _new_flow_map_and_receiver};
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
     use crate::rpc::get_timestamp;
     use crate::utils::test::Capture;
-    use public::proto::agent::AgentType;
+    use public::proto::agent::{AgentType, DynamicConfig};
 
     use packet_sequence_block::PacketSequenceBlock;
 
@@ -832,7 +832,20 @@ mod tests {
         peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
         peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;
 
-        let config = (&RuntimeConfig::default()).into();
+        let config = (
+            &UserConfig::default(),
+            &DynamicConfig {
+                kubernetes_api_enabled: None,
+                region_id: None,
+                pod_cluster_id: None,
+                vpc_id: None,
+                agent_id: None,
+                team_id: None,
+                organize_id: None,
+                secret_key: None,
+            },
+        )
+            .into();
         for (flags, direction) in packets {
             let _ = flow_map.update_flow_state_machine(&config, &mut flow_node, flags, direction);
         }
@@ -902,7 +915,20 @@ mod tests {
         peers[FLOW_METRICS_PEER_SRC].total_packet_count = 1;
         peers[FLOW_METRICS_PEER_DST].total_packet_count = 1;
 
-        let config = (&RuntimeConfig::default()).into();
+        let config = (
+            &UserConfig::default(),
+            &DynamicConfig {
+                kubernetes_api_enabled: None,
+                region_id: None,
+                pod_cluster_id: None,
+                vpc_id: None,
+                agent_id: None,
+                team_id: None,
+                organize_id: None,
+                secret_key: None,
+            },
+        )
+            .into();
         for data in init_test_case() {
             flow_node.flow_state = data.cur_state;
             let closed = flow_map.update_flow_state_machine(

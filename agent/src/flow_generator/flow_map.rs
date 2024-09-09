@@ -72,7 +72,7 @@ use crate::{
     },
     config::{
         handler::{CollectorConfig, LogParserConfig, PluginConfig},
-        FlowConfig, ModuleConfig, RuntimeConfig,
+        FlowConfig, ModuleConfig, UserConfig,
     },
     flow_generator::{protocol_logs::PseudoAppProto, LogMessageType},
     metric::document::TapSide,
@@ -89,7 +89,7 @@ use public::{
     debug::QueueDebugger,
     l7_protocol::L7ProtocolEnum,
     packet::SECONDS_IN_MINUTE,
-    proto::agent::AgentType,
+    proto::agent::{AgentType, DynamicConfig},
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
 };
@@ -2564,7 +2564,20 @@ pub fn _new_flow_map_and_receiver(
             app_proto_log_enabled: true,
             ignore_idc_vlan: ignore_idc_vlan,
             flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
-            ..(&RuntimeConfig::default()).into()
+            ..((
+                &UserConfig::standalone_default(),
+                &DynamicConfig {
+                    kubernetes_api_enabled: None,
+                    region_id: None,
+                    pod_cluster_id: None,
+                    vpc_id: None,
+                    agent_id: None,
+                    team_id: None,
+                    organize_id: None,
+                    secret_key: None,
+                },
+            ))
+                .into()
         },
         ..Default::default()
     };

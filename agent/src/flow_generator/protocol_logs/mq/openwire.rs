@@ -2272,7 +2272,7 @@ mod tests {
     use super::*;
 
     use crate::common::l7_protocol_log::L7PerfCache;
-    use crate::config::{handler::LogParserConfig, CustomFields};
+    use crate::config::{handler::LogParserConfig, ExtraLogFields};
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
@@ -2318,7 +2318,7 @@ mod tests {
                 vec![],
                 vec![TraceType::Sw8, TraceType::TraceParent],
                 vec![TraceType::Sw8, TraceType::TraceParent],
-                CustomFields::default(),
+                ExtraLogFields::default(),
             );
             let parse_config = &LogParserConfig {
                 l7_log_dynamic: config.clone(),
@@ -2397,7 +2397,7 @@ mod tests {
             vec![],
             vec![TraceType::Sw8, TraceType::TraceParent],
             vec![TraceType::Sw8, TraceType::TraceParent],
-            CustomFields::default(),
+            ExtraLogFields::default(),
         );
         let (trace_id, span_id) = parse_trace_and_span(payload, &config).unwrap();
         assert_eq!(trace_id, Some("TRACEID".to_string()));

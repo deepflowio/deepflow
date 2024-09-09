@@ -64,7 +64,7 @@ use crate::{
     config::PcapStream,
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig},
-        Config, ConfigError, RuntimeConfig,
+        Config, ConfigError, UserConfig,
     },
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
@@ -119,7 +119,10 @@ use public::{
     buffer::BatchedBox,
     debug::QueueDebugger,
     packet::MiniPacket,
-    proto::agent::{self, Exception, PacketCaptureType, SocketType},
+    proto::{
+        agent::{self, DynamicConfig, Exception, PacketCaptureType, SocketType},
+        trident,
+    },
     queue::{self, DebugSender},
     utils::net::{get_route_src_ip, Link, MacAddr},
     LeakyBucket,
@@ -131,7 +134,8 @@ const QG_PROCESS_MAX_DELAY: u64 = 5; // FIXME: Potential delay from processing s
 
 #[derive(Debug, Default)]
 pub struct ChangedConfig {
-    pub runtime_config: RuntimeConfig,
+    pub user_config: UserConfig,
+    pub dynamic_config: DynamicConfig,
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
     pub gateway_vmac_addrs: Vec<MacAddr>,
@@ -150,7 +154,7 @@ pub enum State {
     Running,
     ConfigChanged(ChangedConfig),
     Terminated,
-    Disabled(Option<RuntimeConfig>), // Requires runtime config to update platform config
+    Disabled(Option<(UserConfig, DynamicConfig)>), // Requires user config and dynamic config to update platform config
 }
 
 impl State {
@@ -200,7 +204,7 @@ CompileTime: {}",
     }
 }
 
-pub type TridentState = Arc<(Mutex<State>, Condvar)>;
+pub type AgentState = Arc<(Mutex<State>, Condvar)>;
 
 #[derive(Clone, Debug)]
 pub struct AgentId {
@@ -229,8 +233,19 @@ impl From<&AgentId> for agent::AgentId {
     }
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl From<&AgentId> for trident::AgentId {
+    fn from(id: &AgentId) -> Self {
+        Self {
+            ip: Some(id.ip.to_string()),
+            mac: Some(id.mac.to_string()),
+            team_id: Some(id.team_id.clone()),
+        }
+    }
+}
+
 pub struct Trident {
-    state: TridentState,
+    state: AgentState,
     handle: Option<JoinHandle<()>>,
     #[cfg(target_os = "linux")]
     pid_file: Option<crate::utils::pid_file::PidFile>,
@@ -264,7 +279,7 @@ impl Trident {
                 }
             }
             RunningMode::Standalone => {
-                let rc = RuntimeConfig::load_from_file(config_path.as_ref())?;
+                let rc = UserConfig::load_from_file(config_path.as_ref())?;
                 let mut conf = Config::default();
                 conf.controller_ips = vec!["127.0.0.1".into()];
                 conf.log_file = rc.global.self_monitoring.log.log_file;
@@ -426,7 +441,7 @@ impl Trident {
     }
 
     fn run(
-        state: TridentState,
+        state: AgentState,
         ctrl_ip: IpAddr,
         ctrl_mac: MacAddr,
         mut config_handler: ConfigHandler,
@@ -497,6 +512,7 @@ impl Trident {
             config_handler.static_config.controller_ips.clone(),
             exception_handler.clone(),
             &stats_collector,
+            config_handler.static_config.new_rpc,
         ));
 
         let runtime = Arc::new(
@@ -546,6 +562,7 @@ impl Trident {
             config_path,
             agent_id_tx.clone(),
             ntp_diff,
+            config_handler.static_config.new_rpc,
         ));
         stats_collector.register_countable(
             &stats::NoTagModule("ntp"),
@@ -609,18 +626,12 @@ impl Trident {
         let guard = match Guard::new(
             config_handler.environment(),
             log_dir.to_string(),
-            config_handler
-                .candidate_config
-                .config
-                .global
-                .tunning
-                .resource_monitoring_interval,
             exception_handler.clone(),
             cgroup_mount_path,
             is_cgroup_v2,
             config_handler
                 .candidate_config
-                .config
+                .user_config
                 .global
                 .tunning
                 .idle_memory_trimming,
@@ -696,7 +707,6 @@ impl Trident {
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
         let mut components: Option<Components> = None;
-        let mut current_runtime_config: Option<RuntimeConfig> = None;
 
         loop {
             match &mut *state_guard {
@@ -741,7 +751,8 @@ impl Trident {
                     if let Some(c) = config.take() {
                         let agent_id = synchronizer.agent_id.read().clone();
                         let callbacks = config_handler.on_config(
-                            c,
+                            c.0,
+                            c.1,
                             &exception_handler,
                             None,
                             #[cfg(target_os = "linux")]
@@ -788,32 +799,36 @@ impl Trident {
             mem::drop(state_guard);
 
             let ChangedConfig {
-                runtime_config,
+                user_config,
+                dynamic_config,
                 blacklist,
                 vm_mac_addrs,
                 gateway_vmac_addrs,
                 tap_types,
             } = new_state.unwrap_config();
 
-            if let Some(old_yaml) = current_runtime_config {
-                if old_yaml != runtime_config {
-                    if let Some(mut c) = components.take() {
-                        c.stop();
-                    }
-                    // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
-                    // Work around this problem by exiting and restart trident
-                    let info = "runtime_config updated, deepflow-agent restart...";
-                    warn!("{}", info);
-                    thread::sleep(Duration::from_secs(1));
-                    return Err(anyhow!(info));
-                }
-            }
-            current_runtime_config = Some(runtime_config.clone());
+            // TODO At present, all changes in user_config will not cause the agent to restart,
+            // hot update needs to be implemented and this judgment should be removed
+            // if let Some(old_user_config) = current_user_config {
+            //     if old_user_config != user_config {
+            //         if let Some(mut c) = components.take() {
+            //             c.stop();
+            //         }
+            //         // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
+            //         // Work around this problem by exiting and restart trident
+            //         let info = "user_config updated, deepflow-agent restart...";
+            //         warn!("{}", info);
+            //         thread::sleep(Duration::from_secs(1));
+            //         return Err(anyhow!(info));
+            //     }
+            // }
+            // current_user_config = Some(user_config.clone());
             let agent_id = synchronizer.agent_id.read().clone();
             match components.as_mut() {
                 None => {
                     let callbacks = config_handler.on_config(
-                        runtime_config,
+                        user_config,
+                        dynamic_config,
                         &exception_handler,
                         None,
                         #[cfg(target_os = "linux")]
@@ -873,7 +888,8 @@ impl Trident {
                 Some(Components::Agent(components)) => {
                     let callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = config_handler
                         .on_config(
-                            runtime_config,
+                            user_config,
+                            dynamic_config,
                             &exception_handler,
                             Some(components),
                             #[cfg(target_os = "linux")]
@@ -919,7 +935,8 @@ impl Trident {
                 }
                 _ => {
                     config_handler.on_config(
-                        runtime_config,
+                        user_config,
+                        dynamic_config,
                         &exception_handler,
                         None,
                         #[cfg(target_os = "linux")]
@@ -1109,7 +1126,7 @@ fn component_on_config_change(
             if conf.capture_mode == PacketCaptureType::Mirror
                 && (!config_handler
                     .candidate_config
-                    .config
+                    .user_config
                     .inputs
                     .cbpf
                     .special_network
@@ -1563,7 +1580,7 @@ pub struct AgentComponents {
 }
 
 impl AgentComponents {
-    fn get_flowgen_tolerable_delay(config: &RuntimeConfig) -> u64 {
+    fn get_flowgen_tolerable_delay(config: &UserConfig) -> u64 {
         // FIXME: The flow_generator and dispatcher should be decoupled, and a delay function should be provided for this purpose.
         // The components of quadruple_generator's Delay are as follows:
         //   - Inherent delay in flow statistics data in flow_map: second_flow_extra_delay + packet_delay
@@ -1611,7 +1628,7 @@ impl AgentComponents {
         synchronizer: &Arc<Synchronizer>,
         agent_mode: RunningMode,
     ) -> CollectorThread {
-        let config = &config_handler.candidate_config.config;
+        let config = &config_handler.candidate_config.user_config;
 
         let flowgen_tolerable_delay = Self::get_flowgen_tolerable_delay(config);
         // minute QG window is also pushed forward by flow stat time,
@@ -1750,10 +1767,10 @@ impl AgentComponents {
         synchronizer: &Arc<Synchronizer>,
         agent_mode: RunningMode,
     ) -> L7CollectorThread {
-        let runtime_config = &config_handler.candidate_config.config;
+        let user_config = &config_handler.candidate_config.user_config;
 
         let (l7_second_sender, l7_second_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -1769,7 +1786,7 @@ impl AgentComponents {
             Countable::Owned(Box::new(counter)),
         );
         let (l7_minute_sender, l7_minute_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -1785,7 +1802,7 @@ impl AgentComponents {
             Countable::Owned(Box::new(counter)),
         );
 
-        let second_quadruple_tolerable_delay = Self::get_flowgen_tolerable_delay(runtime_config);
+        let second_quadruple_tolerable_delay = Self::get_flowgen_tolerable_delay(user_config);
         // minute QG window is also pushed forward by flow stat time,
         // therefore its delay should be 60 + second delay (including extra flow delay)
         let minute_quadruple_tolerable_delay = 60 + second_quadruple_tolerable_delay;
@@ -1853,29 +1870,23 @@ impl AgentComponents {
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
-        let runtime_config = &candidate_config.config;
+        let user_config = &candidate_config.user_config;
         let ctrl_ip = config_handler.ctrl_ip;
         let max_memory = config_handler.candidate_config.environment.max_memory;
         let process_threshold = config_handler
             .candidate_config
             .environment
             .process_threshold;
-        let feature_flags = FeatureFlags::from(&runtime_config.dev.feature_flags);
+        let feature_flags = FeatureFlags::from(&user_config.dev.feature_flags);
 
-        if !runtime_config
-            .inputs
-            .cbpf
-            .af_packet
-            .src_interfaces
-            .is_empty()
-        {
+        if !user_config.inputs.cbpf.af_packet.src_interfaces.is_empty() {
             warn!("src_interfaces is not empty, but this has already been deprecated, instead, the tap_interface_regex should be set");
         }
 
         info!("Start check process...");
         trident_process_check(process_threshold);
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if !runtime_config.global.alerts.check_core_file_disabled {
+        if !user_config.global.alerts.check_core_file_disabled {
             info!("Start check core file...");
             core_file_check();
         }
@@ -1914,7 +1925,7 @@ impl AgentComponents {
         let local_dispatcher_count = if candidate_config.capture_mode == PacketCaptureType::Local
             && candidate_config.dispatcher.extra_netns_regex == ""
         {
-            runtime_config
+            user_config
                 .inputs
                 .cbpf
                 .af_packet
@@ -1950,7 +1961,7 @@ impl AgentComponents {
         }
         #[cfg(target_os = "linux")]
         if candidate_config.capture_mode == PacketCaptureType::Mirror
-            && (!runtime_config
+            && (!user_config
                 .inputs
                 .cbpf
                 .special_network
@@ -1996,15 +2007,17 @@ impl AgentComponents {
         // =================================================================================
         // 目前仅支持local-mode + ebpf-collector，ebpf-collector不适用fastpath, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
-            1.max(if candidate_config.tap_mode != TapMode::Local {
-                interfaces_and_ns.len()
-            } else {
-                1
-            }),
-            yaml_config.first_path_level as usize,
-            yaml_config.get_fast_path_map_size(candidate_config.dispatcher.max_memory),
-            yaml_config.forward_capacity,
-            yaml_config.fast_path_disabled,
+            1.max(
+                if candidate_config.capture_mode != PacketCaptureType::Local {
+                    interfaces_and_ns.len()
+                } else {
+                    1
+                },
+            ),
+            user_config.processors.packet.policy.max_first_path_level,
+            user_config.get_fast_path_map_size(candidate_config.dispatcher.max_memory),
+            user_config.processors.packet.policy.forward_table_capacity,
+            user_config.processors.packet.policy.fast_path_disabled,
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         policy_setter.set_memory_limit(max_memory);
@@ -2045,13 +2058,13 @@ impl AgentComponents {
 
         //#[cfg(any(target_os = "linux", target_os = "android"))]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
-            runtime_config.processors.packet.toa.sender_queue_size,
+            user_config.processors.packet.toa.sender_queue_size,
             "1-socket-sync-toa-info-queue",
             &queue_debugger,
         );
         #[cfg(target_os = "windows")]
         let (toa_sender, _, _) = queue::bounded_with_debug(
-            runtime_config.processors.packet.toa.sender_queue_size,
+            user_config.processors.packet.toa.sender_queue_size,
             "1-socket-sync-toa-info-queue",
             &queue_debugger,
         );
@@ -2065,8 +2078,8 @@ impl AgentComponents {
             session.clone(),
             toa_recv,
             Arc::new(Mutex::new(Lru::with_capacity(
-                runtime_config.processors.packet.toa.cache_size >> 5,
-                runtime_config.processors.packet.toa.cache_size,
+                user_config.processors.packet.toa.cache_size >> 5,
+                user_config.processors.packet.toa.cache_size,
             ))),
         );
 
@@ -2088,11 +2101,11 @@ impl AgentComponents {
         // Sender/Collector
         info!(
             "static analyzer ip: '{}' actual analyzer ip '{}'",
-            runtime_config.global.communication.ingester_ip, candidate_config.sender.dest_ip
+            user_config.global.communication.ingester_ip, candidate_config.sender.dest_ip
         );
         let l4_flow_aggr_queue_name = "3-flowlog-to-collector-sender";
         let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -2118,11 +2131,7 @@ impl AgentComponents {
 
         let metrics_queue_name = "3-doc-to-collector-sender";
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
-                .outputs
-                .flow_metrics
-                .tunning
-                .sender_queue_size,
+            user_config.outputs.flow_metrics.tunning.sender_queue_size,
             metrics_queue_name,
             &queue_debugger,
         );
@@ -2144,7 +2153,7 @@ impl AgentComponents {
 
         let proto_log_queue_name = "2-protolog-to-collector-sender";
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
-            runtime_config.outputs.flow_log.tunning.collector_queue_size,
+            user_config.outputs.flow_log.tunning.collector_queue_size,
             proto_log_queue_name,
             &queue_debugger,
         );
@@ -2204,7 +2213,7 @@ impl AgentComponents {
         let pcap_batch_queue = "2-pcap-batch-to-sender";
         let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
             queue::bounded_with_debug(
-                runtime_config
+                user_config
                     .processors
                     .packet
                     .pcap_stream
@@ -2234,11 +2243,7 @@ impl AgentComponents {
         let packet_sequence_queue_name = "2-packet-sequence-block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
             queue::bounded_with_debug(
-                runtime_config
-                    .processors
-                    .packet
-                    .tcp_header
-                    .sender_queue_size,
+                user_config.processors.packet.tcp_header.sender_queue_size,
                 packet_sequence_queue_name,
                 &queue_debugger,
             );
@@ -2262,8 +2267,8 @@ impl AgentComponents {
 
         let bpf_builder = bpf::Builder {
             is_ipv6: ctrl_ip.is_ipv6(),
-            vxlan_flags: runtime_config.outputs.npb.custom_vxlan_flags,
-            npb_port: runtime_config.outputs.npb.target_port,
+            vxlan_flags: user_config.outputs.npb.custom_vxlan_flags,
+            npb_port: user_config.outputs.npb.target_port,
             controller_port: static_config.controller_port,
             controller_tls_port: static_config.controller_tls_port,
             proxy_controller_port: candidate_config.dispatcher.proxy_controller_port,
@@ -2326,7 +2331,7 @@ impl AgentComponents {
         let proc_event_queue_name = "1-proc-event-to-sender";
         #[allow(unused)]
         let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
-            runtime_config.inputs.ebpf.tunning.collector_queue_size,
+            user_config.inputs.ebpf.tunning.collector_queue_size,
             proc_event_queue_name,
             &queue_debugger,
         );
@@ -2348,7 +2353,7 @@ impl AgentComponents {
 
         let profile_queue_name = "1-profile-to-sender";
         let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
-            runtime_config.inputs.ebpf.tunning.collector_queue_size,
+            user_config.inputs.ebpf.tunning.collector_queue_size,
             profile_queue_name,
             &queue_debugger,
         );
@@ -2369,7 +2374,7 @@ impl AgentComponents {
         );
         let application_log_queue_name = "1-application-log-to-sender";
         let (application_log_sender, application_log_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -2401,7 +2406,7 @@ impl AgentComponents {
             && candidate_config.capture_mode != PacketCaptureType::Analyzer
         {
             let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
-                runtime_config
+                user_config
                     .processors
                     .flow_log
                     .tunning
@@ -2417,7 +2422,7 @@ impl AgentComponents {
                 Countable::Owned(Box::new(counter)),
             );
             let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
-                runtime_config
+                user_config
                     .processors
                     .flow_log
                     .tunning
@@ -2491,7 +2496,7 @@ impl AgentComponents {
 
         let otel_queue_name = "1-otel-to-sender";
         let (otel_sender, otel_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -2518,7 +2523,7 @@ impl AgentComponents {
         let otel_dispatcher_id = ebpf_dispatcher_id + 1;
 
         let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -2547,7 +2552,7 @@ impl AgentComponents {
 
         let prometheus_queue_name = "1-prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -2575,7 +2580,7 @@ impl AgentComponents {
 
         let telegraf_queue_name = "1-telegraf-to-sender";
         let (telegraf_sender, telegraf_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -2601,7 +2606,7 @@ impl AgentComponents {
 
         let compressed_otel_queue_name = "1-compressed-otel-to-sender";
         let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
-            runtime_config
+            user_config
                 .processors
                 .flow_log
                 .tunning
@@ -2641,28 +2646,28 @@ impl AgentComponents {
             candidate_config.platform.epc_id,
             policy_getter,
             synchronizer.ntp_diff(),
-            runtime_config
+            user_config
                 .inputs
                 .integration
                 .prometheus_extra_labels
                 .clone(),
             candidate_config.log_parser.clone(),
-            runtime_config
+            user_config
                 .inputs
                 .integration
                 .feature_control
                 .profile_integration_disabled,
-            runtime_config
+            user_config
                 .inputs
                 .integration
                 .feature_control
                 .trace_integration_disabled,
-            runtime_config
+            user_config
                 .inputs
                 .integration
                 .feature_control
                 .metric_integration_disabled,
-            runtime_config
+            user_config
                 .inputs
                 .integration
                 .feature_control
@@ -3034,7 +3039,7 @@ fn build_dispatchers(
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
 ) -> Result<DispatcherComponent> {
     let candidate_config = &config_handler.candidate_config;
-    let runtime_config = &candidate_config.config;
+    let user_config = &candidate_config.user_config;
     let dispatcher_config = &candidate_config.dispatcher;
     let static_config = &config_handler.static_config;
     let agent_mode = static_config.agent_mode;
@@ -3043,7 +3048,7 @@ fn build_dispatchers(
     let src_link = links.get(0).map(|l| l.to_owned()).unwrap_or_default();
 
     let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
-        runtime_config
+        user_config
             .processors
             .flow_log
             .tunning
@@ -3060,7 +3065,7 @@ fn build_dispatchers(
     );
 
     let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
-        runtime_config
+        user_config
             .processors
             .flow_log
             .tunning
@@ -3078,7 +3083,7 @@ fn build_dispatchers(
 
     // create and start app proto logs
     let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
-        runtime_config
+        user_config
             .processors
             .flow_log
             .tunning
@@ -3109,11 +3114,7 @@ fn build_dispatchers(
     // Enterprise Edition Feature: packet-sequence
     // create and start packet sequence
     let (packet_sequence_sender, packet_sequence_receiver, counter) = queue::bounded_with_debug(
-        runtime_config
-            .processors
-            .packet
-            .tcp_header
-            .sender_queue_size,
+        user_config.processors.packet.tcp_header.sender_queue_size,
         "1-packet-sequence-block-to-parser",
         &queue_debugger,
     );
@@ -3132,7 +3133,7 @@ fn build_dispatchers(
     );
     let (pcap_assembler, mini_packet_sender) = build_pcap_assembler(
         is_ce_version,
-        &runtime_config.processors.packet.pcap_stream,
+        &user_config.processors.packet.pcap_stream,
         &stats_collector,
         pcap_batch_sender.clone(),
         &queue_debugger,
@@ -3154,7 +3155,7 @@ fn build_dispatchers(
 
     let pcap_interfaces = if candidate_config.capture_mode == PacketCaptureType::Mirror
         && candidate_config
-            .config
+            .user_config
             .inputs
             .cbpf
             .special_network
@@ -3177,28 +3178,23 @@ fn build_dispatchers(
             af_packet_version: dispatcher_config.af_packet_version,
             packet_blocks: dispatcher_config.af_packet_blocks,
             capture_mode: candidate_config.capture_mode,
-            tap_mac_script: runtime_config
+            tap_mac_script: user_config
                 .inputs
                 .resources
                 .private_cloud
                 .vm_mac_mapping_script
                 .clone(),
             is_ipv6: ctrl_ip.is_ipv6(),
-            npb_port: runtime_config.outputs.npb.target_port,
-            vxlan_flags: runtime_config.outputs.npb.custom_vxlan_flags,
+            npb_port: user_config.outputs.npb.target_port,
+            vxlan_flags: user_config.outputs.npb.custom_vxlan_flags,
             controller_port: static_config.controller_port,
             controller_tls_port: static_config.controller_tls_port,
-            libpcap_enabled: runtime_config.inputs.cbpf.special_network.libpcap.enabled,
+            libpcap_enabled: user_config.inputs.cbpf.special_network.libpcap.enabled,
             snap_len: dispatcher_config.capture_packet_size as usize,
             dpdk_enabled: dispatcher_config.dpdk_enabled,
             dispatcher_queue: dispatcher_config.dispatcher_queue,
-            packet_fanout_mode: runtime_config
-                .inputs
-                .cbpf
-                .af_packet
-                .tunning
-                .packet_fanout_mode,
-            vhost_socket_path: runtime_config
+            packet_fanout_mode: user_config.inputs.cbpf.af_packet.tunning.packet_fanout_mode,
+            vhost_socket_path: user_config
                 .inputs
                 .cbpf
                 .special_network
@@ -3211,7 +3207,7 @@ fn build_dispatchers(
         })))
         .bpf_options(bpf_options)
         .default_tap_type(
-            (runtime_config
+            (user_config
                 .inputs
                 .cbpf
                 .physical_mirror
@@ -3220,14 +3216,14 @@ fn build_dispatchers(
                 .unwrap_or(CaptureNetworkType::Cloud),
         )
         .mirror_traffic_pcp(
-            runtime_config
+            user_config
                 .inputs
                 .cbpf
                 .af_packet
                 .vlan_pcp_in_physical_mirror_traffic,
         )
         .tap_typer(tap_typer.clone())
-        .analyzer_dedup_disabled(runtime_config.inputs.cbpf.tunning.dispatcher_queue_enabled)
+        .analyzer_dedup_disabled(user_config.inputs.cbpf.tunning.dispatcher_queue_enabled)
         .flow_output_queue(flow_sender.clone())
         .l7_stats_output_queue(l7_stats_sender.clone())
         .log_output_queue(log_sender.clone())
@@ -3248,16 +3244,12 @@ fn build_dispatchers(
         )
         .agent_type(dispatcher_config.agent_type)
         .queue_debugger(queue_debugger.clone())
-        .analyzer_queue_size(runtime_config.inputs.cbpf.tunning.raw_packet_queue_size)
+        .analyzer_queue_size(user_config.inputs.cbpf.tunning.raw_packet_queue_size)
         .pcap_interfaces(pcap_interfaces.clone())
         .tunnel_type_trim_bitmap(dispatcher_config.tunnel_type_trim_bitmap)
         .bond_group(dispatcher_config.bond_group.clone())
         .analyzer_raw_packet_block_size(
-            runtime_config
-                .inputs
-                .cbpf
-                .tunning
-                .raw_packet_buffer_block_size,
+            user_config.inputs.cbpf.tunning.raw_packet_buffer_block_size,
         );
     #[cfg(target_os = "linux")]
     let dispatcher_builder = dispatcher_builder

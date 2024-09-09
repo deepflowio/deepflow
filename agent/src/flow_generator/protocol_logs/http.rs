@@ -1696,7 +1696,7 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 mod tests {
     use crate::config::{
         handler::{LogParserConfig, TraceType},
-        CustomFields, HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
+        ExtraLogFields, HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
     };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
@@ -1737,7 +1737,7 @@ mod tests {
             vec![],
             vec![TraceType::Sw8],
             vec![TraceType::Sw8],
-            CustomFields::default(),
+            ExtraLogFields::default(),
         );
         let parse_config = &LogParserConfig {
             l7_log_collect_nps_threshold: 10,

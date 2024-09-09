@@ -35,7 +35,7 @@ use crate::{
     utils::lru::Lru,
 };
 use public::{
-    proto::agent::{GpidSyncRequest, GpidSyncResponse},
+    proto::{agent, trident::{GpidSyncRequest, GpidSyncResponse}},
     queue::Receiver,
 };
 
@@ -224,42 +224,84 @@ impl SocketSynchronizer {
                     }
                 };
 
-                match runtime.block_on(
-                    session.gpid_sync(GpidSyncRequest {
-                        ctrl_ip: Some(ctrl_ip),
-                        ctrl_mac: Some(ctrl_mac),
-                        team_id: Some(team_id),
-                        agent_id: Some(conf_guard.agent_id as u32),
-                        entries: sock_entries
-                            .into_iter()
-                            .filter_map(|sock| {
-                                if let Ok(e) = sock.try_into() {
-                                    Some(e)
-                                } else {
-                                    None
+                if session.get_new_rpc() {
+                    match runtime.block_on(
+                        session.agent_gpid_sync(agent::GpidSyncRequest {
+                            ctrl_ip: Some(ctrl_ip),
+                            ctrl_mac: Some(ctrl_mac),
+                            team_id: Some(team_id),
+                            agent_id: Some(conf_guard.agent_id as u32),
+                            entries: sock_entries
+                                .into_iter()
+                                .filter_map(|sock| {
+                                    if let Ok(e) = sock.try_into() {
+                                        Some(e)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect(),
+                            // TODO compress_algorithm
+                            ..Default::default()
+                        }),
+                    ) {
+                        Err(e) => error!("gpid sync fail: {}", e),
+                        Ok(response) => {
+                            let response: agent::GpidSyncResponse = response.into_inner();
+                            let mut current_entries = vec![];
+                            for entry in response.entries.iter() {
+                                let e = GpidEntry::try_from(entry);
+                                if e.is_err() {
+                                    warn!("{:?}", e);
+                                    continue;
                                 }
-                            })
-                            .collect(),
-                        // TODO compress_algorithm
-                        ..Default::default()
-                    }),
-                ) {
-                    Err(e) => error!("gpid sync fail: {}", e),
-                    Ok(response) => {
-                        let response: GpidSyncResponse = response.into_inner();
-                        let mut current_entries = vec![];
-                        for entry in response.entries.iter() {
-                            let e = GpidEntry::try_from(entry);
-                            if e.is_err() {
-                                warn!("{:?}", e);
-                                continue;
+                                current_entries.push(e.unwrap());
                             }
-                            current_entries.push(e.unwrap());
-                        }
 
-                        if current_entries != last_entries {
-                            policy_setter.update_gpids(&current_entries);
-                            last_entries = current_entries
+                            if current_entries != last_entries {
+                                policy_setter.update_gpids(&current_entries);
+                                last_entries = current_entries
+                            }
+                        }
+                    }
+                } else {
+                    match runtime.block_on(
+                        session.gpid_sync(GpidSyncRequest {
+                            ctrl_ip: Some(ctrl_ip),
+                            ctrl_mac: Some(ctrl_mac),
+                            team_id: Some(team_id),
+                            vtap_id: Some(conf_guard.agent_id as u32),
+                            entries: sock_entries
+                                .into_iter()
+                                .filter_map(|sock| {
+                                    if let Ok(e) = sock.try_into() {
+                                        Some(e)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect(),
+                            // TODO compress_algorithm
+                            ..Default::default()
+                        }),
+                    ) {
+                        Err(e) => error!("gpid sync fail: {}", e),
+                        Ok(response) => {
+                            let response: GpidSyncResponse = response.into_inner();
+                            let mut current_entries = vec![];
+                            for entry in response.entries.iter() {
+                                let e = GpidEntry::try_from(entry);
+                                if e.is_err() {
+                                    warn!("{:?}", e);
+                                    continue;
+                                }
+                                current_entries.push(e.unwrap());
+                            }
+
+                            if current_entries != last_entries {
+                                policy_setter.update_gpids(&current_entries);
+                                last_entries = current_entries
+                            }
                         }
                     }
                 }

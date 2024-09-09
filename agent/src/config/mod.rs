@@ -19,7 +19,7 @@ pub mod handler;
 
 pub use config::{
     AgentIdType, Config, ConfigError, KubernetesPollerType, OracleConfig, PcapStream,
-    ProcessMatcher, PrometheusExtraLabels, RuntimeConfig, K8S_CA_CRT_PATH,
+    ProcessMatcher, PrometheusExtraLabels, RuntimeConfig, UserConfig, K8S_CA_CRT_PATH,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use config::{
@@ -32,6 +32,6 @@ pub use handler::FlowAccess;
 pub use handler::{DispatcherConfig, FlowConfig, ModuleConfig, NpbConfig};
 
 #[cfg(test)]
-pub use config::{CustomFields, HttpEndpoint, HttpEndpointMatchRule};
+pub use config::{ExtraLogFields, HttpEndpoint, HttpEndpointMatchRule};
 #[cfg(test)]
 pub use handler::HttpEndpointTrie;

@@ -1291,6 +1291,7 @@ inputs:
     # unit:
     # range: []
     # enum_options:
+    #   - input.proc.symbol_table.golang_specific
     #   - proc.socket_list
     #   - proc.symbol_table
     #   - proc.proc_event # XXX
@@ -4514,8 +4515,8 @@ processors:
         #         tag_extraction:
         #           custom_fields:
         #             HTTP:
-        #             - field-name: "user-agent"
-        #             - field-name: "cookie"
+        #             - field_name: "user-agent"
+        #             - field_name: "cookie"
         #     ```
         #
         #     Attention: use `HTTP2` for `gRPC` Protocol.
@@ -5032,26 +5033,6 @@ outputs:
     #     模式下，需配置为 FILE 类型，agent 将 l4_flow_log 和 l7_flow_log 写入本地文件。
     # upgrade_from: collector_socket_type
     data_socket_type: TCP
-    # type: string
-    # name:
-    #   en: PCAP Socket Type
-    #   ch: PCAP Socket 类型
-    # unit:
-    # range: []
-    # enum_options: [TCP, UDP, RAW_UDP]
-    # modification: hot_update
-    # ee_feature: false
-    # description:
-    #   en: |-
-    #     RAW_UDP uses RawSocket to send UDP packets, which has the highest
-    #     performance, but there may be compatibility issues in some environments.
-    #   ch: |-
-    #     配置 deepflow-agent 向 deepflow-server 回传 PCAP 数据所用的 Socket 类型。
-    #     RAW_UDP 使用 RawSocket 发送 UDP 报文，可以带来更高的性能，但在一些环境中存在兼
-    #     容性问题。
-    # upgrade_from: compressor_socket_type
-    # TODO: 待确认，还用吗？
-    pcap_socket_type: TCP
     # type: string
     # name:
     #   en: NPB Socket Type
