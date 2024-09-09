@@ -33,7 +33,7 @@ const (
 	DefaultThrottle          = 50000
 	DefaultThrottleBucket    = 8
 	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 1 << 14
+	DefaultDecoderQueueSize  = 4096
 	DefaultBrokerQueueSize   = 1 << 14
 	DefaultFlowLogTTL        = 72 // hour
 )
