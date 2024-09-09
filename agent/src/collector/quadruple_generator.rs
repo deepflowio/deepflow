@@ -986,6 +986,7 @@ impl QuadrupleGenerator {
                     | CloseType::TcpFin
                     | CloseType::Unknown
                     | CloseType::TcpFinClientRst
+                    | CloseType::IcmpTimeout
                     | CloseType::Max => (),
                 }
             }

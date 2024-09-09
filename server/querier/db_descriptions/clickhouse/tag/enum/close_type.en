@@ -15,3 +15,4 @@
 11      , Close - Client Half Close          ,
 8       , Close - Server Half Close          ,
 20      , Normal - Client RST                ,
+21      , ICMP - Timeout                     ,
