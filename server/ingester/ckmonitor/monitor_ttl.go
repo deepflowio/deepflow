@@ -23,16 +23,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 )
 
 func getFullTable(database, table string) string {
 	return fmt.Sprintf("%s.`%s`", database, table)
 }
 
-func getDfStorageTTLsMap(connect *sql.DB) (map[string]int, error) {
+func getDfStorageTTLsMap(connect *sql.DB, storagePolicy string) (map[string]int, error) {
 	ttlMap := make(map[string]int)
 
-	sql := "SELECT database,table,engine_full FROM system.tables WHERE storage_policy='df_storage'"
+	sql := fmt.Sprintf("SELECT database,name,engine_full FROM system.tables WHERE storage_policy='%s'", storagePolicy)
 	log.Info(sql)
 	rows, err := connect.Query(sql)
 	if err != nil {
@@ -60,8 +62,8 @@ func getDfStorageTTLsMap(connect *sql.DB) (map[string]int, error) {
 	return ttlMap, nil
 }
 
-func getPartitionsMap(connect *sql.DB) (map[string][]string, error) {
-	sql := "SELECT partition,database,table FROM system.parts WHERE active=1 GROUP BY partition,database,table ORDER BY partition"
+func getPartitionsMap(connect *sql.DB, tableParts string) (map[string][]string, error) {
+	sql := fmt.Sprintf("SELECT partition,database,table FROM system.%s WHERE active=1 GROUP BY partition,database,table ORDER BY partition", tableParts)
 	rows, err := connect.Query(sql)
 	log.Info(sql)
 	if err != nil {
@@ -111,15 +113,31 @@ func dropPartiton(connect *sql.DB, partition, fullTable string) error {
 }
 
 func (m *Monitor) checkAndDropExpiredPartition(connect *sql.DB) error {
-	ttlsMap, err := getDfStorageTTLsMap(connect)
+	ttlsMap, err := getDfStorageTTLsMap(connect, m.storagePolicy)
 	if err != nil {
 		log.Warningf("get ttlsMap failed: %s", err)
 		return err
 	}
-	partitionsMap, err := getPartitionsMap(connect)
+
+	partitionsMap, err := getPartitionsMap(connect, CLICKHOUSE_TABLE_PARTS_NAME)
 	if err != nil {
 		log.Warningf("get partitionsMap failed: %s", err)
 		return err
+	}
+
+	if m.ckdbType == ckdb.CKDBTypeByconity {
+		partitionsMapByconity, err := getPartitionsMap(connect, BYCONITY_TABLE_PARTS_NAME)
+		if err != nil {
+			log.Warningf("get partitionsMap failed: %s", err)
+			return err
+		}
+		for fullTable, partitions := range partitionsMapByconity {
+			if _, ok := partitionsMap[fullTable]; !ok {
+				partitionsMap[fullTable] = partitions
+			} else {
+				partitionsMap[fullTable] = append(partitionsMap[fullTable], partitions...)
+			}
+		}
 	}
 
 	for fullTable, partitions := range partitionsMap {
