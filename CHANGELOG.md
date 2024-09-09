@@ -8,6 +8,12 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Bad event type for offcpu profile [#8078](https://github.com/deepflowio/deepflow/pull/8078) by [rvql](https://github.com/rvql)
+* fix: agent command panic [#8071](https://github.com/deepflowio/deepflow/pull/8071) by [roryye](https://github.com/roryye)
+* fix: clickhouse disk monitoring failure [#8069](https://github.com/deepflowio/deepflow/pull/8069) by [lzf575](https://github.com/lzf575)
+* fix: Tars parse failure cause agent exit [#8068](https://github.com/deepflowio/deepflow/pull/8068) by [rvql](https://github.com/rvql)
+* fix: agent desensitizes the content in backticks [#8060](https://github.com/deepflowio/deepflow/pull/8060) by [TomatoMr](https://github.com/TomatoMr)
+* fix: add timeout to receive agent command heart beat [#8050](https://github.com/deepflowio/deepflow/pull/8050) by [roryye](https://github.com/roryye)
 * fix: OffCpuProfile adds authorization control [#8064](https://github.com/deepflowio/deepflow/pull/8064) by [jin-xiaofeng](https://github.com/jin-xiaofeng)
 * fix: target port associated to controller [#8056](https://github.com/deepflowio/deepflow/pull/8056) by [askyrie](https://github.com/askyrie)
 * fix: agent - eBPF Fix the issue with loading '__sys_recvmmsg' (#8052) [#8055](https://github.com/deepflowio/deepflow/pull/8055) by [yinjiping](https://github.com/yinjiping)
@@ -176,6 +182,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Allow changing memory profile report interval [#8076](https://github.com/deepflowio/deepflow/pull/8076) by [rvql](https://github.com/rvql)
 * feat: Rust memory profile support [#8049](https://github.com/deepflowio/deepflow/pull/8049) by [rvql](https://github.com/rvql)
 * feat: reduce clickhouse connection memory [#8045](https://github.com/deepflowio/deepflow/pull/8045) by [lzf575](https://github.com/lzf575)
 * feat: add tags and metrics visibility [#7985](https://github.com/deepflowio/deepflow/pull/7985) by [duandaa](https://github.com/duandaa)
