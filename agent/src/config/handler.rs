@@ -45,16 +45,19 @@ use tokio::runtime::Runtime;
 
 use super::{
     config::{
-        ApiResources, Config, CustomFields, EbpfFileIoEvent, HttpEndpoint, HttpEndpointMatchRule,
-        OracleConfig, PcapStream, PortConfig, SymbolTable, TagFilterOperator,
+        ApiResources, Config, EbpfFileIoEvent, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
+        HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, SymbolTable,
+        TagFilterOperator, UserConfig, YamlConfig,
     },
-    ConfigError, KubernetesPollerType, RuntimeConfig,
+    ConfigError, KubernetesPollerType,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use super::{
     config::{Ebpf, ProcessMatcher},
     OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
+use crate::common::decapsulate::TunnelType;
+use crate::dispatcher::recv_engine;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
 use crate::{
@@ -83,14 +86,11 @@ use crate::{
     platform::{kubernetes::Poller, ApiWatcher},
     utils::environment::is_tt_pod,
 };
+use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
 
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7Protocol;
-use public::proto::agent::{
-    self, AgentType, CaptureSocketType, Exception, IfMacSource, PacketCaptureType, SocketType,
-};
-
-use crate::{trident::AgentId, utils::cgroups::is_kernel_available_for_cgroups};
+use public::proto::agent::{self, AgentType, DynamicConfig, PacketCaptureType};
 use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
@@ -322,11 +322,11 @@ pub struct DispatcherConfig {
     pub tunnel_type_trim_bitmap: TunnelTypeBitmap,
     pub agent_type: AgentType,
     pub agent_id: u16,
-    pub capture_socket_type: CaptureSocketType,
+    pub capture_socket_type: agent::CaptureSocketType,
     #[cfg(target_os = "linux")]
     pub extra_netns_regex: String,
     pub tap_interface_regex: String,
-    pub if_mac_source: IfMacSource,
+    pub if_mac_source: agent::IfMacSource,
     pub analyzer_ip: String,
     pub analyzer_port: u16,
     pub proxy_controller_ip: String,
@@ -476,11 +476,12 @@ pub struct FlowConfig {
     pub packet_segmentation_reassembly: HashSet<u16>,
 }
 
-impl From<&RuntimeConfig> for FlowConfig {
-    fn from(conf: &RuntimeConfig) -> Self {
+impl From<(&UserConfig, &DynamicConfig)> for FlowConfig {
+    fn from(conf: (&UserConfig, &DynamicConfig)) -> Self {
+        let (conf, dynamic_config) = conf;
         FlowConfig {
-            agent_id: conf.global.tag.agent_id,
-            agent_type: conf.global.tag.agent_type,
+            agent_id: dynamic_config.agent_id() as u16,
+            agent_type: conf.global.common.agent_type,
             cloud_gateway_traffic: conf
                 .inputs
                 .cbpf
@@ -497,7 +498,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                     .iter()
                 {
                     if (t as u16) >= u16::from(CaptureNetworkType::Max) {
-                        warn!("invalid capture_network_types: {}", t);
+                        warn!("invalid tap type: {}", t);
                     } else {
                         tap_types[t as usize] = true;
                     }
@@ -511,7 +512,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 .flow_log
                 .time_window
                 .max_tolerable_packet_delay,
-            flush_interval: conf.processors.flow_log.conntrack.flow_flush_interval,
+            flush_interval: conf.processors.packet.pcap_stream.flush_interval,
             flow_timeout: FlowTimeout::from(TcpTimeout {
                 established: conf
                     .processors
@@ -575,7 +576,7 @@ impl From<&RuntimeConfig> for FlowConfig {
                 .application_protocol_inference
                 .inference_result_ttl
                 .as_secs() as usize,
-            packet_sequence_flag: conf.processors.packet.tcp_header.header_fields_flag,
+            packet_sequence_flag: conf.processors.packet.tcp_header.header_fields_flag, // Enterprise Edition Feature: packet-sequence
             packet_sequence_block_size: conf.processors.packet.tcp_header.block_size, // Enterprise Edition Feature: packet-sequence
             l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
                 &conf
@@ -649,10 +650,25 @@ impl From<&RuntimeConfig> for FlowConfig {
                     .tag_extraction
                     .obfuscate_protocols,
             ),
-            server_ports: conf.yaml_config.server_ports.clone(),
-            consistent_timestamp_in_l7_metrics: conf.yaml_config.consistent_timestamp_in_l7_metrics,
+            server_ports: conf
+                .processors
+                .flow_log
+                .conntrack
+                .flow_generation
+                .server_ports
+                .clone(),
+            consistent_timestamp_in_l7_metrics: conf
+                .processors
+                .request_log
+                .tunning
+                .consistent_timestamp_in_l7_metrics,
             packet_segmentation_reassembly: HashSet::from_iter(
-                conf.yaml_config.packet_segmentation_reassembly.clone(),
+                conf.inputs
+                    .cbpf
+                    .preprocess
+                    .packet_segmentation_reassembly
+                    .clone()
+                    .into_iter(),
             ),
         }
     }
@@ -1358,7 +1374,7 @@ pub struct L7LogDynamicConfig {
     trace_set: HashSet<String>,
     span_set: HashSet<String>,
     pub expected_headers_set: Arc<HashSet<Vec<u8>>>,
-    pub extra_log_fields: CustomFields,
+    pub extra_log_fields: ExtraLogFields,
 }
 
 impl fmt::Debug for L7LogDynamicConfig {
@@ -1401,7 +1417,7 @@ impl L7LogDynamicConfig {
         x_request_id: Vec<String>,
         trace_types: Vec<TraceType>,
         span_types: Vec<TraceType>,
-        mut extra_log_fields: CustomFields,
+        mut extra_log_fields: ExtraLogFields,
     ) -> Self {
         proxy_client.make_ascii_lowercase();
 
@@ -1467,7 +1483,7 @@ pub struct MetricServerConfig {
 pub struct ModuleConfig {
     pub enabled: bool,
     pub capture_mode: PacketCaptureType,
-    pub config: RuntimeConfig,
+    pub user_config: UserConfig,
     pub collector: CollectorConfig,
     pub environment: EnvironmentConfig,
     pub platform: PlatformConfig,
@@ -1497,19 +1513,29 @@ impl Default for ModuleConfig {
                 controller_ips: vec!["127.0.0.1".into()],
                 ..Default::default()
             },
-            RuntimeConfig::default(),
+            UserConfig::standalone_default(),
+            DynamicConfig {
+                kubernetes_api_enabled: None,
+                region_id: None,
+                pod_cluster_id: None,
+                vpc_id: None,
+                agent_id: None,
+                team_id: None,
+                organize_id: None,
+                secret_key: None,
+            },
         ))
         .unwrap()
     }
 }
 
-impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
+impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
     type Error = ConfigError;
 
-    fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
-        let (static_config, conf) = conf;
+    fn try_from(conf: (Config, UserConfig, DynamicConfig)) -> Result<Self, Self::Error> {
+        let (static_config, conf, dynamic_config) = conf;
         let controller_ip = static_config.controller_ips[0].parse::<IpAddr>().unwrap();
-        let dest_ip = if !conf.global.communication.ingester_ip.is_empty() {
+        let dest_ip = if conf.global.communication.ingester_ip.len() > 0 {
             conf.global.communication.ingester_ip.clone()
         } else {
             match controller_ip {
@@ -1517,18 +1543,22 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.to_string(),
             }
         };
-        let proxy_controller_ip = if !conf.global.communication.proxy_controller_ip.is_empty() {
+        let proxy_controller_ip = if conf.global.communication.proxy_controller_ip.len() > 0 {
             conf.global.communication.proxy_controller_ip.clone()
         } else {
             static_config.controller_ips[0].clone()
         };
 
+        let max_memory = conf.global.limits.max_memory;
+        let af_packet_blocks =
+            conf.get_af_packet_blocks(conf.inputs.cbpf.common.capture_mode, max_memory);
+        let capture_socket_type = conf.inputs.cbpf.af_packet.tunning.socket_version;
         let config = ModuleConfig {
-            enabled: conf.global.enabled,
-            config: conf.clone(),
+            enabled: conf.global.common.enabled,
+            user_config: conf.clone(),
             capture_mode: conf.inputs.cbpf.common.capture_mode,
             diagnose: DiagnoseConfig {
-                enabled: conf.global.enabled,
+                enabled: conf.global.common.enabled,
                 libvirt_xml_path: conf
                     .inputs
                     .resources
@@ -1538,7 +1568,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .unwrap_or_default(),
             },
             environment: EnvironmentConfig {
-                max_memory: conf.global.limits.max_memory,
+                max_memory,
                 max_millicpus: conf.global.limits.max_millicpus,
                 process_threshold: conf.global.alerts.process_threshold,
                 thread_threshold: conf.global.alerts.thread_threshold,
@@ -1549,7 +1579,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .trigger_threshold,
                 log_file_size: conf.global.limits.max_local_log_file_size,
                 capture_mode: conf.inputs.cbpf.common.capture_mode,
-                guard_interval: conf.yaml_config.guard_interval,
+                guard_interval: conf.global.tunning.resource_monitoring_interval,
                 system_load_circuit_breaker_threshold: conf
                     .global
                     .circuit_breakers
@@ -1573,7 +1603,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 max_escape: conf.global.communication.max_escape_duration,
             },
             stats: StatsConfig {
-                interval: conf.global.self_monitoring.interval,
+                interval: Duration::from_secs(10), // TODO: make it configurable
                 host: conf.global.self_monitoring.hostname.clone(),
                 analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.global.communication.ingester_port,
@@ -1584,35 +1614,39 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 dpdk_enabled: conf.inputs.cbpf.special_network.dpdk.enabled,
                 dispatcher_queue: conf.inputs.cbpf.tunning.dispatcher_queue_enabled,
                 l7_log_packet_size: conf.processors.request_log.tunning.payload_truncation,
-                tunnel_type_bitmap: TunnelTypeBitmap::from_slice(
-                    &conf.inputs.cbpf.preprocess.tunnel_decap_protocols,
+                tunnel_type_bitmap: TunnelTypeBitmap::new(
+                    &conf
+                        .inputs
+                        .cbpf
+                        .preprocess
+                        .tunnel_decap_protocols
+                        .iter()
+                        .map(|x| TunnelType::from(*x as i32))
+                        .collect(),
                 ),
                 tunnel_type_trim_bitmap: TunnelTypeBitmap::from_strings(
                     &conf.inputs.cbpf.preprocess.tunnel_trim_protocols,
                 ),
-                agent_type: conf.global.tag.agent_type,
-                agent_id: conf.global.tag.agent_id,
-                capture_socket_type: conf.inputs.cbpf.af_packet.tunning.socket_version,
+                agent_type: conf.global.common.agent_type,
+                agent_id: dynamic_config.agent_id() as u16,
+                capture_socket_type,
                 #[cfg(target_os = "linux")]
                 extra_netns_regex: conf.inputs.cbpf.af_packet.extra_netns_regex.clone(),
                 tap_interface_regex: conf.inputs.cbpf.af_packet.interface_regex.clone(),
-                if_mac_source: conf.inputs.resources.private_cloud.vm_mac_source,
+                if_mac_source: conf.inputs.resources.private_cloud.vm_mac_source.into(),
                 analyzer_ip: dest_ip.clone(),
                 analyzer_port: conf.global.communication.ingester_port,
                 proxy_controller_ip,
                 proxy_controller_port: conf.global.communication.proxy_controller_port,
                 capture_bpf: conf.inputs.cbpf.af_packet.extra_bpf_filter.clone(),
-                max_memory: conf.global.limits.max_memory,
-                af_packet_blocks: conf.get_af_packet_blocks(
-                    conf.inputs.cbpf.common.capture_mode,
-                    conf.global.limits.max_memory,
-                ),
+                max_memory,
+                af_packet_blocks,
                 #[cfg(any(target_os = "linux", target_os = "android"))]
-                af_packet_version: conf.inputs.cbpf.af_packet.tunning.socket_version.into(),
+                af_packet_version: capture_socket_type.into(),
                 capture_mode: conf.inputs.cbpf.common.capture_mode,
-                region_id: conf.global.tag.region_id,
-                pod_cluster_id: conf.global.tag.region_id,
-                enabled: conf.global.enabled,
+                region_id: dynamic_config.region_id(),
+                pod_cluster_id: dynamic_config.pod_cluster_id(),
+                enabled: conf.global.common.enabled,
                 npb_dedup_enabled: conf.outputs.npb.traffic_global_dedup,
                 bond_group: if conf.inputs.cbpf.af_packet.bond_interfaces.is_empty() {
                     vec![]
@@ -1625,19 +1659,19 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 cpu_set: CpuSet::new(),
             },
             sender: SenderConfig {
-                mtu: conf.outputs.npb.max_mtu as u32,
+                mtu: conf.outputs.npb.max_mtu,
                 dest_ip: dest_ip.clone(),
-                agent_id: conf.global.tag.agent_id,
-                team_id: conf.global.tag.team_id as u32,
-                organize_id: conf.global.tag.organize_id as u32,
+                agent_id: dynamic_config.agent_id() as u16,
+                team_id: dynamic_config.team_id(),
+                organize_id: dynamic_config.organize_id(),
                 dest_port: conf.global.communication.ingester_port,
                 npb_port: conf.outputs.npb.target_port,
                 vxlan_flags: conf.outputs.npb.custom_vxlan_flags,
                 npb_enable_qos_bypass: conf.outputs.socket.raw_udp_qos_bypass,
                 npb_vlan: conf.outputs.npb.raw_udp_vlan_tag,
-                npb_vlan_mode: conf.outputs.npb.extra_vlan_header,
+                npb_vlan_mode: conf.outputs.npb.extra_vlan_header.into(),
                 npb_dedup_enabled: conf.outputs.npb.traffic_global_dedup,
-                npb_bps_threshold: conf.outputs.npb.max_tx_throughput,
+                npb_bps_threshold: conf.outputs.npb.max_tx_throughput, // npb_bps_threshold 是否等同于 max_tx_throughput，原来的 max_npb_bps 没有用到，且单位不同
                 npb_socket_type: conf.outputs.socket.npb_socket_type,
                 server_tx_bandwidth_threshold: conf
                     .global
@@ -1656,7 +1690,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 enabled: conf.outputs.flow_metrics.enabled,
             },
             npb: NpbConfig {
-                mtu: conf.outputs.npb.max_mtu as u32,
+                mtu: conf.outputs.npb.max_mtu,
                 underlay_is_ipv6: controller_ip.is_ipv6(),
                 npb_port: conf.outputs.npb.target_port,
                 vxlan_flags: conf.outputs.npb.custom_vxlan_flags,
@@ -1677,10 +1711,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .inactive_server_port_aggregation,
                 inactive_ip_enabled: conf.outputs.flow_metrics.filters.inactive_ip_aggregation,
                 vtap_flow_1s_enabled: conf.outputs.flow_metrics.filters.second_metrics,
-                l4_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l4_throttle as u64,
+                l4_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l4_throttle,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
-                agent_type: conf.global.tag.agent_type,
-                agent_id: conf.global.tag.agent_id,
+                agent_type: conf.global.common.agent_type,
+                agent_id: dynamic_config.agent_id() as u16,
                 l4_log_store_tap_types: {
                     let mut tap_types = [false; 256];
                     for &t in conf
@@ -1725,9 +1759,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             handler: HandlerConfig {
                 npb_dedup_enabled: conf.outputs.npb.traffic_global_dedup,
-                agent_type: conf.global.tag.agent_type,
+                agent_type: conf.global.common.agent_type,
             },
-            pcap: conf.processors.packet.pcap_stream.clone(),
+            pcap: conf.processors.packet.pcap_stream,
             platform: PlatformConfig {
                 sync_interval: conf.inputs.resources.push_interval,
                 kubernetes_cluster_id: static_config.kubernetes_cluster_id.clone(),
@@ -1739,15 +1773,15 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .parse()
                     .unwrap_or_default(),
                 kubernetes_poller_type: conf.inputs.resources.kubernetes.pod_mac_collection_method,
-                agent_id: conf.global.tag.agent_id,
+                agent_id: dynamic_config.agent_id() as u16,
                 enabled: conf
                     .inputs
                     .resources
                     .private_cloud
                     .hypervisor_resource_enabled,
-                agent_type: conf.global.tag.agent_type,
-                epc_id: conf.global.tag.vpc_id,
-                kubernetes_api_enabled: conf.inputs.resources.kubernetes.enabled,
+                agent_type: conf.global.common.agent_type,
+                epc_id: dynamic_config.vpc_id(),
+                kubernetes_api_enabled: dynamic_config.kubernetes_api_enabled(),
                 kubernetes_api_list_limit: conf.inputs.resources.kubernetes.api_list_page_size,
                 kubernetes_api_list_interval: conf
                     .inputs
@@ -1755,7 +1789,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .kubernetes
                     .api_list_max_interval,
                 kubernetes_resources: conf.inputs.resources.kubernetes.api_resources.clone(),
-                max_memory: conf.global.limits.max_memory,
+                max_memory,
                 namespace: if conf
                     .inputs
                     .resources
@@ -1779,7 +1813,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 os_proc_scan_conf: OsProcScanConfig {
                     os_proc_root: conf.inputs.proc.proc_dir_path.clone(),
                     os_proc_socket_sync_interval: conf.inputs.proc.sync_interval.as_secs() as u32,
-                    os_proc_socket_min_lifetime: conf.inputs.proc.min_lefttime.as_secs() as u32,
+                    os_proc_socket_min_lifetime: conf.inputs.proc.min_lifetime.as_secs() as u32,
                     os_proc_regex: {
                         let mut v = vec![];
                         for i in &conf.inputs.proc.process_matcher {
@@ -1827,11 +1861,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
                 #[cfg(target_os = "windows")]
                 os_proc_scan_conf: OsProcScanConfig {},
-                agent_enabled: conf.global.enabled,
+                agent_enabled: conf.global.common.enabled,
                 #[cfg(target_os = "linux")]
-                extra_netns_regex: conf.inputs.cbpf.af_packet.extra_netns_regex.clone(),
+                extra_netns_regex: conf.inputs.cbpf.af_packet.extra_netns_regex.to_string(),
             },
-            flow: (&conf).into(),
+            flow: (&conf, &dynamic_config).into(),
             log_parser: LogParserConfig {
                 l7_log_collect_nps_threshold: conf.outputs.flow_log.throttles.l7_throttle,
                 l7_log_session_aggr_timeout: conf
@@ -1850,7 +1884,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .tag_extraction
                         .tracing_tag
                         .http_real_client
-                        .to_string()
                         .to_ascii_lowercase(),
                     conf.processors
                         .request_log
@@ -1876,11 +1909,24 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .iter()
                         .map(|item| TraceType::from(item.as_str()))
                         .collect(),
-                    conf.processors
-                        .request_log
-                        .tag_extraction
-                        .custom_fields
-                        .clone(),
+                    ExtraLogFields {
+                        http: conf
+                            .processors
+                            .request_log
+                            .tag_extraction
+                            .custom_fields
+                            .get("HTTP")
+                            .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
+                            .unwrap_or(vec![]),
+                        http2: conf
+                            .processors
+                            .request_log
+                            .tag_extraction
+                            .custom_fields
+                            .get("HTTP2")
+                            .map(|c| c.iter().map(|f| ExtraLogFieldsInfo::from(f)).collect())
+                            .unwrap_or(vec![]),
+                    },
                 ),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
@@ -1912,28 +1958,16 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .tag_extraction
                         .obfuscate_protocols,
                 ),
-                l7_log_blacklist: conf
-                    .processors
-                    .request_log
-                    .filters
-                    .tag_filters
-                    .to_tag_filters_map(),
+                l7_log_blacklist: conf.processors.request_log.filters.tag_filters.clone(),
                 l7_log_blacklist_trie: {
                     let mut blacklist_trie = HashMap::new();
-                    let list = conf
-                        .processors
-                        .request_log
-                        .filters
-                        .tag_filters
-                        .to_tag_filters_map();
-                    for (k, v) in list.iter() {
-                        let l7_protocol = L7Protocol::from(k.clone());
+                    for (k, v) in conf.processors.request_log.filters.tag_filters.iter() {
+                        let l7_protocol = L7Protocol::from(k.to_string());
                         if l7_protocol == L7Protocol::Unknown {
                             warn!("Unsupported l7_protocol: {:?}", k);
                             continue;
                         }
-                        BlacklistTrie::new(v)
-                            .map(|x| blacklist_trie.insert(l7_protocol, x.clone()));
+                        BlacklistTrie::new(v).map(|x| blacklist_trie.insert(l7_protocol, x));
                     }
                     blacklist_trie
                 },
@@ -1952,7 +1986,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 ),
             },
             debug: DebugConfig {
-                agent_id: conf.global.tag.agent_id,
+                agent_id: dynamic_config.agent_id() as u16,
                 enabled: conf.global.self_monitoring.debug.enabled,
                 controller_ips: static_config
                     .controller_ips
@@ -1981,13 +2015,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             },
             #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf: EbpfConfig {
-                io_event: conf.inputs.ebpf.file.io_event,
-                process_matcher: conf.inputs.proc.process_matcher.clone(),
-                symbol_table: conf.inputs.proc.symbol_table,
                 collector_enabled: conf.outputs.flow_metrics.enabled,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
-                agent_id: conf.global.tag.agent_id,
-                epc_id: conf.global.tag.vpc_id,
+                agent_id: dynamic_config.agent_id() as u16,
+                epc_id: dynamic_config.vpc_id(),
                 l7_log_session_timeout: conf
                     .processors
                     .request_log
@@ -2004,7 +2035,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                         .l7_capture_network_types
                         .iter()
                     {
-                        if (t as u16) >= u16::from(CaptureNetworkType::Max) {
+                        if t >= u16::from(CaptureNetworkType::Max) {
                             warn!("invalid tap type: {}", t);
                         } else {
                             tap_types[t as usize] = true;
@@ -2023,7 +2054,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .application_protocol_inference
                     .inference_result_ttl
                     .as_secs() as usize,
-                ctrl_mac: if is_tt_workload(conf.global.tag.agent_type) {
+                ctrl_mac: if is_tt_workload(conf.global.common.agent_type) {
                     fn get_ctrl_mac(ip: &IpAddr) -> MacAddr {
                         // use host mac
                         #[cfg(target_os = "linux")]
@@ -2069,6 +2100,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_protocol_ports: conf.get_protocol_port(),
                 queue_size: conf.inputs.ebpf.tunning.collector_queue_size,
                 ebpf: conf.inputs.ebpf.clone(),
+                symbol_table: conf.inputs.proc.symbol_table,
+                process_matcher: conf.inputs.proc.process_matcher.clone(),
+                io_event: conf.inputs.ebpf.file.io_event,
             },
             metric_server: MetricServerConfig {
                 enabled: conf.inputs.integration.enabled,
@@ -2076,7 +2110,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 compressed: conf.inputs.integration.compression.trace,
                 profile_compressed: conf.inputs.integration.compression.profile,
             },
-            agent_type: conf.global.tag.agent_type,
+            agent_type: conf.global.common.agent_type,
             port_config: PortConfig {
                 analyzer_port: conf.global.communication.ingester_port,
                 proxy_controller_port: conf.global.communication.proxy_controller_port,
@@ -2100,8 +2134,21 @@ pub struct ConfigHandler {
 
 impl ConfigHandler {
     pub fn new(config: Config, ctrl_ip: IpAddr, ctrl_mac: MacAddr) -> Self {
-        let candidate_config =
-            ModuleConfig::try_from((config.clone(), RuntimeConfig::default())).unwrap();
+        let candidate_config = ModuleConfig::try_from((
+            config.clone(),
+            UserConfig::standalone_default(),
+            DynamicConfig {
+                kubernetes_api_enabled: None,
+                region_id: None,
+                pod_cluster_id: None,
+                vpc_id: None,
+                agent_id: None,
+                team_id: None,
+                organize_id: None,
+                secret_key: None,
+            },
+        ))
+        .unwrap();
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2233,7 +2280,8 @@ impl ConfigHandler {
 
     pub fn on_config(
         &mut self,
-        new_config: RuntimeConfig,
+        user_config: UserConfig,
+        dynamic_config: DynamicConfig,
         exception_handler: &ExceptionHandler,
         mut components: Option<&mut AgentComponents>,
         #[cfg(target_os = "linux")] api_watcher: &Arc<ApiWatcher>,
@@ -2243,8 +2291,10 @@ impl ConfigHandler {
     ) -> Vec<fn(&ConfigHandler, &mut AgentComponents)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &self.static_config;
-        let config = &mut candidate_config.config;
-        let mut new_config: ModuleConfig = (static_config.clone(), new_config).try_into().unwrap();
+        let config = &mut candidate_config.user_config;
+        let mut new_config: ModuleConfig = (static_config.clone(), user_config, dynamic_config)
+            .try_into()
+            .unwrap();
         let mut callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = vec![];
         let mut restart_dispatcher = false;
 
@@ -2270,14 +2320,14 @@ impl ConfigHandler {
 
         if config.inputs.cbpf.physical_mirror.packet_dedup_disabled
             != new_config
-                .config
+                .user_config
                 .inputs
                 .cbpf
                 .physical_mirror
                 .packet_dedup_disabled
         {
             config.inputs.cbpf.physical_mirror.packet_dedup_disabled = new_config
-                .config
+                .user_config
                 .inputs
                 .cbpf
                 .physical_mirror
@@ -2285,7 +2335,7 @@ impl ConfigHandler {
             info!(
                 "packet_dedup_disabled set to {:?}",
                 new_config
-                    .config
+                    .user_config
                     .inputs
                     .cbpf
                     .physical_mirror
@@ -2299,7 +2349,7 @@ impl ConfigHandler {
             .af_packet
             .vlan_pcp_in_physical_mirror_traffic
             != new_config
-                .config
+                .user_config
                 .inputs
                 .cbpf
                 .af_packet
@@ -2310,7 +2360,7 @@ impl ConfigHandler {
                 .cbpf
                 .af_packet
                 .vlan_pcp_in_physical_mirror_traffic = new_config
-                .config
+                .user_config
                 .inputs
                 .cbpf
                 .af_packet
@@ -2318,7 +2368,7 @@ impl ConfigHandler {
             info!(
                 "vlan_pcp_in_physical_mirror_traffic set to {:?}",
                 new_config
-                    .config
+                    .user_config
                     .inputs
                     .cbpf
                     .af_packet
@@ -2327,55 +2377,83 @@ impl ConfigHandler {
         }
 
         if config.inputs.integration.prometheus_extra_labels
-            != new_config.config.inputs.integration.prometheus_extra_labels
+            != new_config
+                .user_config
+                .inputs
+                .integration
+                .prometheus_extra_labels
         {
             config.inputs.integration.prometheus_extra_labels = new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .prometheus_extra_labels
                 .clone();
             info!(
                 "prometheus_extra_labels set to {:?}",
-                new_config.config.inputs.integration.prometheus_extra_labels
+                new_config
+                    .user_config
+                    .inputs
+                    .integration
+                    .prometheus_extra_labels
             );
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if config.global.tunning.process_scheduling_priority
-            != new_config.config.global.tunning.process_scheduling_priority
+            != new_config
+                .user_config
+                .global
+                .tunning
+                .process_scheduling_priority
         {
-            config.global.tunning.process_scheduling_priority =
-                new_config.config.global.tunning.process_scheduling_priority;
+            config.global.tunning.process_scheduling_priority = new_config
+                .user_config
+                .global
+                .tunning
+                .process_scheduling_priority;
             info!(
                 "process_scheduling_priority set to {}.",
-                new_config.config.global.tunning.process_scheduling_priority
+                new_config
+                    .user_config
+                    .global
+                    .tunning
+                    .process_scheduling_priority
             );
             let pid = std::process::id();
             unsafe {
                 if libc::setpriority(
                     libc::PRIO_PROCESS,
                     pid,
-                    new_config.config.global.tunning.process_scheduling_priority as libc::c_int,
+                    new_config
+                        .user_config
+                        .global
+                        .tunning
+                        .process_scheduling_priority as libc::c_int,
                 ) != 0
                 {
                     warn!(
                         "Process scheduling priority set {} to pid {} error.",
-                        new_config.config.global.tunning.process_scheduling_priority, pid
+                        new_config
+                            .user_config
+                            .global
+                            .tunning
+                            .process_scheduling_priority,
+                        pid
                     );
                 }
             }
         }
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
-        if config.global.tunning.cpu_affinity != new_config.config.global.tunning.cpu_affinity
+        if config.global.tunning.cpu_affinity != new_config.user_config.global.tunning.cpu_affinity
             || components.is_none()
         {
             config.global.tunning.cpu_affinity =
-                new_config.config.global.tunning.cpu_affinity.clone();
+                new_config.user_config.global.tunning.cpu_affinity.clone();
             info!(
                 "cpu_affinity set to {:?}.",
-                new_config.config.global.tunning.cpu_affinity
+                new_config.user_config.global.tunning.cpu_affinity
             );
             let mut cpu_set = CpuSet::new();
             let mut invalid_config = false;
@@ -2383,13 +2461,13 @@ impl ConfigHandler {
                 RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
             );
             let cpu_count = system.cpus().len() as usize;
-            if new_config.config.global.tunning.cpu_affinity.len() > 0 {
-                for id in &new_config.config.global.tunning.cpu_affinity {
+            if new_config.user_config.global.tunning.cpu_affinity.len() > 0 {
+                for id in &new_config.user_config.global.tunning.cpu_affinity {
                     if *id < cpu_count {
                         if let Err(e) = cpu_set.set(*id) {
                             warn!(
                                 "Invalid CPU Affinity config {:?}, error: {:?}",
-                                new_config.config.global.tunning.cpu_affinity, e
+                                new_config.user_config.global.tunning.cpu_affinity, e
                             );
                             invalid_config = true;
                         }
@@ -2407,7 +2485,7 @@ impl ConfigHandler {
             if invalid_config {
                 warn!(
                     "Invalid CPU Affinity config {:?}.",
-                    new_config.config.global.tunning.cpu_affinity
+                    new_config.user_config.global.tunning.cpu_affinity
                 );
             } else {
                 let pid = std::process::id() as i32;
@@ -2424,7 +2502,7 @@ impl ConfigHandler {
             .feature_control
             .profile_integration_disabled
             != new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2435,7 +2513,7 @@ impl ConfigHandler {
                 .integration
                 .feature_control
                 .profile_integration_disabled = new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2443,7 +2521,7 @@ impl ConfigHandler {
             info!(
                 "profile_integration_disabled set to {}",
                 new_config
-                    .config
+                    .user_config
                     .inputs
                     .integration
                     .feature_control
@@ -2456,7 +2534,7 @@ impl ConfigHandler {
             .feature_control
             .trace_integration_disabled
             != new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2467,7 +2545,7 @@ impl ConfigHandler {
                 .integration
                 .feature_control
                 .trace_integration_disabled = new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2475,7 +2553,7 @@ impl ConfigHandler {
             info!(
                 "trace_integration_disabled set to {}",
                 new_config
-                    .config
+                    .user_config
                     .inputs
                     .integration
                     .feature_control
@@ -2488,7 +2566,7 @@ impl ConfigHandler {
             .feature_control
             .metric_integration_disabled
             != new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2499,7 +2577,7 @@ impl ConfigHandler {
                 .integration
                 .feature_control
                 .metric_integration_disabled = new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2507,7 +2585,7 @@ impl ConfigHandler {
             info!(
                 "metric_integration_disabled set to {}",
                 new_config
-                    .config
+                    .user_config
                     .inputs
                     .integration
                     .feature_control
@@ -2520,7 +2598,7 @@ impl ConfigHandler {
             .feature_control
             .log_integration_disabled
             != new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2531,7 +2609,7 @@ impl ConfigHandler {
                 .integration
                 .feature_control
                 .log_integration_disabled = new_config
-                .config
+                .user_config
                 .inputs
                 .integration
                 .feature_control
@@ -2539,7 +2617,7 @@ impl ConfigHandler {
             info!(
                 "log_integration_disabled set to {}",
                 new_config
-                    .config
+                    .user_config
                     .inputs
                     .integration
                     .feature_control
@@ -2547,8 +2625,8 @@ impl ConfigHandler {
             );
         }
 
-        if *config != new_config.config {
-            *config = new_config.config.clone();
+        if *config != new_config.user_config {
+            *config = new_config.user_config.clone();
         }
 
         if candidate_config.dispatcher != new_config.dispatcher {
@@ -2692,17 +2770,17 @@ impl ConfigHandler {
 
             if candidate_config.dispatcher.max_memory != new_config.dispatcher.max_memory
                 || candidate_config
-                    .config
+                    .user_config
                     .get_af_packet_blocks(new_config.capture_mode, new_config.dispatcher.max_memory)
-                    != new_config.config.get_af_packet_blocks(
+                    != new_config.user_config.get_af_packet_blocks(
                         new_config.capture_mode,
                         new_config.dispatcher.max_memory,
                     )
                 || candidate_config
-                    .config
+                    .user_config
                     .get_fast_path_map_size(new_config.dispatcher.max_memory)
                     != new_config
-                        .config
+                        .user_config
                         .get_fast_path_map_size(candidate_config.dispatcher.max_memory)
                 || candidate_config.get_channel_size(new_config.dispatcher.max_memory)
                     != candidate_config.get_channel_size(candidate_config.dispatcher.max_memory)
@@ -3430,7 +3508,7 @@ impl ConfigHandler {
                     }
                 }
                 components.npb_arp_table.set_need_resolve_mac(
-                    handler.candidate_config.npb.socket_type == SocketType::RawUdp,
+                    handler.candidate_config.npb.socket_type == agent::SocketType::RawUdp,
                 );
             }
             if components.is_some() {
@@ -3481,7 +3559,7 @@ impl ConfigHandler {
         // deploy updated config
         self.current_config
             .store(Arc::new(candidate_config.clone()));
-        exception_handler.clear(Exception::InvalidConfiguration);
+        exception_handler.clear(agent::Exception::InvalidConfiguration);
 
         callbacks
     }
@@ -3499,7 +3577,7 @@ impl ModuleConfig {
     fn get_flow_capacity(&self, mem_size: u64) -> usize {
         if self.capture_mode == PacketCaptureType::Analyzer {
             return self
-                .config
+                .user_config
                 .processors
                 .flow_log
                 .tunning
@@ -3519,8 +3597,8 @@ impl YamlConfig {
         min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
     }
 
-    fn get_af_packet_blocks(&self, tap_mode: TapMode, mem_size: u64) -> usize {
-        if tap_mode == TapMode::Analyzer || self.af_packet_blocks_enabled {
+    fn get_af_packet_blocks(&self, capture_mode: agent::PacketCaptureType, mem_size: u64) -> usize {
+        if capture_mode == PacketCaptureType::Analyzer || self.af_packet_blocks_enabled {
             self.af_packet_blocks.max(8)
         } else {
             (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)

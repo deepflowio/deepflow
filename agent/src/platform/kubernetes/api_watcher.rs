@@ -53,8 +53,9 @@ use crate::{
     },
 };
 use public::proto::{
-    agent::{Exception, KubernetesApiSyncRequest},
+    agent::{self, Exception},
     common::KubernetesApiInfo,
+    trident::KubernetesApiSyncRequest,
 };
 
 /*
@@ -653,7 +654,7 @@ impl ApiWatcher {
             KubernetesApiSyncRequest {
                 cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
                 version: pb_version,
-                agent_id: Some(config_guard.agent_id as u32),
+                vtap_id: Some(config_guard.agent_id as u32),
                 source_ip: Some(id.ip.to_string()),
                 team_id: Some(id.team_id.clone()),
                 error_msg: Some(
@@ -784,24 +785,46 @@ impl ApiWatcher {
                 Ok(r) => break r,
                 Err(e) => {
                     warn!("{}", e);
-                    let msg = {
-                        let config_guard = context.config.load();
-                        let id = agent_id.read();
-                        KubernetesApiSyncRequest {
-                            cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
-                            version: Some(context.version.load(Ordering::SeqCst)),
-                            agent_id: Some(config_guard.agent_id as u32),
-                            source_ip: Some(id.ip.to_string()),
-                            team_id: Some(id.team_id.clone()),
-                            error_msg: Some(e.to_string()),
-                            entries: vec![],
+                    if session.get_new_rpc() {
+                        let msg = {
+                            let config_guard = context.config.load();
+                            let id = agent_id.read();
+                            agent::KubernetesApiSyncRequest {
+                                cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
+                                version: Some(context.version.load(Ordering::SeqCst)),
+                                agent_id: Some(config_guard.agent_id as u32),
+                                source_ip: Some(id.ip.to_string()),
+                                team_id: Some(id.team_id.clone()),
+                                error_msg: Some(e.to_string()),
+                                entries: vec![],
+                            }
+                        };
+                        if let Err(e) = context
+                            .runtime
+                            .block_on(session.agent_grpc_kubernetes_api_sync_with_statsd(msg))
+                        {
+                            debug!("kubernetes_api_sync grpc call failed: {}", e);
                         }
-                    };
-                    if let Err(e) = context
-                        .runtime
-                        .block_on(session.grpc_kubernetes_api_sync_with_statsd(msg))
-                    {
-                        debug!("kubernetes_api_sync grpc call failed: {}", e);
+                    } else {
+                        let msg = {
+                            let config_guard = context.config.load();
+                            let id = agent_id.read();
+                            KubernetesApiSyncRequest {
+                                cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
+                                version: Some(context.version.load(Ordering::SeqCst)),
+                                vtap_id: Some(config_guard.agent_id as u32),
+                                source_ip: Some(id.ip.to_string()),
+                                team_id: Some(id.team_id.clone()),
+                                error_msg: Some(e.to_string()),
+                                entries: vec![],
+                            }
+                        };
+                        if let Err(e) = context
+                            .runtime
+                            .block_on(session.grpc_kubernetes_api_sync_with_statsd(msg))
+                        {
+                            debug!("kubernetes_api_sync grpc call failed: {}", e);
+                        }
                     }
                 }
             }
@@ -846,31 +869,57 @@ impl ApiWatcher {
                 continue;
             }
             mem::drop(ws);
-            Self::process(
-                &context,
-                &apiserver_version,
-                &session,
-                &err_msgs,
-                &mut watcher_versions,
-                &resource_watchers,
-                &exception_handler,
-                &agent_id,
-            );
+            if session.get_new_rpc() {
+                Self::agent_process(
+                    &context,
+                    &apiserver_version,
+                    &session,
+                    &err_msgs,
+                    &mut watcher_versions,
+                    &resource_watchers,
+                    &exception_handler,
+                    &agent_id,
+                );
+            } else {
+                Self::process(
+                    &context,
+                    &apiserver_version,
+                    &session,
+                    &err_msgs,
+                    &mut watcher_versions,
+                    &resource_watchers,
+                    &exception_handler,
+                    &agent_id,
+                );
+            }
             break;
         }
 
         // 等一等watcher，第一个tick再上报
         while !Self::ready_stop(&running, &timer, sync_interval) {
-            Self::process(
-                &context,
-                &apiserver_version,
-                &session,
-                &err_msgs,
-                &mut watcher_versions,
-                &resource_watchers,
-                &exception_handler,
-                &agent_id,
-            );
+            if session.get_new_rpc() {
+                Self::agent_process(
+                    &context,
+                    &apiserver_version,
+                    &session,
+                    &err_msgs,
+                    &mut watcher_versions,
+                    &resource_watchers,
+                    &exception_handler,
+                    &agent_id,
+                );
+            } else {
+                Self::process(
+                    &context,
+                    &apiserver_version,
+                    &session,
+                    &err_msgs,
+                    &mut watcher_versions,
+                    &resource_watchers,
+                    &exception_handler,
+                    &agent_id,
+                );
+            }
         }
         info!("kubernetes api watcher stopping");
         // 终止要监看的resource watcher 协程
@@ -891,5 +940,182 @@ impl ApiWatcher {
             return true;
         }
         false
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl ApiWatcher {
+    fn agent_process(
+        context: &Arc<Context>,
+        apiserver_version: &Arc<Mutex<Info>>,
+        session: &Arc<Session>,
+        err_msgs: &Arc<Mutex<Vec<String>>>,
+        watcher_versions: &mut HashMap<WatcherKey, u64>,
+        resource_watchers: &Arc<Mutex<HashMap<WatcherKey, GenericResourceWatcher>>>,
+        exception_handler: &ExceptionHandler,
+        agent_id: &Arc<RwLock<AgentId>>,
+    ) {
+        let version = &context.version;
+        // 将缓存的entry 上报，如果没有则跳过
+        let mut has_update = false;
+        let mut updated_versions = vec![];
+        {
+            let mut err_msgs_guard = err_msgs.lock().unwrap();
+            let resource_watchers_guard = resource_watchers.lock().unwrap();
+            for (resource, watcher_version) in watcher_versions.iter_mut() {
+                if let Some(watcher) = resource_watchers_guard.get(resource) {
+                    if !watcher.ready() {
+                        err_msgs_guard.push(format!("{} watcher is not ready", resource));
+                        if let Some(msg) = watcher.error() {
+                            err_msgs_guard.push(msg);
+                        }
+                        continue;
+                    }
+
+                    let new_version = watcher.version();
+                    if new_version != *watcher_version {
+                        updated_versions.push(format!(
+                            "{}: v{} -> v{}",
+                            resource, watcher_version, new_version
+                        ));
+                        *watcher_version = new_version;
+                        has_update = true;
+                    }
+
+                    if let Some(msg) = watcher.error() {
+                        err_msgs_guard.push(msg);
+                    }
+                }
+            }
+        }
+
+        let mut total_entries = vec![];
+        let mut pb_version = Some(version.load(Ordering::SeqCst));
+        if has_update {
+            version.fetch_add(1, Ordering::SeqCst);
+            info!(
+                "version updated to {} ({})",
+                version.load(Ordering::SeqCst),
+                updated_versions.join("; ")
+            );
+            pb_version = Some(version.load(Ordering::SeqCst));
+            if let Some(i) =
+                Self::parse_apiserver_version(apiserver_version.lock().unwrap().deref())
+            {
+                total_entries.push(i);
+            }
+            let resource_watchers_guard = resource_watchers.lock().unwrap();
+            for watcher in resource_watchers_guard.values() {
+                let kind = watcher.pb_name();
+                for entry in watcher.entries() {
+                    total_entries.push(KubernetesApiInfo {
+                        r#type: Some(kind.to_owned()),
+                        compressed_info: Some(entry),
+                        info: None,
+                    });
+                }
+            }
+        }
+        let mut msg = {
+            let config_guard = context.config.load();
+            let id = agent_id.read();
+            agent::KubernetesApiSyncRequest {
+                cluster_id: Some(config_guard.kubernetes_cluster_id.to_string()),
+                version: pb_version,
+                agent_id: Some(config_guard.agent_id as u32),
+                source_ip: Some(id.ip.to_string()),
+                team_id: Some(id.team_id.clone()),
+                error_msg: Some(
+                    err_msgs
+                        .lock()
+                        .unwrap()
+                        .drain(..)
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                        .join(";"),
+                ),
+                entries: total_entries,
+            }
+        };
+
+        if log_enabled!(Level::Debug) {
+            Self::agent_debug_k8s_request(&msg, false);
+        }
+
+        match context
+            .runtime
+            .block_on(session.agent_grpc_kubernetes_api_sync_with_statsd(msg.clone()))
+        {
+            Ok(resp) => {
+                if has_update {
+                    // 已经发过全量了，不用管返回
+                    // 等待下一次timeout
+                    return;
+                }
+                let resp = resp.into_inner();
+                if resp.version() == version.load(Ordering::SeqCst) {
+                    // 接收端返回之前的version，如果相等，不需要全量同步
+                    return;
+                }
+            }
+            Err(e) => {
+                let err = format!("kubernetes_api_sync grpc call failed: {}", e);
+                exception_handler.set(Exception::ControllerSocketError);
+                error!("{}", err);
+                err_msgs.lock().unwrap().push(err);
+                return;
+            }
+        }
+
+        // 发送一次全量
+        let mut total_entries = vec![];
+
+        if let Some(i) = Self::parse_apiserver_version(apiserver_version.lock().unwrap().deref()) {
+            total_entries.push(i);
+        }
+        let resource_watchers_guard = resource_watchers.lock().unwrap();
+        for watcher in resource_watchers_guard.values() {
+            let kind = watcher.pb_name();
+            for entry in watcher.entries() {
+                total_entries.push(KubernetesApiInfo {
+                    r#type: Some(kind.to_owned()),
+                    compressed_info: Some(entry),
+                    info: None,
+                });
+            }
+        }
+        drop(resource_watchers_guard);
+
+        msg.entries = total_entries;
+
+        if log_enabled!(Level::Debug) {
+            Self::agent_debug_k8s_request(&msg, true);
+        }
+
+        if let Err(e) = context
+            .runtime
+            .block_on(session.agent_grpc_kubernetes_api_sync_with_statsd(msg))
+        {
+            let err = format!("kubernetes_api_sync grpc call failed: {}", e);
+            exception_handler.set(Exception::ControllerSocketError);
+            error!("{}", err);
+            err_msgs.lock().unwrap().push(err);
+        }
+    }
+
+    fn agent_debug_k8s_request(request: &agent::KubernetesApiSyncRequest, full_sync: bool) {
+        let mut map = HashMap::new();
+        for entry in request.entries.iter() {
+            *map.entry(entry.r#type().to_string()).or_insert(0) += 1;
+        }
+        let resource_summary = map
+            .into_iter()
+            .map(|(k, v)| format!("resource: {} len: {}", k, v))
+            .collect::<Vec<_>>();
+        if full_sync {
+            debug!("full sync: {:?}", resource_summary);
+        } else {
+            debug!("incremental sync {:?}", resource_summary);
+        }
     }
 }

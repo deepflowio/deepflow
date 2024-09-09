@@ -42,6 +42,7 @@ fn main() {
         vec!["127.0.0.1".to_owned()],
         exc.clone(),
         &stats_collector,
+        false,
     ));
 
     let runtime = Arc::new(

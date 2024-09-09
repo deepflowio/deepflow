@@ -56,7 +56,7 @@ use crate::{exception::ExceptionHandler, trident::AgentId};
 
 use public::{
     netns::{reset_netns, set_netns},
-    proto::agent as pb,
+    proto::{agent as pb, trident},
 };
 
 pub use public::rpc::remote_exec::*;
@@ -223,6 +223,78 @@ impl Interior {
                     continue;
                 }
             };
+            let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+            let now = Instant::now();
+            trace!("remote_execute call");
+
+            let mut stream = match client.remote_execute(responser).await {
+                Ok(stream) => stream,
+                Err(e) => {
+                    warn!("remote_execute failed: {:?}", e);
+                    self.exc.set(pb::Exception::ControllerSocketError);
+                    tokio::time::sleep(RPC_RETRY_INTERVAL).await;
+                    continue;
+                }
+            }
+            .into_inner();
+            trace!("remote_execute initial receive");
+            debug!("remote_execute latency {:?}ms", now.elapsed().as_millis());
+
+            while self.running.load(Ordering::Relaxed) {
+                let message = stream.message().await;
+                let message = match message {
+                    Ok(Some(message)) => message,
+                    Ok(None) => {
+                        debug!("server closed stream");
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("remote_execute failed: {:?}", e);
+                        self.exc.set(pb::Exception::ControllerSocketError);
+                        break;
+                    }
+                };
+                if session_version != self.session.get_version() {
+                    info!("grpc server changed");
+                    break;
+                }
+                if message.exec_type.is_none() {
+                    continue;
+                }
+                match trident::ExecutionType::from_i32(message.exec_type.unwrap()) {
+                    Some(t) => debug!("received {:?} command from server", t),
+                    None => {
+                        warn!(
+                            "unsupported remote exec type id {}",
+                            message.exec_type.unwrap()
+                        );
+                        continue;
+                    }
+                }
+                if sender.send(message).await.is_err() {
+                    debug!("responser channel closed");
+                    break;
+                }
+            }
+        }
+    }
+
+    async fn run_agent(&mut self) {
+        while self.running.load(Ordering::Relaxed) {
+            let (sender, receiver) = mpsc::channel(1);
+            let responser = AgentResponser::new(self.agent_id.clone(), receiver);
+
+            self.session.update_current_server().await;
+            let session_version = self.session.get_version();
+            let client = match self.session.get_client() {
+                Some(c) => c,
+                None => {
+                    self.session.set_request_failed(true);
+                    tokio::time::sleep(RPC_RETRY_INTERVAL).await;
+                    continue;
+                }
+            };
             let mut client = pb::synchronizer_client::SynchronizerClient::new(client);
 
             let now = Instant::now();
@@ -316,9 +388,15 @@ impl Executor {
             exc: self.exc.clone(),
             running: self.running.clone(),
         };
-        self.runtime.spawn(async move {
-            interior.run().await;
-        });
+        if self.session.get_new_rpc() {
+            self.runtime.spawn(async move {
+                interior.run_agent().await;
+            });
+        } else {
+            self.runtime.spawn(async move {
+                interior.run().await;
+            });
+        }
         info!("Started remote executor");
     }
 
@@ -347,6 +425,371 @@ struct Responser {
     batch_len: usize,
 
     heartbeat: Interval,
+    msg_recv: Receiver<trident::RemoteExecRequest>,
+
+    // request id, future
+    pending_lsns: Option<(
+        Option<u64>,
+        BoxFuture<'static, Result<Vec<trident::LinuxNamespace>>>,
+    )>,
+
+    // request id, command id, future
+    pending_command: Option<(Option<u64>, String, BoxFuture<'static, Result<Output>>)>,
+    result: CommandResult,
+}
+
+impl Responser {
+    fn new(agent_id: Arc<RwLock<AgentId>>, receiver: Receiver<trident::RemoteExecRequest>) -> Self {
+        Responser {
+            agent_id: agent_id,
+            batch_len: trident::RemoteExecRequest::default().batch_len() as usize,
+            heartbeat: time::interval(Duration::from_secs(30)),
+            msg_recv: receiver,
+            pending_lsns: None,
+            pending_command: None,
+            result: CommandResult::default(),
+        }
+    }
+
+    fn generate_result_batch(&mut self) -> Option<(trident::CommandResult, Option<String>)> {
+        let batch_len = self.batch_len;
+        let r = &mut self.result;
+        if r.output.is_empty() {
+            return None;
+        }
+
+        let mut pb_result = trident::CommandResult {
+            errno: Some(r.errno),
+            total_len: Some(r.total_len as u64),
+            pkt_count: Some((r.total_len.saturating_sub(1) / batch_len + 1) as u32),
+            ..Default::default()
+        };
+        let last = r.output.len() <= batch_len;
+        if last {
+            let content = r.output.drain(..).collect::<Vec<_>>();
+            r.digest.update(&content[..]);
+            pb_result.content = Some(content);
+            pb_result.md5 = Some(format!("{:x}", r.digest.finalize_reset()));
+            Some((pb_result, r.err_msg.take()))
+        } else {
+            let content = r.output.drain(..batch_len).collect::<Vec<_>>();
+            r.digest.update(&content[..]);
+            pb_result.content = Some(content);
+            Some((pb_result, None))
+        }
+    }
+
+    fn command_failed_helper<'a, S: Into<Cow<'a, str>>>(
+        &self,
+        request_id: Option<u64>,
+        code: Option<i32>,
+        msg: S,
+    ) -> Poll<Option<trident::RemoteExecResponse>> {
+        let msg: Cow<str> = msg.into();
+        warn!("{}", msg);
+        Poll::Ready(Some(trident::RemoteExecResponse {
+            agent_id: Some(self.agent_id.read().deref().into()),
+            request_id,
+            errmsg: Some(msg.into_owned()),
+            command_result: Some(trident::CommandResult {
+                errno: code,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
+    }
+}
+
+impl Stream for Responser {
+    type Item = trident::RemoteExecResponse;
+
+    fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        /*
+         * order of polling:
+         * 1. Send remaining buffered command output
+         * 2. Poll pending command if any. If command succeeded, restart from top
+         * 3. Poll pending lsns function if any
+         * 4. Poll message queue for command from server. On receiving a new command, restart from top
+         * 5. Poll ticker for heartbeat
+         */
+
+        loop {
+            if let Some((batch, errmsg)) = self.as_mut().generate_result_batch() {
+                trace!(
+                    "send buffer {} bytes",
+                    batch.content.as_ref().unwrap().len()
+                );
+                return Poll::Ready(Some(trident::RemoteExecResponse {
+                    agent_id: Some(self.agent_id.read().deref().into()),
+                    request_id: self.result.request_id,
+                    command_result: Some(batch),
+                    errmsg,
+                    ..Default::default()
+                }));
+            }
+
+            if let Some((_, id, future)) = self.pending_command.as_mut() {
+                trace!("poll pending command '{}'", get_cmdline(id).unwrap());
+                let p = future.as_mut().poll(ctx);
+
+                if let Poll::Ready(res) = p {
+                    let (request_id, id, _) = self.pending_command.take().unwrap();
+                    match res {
+                        Ok(output) => {
+                            let err_msg = if output.status.success() {
+                                None
+                            } else {
+                                Some(match String::from_utf8(output.stderr) {
+                                    Ok(msg) if !msg.is_empty() => msg,
+                                    _ => format!("command '{}' failed", get_cmdline(&id).unwrap()),
+                                })
+                            };
+                            if output.stdout.is_empty() {
+                                if let Some(e_msg) = err_msg {
+                                    return self.command_failed_helper(
+                                        request_id,
+                                        output.status.code(),
+                                        e_msg,
+                                    );
+                                } else {
+                                    return Poll::Ready(Some(trident::RemoteExecResponse {
+                                        agent_id: Some(self.agent_id.read().deref().into()),
+                                        request_id: request_id,
+                                        command_result: Some(trident::CommandResult::default()),
+                                        ..Default::default()
+                                    }));
+                                }
+                            }
+                            let r = &mut self.result;
+                            r.request_id = request_id;
+                            r.errno = output.status.code().unwrap_or_default();
+                            r.err_msg = err_msg;
+                            r.output = output.stdout.into();
+                            r.total_len = r.output.len();
+                            r.digest.reset();
+                            continue;
+                        }
+                        Err(e) => {
+                            return self.command_failed_helper(
+                                request_id,
+                                None,
+                                format!(
+                                    "command '{}' execute failed: {}",
+                                    get_cmdline(&id).unwrap(),
+                                    e
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if let Some((_, future)) = self.pending_lsns.as_mut() {
+                trace!("poll pending lsns");
+                if let Poll::Ready(result) = future.as_mut().poll(ctx) {
+                    let (request_id, _) = self.pending_lsns.take().unwrap();
+                    match result {
+                        Ok(namespaces) => {
+                            debug!("list namespace completed with {} entries", namespaces.len());
+                            return Poll::Ready(Some(trident::RemoteExecResponse {
+                                agent_id: Some(self.agent_id.read().deref().into()),
+                                request_id,
+                                linux_namespaces: namespaces,
+                                ..Default::default()
+                            }));
+                        }
+                        Err(e) => {
+                            warn!("list namespace failed: {}", e);
+                            return Poll::Ready(Some(trident::RemoteExecResponse {
+                                agent_id: Some(self.agent_id.read().deref().into()),
+                                request_id,
+                                errmsg: Some(e.to_string()),
+                                ..Default::default()
+                            }));
+                        }
+                    }
+                }
+            }
+
+            match self.msg_recv.poll_recv(ctx) {
+                // sender closed, terminate the current stream
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Ready(Some(msg)) => {
+                    match trident::ExecutionType::from_i32(msg.exec_type.unwrap()).unwrap() {
+                        trident::ExecutionType::ListCommand => {
+                            let mut commands = vec![];
+                            SUPPORTED_COMMANDS.with(|cell| {
+                                let cs = cell.get_or_init(|| all_supported_commands());
+                                for c in cs.iter() {
+                                    commands.push(trident::RemoteCommand {
+                                        cmd: if c.desc.is_empty() {
+                                            Some(c.cmdline.to_owned())
+                                        } else {
+                                            Some(c.desc.to_owned())
+                                        },
+                                        output_format: match c.output_format {
+                                            OutputFormat::Text => {
+                                                Some(trident::OutputFormat::Text as i32)
+                                            }
+                                            OutputFormat::Binary => {
+                                                Some(trident::OutputFormat::Binary as i32)
+                                            }
+                                        },
+                                        ident: Some(c.id.clone()),
+                                        params: c
+                                            .params
+                                            .iter()
+                                            .map(|p| trident::CommandParam {
+                                                name: Some(p.name.to_owned()),
+                                                regex: Some(
+                                                    p.regex
+                                                        .unwrap_or(DEFAULT_PARAM_REGEX)
+                                                        .to_owned(),
+                                                ),
+                                                required: Some(p.required),
+                                                param_type: match p.param_type {
+                                                    ParamType::Boolean => {
+                                                        Some(trident::ParamType::PfBoolean as i32)
+                                                    }
+                                                    _ => Some(trident::ParamType::PfText as i32),
+                                                },
+                                                description: Some(p.description.to_owned()),
+                                            })
+                                            .collect(),
+                                        type_name: Some(c.command_type.to_string()),
+                                        ..Default::default()
+                                    });
+                                }
+                            });
+                            debug!("list command returning {} entries", commands.len());
+                            return Poll::Ready(Some(trident::RemoteExecResponse {
+                                agent_id: Some(self.agent_id.read().deref().into()),
+                                request_id: msg.request_id,
+                                commands,
+                                ..Default::default()
+                            }));
+                        }
+                        trident::ExecutionType::ListNamespace => {
+                            trace!("pending list namespace");
+                            self.pending_lsns = Some((msg.request_id, Box::pin(ls_netns())));
+                            continue;
+                        }
+                        trident::ExecutionType::RunCommand => {
+                            if let Some(batch_len) = msg.batch_len {
+                                self.batch_len = MIN_BATCH_LEN.max(batch_len as usize);
+                            }
+                            let Some(cmd_id) = msg.command_ident else {
+                                return self.command_failed_helper(
+                                    msg.request_id,
+                                    None,
+                                    "command_ident not specified in run command request",
+                                );
+                            };
+                            let Some(cmd) = get_cmd(&cmd_id) else {
+                                return self.command_failed_helper(
+                                    msg.request_id,
+                                    None,
+                                    format!("command not found for id {}", cmd_id),
+                                );
+                            };
+                            let cmdline = &cmd.cmdline;
+                            let temp_params = get_params_from_trident(&msg.params);
+                            let params = Params({
+                                temp_params[..msg.params.len().min(max_param_nums())].as_ref()
+                            });
+                            if let Err(e) = cmd.check_params(&params) {
+                                return self.command_failed_helper(
+                                    msg.request_id,
+                                    None,
+                                    format!(
+                                        "rejected run command '{}' with invalid params: {}",
+                                        cmdline, e
+                                    ),
+                                );
+                            }
+
+                            let nsfile_fp = match msg.linux_ns_pid {
+                                Some(pid) if pid != process::id() => {
+                                    let path: PathBuf =
+                                        ["/proc", &pid.to_string(), "ns", "net"].iter().collect();
+                                    match File::open(&path) {
+                                        Ok(fp) => Some(fp),
+                                        Err(e) => {
+                                            return self.command_failed_helper(
+                                                msg.request_id,
+                                                None,
+                                                format!(
+                                                    "open namespace file {} failed: {}",
+                                                    path.display(),
+                                                    e
+                                                ),
+                                            )
+                                        }
+                                    }
+                                }
+                                _ => None,
+                            };
+
+                            trace!(
+                                "pending run command '{}', ns_pid: {:?}, params: {:?}",
+                                cmdline,
+                                msg.linux_ns_pid,
+                                params
+                            );
+
+                            if let Some(f) = nsfile_fp.as_ref() {
+                                if let Err(e) = set_netns(f) {
+                                    warn!("set_netns failed when executing {}: {}", cmdline, e);
+                                }
+                            }
+
+                            let output = if let Some(func) = cmd.override_cmdline.as_ref() {
+                                func(&params)
+                            } else {
+                                // split the whole command line to enable PATH lookup
+                                let mut args = cmdline.split_whitespace();
+                                let mut cmd = TokioCommand::new(args.next().unwrap());
+                                for arg in args {
+                                    if arg.starts_with('$') {
+                                        let name = arg.split_at(1).1;
+                                        cmd.arg(params.get(name).unwrap());
+                                    } else {
+                                        cmd.arg(arg);
+                                    }
+                                }
+                                Box::pin(cmd.output().map_err(|e| e.into()))
+                            };
+
+                            if nsfile_fp.is_some() {
+                                if let Err(e) = reset_netns() {
+                                    warn!("reset_netns failed when executing {}: {}", cmdline, e);
+                                }
+                            }
+                            self.pending_command = Some((msg.request_id, cmd_id, output));
+                            continue;
+                        }
+                    }
+                }
+                _ => (),
+            }
+
+            return match self.heartbeat.poll_tick(ctx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(_) => Poll::Ready(Some(trident::RemoteExecResponse {
+                    agent_id: Some(self.agent_id.read().deref().into()),
+                    ..Default::default()
+                })),
+            };
+        }
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+struct AgentResponser {
+    agent_id: Arc<RwLock<AgentId>>,
+    batch_len: usize,
+
+    heartbeat: Interval,
     msg_recv: Receiver<pb::RemoteExecRequest>,
 
     // request id, future
@@ -360,10 +803,10 @@ struct Responser {
     result: CommandResult,
 }
 
-impl Responser {
+impl AgentResponser {
     fn new(agent_id: Arc<RwLock<AgentId>>, receiver: Receiver<pb::RemoteExecRequest>) -> Self {
-        Responser {
-            agent_id: agent_id,
+        AgentResponser {
+            agent_id,
             batch_len: pb::RemoteExecRequest::default().batch_len() as usize,
             heartbeat: time::interval(Duration::from_secs(30)),
             msg_recv: receiver,
@@ -422,7 +865,7 @@ impl Responser {
     }
 }
 
-impl Stream for Responser {
+impl Stream for AgentResponser {
     type Item = pb::RemoteExecResponse;
 
     fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -593,7 +1036,7 @@ impl Stream for Responser {
                         }
                         pb::ExecutionType::ListNamespace => {
                             trace!("pending list namespace");
-                            self.pending_lsns = Some((msg.request_id, Box::pin(ls_netns())));
+                            self.pending_lsns = Some((msg.request_id, Box::pin(agent_ls_netns())));
                             continue;
                         }
                         pb::ExecutionType::RunCommand => {
@@ -873,6 +1316,18 @@ impl From<Namespace> for pb::LinuxNamespace {
     }
 }
 
+impl From<Namespace> for trident::LinuxNamespace {
+    fn from(ns: Namespace) -> Self {
+        Self {
+            id: Some(ns.id),
+            pid: Some(ns.pid),
+            user: Some(ns.user),
+            cmd: Some(ns.command),
+            ns_type: Some(ns.ty.to_string()),
+        }
+    }
+}
+
 pub async fn lsns() -> Result<Vec<Namespace>> {
     let mut ns_by_id: HashMap<u64, Namespace> = HashMap::new();
     let mut iter = tokio::fs::read_dir(public::netns::PROC_PATH).await?;
@@ -978,7 +1433,21 @@ pub fn write_namespace_table<W: Write>(mut w: W, table: &[Namespace]) -> Result<
     Ok(())
 }
 
-async fn ls_netns() -> Result<Vec<pb::LinuxNamespace>> {
+async fn ls_netns() -> Result<Vec<trident::LinuxNamespace>> {
+    Ok(lsns()
+        .await?
+        .into_iter()
+        .filter_map(|ns| {
+            if ns.ty == NsType::Net {
+                Some(trident::LinuxNamespace::from(ns))
+            } else {
+                None
+            }
+        })
+        .collect())
+}
+
+async fn agent_ls_netns() -> Result<Vec<pb::LinuxNamespace>> {
     Ok(lsns()
         .await?
         .into_iter()

@@ -31,7 +31,8 @@ use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
 use npb_pcap_policy::{DirectionType, NpbAction, NpbTunnelType, PolicyData, TapSide};
 
-use public::proto::agent;
+use public::proto::agent::{self, RoleType};
+use public::proto::trident;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum GroupType {
@@ -68,6 +69,54 @@ impl IpGroupData {
 impl TryFrom<&agent::Group> for IpGroupData {
     type Error = Error;
     fn try_from(g: &agent::Group) -> Result<Self, Self::Error> {
+        if g.ips.is_empty() && g.ip_ranges.is_empty() {
+            return Err(Error::ParseIpGroupData(format!(
+                "IpGroup({:?}) is invalid, ips and ip-range is none",
+                g
+            )));
+        }
+
+        let mut ips = vec![];
+        for s in g.ips.iter() {
+            let ip = s.parse::<IpNet>().map_err(|e| {
+                Error::ParseIpGroupData(format!("IpGroup({}) parse ip string failed: {}", s, e))
+            })?;
+            ips.push(ip);
+        }
+        for ip_range in g.ip_ranges.iter() {
+            let ip_peers = match ip_range.split_once('-') {
+                Some(p) => p,
+                None => {
+                    return Err(Error::ParseIpGroupData(format!(
+                        "IpGroup ({}) split ip string failed",
+                        ip_range
+                    )));
+                }
+            };
+            let (start, end) = match (ip_peers.0.parse::<IpAddr>(), ip_peers.1.parse::<IpAddr>()) {
+                (Ok(s), Ok(e)) => (s, e),
+                _ => {
+                    return Err(Error::ParseIpGroupData(format!(
+                        "IpGroup ({}, {}) parse ip string failed",
+                        ip_peers.0, ip_peers.1
+                    )));
+                }
+            };
+            ips.append(&mut ip_range_convert_to_cidr(start, end));
+        }
+
+        Ok(IpGroupData {
+            epc_id: (g.epc_id() & 0xffff) as u16,
+            ips,
+            id: (g.id() & 0xffff) as u16,
+        })
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl TryFrom<&trident::Group> for IpGroupData {
+    type Error = Error;
+    fn try_from(g: &trident::Group) -> Result<Self, Self::Error> {
         if g.ips.is_empty() && g.ip_ranges.is_empty() {
             return Err(Error::ParseIpGroupData(format!(
                 "IpGroup({:?}) is invalid, ips and ip-range is none",
@@ -783,6 +832,74 @@ impl TryFrom<agent::FlowAcl> for Acl {
     }
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl TryFrom<trident::FlowAcl> for Acl {
+    type Error = String;
+
+    fn try_from(a: trident::FlowAcl) -> Result<Self, Self::Error> {
+        let tap_type = CaptureNetworkType::try_from((a.tap_type.unwrap_or_default() & 0xff) as u16);
+        if tap_type.is_err() {
+            return Err(format!(
+                "Acl tap_type parse error: {:?}.\n",
+                tap_type.unwrap_err()
+            ));
+        }
+        let src_ports = PortRangeList::try_from(a.src_ports.unwrap_or_default());
+        if src_ports.is_err() {
+            return Err(format!(
+                "Acl src port parse error: {:?}.\n",
+                src_ports.unwrap_err()
+            ));
+        }
+        let dst_ports = PortRangeList::try_from(a.dst_ports.unwrap_or_default());
+        if dst_ports.is_err() {
+            return Err(format!(
+                "Acl dst port parse error: {:?}.\n",
+                dst_ports.unwrap_err()
+            ));
+        }
+        let npb_actions: Vec<NpbAction> = a
+            .npb_actions
+            .iter()
+            .map(|n| {
+                NpbAction::new(
+                    n.npb_acl_group_id(),
+                    n.tunnel_id(),
+                    n.tunnel_ip()
+                        .parse::<IpAddr>()
+                        .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+                    n.tunnel_ip_id.unwrap_or_default() as u16,
+                    NpbTunnelType::new(n.tunnel_type.unwrap() as u8),
+                    TapSide::new(n.tap_side.unwrap() as u8),
+                    DirectionType::new(n.direction.unwrap_or(1) as u8),
+                    n.payload_slice() as u16,
+                )
+            })
+            .collect();
+
+        Ok(Acl {
+            id: a.id.unwrap_or_default(),
+            tap_type: tap_type.unwrap(),
+            src_groups: a
+                .src_group_ids
+                .iter()
+                .map(|x| (x & 0xffff) as u32)
+                .collect(),
+            dst_groups: a
+                .dst_group_ids
+                .iter()
+                .map(|x| (x & 0xffff) as u32)
+                .collect(),
+            src_port_ranges: src_ports.unwrap().element().to_vec(),
+            dst_port_ranges: dst_ports.unwrap().element().to_vec(),
+            proto: (a.protocol.unwrap_or_default() & 0xffff) as u16,
+            npb_actions: npb_actions.clone(),
+            policy: Arc::new(PolicyData::new(npb_actions, a.id.unwrap_or_default())),
+            ..Default::default()
+        })
+    }
+}
+
 impl fmt::Display for Acl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Id:{} CaptureNetworkType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:[{}] DstPortRange:[{}] Proto:{} NpbActions:{}",
@@ -848,6 +965,45 @@ impl TryFrom<&agent::Cidr> for Cidr {
     }
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl From<trident::CidrType> for CidrType {
+    fn from(t: trident::CidrType) -> Self {
+        match t {
+            trident::CidrType::Lan => CidrType::Lan,
+            trident::CidrType::Wan => CidrType::Wan,
+        }
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl TryFrom<&trident::Cidr> for Cidr {
+    type Error = Error;
+    fn try_from(c: &trident::Cidr) -> Result<Self, Self::Error> {
+        if c.prefix.is_none() {
+            return Err(Error::ParseCidr(format!("Cidr({:?}) is invalid", &c)));
+        }
+        let ip: IpNet = c.prefix().parse().map_err(|_| {
+            Error::ParseCidr(format!("Cidr({:?}) has invalid prefix({})", c, c.prefix()))
+        })?;
+
+        let mut epc_id = c.epc_id();
+        if epc_id > 0 {
+            epc_id &= 0xffff;
+        } else if epc_id == 0 {
+            epc_id = EPC_DEEPFLOW;
+        }
+
+        Ok(Cidr {
+            ip,
+            tunnel_id: c.tunnel_id(),
+            epc_id,
+            cidr_type: c.r#type().into(),
+            is_vip: c.is_vip(),
+            region_id: c.region_id(),
+        })
+    }
+}
+
 impl Cidr {
     pub fn netmask_len(&self) -> u8 {
         match self.ip {
@@ -887,6 +1043,16 @@ impl From<&agent::PeerConnection> for PeerConnection {
     }
 }
 
+impl From<&trident::PeerConnection> for PeerConnection {
+    fn from(p: &trident::PeerConnection) -> Self {
+        Self {
+            id: p.id(),
+            local_epc: (p.local_epc_id() & 0xffff) as i32,
+            remote_epc: (p.remote_epc_id() & 0xffff) as i32,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum GpidProtocol {
@@ -906,6 +1072,22 @@ impl TryFrom<agent::ServiceProtocol> for GpidProtocol {
             ))),
             agent::ServiceProtocol::TcpService => Ok(GpidProtocol::Tcp),
             agent::ServiceProtocol::UdpService => Ok(GpidProtocol::Udp),
+        }
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl TryFrom<trident::ServiceProtocol> for GpidProtocol {
+    type Error = Error;
+
+    fn try_from(value: trident::ServiceProtocol) -> Result<Self, Self::Error> {
+        match value {
+            trident::ServiceProtocol::Any => Err(Error::ParseGpid(format!(
+                "Parse GPIDEntry error: {:?}",
+                value
+            ))),
+            trident::ServiceProtocol::TcpService => Ok(GpidProtocol::Tcp),
+            trident::ServiceProtocol::UdpService => Ok(GpidProtocol::Udp),
         }
     }
 }
@@ -1028,6 +1210,52 @@ impl TryFrom<&agent::GpidSyncEntry> for GpidEntry {
     }
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
+    type Error = Error;
+    fn try_from(value: &trident::GpidSyncEntry) -> Result<Self, Self::Error> {
+        let protocol = GpidProtocol::try_from(value.protocol())?;
+        // FIXME: Support epc id
+        // let mut epc_id_0 = value.epc_id_0() as i32;
+        // if epc_id_0 > 0 {
+        //     epc_id_0 &= 0xffff;
+        // } else if epc_id_0 == 0 {
+        //     epc_id_0 = EPC_FROM_DEEPFLOW;
+        // }
+        // let mut epc_id_1 = value.epc_id_1() as i32;
+        // if epc_id_1 > 0 {
+        //     epc_id_1 &= 0xffff;
+        // } else if epc_id_1 == 0 {
+        //     epc_id_1 = EPC_FROM_DEEPFLOW;
+        // }
+        // let mut epc_id_real = value.epc_id_real() as i32;
+        // if epc_id_real > 0 {
+        //     epc_id_real &= 0xffff;
+        // } else if epc_id_real == 0 {
+        //     epc_id_real = EPC_FROM_DEEPFLOW;
+        // }
+        Ok(GpidEntry {
+            epc_id_0: 0,
+            ip_0: value.ipv4_0(),
+            port_0: (value.port_0() & 0xffff) as u16,
+            pid_0: (value.pid_0() & 0xffffffff) as u32,
+            epc_id_1: 0,
+            ip_1: value.ipv4_1(),
+            port_1: (value.port_1() & 0xffff) as u16,
+            pid_1: (value.pid_1() & 0xffffffff) as u32,
+            epc_id_real: 0,
+            ip_real: value.ipv4_real(),
+            port_real: (value.port_real() & 0xffff) as u16,
+            pid_real: (value.pid_real() & 0xffffffff) as u32,
+            protocol,
+            role_real: RoleType::from_str_name(
+                (value.role_real() as trident::RoleType).as_str_name(),
+            )
+            .unwrap_or(RoleType::RoleNone),
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Container {
     pub pod_id: u32,
@@ -1036,6 +1264,15 @@ pub struct Container {
 
 impl From<&agent::Container> for Container {
     fn from(value: &agent::Container) -> Self {
+        Self {
+            pod_id: value.pod_id(),
+            container_id: value.container_id().to_string(),
+        }
+    }
+}
+
+impl From<&trident::Container> for Container {
+    fn from(value: &trident::Container) -> Self {
         Self {
             pod_id: value.pod_id(),
             container_id: value.container_id().to_string(),

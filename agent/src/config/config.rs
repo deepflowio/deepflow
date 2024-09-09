@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -22,7 +23,7 @@ use std::net::{IpAddr, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
 use regex::Regex;
 use serde::{
@@ -33,14 +34,15 @@ use thiserror::Error;
 use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::L7ProtocolParser;
+use crate::dispatcher::DEFAULT_BLOCK_SIZE;
 use crate::flow_generator::{DnsLog, OracleLog, TlsLog};
 use crate::{
     common::{
         decapsulate::TunnelType,
+        enums::CaptureNetworkType,
         l7_protocol_log::{get_all_protocol, L7ProtocolParserInterface},
         DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL,
     },
-    dispatcher::recv_engine,
     flow_generator::protocol_logs::SLOT_WIDTH,
     metric::document::TapSide,
     rpc::Session,
@@ -50,8 +52,9 @@ use public::{
     bitmap::Bitmap,
     consts::NPB_DEFAULT_PORT,
     proto::{
-        agent::{self, PacketCaptureType},
-        trident::{self, TapMode},
+        agent::{self, SocketType, SystemLoadMetric},
+        common,
+        trident::{self, KubernetesClusterIdRequest, TapMode},
     },
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
@@ -95,6 +98,15 @@ impl<'de> Deserialize<'de> for AgentIdType {
     }
 }
 
+impl From<AgentIdType> for trident::AgentIdentifier {
+    fn from(t: AgentIdType) -> Self {
+        match t {
+            AgentIdType::IpMac => trident::AgentIdentifier::IpAndMac,
+            AgentIdType::Ip => trident::AgentIdentifier::Ip,
+        }
+    }
+}
+
 impl From<AgentIdType> for agent::AgentIdentifier {
     fn from(t: AgentIdType) -> Self {
         match t {
@@ -125,6 +137,7 @@ pub struct Config {
     pub pid_file: String,
     pub team_id: String,
     pub cgroups_disabled: bool,
+    pub new_rpc: bool,
 }
 
 impl Config {
@@ -186,15 +199,15 @@ impl Config {
             ),
             Err(e) => {
                 info!(
-                    "get kubernetes_cluster_id error: failed to read {} error: {}, this shows that agent is not running in K8s.",
-                    K8S_CA_CRT_PATH, e
-                );
+                     "get kubernetes_cluster_id error: failed to read {} error: {}, this shows that agent is not running in K8s.",
+                     K8S_CA_CRT_PATH, e
+                 );
                 return None;
             }
         };
 
         loop {
-            let request = agent::KubernetesClusterIdRequest {
+            let request = KubernetesClusterIdRequest {
                 ca_md5: ca_md5.clone(),
                 kubernetes_cluster_name: config.kubernetes_cluster_name.clone(),
                 team_id: Some(config.team_id.clone()),
@@ -276,6 +289,7 @@ impl Default for Config {
             pid_file: Default::default(),
             team_id: "".into(),
             cgroups_disabled: false,
+            new_rpc: false,
         }
     }
 }
@@ -375,7 +389,7 @@ pub struct Proc {
     #[serde(with = "humantime_serde")]
     pub sync_interval: Duration,
     #[serde(with = "humantime_serde")]
-    pub min_lefttime: Duration,
+    pub min_lifetime: Duration,
     pub tag_extraction: TagExtraction,
     pub process_matcher: Vec<ProcessMatcher>,
     pub symbol_table: SymbolTable,
@@ -387,7 +401,7 @@ impl Default for Proc {
             enabled: false,
             proc_dir_path: "/proc".to_string(),
             sync_interval: Duration::from_secs(10),
-            min_lefttime: Duration::from_secs(3),
+            min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
             process_matcher: vec![],
             symbol_table: SymbolTable::default(),
@@ -438,6 +452,24 @@ where
     }
 }
 
+fn to_trident_capture_socket_type<'de, D>(
+    deserializer: D,
+) -> Result<trident::CaptureSocketType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(trident::CaptureSocketType::Auto),
+        1 => Ok(trident::CaptureSocketType::AfPacketV1),
+        2 => Ok(trident::CaptureSocketType::AfPacketV2),
+        3 => Ok(trident::CaptureSocketType::AfPacketV3),
+        o => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(o as u64),
+            &"0|1|2|3",
+        )),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct AfPacketTunning {
@@ -463,7 +495,7 @@ impl Default for AfPacketTunning {
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct BondInterfaceSlave {
+pub struct BondInterface {
     pub slave_interfaces: Vec<String>,
 }
 
@@ -471,7 +503,7 @@ pub struct BondInterfaceSlave {
 #[serde(default)]
 pub struct AfPacket {
     pub interface_regex: String,
-    pub bond_interfaces: Vec<BondInterfaceSlave>,
+    pub bond_interfaces: Vec<BondInterface>,
     pub extra_netns_regex: String,
     pub extra_bpf_filter: String,
     pub src_interfaces: Vec<String>,
@@ -488,10 +520,10 @@ impl Default for AfPacket {
             bond_interfaces: vec![],
             extra_netns_regex: "".to_string(),
             extra_bpf_filter: "".to_string(),
-            src_interfaces: vec![],
             vlan_pcp_in_physical_mirror_traffic: 0,
             bpf_filter_disabled: false,
             tunning: AfPacketTunning::default(),
+            src_interfaces: vec![],
         }
     }
 }
@@ -584,8 +616,9 @@ impl Default for CbpfTunning {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct PreProcess {
-    pub tunnel_decap_protocols: Vec<usize>,
+    pub tunnel_decap_protocols: Vec<u8>,
     pub tunnel_trim_protocols: Vec<String>,
+    pub packet_segmentation_reassembly: Vec<u16>,
 }
 
 impl Default for PreProcess {
@@ -593,6 +626,7 @@ impl Default for PreProcess {
         Self {
             tunnel_decap_protocols: vec![1, 2],
             tunnel_trim_protocols: vec![],
+            packet_segmentation_reassembly: vec![],
         }
     }
 }
@@ -763,11 +797,16 @@ impl Default for EbpfProfileOffCpu {
 #[serde(default)]
 pub struct EbpfProfileMemory {
     pub disabled: bool,
+    #[serde(with = "humantime_serde")]
+    pub report_interval: Duration,
 }
 
 impl Default for EbpfProfileMemory {
     fn default() -> Self {
-        Self { disabled: true }
+        Self {
+            disabled: true,
+            report_interval: Duration::from_secs(10),
+        }
     }
 }
 
@@ -785,12 +824,22 @@ impl Default for EbpfProfilePreprocess {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Unwinding {
+    pub dwarf_disabled: bool,
+    pub dwarf_regex: String,
+    pub dwarf_process_map_size: u32,
+    pub dwarf_shard_map_size: u32,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfProfile {
     pub on_cpu: EbpfProfileOnCpu,
     pub off_cpu: EbpfProfileOffCpu,
     pub memory: EbpfProfileMemory,
+    pub unwinding: Unwinding,
     pub preprocess: EbpfProfilePreprocess,
 }
 
@@ -846,6 +895,8 @@ pub struct Ebpf {
     pub file: EbpfFile,
     pub profile: EbpfProfile,
     pub tunning: EbpfTunning,
+    #[serde(skip)]
+    pub java_symbol_file_refresh_defer_interval: i32,
 }
 
 impl Default for Ebpf {
@@ -856,22 +907,8 @@ impl Default for Ebpf {
             file: EbpfFile::default(),
             profile: EbpfProfile::default(),
             tunning: EbpfTunning::default(),
+            java_symbol_file_refresh_defer_interval: 60,
         }
-    }
-}
-
-fn to_if_mac_source<'de, D>(deserializer: D) -> Result<agent::IfMacSource, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match u8::deserialize(deserializer)? {
-        0 => Ok(agent::IfMacSource::IfMac),
-        1 => Ok(agent::IfMacSource::IfName),
-        2 => Ok(agent::IfMacSource::IfLibvirtXml),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Unsigned(other as u64),
-            &"0|1|2",
-        )),
     }
 }
 
@@ -896,13 +933,13 @@ impl Default for PrivateCloud {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ApiResources {
     pub name: String,
+    pub disabled: bool,
     pub group: String,
     pub version: String,
-    pub disabled: bool,
     pub field_selector: String,
 }
 
@@ -929,10 +966,19 @@ where
     }
 }
 
+impl KubernetesPollerType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Adaptive => "adaptive",
+            Self::Active => "active",
+            Self::Passive => "passive",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Kubernetes {
-    pub enabled: bool,
     pub kubernetes_namespace: String,
     pub api_resources: Vec<ApiResources>,
     pub api_list_page_size: u32,
@@ -946,7 +992,6 @@ pub struct Kubernetes {
 impl Default for Kubernetes {
     fn default() -> Self {
         Self {
-            enabled: false,
             kubernetes_namespace: "".to_string(),
             api_resources: vec![
                 ApiResources {
@@ -1077,12 +1122,12 @@ impl Default for FeatureControl {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct IntegrationCompression {
+pub struct Compression {
     pub trace: bool,
     pub profile: bool,
 }
 
-impl Default for IntegrationCompression {
+impl Default for Compression {
     fn default() -> Self {
         Self {
             trace: true,
@@ -1096,7 +1141,7 @@ impl Default for IntegrationCompression {
 pub struct Integration {
     pub enabled: bool,
     pub listen_port: u16,
-    pub compression: IntegrationCompression,
+    pub compression: Compression,
     pub prometheus_extra_labels: PrometheusExtraLabels,
     pub feature_control: FeatureControl,
 }
@@ -1106,7 +1151,7 @@ impl Default for Integration {
         Self {
             enabled: true,
             listen_port: 38086,
-            compression: IntegrationCompression::default(),
+            compression: Compression::default(),
             prometheus_extra_labels: PrometheusExtraLabels::default(),
             feature_control: FeatureControl::default(),
         }
@@ -1276,81 +1321,6 @@ impl Default for ApplicationProtocolInference {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct PortNumberPrefilters {
-    #[serde(rename = "HTTP")]
-    pub http: String,
-    #[serde(rename = "HTTP")]
-    pub http2: String,
-    #[serde(rename = "Dubbo")]
-    pub dubbo: String,
-    #[serde(rename = "SofaRPC")]
-    pub sofa_rpc: String,
-    #[serde(rename = "FastCGI")]
-    pub fast_cgi: String,
-    #[serde(rename = "bRPC")]
-    pub b_rpc: String,
-    #[serde(rename = "MySQL")]
-    pub mysql: String,
-    #[serde(rename = "PostgreSQL")]
-    pub postgre_sql: String,
-    #[serde(rename = "Oracle")]
-    pub oracle: String,
-    #[serde(rename = "Redis")]
-    pub redis: String,
-    #[serde(rename = "MongoDB")]
-    pub mongodb: String,
-    #[serde(rename = "Kafka")]
-    pub kafka: String,
-    #[serde(rename = "MQTT")]
-    pub mqtt: String,
-    #[serde(rename = "AMQP")]
-    pub amqp: String,
-    #[serde(rename = "OpenWire")]
-    pub openwire: String,
-    #[serde(rename = "NATS")]
-    pub nats: String,
-    #[serde(rename = "Pulsar")]
-    pub pulsar: String,
-    #[serde(rename = "ZMTP")]
-    pub zmtp: String,
-    #[serde(rename = "DNS")]
-    pub dns: String,
-    #[serde(rename = "TLS")]
-    pub tls: String,
-    #[serde(rename = "Custom")]
-    pub custom: String,
-}
-
-impl Default for PortNumberPrefilters {
-    fn default() -> Self {
-        Self {
-            http: "1-65535".to_string(),
-            http2: "1-65535".to_string(),
-            dubbo: "1-65535".to_string(),
-            sofa_rpc: "1-65535".to_string(),
-            fast_cgi: "1-65535".to_string(),
-            b_rpc: "1-65535".to_string(),
-            mysql: "1-65535".to_string(),
-            postgre_sql: "1-65535".to_string(),
-            oracle: "1521".to_string(),
-            redis: "1-65535".to_string(),
-            mongodb: "1-65535".to_string(),
-            kafka: "1-65535".to_string(),
-            mqtt: "1-65535".to_string(),
-            amqp: "1-65535".to_string(),
-            openwire: "1-65535".to_string(),
-            nats: "1-65535".to_string(),
-            pulsar: "1-65535".to_string(),
-            zmtp: "1-65535".to_string(),
-            dns: "53,5353".to_string(),
-            tls: "443,6443".to_string(),
-            custom: "1-65535".to_string(),
-        }
-    }
-}
-
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct TagFilterOperator {
@@ -1361,85 +1331,9 @@ pub struct TagFilterOperator {
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct TagFilters {
-    #[serde(rename = "HTTP")]
-    pub http: Vec<TagFilterOperator>,
-    #[serde(rename = "HTTP")]
-    pub http2: Vec<TagFilterOperator>,
-    #[serde(rename = "Dubbo")]
-    pub dubbo: Vec<TagFilterOperator>,
-    #[serde(rename = "SofaRPC")]
-    pub sofa_rpc: Vec<TagFilterOperator>,
-    #[serde(rename = "FastCGI")]
-    pub fast_cgi: Vec<TagFilterOperator>,
-    #[serde(rename = "bRPC")]
-    pub b_rpc: Vec<TagFilterOperator>,
-    #[serde(rename = "MySQL")]
-    pub mysql: Vec<TagFilterOperator>,
-    #[serde(rename = "PostgreSQL")]
-    pub postgre_sql: Vec<TagFilterOperator>,
-    #[serde(rename = "Oracle")]
-    pub oracle: Vec<TagFilterOperator>,
-    #[serde(rename = "Redis")]
-    pub redis: Vec<TagFilterOperator>,
-    #[serde(rename = "MongoDB")]
-    pub mongodb: Vec<TagFilterOperator>,
-    #[serde(rename = "Kafka")]
-    pub kafka: Vec<TagFilterOperator>,
-    #[serde(rename = "MQTT")]
-    pub mqtt: Vec<TagFilterOperator>,
-    #[serde(rename = "AMQP")]
-    pub amqp: Vec<TagFilterOperator>,
-    #[serde(rename = "OpenWire")]
-    pub openwire: Vec<TagFilterOperator>,
-    #[serde(rename = "NATS")]
-    pub nats: Vec<TagFilterOperator>,
-    #[serde(rename = "Pulsar")]
-    pub pulsar: Vec<TagFilterOperator>,
-    #[serde(rename = "ZMTP")]
-    pub zmtp: Vec<TagFilterOperator>,
-    #[serde(rename = "DNS")]
-    pub dns: Vec<TagFilterOperator>,
-    #[serde(rename = "TLS")]
-    pub tls: Vec<TagFilterOperator>,
-    #[serde(rename = "Custom")]
-    pub custom: Vec<TagFilterOperator>,
-}
-
-impl TagFilters {
-    pub fn to_tag_filters_map(&self) -> HashMap<String, Vec<TagFilterOperator>> {
-        let mut tag_filters_map = HashMap::new();
-        tag_filters_map.insert("HTTP".to_string(), self.http.clone());
-        tag_filters_map.insert("HTTP2".to_string(), self.http2.clone());
-        tag_filters_map.insert("Dubbo".to_string(), self.dubbo.clone());
-        tag_filters_map.insert("SofaRPC".to_string(), self.sofa_rpc.clone());
-        tag_filters_map.insert("FastCGI".to_string(), self.fast_cgi.clone());
-        tag_filters_map.insert("bRPC".to_string(), self.b_rpc.clone());
-        tag_filters_map.insert("MySQL".to_string(), self.mysql.clone());
-        tag_filters_map.insert("PostgreSQL".to_string(), self.postgre_sql.clone());
-        tag_filters_map.insert("Oracle".to_string(), self.oracle.clone());
-        tag_filters_map.insert("Redis".to_string(), self.redis.clone());
-        tag_filters_map.insert("MongoDB".to_string(), self.mongodb.clone());
-        tag_filters_map.insert("Kafka".to_string(), self.kafka.clone());
-        tag_filters_map.insert("MQTT".to_string(), self.mqtt.clone());
-        tag_filters_map.insert("AMQP".to_string(), self.amqp.clone());
-        tag_filters_map.insert("OpenWire".to_string(), self.openwire.clone());
-        tag_filters_map.insert("NATS".to_string(), self.nats.clone());
-        tag_filters_map.insert("Pulsar".to_string(), self.pulsar.clone());
-        tag_filters_map.insert("ZMTP".to_string(), self.zmtp.clone());
-        tag_filters_map.insert("DNS".to_string(), self.dns.clone());
-        tag_filters_map.insert("TLS".to_string(), self.tls.clone());
-        tag_filters_map.insert("Custom".to_string(), self.custom.clone());
-
-        tag_filters_map
-    }
-}
-
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
 pub struct Filters {
-    pub port_number_prefilters: PortNumberPrefilters,
-    pub tag_filters: TagFilters,
+    pub port_number_prefilters: HashMap<String, String>,
+    pub tag_filters: HashMap<String, Vec<TagFilterOperator>>,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
 }
 
@@ -1518,30 +1412,8 @@ impl Default for HttpEndpoint {
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
-pub struct CustomFieldsInfo {
-    pub field_name: String,
-}
-
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
 pub struct CustomFields {
-    pub http: Vec<CustomFieldsInfo>,
-    pub http2: Vec<CustomFieldsInfo>,
-}
-
-impl CustomFields {
-    pub fn deduplicate(&mut self) {
-        fn deduplicate_fields(fields: &mut Vec<CustomFieldsInfo>) {
-            fields
-                .iter_mut()
-                .for_each(|f| f.field_name.make_ascii_lowercase());
-            fields.sort_by(|a, b| a.field_name.cmp(&b.field_name));
-            fields.dedup_by(|a, b| a.field_name == b.field_name);
-        }
-
-        deduplicate_fields(&mut self.http);
-        deduplicate_fields(&mut self.http2);
-    }
+    pub field_name: String,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -1549,7 +1421,7 @@ impl CustomFields {
 pub struct RequestLogTagExtraction {
     pub tracing_tag: TracingTag,
     pub http_endpoint: HttpEndpoint,
-    pub custom_fields: CustomFields,
+    pub custom_fields: HashMap<String, Vec<CustomFields>>,
     pub obfuscate_protocols: Vec<String>,
 }
 
@@ -1558,7 +1430,7 @@ impl Default for RequestLogTagExtraction {
         Self {
             tracing_tag: TracingTag::default(),
             http_endpoint: HttpEndpoint::default(),
-            custom_fields: CustomFields::default(),
+            custom_fields: HashMap::new(),
             obfuscate_protocols: vec!["Redis".to_string()],
         }
     }
@@ -1708,7 +1580,6 @@ pub struct Processors {
 #[serde(default)]
 pub struct Limits {
     pub max_millicpus: u32,
-    pub max_cpus: usize,
     pub max_memory: u64,
     pub max_log_backhaul_rate: u32,
     pub max_local_log_file_size: u32,
@@ -1719,7 +1590,6 @@ impl Default for Limits {
     fn default() -> Self {
         Self {
             max_millicpus: 1000,
-            max_cpus: 1,
             max_memory: 768,
             max_log_backhaul_rate: 300,
             max_local_log_file_size: 1000,
@@ -1875,12 +1745,12 @@ impl Default for Communication {
         Self {
             proactive_request_interval: Duration::from_secs(60),
             max_escape_duration: Duration::from_secs(3600),
-            ingester_ip: "127.0.0.1".to_string(),
+            proxy_controller_ip: "".to_string(),
+            proxy_controller_port: 30035,
+            ingester_ip: "".to_string(),
             ingester_port: 30033,
             grpc_buffer_size: 5,
             request_via_nat_ip: false,
-            proxy_controller_ip: "127.0.0.1".to_string(),
-            proxy_controller_port: 30035,
         }
     }
 }
@@ -1931,9 +1801,9 @@ pub struct Debug {
 impl Default for Debug {
     fn default() -> Self {
         Self {
-            enabled: true,
             local_udp_port: 0,
             debug_metrics_enabled: false,
+            enabled: true,
         }
     }
 }
@@ -2001,23 +1871,14 @@ where
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct GlobalTag {
-    pub region_id: u32,
-    pub pod_cluster_id: u32,
-    pub vpc_id: u32,
-    pub agent_id: u16,
-    pub agent_group_id: String,
+pub struct GlobalCommon {
+    pub enabled: bool,
     #[serde(deserialize_with = "to_agent_type")]
     pub agent_type: agent::AgentType,
-    pub team_id: u16,
-    pub organize_id: u16,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
 pub struct Global {
-    pub enabled: bool,
     pub limits: Limits,
     pub alerts: Alerts,
     pub circuit_breakers: CircuitBreakers,
@@ -2026,7 +1887,7 @@ pub struct Global {
     pub communication: Communication,
     pub self_monitoring: SelfMonitoring,
     pub standalone_mode: StandaloneMode,
-    pub tag: GlobalTag,
+    pub common: GlobalCommon,
 }
 
 fn to_agent_socket_type<'de, D>(deserializer: D) -> Result<agent::SocketType, D::Error>
@@ -2052,8 +1913,6 @@ pub struct Socket {
     #[serde(deserialize_with = "to_agent_socket_type")]
     pub data_socket_type: agent::SocketType,
     #[serde(deserialize_with = "to_agent_socket_type")]
-    pub pcap_socket_type: agent::SocketType,
-    #[serde(deserialize_with = "to_agent_socket_type")]
     pub npb_socket_type: agent::SocketType,
     pub raw_udp_qos_bypass: bool,
     pub multiple_sockets_to_ingester: bool,
@@ -2062,11 +1921,10 @@ pub struct Socket {
 impl Default for Socket {
     fn default() -> Self {
         Self {
-            multiple_sockets_to_ingester: false,
             data_socket_type: agent::SocketType::Tcp,
-            pcap_socket_type: agent::SocketType::Tcp,
             npb_socket_type: agent::SocketType::RawUdp,
             raw_udp_qos_bypass: false,
+            multiple_sockets_to_ingester: false,
         }
     }
 }
@@ -2094,7 +1952,7 @@ impl Default for FlowLogFilters {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Throttles {
-    pub l4_throttle: usize,
+    pub l4_throttle: u64,
     pub l7_throttle: u64,
 }
 
@@ -2205,7 +2063,7 @@ where
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Npb {
-    pub max_mtu: usize,
+    pub max_mtu: u32,
     pub raw_udp_vlan_tag: u16,
     #[serde(deserialize_with = "to_vlan_mode")]
     pub extra_vlan_header: agent::VlanMode,
@@ -2254,9 +2112,9 @@ pub struct Dev {
     pub feature_flags: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct RuntimeConfig {
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default = "UserConfig::standalone_default")]
+pub struct UserConfig {
     pub global: Global,
     pub inputs: Inputs,
     pub outputs: Outputs,
@@ -2265,18 +2123,907 @@ pub struct RuntimeConfig {
     pub dev: Dev,
 }
 
-impl Default for RuntimeConfig {
-    fn default() -> Self {
-        let mut config = RuntimeConfig {
-            global: Global::default(),
-            inputs: Inputs::default(),
-            outputs: Outputs::default(),
-            processors: Processors::default(),
+impl From<&RuntimeConfig> for UserConfig {
+    fn from(rc: &RuntimeConfig) -> Self {
+        let mut user_config = Self {
+            global: Global {
+                limits: Limits {
+                    max_millicpus: rc.max_millicpus,
+                    max_memory: rc.max_memory,
+                    max_log_backhaul_rate: rc.log_threshold,
+                    max_local_log_file_size: rc.log_file_size,
+                    local_log_retention: Duration::from_secs(rc.log_retention as u64),
+                },
+                alerts: Alerts {
+                    thread_threshold: rc.thread_threshold,
+                    process_threshold: rc.process_threshold,
+                    check_core_file_disabled: rc.yaml_config.check_core_file_disabled,
+                },
+                circuit_breakers: CircuitBreakers {
+                    sys_free_memory_percentage: SysFreeMemoryPercentage {
+                        trigger_threshold: rc.sys_free_memory_limit,
+                    },
+                    relative_sys_load: RelativeSysLoad {
+                        trigger_threshold: rc.system_load_circuit_breaker_threshold,
+                        recovery_threshold: rc.system_load_circuit_breaker_recover,
+                        system_load_circuit_breaker_metric: SystemLoadMetric::from_str_name(
+                            rc.system_load_circuit_breaker_metric.as_str_name(),
+                        )
+                        .unwrap_or(SystemLoadMetric::Load15),
+                    },
+                    tx_throughput: TxThroughput {
+                        trigger_threshold: rc.server_tx_bandwidth_threshold,
+                        throughput_monitoring_interval: rc.bandwidth_probe_interval,
+                    },
+                },
+                tunning: Tunning {
+                    cpu_affinity: if rc.yaml_config.cpu_affinity.is_empty() {
+                        vec![]
+                    } else {
+                        rc.yaml_config
+                            .cpu_affinity
+                            .split(',')
+                            .map(|s| s.parse::<usize>().unwrap_or_default())
+                            .collect()
+                    },
+                    process_scheduling_priority: rc.yaml_config.process_scheduling_priority
+                        as usize,
+                    idle_memory_trimming: rc.yaml_config.memory_trim_disabled,
+                    resource_monitoring_interval: rc.yaml_config.guard_interval,
+                },
+                ntp: Ntp {
+                    enabled: rc.ntp_enabled,
+                    max_drift: rc.yaml_config.ntp_max_interval,
+                    min_drift: rc.yaml_config.ntp_min_interval,
+                },
+                communication: Communication {
+                    proactive_request_interval: Duration::from_secs(rc.sync_interval),
+                    max_escape_duration: Duration::from_secs(rc.max_escape),
+                    proxy_controller_ip: rc.proxy_controller_ip.clone(),
+                    proxy_controller_port: rc.proxy_controller_port,
+                    ingester_ip: rc.analyzer_ip.clone(),
+                    ingester_port: rc.analyzer_port,
+                    grpc_buffer_size: rc.yaml_config.grpc_buffer_size,
+                    request_via_nat_ip: false, // TODO: This configuration is not used
+                },
+                self_monitoring: SelfMonitoring {
+                    log: Log {
+                        log_level: rc.log_level,
+                        log_file: rc.yaml_config.log_file.clone(),
+                        log_backhaul_enabled: rc.rsyslog_enabled,
+                    },
+                    profile: Profile {
+                        enabled: rc.yaml_config.profiler,
+                    },
+                    debug: Debug {
+                        enabled: rc.debug_enabled,
+                        local_udp_port: rc.yaml_config.debug_listen_port,
+                        debug_metrics_enabled: rc.yaml_config.enable_debug_stats,
+                    },
+                    hostname: rc.host.clone(),
+                    interval: Duration::from_secs(rc.stats_interval),
+                },
+                standalone_mode: StandaloneMode {
+                    max_data_file_size: rc.yaml_config.standalone_data_file_size,
+                    data_file_dir: rc.yaml_config.standalone_data_file_dir.clone(),
+                },
+                common: GlobalCommon {
+                    enabled: rc.enabled,
+                    agent_type: agent::AgentType::from_str_name(rc.trident_type.as_str_name())
+                        .unwrap_or(agent::AgentType::TtUnknown),
+                },
+            },
+            inputs: Inputs {
+                proc: Proc {
+                    enabled: rc.yaml_config.os_proc_sync_enabled,
+                    proc_dir_path: rc.yaml_config.os_proc_root.clone(),
+                    sync_interval: Duration::from_secs(
+                        rc.yaml_config.os_proc_socket_sync_interval as u64,
+                    ),
+                    min_lifetime: Duration::from_secs(
+                        rc.yaml_config.os_proc_socket_min_lifetime as u64,
+                    ),
+                    tag_extraction: TagExtraction {
+                        script_command: rc.yaml_config.os_app_tag_exec.clone(),
+                        exec_username: rc.yaml_config.os_app_tag_exec_user.clone(),
+                    },
+                    process_matcher: {
+                        let mut matchers = vec![];
+                        if !rc.yaml_config.ebpf.on_cpu_profile.disabled {
+                            matchers.push(ProcessMatcher {
+                                match_regex: rc.yaml_config.ebpf.on_cpu_profile.regex.clone(),
+                                enabled_features: vec!["ebpf.profile.on_cpu".to_string()],
+                                ..Default::default()
+                            });
+                        }
+                        if !rc.yaml_config.ebpf.off_cpu_profile.disabled {
+                            matchers.push(ProcessMatcher {
+                                match_regex: rc.yaml_config.ebpf.off_cpu_profile.regex.clone(),
+                                enabled_features: vec!["ebpf.profile.off_cpu".to_string()],
+                                ..Default::default()
+                            });
+                        }
+                        for o in &rc.yaml_config.os_proc_regex {
+                            matchers.push(ProcessMatcher {
+                                match_regex: o.match_regex.clone(),
+                                match_type: o.match_type.clone(),
+                                rewrite_name: o.rewrite_name.clone(),
+                                action: o.action.clone(),
+                                ..Default::default()
+                            });
+                        }
+                        matchers
+                    },
+                    symbol_table: SymbolTable {
+                        golang_specific: GolangSpecific {
+                            enabled: rc
+                                .yaml_config
+                                .ebpf
+                                .uprobe_proc_regexp
+                                .golang_symbol
+                                .is_empty(),
+                        },
+                        java: Java {
+                            refresh_defer_duration: rc
+                                .yaml_config
+                                .ebpf
+                                .java_symbol_file_refresh_defer_interval,
+                            max_symbol_file_size: 10, // TODO: No corresponding configuration is found
+                        },
+                    },
+                },
+                cbpf: Cbpf {
+                    common: Common {
+                        capture_mode: agent::PacketCaptureType::from_str_name(
+                            rc.tap_mode.as_str_name(),
+                        )
+                        .unwrap_or(agent::PacketCaptureType::Local),
+                    },
+                    af_packet: AfPacket {
+                        interface_regex: rc.tap_interface_regex.clone(),
+                        bond_interfaces: rc
+                            .yaml_config
+                            .tap_interface_bond_groups
+                            .iter()
+                            .map(|g| BondInterface {
+                                slave_interfaces: g.tap_interfaces.clone(),
+                            })
+                            .collect(),
+                        extra_netns_regex: rc.extra_netns_regex.clone(),
+                        extra_bpf_filter: rc.capture_bpf.clone(),
+                        vlan_pcp_in_physical_mirror_traffic: rc.yaml_config.mirror_traffic_pcp,
+                        bpf_filter_disabled: false, // TODO: No corresponding configuration is found
+                        tunning: AfPacketTunning {
+                            socket_version: agent::CaptureSocketType::from_str_name(
+                                rc.capture_socket_type.as_str_name(),
+                            )
+                            .unwrap_or(agent::CaptureSocketType::Auto),
+                            ring_blocks_enabled: rc.yaml_config.af_packet_blocks_enabled,
+                            ring_blocks: rc.yaml_config.af_packet_blocks,
+                            packet_fanout_count: rc.yaml_config.local_dispatcher_count,
+                            packet_fanout_mode: rc.yaml_config.packet_fanout_mode,
+                        },
+                        src_interfaces: vec![],
+                    },
+                    special_network: SpecialNetwork {
+                        dpdk: Dpdk {
+                            enabled: rc.yaml_config.dpdk_enabled,
+                        },
+                        libpcap: Libpcap {
+                            enabled: rc.yaml_config.libpcap_enabled,
+                        },
+                        vhost_user: VhostUser {
+                            vhost_socket_path: rc.yaml_config.vhost_socket_path.clone(),
+                        },
+                        physical_switch: PhysicalSwitch {
+                            sflow_ports: rc
+                                .yaml_config
+                                .xflow_collector
+                                .sflow_ports
+                                .iter()
+                                .map(|p| p.parse::<u16>().unwrap_or_default())
+                                .collect(),
+                            netflow_ports: rc
+                                .yaml_config
+                                .xflow_collector
+                                .netflow_ports
+                                .iter()
+                                .map(|p| p.parse::<u16>().unwrap_or_default())
+                                .collect(),
+                        },
+                    },
+                    tunning: CbpfTunning {
+                        dispatcher_queue_enabled: rc.yaml_config.dispatcher_queue,
+                        max_capture_packet_size: rc.capture_packet_size,
+                        raw_packet_buffer_block_size: rc.yaml_config.analyzer_raw_packet_block_size,
+                        raw_packet_queue_size: rc.yaml_config.analyzer_queue_size,
+                        max_capture_pps: rc.global_pps_threshold,
+                    },
+                    preprocess: PreProcess {
+                        tunnel_decap_protocols: rc.decap_types.iter().map(|d| *d as u8).collect(),
+                        tunnel_trim_protocols: rc.yaml_config.trim_tunnel_types.clone(),
+                        packet_segmentation_reassembly: vec![],
+                    },
+                    physical_mirror: PhysicalMirror {
+                        default_capture_network_type: rc.yaml_config.default_tap_type as u16,
+                        packet_dedup_disabled: rc.yaml_config.analyzer_dedup_disabled,
+                        private_cloud_gateway_traffic: rc.yaml_config.cloud_gateway_traffic,
+                    },
+                },
+                ebpf: Ebpf {
+                    disabled: rc.yaml_config.ebpf.disabled,
+                    socket: EbpfSocket {
+                        uprobe: EbpfSocketUprobe {
+                            golang: EbpfSocketUprobeGolang {
+                                enabled: rc.yaml_config.ebpf.uprobe_proc_regexp.golang.is_empty(),
+                                tracing_timeout: Duration::from_secs(
+                                    rc.yaml_config.ebpf.go_tracing_timeout as u64,
+                                ),
+                            },
+                            tls: EbpfSocketUprobeTls {
+                                enabled: rc.yaml_config.ebpf.uprobe_proc_regexp.openssl.is_empty(),
+                            },
+                        },
+                        kprobe: EbpfSocketKprobe {
+                            blacklist: EbpfSocketKprobePorts {
+                                ports: rc.yaml_config.ebpf.kprobe_blacklist.port_list.clone(),
+                            },
+                            whitelist: EbpfSocketKprobePorts {
+                                ports: rc.yaml_config.ebpf.kprobe_whitelist.port_list.clone(),
+                            },
+                        },
+                        tunning: EbpfSocketTunning {
+                            max_capture_rate: rc.yaml_config.ebpf.global_ebpf_pps_threshold,
+                            syscall_trace_id_disabled: rc
+                                .yaml_config
+                                .ebpf
+                                .syscall_trace_id_disabled,
+                        },
+                        preprocess: EbpfSocketPreprocess {
+                            out_of_order_reassembly_cache_size: rc
+                                .yaml_config
+                                .ebpf
+                                .syscall_out_of_order_cache_size,
+                            out_of_order_reassembly_protocols: rc
+                                .yaml_config
+                                .ebpf
+                                .syscall_out_of_order_reassembly
+                                .clone(),
+                            segmentation_reassembly_protocols: rc
+                                .yaml_config
+                                .ebpf
+                                .syscall_segmentation_reassembly
+                                .clone(),
+                        },
+                    },
+                    file: EbpfFile {
+                        io_event: EbpfFileIoEvent {
+                            collect_mode: rc.yaml_config.ebpf.io_event_collect_mode,
+                            minimal_duration: rc.yaml_config.ebpf.io_event_minimal_duration,
+                        },
+                    },
+                    profile: EbpfProfile {
+                        on_cpu: EbpfProfileOnCpu {
+                            disabled: rc.yaml_config.ebpf.on_cpu_profile.disabled,
+                            sampling_frequency: rc.yaml_config.ebpf.on_cpu_profile.frequency as i32,
+                            aggregate_by_cpu: rc.yaml_config.ebpf.on_cpu_profile.cpu > 0,
+                        },
+                        off_cpu: EbpfProfileOffCpu {
+                            disabled: rc.yaml_config.ebpf.off_cpu_profile.disabled,
+                            min_blocking_time: rc.yaml_config.ebpf.off_cpu_profile.min_block,
+                            aggregate_by_cpu: rc.yaml_config.ebpf.off_cpu_profile.cpu > 0,
+                        },
+                        memory: EbpfProfileMemory {
+                            disabled: rc.yaml_config.ebpf.memory_profile.disabled,
+                            report_interval: rc.yaml_config.ebpf.memory_profile.report_interval,
+                        },
+                        unwinding: Unwinding {
+                            dwarf_disabled: rc.yaml_config.ebpf.dwarf_disabled,
+                            dwarf_regex: rc.yaml_config.ebpf.dwarf_regex.clone(),
+                            dwarf_process_map_size: rc.yaml_config.ebpf.dwarf_process_map_size
+                                as u32,
+                            dwarf_shard_map_size: rc.yaml_config.ebpf.dwarf_shard_map_size as u32,
+                        },
+                        preprocess: EbpfProfilePreprocess {
+                            stack_compression: rc.yaml_config.ebpf.preprocess.stack_compression,
+                        },
+                    },
+                    tunning: EbpfTunning {
+                        collector_queue_size: rc.yaml_config.ebpf_collector_queue_size,
+                        userspace_worker_threads: rc.yaml_config.ebpf.thread_num as i32,
+                        perf_pages_count: rc.yaml_config.ebpf.perf_pages_count as u32,
+                        kernel_ring_size: rc.yaml_config.ebpf.ring_size as u32,
+                        max_socket_entries: rc.yaml_config.ebpf.max_socket_entries as u32,
+                        socket_map_reclaim_threshold: rc.yaml_config.ebpf.socket_map_max_reclaim
+                            as u32,
+                        max_trace_entries: rc.yaml_config.ebpf.max_trace_entries as u32,
+                    },
+                    java_symbol_file_refresh_defer_interval: rc
+                        .yaml_config
+                        .ebpf
+                        .java_symbol_file_refresh_defer_interval
+                        .as_secs()
+                        as i32,
+                },
+                resources: Resources {
+                    push_interval: Duration::from_secs(rc.platform_sync_interval),
+                    private_cloud: PrivateCloud {
+                        hypervisor_resource_enabled: rc.platform_enabled,
+                        vm_mac_source: agent::IfMacSource::from_str_name(
+                            rc.if_mac_source.as_str_name(),
+                        )
+                        .unwrap_or(agent::IfMacSource::IfMac),
+                        vm_xml_directory: rc.libvirt_xml_path.clone(),
+                        vm_mac_mapping_script: rc.yaml_config.tap_mac_script.clone(),
+                    },
+                    kubernetes: Kubernetes {
+                        kubernetes_namespace: rc.yaml_config.kubernetes_namespace.clone(),
+                        api_resources: rc
+                            .yaml_config
+                            .kubernetes_resources
+                            .iter()
+                            .map(|r| ApiResources {
+                                name: r.name.clone(),
+                                disabled: r.disabled,
+                                group: r.group.clone(),
+                                version: r.version.clone(),
+                                field_selector: r.field_selector.clone(),
+                            })
+                            .collect(),
+                        api_list_page_size: rc.yaml_config.kubernetes_api_list_limit,
+                        api_list_max_interval: rc.yaml_config.kubernetes_api_list_interval,
+                        ingress_flavour: "kubernetes".to_string(), // deprecated
+                        pod_mac_collection_method: rc.yaml_config.kubernetes_poller_type,
+                    },
+                    pull_resource_from_controller: PullResourceFromController {
+                        domain_filter: vec![], // TODO: No corresponding configuration is found
+                        only_kubernetes_pod_ip_in_local_cluster: false, // TODO: No corresponding configuration is found
+                    },
+                },
+                integration: Integration {
+                    enabled: rc.external_agent_http_proxy_enabled,
+                    listen_port: rc.external_agent_http_proxy_port,
+                    compression: Compression {
+                        trace: rc.yaml_config.external_agent_http_proxy_compressed,
+                        profile: rc.yaml_config.external_agent_http_proxy_profile_compressed,
+                    },
+                    prometheus_extra_labels: PrometheusExtraLabels {
+                        enabled: rc.yaml_config.prometheus_extra_config.enabled,
+                        extra_labels: rc.yaml_config.prometheus_extra_config.labels.clone(),
+                        label_length: rc.yaml_config.prometheus_extra_config.labels_limit as usize,
+                        value_length: rc.yaml_config.prometheus_extra_config.values_limit as usize,
+                    },
+                    feature_control: FeatureControl {
+                        profile_integration_disabled: rc
+                            .yaml_config
+                            .external_profile_integration_disabled,
+                        trace_integration_disabled: rc
+                            .yaml_config
+                            .external_trace_integration_disabled,
+                        metric_integration_disabled: rc
+                            .yaml_config
+                            .external_metric_integration_disabled,
+                        log_integration_disabled: rc.yaml_config.external_log_integration_disabled,
+                    },
+                },
+            },
+            outputs: Outputs {
+                socket: Socket {
+                    data_socket_type: SocketType::from_str_name(
+                        rc.collector_socket_type.as_str_name(),
+                    )
+                    .unwrap_or(SocketType::Tcp),
+                    npb_socket_type: SocketType::from_str_name(rc.npb_socket_type.as_str_name())
+                        .unwrap_or(SocketType::Tcp),
+                    raw_udp_qos_bypass: rc.yaml_config.enable_qos_bypass,
+                    multiple_sockets_to_ingester: rc.yaml_config.multiple_sockets_to_ingester,
+                },
+                flow_log: OutputsFlowLog {
+                    filters: FlowLogFilters {
+                        l4_capture_network_types: rc
+                            .l4_log_store_tap_types
+                            .iter()
+                            .map(|t| *t as u16)
+                            .collect(),
+                        l7_capture_network_types: rc
+                            .l7_log_store_tap_types
+                            .iter()
+                            .map(|t| *t as u16)
+                            .collect(),
+                        l4_ignored_observation_points: rc
+                            .l4_log_ignore_tap_sides
+                            .iter()
+                            .map(|i| *i as u8 as u16)
+                            .collect(),
+                        l7_ignored_observation_points: rc
+                            .l7_log_ignore_tap_sides
+                            .iter()
+                            .map(|i| *i as u8 as u16)
+                            .collect(),
+                    },
+                    throttles: Throttles {
+                        l4_throttle: rc.l4_log_collect_nps_threshold,
+                        l7_throttle: rc.l7_log_collect_nps_threshold,
+                    },
+                    tunning: OutputsFlowLogTunning {
+                        collector_queue_size: rc.yaml_config.flow_sender_queue_size,
+                        collector_queue_count: rc.yaml_config.flow_sender_queue_count,
+                    },
+                },
+                flow_metrics: FlowMetrics {
+                    enabled: rc.collector_enabled,
+                    filters: FlowMetricsFilters {
+                        inactive_server_port_aggregation: rc.inactive_server_port_enabled,
+                        inactive_ip_aggregation: rc.inactive_ip_enabled,
+                        npm_metrics: rc.l4_performance_enabled,
+                        apm_metrics: rc.l7_metrics_enabled,
+                        second_metrics: rc.vtap_flow_1s_enabled,
+                    },
+                    tunning: FlowMetricsTunning {
+                        sender_queue_size: rc.yaml_config.collector_sender_queue_size,
+                        sender_queue_count: rc.yaml_config.collector_sender_queue_count,
+                    },
+                },
+                npb: Npb {
+                    max_mtu: rc.mtu,
+                    raw_udp_vlan_tag: rc.output_vlan,
+                    extra_vlan_header: agent::VlanMode::from_str_name(
+                        rc.npb_vlan_mode.as_str_name(),
+                    )
+                    .unwrap_or(agent::VlanMode::None),
+                    traffic_global_dedup: rc.npb_dedup_enabled,
+                    target_port: rc.yaml_config.npb_port,
+                    custom_vxlan_flags: rc.yaml_config.vxlan_flags,
+                    overlay_vlan_header_trimming: rc.yaml_config.ignore_overlay_vlan,
+                    max_tx_throughput: rc.npb_bps_threshold,
+                },
+            },
+            processors: Processors {
+                packet: Packet {
+                    policy: Policy {
+                        fast_path_map_size: rc.yaml_config.fast_path_map_size,
+                        fast_path_disabled: rc.yaml_config.fast_path_disabled,
+                        forward_table_capacity: rc.yaml_config.forward_capacity,
+                        max_first_path_level: rc.yaml_config.first_path_level as usize,
+                    },
+                    tcp_header: TcpHeader {
+                        block_size: rc.yaml_config.packet_sequence_block_size,
+                        sender_queue_size: rc.yaml_config.packet_sequence_queue_size,
+                        sender_queue_count: rc.yaml_config.packet_sequence_queue_count,
+                        header_fields_flag: rc.yaml_config.packet_sequence_flag,
+                    },
+                    pcap_stream: PcapStream {
+                        receiver_queue_size: rc.yaml_config.pcap.queue_size as usize,
+                        buffer_size_per_flow: rc.yaml_config.pcap.flow_buffer_size,
+                        total_buffer_size: rc.yaml_config.pcap.buffer_size,
+                        flush_interval: rc.yaml_config.pcap.flush_interval,
+                    },
+                    toa: Toa {
+                        sender_queue_size: rc.yaml_config.toa_sender_queue_size,
+                        cache_size: rc.yaml_config.toa_lru_cache_size,
+                    },
+                },
+                request_log: RequestLog {
+                    application_protocol_inference: ApplicationProtocolInference {
+                        inference_max_retries: rc.yaml_config.l7_protocol_inference_max_fail_count,
+                        inference_result_ttl: Duration::from_secs(
+                            rc.yaml_config.l7_protocol_inference_ttl as u64,
+                        ),
+                        enabled_protocols: rc.yaml_config.l7_protocol_enabled.clone(),
+                        protocol_special_config: ProtocolSpecialConfig {
+                            oracle: OracleConfig {
+                                is_be: rc.yaml_config.oracle_parse_config.is_be,
+                                int_compressed: rc.yaml_config.oracle_parse_config.int_compress,
+                                resp_0x04_extra_byte: rc
+                                    .yaml_config
+                                    .oracle_parse_config
+                                    .resp_0x04_extra_byte,
+                            },
+                        },
+                    },
+                    filters: Filters {
+                        port_number_prefilters: rc.yaml_config.l7_protocol_ports.clone(),
+                        tag_filters: {
+                            let mut output = HashMap::new();
+                            for (k, v) in rc.yaml_config.l7_log_blacklist.iter() {
+                                output.insert(
+                                    k.clone(),
+                                    v.iter()
+                                        .map(|l| TagFilterOperator {
+                                            name: l.field_name.clone(),
+                                            operator: l.operator.clone(),
+                                            value: l.value.clone(),
+                                        })
+                                        .collect(),
+                                );
+                            }
+                            output
+                        },
+                        unconcerned_dns_nxdomain_response_suffixes: rc
+                            .yaml_config
+                            .l7_protocol_advanced_features
+                            .unconcerned_dns_nxdomain_response_suffixes
+                            .clone(),
+                    },
+                    timeouts: Timeouts {
+                        tcp_request_timeout: rc.yaml_config.rrt_tcp_timeout,
+                        udp_request_timeout: rc.yaml_config.rrt_udp_timeout,
+                        session_aggregate_window_duration: rc
+                            .yaml_config
+                            .l7_log_session_aggr_timeout,
+                    },
+                    tag_extraction: RequestLogTagExtraction {
+                        tracing_tag: TracingTag {
+                            http_real_client: rc.http_log_proxy_client.clone(),
+                            x_request_id: rc.http_log_x_request_id.clone(),
+                            apm_trace_id: rc
+                                .http_log_trace_id
+                                .split(',')
+                                .map(|s| s.to_string())
+                                .collect(),
+                            apm_span_id: rc
+                                .http_log_span_id
+                                .split(',')
+                                .map(|s| s.to_string())
+                                .collect(),
+                        },
+                        http_endpoint: HttpEndpoint {
+                            extraction_disabled: rc
+                                .yaml_config
+                                .l7_protocol_advanced_features
+                                .http_endpoint_extraction
+                                .disabled,
+                            match_rules: rc
+                                .yaml_config
+                                .l7_protocol_advanced_features
+                                .http_endpoint_extraction
+                                .match_rules
+                                .iter()
+                                .map(|r| HttpEndpointMatchRule {
+                                    url_prefix: r.prefix.clone(),
+                                    keep_segments: r.keep_segments,
+                                })
+                                .collect(),
+                        },
+                        custom_fields: {
+                            let mut fields = HashMap::new();
+                            fields.insert(
+                                "http".to_string(),
+                                rc.yaml_config
+                                    .l7_protocol_advanced_features
+                                    .extra_log_fields
+                                    .http
+                                    .iter()
+                                    .map(|f| CustomFields {
+                                        field_name: f.field_name.clone(),
+                                    })
+                                    .collect(),
+                            );
+                            fields.insert(
+                                "http2".to_string(),
+                                rc.yaml_config
+                                    .l7_protocol_advanced_features
+                                    .extra_log_fields
+                                    .http2
+                                    .iter()
+                                    .map(|f| CustomFields {
+                                        field_name: f.field_name.clone(),
+                                    })
+                                    .collect(),
+                            );
+                            fields
+                        },
+                        obfuscate_protocols: rc
+                            .yaml_config
+                            .l7_protocol_advanced_features
+                            .obfuscate_enabled_protocols
+                            .clone(),
+                    },
+                    tunning: RequestLogTunning {
+                        payload_truncation: rc.l7_log_packet_size,
+                        session_aggregate_slot_capacity: rc
+                            .yaml_config
+                            .l7_log_session_slot_capacity,
+                        consistent_timestamp_in_l7_metrics: rc
+                            .yaml_config
+                            .consistent_timestamp_in_l7_metrics,
+                    },
+                },
+                flow_log: ProcessorsFlowLog {
+                    time_window: TimeWindow {
+                        max_tolerable_packet_delay: rc.yaml_config.packet_delay,
+                        extra_tolerable_flow_delay: rc.yaml_config.second_flow_extra_delay,
+                    },
+                    conntrack: Conntrack {
+                        flow_flush_interval: rc.yaml_config.flow.flush_interval,
+                        flow_generation: FlowGeneration {
+                            server_ports: rc.yaml_config.server_ports.clone(),
+                            cloud_traffic_ignore_mac: rc.yaml_config.flow.ignore_tor_mac,
+                            ignore_l2_end: rc.yaml_config.flow.ignore_l2_end,
+                            idc_traffic_ignore_vlan: rc.yaml_config.flow.ignore_idc_vlan,
+                        },
+                        timeouts: ConntrackTimeouts {
+                            established: rc.yaml_config.flow.established_timeout,
+                            closing_rst: rc.yaml_config.flow.closing_rst_timeout,
+                            opening_rst: rc.yaml_config.flow.opening_rst_timeout,
+                            others: rc.yaml_config.flow.others_timeout,
+                        },
+                    },
+                    tunning: ProcessorsFlowLogTunning {
+                        flow_map_hash_slots: rc.yaml_config.flow.hash_slots,
+                        concurrent_flow_limit: rc.yaml_config.flow.capacity,
+                        memory_pool_size: rc.yaml_config.flow.memory_pool_size,
+                        max_batched_buffer_size: rc.yaml_config.batched_buffer_size_limit,
+                        flow_aggregator_queue_size: rc.yaml_config.flow.aggr_queue_size as usize,
+                        flow_generator_queue_size: rc.yaml_config.flow_queue_size,
+                        quadruple_generator_queue_size: rc.yaml_config.quadruple_queue_size,
+                    },
+                },
+            },
             plugins: Plugins::default(),
-            dev: Dev::default(),
+            dev: Dev {
+                feature_flags: rc.yaml_config.feature_flags.clone(),
+            },
+        };
+        user_config.modify();
+        user_config
+    }
+}
+
+const MB: u64 = 1048576;
+
+impl UserConfig {
+    const DEFAULT_DNS_PORTS: &'static str = "53,5353";
+    const DEFAULT_TLS_PORTS: &'static str = "443,6443";
+    const DEFAULT_ORACLE_PORTS: &'static str = "1521";
+    const PACKET_FANOUT_MODE_MAX: u32 = 7;
+
+    pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
+        if self.processors.packet.policy.fast_path_map_size > 0 {
+            return self.processors.packet.policy.fast_path_map_size;
+        }
+
+        min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
+    }
+
+    pub fn get_af_packet_blocks(
+        &self,
+        capture_mode: agent::PacketCaptureType,
+        mem_size: u64,
+    ) -> usize {
+        if capture_mode == agent::PacketCaptureType::Analyzer
+            || self.inputs.cbpf.af_packet.tunning.ring_blocks_enabled
+        {
+            self.inputs.cbpf.af_packet.tunning.ring_blocks.max(8)
+        } else {
+            (mem_size as usize / DEFAULT_BLOCK_SIZE / 16).min(128)
+        }
+    }
+
+    pub fn get_protocol_port(&self) -> HashMap<String, String> {
+        let mut new = self
+            .processors
+            .request_log
+            .filters
+            .port_number_prefilters
+            .clone();
+
+        let dns_str = L7ProtocolParser::DNS(DnsLog::default()).as_str();
+        // dns default only parse 53,5353 port. when l7_protocol_ports config without DNS, need to reserve the dns default config.
+        if !self
+            .processors
+            .request_log
+            .filters
+            .port_number_prefilters
+            .contains_key(dns_str)
+        {
+            new.insert(dns_str.to_string(), Self::DEFAULT_DNS_PORTS.to_string());
+        }
+        let tls_str = L7ProtocolParser::TLS(TlsLog::default()).as_str();
+        // tls default only parse 443,6443 port. when l7_protocol_ports config without TLS, need to reserve the tls default config.
+        if !self
+            .processors
+            .request_log
+            .filters
+            .port_number_prefilters
+            .contains_key(tls_str)
+        {
+            new.insert(tls_str.to_string(), Self::DEFAULT_TLS_PORTS.to_string());
+        }
+        let oracle_str = L7ProtocolParser::Oracle(OracleLog::default()).as_str();
+        // oracle default only parse 1521 port. when l7_protocol_ports config without ORACLE, need to reserve the oracle default config.
+        if !self
+            .processors
+            .request_log
+            .filters
+            .port_number_prefilters
+            .contains_key(oracle_str)
+        {
+            new.insert(
+                oracle_str.to_string(),
+                Self::DEFAULT_ORACLE_PORTS.to_string(),
+            );
+        }
+
+        new
+    }
+
+    pub fn get_protocol_port_parse_bitmap(&self) -> Vec<(String, Bitmap)> {
+        /*
+            parse all protocol port range
+            format example:
+
+                l7-protocol-ports:
+                    "HTTP": "80,8080,1000-2000"
+                ...
+        */
+        let l7_protocol_ports = self.get_protocol_port();
+        let mut port_bitmap = Vec::new();
+        for (protocol_name, port_range) in l7_protocol_ports.iter() {
+            port_bitmap.push((
+                protocol_name.clone(),
+                parse_u16_range_list_to_bitmap(port_range, false).unwrap(),
+            ));
+        }
+        port_bitmap.sort_unstable_by_key(|p| p.0.clone());
+        port_bitmap
+    }
+
+    pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {
+        let contents = fs::read_to_string(path)?;
+        let mut c = if contents.len() == 0 {
+            Self::standalone_default()
+        } else {
+            serde_yaml::from_str(contents.as_str())
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?
         };
 
-        config.modify();
+        c.set_standalone();
+        c.validate()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        Ok(c)
+    }
+
+    fn validate(&self) -> Result<(), ConfigError> {
+        if self.global.communication.proactive_request_interval < Duration::from_secs(1)
+            || self.global.communication.proactive_request_interval > Duration::from_secs(60 * 60)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "proactive_request_interval {:?} not in [1s, 1h]",
+                self.global.communication.proactive_request_interval
+            )));
+        }
+        if self.inputs.resources.push_interval < Duration::from_secs(10)
+            || self.inputs.resources.push_interval > Duration::from_secs(60 * 60)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "push_interval {:?} not in [10s, 1h]",
+                self.inputs.resources.push_interval
+            )));
+        }
+        if self.global.self_monitoring.interval < Duration::from_secs(1)
+            || self.global.self_monitoring.interval > Duration::from_secs(60 * 60)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "interval {:?} not in [1s, 1h]",
+                self.global.self_monitoring.interval
+            )));
+        }
+
+        // 虽然RFC 791里最低MTU是68，但是此时compressor会崩溃，
+        // 所以MTU最低限定到200以确保deepflow-agent能够成功运行
+        if self.outputs.npb.max_mtu < 200 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "MTU({}) specified smaller than 200",
+                self.outputs.npb.max_mtu
+            )));
+        }
+
+        if self.outputs.npb.raw_udp_vlan_tag > 4095 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "raw_udp_vlan_tag({}) out of range (0-4095)",
+                self.outputs.npb.raw_udp_vlan_tag
+            )));
+        }
+
+        if self.global.communication.ingester_port == 0 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "ingester_port({}) invalid",
+                self.global.communication.ingester_port
+            )));
+        }
+        #[cfg(target_os = "linux")]
+        if regex::Regex::new(&self.inputs.cbpf.af_packet.extra_netns_regex).is_err() {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "malformed extra_netns_regex({})",
+                self.inputs.cbpf.af_packet.extra_netns_regex
+            )));
+        }
+
+        if !self.inputs.cbpf.af_packet.interface_regex.is_empty()
+            && regex::Regex::new(&self.inputs.cbpf.af_packet.interface_regex).is_err()
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "malformed interface_regex({})",
+                self.inputs.cbpf.af_packet.interface_regex
+            )));
+        }
+
+        if self.global.communication.max_escape_duration < Duration::from_secs(600)
+            || self.global.communication.max_escape_duration
+                > Duration::from_secs(30 * 24 * 60 * 60)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "max_escape_duration {:?} not in [600s, 30d]",
+                self.global.communication.max_escape_duration
+            )));
+        }
+
+        if self.global.communication.proxy_controller_port == 0 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "proxy_controller_port({}) invalid",
+                self.global.communication.proxy_controller_port
+            )));
+        }
+
+        if !(128..=65535).contains(&self.inputs.cbpf.tunning.max_capture_packet_size) {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "max_capture_packet_size {} not in [128, 65535]",
+                self.inputs.cbpf.tunning.max_capture_packet_size
+            )));
+        }
+
+        if self.outputs.socket.data_socket_type == agent::SocketType::RawUdp {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "invalid data_socket_type {:?}",
+                self.outputs.socket.data_socket_type
+            )));
+        }
+
+        Ok(())
+    }
+
+    fn modify_decap_types(&mut self) {
+        for tunnel_type in &self.inputs.cbpf.preprocess.tunnel_trim_protocols {
+            self.inputs
+                .cbpf
+                .preprocess
+                .tunnel_decap_protocols
+                .push(TunnelType::from(tunnel_type.as_str()) as u8)
+        }
+    }
+
+    fn modify_unit(&mut self) {
+        self.global.circuit_breakers.tx_throughput.trigger_threshold <<= 20;
+        self.global.communication.grpc_buffer_size <<= 20;
+        self.global.limits.max_memory <<= 20;
+        self.global.limits.max_local_log_file_size <<= 20;
+        self.global.standalone_mode.max_data_file_size <<= 20;
+        self.inputs.proc.symbol_table.java.max_symbol_file_size <<= 20;
+        self.outputs.npb.max_tx_throughput <<= 20;
+    }
+
+    fn modify(&mut self) {
+        self.modify_unit();
+        self.modify_decap_types();
+    }
+
+    fn set_standalone(&mut self) {
+        self.global.common.enabled = true;
+        self.global.communication.ingester_ip = "127.0.0.1".to_string();
+        self.global.communication.ingester_port = 30033;
+        self.global.communication.proxy_controller_ip = "127.0.0.1".to_string();
+        self.global.communication.proxy_controller_port = 30035;
+        self.global.ntp.enabled = false;
+        self.outputs.socket.data_socket_type = agent::SocketType::File;
+        self.outputs.flow_log.filters.l4_capture_network_types = vec![3];
+        self.outputs.flow_log.filters.l7_capture_network_types = vec![3];
+        self.modify();
+    }
+
+    pub fn standalone_default() -> Self {
+        let mut config = Self::default();
+        config.set_standalone();
 
         config
     }
@@ -2307,11 +3054,28 @@ pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
 
 pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
 pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
+// use for proc scan match and replace
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct OsProcRegexp {
+    pub match_regex: String,
+    pub match_type: String, // one of cmdline or process_name
+    pub rewrite_name: String,
+    pub action: String, // one of accept or drop
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct EbpfKprobePortlist {
     pub port_list: String,
+}
+
+impl From<&EbpfSocketKprobePorts> for EbpfKprobePortlist {
+    fn from(p: &EbpfSocketKprobePorts) -> Self {
+        Self {
+            port_list: p.ports.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -2489,6 +3253,18 @@ pub struct KubernetesResourceConfig {
     pub field_selector: String,
 }
 
+impl From<&ApiResources> for KubernetesResourceConfig {
+    fn from(r: &ApiResources) -> Self {
+        Self {
+            name: r.name.clone(),
+            group: r.group.clone(),
+            version: r.version.clone(),
+            disabled: r.disabled.clone(),
+            field_selector: r.field_selector.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct MatchRule {
@@ -2496,11 +3272,56 @@ pub struct MatchRule {
     pub keep_segments: usize,
 }
 
+impl From<&HttpEndpointMatchRule> for MatchRule {
+    fn from(r: &HttpEndpointMatchRule) -> Self {
+        Self {
+            prefix: r.url_prefix.clone(),
+            keep_segments: r.keep_segments,
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct HttpEndpointExtraction {
     pub disabled: bool,
     pub match_rules: Vec<MatchRule>,
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct ExtraLogFieldsInfo {
+    pub field_name: String,
+}
+
+impl From<&CustomFields> for ExtraLogFieldsInfo {
+    fn from(c: &CustomFields) -> Self {
+        Self {
+            field_name: c.field_name.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct ExtraLogFields {
+    pub http: Vec<ExtraLogFieldsInfo>,
+    pub http2: Vec<ExtraLogFieldsInfo>,
+}
+
+impl ExtraLogFields {
+    pub fn deduplicate(&mut self) {
+        fn deduplicate_fields(fields: &mut Vec<ExtraLogFieldsInfo>) {
+            fields
+                .iter_mut()
+                .for_each(|f| f.field_name.make_ascii_lowercase());
+            fields.sort_by(|a, b| a.field_name.cmp(&b.field_name));
+            fields.dedup_by(|a, b| a.field_name == b.field_name);
+        }
+
+        deduplicate_fields(&mut self.http);
+        deduplicate_fields(&mut self.http2);
+    }
 }
 
 fn default_obfuscate_enabled_protocols() -> Vec<String> {
@@ -2513,7 +3334,7 @@ pub struct L7ProtocolAdvancedFeatures {
     pub http_endpoint_extraction: HttpEndpointExtraction,
     #[serde(default = "default_obfuscate_enabled_protocols")]
     pub obfuscate_enabled_protocols: Vec<String>,
-    pub extra_log_fields: CustomFields,
+    pub extra_log_fields: ExtraLogFields,
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
 }
 
@@ -2523,6 +3344,16 @@ pub struct L7LogBlacklist {
     pub field_name: String,
     pub operator: String,
     pub value: String,
+}
+
+impl From<&TagFilterOperator> for L7LogBlacklist {
+    fn from(o: &TagFilterOperator) -> Self {
+        Self {
+            field_name: o.name.to_string(),
+            operator: o.operator.to_string(),
+            value: o.value.to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -2537,23 +3368,6 @@ pub struct OracleParseConfig {
 #[serde(default, rename_all = "kebab-case")]
 pub struct BondGroup {
     pub tap_interfaces: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default, rename_all = "kebab-case")]
-pub struct TripleMapConfig {
-    #[serde(rename = "flow-slots-size")]
-    pub hash_slots: u32,
-    pub capacity: u32,
-}
-
-impl Default for TripleMapConfig {
-    fn default() -> Self {
-        TripleMapConfig {
-            hash_slots: 65536,
-            capacity: 1048576,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -2579,7 +3393,6 @@ pub struct YamlConfig {
     pub src_interfaces: Vec<String>,
     pub tap_interface_bond_groups: Vec<BondGroup>,
     pub mirror_traffic_pcp: u16,
-    pub vtap_group_id_request: String,
     pub pcap: PcapConfig,
     pub flow: FlowGeneratorConfig,
     pub flow_queue_size: usize,
@@ -2644,7 +3457,7 @@ pub struct YamlConfig {
     pub os_proc_root: String,
     pub os_proc_socket_sync_interval: u32, // for sec
     pub os_proc_socket_min_lifetime: u32,  // for sec
-    pub os_proc_regex: Vec<ProcessMatcher>,
+    pub os_proc_regex: Vec<OsProcRegexp>,
     pub os_app_tag_exec_user: String,
     pub os_app_tag_exec: Vec<String>,
     // whether to sync os socket and proc info.
@@ -2736,14 +3549,14 @@ impl YamlConfig {
             c.batched_buffer_size_limit = 1024;
         }
         if c.collector_sender_queue_size == 0 {
-            c.collector_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
+            c.collector_sender_queue_size = if tap_mode == TapMode::Analyzer {
                 8 << 20
             } else {
                 1 << 16
             };
         }
         if c.flow_sender_queue_size == 0 {
-            c.flow_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
+            c.flow_sender_queue_size = if tap_mode == TapMode::Analyzer {
                 8 << 20
             } else {
                 1 << 16
@@ -2788,7 +3601,7 @@ impl YamlConfig {
 
         // Enterprise Edition Feature: packet-sequence
         if c.packet_sequence_queue_size == 0 {
-            if tap_mode == trident::TapMode::Analyzer {
+            if tap_mode == TapMode::Analyzer {
                 c.packet_sequence_queue_size = 8 << 20;
             } else {
                 c.packet_sequence_queue_size = 1 << 16;
@@ -2998,7 +3811,6 @@ impl Default for YamlConfig {
             src_interfaces: vec![],
             tap_interface_bond_groups: vec![],
             mirror_traffic_pcp: 0,
-            vtap_group_id_request: "".into(),
             pcap: Default::default(),
             flow: Default::default(),
             flow_queue_size: 65536,
@@ -3077,12 +3889,11 @@ impl Default for YamlConfig {
             os_proc_root: "/proc".into(),
             os_proc_socket_sync_interval: 10,
             os_proc_socket_min_lifetime: 3,
-            os_proc_regex: vec![ProcessMatcher {
+            os_proc_regex: vec![OsProcRegexp {
                 match_regex: ".*".into(),
                 match_type: OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME.into(),
                 rewrite_name: "".into(),
                 action: OS_PROC_REGEXP_MATCH_ACTION_ACCEPT.into(),
-                ..Default::default()
             }],
             os_app_tag_exec_user: "deepflow".to_string(),
             os_app_tag_exec: vec![],
@@ -3116,6 +3927,22 @@ impl Default for YamlConfig {
             server_ports: vec![],
             consistent_timestamp_in_l7_metrics: false,
             packet_segmentation_reassembly: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct PortConfig {
+    pub analyzer_port: u16,
+    pub proxy_controller_port: u16,
+}
+
+impl Default for PortConfig {
+    fn default() -> Self {
+        let config = UserConfig::default();
+        PortConfig {
+            analyzer_port: config.global.communication.ingester_port,
+            proxy_controller_port: config.global.communication.proxy_controller_port,
         }
     }
 }
@@ -3206,312 +4033,347 @@ impl Default for XflowGeneratorConfig {
     }
 }
 
-const MB: u64 = 1048576;
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct TripleMapConfig {
+    #[serde(rename = "flow-slots-size")]
+    pub hash_slots: u32,
+    pub capacity: u32,
+}
+
+impl Default for TripleMapConfig {
+    fn default() -> Self {
+        TripleMapConfig {
+            hash_slots: 65536,
+            capacity: 1048576,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default = "RuntimeConfig::standalone_default")]
+pub struct RuntimeConfig {
+    pub vtap_group_id: String,
+    #[serde(skip)]
+    pub enabled: bool,
+    pub max_millicpus: u32,
+    pub max_memory: u64,
+    pub sync_interval: u64,          // unit(second)
+    pub platform_sync_interval: u64, // unit(second)
+    pub stats_interval: u64,         // unit(second)
+    #[serde(rename = "max_collect_pps")]
+    pub global_pps_threshold: u64,
+    #[cfg(target_os = "linux")]
+    #[serde(skip)]
+    pub extra_netns_regex: String,
+    pub tap_interface_regex: String,
+    #[serde(skip)]
+    pub host: String,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub rsyslog_enabled: bool,
+    #[serde(skip)]
+    pub output_vlan: u16,
+    pub mtu: u32,
+    #[serde(rename = "max_npb_bps")]
+    pub npb_bps_threshold: u64,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub collector_enabled: bool,
+    pub l4_log_store_tap_types: Vec<u8>,
+    #[serde(skip)]
+    pub app_proto_log_enabled: bool,
+    pub l7_log_store_tap_types: Vec<u8>,
+    #[serde(deserialize_with = "tap_side_vec_de")]
+    pub l4_log_ignore_tap_sides: Vec<TapSide>,
+    #[serde(deserialize_with = "tap_side_vec_de")]
+    pub l7_log_ignore_tap_sides: Vec<TapSide>,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub platform_enabled: bool,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_threshold: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_recover: f32,
+    #[serde(skip)]
+    pub system_load_circuit_breaker_metric: trident::SystemLoadMetric,
+    #[serde(skip)]
+    pub server_tx_bandwidth_threshold: u64,
+    #[serde(skip)]
+    pub bandwidth_probe_interval: Duration,
+    #[serde(deserialize_with = "to_trident_vlan_mode")]
+    pub npb_vlan_mode: trident::VlanMode,
+    #[serde(skip)]
+    pub npb_dedup_enabled: bool,
+    #[serde(deserialize_with = "to_trident_if_mac_source")]
+    pub if_mac_source: trident::IfMacSource,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub vtap_flow_1s_enabled: bool,
+    #[serde(skip)]
+    pub debug_enabled: bool,
+    pub log_threshold: u32,
+    #[serde(deserialize_with = "to_log_level")]
+    pub log_level: log::Level,
+    pub analyzer_ip: String,
+    pub analyzer_port: u16,
+    #[serde(rename = "max_escape_seconds")]
+    pub max_escape: u64,
+    #[serde(skip)]
+    pub proxy_controller_ip: String,
+    pub proxy_controller_port: u16,
+    #[serde(skip)]
+    pub epc_id: u32,
+    #[serde(skip)]
+    pub vtap_id: u16,
+    #[serde(skip)]
+    pub team_id: u32,
+    #[serde(skip)]
+    pub organize_id: u32,
+    #[serde(deserialize_with = "to_trident_socket_type")]
+    pub collector_socket_type: trident::SocketType,
+    #[serde(deserialize_with = "to_trident_socket_type")]
+    pub npb_socket_type: trident::SocketType,
+    #[serde(skip)]
+    pub trident_type: common::TridentType,
+    pub capture_packet_size: u32,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub inactive_server_port_enabled: bool,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub inactive_ip_enabled: bool,
+    #[serde(rename = "vm_xml_path")]
+    pub libvirt_xml_path: String,
+    pub l7_log_packet_size: u32,
+    pub l4_log_collect_nps_threshold: u64,
+    pub l7_log_collect_nps_threshold: u64,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub l7_metrics_enabled: bool,
+    #[serde(deserialize_with = "to_tunnel_types")]
+    pub decap_types: Vec<TunnelType>,
+    pub http_log_proxy_client: String,
+    pub http_log_trace_id: String,
+    pub http_log_span_id: String,
+    pub http_log_x_request_id: String,
+    #[serde(skip)]
+    pub region_id: u32,
+    #[serde(skip)]
+    pub pod_cluster_id: u32,
+    pub log_retention: u32,
+    #[serde(deserialize_with = "to_trident_capture_socket_type")]
+    pub capture_socket_type: trident::CaptureSocketType,
+    pub process_threshold: u32,
+    pub thread_threshold: u32,
+    pub capture_bpf: String,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub l4_performance_enabled: bool,
+    #[serde(skip)]
+    pub kubernetes_api_enabled: bool,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub ntp_enabled: bool,
+    pub sys_free_memory_limit: u32,
+    pub log_file_size: u32,
+    #[serde(deserialize_with = "bool_from_int")]
+    pub external_agent_http_proxy_enabled: bool,
+    pub external_agent_http_proxy_port: u16,
+    #[serde(deserialize_with = "to_tap_mode")]
+    pub tap_mode: TapMode,
+    #[serde(skip)]
+    pub plugins: Option<trident::PluginConfig>,
+    pub secret_key: String,
+    // TODO: expand and remove
+    #[serde(rename = "static_config")]
+    pub yaml_config: YamlConfig,
+}
 
 impl RuntimeConfig {
-    pub fn get_protocol_port(&self) -> HashMap<String, String> {
-        let mut hashmap = HashMap::new();
-        let l7_protocol_ports = &self.processors.request_log.filters.port_number_prefilters;
-
-        hashmap.insert("HTTP".to_string(), l7_protocol_ports.http.clone());
-        hashmap.insert("HTTP2".to_string(), l7_protocol_ports.http.clone());
-        hashmap.insert("Dubbo".to_string(), l7_protocol_ports.dubbo.clone());
-        hashmap.insert("SofaRPC".to_string(), l7_protocol_ports.sofa_rpc.clone());
-        hashmap.insert("bRPC".to_string(), l7_protocol_ports.b_rpc.clone());
-        hashmap.insert("MySQL".to_string(), l7_protocol_ports.mysql.clone());
-        hashmap.insert(
-            "PostgreSQL".to_string(),
-            l7_protocol_ports.postgre_sql.clone(),
-        );
-        hashmap.insert("Oracle".to_string(), l7_protocol_ports.oracle.clone());
-        hashmap.insert("Redis".to_string(), l7_protocol_ports.redis.clone());
-        hashmap.insert("MongoDB".to_string(), l7_protocol_ports.mongodb.clone());
-        hashmap.insert("Kafka".to_string(), l7_protocol_ports.kafka.clone());
-        hashmap.insert("MQTT".to_string(), l7_protocol_ports.mqtt.clone());
-        hashmap.insert("AMQP".to_string(), l7_protocol_ports.amqp.clone());
-        hashmap.insert("OpenWire".to_string(), l7_protocol_ports.openwire.clone());
-        hashmap.insert("NATS".to_string(), l7_protocol_ports.nats.clone());
-        hashmap.insert("Pulsar".to_string(), l7_protocol_ports.pulsar.clone());
-        hashmap.insert("ZMTP".to_string(), l7_protocol_ports.zmtp.clone());
-        hashmap.insert("DNS".to_string(), l7_protocol_ports.dns.clone());
-        hashmap.insert("TLS".to_string(), l7_protocol_ports.tls.clone());
-        hashmap.insert("Custom".to_string(), l7_protocol_ports.custom.clone());
-
-        hashmap
-    }
-
-    pub fn get_protocol_port_parse_bitmap(&self) -> Vec<(String, Bitmap)> {
-        /*
-            parse all protocol port range
-            format example:
-
-                l7-protocol-ports:
-                    "HTTP": "80,8080,1000-2000"
-                ...
-        */
-        let mut port_bitmap = Vec::new();
-        let l7_protocol_ports = &self.processors.request_log.filters.port_number_prefilters;
-
-        port_bitmap.push((
-            "HTTP".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.http, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "HTTP2".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.http2, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "Dubbo".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.dubbo, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "SofaRPC".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.sofa_rpc, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "bRPC".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.b_rpc, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "MySQL".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.mysql, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "PostgreSQL".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.postgre_sql, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "Oracle".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.oracle, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "Redis".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.redis, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "MongoDB".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.mongodb, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "Kafka".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.kafka, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "MQTT".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.mqtt, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "AMQP".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.amqp, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "OpenWire".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.openwire, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "NATS".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.nats, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "Pulsar".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.pulsar, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "ZMTP".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.zmtp, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "DNS".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.dns, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "TLS".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.tls, false).unwrap(),
-        ));
-        port_bitmap.push((
-            "Custom".to_string(),
-            parse_u16_range_list_to_bitmap(&l7_protocol_ports.custom, false).unwrap(),
-        ));
-
-        port_bitmap.sort_unstable_by_key(|p| p.0.clone());
-        port_bitmap
-    }
-
-    pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
-        if self.processors.packet.policy.fast_path_map_size > 0 {
-            return self.processors.packet.policy.fast_path_map_size;
-        }
-
-        ((mem_size / MB / 128 * 32000) as usize)
-            .max(32000)
-            .min(1 << 20)
-    }
-
-    pub fn get_af_packet_blocks(&self, capture_mode: PacketCaptureType, mem_size: u64) -> usize {
-        if capture_mode == PacketCaptureType::Analyzer
-            || self.inputs.cbpf.af_packet.tunning.ring_blocks_enabled
-        {
-            self.inputs.cbpf.af_packet.tunning.ring_blocks.max(8)
-        } else {
-            (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
-        }
-    }
-
     pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
         let mut c = if contents.len() == 0 {
-            Self::default()
+            // parsing empty string leads to EOF error
+            Self::standalone_default()
         } else {
             serde_yaml::from_str(contents.as_str())
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?
         };
 
-        c.set_standalone();
+        // reset below switch in standalone mode
+        c.app_proto_log_enabled = !c.l7_log_store_tap_types.is_empty();
+        c.ntp_enabled = false;
         c.validate()
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         Ok(c)
     }
 
-    fn set_standalone(&mut self) {
-        self.global.enabled = true;
-        self.global.communication.ingester_ip = "127.0.0.1".to_string();
-        self.global.communication.ingester_port = 30033;
-        self.global.communication.proxy_controller_ip = "127.0.0.1".to_string();
-        self.global.communication.proxy_controller_port = 30035;
-        self.global.tag.agent_id = 3302;
-        self.global.tag.agent_type = agent::AgentType::TtProcess;
-        self.global.tag.vpc_id = 3302;
-        self.global.ntp.enabled = false;
-        self.outputs.socket.data_socket_type = agent::SocketType::File;
-        self.outputs.flow_log.filters.l4_capture_network_types = vec![3];
-        self.outputs.flow_log.filters.l7_capture_network_types = vec![3];
-    }
-
     fn standalone_default() -> Self {
-        let mut config = Self::default();
-        config.set_standalone();
-
-        config
+        Self {
+            vtap_group_id: Default::default(),
+            enabled: true,
+            max_millicpus: 1000,
+            max_memory: 768,
+            sync_interval: 60,
+            platform_sync_interval: 10,
+            stats_interval: 10,
+            global_pps_threshold: 2000000,
+            #[cfg(target_os = "linux")]
+            extra_netns_regex: Default::default(),
+            tap_interface_regex: "".into(),
+            host: Default::default(),
+            rsyslog_enabled: false,
+            output_vlan: 0,
+            mtu: 1500,
+            npb_bps_threshold: 1000,
+            collector_enabled: true,
+            l4_log_store_tap_types: vec![0],
+            platform_enabled: false,
+            system_load_circuit_breaker_threshold: 1.0,
+            system_load_circuit_breaker_recover: 0.9,
+            system_load_circuit_breaker_metric: trident::SystemLoadMetric::Load15,
+            server_tx_bandwidth_threshold: 1,
+            bandwidth_probe_interval: Duration::from_secs(60),
+            npb_vlan_mode: trident::VlanMode::None,
+            npb_dedup_enabled: false,
+            if_mac_source: trident::IfMacSource::IfMac,
+            vtap_flow_1s_enabled: true,
+            debug_enabled: true,
+            log_threshold: 300,
+            log_level: log::Level::Info,
+            analyzer_ip: "127.0.0.1".into(),
+            analyzer_port: 30033,
+            max_escape: 3600,
+            proxy_controller_ip: "127.0.0.1".into(),
+            proxy_controller_port: 30035,
+            epc_id: 3302,
+            vtap_id: 3302,
+            team_id: 0,
+            organize_id: 0,
+            collector_socket_type: trident::SocketType::File,
+            npb_socket_type: trident::SocketType::RawUdp,
+            trident_type: common::TridentType::TtProcess,
+            capture_packet_size: 65535,
+            inactive_server_port_enabled: true,
+            inactive_ip_enabled: true,
+            libvirt_xml_path: "/etc/libvirt/qemu/".into(),
+            l7_log_packet_size: 1024,
+            l4_log_collect_nps_threshold: 10000,
+            l7_log_collect_nps_threshold: 10000,
+            l7_metrics_enabled: true,
+            app_proto_log_enabled: true,
+            l7_log_store_tap_types: vec![0],
+            l4_log_ignore_tap_sides: vec![],
+            l7_log_ignore_tap_sides: vec![],
+            decap_types: Default::default(),
+            http_log_proxy_client: "X-Forwarded-For".into(),
+            http_log_trace_id: "traceparent, sw8".into(),
+            http_log_span_id: "traceparent, sw8".into(),
+            http_log_x_request_id: "X-Request-ID".into(),
+            region_id: 3302,
+            pod_cluster_id: 0,
+            log_retention: 300,
+            capture_socket_type: trident::CaptureSocketType::Auto,
+            process_threshold: 10,
+            thread_threshold: 500,
+            capture_bpf: Default::default(),
+            l4_performance_enabled: true,
+            kubernetes_api_enabled: false,
+            ntp_enabled: false,
+            sys_free_memory_limit: 0,
+            log_file_size: 1000,
+            external_agent_http_proxy_enabled: false,
+            external_agent_http_proxy_port: 38086,
+            tap_mode: TapMode::Local,
+            yaml_config: YamlConfig::load("", TapMode::Local).unwrap(), // Default configuration that needs to be corrected to be available
+            plugins: Default::default(),
+            secret_key: Default::default(),
+        }
     }
 
     fn modify_decap_types(&mut self) {
-        for tunnel_type in &self.inputs.cbpf.preprocess.tunnel_trim_protocols {
-            self.inputs
-                .cbpf
-                .preprocess
-                .tunnel_decap_protocols
-                .push(TunnelType::from(tunnel_type.as_str()) as u8 as usize)
+        for tunnel_type in &self.yaml_config.trim_tunnel_types {
+            self.decap_types
+                .push(TunnelType::from(tunnel_type.as_str()));
         }
-    }
-
-    fn modify_unit(&mut self) {
-        self.global.circuit_breakers.tx_throughput.trigger_threshold <<= 20;
-        self.global.communication.grpc_buffer_size <<= 20;
-        self.global.limits.max_memory <<= 20;
-        self.global.limits.max_local_log_file_size <<= 20;
-        self.global.standalone_mode.max_data_file_size <<= 20;
-        self.inputs.proc.symbol_table.java.max_symbol_file_size <<= 20;
-        self.outputs.npb.max_tx_throughput <<= 20;
-    }
-
-    fn modify(&mut self) {
-        self.modify_unit();
-        self.modify_decap_types();
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
-        if self.global.communication.proactive_request_interval < Duration::from_secs(1)
-            || self.global.communication.proactive_request_interval > Duration::from_secs(60 * 60)
-        {
+        if self.sync_interval < 1 || self.sync_interval > 60 * 60 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "proactive_request_interval {:?} not in [1s, 1h]",
-                self.global.communication.proactive_request_interval
+                "sync-interval {:?} not in [1s, 1h]",
+                Duration::from_secs(self.sync_interval)
             )));
         }
-        if self.inputs.resources.push_interval < Duration::from_secs(10)
-            || self.inputs.resources.push_interval > Duration::from_secs(60 * 60)
-        {
+        if self.platform_sync_interval < 10 || self.platform_sync_interval > 60 * 60 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "push_interval {:?} not in [10s, 1h]",
-                self.inputs.resources.push_interval
+                "platform-sync-interval {:?} not in [10s, 1h]",
+                Duration::from_secs(self.platform_sync_interval)
             )));
         }
-        if self.global.self_monitoring.interval < Duration::from_secs(1)
-            || self.global.self_monitoring.interval > Duration::from_secs(60 * 60)
-        {
+        if self.stats_interval < 1 || self.stats_interval > 60 * 60 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "interval {:?} not in [1s, 1h]",
-                self.global.self_monitoring.interval
+                "stats-interval {:?} not in [1s, 1h]",
+                Duration::from_secs(self.stats_interval)
             )));
         }
 
         // 虽然RFC 791里最低MTU是68，但是此时compressor会崩溃，
         // 所以MTU最低限定到200以确保deepflow-agent能够成功运行
-        if self.outputs.npb.max_mtu < 200 {
+        if self.mtu < 200 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "MTU({}) specified smaller than 200",
-                self.outputs.npb.max_mtu
+                self.mtu
             )));
         }
 
-        if self.outputs.npb.raw_udp_vlan_tag > 4095 {
+        if self.output_vlan > 4095 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "raw_udp_vlan_tag({}) out of range (0-4095)",
-                self.outputs.npb.raw_udp_vlan_tag
+                "output-vlan({}) out of range (0-4095)",
+                self.output_vlan
             )));
         }
 
-        if self.global.communication.ingester_port == 0 {
+        if self.analyzer_port == 0 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "ingester_port({}) invalid",
-                self.global.communication.ingester_port
+                "analyzer-port({}) invalid",
+                self.analyzer_port
             )));
         }
         #[cfg(target_os = "linux")]
-        if regex::Regex::new(&self.inputs.cbpf.af_packet.extra_netns_regex).is_err() {
+        if regex::Regex::new(&self.extra_netns_regex).is_err() {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "malformed extra_netns_regex({})",
-                self.inputs.cbpf.af_packet.extra_netns_regex
+                "malformed extra-netns-regex({})",
+                self.extra_netns_regex
             )));
         }
 
-        if !self.inputs.cbpf.af_packet.interface_regex.is_empty()
-            && regex::Regex::new(&self.inputs.cbpf.af_packet.interface_regex).is_err()
+        if !self.tap_interface_regex.is_empty()
+            && regex::Regex::new(&self.tap_interface_regex).is_err()
         {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "malformed interface_regex({})",
-                self.inputs.cbpf.af_packet.interface_regex
+                "malformed tap-interface-regex({})",
+                self.tap_interface_regex
             )));
         }
 
-        if self.global.communication.max_escape_duration < Duration::from_secs(600)
-            || self.global.communication.max_escape_duration
-                > Duration::from_secs(30 * 24 * 60 * 60)
-        {
+        if self.max_escape < 600 || self.max_escape > 30 * 24 * 60 * 60 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "max_escape_duration {:?} not in [600s, 30d]",
-                self.global.communication.max_escape_duration
+                "max-escape-seconds {:?} not in [600s, 30d]",
+                self.max_escape
             )));
         }
 
-        if self.global.communication.proxy_controller_port == 0 {
+        if self.proxy_controller_port == 0 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "proxy_controller_port({}) invalid",
-                self.global.communication.proxy_controller_port
+                "proxy-controller-port({}) invalid",
+                self.proxy_controller_port
             )));
         }
 
-        if !(128..=65535).contains(&self.inputs.cbpf.tunning.max_capture_packet_size) {
+        if self.capture_packet_size > 65535 || self.capture_packet_size < 128 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "max_capture_packet_size {} not in [128, 65535]",
-                self.inputs.cbpf.tunning.max_capture_packet_size
+                "capture packet size {} not in [128, 65535]",
+                self.capture_packet_size
             )));
         }
 
-        if self.outputs.socket.data_socket_type == agent::SocketType::RawUdp {
+        if self.collector_socket_type == trident::SocketType::RawUdp {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "invalid data_socket_type {:?}",
-                self.outputs.socket.data_socket_type
+                "invalid collector_socket_type {:?}",
+                self.collector_socket_type
             )));
         }
 
@@ -3519,15 +4381,167 @@ impl RuntimeConfig {
     }
 }
 
-impl TryFrom<String> for RuntimeConfig {
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        trident::Config::default().try_into().unwrap()
+    }
+}
+
+impl TryFrom<trident::Config> for RuntimeConfig {
     type Error = io::Error;
 
-    fn try_from(config: String) -> Result<Self, io::Error> {
-        let mut rc: Self = serde_yaml::from_str(&config)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
-        rc.modify();
+    fn try_from(conf: trident::Config) -> Result<Self, io::Error> {
+        let mut rc = Self {
+            vtap_group_id: Default::default(),
+            enabled: conf.enabled(),
+            max_millicpus: {
+                // Compatible with max_cpus and max_millicpus, take the smaller value in milli-cores.
+                let max_cpus = conf.max_cpus() * 1000;
+                let max_millicpus = conf.max_millicpus.unwrap_or(max_cpus); // conf.max_millicpus may be None, handle the case where conf.max_millicpus is None
+                if max_cpus != 0 && max_millicpus != 0 {
+                    max_cpus.min(max_millicpus)
+                } else {
+                    max_cpus | max_millicpus
+                }
+            },
+            max_memory: conf.max_memory() as u64,
+            sync_interval: conf.sync_interval() as u64,
+            platform_sync_interval: conf.platform_sync_interval() as u64,
+            stats_interval: conf.stats_interval() as u64,
+            global_pps_threshold: conf.global_pps_threshold(),
+            #[cfg(target_os = "linux")]
+            extra_netns_regex: conf.extra_netns_regex().to_owned(),
+            tap_interface_regex: conf.tap_interface_regex().to_owned(),
+            host: conf.host().to_owned(),
+            rsyslog_enabled: conf.rsyslog_enabled(),
+            output_vlan: (conf.output_vlan() & 0xFFFFFFFF) as u16,
+            mtu: conf.mtu(),
+            npb_bps_threshold: conf.npb_bps_threshold(),
+            collector_enabled: conf.collector_enabled(),
+            l4_log_store_tap_types: conf
+                .l4_log_tap_types
+                .iter()
+                .filter_map(|&i| {
+                    if i >= u16::from(CaptureNetworkType::Max) as u32 {
+                        warn!("invalid tap type: {}", i);
+                        None
+                    } else {
+                        Some(i as u8)
+                    }
+                })
+                .collect(),
+            platform_enabled: conf.platform_enabled(),
+            system_load_circuit_breaker_threshold: conf.system_load_circuit_breaker_threshold(),
+            system_load_circuit_breaker_recover: conf.system_load_circuit_breaker_recover(),
+            system_load_circuit_breaker_metric: conf.system_load_circuit_breaker_metric(),
+            server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
+            bandwidth_probe_interval: Duration::from_secs(conf.bandwidth_probe_interval()),
+            npb_vlan_mode: conf.npb_vlan_mode(),
+            npb_dedup_enabled: conf.npb_dedup_enabled(),
+            if_mac_source: conf.if_mac_source(),
+            vtap_flow_1s_enabled: conf.vtap_flow_1s_enabled(),
+            debug_enabled: conf.debug_enabled(),
+            log_threshold: conf.log_threshold(),
+            log_level: match conf.log_level().to_lowercase().as_str() {
+                "error" => log::Level::Error,
+                "warn" | "warning" => log::Level::Warn,
+                "info" => log::Level::Info,
+                "debug" => log::Level::Debug,
+                "trace" => log::Level::Trace,
+                _ => log::Level::Info,
+            },
+            analyzer_ip: conf.analyzer_ip().to_owned(),
+            analyzer_port: conf.analyzer_port() as u16,
+            max_escape: conf.max_escape_seconds() as u64,
+            proxy_controller_ip: conf.proxy_controller_ip().to_owned(),
+            proxy_controller_port: conf.proxy_controller_port() as u16,
+            epc_id: conf.epc_id(),
+            vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
+            team_id: conf.team_id(),
+            organize_id: conf.organize_id(),
+            collector_socket_type: conf.collector_socket_type(),
+            npb_socket_type: conf.npb_socket_type(),
+            trident_type: conf.trident_type(),
+            capture_packet_size: conf.capture_packet_size(),
+            inactive_server_port_enabled: conf.inactive_server_port_enabled(),
+            inactive_ip_enabled: conf.inactive_ip_enabled(),
+            libvirt_xml_path: conf.libvirt_xml_path().to_owned(),
+            l7_log_packet_size: conf.l7_log_packet_size(),
+            l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold(),
+            l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold(),
+            l7_metrics_enabled: conf.l7_metrics_enabled(),
+            app_proto_log_enabled: !conf.l7_log_store_tap_types.is_empty(),
+            l7_log_store_tap_types: conf
+                .l7_log_store_tap_types
+                .iter()
+                .filter_map(|&i| {
+                    if i >= u16::from(CaptureNetworkType::Max) as u32 {
+                        warn!("invalid tap type: {}", i);
+                        None
+                    } else {
+                        Some(i as u8)
+                    }
+                })
+                .collect(),
+            l4_log_ignore_tap_sides: conf
+                .l4_log_ignore_tap_sides
+                .iter()
+                .filter_map(|s| match TapSide::try_from(*s as u8) {
+                    Ok(side) => Some(side),
+                    Err(_) => {
+                        warn!("invalid tap side: {}", s);
+                        None
+                    }
+                })
+                .collect(),
+            l7_log_ignore_tap_sides: conf
+                .l7_log_ignore_tap_sides
+                .iter()
+                .filter_map(|s| match TapSide::try_from(*s as u8) {
+                    Ok(side) => Some(side),
+                    Err(_) => {
+                        warn!("invalid tap side: {}", s);
+                        None
+                    }
+                })
+                .collect(),
+            decap_types: conf
+                .decap_type
+                .iter()
+                .filter_map(|&t| match TunnelType::try_from(t as u8) {
+                    Ok(t) => Some(t),
+                    Err(_) => {
+                        warn!("invalid tunnel type: {}", t);
+                        None
+                    }
+                })
+                .collect(),
+            http_log_proxy_client: conf.http_log_proxy_client().to_owned(),
+            http_log_trace_id: conf.http_log_trace_id().to_owned(),
+            http_log_span_id: conf.http_log_span_id().to_owned(),
+            http_log_x_request_id: conf.http_log_x_request_id().to_owned(),
+            region_id: conf.region_id(),
+            pod_cluster_id: conf.pod_cluster_id(),
+            log_retention: conf.log_retention(),
+            capture_socket_type: conf.capture_socket_type(),
+            process_threshold: conf.process_threshold(),
+            thread_threshold: conf.thread_threshold(),
+            capture_bpf: conf.capture_bpf().to_owned(),
+            l4_performance_enabled: conf.l4_performance_enabled(),
+            kubernetes_api_enabled: conf.kubernetes_api_enabled(),
+            ntp_enabled: conf.ntp_enabled(),
+            sys_free_memory_limit: conf.sys_free_memory_limit(),
+            log_file_size: conf.log_file_size(),
+            external_agent_http_proxy_enabled: conf.external_agent_http_proxy_enabled(),
+            external_agent_http_proxy_port: conf.external_agent_http_proxy_port() as u16,
+            tap_mode: conf.tap_mode(),
+            yaml_config: YamlConfig::load(conf.local_config(), conf.tap_mode())?,
+            plugins: conf.plugins,
+            secret_key: Default::default(),
+        };
+        rc.modify_decap_types();
         rc.validate()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
         Ok(rc)
     }
 }
@@ -3549,6 +4563,40 @@ where
         .collect()
 }
 
+fn to_trident_socket_type<'de, D>(deserializer: D) -> Result<trident::SocketType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.as_str() {
+        "FILE" => Ok(trident::SocketType::File),
+        "TCP" => Ok(trident::SocketType::Tcp),
+        "UDP" => Ok(trident::SocketType::Udp),
+        "RAW_UDP" => Ok(trident::SocketType::RawUdp),
+        "" => Ok(trident::SocketType::File),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"FILE|TCP|UDP|RAW_UDP",
+        )),
+    }
+}
+
+fn to_socket_type<'de, D>(deserializer: D) -> Result<agent::SocketType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.as_str() {
+        "FILE" => Ok(agent::SocketType::File),
+        "TCP" => Ok(agent::SocketType::Tcp),
+        "UDP" => Ok(agent::SocketType::Udp),
+        "RAW_UDP" => Ok(agent::SocketType::RawUdp),
+        "" => Ok(agent::SocketType::File),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"FILE|TCP|UDP|RAW_UDP",
+        )),
+    }
+}
+
 fn to_log_level<'de, D>(deserializer: D) -> Result<log::Level, D::Error>
 where
     D: Deserializer<'de>,
@@ -3567,14 +4615,59 @@ where
     }
 }
 
-fn to_packet_capture_type<'de, D>(deserializer: D) -> Result<agent::PacketCaptureType, D::Error>
+fn to_if_mac_source<'de, D>(deserializer: D) -> Result<agent::IfMacSource, D::Error>
 where
     D: Deserializer<'de>,
 {
     match u8::deserialize(deserializer)? {
-        0 => Ok(agent::PacketCaptureType::Local),
-        1 => Ok(agent::PacketCaptureType::Mirror),
-        2 => Ok(agent::PacketCaptureType::Analyzer),
+        0 => Ok(agent::IfMacSource::IfMac),
+        1 => Ok(agent::IfMacSource::IfName),
+        2 => Ok(agent::IfMacSource::IfLibvirtXml),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1|2",
+        )),
+    }
+}
+
+fn to_trident_if_mac_source<'de, D>(deserializer: D) -> Result<trident::IfMacSource, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(trident::IfMacSource::IfMac),
+        1 => Ok(trident::IfMacSource::IfName),
+        2 => Ok(trident::IfMacSource::IfLibvirtXml),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1|2",
+        )),
+    }
+}
+
+fn to_trident_vlan_mode<'de, D>(deserializer: D) -> Result<trident::VlanMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(trident::VlanMode::None),
+        1 => Ok(trident::VlanMode::Qinq),
+        2 => Ok(trident::VlanMode::Vlan),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1|2",
+        )),
+    }
+}
+
+fn to_tap_mode<'de, D>(deserializer: D) -> Result<TapMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(TapMode::Local),
+        1 => Ok(TapMode::Mirror),
+        2 => Ok(TapMode::Analyzer),
         other => Err(de::Error::invalid_value(
             Unexpected::Unsigned(other as u64),
             &"0|1|2",
@@ -3616,22 +4709,6 @@ fn resolve_domain(addr: &str) -> Option<String> {
         Err(e) => {
             eprintln!("{:?}", e);
             None
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-pub struct PortConfig {
-    pub analyzer_port: u16,
-    pub proxy_controller_port: u16,
-}
-
-impl Default for PortConfig {
-    fn default() -> Self {
-        let config = RuntimeConfig::default();
-        PortConfig {
-            analyzer_port: config.global.communication.ingester_port,
-            proxy_controller_port: config.global.communication.proxy_controller_port,
         }
     }
 }

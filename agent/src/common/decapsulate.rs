@@ -53,6 +53,19 @@ impl From<DecapType> for TunnelType {
     }
 }
 
+impl From<i32> for TunnelType {
+    fn from(t: i32) -> Self {
+        match t {
+            0 => TunnelType::None,
+            1 => TunnelType::Vxlan,
+            2 => TunnelType::Ipip,
+            3 => TunnelType::TencentGre,
+            4 => TunnelType::Geneve,
+            _ => TunnelType::None,
+        }
+    }
+}
+
 impl fmt::Display for TunnelType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

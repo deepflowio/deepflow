@@ -40,6 +40,8 @@ use public::{
     proto::agent::{GpidSyncEntry, RoleType, ServiceProtocol},
 };
 
+use public::proto::trident::GpidSyncEntry as TridentGpidSyncEntry;
+
 use super::linux_process::{get_all_pid_process_map, get_os_app_tag_by_exec, RegExpAction};
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -72,6 +74,87 @@ pub(super) struct SockEntry {
     pub(super) real_client: Option<SockAddrData>,
     // netns idx is the unique number of netns, not equal to netns inode.
     pub(super) netns_idx: u16,
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl TryFrom<SockEntry> for TridentGpidSyncEntry {
+    type Error = ProcError;
+
+    fn try_from(s: SockEntry) -> Result<Self, Self::Error> {
+        let (local_ip, remote_ip) = match (s.local.ip, s.remote.ip) {
+            (IpAddr::V4(v4_local), IpAddr::V4(v4_remote)) => (
+                Some(read_u32_be(&v4_local.octets())),
+                Some(read_u32_be(&v4_remote.octets())),
+            ),
+            _ => {
+                return Err(ProcError::Other(
+                    "unreachable: not support ipv6".to_string(),
+                ))
+            }
+        };
+
+        let (epc_0, pid_0, ip_0, port_0, epc_1, pid_1, ip_1, port_1) = match s.role {
+            // when role is client, local addr is client side and remote is server side
+            Role::Client => (
+                // TODO set epc_id
+                None,
+                Some(s.pid),
+                local_ip,
+                Some(s.local.port as u32),
+                // TODO set epc_id
+                None,
+                None,
+                remote_ip,
+                Some(s.remote.port as u32),
+            ),
+            // when role is server, local is server side and remote is client side
+            Role::Server => (
+                // TODO set epc_id
+                None,
+                None,
+                remote_ip,
+                Some(s.remote.port as u32),
+                // TODO set epc_id
+                None,
+                Some(s.pid),
+                local_ip,
+                Some(s.local.port as u32),
+            ),
+        };
+
+        let mut r = Self {
+            protocol: Some(match s.proto {
+                Protocol::Tcp => ServiceProtocol::TcpService.into(),
+                Protocol::Udp => ServiceProtocol::UdpService.into(),
+            }),
+            epc_id_1: epc_1,
+            ipv4_1: ip_1,
+            port_1: port_1,
+            pid_1: pid_1,
+            epc_id_0: epc_0,
+            ipv4_0: ip_0,
+            port_0: port_0,
+            pid_0: pid_0,
+            netns_idx: Some(s.netns_idx as u32),
+            ..Default::default()
+        };
+
+        if let Some(real) = s.real_client {
+            r.role_real = Some(RoleType::RoleClient.into());
+            r.epc_id_real = Some(real.epc_id);
+            r.ipv4_real = Some(match real.ip {
+                IpAddr::V4(v4) => read_u32_be(&v4.octets()),
+                _ => {
+                    return Err(ProcError::Other(
+                        "unreachable: not support ipv6".to_string(),
+                    ))
+                }
+            });
+            r.port_real = Some(real.port as u32);
+        }
+
+        Ok(r)
+    }
 }
 
 impl TryFrom<SockEntry> for GpidSyncEntry {
