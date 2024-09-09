@@ -24,6 +24,11 @@
 #define DF_BPF_NAME           "deepflow-ebpfctl"
 #define DF_BPF_VERSION        "v1.0.0"
 #define LINUX_VER_LEN         128
+#define CMD_BUF_SZ	      256
+#define TIMEOUT_DEF	      60
+
+static char *match_str_def = ".*";
+static char *comm_str_def = "";
 
 typedef enum df_bpf_cmd_e {
 	DF_BPF_CMD_ADD,
@@ -34,6 +39,7 @@ typedef enum df_bpf_cmd_e {
 	DF_BPF_CMD_SHOW,
 	DF_BPF_CMD_REPLACE,
 	DF_BPF_CMD_FLUSH,
+	DF_BPF_CMD_FIND,
 	DF_BPF_CMD_HELP,
 } df_bpf_cmd_t;
 
@@ -44,6 +50,11 @@ struct df_bpf_conf {
 	int interval;
 	int count;
 	int timeout;
+	char *match_str;
+	int pid;
+	int l7_proto;
+	bool is_all_files;
+	char *comm_str;
 	bool color;
 	bool only_stdout;
 	char *obj;
@@ -92,7 +103,8 @@ static void cpdbg_help(void)
 
 static void datadump_help(void)
 {
-	fprintf(stderr, "Usage:\n" "    %s datadump {on|off} [OPTIONS]\n",
+	fprintf(stderr,
+		"Usage:\n" "    %s datadump {on|off|ls|clear|find} [OPTIONS]\n",
 		DF_BPF_NAME);
 	fprintf(stderr,
 		"    %s datadump set pid PID comm COMM proto PROTO_NUM\n",
@@ -137,6 +149,56 @@ static void datadump_help(void)
 	fprintf(stderr, "    %s datadump on --only-stdout --timeout 60\n",
 		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump off\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump ls\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump clear\n", DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump find <Match string>\n", DF_BPF_NAME);
+	fprintf(stderr,
+		"    %s datadump set --pid 1234 --comm nginx --l7-proto 20\n",
+		DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump find --match-str nginx\n",
+		DF_BPF_NAME);
+	fprintf(stderr, "    %s datadump find --match-str nginx --all-files\n",
+		DF_BPF_NAME);
+}
+
+static int __exec_command(const char *cmd, const char *args)
+{
+	FILE *fp;
+	int rc = 0;
+	char cmd_buf[CMD_BUF_SZ * 2];
+	snprintf(cmd_buf, sizeof(cmd_buf), "%s %s", cmd, args);
+	fp = popen(cmd_buf, "r");
+	if (NULL == fp) {
+		fprintf(stderr, "%s '%s' execute error,[%s]\n",
+			__func__, cmd_buf, strerror(errno));
+		return -1;
+	}
+
+	char buffer[8192];
+	while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+		fprintf(stdout, "%s", buffer);
+		fflush(stdout);
+	}
+
+	rc = pclose(fp);
+	if (-1 == rc) {
+		fprintf(stderr, "pclose error, '%s' error:%s\n",
+			cmd_buf, strerror(errno));
+	} else {
+		if (WIFEXITED(rc)) {
+			return WEXITSTATUS(rc);
+		} else if (WIFSIGNALED(rc)) {
+			fprintf(stdout,
+				"'%s' abnormal termination,signal number %d\n",
+				cmd_buf, WTERMSIG(rc));
+		} else if (WIFSTOPPED(rc)) {
+			fprintf(stdout,
+				"'%s' process stopped, signal number %d\n",
+				cmd_buf, WSTOPSIG(rc));
+		}
+	}
+
+	return -1;
 }
 
 static void tracer_dump(struct bpf_tracer_param *param)
@@ -538,6 +600,19 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 					printf("Set datadump off ");
 				}
 			} else {
+				if (conf->argc == 0) {
+					msg.is_params = true;
+					msg.pid = conf->pid;
+					msg.proto = conf->l7_proto;
+					memset(msg.comm, 0, sizeof(msg.comm));
+					memcpy(msg.comm, conf->comm_str,
+					       sizeof(msg.comm) - 1);
+					fprintf(stdout,
+						" == pid %d l7-proto %d comm %s\n",
+						msg.pid, msg.proto, msg.comm);
+					goto conf_finish;
+				}
+
 				if (conf->argc != 6
 				    || strcmp(conf->argv[0], "pid")
 				    || strcmp(conf->argv[2], "comm")
@@ -574,7 +649,7 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 					memcpy(msg.comm, conf->argv[3],
 					       sizeof(msg.comm) - 1);
 				}
-
+			      conf_finish:
 				printf("Set pid %d comm %s proto %d ", msg.pid,
 				       msg.comm, msg.proto);
 			}
@@ -588,6 +663,51 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 
 			break;
 		}
+	case DF_BPF_CMD_SHOW:
+		if (conf->argc != 0)
+			fprintf(stdout, "Invalid params.\n");
+		else
+			__exec_command("ls -sh /var/log/datadump-*.log", "");
+		break;
+	case DF_BPF_CMD_FLUSH:
+		if (conf->argc != 0)
+			fprintf(stdout, "Invalid params.\n");
+		else
+			__exec_command("rm -rf /var/log/datadump-*.log", "");
+		break;
+	case DF_BPF_CMD_FIND:
+		{
+			char *match_str;
+			fprintf(stdout, "conf->argc == %d conf->match_str %s\n",
+				conf->argc, conf->match_str);
+			if (conf->argc == 0 && conf->match_str != NULL) {
+				match_str = conf->match_str;
+				goto process_find;
+
+			}
+
+			if (conf->argc != 1) {
+				fprintf(stdout, "Invalid params.\n");
+				return ETR_NOTSUPP;
+			}
+
+			match_str = conf->argv[0];
+
+		      process_find:
+			{
+				char cmdbuf[CMD_BUF_SZ];
+				snprintf(cmdbuf, sizeof(cmdbuf),
+					 "grep -n -A 1 \"%s\" %s",
+					 match_str,
+					 conf->
+					 is_all_files ?
+					 "/var/log/datadump-*.log" :
+					 "$(ls -t /var/log/datadump-*.log | head -n 1)");
+				printf("%s\n", cmdbuf);
+				__exec_command(cmdbuf, "");
+			}
+		}
+		break;
 	default:
 		return ETR_NOTSUPP;
 	}
@@ -737,21 +857,33 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		{"version", no_argument, NULL, 'V'},
 		{"color", no_argument, NULL, 'C'},
 		{"only-stdout", no_argument, NULL, 'O'},
+		{"all-files", no_argument, NULL, 'A'},
 		{"timeout", required_argument, NULL, 't'},
+		{"match-str", required_argument, NULL, 'm'},
+		{"pid", required_argument, NULL, 'p'},
+		{"comm", required_argument, NULL, 'c'},
+		{"l7-proto", required_argument, NULL, 'l'},
 		{NULL, 0, NULL, 0},
 	};
 
 	memset(conf, 0, sizeof(*conf));
 	conf->af = AF_UNSPEC;
 	conf->only_stdout = false;
-	conf->timeout = 0;
+	conf->timeout = TIMEOUT_DEF;
+	conf->pid = 0;
+	conf->l7_proto = 0;
+	conf->match_str = match_str_def;
+	conf->comm_str = comm_str_def;
+	conf->is_all_files = false;
 
 	if (argc <= 1) {
 		usage();
 		exit(0);
 	}
 
-	while ((opt = getopt_long(argc, argv, "vhVCOt:", opts, NULL)) != -1) {
+	while ((opt =
+		getopt_long(argc, argv, "vhVCOAt:m:p:c:l:", opts,
+			    NULL)) != -1) {
 		switch (opt) {
 		case 'v':
 			conf->verbose = 1;
@@ -768,16 +900,72 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		case 'O':
 			conf->only_stdout = true;
 			break;
+		case 'A':
+			conf->is_all_files = true;
+			break;
 		case 't':
 			conf->timeout = atoi(optarg);
 			if (conf->timeout <= 0) {
-				fprintf(stderr, "Invalid option: --timeout");
+				fprintf(stderr, "Invalid option: --timeout\n");
 				return -1;
+			}
+			break;
+		case 'p':
+			conf->pid = atoi(optarg);
+			if (conf->pid < 0) {
+				fprintf(stderr,
+					"Invalid option: --pid, need >= 0\n");
+				return -1;
+			}
+			break;
+		case 'l':
+			conf->l7_proto = atoi(optarg);
+			if (conf->l7_proto < 0) {
+				fprintf(stderr,
+					"Invalid option: --l7-proto, need >= 0\n");
+				return -1;
+			}
+			break;
+		case 'c':{
+				if (optarg == NULL) {
+					fprintf(stderr,
+						"Invalid option: --comm\n");
+					return -1;
+				}
+				int len = strlen(optarg) + 1;
+				conf->comm_str = malloc(len);
+				if (conf->comm_str == NULL) {
+					fprintf(stderr, "malloc failed\n");
+					return -1;
+				}
+				memcpy((void *)conf->comm_str, (void *)optarg,
+				       len);
+				conf->comm_str[len] = '\0';
+			}
+			break;
+		case 'm':
+			{
+				if (optarg == NULL) {
+					fprintf(stderr,
+						"Invalid option: --match-str");
+					return -1;
+				}
+
+				int len = strlen(optarg) + 1;
+				conf->match_str = malloc(len);
+				if (conf->match_str == NULL) {
+					fprintf(stderr, "malloc failed\n");
+					return -1;
+				}
+				memcpy((void *)conf->match_str, (void *)optarg,
+				       len);
+				conf->match_str[len] = '\0';
 			}
 			break;
 		case '?':
 		default:
-			fprintf(stderr, "Invalid option: %s\n", argv[optind]);
+			fprintf(stderr, "aa Invalid option: %s\n",
+				argv[optind]);
 			return -1;
 		}
 	}
@@ -812,6 +1000,15 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		goto show_exit;
 	} else if (strcmp(argv[1], "off") == 0) {
 		conf->cmd = DF_BPF_CMD_OFF;
+		goto show_exit;
+	} else if (strcmp(argv[1], "ls") == 0) {
+		conf->cmd = DF_BPF_CMD_SHOW;
+		goto show_exit;
+	} else if (strcmp(argv[1], "clear") == 0) {
+		conf->cmd = DF_BPF_CMD_FLUSH;
+		goto show_exit;
+	} else if (strcmp(argv[1], "find") == 0) {
+		conf->cmd = DF_BPF_CMD_FIND;
 		goto show_exit;
 	} else if (strcmp(argv[1], "help") == 0) {
 		conf->cmd = DF_BPF_CMD_HELP;
