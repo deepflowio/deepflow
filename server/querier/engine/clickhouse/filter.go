@@ -760,7 +760,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			noSuffixTag := strings.TrimSuffix(whereTag, "_0")
 			noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
 			noIDTag := noSuffixTag
-			if !slices.Contains([]string{"_id", "pod_service_id"}, noSuffixTag) {
+			if !slices.Contains([]string{"_id", "pod_service_id", "x_request_id", "syscall_trace_id"}, noSuffixTag) {
 				noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
 			}
 			switch noIDTag {
