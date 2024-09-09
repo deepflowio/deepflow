@@ -16,6 +16,11 @@
 
 use std::{net::IpAddr, sync::Arc};
 
+use pnet::packet::{
+    icmp::{IcmpType, IcmpTypes},
+    icmpv6::{Icmpv6Type, Icmpv6Types},
+};
+
 use super::{perf::FlowLog, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::common::{
     decapsulate::TunnelType,
@@ -23,11 +28,11 @@ use crate::common::{
     enums::{EthernetType, TapType, TcpFlags},
     flow::{FlowMetricsPeer, L7PerfStats, PacketDirection, SignalSource, TcpPerfStats},
     lookup_key::LookupKey,
-    meta_packet::MetaPacket,
+    meta_packet::{MetaPacket, ProtocolData},
     tagged_flow::TaggedFlow,
     TapPort, Timestamp,
 };
-use public::{proto::common::TridentType, utils::net::MacAddr};
+use public::{enums::IpProtocol, proto::common::TridentType, utils::net::MacAddr};
 
 use npb_pcap_policy::PolicyData;
 use packet_sequence_block::PacketSequenceBlock;
@@ -145,6 +150,65 @@ pub struct FlowNode {
 }
 
 impl FlowNode {
+    pub(super) fn set_icmpv4_flow_state(&mut self, meta_packet: &MetaPacket) {
+        let ProtocolData::IcmpData(icmp_data) = &meta_packet.protocol_data else {
+            return;
+        };
+        let icmp_type = IcmpType::new(icmp_data.icmp_type);
+        match icmp_type {
+            IcmpTypes::AddressMaskReply => self.flow_state = FlowState::IcmpAddressMaskReply,
+            IcmpTypes::AddressMaskRequest => self.flow_state = FlowState::IcmpAddressMaskRequest,
+            IcmpTypes::DestinationUnreachable => {
+                self.flow_state = FlowState::IcmpDestinationUnreachable
+            }
+            IcmpTypes::EchoReply => self.flow_state = FlowState::IcmpEchoReply,
+            IcmpTypes::EchoRequest => self.flow_state = FlowState::IcmpEchoRequest,
+            IcmpTypes::InformationReply => self.flow_state = FlowState::IcmpInformationReply,
+            IcmpTypes::InformationRequest => self.flow_state = FlowState::IcmpInformationRequest,
+            IcmpTypes::ParameterProblem => self.flow_state = FlowState::IcmpParameterProblem,
+            IcmpTypes::RedirectMessage => self.flow_state = FlowState::IcmpRedirectMessage,
+            IcmpTypes::RouterAdvertisement => self.flow_state = FlowState::IcmpRouterAdvertisement,
+            IcmpTypes::RouterSolicitation => self.flow_state = FlowState::IcmpRouterSolicitation,
+            IcmpTypes::SourceQuench => self.flow_state = FlowState::IcmpSourceQuench,
+            IcmpTypes::TimeExceeded => self.flow_state = FlowState::IcmpTimeExceeded,
+            IcmpTypes::Timestamp => self.flow_state = FlowState::IcmpTimestamp,
+            IcmpTypes::TimestampReply => self.flow_state = FlowState::IcmpTimestampReply,
+            IcmpTypes::Traceroute => self.flow_state = FlowState::IcmpTraceroute,
+            _ => self.flow_state = FlowState::Established,
+        }
+    }
+
+    pub(super) fn set_icmpv6_flow_state(&mut self, meta_packet: &MetaPacket) {
+        let ProtocolData::IcmpData(icmp_data) = &meta_packet.protocol_data else {
+            return;
+        };
+        let icmp_type = Icmpv6Type::new(icmp_data.icmp_type);
+        match icmp_type {
+            Icmpv6Types::DestinationUnreachable => {
+                self.flow_state = FlowState::IcmpDestinationUnreachable
+            }
+            Icmpv6Types::EchoReply => self.flow_state = FlowState::IcmpEchoReply,
+            Icmpv6Types::EchoRequest => self.flow_state = FlowState::IcmpEchoRequest,
+            Icmpv6Types::NeighborAdvert => self.flow_state = FlowState::IcmpNeighborAdvert,
+            Icmpv6Types::NeighborSolicit => self.flow_state = FlowState::IcmpNeighborSolicit,
+            Icmpv6Types::PacketTooBig => self.flow_state = FlowState::IcmpPacketTooBig,
+            Icmpv6Types::ParameterProblem => self.flow_state = FlowState::IcmpParameterProblem,
+            Icmpv6Types::Redirect => self.flow_state = FlowState::IcmpRedirectMessage,
+            Icmpv6Types::RouterAdvert => self.flow_state = FlowState::IcmpRouterAdvertisement,
+            Icmpv6Types::RouterSolicit => self.flow_state = FlowState::IcmpRouterSolicitation,
+            Icmpv6Types::TimeExceeded => self.flow_state = FlowState::IcmpTimeExceeded,
+            _ => self.flow_state = FlowState::Established,
+        }
+    }
+
+    pub(super) fn set_icmp_flow_state(&mut self, meta_packet: &MetaPacket) {
+        match meta_packet.lookup_key.proto {
+            IpProtocol::ICMPV4 => self.set_icmpv4_flow_state(meta_packet),
+            IpProtocol::ICMPV6 => self.set_icmpv6_flow_state(meta_packet),
+            _ => unreachable!(),
+        }
+    }
+
     pub(super) fn reset_flow_stat_info(&mut self) {
         self.policy_in_tick = [false; 2];
         self.packet_in_tick = false;

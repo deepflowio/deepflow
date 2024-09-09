@@ -49,26 +49,40 @@ const (
 	//	ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
 	//	...
 
-	CloseTypeTCPFin                //  1: 正常结束
-	CloseTypeTCPServerRst          //  2: 传输-服务端重置
-	CloseTypeTimeout               //  3: 连接超时
-	_                              //  4: 【废弃】CloseTypeFlood
-	CloseTypeForcedReport          //  5: 周期性上报
-	_                              //  6: 【废弃】CloseTypeFoecedClose
-	CloseTypeClientSYNRepeat       //  7: 建连-客户端SYN结束
-	CloseTypeServerHalfClose       //  8: 断连-服务端半关
-	CloseTypeTCPClientRst          //  9: 传输-客户端重置
-	CloseTypeServerSYNACKRepeat    // 10: 建连-服务端SYN结束
-	CloseTypeClientHalfClose       // 11: 断连-客户端半关
-	_                              // 12: 【废弃】CloseTypeClientNoResponse
-	CloseTypeClientSourcePortReuse // 13: 建连-客户端端口复用
-	_                              // 14: 【废弃】CloseTypeClientSYNRetryLack
-	CloseTypeServerReset           // 15: 建连-服务端直接重置
-	_                              // 16: 【废弃】CloseTypeServerNoResponse
-	CloseTypeServerQueueLack       // 17: 传输-服务端队列溢出
-	CloseTypeClientEstablishReset  // 18: 建连-客户端其他重置
-	CloseTypeServerEstablishReset  // 19: 建连-服务端其他重置
-	CloseTypeTCPFinClientRst       // 20: 正常结束-客户端重置
+	CloseTypeTCPFin                     //  1: 正常结束
+	CloseTypeTCPServerRst               //  2: 传输-服务端重置
+	CloseTypeTimeout                    //  3: 连接超时
+	_                                   //  4: 【废弃】CloseTypeFlood
+	CloseTypeForcedReport               //  5: 周期性上报
+	_                                   //  6: 【废弃】CloseTypeFoecedClose
+	CloseTypeClientSYNRepeat            //  7: 建连-客户端SYN结束
+	CloseTypeServerHalfClose            //  8: 断连-服务端半关
+	CloseTypeTCPClientRst               //  9: 传输-客户端重置
+	CloseTypeServerSYNACKRepeat         // 10: 建连-服务端SYN结束
+	CloseTypeClientHalfClose            // 11: 断连-客户端半关
+	_                                   // 12: 【废弃】CloseTypeClientNoResponse
+	CloseTypeClientSourcePortReuse      // 13: 建连-客户端端口复用
+	_                                   // 14: 【废弃】CloseTypeClientSYNRetryLack
+	CloseTypeServerReset                // 15: 建连-服务端直接重置
+	_                                   // 16: 【废弃】CloseTypeServerNoResponse
+	CloseTypeServerQueueLack            // 17: 传输-服务端队列溢出
+	CloseTypeClientEstablishReset       // 18: 建连-客户端其他重置
+	CloseTypeServerEstablishReset       // 19: 建连-服务端其他重置
+	CloseTypeTCPFinClientRst            // 20: 正常结束-客户端重置
+	CloseTypeIcmpNormal                 // 21: ICMP-正常结束
+	CloseTypeIcmpAddressMaskTimeout     // 22: ICMP-地址掩码超时
+	CloseTypeIcmpDestinationUnreachable // 23: ICMP-目标不可达
+	CloseTypeIcmpEchoTimeout            // 24: ICMP-PING超时
+	CloseTypeIcmpInformationTimeout     // 25: ICMP-信息超时
+	CloseTypeIcmpParameterProblem       // 26: ICMP-参数问题
+	CloseTypeIcmpRouterTimeout          // 27: ICMP-路由器超时
+	CloseTypeIcmpSourceQuench           // 28: ICMP-源站抑制
+	CloseTypeIcmpTimeExceeded           // 29: ICMP-TTL溢出
+	CloseTypeIcmpTimestampTimeout       // 30: ICMP-时间戳超时
+	CloseTypeIcmpNeighborTimeout        // 31: ICMP-邻居发现超时
+	CloseTypeIcmpPacketTooBig           // 32: ICMP-Packet过大
+	CloseTypeIcmpOtherTimeout           // 33: ICMP-未知超时
+
 	MaxCloseType
 )
 
@@ -81,7 +95,13 @@ func (t CloseType) IsClientError() bool {
 func (t CloseType) IsServerError() bool {
 	return t == CloseTypeTCPServerRst || t == CloseTypeTimeout ||
 		t == CloseTypeServerHalfClose || t == CloseTypeServerSYNACKRepeat ||
-		t == CloseTypeServerReset || t == CloseTypeServerQueueLack || t == CloseTypeServerEstablishReset
+		t == CloseTypeServerReset || t == CloseTypeServerQueueLack || t == CloseTypeServerEstablishReset ||
+		t == CloseTypeIcmpAddressMaskTimeout || t == CloseTypeIcmpDestinationUnreachable ||
+		t == CloseTypeIcmpEchoTimeout || t == CloseTypeIcmpInformationTimeout ||
+		t == CloseTypeIcmpParameterProblem || t == CloseTypeIcmpRouterTimeout ||
+		t == CloseTypeIcmpSourceQuench || t == CloseTypeIcmpTimeExceeded ||
+		t == CloseTypeIcmpTimestampTimeout || t == CloseTypeIcmpNeighborTimeout ||
+		t == CloseTypeIcmpPacketTooBig || t == CloseTypeIcmpOtherTimeout
 }
 
 type DeviceType uint8
