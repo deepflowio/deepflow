@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
@@ -65,6 +66,8 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 	var regions []mysql.Region
 	var azs []mysql.AZ
 	var vtapRepos []mysql.VTapRepo
+
+	<-time.After(1 * time.Second)
 
 	userInfo := a.resourceAccess.UserInfo
 	dbInfo, err := mysql.GetDB(userInfo.ORGID)
