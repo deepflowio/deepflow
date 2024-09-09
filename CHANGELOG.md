@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Memory profile report interval not effective [#8092](https://github.com/deepflowio/deepflow/pull/8092) by [rvql](https://github.com/rvql)
 * fix: Bad event type for offcpu profile [#8078](https://github.com/deepflowio/deepflow/pull/8078) by [rvql](https://github.com/rvql)
 * fix: agent command panic [#8071](https://github.com/deepflowio/deepflow/pull/8071) by [roryye](https://github.com/roryye)
 * fix: clickhouse disk monitoring failure [#8069](https://github.com/deepflowio/deepflow/pull/8069) by [lzf575](https://github.com/lzf575)
@@ -182,6 +183,11 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: add fields to some/ip log [#8093](https://github.com/deepflowio/deepflow/pull/8093) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: agent - eBPF Add Command for datadump [#8087](https://github.com/deepflowio/deepflow/pull/8087) by [yinjiping](https://github.com/yinjiping)
+* feat: support ByConity disk monitor [#8079](https://github.com/deepflowio/deepflow/pull/8079) by [lzf575](https://github.com/lzf575)
+* feat: querier exist support pod_service [#8072](https://github.com/deepflowio/deepflow/pull/8072) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: support some/ip [#8019](https://github.com/deepflowio/deepflow/pull/8019) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: Allow changing memory profile report interval [#8076](https://github.com/deepflowio/deepflow/pull/8076) by [rvql](https://github.com/rvql)
 * feat: Rust memory profile support [#8049](https://github.com/deepflowio/deepflow/pull/8049) by [rvql](https://github.com/rvql)
 * feat: reduce clickhouse connection memory [#8045](https://github.com/deepflowio/deepflow/pull/8045) by [lzf575](https://github.com/lzf575)
@@ -378,6 +384,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: reduce the length of the receive queue [#8077](https://github.com/deepflowio/deepflow/pull/8077) by [lzf575](https://github.com/lzf575)
 * refactor: remove unused sql [#7656](https://github.com/deepflowio/deepflow/pull/7656) by [roryye](https://github.com/roryye)
 * refactor: Adjust agent profile configurations [#7918](https://github.com/deepflowio/deepflow/pull/7918) by [rvql](https://github.com/rvql)
 * refactor: update trace_tree debug info [#7915](https://github.com/deepflowio/deepflow/pull/7915) by [lzf575](https://github.com/lzf575)

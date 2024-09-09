@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: querier filter error when tag is x_request_id and syscall_trace_id [#8090](https://github.com/deepflowio/deepflow/pull/8090) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent desensitizes the content in backticks [#8073](https://github.com/deepflowio/deepflow/pull/8073) by [TomatoMr](https://github.com/TomatoMr)
 * fix: agent command panic [#8070](https://github.com/deepflowio/deepflow/pull/8070) by [roryye](https://github.com/roryye)
 * fix: add timeout to receive agent command heart beat [#8048](https://github.com/deepflowio/deepflow/pull/8048) by [roryye](https://github.com/roryye)
@@ -131,6 +132,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Add Command for datadump [#8083](https://github.com/deepflowio/deepflow/pull/8083) by [yinjiping](https://github.com/yinjiping)
 * feat: support multi target port [#8032](https://github.com/deepflowio/deepflow/pull/8032) by [askyrie](https://github.com/askyrie)
 * feat: trace tree support store PseudoLink field [#7952](https://github.com/deepflowio/deepflow/pull/7952) by [lzf575](https://github.com/lzf575)
 * feat: add enable features to agent group [#7945](https://github.com/deepflowio/deepflow/pull/7945) by [roryye](https://github.com/roryye)
