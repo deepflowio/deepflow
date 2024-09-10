@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: remove unnecessary restart for ebpf collector [#8101](https://github.com/deepflowio/deepflow/pull/8101) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Bad event type for offcpu profile [#8078](https://github.com/deepflowio/deepflow/pull/8078) by [rvql](https://github.com/rvql)
 * fix: agent command panic [#8071](https://github.com/deepflowio/deepflow/pull/8071) by [roryye](https://github.com/roryye)
 * fix: clickhouse disk monitoring failure [#8069](https://github.com/deepflowio/deepflow/pull/8069) by [lzf575](https://github.com/lzf575)
@@ -182,6 +183,8 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8102](https://github.com/deepflowio/deepflow/pull/8102) by [yinjiping](https://github.com/yinjiping)
+* feat: support profile data compression when sending [#8094](https://github.com/deepflowio/deepflow/pull/8094) by [lzf575](https://github.com/lzf575)
 * feat: Allow changing memory profile report interval [#8076](https://github.com/deepflowio/deepflow/pull/8076) by [rvql](https://github.com/rvql)
 * feat: Rust memory profile support [#8049](https://github.com/deepflowio/deepflow/pull/8049) by [rvql](https://github.com/rvql)
 * feat: reduce clickhouse connection memory [#8045](https://github.com/deepflowio/deepflow/pull/8045) by [lzf575](https://github.com/lzf575)
@@ -422,6 +425,7 @@
 
 
 #### OTHER
+* Cmbc [#8098](https://github.com/deepflowio/deepflow/pull/8098) by [rvql](https://github.com/rvql)
 * Update the description of `status` in l4_flow_log. [#8036](https://github.com/deepflowio/deepflow/pull/8036) by [deepflow-lifei](https://github.com/deepflow-lifei)
 * Relaxing regular expression restrictions for the ClusterID [#7907](https://github.com/deepflowio/deepflow/pull/7907) by [Hyzhou](https://github.com/Hyzhou)
 * use .env to config docker-compose.yaml [#7729](https://github.com/deepflowio/deepflow/pull/7729) by [asdfsx](https://github.com/asdfsx)
