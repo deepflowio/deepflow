@@ -486,6 +486,7 @@ extern "C" {
     pub fn set_bypass_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
     pub fn enable_ebpf_seg_reasm_protocol(protocol: c_int) -> c_int;
+    pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
     /*
      * @brief Add regex-matched process list for feature.
      * 
@@ -615,6 +616,45 @@ extern "C" {
     pub fn continuous_profiler_running() -> bool;
 
     /*
+     * To set the regex matching for the profiler.
+     *
+     * Perform regular expression matching on process names.
+     * Processes that successfully match the regular expression are
+     * aggregated using the key:
+     *     `{pid + stime + u_stack_id + k_stack_id + tid + cpu}`.
+     *
+     * For processes that do not match, they are aggregated using the
+     * key:
+     *     `<process name + u_stack_id + k_stack_id + cpu>`.
+     *
+     * Using regular expressions, we match process names to establish
+     * symbol table caching for specific processes, rather than enabling
+     * symbol caching for all processes. This approach aims to reduce
+     * memory usage.
+     *
+     * For example:
+     *
+     *  "^(java|nginx|profiler|telegraf|mysqld|socket_tracer|.*deepflow.*)$"
+     *
+     * This regex pattern matches the process names: "java", "nginx", "profiler",
+     * "telegraf", "mysqld", "socket_tracer", and any process containing the
+     * substring "deepflow".
+     *
+     * By using this interface, you can customize the regular expression to
+     * match specific process names that you want to establish symbol table
+     * caching for, providing flexibility and control over which processes will
+     * have symbol caching enabled. This allows you to finetune the memory usage
+     * and profiling behavior of the profiler according to your requirements.
+     *
+     * The default expression is empty (''), indicating that no profile data will
+     * be generated.
+     *
+     * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
+     * @returns 0 on success, < 0 on error
+     */
+    pub fn set_profiler_regex(pattern: *const c_char) -> c_int;
+
+    /*
      * This interface is used to set whether CPUID should be included in the
      * aggregation of stack trace data.
      *
@@ -703,6 +743,8 @@ extern "C" {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_profile")] {
+            pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
+
             pub fn enable_offcpu_profiler() -> c_int;
 
             pub fn disable_offcpu_profiler() -> c_int;
@@ -712,6 +754,8 @@ extern "C" {
             pub fn set_offcpu_minblock_time(
                 block_time: c_uint,
             ) -> c_int;
+
+            pub fn set_memory_profiler_regex(pattern: *const c_char) -> c_int;
 
             pub fn enable_memory_profiler() -> c_int;
 

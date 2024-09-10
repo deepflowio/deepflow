@@ -1695,6 +1695,21 @@ int set_bypass_port_bitmap(void *bitmap)
 	return 0;
 }
 
+int set_feature_regex(int feature, const char *pattern)
+{
+	if (feature < 0 || feature >= FEATURE_MAX) {
+		return ETR_INVAL;
+	}
+
+	if (regcomp(&cfg_feature_regex_array[feature].preg, pattern,
+		    REG_EXTENDED)) {
+		return ETR_INVAL;
+	}
+
+	cfg_feature_regex_array[feature].ok = true;
+	return 0;
+}
+
 bool is_feature_enabled(int feature)
 {
 	if (feature < 0 || feature >= FEATURE_MAX) {
