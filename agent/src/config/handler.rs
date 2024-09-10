@@ -2938,7 +2938,9 @@ impl ConfigHandler {
                         .on_config_change(&handler.candidate_config.ebpf);
                 }
             }
-            callbacks.push(ebpf_callback);
+            if components.is_some() {
+                callbacks.push(ebpf_callback);
+            }
         }
 
         if candidate_config.trident_type != new_config.trident_type {
