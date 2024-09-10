@@ -157,6 +157,7 @@ const (
 	L7_PROTOCOL_FASTCGI  L7Protocol = 44
 	L7_PROTOCOL_BRPC     L7Protocol = 45
 	L7_PROTOCOL_TARS     L7Protocol = 46
+	L7_PROTOCOL_SOME_IP  L7Protocol = 47
 	L7_PROTOCOL_MYSQL    L7Protocol = 60
 	L7_PROTOCOL_POSTGRE  L7Protocol = 61
 	L7_PROTOCOL_ORACLE   L7Protocol = 62
@@ -662,6 +663,12 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "Tars"
 		}
+	case L7_PROTOCOL_SOME_IP:
+		if isTLS {
+			return "SOME/IP_TLS"
+		} else {
+			return "SOME/IP"
+		}
 	case L7_PROTOCOL_MYSQL:
 		if isTLS {
 			return "MySQL_TLS"
@@ -761,6 +768,8 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	strings.ToLower(L7_PROTOCOL_SOFARPC.String(false)):  L7_PROTOCOL_SOFARPC,
 	strings.ToLower(L7_PROTOCOL_FASTCGI.String(false)):  L7_PROTOCOL_FASTCGI,
 	strings.ToLower(L7_PROTOCOL_BRPC.String(false)):     L7_PROTOCOL_BRPC,
+	strings.ToLower(L7_PROTOCOL_TARS.String(false)):     L7_PROTOCOL_TARS,
+	strings.ToLower(L7_PROTOCOL_SOME_IP.String(false)):  L7_PROTOCOL_SOME_IP,
 	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):    L7_PROTOCOL_MYSQL,
 	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):  L7_PROTOCOL_POSTGRE,
 	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):   L7_PROTOCOL_ORACLE,
