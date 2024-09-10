@@ -131,6 +131,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8103](https://github.com/deepflowio/deepflow/pull/8103) by [yinjiping](https://github.com/yinjiping)
+* feat: Change opengauss api group [#8099](https://github.com/deepflowio/deepflow/pull/8099) by [rvql](https://github.com/rvql)
+* feat: improves performance of recorder synchronization when there are a large number of process data [#8086](https://github.com/deepflowio/deepflow/pull/8086) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: support multi target port [#8032](https://github.com/deepflowio/deepflow/pull/8032) by [askyrie](https://github.com/askyrie)
 * feat: trace tree support store PseudoLink field [#7952](https://github.com/deepflowio/deepflow/pull/7952) by [lzf575](https://github.com/lzf575)
 * feat: add enable features to agent group [#7945](https://github.com/deepflowio/deepflow/pull/7945) by [roryye](https://github.com/roryye)
