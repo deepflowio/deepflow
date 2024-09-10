@@ -59,12 +59,13 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			wholeCache,
-			db.NewPod().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPod(),
 			wholeCache.DiffBaseDataSet.Pods,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -152,6 +153,11 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*mysqlmodel.Pod, b
 		dbItem.CreatedAt = cloudItem.CreatedAt
 	}
 	return dbItem, true
+}
+
+func (p *Pod) getUpdateableFields() []string {
+	return []string{"epc_id", "pod_node_id", "pod_rs_id", "pod_group_id", "pod_service_id", "name", "label",
+		"annotation", "env", "container_ids", "region", "az", "state", "created_at"}
 }
 
 func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (*message.PodFieldsUpdate, map[string]interface{}, bool) {
@@ -261,4 +267,49 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *Pod) setUpdatedFields(dbItem *mysqlmodel.Pod, updateInfo *message.PodFieldsUpdate) {
+	if updateInfo.VPCID.IsDifferent() {
+		dbItem.VPCID = updateInfo.VPCID.GetNew()
+	}
+	if updateInfo.PodNodeID.IsDifferent() {
+		dbItem.PodNodeID = updateInfo.PodNodeID.GetNew()
+	}
+	if updateInfo.PodReplicaSetID.IsDifferent() {
+		dbItem.PodReplicaSetID = updateInfo.PodReplicaSetID.GetNew()
+	}
+	if updateInfo.PodGroupID.IsDifferent() {
+		dbItem.PodGroupID = updateInfo.PodGroupID.GetNew()
+	}
+	if updateInfo.PodServiceID.IsDifferent() {
+		dbItem.PodServiceID = updateInfo.PodServiceID.GetNew()
+	}
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.Annotation.IsDifferent() {
+		dbItem.Annotation = updateInfo.Annotation.GetNew()
+	}
+	if updateInfo.ENV.IsDifferent() {
+		dbItem.ENV = updateInfo.ENV.GetNew()
+	}
+	if updateInfo.ContainerIDs.IsDifferent() {
+		dbItem.ContainerIDs = updateInfo.ContainerIDs.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
+	if updateInfo.State.IsDifferent() {
+		dbItem.State = updateInfo.State.GetNew()
+	}
+	if updateInfo.CreatedAt.IsDifferent() {
+		dbItem.CreatedAt = updateInfo.CreatedAt.GetNew()
+	}
 }

@@ -59,12 +59,13 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			wholeCache,
-			db.NewNATGateway().SetMetadata(wholeCache.GetMetadata()),
+			db.NewNATGateway(),
 			wholeCache.DiffBaseDataSet.NATGateways,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -96,6 +97,10 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*mys
 	return dbItem, true
 }
 
+func (g *NATGateway) getUpdateableFields() []string {
+	return []string{"name", "region", "floating_ips"}
+}
+
 func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (*message.NATGatewayFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.NATGatewayFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -113,4 +118,16 @@ func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (g *NATGateway) setUpdatedFields(dbItem *mysqlmodel.NATGateway, updateInfo *message.NATGatewayFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.FloatingIPs.IsDifferent() {
+		dbItem.FloatingIPs = updateInfo.FloatingIPs.GetNew()
+	}
 }

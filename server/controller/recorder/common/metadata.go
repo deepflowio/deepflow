@@ -51,6 +51,10 @@ func (m *Metadata) Copy() *Metadata {
 	}
 }
 
+func (m *Metadata) GetDB() *mysql.DB {
+	return m.DB
+}
+
 func (m *Metadata) GetORGID() int {
 	return m.ORGID
 }

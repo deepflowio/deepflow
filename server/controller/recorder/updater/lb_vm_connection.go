@@ -59,12 +59,13 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			wholeCache,
-			db.NewLBVMConnection().SetMetadata(wholeCache.GetMetadata()),
+			db.NewLBVMConnection(),
 			wholeCache.DiffBaseDataSet.LBVMConnections,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -101,6 +102,15 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 }
 
 // 保留接口
+func (c *LBVMConnection) getUpdateableFields() []string {
+	return nil
+}
+
+// 保留接口
 func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (*message.LBVMConnectionFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
+}
+
+// 保留接口
+func (c *LBVMConnection) setUpdatedFields(dbItem *mysqlmodel.LBVMConnection, updateInfo *message.LBVMConnectionFieldsUpdate) {
 }

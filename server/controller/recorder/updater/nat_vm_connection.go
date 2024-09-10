@@ -59,12 +59,13 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			wholeCache,
-			db.NewNATVMConnection().SetMetadata(wholeCache.GetMetadata()),
+			db.NewNATVMConnection(),
 			wholeCache.DiffBaseDataSet.NATVMConnections,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -101,6 +102,15 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 }
 
 // 保留接口
+func (c *NATVMConnection) getUpdateableFields() []string {
+	return nil
+}
+
+// 保留接口
 func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (*message.NATVMConnectionFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
+}
+
+// 保留接口
+func (c *NATVMConnection) setUpdatedFields(dbItem *mysqlmodel.NATVMConnection, updateInfo *message.NATVMConnectionFieldsUpdate) {
 }

@@ -62,12 +62,13 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			wholeCache,
-			db.NewPodNamespace().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodNamespace(),
 			wholeCache.DiffBaseDataSet.PodNamespaces,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -102,6 +103,10 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 	return dbItem, true
 }
 
+func (n *PodNamespace) getUpdateableFields() []string {
+	return []string{"region", "cloud_tags"}
+}
+
 func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloudItem *cloudmodel.PodNamespace) (*message.PodNamespaceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodNamespaceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -124,4 +129,13 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloud
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (n *PodNamespace) setUpdatedFields(dbItem *mysqlmodel.PodNamespace, updateInfo *message.PodNamespaceFieldsUpdate) {
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.CloudTags.IsDifferent() {
+		dbItem.CloudTags = updateInfo.CloudTags.GetNew()
+	}
 }

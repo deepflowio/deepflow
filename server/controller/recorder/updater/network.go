@@ -59,12 +59,13 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 		](
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			wholeCache,
-			db.NewNetwork().SetMetadata(wholeCache.GetMetadata()),
+			db.NewNetwork(),
 			wholeCache.DiffBaseDataSet.Networks,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -98,6 +99,10 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*mysqlmode
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
+}
+
+func (n *Network) getUpdateableFields() []string {
+	return []string{"epc_id", "name", "label", "tunnel_id", "segmentation_id", "net_type", "region", "az"}
 }
 
 func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (*message.NetworkFieldsUpdate, map[string]interface{}, bool) {
@@ -146,4 +151,31 @@ func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *clou
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (n *Network) setUpdatedFields(dbItem *mysqlmodel.Network, updateInfo *message.NetworkFieldsUpdate) {
+	if updateInfo.VPCID.IsDifferent() {
+		dbItem.VPCID = updateInfo.VPCID.GetNew()
+	}
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.TunnelID.IsDifferent() {
+		dbItem.TunnelID = updateInfo.TunnelID.GetNew()
+	}
+	if updateInfo.SegmentationID.IsDifferent() {
+		dbItem.SegmentationID = updateInfo.SegmentationID.GetNew()
+	}
+	if updateInfo.NetType.IsDifferent() {
+		dbItem.NetType = updateInfo.NetType.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
 }

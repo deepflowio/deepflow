@@ -59,12 +59,13 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			wholeCache,
-			db.NewPodIngress().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodIngress(),
 			wholeCache.DiffBaseDataSet.PodIngresses,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -103,6 +104,10 @@ func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*mys
 	return dbItem, true
 }
 
+func (i *PodIngress) getUpdateableFields() []string {
+	return []string{"name", "region"}
+}
+
 func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem *cloudmodel.PodIngress) (*message.PodIngressFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodIngressFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -120,4 +125,16 @@ func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem
 	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (i *PodIngress) setUpdatedFields(dbItem *mysqlmodel.PodIngress, updateInfo *message.PodIngressFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	// if updateInfo.AZLcuuid.IsDifferent() {
+	// 	dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	// }
 }

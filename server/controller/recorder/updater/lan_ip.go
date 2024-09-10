@@ -61,13 +61,14 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			wholeCache,
-			db.NewLANIP().SetMetadata(wholeCache.GetMetadata()),
+			db.NewLANIP(),
 			wholeCache.DiffBaseDataSet.LANIPs,
 			nil,
 		),
 	}
 	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -141,6 +142,11 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.LANIP
 	return dbItem, true
 }
 
+// getUpdateableFields implements the DataGenerator interface method
+func (i *LANIP) getUpdateableFields() []string {
+	return nil
+}
+
 func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (*message.LANIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LANIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -168,4 +174,7 @@ func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmod
 	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (i *LANIP) setUpdatedFields(dbItem *mysqlmodel.LANIP, updateInfo *message.LANIPFieldsUpdate) {
 }

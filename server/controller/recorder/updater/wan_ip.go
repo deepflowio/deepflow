@@ -63,13 +63,14 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,
-			db.NewWANIP().SetMetadata(wholeCache.GetMetadata()),
+			db.NewWANIP(),
 			wholeCache.DiffBaseDataSet.WANIPs,
 			nil,
 		),
 	}
 	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -129,6 +130,10 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.WANIP
 	return dbItem, true
 }
 
+func (i *WANIP) getUpdateableFields() []string {
+	return []string{"region"}
+}
+
 func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (*message.WANIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.WANIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -164,4 +169,10 @@ func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmod
 	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (i *WANIP) setUpdatedFields(dbItem *mysqlmodel.WANIP, updateInfo *message.WANIPFieldsUpdate) {
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
 }

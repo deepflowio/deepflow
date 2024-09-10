@@ -59,12 +59,13 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,
-			db.NewVPC().SetMetadata(wholeCache.GetMetadata()),
+			db.NewVPC(),
 			wholeCache.DiffBaseDataSet.VPCs,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -86,6 +87,10 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysqlmodel.VPC, b
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
+}
+
+func (v *VPC) getUpdateableFields() []string {
+	return []string{"name", "label", "region", "cidr", "tunnel_id"}
 }
 
 func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (*message.VPCFieldsUpdate, map[string]interface{}, bool) {
@@ -113,4 +118,22 @@ func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.V
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (v *VPC) setUpdatedFields(dbItem *mysqlmodel.VPC, updateInfo *message.VPCFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.CIDR.IsDifferent() {
+		dbItem.CIDR = updateInfo.CIDR.GetNew()
+	}
+	if updateInfo.TunnelID.IsDifferent() {
+		dbItem.TunnelID = updateInfo.TunnelID.GetNew()
+	}
 }

@@ -59,12 +59,13 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 		](
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			wholeCache,
-			db.NewRedisInstance().SetMetadata(wholeCache.GetMetadata()),
+			db.NewRedisInstance(),
 			wholeCache.DiffBaseDataSet.RedisInstances,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -99,6 +100,10 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 	return dbItem, true
 }
 
+func (r *RedisInstance) getUpdateableFields() []string {
+	return []string{"name", "state", "public_host", "region", "az"}
+}
+
 func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (*message.RedisInstanceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RedisInstanceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -124,4 +129,22 @@ func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, clo
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (r *RedisInstance) setUpdatedFields(dbItem *mysqlmodel.RedisInstance, updateInfo *message.RedisInstanceFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.State.IsDifferent() {
+		dbItem.State = updateInfo.State.GetNew()
+	}
+	if updateInfo.PublicHost.IsDifferent() {
+		dbItem.PublicHost = updateInfo.PublicHost.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
 }

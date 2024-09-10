@@ -19,6 +19,8 @@ package db
 import (
 	"time"
 
+	"gorm.io/gorm/clause"
+
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -34,10 +36,14 @@ type Operator[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] interf
 	AddBatch(dbItems []*MT) ([]*MT, bool)
 	// 更新数据
 	Update(lcuuid string, updateInfo map[string]interface{}) (*MT, bool)
+	// 批量更新数据
+	UpdateBatch([]*MT, map[string]map[string]interface{}) ([]*MT, bool)
 	// 批量删除数据
 	DeleteBatch(lcuuids []string) ([]*MT, bool)
 
 	GetSoftDelete() bool
+	SetFieldsToUpdate([]string)
+	SetMetadata(*rcommon.Metadata)
 }
 
 type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] struct {
@@ -47,6 +53,7 @@ type OperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel] st
 	softDelete              bool
 	allocateID              bool
 	fieldsNeededAfterCreate []string // fields needed to be used after create
+	fieldsToUpdate          []string // fields needed to be updated
 }
 
 func newOperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel](resourceTypeName string, softDelete, allocateID bool) OperatorBase[MPT, MT] {
@@ -57,9 +64,14 @@ func newOperatorBase[MPT constraint.MySQLModelPtr[MT], MT constraint.MySQLModel]
 	}
 }
 
-func (o *OperatorBase[MPT, MT]) SetMetadata(md *rcommon.Metadata) Operator[MPT, MT] {
+func (o *OperatorBase[MPT, MT]) SetFieldsToUpdate(fs []string) {
+	o.fieldsToUpdate = fs
+	return
+}
+
+func (o *OperatorBase[MPT, MT]) SetMetadata(md *rcommon.Metadata) {
 	o.metadata = md
-	return o
+	return
 }
 
 func (o *OperatorBase[MPT, MT]) GetSoftDelete() bool {
@@ -115,6 +127,23 @@ func (o *OperatorBase[MPT, MT]) Update(lcuuid string, updateInfo map[string]inte
 	log.Infof("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, o.metadata.LogPrefixes)
 	o.metadata.DB.Model(&dbItem).Where("lcuuid = ?", lcuuid).Find(&dbItem)
 	return dbItem, true
+}
+
+func (o *OperatorBase[MPT, MT]) UpdateBatch(dbItems []*MT, lcuuidToUpdateInfo map[string]map[string]interface{}) ([]*MT, bool) {
+	startTime := time.Now()
+	err := o.metadata.DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "lcuuid"}},
+		DoUpdates: clause.AssignmentColumns(o.fieldsToUpdate),
+	}).Create(&dbItems).Error
+	log.Infof("update batch cost: %v", time.Since(startTime))
+	if err != nil {
+		log.Errorf("%s batch failed: %v", rcommon.LogUpdate(o.resourceTypeName), err.Error(), o.metadata.LogPrefixes)
+		return nil, false
+	}
+	for lcuuid, updateInfo := range lcuuidToUpdateInfo {
+		log.Infof("%s (lcuuid: %s, detail: %+v) success", rcommon.LogUpdate(o.resourceTypeName), lcuuid, updateInfo, o.metadata.LogPrefixes)
+	}
+	return dbItems, true
 }
 
 func (o *OperatorBase[MPT, MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {

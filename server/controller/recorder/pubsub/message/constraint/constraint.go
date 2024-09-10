@@ -45,10 +45,16 @@ type UpdatePtr[T Update] interface {
 
 	SetFields(interface{})
 	GetFields() interface{} // return *FieldsUpdate
-	SetDiffBase(interface{})
-	GetDiffBase() interface{} // return *constraint.DiffBase
-	SetCloudItem(interface{})
+	SetFieldsMap(map[string]interface{})
+	GetFieldsMap() map[string]interface{}
+	SetDiffBase(interface{})   // TODO remove this
+	GetDiffBase() interface{}  // return *constraint.DiffBase
+	SetCloudItem(interface{})  // TODO remove this
 	GetCloudItem() interface{} // return *constraint.CloudModel
+	// SetNewMySQL(interface{}) // TODO: remove this
+	// GetNewMySQL() interface{}
+	// SetOldMySQL(interface{})
+	// GetOldMySQL() interface{}
 }
 
 // Update是所有资源更新消息的泛型约束
