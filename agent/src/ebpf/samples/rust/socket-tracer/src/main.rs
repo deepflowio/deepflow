@@ -635,15 +635,6 @@ fn main() {
         //    ::std::process::exit(1);
         //}
 
-        //set_profiler_regex(
-        //    CString::new(
-        //        "^(java|nginx|profiler|telegraf|mysqld|.*deepflow.*|socket_tracer)$".as_bytes(),
-        //    )
-        //    .unwrap()
-        //    .as_c_str()
-        //    .as_ptr(),
-        //);
-
         //// CPUID will not be included in the aggregation of stack trace data.
         //set_profiler_cpu_aggregation(0);
 

@@ -68,8 +68,7 @@ struct profiler_context {
 
 	/*
 	 * To perform regular expression matching on process names,
-	 * the 'profiler_regex' is set using the 'set_profiler_regex()'
-	 * interface. Processes that successfully match the regular
+	 * Processes that successfully match the regular
 	 * expression are aggregated using the key:
 	 * `{pid + stime + u_stack_id + k_stack_id + tid + cpu}`.
 	 *

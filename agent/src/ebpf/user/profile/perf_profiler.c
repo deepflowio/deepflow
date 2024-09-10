@@ -876,44 +876,6 @@ void release_flame_graph_hash(void)
 		  flame_graph_start_time, flame_graph_end_time);
 }
 
-/*
- * To set the regex matching for the profiler. 
- *
- * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
- * @returns 0 on success, < 0 on error
- */
-int set_profiler_regex(const char *pattern)
-{
-	if (profiler_tracer == NULL) {
-		ebpf_warning(LOG_CP_TAG
-			     "The 'profiler_tracer' has not been created yet."
-			     " Please use start_continuous_profiler() to create it first.\n");
-		return (-1);
-	}
-
-	if (!g_enable_oncpu) {
-		ebpf_warning(LOG_CP_TAG
-			     "'profiler_regex' cannot be set while on-CPU is currently disabled.\n");
-		return (-1);
-	}
-
-	/*
-	 * During the data processing, the thread responsible for matching reads the
-	 * regular expression, while the thread handling the regular expression upd-
-	 * ates is different. Synchronization is implemented to ensure protection and
-	 * coordination between these two threads.
-	 */
-	profile_regex_lock(&oncpu_ctx);
-	do_profiler_regex_config(pattern, &oncpu_ctx);
-	profile_regex_unlock(&oncpu_ctx);
-
-	unwind_process_reload();
-
-	ebpf_info(LOG_CP_TAG "Set 'profiler_regex' successful, pattern : '%s'",
-		  pattern);
-	return (0);
-}
-
 bool check_oncpu_profiler_regex(const char *name) {
 	return check_profiler_regex(&oncpu_ctx, name);
 }
@@ -1024,11 +986,6 @@ void process_stack_trace_data_for_flame_graph(stack_trace_msg_t * val)
 void release_flame_graph_hash(void)
 {
 	return;
-}
-
-int set_profiler_regex(const char *pattern)
-{
-	return (-1);
 }
 
 int set_profiler_cpu_aggregation(int flag)

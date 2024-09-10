@@ -615,7 +615,6 @@ static int inline __reclaim_map(int map_fd, struct list_head *h)
 int set_allow_port_bitmap(void *bitmap);
 int set_bypass_port_bitmap(void *bitmap);
 int enable_ebpf_protocol(int protocol);
-int set_feature_regex(int feature, const char *pattern);
 bool is_feature_enabled(int feature);
 bool is_feature_matched(int feature, int pid, const char *path);
 int bpf_tracer_init(const char *log_file, bool is_stdout);
