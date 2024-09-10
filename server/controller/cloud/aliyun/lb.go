@@ -96,10 +96,9 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 				Label:        lbId,
 				Model:        lbModel,
 				VPCLcuuid:    vpcLcuuid,
-				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid: a.regionLcuuid,
 			}
 			retLBs = append(retLBs, retLB)
-			a.regionLcuuidToResourceNum[retLB.RegionLcuuid]++
 
 			// 监听器信息
 			retLBListeners = append(retLBListeners, a.getLBListeners(region, lbId, lb.Get("Address").MustString())...)
@@ -120,7 +119,7 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 				DeviceType:    common.VIF_DEVICE_TYPE_LB,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:  a.regionLcuuid,
 			}
 			retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -130,7 +129,7 @@ func (a *Aliyun) getLoadBalances(region model.Region, vmLcuuidToVPCLcuuid map[st
 				VInterfaceLcuuid: portLcuuid,
 				IP:               lb.Get("Address").MustString(),
 				SubnetLcuuid:     common.GenerateUUIDByOrgID(a.orgID, networkLcuuid),
-				RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:     a.regionLcuuid,
 			}
 			retIPs = append(retIPs, retIP)
 		}

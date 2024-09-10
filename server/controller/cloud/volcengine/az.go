@@ -47,7 +47,7 @@ func (v *VolcEngine) getAZs(sess *session.Session) ([]model.AZ, error) {
 			Lcuuid:       lcuuid,
 			Name:         zoneID,
 			Label:        zoneID,
-			RegionLcuuid: v.regionUUID,
+			RegionLcuuid: v.regionLcuuid,
 		})
 	}
 	log.Debug("get azs complete", logger.NewORGPrefix(v.orgID))

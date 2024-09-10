@@ -128,6 +128,21 @@ func UnionMapStringSet(m, n map[string]mapset.Set) map[string]mapset.Set {
 	return m
 }
 
+func UniqRegions(regionStrings string) map[string]bool {
+	retRegions := map[string]bool{}
+	if regionStrings == "" {
+		return retRegions
+	}
+	regionStrings = strings.ReplaceAll(regionStrings, "，", ",")
+	for _, regionName := range strings.Split(regionStrings, ",") {
+		if regionName == "" {
+			continue
+		}
+		retRegions[regionName] = false
+	}
+	return retRegions
+}
+
 func ReadJSONFile(path string) (*simplejson.Json, error) {
 	jsonFile, err := os.ReadFile(path)
 	if err != nil {

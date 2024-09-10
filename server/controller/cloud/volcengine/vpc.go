@@ -56,7 +56,7 @@ func (v *VolcEngine) getVPCs(sess *session.Session) ([]model.VPC, error) {
 			Name:         v.getStringPointerValue(vpc.VpcName),
 			CIDR:         v.getStringPointerValue(vpc.CidrBlock),
 			Label:        vpcID,
-			RegionLcuuid: v.regionUUID,
+			RegionLcuuid: v.regionLcuuid,
 		})
 	}
 	log.Debug("get vpcs complete", logger.NewORGPrefix(v.orgID))

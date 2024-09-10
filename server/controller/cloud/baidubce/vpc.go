@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string, map[string]string, error) {
+func (b *BaiduBce) getVPCs() ([]model.VPC, map[string]string, map[string]string, error) {
 	var retVPCs []model.VPC
 	var vpcIdToLcuuid map[string]string
 	var vpcIdToName map[string]string
@@ -64,12 +64,11 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 				Lcuuid:       vpcLcuuid,
 				Name:         vpc.Name,
 				CIDR:         vpc.Cidr,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 			}
 			retVPCs = append(retVPCs, retVPC)
 			vpcIdToName[vpc.VPCID] = vpc.Name
 			vpcIdToLcuuid[vpc.VPCID] = vpcLcuuid
-			b.regionLcuuidToResourceNum[retVPC.RegionLcuuid]++
 		}
 	}
 	log.Debug("get vpcs complete", logger.NewORGPrefix(b.orgID))

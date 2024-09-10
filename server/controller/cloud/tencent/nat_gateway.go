@@ -24,7 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
+func (t *Tencent) getNatGateways(region string) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
 	log.Debug("get nat gateways starting", logger.NewORGPrefix(t.orgID))
 	var natGateways []model.NATGateway
 	var natVinterfaces []model.VInterface
@@ -32,7 +32,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 
 	attrs := []string{"NatGatewayId", "NatGatewayName", "VpcId"}
 
-	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGateways", region.name, "NatGatewaySet", true, map[string]interface{}{})
+	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGateways", region, "NatGatewaySet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("nat gateway request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, err
@@ -54,7 +54,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 			Label:        natID,
 			FloatingIPs:  strings.Join(floatingIPs, ","),
 			VPCLcuuid:    vpcLcuuid,
-			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: t.regionLcuuid,
 		})
 		t.natIDs = append(t.natIDs, natID)
 
@@ -68,14 +68,14 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 				DeviceType:    common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 				NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
+				RegionLcuuid:  t.regionLcuuid,
 			})
 			for _, ip := range floatingIPs {
 				natIPs = append(natIPs, model.IP{
 					Lcuuid:           common.GetUUIDByOrgID(t.orgID, vinterfaceLcuuid+ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
-					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
+					RegionLcuuid:     t.regionLcuuid,
 				})
 			}
 		}

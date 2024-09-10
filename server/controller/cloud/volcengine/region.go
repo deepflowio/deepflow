@@ -17,8 +17,6 @@
 package volcengine
 
 import (
-	"sort"
-
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/volcengine/volcengine-go-sdk/service/ecs"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
@@ -29,6 +27,14 @@ import (
 func (v *VolcEngine) getRegions() ([]string, error) {
 	log.Debug("get regions starting", logger.NewORGPrefix(v.orgID))
 	var regionIDs []string
+
+	if len(v.includeRegions) == 1 {
+		for regionID := range v.includeRegions {
+			regionIDs = append(regionIDs, regionID)
+		}
+		log.Debug("get regions complete", logger.NewORGPrefix(v.orgID))
+		return regionIDs, nil
+	}
 
 	config := volcengine.NewConfig().
 		WithCredentials(credentials.NewStaticCredentials(v.secretID, v.secretKey, "")).
@@ -50,21 +56,15 @@ func (v *VolcEngine) getRegions() ([]string, error) {
 			continue
 		}
 		regionID := v.getStringPointerValue(region.RegionId)
-		// 当存在区域白名单时，如果当前区域不在白名单中，则跳过
-		if len(v.includeRegions) > 0 {
-			regionIndex := sort.SearchStrings(v.includeRegions, regionID)
-			if regionIndex == len(v.includeRegions) || v.includeRegions[regionIndex] != regionID {
-				log.Infof("region (%s) not in include_regions", regionID, logger.NewORGPrefix(v.orgID))
-				continue
-			}
+		// 区域白名单，如果当前区域不在白名单中，则跳过
+		if _, ok := v.includeRegions[regionID]; !ok {
+			log.Infof("region (%s) not in include_regions", regionID, logger.NewORGPrefix(v.orgID))
+			continue
 		}
-		// 当存在区域黑名单是，如果当前区域在黑名单中，则跳过
-		if len(v.excludeRegions) > 0 {
-			regionIndex := sort.SearchStrings(v.excludeRegions, regionID)
-			if regionIndex < len(v.excludeRegions) && v.excludeRegions[regionIndex] == regionID {
-				log.Infof("region (%s) in exclude_regions", regionID, logger.NewORGPrefix(v.orgID))
-				continue
-			}
+		// 区域黑名单，如果当前区域在黑名单中，则跳过
+		if _, ok := v.excludeRegions[regionID]; ok {
+			log.Infof("region (%s) in exclude_regions", regionID, logger.NewORGPrefix(v.orgID))
+			continue
 		}
 		regionIDs = append(regionIDs, regionID)
 	}

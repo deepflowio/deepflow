@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, error) {
+func (a *Aws) getPeerConnections(client *ec2.Client) ([]model.PeerConnection, error) {
 	log.Debug("get peer connections starting", logger.NewORGPrefix(a.orgID))
 	var peerConnections []model.PeerConnection
 
@@ -40,7 +40,7 @@ func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, erro
 		} else {
 			input = &ec2.DescribeVpcPeeringConnectionsInput{MaxResults: &maxResults, NextToken: &nextToken}
 		}
-		result, err := a.ec2Client.DescribeVpcPeeringConnections(context.TODO(), input)
+		result, err := client.DescribeVpcPeeringConnections(context.TODO(), input)
 		if err != nil {
 			log.Errorf("peer connection request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.PeerConnection{}, err
@@ -72,8 +72,8 @@ func (a *Aws) getPeerConnections(region awsRegion) ([]model.PeerConnection, erro
 			Label:              peerConnectionID,
 			RemoteVPCLcuuid:    common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.AccepterVpcInfo.VpcId)),
 			LocalVPCLcuuid:     common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.RequesterVpcInfo.VpcId)),
-			RemoteRegionLcuuid: a.getRegionLcuuid(common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.AccepterVpcInfo.Region))),
-			LocalRegionLcuuid:  a.getRegionLcuuid(common.GetUUIDByOrgID(a.orgID, a.getStringPointerValue(pData.RequesterVpcInfo.Region))),
+			RemoteRegionLcuuid: a.regionLcuuid,
+			LocalRegionLcuuid:  a.regionLcuuid,
 		})
 	}
 	log.Debug("get peer connections complete", logger.NewORGPrefix(a.orgID))

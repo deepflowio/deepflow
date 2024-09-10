@@ -28,10 +28,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getVMs(
-	region model.Region, zoneNameToAZLcuuid map[string]string, vpcIdToLcuuid map[string]string,
-	networkIdToLcuuid map[string]string,
-) ([]model.VM, []model.VInterface, []model.IP, error) {
+func (b *BaiduBce) getVMs(zoneNameToAZLcuuid map[string]string, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) ([]model.VM, []model.VInterface, []model.IP, error) {
 	var retVMs []model.VM
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
@@ -105,12 +102,11 @@ func (b *BaiduBce) getVMs(
 				State:        vmState,
 				IP:           pIP,
 				AZLcuuid:     azLcuuid,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 			}
 			retVMs = append(retVMs, retVM)
 			vmIdToLcuuid[vm.InstanceId] = vmLcuuid
 			b.azLcuuidToResourceNum[retVM.AZLcuuid]++
-			b.regionLcuuidToResourceNum[retVM.RegionLcuuid]++
 
 			// 虚拟机主网卡信息
 			// 虚拟机API不会返回弹性网卡信息，需要通过弹性网卡API单独获取
@@ -127,7 +123,7 @@ func (b *BaiduBce) getVMs(
 				DeviceType:    common.VIF_DEVICE_TYPE_VM,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  region.Lcuuid,
+				RegionLcuuid:  b.regionLcuuid,
 			}
 			retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -142,7 +138,7 @@ func (b *BaiduBce) getVMs(
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip.PrivateIp,
 					SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
-					RegionLcuuid:     region.Lcuuid,
+					RegionLcuuid:     b.regionLcuuid,
 				}
 				retIPs = append(retIPs, retIP)
 
@@ -159,7 +155,7 @@ func (b *BaiduBce) getVMs(
 					DeviceType:    common.VIF_DEVICE_TYPE_VM,
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  region.Lcuuid,
+					RegionLcuuid:  b.regionLcuuid,
 				}
 				retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -168,7 +164,7 @@ func (b *BaiduBce) getVMs(
 					Lcuuid:           publicIPLcuuid,
 					VInterfaceLcuuid: publicVInterfaceLcuuid,
 					IP:               ip.Eip,
-					RegionLcuuid:     region.Lcuuid,
+					RegionLcuuid:     b.regionLcuuid,
 				}
 				retIPs = append(retIPs, retIP)
 			}
@@ -176,7 +172,7 @@ func (b *BaiduBce) getVMs(
 	}
 
 	// 获取弹性网卡及IP信息
-	tmpVInterfaces, tmpIPs, err := b.getVMEnis(region, vpcIdToLcuuid, networkIdToLcuuid, vmIdToLcuuid)
+	tmpVInterfaces, tmpIPs, err := b.getVMEnis(vpcIdToLcuuid, networkIdToLcuuid, vmIdToLcuuid)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -189,7 +185,7 @@ func (b *BaiduBce) getVMs(
 }
 
 func (b *BaiduBce) getVMEnis(
-	region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string, vmIdToLcuuid map[string]string,
+	vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string, vmIdToLcuuid map[string]string,
 ) ([]model.VInterface, []model.IP, error) {
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
@@ -246,7 +242,7 @@ func (b *BaiduBce) getVMEnis(
 					DeviceType:    common.VIF_DEVICE_TYPE_VM,
 					NetworkLcuuid: networkLcuuid,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  region.Lcuuid,
+					RegionLcuuid:  b.regionLcuuid,
 				}
 				retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -259,7 +255,7 @@ func (b *BaiduBce) getVMEnis(
 						VInterfaceLcuuid: vinterfaceLcuuid,
 						IP:               privateIP.PrivateIpAddress,
 						SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
-						RegionLcuuid:     region.Lcuuid,
+						RegionLcuuid:     b.regionLcuuid,
 					}
 					retIPs = append(retIPs, retIP)
 
@@ -277,7 +273,7 @@ func (b *BaiduBce) getVMEnis(
 						DeviceType:    common.VIF_DEVICE_TYPE_VM,
 						NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 						VPCLcuuid:     vpcLcuuid,
-						RegionLcuuid:  region.Lcuuid,
+						RegionLcuuid:  b.regionLcuuid,
 					}
 					retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -285,7 +281,7 @@ func (b *BaiduBce) getVMEnis(
 						Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, publicVInterfaceLcuuid+privateIP.PublicIpAddress),
 						VInterfaceLcuuid: publicVInterfaceLcuuid,
 						IP:               privateIP.PublicIpAddress,
-						RegionLcuuid:     region.Lcuuid,
+						RegionLcuuid:     b.regionLcuuid,
 					}
 					retIPs = append(retIPs, retIP)
 				}

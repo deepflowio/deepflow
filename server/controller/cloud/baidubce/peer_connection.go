@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[string]string) ([]model.PeerConnection, error) {
+func (b *BaiduBce) getPeerConnections(vpcIdToLcuuid map[string]string) ([]model.PeerConnection, error) {
 	var retPeerConnections []model.PeerConnection
 
 	log.Debug("get peer_connections starting", logger.NewORGPrefix(b.orgID))
@@ -74,8 +74,8 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 				Label:              conn.PeerConnId,
 				LocalVPCLcuuid:     localVPCLcuuid,
 				RemoteVPCLcuuid:    remoteVPCLcuuid,
-				LocalRegionLcuuid:  region.Lcuuid,
-				RemoteRegionLcuuid: region.Lcuuid,
+				LocalRegionLcuuid:  b.regionLcuuid,
+				RemoteRegionLcuuid: b.regionLcuuid,
 			})
 		}
 	}

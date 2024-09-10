@@ -26,9 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getNetworks(
-	region model.Region, zoneNameToAZLcuuid map[string]string, vpcIdToLcuuid map[string]string,
-) ([]model.Network, []model.Subnet, map[string]string, error) {
+func (b *BaiduBce) getNetworks(zoneNameToAZLcuuid map[string]string, vpcIdToLcuuid map[string]string) ([]model.Network, []model.Subnet, map[string]string, error) {
 	var retNetworks []model.Network
 	var retSubnets []model.Subnet
 	var networkIdToLcuuid map[string]string
@@ -80,12 +78,11 @@ func (b *BaiduBce) getNetworks(
 				External:     false,
 				NetType:      common.NETWORK_TYPE_LAN,
 				AZLcuuid:     azLcuuid,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 			}
 			retNetworks = append(retNetworks, retNetwork)
 			networkIdToLcuuid[subnet.SubnetId] = networkLcuuid
 			b.azLcuuidToResourceNum[retNetwork.AZLcuuid]++
-			b.regionLcuuidToResourceNum[retNetwork.RegionLcuuid]++
 
 			retSubnet := model.Subnet{
 				Lcuuid:        common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),

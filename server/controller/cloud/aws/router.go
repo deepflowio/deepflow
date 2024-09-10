@@ -27,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.RoutingTable, error) {
+func (a *Aws) getRouterAndTables(client *ec2.Client) ([]model.VRouter, []model.RoutingTable, error) {
 	log.Debug("get routers and tables starting", logger.NewORGPrefix(a.orgID))
 	a.vpcOrSubnetToRouter = map[string]string{}
 	var routers []model.VRouter
@@ -52,7 +52,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 		} else {
 			input = &ec2.DescribeRouteTablesInput{MaxResults: &maxResults, NextToken: &nextToken}
 		}
-		result, err := a.ec2Client.DescribeRouteTables(context.TODO(), input)
+		result, err := client.DescribeRouteTables(context.TODO(), input)
 		if err != nil {
 			log.Errorf("routetable request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VRouter{}, []model.RoutingTable{}, err
@@ -83,7 +83,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 			Lcuuid:       routeTableLcuuid,
 			Name:         routeTableName,
 			VPCLcuuid:    common.GetUUIDByOrgID(a.orgID, vpcID),
-			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: a.regionLcuuid,
 		})
 
 		for _, route := range rData.Routes {

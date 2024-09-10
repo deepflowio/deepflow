@@ -32,13 +32,17 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener, []model.LBTargetServer, error) {
+func (a *Aws) getLoadBalances(region string) ([]model.LB, []model.LBListener, []model.LBTargetServer, error) {
 	log.Debug("get load balances starting", logger.NewORGPrefix(a.orgID))
 	var lbs []model.LB
 	var lbListeners []model.LBListener
 	var lbTargetServers []model.LBTargetServer
 
-	v2ClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(region.name), config.WithHTTPClient(a.httpClient))
+	v2ClientConfig, err := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(region), config.WithHTTPClient(a.httpClient))
+	if err != nil {
+		log.Error(err.Error(), logger.NewORGPrefix(a.orgID))
+		return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, err
+	}
 
 	var retLBs []types.LoadBalancerDescription
 	var marker string
@@ -75,7 +79,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			Name:         a.getStringPointerValue(lData.LoadBalancerName),
 			Model:        lbModel,
 			VPCLcuuid:    vpcLcuuid,
-			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: a.regionLcuuid,
 		})
 
 		for _, listener := range lData.ListenerDescriptions {
@@ -159,7 +163,7 @@ func (a *Aws) getLoadBalances(region awsRegion) ([]model.LB, []model.LBListener,
 			Name:         v2LBName,
 			Model:        v2LBModel,
 			VPCLcuuid:    v2VPCLcuuid,
-			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: a.regionLcuuid,
 		})
 
 		v2RetListeners, err := v2Client.DescribeListeners(context.TODO(), &elasticloadbalancingv2.DescribeListenersInput{LoadBalancerArn: v2LData.LoadBalancerArn})

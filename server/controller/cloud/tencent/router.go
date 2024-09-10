@@ -24,7 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []model.RoutingTable, error) {
+func (t *Tencent) getRouterAndTables(region string) ([]model.VRouter, []model.RoutingTable, error) {
 	log.Debug("get routers and tables starting", logger.NewORGPrefix(t.orgID))
 	var routers []model.VRouter
 	var routerTables []model.RoutingTable
@@ -42,7 +42,7 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 
 	rAttrs := []string{"RouteTableId", "RouteTableName", "VpcId"}
 	rtAttrs := []string{"RouteId", "DestinationCidrBlock", "GatewayType", "GatewayId"}
-	rResp, err := t.getResponse("vpc", "2017-03-12", "DescribeRouteTables", region.name, "RouteTableSet", true, map[string]interface{}{})
+	rResp, err := t.getResponse("vpc", "2017-03-12", "DescribeRouteTables", region, "RouteTableSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("router request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.VRouter{}, []model.RoutingTable{}, err
@@ -58,7 +58,7 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 			Lcuuid:       rLcuuid,
 			Name:         rData.Get("RouteTableName").MustString(),
 			VPCLcuuid:    common.GetUUIDByOrgID(t.orgID, vpcID),
-			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: t.regionLcuuid,
 		})
 
 		routes := rData.Get("RouteSet")

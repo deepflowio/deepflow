@@ -72,7 +72,7 @@ func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) (
 			Version:      "Redis " + v.getStringPointerValue(r.EngineVersion),
 			AZLcuuid:     azLcuuid,
 			VPCLcuuid:    vpcLcuuid,
-			RegionLcuuid: v.regionUUID,
+			RegionLcuuid: v.regionLcuuid,
 		}
 
 		networkLcuuid := common.NETWORK_ISP_LCUUID
@@ -113,7 +113,7 @@ func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) (
 				DeviceType:    common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 				VPCLcuuid:     vpcLcuuid,
 				NetworkLcuuid: networkLcuuid,
-				RegionLcuuid:  v.regionUUID,
+				RegionLcuuid:  v.regionLcuuid,
 			})
 
 			ips = append(ips, model.IP{
@@ -121,7 +121,7 @@ func (v *VolcEngine) getRedisInstances(regionID string, sess *session.Session) (
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				IP:               conIP,
 				SubnetLcuuid:     subnetLcuuid,
-				RegionLcuuid:     v.regionUUID,
+				RegionLcuuid:     v.regionLcuuid,
 			})
 		}
 		rediss = append(rediss, retRedis)

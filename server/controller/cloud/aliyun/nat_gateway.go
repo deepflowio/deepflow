@@ -75,10 +75,9 @@ func (a *Aliyun) getNatGateways(region model.Region) ([]model.NATGateway, []mode
 				Label:        natGatewayId,
 				FloatingIPs:  strings.Join(floatingIPs, `,`),
 				VPCLcuuid:    vpcLcuuid,
-				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid: a.regionLcuuid,
 			}
 			retNATGateways = append(retNATGateways, retNATGateway)
-			a.regionLcuuidToResourceNum[retNATGateway.RegionLcuuid]++
 
 			// 接口
 			vinterfaceLcuuid := common.GenerateUUIDByOrgID(a.orgID, natGatewayLcuuid)
@@ -90,7 +89,7 @@ func (a *Aliyun) getNatGateways(region model.Region) ([]model.NATGateway, []mode
 				DeviceType:    common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 				NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:  a.regionLcuuid,
 			}
 			retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -101,7 +100,7 @@ func (a *Aliyun) getNatGateways(region model.Region) ([]model.NATGateway, []mode
 					Lcuuid:           ipLcuuid,
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
-					RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
+					RegionLcuuid:     a.regionLcuuid,
 				}
 				retIPs = append(retIPs, retIP)
 			}

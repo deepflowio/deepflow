@@ -132,7 +132,7 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 				Label:        rdsId,
 				VPCLcuuid:    vpcLcuuid,
 				AZLcuuid:     common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+zoneId),
-				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid: a.regionLcuuid,
 				State:        rdsState,
 				Type:         rdsEngine,
 				Series:       rdsSeries,
@@ -141,7 +141,6 @@ func (a *Aliyun) getRDSInstances(region model.Region) (
 			}
 			retRDSInstances = append(retRDSInstances, retRDSInstance)
 			a.azLcuuidToResourceNum[retRDSInstance.AZLcuuid]++
-			a.regionLcuuidToResourceNum[retRDSInstance.RegionLcuuid]++
 
 			// 获取接口信息
 			tmpVInterfaces, tmpIPs := a.getRDSPorts(region, rdsId)
@@ -190,7 +189,7 @@ func (a *Aliyun) getRDSPorts(region model.Region, rdsId string) ([]model.VInterf
 				DeviceType:    common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:  a.regionLcuuid,
 			}
 			retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -199,7 +198,7 @@ func (a *Aliyun) getRDSPorts(region model.Region, rdsId string) ([]model.VInterf
 				VInterfaceLcuuid: portLcuuid,
 				IP:               ip,
 				SubnetLcuuid:     common.GenerateUUIDByOrgID(a.orgID, networkLcuuid),
-				RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:     a.regionLcuuid,
 			}
 			retIPs = append(retIPs, retIP)
 		}

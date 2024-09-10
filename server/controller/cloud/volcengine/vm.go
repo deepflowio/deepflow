@@ -85,7 +85,7 @@ func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterfa
 			CreatedAt:    createAt,
 			VPCLcuuid:    vpcLcuuid,
 			AZLcuuid:     azLcuuid,
-			RegionLcuuid: v.regionUUID,
+			RegionLcuuid: v.regionLcuuid,
 		}
 		v.azLcuuids[azLcuuid] = false
 
@@ -105,7 +105,7 @@ func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterfa
 				DeviceType:    common.VIF_DEVICE_TYPE_VM,
 				VPCLcuuid:     vpcLcuuid,
 				NetworkLcuuid: networkLcuuid,
-				RegionLcuuid:  v.regionUUID,
+				RegionLcuuid:  v.regionLcuuid,
 			})
 
 			privateIP := v.getStringPointerValue(net.PrimaryIpAddress)
@@ -117,7 +117,7 @@ func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterfa
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				IP:               privateIP,
 				SubnetLcuuid:     common.GetUUIDByOrgID(v.orgID, networkLcuuid),
-				RegionLcuuid:     v.regionUUID,
+				RegionLcuuid:     v.regionLcuuid,
 			})
 		}
 		vm.IP = vmPrimaryIP
@@ -137,14 +137,14 @@ func (v *VolcEngine) getVMs(sess *session.Session) ([]model.VM, []model.VInterfa
 			DeviceType:    common.VIF_DEVICE_TYPE_VM,
 			VPCLcuuid:     vpcLcuuid,
 			NetworkLcuuid: common.NETWORK_ISP_LCUUID,
-			RegionLcuuid:  v.regionUUID,
+			RegionLcuuid:  v.regionLcuuid,
 		})
 		ips = append(ips, model.IP{
 			Lcuuid:           common.GetUUIDByOrgID(v.orgID, eID),
 			IP:               eIP,
 			VInterfaceLcuuid: eVInterfaceLcuuid,
 			SubnetLcuuid:     common.SUBNET_ISP_LCUUID,
-			RegionLcuuid:     v.regionUUID,
+			RegionLcuuid:     v.regionLcuuid,
 		})
 	}
 	log.Debug("get vms complete", logger.NewORGPrefix(v.orgID))

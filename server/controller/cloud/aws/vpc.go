@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
+func (a *Aws) getVPCs(client *ec2.Client) ([]model.VPC, error) {
 	log.Debug("get vpcs starting", logger.NewORGPrefix(a.orgID))
 	var vpcs []model.VPC
 
@@ -40,7 +40,7 @@ func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
 		} else {
 			input = &ec2.DescribeVpcsInput{MaxResults: &maxResults, NextToken: &nextToken}
 		}
-		result, err := a.ec2Client.DescribeVpcs(context.TODO(), input)
+		result, err := client.DescribeVpcs(context.TODO(), input)
 		if err != nil {
 			log.Errorf("vpc request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VPC{}, err
@@ -64,7 +64,7 @@ func (a *Aws) getVPCs(region awsRegion) ([]model.VPC, error) {
 			Name:         vpcName,
 			CIDR:         a.getStringPointerValue(vData.CidrBlock),
 			Label:        vpcID,
-			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: a.regionLcuuid,
 		})
 		a.vpcIDToLcuuid[vpcID] = vpcLcuuid
 	}

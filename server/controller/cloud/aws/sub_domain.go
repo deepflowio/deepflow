@@ -27,12 +27,16 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
+func (a *Aws) getSubDomains(region string) ([]model.SubDomain, error) {
 	var retSubDomains []model.SubDomain
 
 	log.Debug("get sub_domains starting", logger.NewORGPrefix(a.orgID))
 
-	eksClientConfig, _ := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(region.name), config.WithHTTPClient(a.httpClient))
+	eksClientConfig, err := config.LoadDefaultConfig(context.TODO(), a.credential, config.WithRegion(region), config.WithHTTPClient(a.httpClient))
+	if err != nil {
+		log.Error(err.Error(), logger.NewORGPrefix(a.orgID))
+		return []model.SubDomain{}, err
+	}
 
 	var retClusterNames []string
 	var nextToken string
@@ -73,7 +77,7 @@ func (a *Aws) getSubDomains(region awsRegion) ([]model.SubDomain, error) {
 		}
 		config := map[string]interface{}{
 			"cluster_id":                 name,
-			"region_uuid":                a.getRegionLcuuid(region.lcuuid),
+			"region_uuid":                a.regionLcuuid,
 			"vpc_uuid":                   vpcLcuuid,
 			"port_name_regex":            common.DEFAULT_PORT_NAME_REGEX,
 			"pod_net_ipv4_cidr_max_mask": common.K8S_POD_IPV4_NETMASK,

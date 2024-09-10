@@ -46,7 +46,7 @@ func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 			Type:          int(v.Type),
 			Mac:           v.Mac,
 			VPCLcuuid:     vpcLcuuid,
-			RegionLcuuid:  g.regionUuid,
+			RegionLcuuid:  g.regionLcuuid,
 			DeviceType:    int(v.DeviceType),
 			DeviceLcuuid:  v.DeviceLcuuid,
 			NetworkLcuuid: v.NetworkLcuuid,

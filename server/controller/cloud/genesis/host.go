@@ -41,7 +41,7 @@ func (g *Genesis) getHosts() ([]model.Host, error) {
 			MemTotal:     common.HOST_MEMORY_MB,
 			Type:         common.HOST_TYPE_VM,
 			AZLcuuid:     g.azLcuuid,
-			RegionLcuuid: g.regionUuid,
+			RegionLcuuid: g.regionLcuuid,
 		}
 		hosts = append(hosts, host)
 	}

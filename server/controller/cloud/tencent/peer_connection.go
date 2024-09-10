@@ -17,23 +17,18 @@
 package tencent
 
 import (
-	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []model.PeerConnection) ([]model.PeerConnection, error) {
+func (t *Tencent) getPeerConnections(region string) ([]model.PeerConnection, error) {
 	log.Debug("get peer connections starting", logger.NewORGPrefix(t.orgID))
-	var pConnections []model.PeerConnection
-	peerConnectionLcuuids := mapset.NewSet()
-	for _, p := range peerConnections {
-		peerConnectionLcuuids.Add(p.Lcuuid)
-	}
+	var peerConnections []model.PeerConnection
 
-	attrs := []string{"VpcPeerConnectionId", "VpcPeerConnectionName", "VpcId", "PeerVpcId"}
+	attrs := []string{"PeeringConnectionId", "PeeringConnectionName", "SourceVpcId", "DestinationVpcId"}
 
-	resp, err := t.getResponse("bmvpc", "2018-06-25", "DescribeVpcPeerConnections", region.name, "VpcPeerConnectionSet", true, map[string]interface{}{})
+	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeVpcPeeringConnections", region, "PeerConnectionSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("peer connection request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.PeerConnection{}, err
@@ -42,32 +37,21 @@ func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []mod
 		if !t.checkRequiredAttributes(pData, attrs) {
 			continue
 		}
-		peerID := pData.Get("VpcPeerConnectionId").MustString()
-		peerLcuuid := common.GetUUIDByOrgID(t.orgID, peerID)
-		if peerConnectionLcuuids.Contains(peerLcuuid) {
-			continue
-		}
-
-		peerName := pData.Get("VpcPeerConnectionName").MustString()
-		localVpcID := pData.Get("VpcId").MustString()
-		remoteVpcID := pData.Get("PeerVpcId").MustString()
-		localRegionLcuuid := t.vpcIDToRegionLcuuid[localVpcID]
-		remoteRegionLcuuid := t.vpcIDToRegionLcuuid[remoteVpcID]
-		if localRegionLcuuid == "" || remoteRegionLcuuid == "" {
-			log.Infof("peer connection (%s) region not found", peerName, logger.NewORGPrefix(t.orgID))
-			continue
-		}
+		peerID := pData.Get("PeeringConnectionId").MustString()
+		peerName := pData.Get("PeeringConnectionName").MustString()
+		localVpcID := pData.Get("SourceVpcId").MustString()
+		remoteVpcID := pData.Get("DestinationVpcId").MustString()
 
 		peerConnections = append(peerConnections, model.PeerConnection{
-			Lcuuid:             peerLcuuid,
+			Lcuuid:             common.GetUUIDByOrgID(t.orgID, peerID),
 			Name:               peerName,
 			Label:              peerID,
 			LocalVPCLcuuid:     common.GetUUIDByOrgID(t.orgID, localVpcID),
 			RemoteVPCLcuuid:    common.GetUUIDByOrgID(t.orgID, remoteVpcID),
-			LocalRegionLcuuid:  localRegionLcuuid,
-			RemoteRegionLcuuid: remoteRegionLcuuid,
+			LocalRegionLcuuid:  t.regionLcuuid,
+			RemoteRegionLcuuid: t.regionLcuuid,
 		})
 	}
 	log.Debug("get peer connections complete", logger.NewORGPrefix(t.orgID))
-	return pConnections, nil
+	return peerConnections, nil
 }

@@ -18,8 +18,6 @@ package aws
 
 import (
 	"context"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -29,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/bitly/go-simplejson"
 
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -49,25 +48,19 @@ type Aws struct {
 	teamID                int
 	name                  string
 	lcuuid                string
-	regionUUID            string
+	regionLcuuid          string
 	uuidGenerate          string
 	apiDefaultRegion      string
-	includeRegions        []string
-	excludeRegions        []string
 	httpClient            *http.BuildableClient
 	azLcuuidMap           map[string]int
+	includeRegions        map[string]bool
+	excludeRegions        map[string]bool
 	vpcOrSubnetToRouter   map[string]string
 	vmIDToPrivateIP       map[string]string
 	vpcIDToLcuuid         map[string]string
 	instanceIDToPrimaryIP map[string]string
 	publicIPToVinterface  map[string]model.VInterface
 	credential            awsconfig.LoadOptionsFunc
-	ec2Client             *ec2.Client
-}
-
-type awsRegion struct {
-	name   string
-	lcuuid string
 }
 
 type awsGressRule struct {
@@ -101,19 +94,10 @@ func NewAws(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*
 		return nil, err
 	}
 
-	excludeRegionsStr := config.Get("exclude_regions").MustString()
-	excludeRegions := []string{}
-	if excludeRegionsStr != "" {
-		excludeRegions = strings.Split(excludeRegionsStr, ",")
+	regionLcuuid := config.Get("region_uuid").MustString()
+	if regionLcuuid == "" {
+		regionLcuuid = common.DEFAULT_REGION
 	}
-
-	sort.Strings(excludeRegions)
-	includeRegionsStr := config.Get("include_regions").MustString()
-	includeRegions := []string{}
-	if includeRegionsStr != "" {
-		includeRegions = strings.Split(includeRegionsStr, ",")
-	}
-	sort.Strings(includeRegions)
 
 	httpClient := http.NewBuildableClient().WithTimeout(time.Second * time.Duration(cfg.HTTPTimeout))
 
@@ -124,11 +108,11 @@ func NewAws(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig) (*
 		name:             domain.Name,
 		lcuuid:           domain.Lcuuid,
 		uuidGenerate:     domain.DisplayName,
-		excludeRegions:   excludeRegions,
-		includeRegions:   includeRegions,
 		httpClient:       httpClient,
 		apiDefaultRegion: cfg.AWSRegionName,
-		regionUUID:       config.Get("region_uuid").MustString(),
+		regionLcuuid:     regionLcuuid,
+		includeRegions:   cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
+		excludeRegions:   cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		credential:       awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(secretID, decryptSecretKey, "")),
 
 		// 以下属性为获取资源所用的关联关系
@@ -149,13 +133,6 @@ func (a *Aws) CheckAuth() error {
 	}
 	_, err = ec2.NewFromConfig(awsClientConfig).DescribeRegions(context.TODO(), &ec2.DescribeRegionsInput{})
 	return err
-}
-
-func (a *Aws) getRegionLcuuid(lcuuid string) string {
-	if a.regionUUID != "" {
-		return a.regionUUID
-	}
-	return lcuuid
 }
 
 func (a *Aws) getResultTagName(tags []types.Tag) string {
@@ -201,142 +178,102 @@ func (a *Aws) ClearDebugLog() {}
 func (a *Aws) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
 
-	regionList, err := a.getRegions()
+	regions, err := a.getRegions()
 	if err != nil {
 		return model.Resource{}, err
 	}
 
-	for _, region := range regionList {
-		log.Infof("region (%s) collect starting", region.name, logger.NewORGPrefix(a.orgID))
+	for _, region := range regions {
+		log.Infof("region (%s) collect starting", region, logger.NewORGPrefix(a.orgID))
 
-		clientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(region.name), awsconfig.WithHTTPClient(a.httpClient))
+		clientConfig, err := awsconfig.LoadDefaultConfig(context.TODO(), a.credential, awsconfig.WithRegion(region), awsconfig.WithHTTPClient(a.httpClient))
 		if err != nil {
 			log.Error("client config failed (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return model.Resource{}, err
 		}
-		a.ec2Client = ec2.NewFromConfig(clientConfig)
+		ec2Client := ec2.NewFromConfig(clientConfig)
 
-		regionFlag := false
 		a.azLcuuidMap = map[string]int{}
 		a.vpcIDToLcuuid = map[string]string{}
 		a.instanceIDToPrimaryIP = map[string]string{}
 
-		vpcs, err := a.getVPCs(region)
+		vpcs, err := a.getVPCs(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vpcs) > 0 {
-			regionFlag = true
-			resource.VPCs = append(resource.VPCs, vpcs...)
-		}
+		resource.VPCs = append(resource.VPCs, vpcs...)
 
-		peerConnections, err := a.getPeerConnections(region)
+		peerConnections, err := a.getPeerConnections(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(peerConnections) > 0 {
-			regionFlag = true
-			resource.PeerConnections = append(resource.PeerConnections, peerConnections...)
-		}
+		resource.PeerConnections = append(resource.PeerConnections, peerConnections...)
 
-		natGateways, natVinterfaces, natIPs, err := a.getNatGateways(region)
+		natGateways, natVinterfaces, natIPs, err := a.getNatGateways(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(natGateways) > 0 || len(natVinterfaces) > 0 || len(natIPs) > 0 {
-			regionFlag = true
-			resource.NATGateways = append(resource.NATGateways, natGateways...)
-			resource.VInterfaces = append(resource.VInterfaces, natVinterfaces...)
-			resource.IPs = append(resource.IPs, natIPs...)
-		}
+		resource.NATGateways = append(resource.NATGateways, natGateways...)
+		resource.VInterfaces = append(resource.VInterfaces, natVinterfaces...)
+		resource.IPs = append(resource.IPs, natIPs...)
 
-		routers, routerTables, err := a.getRouterAndTables(region)
+		routers, routerTables, err := a.getRouterAndTables(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(routers) > 0 || len(routerTables) > 0 {
-			regionFlag = true
-			resource.VRouters = append(resource.VRouters, routers...)
-			resource.RoutingTables = append(resource.RoutingTables, routerTables...)
-		}
+		resource.VRouters = append(resource.VRouters, routers...)
+		resource.RoutingTables = append(resource.RoutingTables, routerTables...)
 
-		networks, subnets, netVinterfaces, err := a.getNetworks(region)
+		networks, subnets, netVinterfaces, err := a.getNetworks(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(networks) > 0 || len(netVinterfaces) > 0 {
-			regionFlag = true
-			resource.Networks = append(resource.Networks, networks...)
-			resource.Subnets = append(resource.Subnets, subnets...)
-			resource.VInterfaces = append(resource.VInterfaces, netVinterfaces...)
-		}
+		resource.Networks = append(resource.Networks, networks...)
+		resource.Subnets = append(resource.Subnets, subnets...)
+		resource.VInterfaces = append(resource.VInterfaces, netVinterfaces...)
 
-		vinterfaces, ips, vNatRules, err := a.getVInterfacesAndIPs(region)
+		vinterfaces, ips, vNatRules, err := a.getVInterfacesAndIPs(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vinterfaces) > 0 || len(ips) > 0 || len(vNatRules) > 0 {
-			regionFlag = true
-			resource.VInterfaces = append(resource.VInterfaces, vinterfaces...)
-			resource.IPs = append(resource.IPs, ips...)
-			resource.NATRules = append(resource.NATRules, vNatRules...)
-		}
+		resource.VInterfaces = append(resource.VInterfaces, vinterfaces...)
+		resource.IPs = append(resource.IPs, ips...)
+		resource.NATRules = append(resource.NATRules, vNatRules...)
 
-		vms, err := a.getVMs(region)
+		vms, err := a.getVMs(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vms) > 0 {
-			regionFlag = true
-			resource.VMs = append(resource.VMs, vms...)
-		}
+		resource.VMs = append(resource.VMs, vms...)
 
 		lbs, lbListeners, lbTargetServers, err := a.getLoadBalances(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(lbs) > 0 || len(lbListeners) > 0 || len(lbTargetServers) > 0 {
-			regionFlag = true
-			resource.LBs = append(resource.LBs, lbs...)
-			resource.LBListeners = append(resource.LBListeners, lbListeners...)
-			resource.LBTargetServers = append(resource.LBTargetServers, lbTargetServers...)
-		}
+		resource.LBs = append(resource.LBs, lbs...)
+		resource.LBListeners = append(resource.LBListeners, lbListeners...)
+		resource.LBTargetServers = append(resource.LBTargetServers, lbTargetServers...)
 
 		fIPs, err := a.getFloatingIPs()
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(fIPs) > 0 {
-			regionFlag = true
-			resource.FloatingIPs = append(resource.FloatingIPs, fIPs...)
-		}
+		resource.FloatingIPs = append(resource.FloatingIPs, fIPs...)
 
 		// 附属容器集群
 		sDomains, err := a.getSubDomains(region)
 		if err != nil {
 			return resource, err
 		}
-		if len(sDomains) > 0 {
-			regionFlag = true
-			resource.SubDomains = append(resource.SubDomains, sDomains...)
-		}
+		resource.SubDomains = append(resource.SubDomains, sDomains...)
 
-		if regionFlag && a.regionUUID == "" {
-			resource.Regions = append(resource.Regions, model.Region{
-				Name:   region.name,
-				Lcuuid: region.lcuuid,
-			})
-		}
-
-		azs, err := a.getAZs(region)
+		azs, err := a.getAZs(ec2Client)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(azs) > 0 {
-			resource.AZs = append(resource.AZs, azs...)
-		}
+		resource.AZs = append(resource.AZs, azs...)
 
-		log.Infof("region (%s) collect complete", region.name, logger.NewORGPrefix(a.orgID))
+		log.Infof("region (%s) collect complete", region, logger.NewORGPrefix(a.orgID))
 	}
 
 	return resource, nil

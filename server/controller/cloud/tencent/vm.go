@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
+func (t *Tencent) getVMs(region string) ([]model.VM, error) {
 	log.Debug("get vms starting", logger.NewORGPrefix(t.orgID))
 	var vms []model.VM
 	states := map[string]int{
@@ -34,7 +34,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
 	}
 
 	attrs := []string{"InstanceId", "InstanceName", "InstanceState", "SecurityGroupIds", "VirtualPrivateCloud", "CreatedTime"}
-	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeInstances", region.name, "InstanceSet", true, map[string]interface{}{})
+	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeInstances", region, "InstanceSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("vm request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.VM{}, err
@@ -77,7 +77,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, error) {
 			CloudTags:    expand.GetVMTags(vData),
 			VPCLcuuid:    common.GetUUIDByOrgID(t.orgID, vpcID),
 			AZLcuuid:     azLcuuid,
-			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: t.regionLcuuid,
 		})
 		t.azLcuuidMap[azLcuuid] = 0
 	}

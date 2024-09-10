@@ -48,7 +48,7 @@ func (a *Aliyun) getSubDomains(region model.Region) []model.SubDomain {
 			}
 			config := map[string]interface{}{
 				"cluster_id":                 clusterID,
-				"region_uuid":                a.getRegionLcuuid(region.Lcuuid),
+				"region_uuid":                a.regionLcuuid,
 				"vpc_uuid":                   vpcLcuuid,
 				"port_name_regex":            common.DEFAULT_PORT_NAME_REGEX,
 				"pod_net_ipv4_cidr_max_mask": common.K8S_POD_IPV4_NETMASK,

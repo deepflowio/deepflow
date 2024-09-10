@@ -120,7 +120,7 @@ func (v *VolcEngine) getRDSMySQL(sess *session.Session) ([]model.RDSInstance, []
 			Model:        rdsModel,
 			VPCLcuuid:    vpcLcuuid,
 			AZLcuuid:     azLcuuid,
-			RegionLcuuid: v.regionUUID,
+			RegionLcuuid: v.regionLcuuid,
 		})
 
 		for _, ep := range rdsDetail.Endpoints {
@@ -161,7 +161,7 @@ func (v *VolcEngine) getRDSMySQL(sess *session.Session) ([]model.RDSInstance, []
 					DeviceType:    common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 					VPCLcuuid:     vpcLcuuid,
 					NetworkLcuuid: networkLcuuid,
-					RegionLcuuid:  v.regionUUID,
+					RegionLcuuid:  v.regionLcuuid,
 				})
 
 				ips = append(ips, model.IP{
@@ -169,7 +169,7 @@ func (v *VolcEngine) getRDSMySQL(sess *session.Session) ([]model.RDSInstance, []
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               netIP,
 					SubnetLcuuid:     subnetLcuuid,
-					RegionLcuuid:     v.regionUUID,
+					RegionLcuuid:     v.regionLcuuid,
 				})
 			}
 		}
@@ -228,7 +228,7 @@ func (v *VolcEngine) getRDSPostgreSQL(sess *session.Session) ([]model.RDSInstanc
 			Model:        common.RDS_MODEL_PRIMARY,
 			VPCLcuuid:    vpcLcuuid,
 			AZLcuuid:     azLcuuid,
-			RegionLcuuid: v.regionUUID,
+			RegionLcuuid: v.regionLcuuid,
 		})
 
 		for _, ep := range rdsDetail.Endpoints {
@@ -269,7 +269,7 @@ func (v *VolcEngine) getRDSPostgreSQL(sess *session.Session) ([]model.RDSInstanc
 					DeviceType:    common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 					VPCLcuuid:     vpcLcuuid,
 					NetworkLcuuid: networkLcuuid,
-					RegionLcuuid:  v.regionUUID,
+					RegionLcuuid:  v.regionLcuuid,
 				})
 
 				ips = append(ips, model.IP{
@@ -277,7 +277,7 @@ func (v *VolcEngine) getRDSPostgreSQL(sess *session.Session) ([]model.RDSInstanc
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               netIP,
 					SubnetLcuuid:     subnetLcuuid,
-					RegionLcuuid:     v.regionUUID,
+					RegionLcuuid:     v.regionLcuuid,
 				})
 			}
 		}
@@ -335,7 +335,7 @@ func (v *VolcEngine) getRDSSQLServer(sess *session.Session) ([]model.RDSInstance
 			Model:        common.RDS_MODEL_PRIMARY, // TODO: get for rds.InstanceCategory
 			VPCLcuuid:    vpcLcuuid,
 			AZLcuuid:     azLcuuid,
-			RegionLcuuid: v.regionUUID,
+			RegionLcuuid: v.regionLcuuid,
 		})
 
 		for _, con := range rdsDetail.ConnectionInfo {
@@ -375,7 +375,7 @@ func (v *VolcEngine) getRDSSQLServer(sess *session.Session) ([]model.RDSInstance
 					DeviceType:    common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 					VPCLcuuid:     vpcLcuuid,
 					NetworkLcuuid: networkLcuuid,
-					RegionLcuuid:  v.regionUUID,
+					RegionLcuuid:  v.regionLcuuid,
 				})
 
 				ips = append(ips, model.IP{
@@ -383,7 +383,7 @@ func (v *VolcEngine) getRDSSQLServer(sess *session.Session) ([]model.RDSInstance
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               netIP,
 					SubnetLcuuid:     subnetLcuuid,
-					RegionLcuuid:     v.regionUUID,
+					RegionLcuuid:     v.regionLcuuid,
 				})
 			}
 		}

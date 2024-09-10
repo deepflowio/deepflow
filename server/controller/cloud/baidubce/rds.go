@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RDSInstance, []model.VInterface, []model.IP, error) {
+func (b *BaiduBce) getRDSInstances(vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RDSInstance, []model.VInterface, []model.IP, error) {
 	var retRDSInstances []model.RDSInstance
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
@@ -117,10 +117,9 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 				Model:        common.RDS_MODEL_PRIMARY,
 				VPCLcuuid:    vpcLcuuid,
 				AZLcuuid:     azLcuuid,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 			})
 			b.azLcuuidToResourceNum[azLcuuid]++
-			b.regionLcuuidToResourceNum[region.Lcuuid]++
 
 			if len(rds.Subnets) == 0 {
 				log.Debugf("rds (%s) with no subnets", rds.InstanceId, logger.NewORGPrefix(b.orgID))
@@ -143,14 +142,14 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 					DeviceType:    common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 					NetworkLcuuid: networkLcuuid,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  region.Lcuuid,
+					RegionLcuuid:  b.regionLcuuid,
 				})
 				retIPs = append(retIPs, model.IP{
 					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+rds.Endpoint.VnetIp),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               rds.Endpoint.VnetIp,
 					SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
-					RegionLcuuid:     region.Lcuuid,
+					RegionLcuuid:     b.regionLcuuid,
 				})
 			}
 
@@ -165,13 +164,13 @@ func (b *BaiduBce) getRDSInstances(region model.Region, vpcIdToLcuuid, networkId
 					DeviceType:    common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  region.Lcuuid,
+					RegionLcuuid:  b.regionLcuuid,
 				})
 				retIPs = append(retIPs, model.IP{
 					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+rds.Endpoint.InetIp),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               rds.Endpoint.InetIp,
-					RegionLcuuid:     region.Lcuuid,
+					RegionLcuuid:     b.regionLcuuid,
 				})
 			}
 		}
