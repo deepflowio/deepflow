@@ -126,7 +126,7 @@ void java_syms_update_main(void *arg)
 {
 	// Ensure the profiler is initialized and currently running
 	while (!profiler_is_running())
-		CLIB_PAUSE();
+		usleep(LOOP_DELAY_US);
 
 	pthread_mutex_init(&list_lock, NULL);
 	init_list_head(&java_syms_update_tasks_head);
