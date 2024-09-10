@@ -21,6 +21,7 @@ import (
 
 	"github.com/bitly/go-simplejson"
 
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -39,8 +40,8 @@ type Config struct {
 	ProjectID      string
 	ProjectName    string
 	Domain         string // 用于构造访问华为云的endpoint，需与DeepFlow自身domain做区分
-	ExcludeRegions []string
-	IncludeRegions []string
+	IncludeRegions map[string]bool
+	ExcludeRegions map[string]bool
 }
 
 func (c *Config) LoadFromString(orgID int, sConf string) (err error) {
@@ -95,13 +96,7 @@ func (c *Config) LoadFromString(orgID int, sConf string) (err error) {
 		log.Error("region_uuid must be specified", logger.NewORGPrefix(orgID))
 		return
 	}
-	eRegions := jConf.Get("exclude_regions").MustString()
-	if eRegions != "" {
-		c.ExcludeRegions = strings.Split(eRegions, ",")
-	}
-	iRegions := jConf.Get("include_regions").MustString()
-	if iRegions != "" {
-		c.IncludeRegions = strings.Split(iRegions, ",")
-	}
+	c.IncludeRegions = cloudcommon.UniqRegions(jConf.Get("include_regions").MustString())
+	c.ExcludeRegions = cloudcommon.UniqRegions(jConf.Get("exclude_regions").MustString())
 	return
 }

@@ -22,14 +22,14 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Subnet, []model.VInterface, error) {
+func (t *Tencent) getNetworks(region string) ([]model.Network, []model.Subnet, []model.VInterface, error) {
 	log.Debug("get networks starting", logger.NewORGPrefix(t.orgID))
 	var networks []model.Network
 	var subnets []model.Subnet
 	var netVinterfaces []model.VInterface
 
 	attrs := []string{"SubnetId", "SubnetName", "VpcId", "CidrBlock"}
-	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeSubnets", region.name, "SubnetSet", true, map[string]interface{}{})
+	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeSubnets", region, "SubnetSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("network request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.Network{}, []model.Subnet{}, []model.VInterface{}, err
@@ -54,7 +54,7 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 			External:       false,
 			NetType:        common.NETWORK_TYPE_LAN,
 			AZLcuuid:       azLcuuid,
-			RegionLcuuid:   t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid:   t.regionLcuuid,
 		})
 		t.azLcuuidMap[azLcuuid] = 0
 
@@ -78,7 +78,7 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 				DeviceType:    common.VIF_DEVICE_TYPE_VROUTER,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
+				RegionLcuuid:  t.regionLcuuid,
 			})
 		}
 	}

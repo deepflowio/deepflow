@@ -24,7 +24,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface, []model.IP, []model.NATRule, error) {
+func (t *Tencent) getVInterfacesAndIPs(region string) ([]model.VInterface, []model.IP, []model.NATRule, error) {
 	log.Debug("get vinterfaces,ips starting", logger.NewORGPrefix(t.orgID))
 	t.publicIPToVinterface = map[string]model.VInterface{}
 	var vinterfaces []model.VInterface
@@ -33,7 +33,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 
 	vAttrs := []string{"NetworkInterfaceId", "MacAddress", "SubnetId", "VpcId", "Attachment"}
 	iAttrs := []string{"PrivateIpAddress", "PublicIpAddress"}
-	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNetworkInterfaces", region.name, "NetworkInterfaceSet", true, map[string]interface{}{})
+	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNetworkInterfaces", region, "NetworkInterfaceSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("vinterface request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.VInterface{}, []model.IP{}, []model.NATRule{}, err
@@ -65,7 +65,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 			DeviceType:    common.VIF_DEVICE_TYPE_VM,
 			VPCLcuuid:     vpcLcuuid,
 			NetworkLcuuid: subnetLcuuid,
-			RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid:  t.regionLcuuid,
 		}
 		vinterfaces = append(vinterfaces, vinterface)
 
@@ -86,7 +86,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               privateIP,
 					SubnetLcuuid:     common.GetUUIDByOrgID(t.orgID, subnetLcuuid),
-					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
+					RegionLcuuid:     t.regionLcuuid,
 				})
 			} else {
 				log.Infof("ip (%s) not support", privateIP, logger.NewORGPrefix(t.orgID))
@@ -104,14 +104,14 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 					DeviceType:    common.VIF_DEVICE_TYPE_VM,
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
+					RegionLcuuid:  t.regionLcuuid,
 				})
 
 				ips = append(ips, model.IP{
 					Lcuuid:           common.GetUUIDByOrgID(t.orgID, deviceLcuuid+publicIP),
 					VInterfaceLcuuid: vLcuuid,
 					IP:               publicIP,
-					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
+					RegionLcuuid:     t.regionLcuuid,
 				})
 
 				t.publicIPToVinterface[publicIP] = vinterface

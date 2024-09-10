@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RedisInstance, []model.VInterface, []model.IP, error) {
+func (b *BaiduBce) getRedisInstances(vpcIdToLcuuid, networkIdToLcuuid, zoneNameToAZLcuuid map[string]string) ([]model.RedisInstance, []model.VInterface, []model.IP, error) {
 	var redisInstances []model.RedisInstance
 	var vinterfaces []model.VInterface
 	var ips []model.IP
@@ -87,14 +87,13 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 				Label:        redis.InstanceID,
 				VPCLcuuid:    vpcLcuuid,
 				AZLcuuid:     azLcuuid,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 				InternalHost: redis.VnetIP,
 				PublicHost:   redis.Eip,
 				State:        common.REDIS_STATE_RUNNING,
 				Version:      "Redis " + redis.EngineVersion,
 			})
 			b.azLcuuidToResourceNum[azLcuuid]++
-			b.regionLcuuidToResourceNum[region.Lcuuid]++
 
 			if len(redis.Subnets) == 0 {
 				log.Infof("redis (%s) without subnets", redis.InstanceName, logger.NewORGPrefix(b.orgID))
@@ -128,14 +127,14 @@ func (b *BaiduBce) getRedisInstances(region model.Region, vpcIdToLcuuid, network
 					DeviceType:    common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 					NetworkLcuuid: networkLcuuid,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  region.Lcuuid,
+					RegionLcuuid:  b.regionLcuuid,
 				})
 				ips = append(ips, model.IP{
 					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
 					SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
-					RegionLcuuid:     region.Lcuuid,
+					RegionLcuuid:     b.regionLcuuid,
 				})
 			}
 		}

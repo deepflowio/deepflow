@@ -19,8 +19,6 @@ package aliyun
 import (
 	"errors"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	ecs "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
@@ -42,18 +40,17 @@ type Aliyun struct {
 	teamID         int
 	uuid           string
 	uuidGenerate   string
-	regionUuid     string
+	regionLcuuid   string
 	secretID       string
 	secretKey      string
 	regionName     string
 	httpTimeout    int
-	includeRegions []string
-	excludeRegions []string
+	includeRegions map[string]bool
+	excludeRegions map[string]bool
 	vpcIDToLcuuids map[string]string
 
-	// 以下两个字段的作用：消除公有云的无资源的区域和可用区
-	regionLcuuidToResourceNum map[string]int
-	azLcuuidToResourceNum     map[string]int
+	// 消除公有云的无资源可用区使用
+	azLcuuidToResourceNum map[string]int
 
 	debugger *cloudcommon.Debugger
 }
@@ -82,17 +79,9 @@ func NewAliyun(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig)
 		return nil, err
 	}
 
-	excludeRegionsStr := config.Get("exclude_regions").MustString()
-	excludeRegions := []string{}
-	if excludeRegionsStr != "" {
-		excludeRegions = strings.Split(excludeRegionsStr, ",")
-		sort.Strings(excludeRegions)
-	}
-	includeRegionsStr := config.Get("include_regions").MustString()
-	includeRegions := []string{}
-	if includeRegionsStr != "" {
-		includeRegions = strings.Split(includeRegionsStr, ",")
-		sort.Strings(includeRegions)
+	regionLcuuid := config.Get("region_uuid").MustString()
+	if regionLcuuid == "" {
+		regionLcuuid = common.DEFAULT_REGION
 	}
 
 	return &Aliyun{
@@ -101,17 +90,16 @@ func NewAliyun(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig)
 		uuid:   domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
 		uuidGenerate: domain.DisplayName,
-		regionUuid:   config.Get("region_uuid").MustString(),
+		regionLcuuid: regionLcuuid,
 		secretID:     secretID,
 		secretKey:    decryptSecretKey,
 		// TODO: 后期需要修改为从配置文件读取
 		regionName:     "cn-beijing",
-		excludeRegions: excludeRegions,
-		includeRegions: includeRegions,
+		includeRegions: cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
+		excludeRegions: cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		httpTimeout:    cfg.HTTPTimeout,
 
-		regionLcuuidToResourceNum: make(map[string]int),
-		azLcuuidToResourceNum:     make(map[string]int),
+		azLcuuidToResourceNum: make(map[string]int),
 
 		vpcIDToLcuuids: map[string]string{},
 
@@ -126,14 +114,6 @@ func (a *Aliyun) ClearDebugLog() {
 func (a *Aliyun) CheckAuth() error {
 	_, err := sdk.NewClientWithAccessKey(a.regionName, a.secretID, a.secretKey)
 	return err
-}
-
-func (a *Aliyun) getRegionLcuuid(lcuuid string) string {
-	if a.regionUuid != "" {
-		return a.regionUuid
-	} else {
-		return lcuuid
-	}
 }
 
 func (a *Aliyun) checkRequiredAttributes(json *simplejson.Json, attributes []string) error {
@@ -309,7 +289,6 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 		log.Infof("get region (%s) data completed", region.Name, logger.NewORGPrefix(a.orgID))
 	}
 
-	resource.Regions = cloudcommon.EliminateEmptyRegions(regions, a.regionLcuuidToResourceNum)
 	resource.AZs = cloudcommon.EliminateEmptyAZs(azs, a.azLcuuidToResourceNum)
 	resource.VPCs = vpcs
 	resource.Networks = networks

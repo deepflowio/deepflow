@@ -39,7 +39,7 @@ func (g *Genesis) getVPCs() ([]model.VPC, error) {
 		vpc := model.VPC{
 			Lcuuid:       vpcLcuuid,
 			Name:         v.Name,
-			RegionLcuuid: g.regionUuid,
+			RegionLcuuid: g.regionLcuuid,
 		}
 		vpcs = append(vpcs, vpc)
 	}

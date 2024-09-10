@@ -25,11 +25,11 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getAZs(region awsRegion) ([]model.AZ, error) {
+func (a *Aws) getAZs(client *ec2.Client) ([]model.AZ, error) {
 	log.Debug("get azs starting", logger.NewORGPrefix(a.orgID))
 	var azs []model.AZ
 
-	result, err := a.ec2Client.DescribeAvailabilityZones(context.TODO(), &ec2.DescribeAvailabilityZonesInput{})
+	result, err := client.DescribeAvailabilityZones(context.TODO(), &ec2.DescribeAvailabilityZonesInput{})
 	if err != nil {
 		log.Errorf("az request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 		return []model.AZ{}, err
@@ -45,7 +45,7 @@ func (a *Aws) getAZs(region awsRegion) ([]model.AZ, error) {
 			Lcuuid:       lcuuid,
 			Label:        a.getStringPointerValue(aData.ZoneId),
 			Name:         zoneName,
-			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: a.regionLcuuid,
 		})
 	}
 	log.Debug("get azs complete", logger.NewORGPrefix(a.orgID))

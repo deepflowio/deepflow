@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []model.VInterface, error) {
+func (a *Aws) getNetworks(client *ec2.Client) ([]model.Network, []model.Subnet, []model.VInterface, error) {
 	log.Debug("get networks starting", logger.NewORGPrefix(a.orgID))
 	var networks []model.Network
 	var subnets []model.Subnet
@@ -42,7 +42,7 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 		} else {
 			input = &ec2.DescribeSubnetsInput{MaxResults: &maxResults, NextToken: &nextToken}
 		}
-		result, err := a.ec2Client.DescribeSubnets(context.TODO(), input)
+		result, err := client.DescribeSubnets(context.TODO(), input)
 		if err != nil {
 			log.Errorf("network request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.Network{}, []model.Subnet{}, []model.VInterface{}, err
@@ -73,7 +73,7 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 			External:       false,
 			NetType:        common.NETWORK_TYPE_LAN,
 			AZLcuuid:       azLcuuid,
-			RegionLcuuid:   a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid:   a.regionLcuuid,
 		})
 		a.azLcuuidMap[azLcuuid] = 0
 
@@ -98,7 +98,7 @@ func (a *Aws) getNetworks(region awsRegion) ([]model.Network, []model.Subnet, []
 				DeviceType:    common.VIF_DEVICE_TYPE_VROUTER,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  a.getRegionLcuuid(region.lcuuid),
+				RegionLcuuid:  a.regionLcuuid,
 			})
 		}
 	}

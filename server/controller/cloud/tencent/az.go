@@ -22,12 +22,12 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getAZs(region tencentRegion) ([]model.AZ, error) {
+func (t *Tencent) getAZs(region string) ([]model.AZ, error) {
 	log.Debug("get azs starting", logger.NewORGPrefix(t.orgID))
 	var azs []model.AZ
 
 	attrs := []string{"Zone", "ZoneName"}
-	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeZones", region.name, "ZoneSet", false, map[string]interface{}{})
+	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeZones", region, "ZoneSet", false, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("az request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.AZ{}, err
@@ -47,7 +47,7 @@ func (t *Tencent) getAZs(region tencentRegion) ([]model.AZ, error) {
 			Lcuuid:       lcuuid,
 			Label:        zone,
 			Name:         name,
-			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: t.regionLcuuid,
 		})
 	}
 	log.Debug("get azs complete", logger.NewORGPrefix(t.orgID))

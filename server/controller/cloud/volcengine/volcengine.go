@@ -18,8 +18,6 @@ package volcengine
 
 import (
 	"net/http"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
@@ -28,6 +26,7 @@ import (
 	"github.com/volcengine/volcengine-go-sdk/volcengine/credentials"
 	"github.com/volcengine/volcengine-go-sdk/volcengine/session"
 
+	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudconfig "github.com/deepflowio/deepflow/server/controller/cloud/config"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -66,12 +65,12 @@ type VolcEngine struct {
 	teamID         int
 	name           string
 	lcuuid         string
-	regionUUID     string
+	regionLcuuid   string
 	uuidGenerate   string
 	secretID       string
 	secretKey      string
-	includeRegions []string
-	excludeRegions []string
+	includeRegions map[string]bool
+	excludeRegions map[string]bool
 	azLcuuids      map[string]bool
 	httpClient     *http.Client
 }
@@ -101,23 +100,9 @@ func NewVolcEngine(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudCon
 		return nil, err
 	}
 
-	includeRegionsStr := config.Get("include_regions").MustString()
-	includeRegions := []string{}
-	if includeRegionsStr != "" {
-		includeRegions = strings.Split(includeRegionsStr, ",")
-	}
-	sort.Strings(includeRegions)
-
-	excludeRegionsStr := config.Get("exclude_regions").MustString()
-	excludeRegions := []string{}
-	if excludeRegionsStr != "" {
-		excludeRegions = strings.Split(excludeRegionsStr, ",")
-	}
-	sort.Strings(excludeRegions)
-
-	regionUUID := config.Get("region_uuid").MustString()
-	if regionUUID == "" {
-		regionUUID = common.DEFAULT_REGION
+	regionLcuuid := config.Get("region_uuid").MustString()
+	if regionLcuuid == "" {
+		regionLcuuid = common.DEFAULT_REGION
 	}
 
 	return &VolcEngine{
@@ -126,11 +111,11 @@ func NewVolcEngine(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudCon
 		name:           domain.Name,
 		lcuuid:         domain.Lcuuid,
 		uuidGenerate:   domain.DisplayName,
-		regionUUID:     regionUUID,
+		regionLcuuid:   regionLcuuid,
 		secretID:       secretID,
 		secretKey:      decryptSecretKey,
-		excludeRegions: excludeRegions,
-		includeRegions: includeRegions,
+		includeRegions: cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
+		excludeRegions: cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		azLcuuids:      map[string]bool{},
 		httpClient: &http.Client{
 			Timeout: time.Duration(cfg.HTTPTimeout) * time.Second,

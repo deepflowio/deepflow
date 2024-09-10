@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]string) ([]model.SubDomain, error) {
+func (b *BaiduBce) getSubDomains(vpcIdToLcuuid map[string]string) ([]model.SubDomain, error) {
 	var retSubDomains []model.SubDomain
 
 	log.Debug("get sub_domains starting", logger.NewORGPrefix(b.orgID))
@@ -67,7 +67,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 				"port_name_regex":            common.DEFAULT_PORT_NAME_REGEX,
 				"vtap_id":                    "",
 				"controller_ip":              "",
-				"region_uuid":                region.Lcuuid,
+				"region_uuid":                b.regionLcuuid,
 				"pod_net_ipv4_cidr_max_mask": common.K8S_POD_IPV4_NETMASK,
 				"pod_net_ipv6_cidr_max_mask": common.K8S_POD_IPV6_NETMASK,
 			}

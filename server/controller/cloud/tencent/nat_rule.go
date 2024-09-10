@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
+func (t *Tencent) getNatRules(region string) ([]model.NATRule, error) {
 	log.Debug("get nat rules starting", logger.NewORGPrefix(t.orgID))
 	var natRules []model.NATRule
 
@@ -40,7 +40,7 @@ func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
 		"NatGatewayIds": t.natIDs,
 	}
 
-	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGatewayDestinationIpPortTranslationNatRules", region.name, "NatGatewayDestinationIpPortTranslationNatRuleSet", true, params)
+	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGatewayDestinationIpPortTranslationNatRules", region, "NatGatewayDestinationIpPortTranslationNatRuleSet", true, params)
 	if err != nil {
 		log.Errorf("nat rule request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.NATRule{}, err

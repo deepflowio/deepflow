@@ -96,7 +96,7 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 				Label:        redisId,
 				VPCLcuuid:    vpcLcuuid,
 				AZLcuuid:     common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+zoneId),
-				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid: a.regionLcuuid,
 				InternalHost: internalHost,
 				PublicHost:   publicHost,
 				State:        common.REDIS_STATE_RUNNING,
@@ -104,7 +104,6 @@ func (a *Aliyun) getRedisInstances(region model.Region) (
 			}
 			retRedisInstances = append(retRedisInstances, retRedisInstance)
 			a.azLcuuidToResourceNum[retRedisInstance.AZLcuuid]++
-			a.regionLcuuidToResourceNum[retRedisInstance.RegionLcuuid]++
 
 			// 获取接口信息
 			tmpVInterfaces, tmpIPs := a.getRedisPorts(region, redisId)
@@ -153,7 +152,7 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 				DeviceType:    common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:  a.regionLcuuid,
 			}
 			retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -162,7 +161,7 @@ func (a *Aliyun) getRedisPorts(region model.Region, redisId string) ([]model.VIn
 				VInterfaceLcuuid: portLcuuid,
 				IP:               ip,
 				SubnetLcuuid:     common.GenerateUUIDByOrgID(a.orgID, networkLcuuid),
-				RegionLcuuid:     a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:     a.regionLcuuid,
 			}
 			retIPs = append(retIPs, retIP)
 		}

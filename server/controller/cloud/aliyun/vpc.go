@@ -56,10 +56,9 @@ func (a *Aliyun) getVPCs(region model.Region) ([]model.VPC, error) {
 				Name:         vpcName,
 				Label:        vpcId,
 				CIDR:         cidr,
-				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid: a.regionLcuuid,
 			}
 			retVPCs = append(retVPCs, retVPC)
-			a.regionLcuuidToResourceNum[retVPC.RegionLcuuid]++
 			a.vpcIDToLcuuids[vpcId] = vpcLcuuid
 		}
 	}

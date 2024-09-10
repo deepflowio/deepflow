@@ -27,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
+func (b *BaiduBce) getLoadBalances(vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
 	[]model.LB, []model.VInterface, []model.IP, error,
 ) {
 	var retLBs []model.LB
@@ -37,7 +37,7 @@ func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string
 	log.Debug("get lbs starting", logger.NewORGPrefix(b.orgID))
 
 	// 普通型负载均衡器
-	tmpLBs, tmpVInterfaces, tmpIPs, err := b.getBLoadBalances(region, vpcIdToLcuuid, networkIdToLcuuid)
+	tmpLBs, tmpVInterfaces, tmpIPs, err := b.getBLoadBalances(vpcIdToLcuuid, networkIdToLcuuid)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -46,7 +46,7 @@ func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string
 	retIPs = append(retIPs, tmpIPs...)
 
 	// 应用型负载均衡器
-	tmpLBs, tmpVInterfaces, tmpIPs, err = b.getAppBLoadBalances(region, vpcIdToLcuuid, networkIdToLcuuid)
+	tmpLBs, tmpVInterfaces, tmpIPs, err = b.getAppBLoadBalances(vpcIdToLcuuid, networkIdToLcuuid)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -58,7 +58,7 @@ func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string
 	return retLBs, retVInterfaces, retIPs, nil
 }
 
-func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
+func (b *BaiduBce) getBLoadBalances(vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
 	[]model.LB, []model.VInterface, []model.IP, error,
 ) {
 	var retLBs []model.LB
@@ -108,13 +108,12 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 				Label:        lb.BlbId,
 				Model:        common.LB_MODEL_INTERNAL,
 				VPCLcuuid:    vpcLcuuid,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 			}
 			retLBs = append(retLBs, retLB)
-			b.regionLcuuidToResourceNum[retLB.RegionLcuuid]++
 
 			tmpVInterfaces, tmpIPs := b.getLBVInterfaceAndIPs(
-				region, vpcLcuuid, networkLcuuid, lbLcuuid, lb.Address, lb.PublicIp,
+				vpcLcuuid, networkLcuuid, lbLcuuid, lb.Address, lb.PublicIp,
 			)
 			retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
 			retIPs = append(retIPs, tmpIPs...)
@@ -124,9 +123,8 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 	return retLBs, retVInterfaces, retIPs, nil
 }
 
-func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
-	[]model.LB, []model.VInterface, []model.IP, error,
-) {
+func (b *BaiduBce) getAppBLoadBalances(vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
+	[]model.LB, []model.VInterface, []model.IP, error) {
 	var retLBs []model.LB
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
@@ -174,13 +172,12 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 				Label:        lb.BlbId,
 				Model:        common.LB_MODEL_INTERNAL,
 				VPCLcuuid:    vpcLcuuid,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 			}
 			retLBs = append(retLBs, retLB)
-			b.regionLcuuidToResourceNum[retLB.RegionLcuuid]++
 
 			tmpVInterfaces, tmpIPs := b.getLBVInterfaceAndIPs(
-				region, vpcLcuuid, networkLcuuid, lbLcuuid, lb.Address, lb.PublicIp,
+				vpcLcuuid, networkLcuuid, lbLcuuid, lb.Address, lb.PublicIp,
 			)
 			retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
 			retIPs = append(retIPs, tmpIPs...)
@@ -190,9 +187,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 	return retLBs, retVInterfaces, retIPs, nil
 }
 
-func (b *BaiduBce) getLBVInterfaceAndIPs(
-	region model.Region, vpcLcuuid, networkLcuuid, lbLcuuid, ip, publicIP string,
-) ([]model.VInterface, []model.IP) {
+func (b *BaiduBce) getLBVInterfaceAndIPs(vpcLcuuid, networkLcuuid, lbLcuuid, ip, publicIP string) ([]model.VInterface, []model.IP) {
 
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
@@ -208,14 +203,14 @@ func (b *BaiduBce) getLBVInterfaceAndIPs(
 			DeviceType:    common.VIF_DEVICE_TYPE_LB,
 			NetworkLcuuid: networkLcuuid,
 			VPCLcuuid:     vpcLcuuid,
-			RegionLcuuid:  region.Lcuuid,
+			RegionLcuuid:  b.regionLcuuid,
 		})
 		retIPs = append(retIPs, model.IP{
 			Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+ip),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               ip,
 			SubnetLcuuid:     common.GenerateUUIDByOrgID(b.orgID, networkLcuuid),
-			RegionLcuuid:     region.Lcuuid,
+			RegionLcuuid:     b.regionLcuuid,
 		})
 	}
 
@@ -230,13 +225,13 @@ func (b *BaiduBce) getLBVInterfaceAndIPs(
 			DeviceType:    common.VIF_DEVICE_TYPE_LB,
 			NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 			VPCLcuuid:     vpcLcuuid,
-			RegionLcuuid:  region.Lcuuid,
+			RegionLcuuid:  b.regionLcuuid,
 		})
 		retIPs = append(retIPs, model.IP{
 			Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+publicIP),
 			VInterfaceLcuuid: vinterfaceLcuuid,
 			IP:               publicIP,
-			RegionLcuuid:     region.Lcuuid,
+			RegionLcuuid:     b.regionLcuuid,
 		})
 	}
 	return retVInterfaces, retIPs

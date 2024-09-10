@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]string) (
+func (b *BaiduBce) getNatGateways(vpcIdToLcuuid map[string]string) (
 	[]model.NATGateway, []model.VInterface, []model.IP, error,
 ) {
 	var retNATGateways []model.NATGateway
@@ -71,10 +71,9 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 				Label:        nat.Id,
 				FloatingIPs:  strings.Join(nat.Eips, ","),
 				VPCLcuuid:    vpcLcuuid,
-				RegionLcuuid: region.Lcuuid,
+				RegionLcuuid: b.regionLcuuid,
 			}
 			retNATGateways = append(retNATGateways, retNATGateway)
-			b.regionLcuuidToResourceNum[retNATGateway.RegionLcuuid]++
 
 			// TODO: 目前Go sdk只能返回snat_ip，需要后续跟进dnat_ips
 			// 将nat_ip作为接口 + 公网IP返回
@@ -88,7 +87,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 					DeviceLcuuid:  natGatewayLcuuid,
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  region.Lcuuid,
+					RegionLcuuid:  b.regionLcuuid,
 				}
 				retVInterfaces = append(retVInterfaces, retVInterface)
 
@@ -96,7 +95,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 					Lcuuid:           common.GenerateUUIDByOrgID(b.orgID, vinterfaceLcuuid+ip),
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
-					RegionLcuuid:     region.Lcuuid,
+					RegionLcuuid:     b.regionLcuuid,
 				}
 				retIPs = append(retIPs, retIP)
 			}

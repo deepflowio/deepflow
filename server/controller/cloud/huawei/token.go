@@ -116,11 +116,11 @@ func (h *HuaWei) refreshTokenMap() error {
 			continue
 		}
 		name := jp.Get("name").MustString()
-		if len(h.config.IncludeRegions) > 0 && !common.Contains(h.config.IncludeRegions, name) {
+		if _, ok := h.config.IncludeRegions[name]; !ok {
 			log.Infof("exclude project: %s, not included", name, logger.NewORGPrefix(h.orgID))
 			continue
 		}
-		if common.Contains(h.config.ExcludeRegions, name) {
+		if _, ok := h.config.ExcludeRegions[name]; ok {
 			log.Infof("exclude project: %s", name, logger.NewORGPrefix(h.orgID))
 			continue
 		}

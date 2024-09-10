@@ -66,7 +66,7 @@ func (v *VolcEngine) getNetworks(sess *session.Session) ([]model.Network, []mode
 			External:       false,
 			NetType:        common.NETWORK_TYPE_LAN,
 			AZLcuuid:       azLcuuid,
-			RegionLcuuid:   v.regionUUID,
+			RegionLcuuid:   v.regionLcuuid,
 		})
 		v.azLcuuids[azLcuuid] = false
 

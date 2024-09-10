@@ -27,7 +27,7 @@ import (
 func (g *Genesis) getAZ() (model.AZ, error) {
 	log.Debug("get az starting", logger.NewORGPrefix(g.orgID))
 	azName := common.DEFAULT_REGION_NAME
-	if g.regionUuid != common.DEFAULT_REGION {
+	if g.regionLcuuid != common.DEFAULT_REGION {
 		azName = g.Name
 	}
 	azLcuuid := common.GetUUIDByOrgID(g.orgID, azName)
@@ -36,7 +36,7 @@ func (g *Genesis) getAZ() (model.AZ, error) {
 
 	az := model.AZ{
 		Lcuuid:       azLcuuid,
-		RegionLcuuid: g.regionUuid,
+		RegionLcuuid: g.regionLcuuid,
 		Name:         azName,
 	}
 	g.azLcuuid = azLcuuid

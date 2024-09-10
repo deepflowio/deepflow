@@ -51,7 +51,7 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 			LaunchServer: launchServer,
 			CreatedAt:    v.CreatedAt,
 			AZLcuuid:     g.azLcuuid,
-			RegionLcuuid: g.regionUuid,
+			RegionLcuuid: g.regionLcuuid,
 		}
 		vms = append(vms, vm)
 	}

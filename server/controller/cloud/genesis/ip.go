@@ -44,7 +44,7 @@ func (g *Genesis) getIPs() ([]model.IP, error) {
 			VInterfaceLcuuid: i.VInterfaceLcuuid,
 			IP:               i.IP,
 			SubnetLcuuid:     i.SubnetLcuuid,
-			RegionLcuuid:     g.regionUuid,
+			RegionLcuuid:     g.regionLcuuid,
 		}
 		ips = append(ips, ip)
 	}

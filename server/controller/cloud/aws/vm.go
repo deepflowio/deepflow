@@ -26,7 +26,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
+func (a *Aws) getVMs(client *ec2.Client) ([]model.VM, error) {
 	log.Debug("get vms starting", logger.NewORGPrefix(a.orgID))
 	a.vmIDToPrivateIP = map[string]string{}
 	var vms []model.VM
@@ -45,7 +45,7 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
 		} else {
 			input = &ec2.DescribeInstancesInput{MaxResults: &maxResults, NextToken: &nextToken}
 		}
-		result, err := a.ec2Client.DescribeInstances(context.TODO(), input)
+		result, err := client.DescribeInstances(context.TODO(), input)
 		if err != nil {
 			log.Errorf("vm request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VM{}, err
@@ -84,7 +84,7 @@ func (a *Aws) getVMs(region awsRegion) ([]model.VM, error) {
 				IP:           a.instanceIDToPrimaryIP[instanceID],
 				CreatedAt:    a.getTimePointerValue(ins.LaunchTime),
 				AZLcuuid:     azLcuuid,
-				RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
+				RegionLcuuid: a.regionLcuuid,
 			})
 			a.azLcuuidMap[azLcuuid] = 0
 			a.vmIDToPrivateIP[instanceID] = a.getStringPointerValue(ins.PrivateIpAddress)

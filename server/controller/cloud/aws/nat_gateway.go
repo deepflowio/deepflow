@@ -27,7 +27,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
+func (a *Aws) getNatGateways(client *ec2.Client) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
 	log.Debug("get nat gateways starting", logger.NewORGPrefix(a.orgID))
 	var natGateways []model.NATGateway
 	var natVinterfaces []model.VInterface
@@ -43,7 +43,7 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 		} else {
 			input = &ec2.DescribeNatGatewaysInput{MaxResults: &maxResults, NextToken: &nextToken}
 		}
-		result, err := a.ec2Client.DescribeNatGateways(context.TODO(), input)
+		result, err := client.DescribeNatGateways(context.TODO(), input)
 		if err != nil {
 			log.Errorf("nat gateway request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, err
@@ -79,7 +79,7 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 			Label:        natGatewayID,
 			FloatingIPs:  strings.Join(floatingIPs, ","),
 			VPCLcuuid:    vpcLcuuid,
-			RegionLcuuid: a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: a.regionLcuuid,
 		})
 
 		vinterfaceLcuuid := common.GetUUIDByOrgID(a.orgID, natGatewayLcuuid)
@@ -91,14 +91,14 @@ func (a *Aws) getNatGateways(region awsRegion) ([]model.NATGateway, []model.VInt
 			DeviceType:    common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 			NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 			VPCLcuuid:     vpcLcuuid,
-			RegionLcuuid:  a.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid:  a.regionLcuuid,
 		})
 
 		for _, ip := range floatingIPs {
 			natIPs = append(natIPs, model.IP{
 				IP:               ip,
 				VInterfaceLcuuid: vinterfaceLcuuid,
-				RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
+				RegionLcuuid:     a.regionLcuuid,
 				Lcuuid:           common.GetUUIDByOrgID(a.orgID, vinterfaceLcuuid+ip),
 			})
 		}

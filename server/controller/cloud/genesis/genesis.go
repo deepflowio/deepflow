@@ -46,7 +46,7 @@ type Genesis struct {
 	Name            string
 	Lcuuid          string
 	UuidGenerate    string
-	regionUuid      string
+	regionLcuuid    string
 	azLcuuid        string
 	defaultVpcName  string
 	ips             []cloudmodel.IP
@@ -69,6 +69,10 @@ func NewGenesis(orgID int, domain mysqlmodel.Domain, cfg config.CloudConfig) (*G
 	if ipV6MaxMask == 0 {
 		ipV6MaxMask = 64
 	}
+	regionLcuuid := config.Get("region_uuid").MustString()
+	if regionLcuuid == "" {
+		regionLcuuid = common.DEFAULT_REGION
+	}
 	return &Genesis{
 		orgID:           orgID,
 		teamID:          domain.TeamID,
@@ -78,7 +82,7 @@ func NewGenesis(orgID int, domain mysqlmodel.Domain, cfg config.CloudConfig) (*G
 		Lcuuid:          domain.Lcuuid,
 		UuidGenerate:    domain.DisplayName,
 		defaultVpcName:  cfg.GenesisDefaultVpcName,
-		regionUuid:      config.Get("region_uuid").MustString(),
+		regionLcuuid:    regionLcuuid,
 		genesisData:     gcommon.GenesisSyncDataResponse{},
 		cloudStatsd:     statsd.NewCloudStatsd(),
 	}, nil
@@ -322,7 +326,7 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 		vpc := cloudmodel.VPC{
 			Lcuuid:       common.GetUUIDByOrgID(g.orgID, g.defaultVpcName),
 			Name:         g.defaultVpcName,
-			RegionLcuuid: g.regionUuid,
+			RegionLcuuid: g.regionLcuuid,
 		}
 		vpcs = append(vpcs, vpc)
 	}

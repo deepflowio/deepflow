@@ -19,7 +19,6 @@ package tencent
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,8 +40,8 @@ import (
 var log = logger.MustGetLogger("cloud.tencent")
 
 const (
-	FINANCE_REGION_PROFILE = "金融"
-	TENCENT_ENDPOINT       = ".tencentcloudapi.com"
+	FINANCE_REGION_SUFFIX = "-fsi"
+	TENCENT_ENDPOINT      = ".tencentcloudapi.com"
 )
 
 var pagesIntControl = map[string]int{
@@ -50,7 +49,7 @@ var pagesIntControl = map[string]int{
 	"DescribeNatGateways":                                    0,
 	"DescribeLoadBalancers":                                  0,
 	"DescribeNetworkInterfaces":                              0,
-	"DescribeVpcPeerConnections":                             0,
+	"DescribeVpcPeeringConnections":                          0,
 	"DescribeNatGatewayDestinationIpPortTranslationNatRules": 0,
 }
 
@@ -59,26 +58,18 @@ type Tencent struct {
 	teamID               int
 	name                 string
 	lcuuid               string
-	regionUUID           string
+	regionLcuuid         string
 	uuidGenerate         string
 	httpTimeout          int
-	includeRegions       []string
-	excludeRegions       []string
+	includeRegions       map[string]bool
+	excludeRegions       map[string]bool
 	credential           *tcommon.Credential
 	natIDs               []string
 	azLcuuidMap          map[string]int
-	vpcIDToRegionLcuuid  map[string]string
 	publicIPToVinterface map[string]model.VInterface
 	cloudStatsd          statsd.CloudStatsd
 
 	debugger *cloudcommon.Debugger
-}
-
-type tencentRegion struct {
-	finance    bool
-	name       string
-	lcuuid     string
-	regionName string
 }
 
 type tencentGressRule struct {
@@ -121,19 +112,10 @@ func NewTencent(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig
 		return nil, err
 	}
 
-	excludeRegionsStr := config.Get("exclude_regions").MustString()
-	excludeRegions := []string{}
-	if excludeRegionsStr != "" {
-		excludeRegions = strings.Split(excludeRegionsStr, ",")
+	regionLcuuid := config.Get("region_uuid").MustString()
+	if regionLcuuid == "" {
+		regionLcuuid = common.DEFAULT_REGION
 	}
-
-	sort.Strings(excludeRegions)
-	includeRegionsStr := config.Get("include_regions").MustString()
-	includeRegions := []string{}
-	if includeRegionsStr != "" {
-		includeRegions = strings.Split(includeRegionsStr, ",")
-	}
-	sort.Strings(includeRegions)
 
 	return &Tencent{
 		// TODO: display_name后期需要修改为uuid_generate
@@ -142,16 +124,15 @@ func NewTencent(orgID int, domain mysqlmodel.Domain, cfg cloudconfig.CloudConfig
 		name:           domain.Name,
 		lcuuid:         domain.Lcuuid,
 		uuidGenerate:   domain.DisplayName,
-		excludeRegions: excludeRegions,
-		includeRegions: includeRegions,
 		httpTimeout:    cfg.HTTPTimeout,
-		regionUUID:     config.Get("region_uuid").MustString(),
+		regionLcuuid:   regionLcuuid,
+		includeRegions: cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
+		excludeRegions: cloudcommon.UniqRegions(config.Get("exclude_regions").MustString()),
 		credential:     tcommon.NewCredential(secretID, decryptSecretKey),
 
 		// 以下属性为获取资源所用的关联关系
 		natIDs:               []string{},
 		azLcuuidMap:          map[string]int{},
-		vpcIDToRegionLcuuid:  map[string]string{},
 		publicIPToVinterface: map[string]model.VInterface{},
 		cloudStatsd:          statsd.NewCloudStatsd(),
 		debugger:             cloudcommon.NewDebugger(domain.Name),
@@ -167,7 +148,7 @@ func (t *Tencent) CheckAuth() error {
 	return nil
 }
 
-func (t *Tencent) getResponse(service, version, action, regionName, resultKey string, pages bool, params map[string]interface{}, filters ...map[string]interface{}) ([]*simplejson.Json, error) {
+func (t *Tencent) getResponse(service, version, action, region, resultKey string, pages bool, params map[string]interface{}, filters ...map[string]interface{}) ([]*simplejson.Json, error) {
 	var responses []*simplejson.Json
 	var err error
 	var totalCount int
@@ -179,7 +160,11 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	cpf := profile.NewClientProfile()
 	// sdk debug
 	// cpf.Debug = true
-	cpf.HttpProfile.Endpoint = service + ".tencentcloudapi.com"
+	endpoint := service + TENCENT_ENDPOINT
+	if strings.HasSuffix(region, FINANCE_REGION_SUFFIX) {
+		endpoint = service + "." + region + TENCENT_ENDPOINT
+	}
+	cpf.HttpProfile.Endpoint = endpoint
 	cpf.HttpProfile.ReqMethod = "POST"
 	cpf.HttpProfile.ReqTimeout = t.httpTimeout
 	cpf.NetworkFailureMaxRetries = 1
@@ -187,7 +172,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	cpf.RateLimitExceededMaxRetries = 1
 	cpf.RateLimitExceededRetryDuration = profile.ExponentialBackoff
 	// create common client
-	client := tcommon.NewCommonClient(t.credential, regionName, cpf)
+	client := tcommon.NewCommonClient(t.credential, region, cpf)
 
 	// create common request
 	request := thttp.NewCommonRequest(service, version, action)
@@ -271,7 +256,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 	if !strings.Contains(common.CloudMonitorExceptionAPI[common.TENCENT_EN], action) {
 		t.cloudStatsd.RefreshAPIMoniter(action, totalCount, startTime)
 	}
-	t.debugger.WriteJson(resultKey, regionName, responses)
+	t.debugger.WriteJson(resultKey, region, responses)
 	return responses, nil
 }
 
@@ -283,13 +268,6 @@ func (t *Tencent) checkRequiredAttributes(json *simplejson.Json, attributes []st
 		}
 	}
 	return true
-}
-
-func (t *Tencent) getRegionLcuuid(lcuuid string) string {
-	if t.regionUUID != "" {
-		return t.regionUUID
-	}
-	return lcuuid
 }
 
 func (t *Tencent) GetStatter() statsd.StatsdStatter {
@@ -312,118 +290,87 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 	// 任务循环执行的是同一个实例，所以这里要对关联关系进行初始化
 	t.natIDs = []string{}
 	t.cloudStatsd = statsd.NewCloudStatsd()
-	t.vpcIDToRegionLcuuid = map[string]string{}
 	t.publicIPToVinterface = map[string]model.VInterface{}
 
-	regionList, err := t.getRegions()
+	regions, err := t.getRegions()
 	if err != nil {
 		return model.Resource{}, err
 	}
-	for _, region := range regionList {
-		log.Infof("region (%s) collect starting", region.regionName, logger.NewORGPrefix(t.orgID))
+	for _, region := range regions {
+		log.Infof("region (%s) collect starting", region, logger.NewORGPrefix(t.orgID))
 
-		regionFlag := false
 		t.azLcuuidMap = map[string]int{}
 
 		vpcs, err := t.getVPCs(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vpcs) > 0 {
-			regionFlag = true
-			resource.VPCs = append(resource.VPCs, vpcs...)
-		}
+		resource.VPCs = append(resource.VPCs, vpcs...)
 
 		natGateways, natVinterfaces, natIPs, err := t.getNatGateways(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(natGateways) > 0 || len(natVinterfaces) > 0 || len(natIPs) > 0 {
-			regionFlag = true
-			resource.NATGateways = append(resource.NATGateways, natGateways...)
-			resource.VInterfaces = append(resource.VInterfaces, natVinterfaces...)
-			resource.IPs = append(resource.IPs, natIPs...)
-		}
+		resource.NATGateways = append(resource.NATGateways, natGateways...)
+		resource.VInterfaces = append(resource.VInterfaces, natVinterfaces...)
+		resource.IPs = append(resource.IPs, natIPs...)
 
 		natRules, err := t.getNatRules(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(natRules) > 0 {
-			regionFlag = true
-			resource.NATRules = append(resource.NATRules, natRules...)
-
-		}
+		resource.NATRules = append(resource.NATRules, natRules...)
 
 		routers, routerTables, err := t.getRouterAndTables(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(routers) > 0 || len(routerTables) > 0 {
-			regionFlag = true
-			resource.VRouters = append(resource.VRouters, routers...)
-			resource.RoutingTables = append(resource.RoutingTables, routerTables...)
-		}
+		resource.VRouters = append(resource.VRouters, routers...)
+		resource.RoutingTables = append(resource.RoutingTables, routerTables...)
 
 		networks, subnets, netVinterfaces, err := t.getNetworks(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(networks) > 0 || len(subnets) > 0 || len(netVinterfaces) > 0 {
-			regionFlag = true
-			resource.Networks = append(resource.Networks, networks...)
-			resource.Subnets = append(resource.Subnets, subnets...)
-			resource.VInterfaces = append(resource.VInterfaces, netVinterfaces...)
-		}
+		resource.Networks = append(resource.Networks, networks...)
+		resource.Subnets = append(resource.Subnets, subnets...)
+		resource.VInterfaces = append(resource.VInterfaces, netVinterfaces...)
 
 		vms, err := t.getVMs(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vms) > 0 {
-			regionFlag = true
-			resource.VMs = append(resource.VMs, vms...)
-		}
+		resource.VMs = append(resource.VMs, vms...)
 
 		vinterfaces, ips, vNatRules, err := t.getVInterfacesAndIPs(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(vinterfaces) > 0 || len(ips) > 0 || len(vNatRules) > 0 {
-			regionFlag = true
-			resource.VInterfaces = append(resource.VInterfaces, vinterfaces...)
-			resource.IPs = append(resource.IPs, ips...)
-			resource.NATRules = append(resource.NATRules, vNatRules...)
-		}
+		resource.VInterfaces = append(resource.VInterfaces, vinterfaces...)
+		resource.IPs = append(resource.IPs, ips...)
+		resource.NATRules = append(resource.NATRules, vNatRules...)
 
 		fIPs, err := t.getFloatingIPs()
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(fIPs) > 0 {
-			regionFlag = true
-			resource.FloatingIPs = append(resource.FloatingIPs, fIPs...)
-		}
+		resource.FloatingIPs = append(resource.FloatingIPs, fIPs...)
 
 		lbs, lbListeners, lbTargetServers, lbVinterfaces, lbIPs, err := t.getLoadBalances(region)
 		if err != nil {
 			return model.Resource{}, err
 		}
-		if len(lbs) > 0 || len(lbListeners) > 0 || len(lbTargetServers) > 0 {
-			regionFlag = true
-			resource.LBs = append(resource.LBs, lbs...)
-			resource.LBListeners = append(resource.LBListeners, lbListeners...)
-			resource.LBTargetServers = append(resource.LBTargetServers, lbTargetServers...)
-			resource.VInterfaces = append(resource.VInterfaces, lbVinterfaces...)
-			resource.IPs = append(resource.IPs, lbIPs...)
-		}
+		resource.LBs = append(resource.LBs, lbs...)
+		resource.LBListeners = append(resource.LBListeners, lbListeners...)
+		resource.LBTargetServers = append(resource.LBTargetServers, lbTargetServers...)
+		resource.VInterfaces = append(resource.VInterfaces, lbVinterfaces...)
+		resource.IPs = append(resource.IPs, lbIPs...)
 
-		if regionFlag && t.regionUUID == "" {
-			resource.Regions = append(resource.Regions, model.Region{
-				Name:   region.regionName,
-				Lcuuid: region.lcuuid,
-			})
+		peerConnections, err := t.getPeerConnections(region)
+		if err != nil {
+			return model.Resource{}, err
 		}
+		resource.PeerConnections = append(resource.PeerConnections, peerConnections...)
 
 		azs, err := t.getAZs(region)
 		if err != nil {
@@ -433,19 +380,8 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 			resource.AZs = append(resource.AZs, azs...)
 		}
 
-		log.Infof("region (%s) collect complete", region.regionName, logger.NewORGPrefix(t.orgID))
+		log.Infof("region (%s) collect complete", region, logger.NewORGPrefix(t.orgID))
 	}
-
-	// TODO: 因为腾讯云服务器 API 3.0 版本暂未支持对等连接的获取，这里等待后续支持
-	// peerConnections := []model.PeerConnection{}
-	// for _, r := range regionList {
-	// 	pConnections, err := t.getPeerConnections(r, peerConnections)
-	// 	if err != nil {
-	// 		return model.Resource{}, err
-	// 	}
-	// 	peerConnections = append(peerConnections, pConnections...)
-	// }
-	// resource.PeerConnections = peerConnections
 
 	t.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(t)

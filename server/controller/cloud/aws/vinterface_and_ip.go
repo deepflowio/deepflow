@@ -28,7 +28,7 @@ import (
 	"inet.af/netaddr"
 )
 
-func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []model.IP, []model.NATRule, error) {
+func (a *Aws) getVInterfacesAndIPs(client *ec2.Client) ([]model.VInterface, []model.IP, []model.NATRule, error) {
 	log.Debug("get vinterfaces,ips starting", logger.NewORGPrefix(a.orgID))
 	a.publicIPToVinterface = map[string]model.VInterface{}
 	var vinterfaces []model.VInterface
@@ -45,7 +45,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 		} else {
 			input = &ec2.DescribeNetworkInterfacesInput{MaxResults: &maxResults, NextToken: &nextToken}
 		}
-		result, err := a.ec2Client.DescribeNetworkInterfaces(context.TODO(), input)
+		result, err := client.DescribeNetworkInterfaces(context.TODO(), input)
 		if err != nil {
 			log.Errorf("vinterface request aws api error: (%s)", err.Error(), logger.NewORGPrefix(a.orgID))
 			return []model.VInterface{}, []model.IP{}, []model.NATRule{}, err
@@ -110,7 +110,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 				DeviceType:    common.VIF_DEVICE_TYPE_VM,
 				NetworkLcuuid: networkLcuuid,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  a.getRegionLcuuid(region.lcuuid),
+				RegionLcuuid:  a.regionLcuuid,
 			}
 			vinterfaces = append(vinterfaces, vinterface)
 			for _, ip := range vData.PrivateIpAddresses {
@@ -140,7 +140,7 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               privateIP,
 					SubnetLcuuid:     common.GetUUIDByOrgID(a.orgID, networkLcuuid),
-					RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
+					RegionLcuuid:     a.regionLcuuid,
 				})
 
 				if ip.Association == nil {
@@ -159,14 +159,14 @@ func (a *Aws) getVInterfacesAndIPs(region awsRegion) ([]model.VInterface, []mode
 						DeviceType:    common.VIF_DEVICE_TYPE_VM,
 						NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 						VPCLcuuid:     vpcLcuuid,
-						RegionLcuuid:  a.getRegionLcuuid(region.lcuuid),
+						RegionLcuuid:  a.regionLcuuid,
 					})
 
 					ips = append(ips, model.IP{
 						Lcuuid:           common.GetUUIDByOrgID(a.orgID, vinterfaceLcuuid+publicIP),
 						VInterfaceLcuuid: vLcuuid,
 						IP:               publicIP,
-						RegionLcuuid:     a.getRegionLcuuid(region.lcuuid),
+						RegionLcuuid:     a.regionLcuuid,
 					})
 
 					a.publicIPToVinterface[publicIP] = vinterface

@@ -25,9 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (b *BaiduBce) getRouterAndTables(
-	region model.Region, vpcIdToLcuuid map[string]string, vpcIdToName map[string]string,
-) ([]model.VRouter, []model.RoutingTable, error) {
+func (b *BaiduBce) getRouterAndTables(vpcIdToLcuuid map[string]string, vpcIdToName map[string]string) ([]model.VRouter, []model.RoutingTable, error) {
 	var retVRouters []model.VRouter
 	var retRoutingTables []model.RoutingTable
 
@@ -52,10 +50,9 @@ func (b *BaiduBce) getRouterAndTables(
 			Lcuuid:       vrouterLcuuid,
 			Name:         vrouterName,
 			VPCLcuuid:    vpcLcuuid,
-			RegionLcuuid: region.Lcuuid,
+			RegionLcuuid: b.regionLcuuid,
 		}
 		retVRouters = append(retVRouters, retVRouter)
-		b.regionLcuuidToResourceNum[retVRouter.RegionLcuuid]++
 
 		// 暂不支持对接连接专线网关的路由表(无法创建可用的专线网关)
 		nexthop_types := map[string]string{

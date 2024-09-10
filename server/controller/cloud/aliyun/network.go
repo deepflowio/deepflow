@@ -66,11 +66,10 @@ func (a *Aliyun) getNetworks(region model.Region) ([]model.Network, []model.Subn
 				External:       false,
 				NetType:        common.NETWORK_TYPE_LAN,
 				AZLcuuid:       common.GenerateUUIDByOrgID(a.orgID, a.uuidGenerate+"_"+azId),
-				RegionLcuuid:   a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid:   a.regionLcuuid,
 			}
 			retNetworks = append(retNetworks, retNetwork)
 			a.azLcuuidToResourceNum[retNetwork.AZLcuuid]++
-			a.regionLcuuidToResourceNum[retNetwork.RegionLcuuid]++
 
 			retSubnet := model.Subnet{
 				Lcuuid:        common.GenerateUUIDByOrgID(a.orgID, networkLcuuid),

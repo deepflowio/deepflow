@@ -25,7 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBListener, []model.LBTargetServer, []model.VInterface, []model.IP, error) {
+func (t *Tencent) getLoadBalances(region string) ([]model.LB, []model.LBListener, []model.LBTargetServer, []model.VInterface, []model.IP, error) {
 	log.Debug("get load balances starting", logger.NewORGPrefix(t.orgID))
 	var lbs []model.LB
 	var lbListeners []model.LBListener
@@ -39,7 +39,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 
 	listenerIDToProtocol := map[string]string{}
 
-	lbResp, err := t.getResponse("clb", "2018-03-17", "DescribeLoadBalancers", region.name, "LoadBalancerSet", true, map[string]interface{}{})
+	lbResp, err := t.getResponse("clb", "2018-03-17", "DescribeLoadBalancers", region, "LoadBalancerSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("load balance request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 		return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
@@ -72,7 +72,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			Label:        lbID,
 			Model:        lbModel,
 			VPCLcuuid:    vpcLcuuid,
-			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid: t.regionLcuuid,
 		})
 
 		lbForward := lbData.Get("Forward").MustInt()
@@ -81,7 +81,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 		}
 		if lbForward == 1 {
 			// Application load balance
-			lbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeListeners", region.name, "Listeners", false, params)
+			lbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeListeners", region, "Listeners", false, params)
 			if err != nil {
 				log.Errorf("application load balance listener request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
@@ -109,7 +109,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 				listenerIDToProtocol[listenerID] = listenerProtocol
 			}
 
-			lbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeTargets", region.name, "Listeners", false, params)
+			lbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeTargets", region, "Listeners", false, params)
 			if err != nil {
 				log.Errorf("application load balance target request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
@@ -170,7 +170,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			}
 		} else if lbForward == 0 {
 			// Classic load balance
-			clbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBListeners", region.name, "Listeners", false, params)
+			clbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBListeners", region, "Listeners", false, params)
 			if err != nil {
 				log.Errorf("classic load balance listener request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
@@ -192,7 +192,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 					Protocol: listenerProtocol,
 				})
 
-				clbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBTargets", region.name, "Targets", false, params)
+				clbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBTargets", region, "Targets", false, params)
 				if err != nil {
 					log.Errorf("classic load balance classic target request tencent api error: (%s)", err.Error(), logger.NewORGPrefix(t.orgID))
 					return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
@@ -242,7 +242,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			DeviceType:    common.VIF_DEVICE_TYPE_LB,
 			NetworkLcuuid: networkLcuuid,
 			VPCLcuuid:     vpcLcuuid,
-			RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
+			RegionLcuuid:  t.regionLcuuid,
 		})
 		lbVIPs := lbData.Get("LoadBalancerVips")
 		for v := range lbVIPs.MustArray() {
@@ -252,7 +252,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 				VInterfaceLcuuid: vinterfaceLcuuid,
 				IP:               lbVIP,
 				SubnetLcuuid:     common.GetUUIDByOrgID(t.orgID, networkLcuuid),
-				RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
+				RegionLcuuid:     t.regionLcuuid,
 			})
 		}
 	}

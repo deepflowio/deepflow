@@ -57,10 +57,9 @@ func (a *Aliyun) getRouterAndTables(region model.Region) ([]model.VRouter, []mod
 				Lcuuid:       routerLcuuid,
 				Name:         routerTableName,
 				VPCLcuuid:    common.GenerateUUIDByOrgID(a.orgID, vpcId),
-				RegionLcuuid: a.getRegionLcuuid(region.Lcuuid),
+				RegionLcuuid: a.regionLcuuid,
 			}
 			retVRouters = append(retVRouters, retVRouter)
-			a.regionLcuuidToResourceNum[retVRouter.RegionLcuuid]++
 
 			// 路由表规则
 			retRoutingTables = append(retRoutingTables, a.getRouterTables(region, routerTableId)...)
