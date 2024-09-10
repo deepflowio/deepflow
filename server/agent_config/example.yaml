@@ -1102,6 +1102,7 @@ static_config:
   - ZMTP
   - DNS
   - TLS
+  - SomeIP
   - Custom ## custom protocol from plugin
 
   # Application Protocol Port Numbers
@@ -1131,6 +1132,7 @@ static_config:
     "ZMTP": "1-65535"
     "DNS": "53,5353"
     "TLS": "443,6443"
+    "SomeIP": "1-65535"
     "Custom": "1-65535" # plugins
 
   # l7_flow_log Blacklist
@@ -1166,6 +1168,7 @@ static_config:
     ZMTP: []
     DNS: []
     TLS: []
+    SomeIP: []
 
   # L7 Protocol Advanced Features
   l7-protocol-advanced-features:
@@ -1545,6 +1548,11 @@ static_config:
       # Memory trace process name
       # Default: ^java
       regex: ^java
+
+      # Memory profile report interval
+      # Default: 10s
+      # Note: Memory profiler will aggregate profile data by window and report according to this setting.
+      report-interval: 10s
 
     # eBPF OOOR (Out-Of-Order-Reassembly) Cache Size
     # Default: 16. Range: [8, 1024]

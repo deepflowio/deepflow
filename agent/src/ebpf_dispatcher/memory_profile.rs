@@ -14,7 +14,16 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, ffi::CStr, slice, time::Duration};
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    slice,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use log::{debug, trace, warn};
 use procfs::process::Process;
@@ -115,19 +124,31 @@ impl ProcessAllocInfo {
     }
 }
 
-#[derive(Default)]
 pub struct MemoryContext {
     processes: HashMap<u32, ProcessAllocInfo>,
 
+    report_interval_secs: Arc<AtomicU8>,
     last_report: Duration,
 }
 
 impl MemoryContext {
-    const REPORT_INTERVAL: Duration = Duration::from_secs(1);
-
     // There's a small difference (less than 1s) between start time from profiler and from procfs rust lib.
     // If cached stime from profiler plus THRESHOLD is smaller than start time from procfs, it's a process restart
     const PROCESS_RESTART_THRESHOLD: Duration = Duration::from_secs(3);
+
+    pub fn new(report_interval: Duration) -> Self {
+        Self {
+            processes: Default::default(),
+            report_interval_secs: Arc::new(AtomicU8::new(report_interval.as_secs() as u8)),
+            last_report: Default::default(),
+        }
+    }
+
+    pub fn settings(&self) -> MemoryContextSettings {
+        MemoryContextSettings {
+            report_interval_secs: self.report_interval_secs.clone(),
+        }
+    }
 
     pub unsafe fn update(&mut self, data: &ebpf::stack_profile_data) {
         assert_eq!(data.profiler_type, ebpf::PROFILER_TYPE_MEMORY);
@@ -142,7 +163,9 @@ impl MemoryContext {
             self.last_report = timestamp;
             return;
         }
-        if timestamp < self.last_report + Self::REPORT_INTERVAL {
+        let report_interval =
+            Duration::from_secs(self.report_interval_secs.load(Ordering::Relaxed) as u64);
+        if timestamp < self.last_report + report_interval {
             return;
         }
         self.last_report = timestamp;
@@ -186,7 +209,7 @@ impl MemoryContext {
                     }
                 }
                 p.event_type = metric::ProfileEventType::EbpfMemAlloc.into();
-                p.timestamp = (timestamp - Self::REPORT_INTERVAL).as_millis() as u64;
+                p.timestamp = (timestamp - report_interval).as_nanos() as u64;
                 p.count = p.wide_count as u32;
                 batch.push(Profile(p));
             }
@@ -202,7 +225,7 @@ impl MemoryContext {
                 }
                 let mut p = rp.clone();
                 p.event_type = metric::ProfileEventType::EbpfMemInUse.into();
-                p.timestamp = (timestamp - Self::REPORT_INTERVAL).as_millis() as u64;
+                p.timestamp = (timestamp - report_interval).as_nanos() as u64;
                 p.count = p.wide_count as u32;
                 batch.push(Profile(p));
             }
@@ -211,5 +234,16 @@ impl MemoryContext {
         for pid in dead_pids {
             self.processes.remove(&pid);
         }
+    }
+}
+
+pub struct MemoryContextSettings {
+    report_interval_secs: Arc<AtomicU8>,
+}
+
+impl MemoryContextSettings {
+    pub fn set_report_interval(&self, interval: Duration) {
+        self.report_interval_secs
+            .store(interval.as_secs() as u8, Ordering::Relaxed);
     }
 }

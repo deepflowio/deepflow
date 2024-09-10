@@ -1,0 +1,2 @@
+{"version":"Protocol 1 Interface 1","request_type":"Request","request_resource":41,"client_id":1,"session_id":171,"exception":null,"response_status":"Ok","endpoint":20484,"request_length":8,"captured_request_byte":16,"captured_response_byte":0,"rrt":0} check: true
+{"version":"Protocol 1 Interface 1","request_type":"Response","request_resource":41,"client_id":1,"session_id":171,"response_code":0,"exception":"No error occurred","response_status":"Ok","endpoint":20484,"response_length":29,"captured_request_byte":0,"captured_response_byte":37,"rrt":0} check: false

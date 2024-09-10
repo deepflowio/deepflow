@@ -30,7 +30,7 @@ var log = logging.MustGetLogger("event.config")
 
 const (
 	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 16384
+	DefaultDecoderQueueSize  = 4096
 	DefaultTTL               = 720 // hour
 )
 

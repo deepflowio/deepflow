@@ -1336,8 +1336,8 @@ static int perf_reader_setup(struct bpf_perf_reader *perf_reader, int thread_nr)
 		fwd_info->cpu_id = i;
 		fwd_info->tracer = perf_reader->tracer;
 
-		ebpf_info("Perf buffer reader cpu(%d) -> queue(%d)\n",
-			  fwd_info->cpu_id, fwd_info->queue_id);
+		ebpf_debug("Perf buffer reader cpu(%d) -> queue(%d)\n",
+			   fwd_info->cpu_id, fwd_info->queue_id);
 		reader = (struct perf_reader *)
 		    bpf_open_perf_buffer(perf_reader->raw_cb,
 					 perf_reader->lost_cb,

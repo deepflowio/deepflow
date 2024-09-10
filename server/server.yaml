@@ -416,7 +416,7 @@ ingester:
   #  external: false
   #  # database type: suport 'clickhouse', 'byconity', default is 'clickhouse'
   #  type: clickhouse
-  #  # if type is 'byconity', default host is 'byconity-server', else 'deepflow-clickhouse'
+  #  # if type is 'byconity', default host is 'deepflow-byconity-server', else 'deepflow-clickhouse'
   #  host: deepflow-clickhouse
   #  port: 9000
   #  # for get clickchouse endpoints tcp port value
@@ -560,11 +560,11 @@ ingester:
 
   ## pcap decoder queue count/size
   #pcap-queue-count: 2
-  #pcap-queue-size: 10000
+  #pcap-queue-size: 4096
 
   ## profile process data write config
   #profile-ck-writer:
-  #  queue-count: 1      # parallelism of table writing
+  #  queue-count: 2      # parallelism of table writing
   #  queue-size: 100000  # size of writing queue
   #  batch-size: 51200   # size of batch writing
   #  flush-timeout: 5    # timeout of table writing
@@ -591,7 +591,7 @@ ingester:
 
   ## prometheus decoder queue count/size
   #prometheus-decoder-queue-count: 1
-  #prometheus-decoder-queue-size: 16384
+  #prometheus-decoder-queue-size: 4096
 
   ## prometheus database data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
@@ -620,7 +620,7 @@ ingester:
 
   ## app log decoder queue count/size
   #application-log-decoder-queue-count: 2
-  #application-log-decoder-queue-size: 16384
+  #application-log-decoder-queue-size: 4096
 
   ## app log database data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
@@ -640,6 +640,8 @@ ingester:
   #    used-percent: 80         #  disk usage threshold, ranges: 0-100
   #    free-space: 300          #  uint: GB, disk minimum free threshold
   #    used-space: 0            #  uint: GB, disk maximum usage space threshold. (If it is 0, it means ignore the condition)
+  #  - disk-name-prefix: server_local_  # only when ckdb type is byconity
+  #  - disk-name-prefix: server_s3_disk_ # only when ckdb type is byconity
   #  priority-drops:     # set which database and table data will be deleted first when disk is full
   #  - database: flow_log   # databases under all organizations
   #    tables-contain:      # tables name containing the string will be priority-dropped. If it is empty, it means all the tables under the database
@@ -690,22 +692,22 @@ ingester:
   #l7-throttle: 0
 
   #flow-log-decoder-queue-count: 2
-  #flow-log-decoder-queue-size: 10000
+  #flow-log-decoder-queue-size: 4096
 
   #ext-metrics-decoder-queue-count: 2
-  #ext-metrics-decoder-queue-size: 10000
+  #ext-metrics-decoder-queue-size: 4096
 
   #profile-decoder-queue-count: 2
-  #profile-decoder-queue-size: 10000
+  #profile-decoder-queue-size: 4096
 
   #event-decoder-queue-count: 1
-  #event-decoder-queue-size: 10000
+  #event-decoder-queue-size: 4096
 
   #k8s-event-decoder-queue-count: 1
-  #k8s-event-decoder-queue-size: 10000
+  #k8s-event-decoder-queue-size: 4096
 
   #perf-event-decoder-queue-count: 2
-  #perf-event-decoder-queue-size: 100000
+  #perf-event-decoder-queue-size: 4096
 
   ## unit: byte
   #flow-tag-cache-max-size: 262144

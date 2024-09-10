@@ -102,12 +102,13 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 		resourceNoID := strings.TrimSuffix(resourceNoSuffix, "_id")
 		deviceTypeValue, ok := tag.DEVICE_MAP[resourceNoID]
 		if ok {
-			relatedOK := slices.Contains[[]string, string]([]string{"pod_service"}, resourceNoID)
-			if relatedOK {
-				return
+			if resourceNoID == "pod_service" {
+				serviceTagSuffix := "service_id" + suffix
+				filter = fmt.Sprintf("%s != 0", serviceTagSuffix)
+			} else {
+				deviceTypeTagSuffix := "l3_device_type" + suffix
+				filter = fmt.Sprintf("%s=%d", deviceTypeTagSuffix, deviceTypeValue)
 			}
-			deviceTypeTagSuffix := "l3_device_type" + suffix
-			filter = fmt.Sprintf("%s=%d", deviceTypeTagSuffix, deviceTypeValue)
 			return
 		} else if strings.HasPrefix(resourceNoID, "k8s.label.") {
 			podIDSuffix := "pod_id" + suffix
@@ -764,7 +765,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		noSuffixTag := strings.TrimSuffix(strings.Trim(t.Tag, "`"), "_0")
 		noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
 		noIDTag := noSuffixTag
-		if !slices.Contains([]string{"_id", "pod_service_id"}, noSuffixTag) {
+		if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id"}, noSuffixTag) {
 			noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
 		}
 		if ok {
@@ -933,7 +934,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			noSuffixTag := strings.TrimSuffix(whereTag, "_0")
 			noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
 			noIDTag := noSuffixTag
-			if !slices.Contains([]string{"_id", "pod_service_id"}, noSuffixTag) {
+			if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id"}, noSuffixTag) {
 				noIDTag = strings.TrimSuffix(noSuffixTag, "_id")
 			}
 			switch noIDTag {
@@ -1115,7 +1116,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 				}
 			case "service", "chost", "chost_hostname", "chost_ip", "router", "dhcpgw", "redis", "rds", "lb_listener",
 				"natgw", "lb", "host", "host_hostname", "host_ip", "pod_node", "pod_node_hostname", "pod_node_ip", "user",
-				"pod_group_type", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "pod_service_id", "pod_service":
+				"pod_group_type", "region", "az", "pod_ns", "pod_group", "pod", "pod_cluster", "subnet", "gprocess", "pod_service":
 				whereFilter = TransChostFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)
 			case "pod_ingress", "x_request_id", "syscall_thread", "syscall_coroutine", "syscall_cap_seq", "syscall_trace_id", "tcp_seq":
 				whereFilter = TransIngressFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, t.Value)

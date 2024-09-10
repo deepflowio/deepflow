@@ -435,9 +435,17 @@ impl FlowAclListener for SyncEbpfDispatcher {
     }
 }
 
+#[derive(Default)]
+struct ConfigHandle {
+    #[cfg(feature = "extended_profile")]
+    memory_profile_settings: Option<memory_profile::MemoryContextSettings>,
+}
+
 pub struct EbpfCollector {
     thread_dispatcher: EbpfDispatcher,
     thread_handle: Option<JoinHandle<()>>,
+
+    config_handle: ConfigHandle,
 
     counter: Arc<EbpfCounter>,
 
@@ -512,13 +520,13 @@ impl EbpfCollector {
 
             #[cfg(feature = "extended_profile")]
             if data.profiler_type == ebpf::PROFILER_TYPE_MEMORY {
-                let mut ts_millis = data.timestamp;
+                let mut ts_nanos = data.timestamp;
                 if let Some(time_diff) = TIME_DIFF.as_ref() {
                     let diff = time_diff.load(Ordering::Relaxed);
                     if diff > 0 {
-                        ts_millis += diff as u64;
+                        ts_nanos += diff as u64;
                     } else {
-                        ts_millis -= (-diff) as u64;
+                        ts_nanos -= (-diff) as u64;
                     }
                 }
                 let Some(m_ctx) = (ctx as *mut memory_profile::MemoryContext).as_mut() else {
@@ -526,7 +534,7 @@ impl EbpfCollector {
                 };
                 m_ctx.update(data);
                 m_ctx.report(
-                    Duration::from_millis(ts_millis),
+                    Duration::from_nanos(ts_nanos),
                     EBPF_PROFILE_SENDER.as_mut().unwrap(),
                 );
                 return;
@@ -543,7 +551,11 @@ impl EbpfCollector {
                     profile.timestamp -= (-diff) as u64;
                 }
             }
-            profile.event_type = metric::ProfileEventType::EbpfOnCpu.into();
+            profile.event_type = match data.profiler_type {
+                #[cfg(feature = "extended_profile")]
+                ebpf::PROFILER_TYPE_OFFCPU => metric::ProfileEventType::EbpfOffCpu.into(),
+                _ => metric::ProfileEventType::EbpfOnCpu.into(),
+            };
             profile.stime = data.stime;
             profile.pid = data.pid;
             profile.tid = data.tid;
@@ -576,8 +588,10 @@ impl EbpfCollector {
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
-    ) -> Result<()> {
+    ) -> Result<ConfigHandle> {
         // ebpf内核模块初始化
+        #[allow(unused_mut)]
+        let mut cfg = ConfigHandle::default();
         unsafe {
             if !config.ebpf.uprobe_proc_regexp.golang.is_empty() {
                 info!(
@@ -788,9 +802,10 @@ impl EbpfCollector {
                 let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
                 #[cfg(feature = "extended_profile")]
                 {
+                    let mp_ctx = memory_profile::MemoryContext::new(memory.report_interval);
+                    cfg.memory_profile_settings = Some(mp_ctx.settings());
                     contexts[ebpf::PROFILER_CTX_MEMORY_IDX] =
-                        Box::into_raw(Box::new(memory_profile::MemoryContext::default()))
-                            as *mut c_void;
+                        Box::into_raw(Box::new(mp_ctx)) as *mut c_void;
                 }
 
                 if ebpf::start_continuous_profiler(
@@ -854,7 +869,7 @@ impl EbpfCollector {
             TIME_DIFF = Some(time_diff);
         }
 
-        Ok(())
+        Ok(cfg)
     }
 
     fn ebpf_on_config_change(l7_log_packet_size: usize) {
@@ -945,7 +960,7 @@ impl EbpfCollector {
             Countable::Owned(Box::new(counter)),
         );
 
-        Self::ebpf_init(
+        let config_handle = Self::ebpf_init(
             &ebpf_config,
             sender,
             proc_event_output,
@@ -973,6 +988,7 @@ impl EbpfCollector {
                 pause: Arc::new(AtomicBool::new(true)),
             },
             thread_handle: None,
+            config_handle,
             counter: Arc::new(EbpfCounter {
                 rx: AtomicU64::new(0),
                 get_token_failed: AtomicU64::new(0),
@@ -1034,6 +1050,10 @@ impl EbpfCollector {
                 {
                     warn!("ebpf start_continuous_profiler error.");
                 }
+            }
+            #[cfg(feature = "extended_profile")]
+            if let Some(s) = self.config_handle.memory_profile_settings.as_ref() {
+                s.set_report_interval(ecfg.memory_profile.report_interval);
             }
         }
     }
