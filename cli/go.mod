@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240718034203-09d6b7d4e926
-	github.com/deepflowio/deepflow/server v0.0.0-20240722004820-198136782148
+	github.com/deepflowio/deepflow/message v0.0.0-20240725065348-535fb6f1efdc
+	github.com/deepflowio/deepflow/server v0.0.0-20240911003818-fe2fc65d8502
 	github.com/golang/protobuf v1.5.4
 	github.com/mattn/go-runewidth v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
@@ -29,6 +29,8 @@ require (
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cornelk/hashmap v1.0.8 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator/edition v0.0.0-20240911003818-fe2fc65d8502 // indirect
+	github.com/deepflowio/deepflow/server/libs/logger/blocker v0.0.0-20240822020041-cdaf0f82ce6f // indirect
 	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
