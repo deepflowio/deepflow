@@ -386,7 +386,9 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
-    env::set_var("RUST_LOG", "INFO");
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info")
+    }
     env_logger::builder()
         .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
         .init();
