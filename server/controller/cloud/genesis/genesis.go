@@ -38,7 +38,6 @@ import (
 var log = logging.MustGetLogger("cloud.genesis")
 
 type Genesis struct {
-	defaultVpc      bool
 	ipV4CIDRMaxMask int
 	ipV6CIDRMaxMask int
 	Name            string
@@ -46,7 +45,6 @@ type Genesis struct {
 	UuidGenerate    string
 	regionUuid      string
 	azLcuuid        string
-	defaultVpcName  string
 	ips             []cloudmodel.IP
 	subnets         []cloudmodel.Subnet
 	genesisData     genesis.GenesisSyncData
@@ -73,7 +71,6 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		Name:            domain.Name,
 		Lcuuid:          domain.Lcuuid,
 		UuidGenerate:    domain.DisplayName,
-		defaultVpcName:  cfg.GenesisDefaultVpcName,
 		regionUuid:      config.Get("region_uuid").MustString(),
 		genesisData:     genesis.GenesisSyncData{},
 		cloudStatsd:     statsd.NewCloudStatsd(),
@@ -258,7 +255,6 @@ func (g *Genesis) generateIPsAndSubnets() {
 
 func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	g.azLcuuid = ""
-	g.defaultVpc = false
 	g.cloudStatsd = statsd.NewCloudStatsd()
 
 	if genesis.GenesisService == nil {
@@ -311,14 +307,6 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	ips, err := g.getIPs()
 	if err != nil {
 		return cloudmodel.Resource{}, err
-	}
-	if g.defaultVpc {
-		vpc := cloudmodel.VPC{
-			Lcuuid:       common.GetUUID(g.defaultVpcName, uuid.Nil),
-			Name:         g.defaultVpcName,
-			RegionLcuuid: g.regionUuid,
-		}
-		vpcs = append(vpcs, vpc)
 	}
 
 	resource := cloudmodel.Resource{
