@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Fix the calculation of total process time [#8116](https://github.com/deepflowio/deepflow/pull/8116) by [yinjiping](https://github.com/yinjiping)
+* fix: querier last function add order by time [#8113](https://github.com/deepflowio/deepflow/pull/8113) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent desensitizes the content in backticks [#8073](https://github.com/deepflowio/deepflow/pull/8073) by [TomatoMr](https://github.com/TomatoMr)
 * fix: agent command panic [#8070](https://github.com/deepflowio/deepflow/pull/8070) by [roryye](https://github.com/roryye)
 * fix: add timeout to receive agent command heart beat [#8048](https://github.com/deepflowio/deepflow/pull/8048) by [roryye](https://github.com/roryye)
