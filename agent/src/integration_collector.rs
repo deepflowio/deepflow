@@ -46,6 +46,7 @@ use tokio::{
     task::JoinHandle,
     time,
 };
+use zstd::bulk::compress;
 
 use crate::{
     common::{
@@ -596,6 +597,7 @@ async fn handler(
     application_log_sender: DebugSender<ApplicationLog>,
     exception_handler: ExceptionHandler,
     compressed: bool,
+    profile_compressed: bool,
     counter: Arc<CompressedMetric>,
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
@@ -770,6 +772,22 @@ async fn handler(
                 }
             };
             profile.data = decode_metric(whole_body, &part.headers)?;
+            if profile_compressed {
+                match compress(&profile.data, 0) {
+                    Ok(compressed_data) => {
+                        profile.data_compressed = true;
+                        counter
+                            .uncompressed
+                            .fetch_add(profile.data.len() as u64, Ordering::Relaxed);
+                        counter
+                            .compressed
+                            .fetch_add(compressed_data.len() as u64, Ordering::Relaxed);
+                        profile.data = compressed_data;
+                    }
+                    Err(e) => debug!("failed to compress: {:?}", e),
+                }
+            }
+
             profile.ip = match peer_addr.ip() {
                 IpAddr::V4(ip4) => ip4.octets().to_vec(),
                 IpAddr::V6(ip6) => ip6.octets().to_vec(),
@@ -912,6 +930,7 @@ pub struct MetricServer {
     server_shutdown_tx: Mutex<Option<mpsc::Sender<()>>>,
     counter: Arc<CompressedMetric>,
     compressed: Arc<AtomicBool>,
+    profile_compressed: Arc<AtomicBool>,
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
@@ -936,6 +955,7 @@ impl MetricServer {
         port: u16,
         exception_handler: ExceptionHandler,
         compressed: bool,
+        profile_compressed: bool,
         local_epc_id: u32,
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
@@ -953,6 +973,7 @@ impl MetricServer {
                 runtime,
                 thread: Arc::new(Mutex::new(None)),
                 compressed: Arc::new(AtomicBool::new(compressed)),
+                profile_compressed: Arc::new(AtomicBool::new(profile_compressed)),
                 otel_sender,
                 compressed_otel_sender,
                 prometheus_sender,
@@ -980,6 +1001,10 @@ impl MetricServer {
 
     pub fn enable_compressed(&self, enable: bool) {
         self.compressed.store(enable, Ordering::Relaxed);
+    }
+
+    pub fn enable_profile_compressed(&self, enable: bool) {
+        self.profile_compressed.store(enable, Ordering::Relaxed);
     }
 
     pub fn set_port(&self, port: u16) {
@@ -1011,6 +1036,7 @@ impl MetricServer {
         let running = self.running.clone();
         let counter = self.counter.clone();
         let compressed = self.compressed.clone();
+        let profile_compressed = self.profile_compressed.clone();
         let local_epc_id = self.local_epc_id.clone();
         let policy_getter = self.policy_getter.clone();
         let time_diff = self.time_diff.clone();
@@ -1078,6 +1104,7 @@ impl MetricServer {
                     let exception_handler_inner = exception_handler.clone();
                     let counter = counter.clone();
                     let compressed = compressed.clone();
+                    let profile_compressed = profile_compressed.clone();
                     let local_epc_id = local_epc_id.clone();
                     let policy_getter = policy_getter.clone();
                     let time_diff = time_diff.clone();
@@ -1095,6 +1122,7 @@ impl MetricServer {
                         let peer_addr = conn.remote_addr();
                         let counter = counter.clone();
                         let compressed = compressed.clone();
+                        let profile_compressed = profile_compressed.clone();
                         let local_epc_id = local_epc_id.clone();
                         let policy_getter = policy_getter.clone();
                         let time_diff = time_diff.clone();
@@ -1115,6 +1143,7 @@ impl MetricServer {
                                     application_log_sender.clone(),
                                     exception_handler.clone(),
                                     compressed.load(Ordering::Relaxed),
+                                    profile_compressed.load(Ordering::Relaxed),
                                     counter.clone(),
                                     local_epc_id,
                                     policy_getter.clone(),

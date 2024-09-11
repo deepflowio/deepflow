@@ -68,7 +68,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// Resource tag translation:
 	// Device resources, auto_instance, auto_service and resources without their own map, use device_map.
 	// Resources that have their own map, use their own map.
-	// pod_service, pod_ingress, lb_listener, natgw, lb are used as related resources, and ip_relation_map is used for filtering.
+	// pod_ingress, lb_listener, natgw, lb are used as related resources, and ip_relation_map is used for filtering.
 	// Use device_map when querying natgw, lb, pod_service.
 
 	tagResourceMap := make(map[string]map[string]*Tag)

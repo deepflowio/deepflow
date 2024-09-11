@@ -2513,6 +2513,7 @@ impl AgentComponents {
             candidate_config.metric_server.port,
             exception_handler.clone(),
             candidate_config.metric_server.compressed,
+            candidate_config.metric_server.profile_compressed,
             candidate_config.platform.epc_id,
             policy_getter,
             synchronizer.ntp_diff(),

@@ -26,7 +26,7 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
+            pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response},
             set_captured_byte, swap_if, value_is_default, AppProtoHead, L7ResponseStatus,
             LogMessageType,
         },
@@ -57,6 +57,7 @@ pub struct SomeIpInfo {
     pub exception: Option<String>,
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
+    pub endpoint: u16,
 
     #[serde(rename = "request_length", skip_serializing_if = "Option::is_none")]
     pub req_msg_size: Option<u32>,
@@ -130,6 +131,11 @@ impl From<SomeIpInfo> for L7ProtocolSendLog {
         } else {
             EbpfFlags::NONE.bits()
         };
+        let attributes = vec![KeyVal {
+            key: "client_id".to_string(),
+            val: f.client_id.to_string(),
+        }];
+
         L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,
@@ -139,6 +145,7 @@ impl From<SomeIpInfo> for L7ProtocolSendLog {
             req: L7Request {
                 resource: f.service_id.to_string(),
                 req_type: f.message_type,
+                endpoint: f.endpoint.to_string(),
                 ..Default::default()
             },
             resp: L7Response {
@@ -148,7 +155,8 @@ impl From<SomeIpInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
-                request_id: Some(f.client_id as u32),
+                request_id: Some(f.session_id as u32),
+                attributes: Some(attributes),
                 ..Default::default()
             }),
             flags,
@@ -208,6 +216,7 @@ impl SomeIpLog {
         info.service_id = header.service_id;
         info.session_id = header.session_id;
         info.client_id = header.client_id;
+        info.endpoint = header.method_id;
         info.req_msg_size = Some(header.length);
     }
 
@@ -239,6 +248,7 @@ impl SomeIpLog {
         info.version = header.to_version();
         info.service_id = header.service_id;
         info.exception = Some(header.to_exception());
+        info.endpoint = header.method_id;
         self.set_status(header.return_code, info);
     }
 
