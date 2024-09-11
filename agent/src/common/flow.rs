@@ -62,22 +62,35 @@ const COUNTER_FLOW_ID_MASK: u64 = 0x00FFFFFF;
 #[repr(u8)]
 pub enum CloseType {
     Unknown = 0,
-    TcpFin = 1,                 //  1: 正常结束
-    TcpServerRst = 2,           //  2: 传输-服务端重置
-    Timeout = 3,                //  3: 连接超时
-    ForcedReport = 5,           //  5: 周期性上报
-    ClientSynRepeat = 7,        //  7: 建连-客户端SYN结束
-    ServerHalfClose = 8,        //  8: 断连-服务端半关
-    TcpClientRst = 9,           //  9: 传输-客户端重置
-    ServerSynAckRepeat = 10,    // 10: 建连-服务端SYN结束
-    ClientHalfClose = 11,       // 11: 断连-客户端半关
-    ClientSourcePortReuse = 13, // 13: 建连-客户端端口复用
-    ServerReset = 15,           // 15: 建连-服务端直接重置
-    ServerQueueLack = 17,       // 17: 传输-服务端队列溢出
-    ClientEstablishReset = 18,  // 18: 建连-客户端其他重置
-    ServerEstablishReset = 19,  // 19: 建连-服务端其他重置
-    TcpFinClientRst = 20,       // 20: 正常结束-客户端重置
-    Max = 21,
+    TcpFin = 1,                      //  1: 正常结束
+    TcpServerRst = 2,                //  2: 传输-服务端重置
+    Timeout = 3,                     //  3: 连接超时
+    ForcedReport = 5,                //  5: 周期性上报
+    ClientSynRepeat = 7,             //  7: 建连-客户端SYN结束
+    ServerHalfClose = 8,             //  8: 断连-服务端半关
+    TcpClientRst = 9,                //  9: 传输-客户端重置
+    ServerSynAckRepeat = 10,         // 10: 建连-服务端SYN结束
+    ClientHalfClose = 11,            // 11: 断连-客户端半关
+    ClientSourcePortReuse = 13,      // 13: 建连-客户端端口复用
+    ServerReset = 15,                // 15: 建连-服务端直接重置
+    ServerQueueLack = 17,            // 17: 传输-服务端队列溢出
+    ClientEstablishReset = 18,       // 18: 建连-客户端其他重置
+    ServerEstablishReset = 19,       // 19: 建连-服务端其他重置
+    TcpFinClientRst = 20,            // 20: 正常结束-客户端重置
+    IcmpNormal = 21,                 // 21: ICMP-正常结束
+    IcmpAddressMaskTimeout = 22,     // 22: ICMP-地址掩码超时
+    IcmpDestinationUnreachable = 23, // 23: ICMP-目标不可达
+    IcmpEchoTimeout = 24,            // 24: ICMP-PING超时
+    IcmpInformationTimeout = 25,     // 25: ICMP-信息超时
+    IcmpParameterProblem = 26,       // 26: ICMP-参数问题
+    IcmpRouterTimeout = 27,          // 27: ICMP-路由器超时
+    IcmpSourceQuench = 28,           // 28: ICMP-源站抑制
+    IcmpTimeExceeded = 29,           // 29: ICMP-TTL溢出
+    IcmpTimestampTimeout = 30,       // 30: ICMP-时间戳超时
+    IcmpNeighborTimeout = 31,        // 31: ICMP-邻居发现超时
+    IcmpPacketTooBig = 32,           // 32: ICMP-Packet过大
+    IcmpOtherTimeout = 33,           // 33: ICMP-未知超时
+    Max = 34,
 }
 
 impl CloseType {
@@ -97,6 +110,18 @@ impl CloseType {
             || self == CloseType::ServerReset
             || self == CloseType::ServerQueueLack
             || self == CloseType::ServerEstablishReset
+            || self == CloseType::IcmpAddressMaskTimeout
+            || self == CloseType::IcmpEchoTimeout
+            || self == CloseType::IcmpInformationTimeout
+            || self == CloseType::IcmpRouterTimeout
+            || self == CloseType::IcmpTimestampTimeout
+            || self == CloseType::IcmpNeighborTimeout
+            || self == CloseType::IcmpPacketTooBig
+            || self == CloseType::IcmpTimeExceeded
+            || self == CloseType::IcmpSourceQuench
+            || self == CloseType::IcmpDestinationUnreachable
+            || self == CloseType::IcmpParameterProblem
+            || self == CloseType::IcmpOtherTimeout
     }
 }
 
@@ -1070,7 +1095,40 @@ impl Flow {
             FlowState::Exception => CloseType::Unknown,
             FlowState::Opening1 => CloseType::ClientSynRepeat,
             FlowState::Opening2 => CloseType::ServerSynAckRepeat,
-            FlowState::Established => CloseType::Timeout,
+            FlowState::IcmpAddressMaskReply => CloseType::IcmpNormal,
+            FlowState::IcmpAddressMaskRequest => CloseType::IcmpAddressMaskTimeout,
+            FlowState::IcmpEchoReply => CloseType::IcmpNormal,
+            FlowState::IcmpEchoRequest => CloseType::IcmpEchoTimeout,
+            FlowState::IcmpDestinationUnreachable => CloseType::IcmpDestinationUnreachable,
+            FlowState::IcmpInformationReply => CloseType::IcmpNormal,
+            FlowState::IcmpInformationRequest => CloseType::IcmpInformationTimeout,
+            FlowState::IcmpNeighborAdvert => CloseType::IcmpNormal,
+            FlowState::IcmpNeighborSolicit => CloseType::IcmpNeighborTimeout,
+            FlowState::IcmpPacketTooBig => CloseType::IcmpPacketTooBig,
+            FlowState::IcmpParameterProblem => CloseType::IcmpParameterProblem,
+            FlowState::IcmpRedirectMessage => CloseType::IcmpNormal,
+            FlowState::IcmpRouterAdvertisement => CloseType::IcmpNormal,
+            FlowState::IcmpRouterSolicitation => CloseType::IcmpRouterTimeout,
+            FlowState::IcmpSourceQuench => CloseType::IcmpSourceQuench,
+            FlowState::IcmpTimeExceeded => CloseType::IcmpTimeExceeded,
+            FlowState::IcmpTimestamp => CloseType::IcmpTimestampTimeout,
+            FlowState::IcmpTimestampReply => CloseType::IcmpNormal,
+            FlowState::IcmpTraceroute => CloseType::IcmpNormal,
+            FlowState::Established => {
+                if self.flow_key.proto == IpProtocol::ICMPV4
+                    || self.flow_key.proto == IpProtocol::ICMPV6
+                {
+                    if self.flow_metrics_peers[0].total_packet_count
+                        != self.flow_metrics_peers[1].total_packet_count
+                    {
+                        CloseType::IcmpOtherTimeout
+                    } else {
+                        CloseType::IcmpNormal
+                    }
+                } else {
+                    CloseType::Timeout
+                }
+            }
             FlowState::ClosingTx1 => CloseType::ServerHalfClose,
             FlowState::ClosingRx1 => CloseType::ClientHalfClose,
             FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,

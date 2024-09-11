@@ -44,6 +44,26 @@ pub enum FlowState {
     EstablishReset,
     OpeningRst,
 
+    IcmpAddressMaskReply,
+    IcmpAddressMaskRequest,
+    IcmpDestinationUnreachable,
+    IcmpEchoReply,
+    IcmpEchoRequest,
+    IcmpInformationReply,
+    IcmpInformationRequest,
+    IcmpParameterProblem,
+    IcmpRedirectMessage,
+    IcmpRouterAdvertisement,
+    IcmpRouterSolicitation,
+    IcmpSourceQuench,
+    IcmpTimeExceeded,
+    IcmpTimestamp,
+    IcmpTimestampReply,
+    IcmpTraceroute,
+    IcmpNeighborAdvert,
+    IcmpNeighborSolicit,
+    IcmpPacketTooBig,
+
     Max,
 }
 

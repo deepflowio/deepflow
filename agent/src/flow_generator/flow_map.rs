@@ -915,7 +915,12 @@ impl FlowMap {
     ) -> bool {
         self.update_flow(config, node, meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
-        if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
+        if node.tagged_flow.flow.flow_key.proto == IpProtocol::ICMPV4
+            || node.tagged_flow.flow.flow_key.proto == IpProtocol::ICMPV6
+        {
+            node.timeout = config.flow.flow_timeout.icmp_timeout;
+            node.set_icmp_flow_state(meta_packet);
+        } else if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
             && peers[FLOW_METRICS_PEER_DST].packet_count > 0
         {
             node.timeout = config.flow.flow_timeout.established_rst;
@@ -1732,9 +1737,15 @@ impl FlowMap {
         meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         meta_packet.second_in_minute =
             (node.tagged_flow.flow.start_time.as_secs() % SECONDS_IN_MINUTE) as u8;
-        node.flow_state = FlowState::Established;
-        // opening timeout
-        node.timeout = config.flow.flow_timeout.opening;
+        if meta_packet.lookup_key.proto == IpProtocol::ICMPV4
+            || meta_packet.lookup_key.proto == IpProtocol::ICMPV6
+        {
+            node.set_icmp_flow_state(meta_packet);
+            node.timeout = config.flow.flow_timeout.icmp_timeout;
+        } else {
+            node.flow_state = FlowState::Established;
+            node.timeout = config.flow.flow_timeout.opening;
+        }
         if let Some(meta_flow_log) = node.meta_flow_log.as_mut() {
             let _ = meta_flow_log.parse_l3(meta_packet);
         }
@@ -3087,6 +3098,7 @@ mod tests {
                 exception: Timestamp::from_secs(5),
                 closed_fin: Timestamp::ZERO,
                 single_direction: Timestamp::from_millis(10),
+                icmp_timeout: Timestamp::from_secs(5),
                 max: Timestamp::from_secs(300),
                 min: Timestamp::ZERO,
             }),
