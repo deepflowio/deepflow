@@ -180,8 +180,6 @@ controller:
         aliyun_region_name: cn-beijing
         # AWS API获取区域列表时，需要指定一个区域，并通过这个区域区分国际版和国内版
         aws_region_name: cn-north-1
-        # 采集器同步默认vpc名称
-        genesis_default_vpc: default_vpc
         # 配置宿主机IP文件
         hostname_to_ip_file: /etc/hostname_to_ip.csv
         # 开启debug模式，支持debug云平台API/SDK原始数据
@@ -268,6 +266,9 @@ controller:
     # 无子网IP的最大掩码长度
     ipv4_cidr_max_mask: 24
     ipv6_cidr_max_mask: 64
+
+    # 采集器同步默认vpc名称
+    default_vpc_name: default-public-vpc
 
     # 采集器上报数据处理的队列长度
     queue_length: 1000

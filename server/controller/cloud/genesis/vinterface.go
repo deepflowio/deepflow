@@ -20,9 +20,6 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
@@ -37,16 +34,11 @@ func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 			log.Debug("device lcuuid or network lcuuid not found")
 			continue
 		}
-		vpcLcuuid := v.VPCLcuuid
-		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUID(g.defaultVpcName, uuid.Nil)
-			g.defaultVpc = true
-		}
 		vinterface := model.VInterface{
 			Lcuuid:        v.Lcuuid,
 			Type:          int(v.Type),
 			Mac:           v.Mac,
-			VPCLcuuid:     vpcLcuuid,
+			VPCLcuuid:     v.VPCLcuuid,
 			RegionLcuuid:  g.regionUuid,
 			DeviceType:    int(v.DeviceType),
 			DeviceLcuuid:  v.DeviceLcuuid,

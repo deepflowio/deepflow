@@ -57,6 +57,7 @@ type GenesisSyncRpcUpdater struct {
 	multiNSMode           bool
 	singleVPCMode         bool
 	vmNameField           string
+	defaultVPCName        string
 	ignoreNICRegex        *regexp.Regexp
 	genesisSyncDataByPeer map[uint32]GenesisSyncDataOperation
 }
@@ -144,6 +145,7 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		multiNSMode:           cfg.MultiNSMode,
 		singleVPCMode:         cfg.SingleVPCMode,
 		vmNameField:           cfg.VMNameField,
+		defaultVPCName:        cfg.DefaultVPCName,
 		ignoreNICRegex:        ignoreNICRegex,
 		genesisSyncDataByPeer: map[uint32]GenesisSyncDataOperation{},
 	}
@@ -374,13 +376,15 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 		log.Error(err.Error())
 		return GenesisSyncDataOperation{}
 	}
-	// check if vm is behind NAT
-	behindNat := peer != natIP
+
 	vpc := model.GenesisVpc{
-		Name:   "default-public-cloud-vpc",
-		Lcuuid: common.GetUUID("default-public-cloud-vpc", uuid.Nil),
+		Name:   v.defaultVPCName,
+		Lcuuid: common.GetUUID(v.defaultVPCName, uuid.Nil),
 		VtapID: vtapID,
 	}
+	// check if vm is behind NAT
+	behindNat := peer != natIP
+	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode)
 	if behindNat && !v.singleVPCMode {
 		vpc = model.GenesisVpc{
 			Name:   "VPC-" + peer,
