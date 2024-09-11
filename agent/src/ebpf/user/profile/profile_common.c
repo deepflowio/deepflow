@@ -760,7 +760,19 @@ static inline void update_matched_process_in_total(struct profiler_context *ctx,
 	    (msg_hash, (stack_trace_msg_hash_kv *) & kv,
 	     (stack_trace_msg_hash_kv *) & kv) == 0) {
 		__sync_fetch_and_add(&msg_hash->hit_hash_count, 1);
-		((stack_trace_msg_t *) kv.msg_ptr)->count++;
+		if (ctx->use_delta_time) {
+			if (ctx->sample_period > 0) {
+				((stack_trace_msg_t *) kv.msg_ptr)->count +=
+				    (ctx->sample_period / 1000);
+			} else {
+				// Using microseconds for storage.
+				((stack_trace_msg_t *) kv.msg_ptr)->count +=
+				    (v->off_cpu.duration_ns / 1000);
+			}
+
+		} else {
+			((stack_trace_msg_t *) kv.msg_ptr)->count++;
+		}
 		return;
 	}
 
