@@ -712,6 +712,7 @@ extern "C" {
     pub fn show_collect_pool();
     pub fn disable_syscall_trace_id() -> c_int;
 
+    pub fn dwarf_available() -> bool;
     /*
      * DWARF unwinding related settings.
      * Be advised that these settings are only effective before
