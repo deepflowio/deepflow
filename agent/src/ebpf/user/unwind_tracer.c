@@ -44,12 +44,9 @@
 
 extern int major, minor;
 
-#define DWARF_KERNEL_CHECK                                                                         \
-    do {                                                                                           \
-        if (!(major > 5 || (major == 5 && minor >= 2))) {                                          \
-            return;                                                                                \
-        }                                                                                          \
-    } while (0)
+bool dwarf_available(void) {
+    return major > 5 || (major == 5 && minor >= 2);
+}
 
 static proc_event_list_t proc_events = { .head = { .prev = &proc_events.head,
                                                    .next = &proc_events.head, },
@@ -84,7 +81,9 @@ bool get_dwarf_enabled(void) {
 }
 
 void set_dwarf_enabled(bool enabled) {
-    DWARF_KERNEL_CHECK;
+    if (!dwarf_available()) {
+        return;
+    }
 
     if (g_unwind_config.dwarf_enabled == enabled) {
         return;
@@ -268,7 +267,9 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
 }
 
 void unwind_tracer_drop() {
-    DWARF_KERNEL_CHECK;
+    if (!dwarf_available()) {
+        return;
+    }
 
     pthread_mutex_lock(&g_unwind_table_lock);
     if (g_unwind_table) {
@@ -280,7 +281,9 @@ void unwind_tracer_drop() {
 }
 
 void unwind_process_exec(int pid) {
-    DWARF_KERNEL_CHECK;
+    if (!dwarf_available()) {
+        return;
+    }
 
     struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
     if (tracer == NULL) {
@@ -300,7 +303,9 @@ void unwind_process_exec(int pid) {
 
 // Process events in the queue
 void unwind_events_handle(void) {
-    DWARF_KERNEL_CHECK;
+    if (!dwarf_available()) {
+        return;
+    }
 
     struct process_create_event *event = NULL;
     pthread_mutex_lock(&g_unwind_table_lock);
@@ -326,7 +331,14 @@ void unwind_events_handle(void) {
 
 // Process exit, reclaim resources
 void unwind_process_exit(int pid) {
-    DWARF_KERNEL_CHECK;
+    if (!dwarf_available()) {
+        return;
+    }
+
+    struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
+    if (tracer == NULL || tracer->state != TRACER_RUNNING) {
+        return;
+    }
 
     struct list_head *p, *n;
     struct process_create_event *e = NULL;
@@ -348,9 +360,7 @@ void unwind_process_exit(int pid) {
 }
 
 void unwind_process_reload() {
-    DWARF_KERNEL_CHECK;
-
-    if (!get_dwarf_enabled()) {
+    if (!dwarf_available() || !get_dwarf_enabled()) {
         return;
     }
 
@@ -360,9 +370,11 @@ void unwind_process_reload() {
     }
 
     pthread_mutex_lock(&g_unwind_table_lock);
-    // Unload everything for the moment
-    // Maybe preserve some data on regex changes
-    unwind_table_unload_all(g_unwind_table);
-    load_running_processes(tracer, g_unwind_table);
+    if (g_unwind_table) {
+        // Unload everything for the moment
+        // Maybe preserve some data on regex changes
+        unwind_table_unload_all(g_unwind_table);
+        load_running_processes(tracer, g_unwind_table);
+    }
     pthread_mutex_unlock(&g_unwind_table_lock);
 }
