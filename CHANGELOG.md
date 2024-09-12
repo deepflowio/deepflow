@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: Memory profile not outputing data [#8129](https://github.com/deepflowio/deepflow/pull/8129) by [rvql](https://github.com/rvql)
+* fix: Crash caused by UnwindEntryShard on stack [#8125](https://github.com/deepflowio/deepflow/pull/8125) by [rvql](https://github.com/rvql)
+* fix:  specify the go mod version when building the cli [#8122](https://github.com/deepflowio/deepflow/pull/8122) by [jiumos](https://github.com/jiumos)
 * fix: Fix DWARF config on unsupported systems and tracer restart [#8118](https://github.com/deepflowio/deepflow/pull/8118) by [rvql](https://github.com/rvql)
 * fix: agent - eBPF Fix the calculation of total process time [#8117](https://github.com/deepflowio/deepflow/pull/8117) by [yinjiping](https://github.com/yinjiping)
 * fix: querier TopK supporrt resource_id [#8104](https://github.com/deepflowio/deepflow/pull/8104) by [xiaochaoren1](https://github.com/xiaochaoren1)
@@ -430,6 +433,7 @@
 
 
 #### OTHER
+* Update typo in comments [#8127](https://github.com/deepflowio/deepflow/pull/8127) by [Hyzhou](https://github.com/Hyzhou)
 * Cmbc [#8098](https://github.com/deepflowio/deepflow/pull/8098) by [rvql](https://github.com/rvql)
 * Update the description of `status` in l4_flow_log. [#8036](https://github.com/deepflowio/deepflow/pull/8036) by [deepflow-lifei](https://github.com/deepflow-lifei)
 * Relaxing regular expression restrictions for the ClusterID [#7907](https://github.com/deepflowio/deepflow/pull/7907) by [Hyzhou](https://github.com/Hyzhou)
