@@ -17,11 +17,13 @@
 pub mod dwarf;
 pub mod maps;
 
+use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
 use std::fs;
 use std::hash::Hasher;
 use std::mem;
 use std::path::PathBuf;
+use std::ptr::NonNull;
 use std::slice;
 
 use ahash::AHasher;
@@ -69,7 +71,7 @@ impl UnwindTable {
         trace!("load dwarf entries for process#{pid}");
 
         let mut shard_list = ProcessShardList::default();
-        let mut shard: Option<UnwindEntryShard> = None;
+        let mut shard: Option<BoxedShard> = None;
         let mut shard_count = 0;
 
         let base_path: PathBuf = ["/proc", &pid.to_string(), "root"].iter().collect();
@@ -168,7 +170,7 @@ impl UnwindTable {
                 continue;
             }
 
-            match shard.as_ref() {
+            match shard.as_ref().map(|b| b.as_ref()) {
                 Some(s) if s.len as usize + entries.len() > UNWIND_ENTRIES_PER_SHARD => {
                     trace!(
                         "finish shard#{} because {} + {} > {}",
@@ -177,19 +179,20 @@ impl UnwindTable {
                         entries.len(),
                         UNWIND_ENTRIES_PER_SHARD
                     );
-                    let s = shard.take().unwrap();
-                    self.update_unwind_entry_shard(s.id, &s);
+                    let boxed_shard = shard.take().unwrap();
+                    let s = boxed_shard.as_ref();
+                    self.update_unwind_entry_shard(s.id, s);
                 }
                 _ => (),
             }
             if shard.is_none() {
                 let shard_id = self.id_gen.acquire();
                 trace!("create shard#{shard_id} for unwind entries");
-                shard.replace(UnwindEntryShard::new(shard_id));
+                shard.replace(BoxedShard::new(shard_id));
                 shard_count += 1;
             }
 
-            let shard = shard.as_mut().unwrap();
+            let shard = shard.as_mut().unwrap().as_mut();
             trace!(
                 "load object {} into shard#{} with {} entries",
                 path.display(),
@@ -230,9 +233,10 @@ impl UnwindTable {
             );
             shard_list.len += 1;
         }
-        if let Some(s) = shard.take() {
+        if let Some(bs) = shard.take() {
+            let s = bs.as_ref();
             trace!("finish shard#{} with {} entries", s.id, s.len);
-            self.update_unwind_entry_shard(s.id, &s);
+            self.update_unwind_entry_shard(s.id, s);
         }
 
         if shard_list.len == 0 {
@@ -346,6 +350,7 @@ impl UnwindTable {
             ..Default::default()
         };
         let mut first_shard = true;
+        let mut boxed_shard = BoxedShard::new(0);
         for chunk in entries.chunks(UNWIND_ENTRIES_PER_SHARD) {
             let shard_id = self.id_gen.acquire();
             trace!(
@@ -353,11 +358,12 @@ impl UnwindTable {
                 chunk.len()
             );
 
-            let mut shard = UnwindEntryShard::new(shard_id);
+            let shard = boxed_shard.as_mut();
+            shard.id = shard_id;
             shard.len = chunk.len() as u32;
             (&mut shard.entries[..shard.len as usize]).copy_from_slice(chunk);
 
-            self.update_unwind_entry_shard(shard_id, &shard);
+            self.update_unwind_entry_shard(shard_id, shard);
 
             if shard_list.len as usize >= UNWIND_SHARDS_PER_PROCESS {
                 warn!(
@@ -565,6 +571,9 @@ impl Default for ProcessShardList {
     }
 }
 
+/*
+ * This struct has size of 1M, do not allocate it on stack
+ */
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct UnwindEntryShard {
@@ -573,12 +582,44 @@ pub struct UnwindEntryShard {
     pub entries: [UnwindEntry; UNWIND_ENTRIES_PER_SHARD],
 }
 
-impl UnwindEntryShard {
+struct BoxedShard(NonNull<UnwindEntryShard>);
+
+impl BoxedShard {
     fn new(id: u32) -> Self {
-        Self {
-            id,
-            len: 0,
-            entries: [UnwindEntry::default(); UNWIND_ENTRIES_PER_SHARD],
+        // creating UnwindEntryShard with `new` or `default` still use stack
+        // allocate with Allocater API to avoid this
+        unsafe {
+            let layout = Layout::new::<UnwindEntryShard>();
+            let ptr = alloc(layout);
+            if ptr.is_null() {
+                handle_alloc_error(layout);
+            }
+            let ptr = ptr as *mut UnwindEntryShard;
+            (*ptr).id = id;
+            (*ptr).len = 0;
+            // entries array do not require initializing
+            Self(NonNull::new_unchecked(ptr as *mut UnwindEntryShard))
         }
+    }
+}
+
+impl Drop for BoxedShard {
+    fn drop(&mut self) {
+        unsafe {
+            let layout = Layout::new::<UnwindEntryShard>();
+            dealloc(self.0.as_ptr() as *mut u8, layout);
+        }
+    }
+}
+
+impl AsRef<UnwindEntryShard> for BoxedShard {
+    fn as_ref(&self) -> &UnwindEntryShard {
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl AsMut<UnwindEntryShard> for BoxedShard {
+    fn as_mut(&mut self) -> &mut UnwindEntryShard {
+        unsafe { self.0.as_mut() }
     }
 }

@@ -16,7 +16,7 @@
 
 use std::fmt::Display;
 
-use chrono::{prelude::NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use super::pb_adapter::{
@@ -370,12 +370,9 @@ impl From<TlsInfo> for L7ProtocolSendLog {
         if !f.client_cert_not_before.is_zero() {
             attributes.push(KeyVal {
                 key: "client_cert_not_before".to_string(),
-                val: NaiveDateTime::from_timestamp_opt(
-                    f.client_cert_not_before.as_secs() as i64,
-                    0,
-                )
-                .unwrap()
-                .to_string(),
+                val: DateTime::from_timestamp(f.client_cert_not_before.as_secs() as i64, 0)
+                    .unwrap()
+                    .to_string(),
             });
         }
         if !f.client_cert_not_after.is_zero() {
@@ -383,7 +380,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
                 (f.client_cert_not_after.as_secs() as i64 - now) as f32 / Self::SECONDS_PER_DAY;
             attributes.push(KeyVal {
                 key: "client_cert_not_after".to_string(),
-                val: NaiveDateTime::from_timestamp_opt(f.client_cert_not_after.as_secs() as i64, 0)
+                val: DateTime::from_timestamp(f.client_cert_not_after.as_secs() as i64, 0)
                     .unwrap()
                     .to_string(),
             });
@@ -395,12 +392,9 @@ impl From<TlsInfo> for L7ProtocolSendLog {
         if !f.server_cert_not_before.is_zero() {
             attributes.push(KeyVal {
                 key: "server_cert_not_before".to_string(),
-                val: NaiveDateTime::from_timestamp_opt(
-                    f.server_cert_not_before.as_secs() as i64,
-                    0,
-                )
-                .unwrap()
-                .to_string(),
+                val: DateTime::from_timestamp(f.server_cert_not_before.as_secs() as i64, 0)
+                    .unwrap()
+                    .to_string(),
             });
         }
         if !f.server_cert_not_after.is_zero() {
@@ -408,7 +402,7 @@ impl From<TlsInfo> for L7ProtocolSendLog {
                 (f.server_cert_not_after.as_secs() as i64 - now) as f32 / Self::SECONDS_PER_DAY;
             attributes.push(KeyVal {
                 key: "server_cert_not_after".to_string(),
-                val: NaiveDateTime::from_timestamp_opt(f.server_cert_not_after.as_secs() as i64, 0)
+                val: DateTime::from_timestamp(f.server_cert_not_after.as_secs() as i64, 0)
                     .unwrap()
                     .to_string(),
             });
