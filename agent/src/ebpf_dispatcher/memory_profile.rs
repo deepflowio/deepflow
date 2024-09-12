@@ -231,6 +231,13 @@ impl MemoryContext {
             }
         }
 
+        if !batch.is_empty() {
+            if let Err(e) = sender.send_all(&mut batch) {
+                warn!("output queue failed to send data: {e}");
+                batch.clear();
+            }
+        }
+
         for pid in dead_pids {
             self.processes.remove(&pid);
         }
