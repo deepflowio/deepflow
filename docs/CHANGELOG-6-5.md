@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix:  specify the go mod version when building the cli [#8123](https://github.com/deepflowio/deepflow/pull/8123) by [jiumos](https://github.com/jiumos)
 * fix: agent - eBPF Fix the calculation of total process time [#8116](https://github.com/deepflowio/deepflow/pull/8116) by [yinjiping](https://github.com/yinjiping)
 * fix: querier last function add order by time [#8113](https://github.com/deepflowio/deepflow/pull/8113) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent desensitizes the content in backticks [#8073](https://github.com/deepflowio/deepflow/pull/8073) by [TomatoMr](https://github.com/TomatoMr)
@@ -133,6 +134,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: querier support simple sql [#8121](https://github.com/deepflowio/deepflow/pull/8121) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8103](https://github.com/deepflowio/deepflow/pull/8103) by [yinjiping](https://github.com/yinjiping)
 * feat: Change opengauss api group [#8099](https://github.com/deepflowio/deepflow/pull/8099) by [rvql](https://github.com/rvql)
 * feat: improves performance of recorder synchronization when there are a large number of process data [#8086](https://github.com/deepflowio/deepflow/pull/8086) by [ZhengYa-0110](https://github.com/ZhengYa-0110)

@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix:  specify the go mod version when building the cli [#8124](https://github.com/deepflowio/deepflow/pull/8124) by [jiumos](https://github.com/jiumos)
 * fix: resource label errors for non-default organization resource chan… [#8010](https://github.com/deepflowio/deepflow/pull/8010) by [lzf575](https://github.com/lzf575)
 * fix: end_point is null [#8002](https://github.com/deepflowio/deepflow/pull/8002) by [lzf575](https://github.com/lzf575)
 * fix: querier converts types when using dictget [#7998](https://github.com/deepflowio/deepflow/pull/7998) by [xiaochaoren1](https://github.com/xiaochaoren1)
