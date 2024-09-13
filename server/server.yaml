@@ -191,8 +191,6 @@ controller:
         aliyun_region_name: cn-beijing
         # AWS API获取区域列表时，需要指定一个区域，并通过这个区域区分国际版和国内版
         aws_region_name: cn-north-1
-        # 采集器同步默认vpc名称
-        genesis_default_vpc: default_vpc
         # 配置宿主机IP文件
         hostname_to_ip_file: /etc/hostname_to_ip.csv
         # 开启debug模式，支持debug云平台API/SDK原始数据
@@ -284,6 +282,9 @@ controller:
     ipv4_cidr_max_mask: 24
     ipv6_cidr_max_mask: 64
 
+    # 采集器同步默认vpc名称
+    default_vpc_name: default-public-vpc
+
     # 采集器上报数据处理的队列长度
     queue_length: 1000
 
@@ -314,7 +315,7 @@ controller:
     ignore_nic_regex:
 
     ## 采集器同步 KVM ，解析虚拟机的 XML 时，默认为 metadata 即使用 domian.metadata.instance.name 字段作为虚拟机的名称
-    ## 可通过此配置将虚拟机名称指定为 domain.name、domain.title、domain.uuid 之一，默认为空
+    ## 可通过此配置将虚拟机名称指定为 domain.name、domain.title、domain.uuid 之一
     ## 当使用此配置指定的字段取不到虚拟机名称或虚拟机名称为空时，则将使用 domain.name 的值作为虚拟机名称
     ## 例：vm_name_field: title ，指定 domain.title 作为虚拟机的名称
     #vm_name_field: metadata
