@@ -1,0 +1,74 @@
+name: Clear Branch
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Runs every Monday at 16:00 Beijing Time (8:00 UTC)
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
+jobs:
+  clear_branch:
+    runs-on: ubuntu-latest
+    env:
+      SKIP_PATTERNS: |
+        v7\..*
+        v6\..*
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Delete stale branches
+        run: |
+          git fetch --prune
+          current_branch=$(git rev-parse --abbrev-ref HEAD)
+          protected_branches=$(gh api /repos/${{ github.repository }}/branches --paginate --jq '.[] | select(.protected == true) | .name' | tr '\n' ' ')
+          echo "All protected branch: ${protected_branches}"
+          for branch in $(git branch -r | sed 's/origin\///'|grep -v origin); do
+            skip_branch=false
+            # Check if the branch matches any of the skip patterns
+            for pattern in $SKIP_PATTERNS; do
+                if [[ $branch =~ $pattern ]]; then
+                    echo "Skipping branch matching pattern: $branch"
+                    skip_branch=true
+                    break
+                fi
+            done
+
+            if $skip_branch; then
+                continue
+            fi
+            
+            if [[ " ${protected_branches[@]} " =~ " ${branch} " ]]; then
+                echo "Skipping protected branch: $branch"
+                continue
+            fi
+
+            if [[ "$branch" == "$current_branch" ]]; then
+                echo "Skipping current branch: $branch"
+                continue
+            fi
+            
+            # Skip branches with submitted PR
+            if gh pr list --head $branch --repo https://github.com//${{ github.repository }} | grep $branch; then
+                echo "Skipping branch with submitted PR: $branch"
+                continue
+            fi
+
+            # Check if the branch is stale
+            last_commit_date=$(git log -1 --format=%ci origin/$branch)
+            if [[ $(date -d "$last_commit_date" +%s) -lt $(date -d "1 month ago" +%s) ]]; then
+              echo "Deleting branch: $branch"
+              git push origin --delete refs/heads/$branch
+            fi
+
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
