@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF fix errors caused by java_syms_update_tasks_head [#8147](https://github.com/deepflowio/deepflow/pull/8147) by [yinjiping](https://github.com/yinjiping)
+* fix: dispatcher pipelines is empty [#8001](https://github.com/deepflowio/deepflow/pull/8001) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: incorrect request resource in kafka logs [#8142](https://github.com/deepflowio/deepflow/pull/8142) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: specify the go mod version when cli verify [#8136](https://github.com/deepflowio/deepflow/pull/8136) by [jiumos](https://github.com/jiumos)
 * fix:  specify the go mod version when building the cli [#8123](https://github.com/deepflowio/deepflow/pull/8123) by [jiumos](https://github.com/jiumos)
@@ -136,6 +138,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: default genesis sync vpc name [#8133](https://github.com/deepflowio/deepflow/pull/8133) by [askyrie](https://github.com/askyrie)
 * feat: querier support simple sql [#8121](https://github.com/deepflowio/deepflow/pull/8121) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8103](https://github.com/deepflowio/deepflow/pull/8103) by [yinjiping](https://github.com/yinjiping)
 * feat: Change opengauss api group [#8099](https://github.com/deepflowio/deepflow/pull/8099) by [rvql](https://github.com/rvql)

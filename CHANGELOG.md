@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: dispatcher pipelines is empty [#8146](https://github.com/deepflowio/deepflow/pull/8146) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: agent - eBPF fix errors caused by java_syms_update_tasks_head [#8145](https://github.com/deepflowio/deepflow/pull/8145) by [yinjiping](https://github.com/yinjiping)
+* fix: querier data visibility filter error [#8139](https://github.com/deepflowio/deepflow/pull/8139) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: incorrect request resource in kafka logs [#8141](https://github.com/deepflowio/deepflow/pull/8141) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: specify the go mod version when cli verify [#8135](https://github.com/deepflowio/deepflow/pull/8135) by [jiumos](https://github.com/jiumos)
 * fix: Memory profile not outputing data [#8129](https://github.com/deepflowio/deepflow/pull/8129) by [rvql](https://github.com/rvql)
@@ -191,6 +194,9 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - Retain the profiler_regex interface [#8150](https://github.com/deepflowio/deepflow/pull/8150) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Unified Process Matching Interface [#8033](https://github.com/deepflowio/deepflow/pull/8033) by [yinjiping](https://github.com/yinjiping)
+* feat: update genesis data store [#7964](https://github.com/deepflowio/deepflow/pull/7964) by [askyrie](https://github.com/askyrie)
 * feat: support free OS memory at intervals [#8091](https://github.com/deepflowio/deepflow/pull/8091) by [lzf575](https://github.com/lzf575)
 * feat: support profile data compressed by agent [#8088](https://github.com/deepflowio/deepflow/pull/8088) by [taloric](https://github.com/taloric)
 * feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8102](https://github.com/deepflowio/deepflow/pull/8102) by [yinjiping](https://github.com/yinjiping)
@@ -436,6 +442,8 @@
 
 
 #### OTHER
+* add ci to clear stale branch [#8149](https://github.com/deepflowio/deepflow/pull/8149) by [jiumos](https://github.com/jiumos)
+* failed to create tables in ByConity database under non-default organization [#8148](https://github.com/deepflowio/deepflow/pull/8148) by [lzf575](https://github.com/lzf575)
 * Update typo in comments [#8127](https://github.com/deepflowio/deepflow/pull/8127) by [Hyzhou](https://github.com/Hyzhou)
 * Cmbc [#8098](https://github.com/deepflowio/deepflow/pull/8098) by [rvql](https://github.com/rvql)
 * Update the description of `status` in l4_flow_log. [#8036](https://github.com/deepflowio/deepflow/pull/8036) by [deepflow-lifei](https://github.com/deepflow-lifei)
