@@ -665,6 +665,9 @@ impl TcpPerf {
         }
 
         if p.is_ack() {
+            // The first ACK packet sent by the server after handshake does not calculate rtt.
+            self.handshaking = fpd;
+
             // It is impossible to distinguish retransmission between ACK and ACK
             // keepalive. To avoid misunderstanding, retransmission of pure ACK
             // ==================================================================
@@ -757,6 +760,7 @@ impl TcpPerf {
                         (p.lookup_key.timestamp - oppo_dir.first_handshake_timestamp).into(),
                         RTT_MAX,
                     );
+
                     if !rtt.is_zero() {
                         self.perf_data.calc_rtt(rtt, fpd);
                     }
@@ -1181,6 +1185,7 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
      */
     // 1SYN
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::SYN,
         seq: 111,
         ack: 0,
@@ -1188,10 +1193,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, false).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 2SYN/ACK rttSum1=1
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::SYN_ACK,
         seq: 1111,
         ack: 112,
@@ -1199,10 +1205,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, true).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 1ACK rttSum0=10
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 112,
         ack: 1112,
@@ -1210,10 +1217,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, false).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 1ACK/LEN>0 len=100
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 112,
         ack: 1112,
@@ -1222,10 +1230,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, false).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 2ACK/LEN>0包，len=100 *art1=4
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 1112,
         ack: 212,
@@ -1234,10 +1243,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, true).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 2ACK 测试连续ACK包, 对RTT计算的影响
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 1112,
         ack: 212,
@@ -1245,10 +1255,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, true).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 2ACK/LEN>0 len=500
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::PSH_ACK,
         seq: 1212,
         ack: 212,
@@ -1257,10 +1268,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, true).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 1ACK srt0=16
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 212,
         ack: 1712,
@@ -1268,10 +1280,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, false).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 1ACK/LEN>0 len=200 art0=70
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 212,
         ack: 1712,
@@ -1280,10 +1293,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, false).unwrap();
+    perf.parse(&packet, true).unwrap();
 
     // 2ACK *srt1=100
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 1712,
         ack: 412,
@@ -1291,10 +1305,11 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, true).unwrap();
+    perf.parse(&packet, false).unwrap();
 
     // 2ACK/LEN>0 len=300 *art1=106
     let packet = MiniMetaPacket {
+        data_offset: 20,
         flags: TcpFlags::ACK,
         seq: 1712,
         ack: 412,
@@ -1303,7 +1318,7 @@ pub fn _meta_flow_perf_update(perf: &mut TcpPerf) {
         ..Default::default()
     }
     .into();
-    perf.parse(&packet, true).unwrap();
+    perf.parse(&packet, false).unwrap();
 }
 
 #[cfg(test)]
@@ -1831,47 +1846,31 @@ mod tests {
         assert!(!perf.is_interested_packet(&packet));
     }
 
-    // TODO: fix this broken test (also fails in go code)
     #[test]
-    #[should_panic]
     fn meta_flow_perf_update() {
         let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
         _meta_flow_perf_update(&mut perf);
 
         let perf_data = PerfData {
             rtt_0: TimeStats {
-                sum: Timestamp::from_nanos(10),
-                max: Timestamp::from_nanos(2),
+                count: 1,
+                sum: Timestamp::from_secs(10),
+                max: Timestamp::from_secs(10),
                 updated: true,
                 ..Default::default()
             },
             rtt_1: TimeStats {
-                sum: Timestamp::from_nanos(1),
-                max: Timestamp::from_nanos(1),
-                updated: true,
-                ..Default::default()
-            },
-            art_0: TimeStats {
-                sum: Timestamp::from_nanos(70),
-                max: Timestamp::from_nanos(70),
                 count: 1,
+                sum: Timestamp::from_secs(1),
+                max: Timestamp::from_secs(1),
                 updated: true,
                 ..Default::default()
             },
-            srt_0: TimeStats {
-                sum: Timestamp::from_nanos(16),
-                max: Timestamp::from_nanos(16),
-                count: 2,
-                updated: true,
-                ..Default::default()
-            },
-            srt_1: TimeStats {
-                count: 1,
-                updated: true,
-                ..Default::default()
-            },
-            zero_win_count_0: 3,
+            rtt_full: Timestamp::from_secs(11),
+            zero_win_count_0: 2,
             zero_win_count_1: 5,
+            syn: 1,
+            synack: 1,
             updated: true,
             ..Default::default()
         };
@@ -1919,6 +1918,172 @@ mod tests {
                 output_path
             );
         }
+    }
+
+    #[test]
+    fn test_handshake_double_ack() {
+        let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
+
+        // SYN
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::SYN,
+            seq: 111,
+            ack: 0,
+            timestamp: 3333,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, true).unwrap();
+
+        // SYN/ACK
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::SYN_ACK,
+            seq: 1111,
+            ack: 112,
+            timestamp: 3334,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, false).unwrap();
+
+        // ACK c2s
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::ACK,
+            seq: 112,
+            ack: 1112,
+            timestamp: 3344,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, true).unwrap();
+
+        // ACK c2s
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::ACK,
+            seq: 112,
+            ack: 1112,
+            timestamp: 3354,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, true).unwrap();
+
+        println!("perf: {:?}", &perf.perf_data);
+        assert_eq!(
+            perf.perf_data.rtt_0.count, 2,
+            "rtt_0: {:?}",
+            perf.perf_data.rtt_0
+        );
+        assert_eq!(
+            perf.perf_data.rtt_0.max.as_secs(),
+            20,
+            "rtt_0: {:?}",
+            perf.perf_data.rtt_0
+        );
+        assert_eq!(
+            perf.perf_data.rtt_1.count, 1,
+            "rtt_1: {:?}",
+            perf.perf_data.rtt_1
+        );
+        assert_eq!(
+            perf.perf_data.rtt_1.max.as_secs(),
+            1,
+            "rtt_1: {:?}",
+            perf.perf_data.rtt_1
+        );
+        assert_eq!(
+            perf.perf_data.rtt_full.as_secs(),
+            21,
+            "rtt_full: {:?}",
+            perf.perf_data.rtt_full
+        );
+    }
+
+    #[test]
+    fn test_handshake_no_push() {
+        let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
+
+        // SYN
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::SYN,
+            seq: 111,
+            ack: 0,
+            timestamp: 3333,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, true).unwrap();
+
+        // SYN/ACK
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::SYN_ACK,
+            seq: 1111,
+            ack: 112,
+            timestamp: 3334,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, false).unwrap();
+
+        // ACK c2s
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::ACK,
+            seq: 112,
+            ack: 1112,
+            timestamp: 3344,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, true).unwrap();
+
+        // ACK s2c
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::ACK,
+            seq: 1111,
+            ack: 112,
+            timestamp: 3354,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, false).unwrap();
+
+        println!("perf: {:?}", &perf.perf_data);
+        assert_eq!(
+            perf.perf_data.rtt_0.count, 1,
+            "rtt_0: {:?}",
+            perf.perf_data.rtt_0
+        );
+        assert_eq!(
+            perf.perf_data.rtt_0.max.as_secs(),
+            10,
+            "rtt_0: {:?}",
+            perf.perf_data.rtt_0
+        );
+        assert_eq!(
+            perf.perf_data.rtt_1.count, 1,
+            "rtt_1: {:?}",
+            perf.perf_data.rtt_1
+        );
+        assert_eq!(
+            perf.perf_data.rtt_1.max.as_secs(),
+            1,
+            "rtt_1: {:?}",
+            perf.perf_data.rtt_1
+        );
+        assert_eq!(
+            perf.perf_data.rtt_full.as_secs(),
+            11,
+            "rtt_full: {:?}",
+            perf.perf_data.rtt_full
+        );
     }
 
     fn update_test_helper<P: AsRef<Path>>(file: P, check_seq_list: bool) -> String {
