@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: incorrect request resource in kafka logs [#8142](https://github.com/deepflowio/deepflow/pull/8142) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: specify the go mod version when cli verify [#8136](https://github.com/deepflowio/deepflow/pull/8136) by [jiumos](https://github.com/jiumos)
 * fix:  specify the go mod version when building the cli [#8123](https://github.com/deepflowio/deepflow/pull/8123) by [jiumos](https://github.com/jiumos)
 * fix: agent - eBPF Fix the calculation of total process time [#8116](https://github.com/deepflowio/deepflow/pull/8116) by [yinjiping](https://github.com/yinjiping)
 * fix: querier last function add order by time [#8113](https://github.com/deepflowio/deepflow/pull/8113) by [xiaochaoren1](https://github.com/xiaochaoren1)
