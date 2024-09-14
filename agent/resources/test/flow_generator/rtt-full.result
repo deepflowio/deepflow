@@ -181,9 +181,9 @@ PerfData {
 3th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -223,7 +223,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 0,
-    rtt_full: 225.4ms,
+    rtt_full: 525.4ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -241,9 +241,9 @@ PerfData {
 4th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -283,7 +283,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 0,
-    rtt_full: 225.4ms,
+    rtt_full: 525.4ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -301,9 +301,9 @@ PerfData {
 5th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -343,7 +343,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 0,
-    rtt_full: 225.4ms,
+    rtt_full: 525.4ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -361,9 +361,9 @@ PerfData {
 6th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -403,7 +403,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 0,
-    rtt_full: 225.4ms,
+    rtt_full: 525.4ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -601,9 +601,9 @@ PerfData {
 3th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 74µs,
-        max: 74µs,
+        count: 2,
+        sum: 454.813ms,
+        max: 454.739ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -643,7 +643,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 0,
-    rtt_full: 825µs,
+    rtt_full: 455.49ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -661,9 +661,9 @@ PerfData {
 4th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 74µs,
-        max: 74µs,
+        count: 2,
+        sum: 454.813ms,
+        max: 454.739ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -703,7 +703,7 @@ PerfData {
         updated: true,
     },
     retrans_sum: 0,
-    rtt_full: 825µs,
+    rtt_full: 455.49ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -721,9 +721,9 @@ PerfData {
 5th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 74µs,
-        max: 74µs,
+        count: 2,
+        sum: 454.813ms,
+        max: 454.739ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -763,7 +763,7 @@ PerfData {
         updated: true,
     },
     retrans_sum: 0,
-    rtt_full: 825µs,
+    rtt_full: 455.49ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -781,9 +781,9 @@ PerfData {
 6th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 74µs,
-        max: 74µs,
+        count: 2,
+        sum: 454.813ms,
+        max: 454.739ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -823,7 +823,7 @@ PerfData {
         updated: true,
     },
     retrans_sum: 0,
-    rtt_full: 825µs,
+    rtt_full: 455.49ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -841,9 +841,9 @@ PerfData {
 7th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 74µs,
-        max: 74µs,
+        count: 2,
+        sum: 454.813ms,
+        max: 454.739ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -883,7 +883,7 @@ PerfData {
         updated: true,
     },
     retrans_sum: 0,
-    rtt_full: 825µs,
+    rtt_full: 455.49ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -901,9 +901,9 @@ PerfData {
 8th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 74µs,
-        max: 74µs,
+        count: 2,
+        sum: 454.813ms,
+        max: 454.739ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -943,7 +943,7 @@ PerfData {
         updated: true,
     },
     retrans_sum: 0,
-    rtt_full: 825µs,
+    rtt_full: 455.49ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -961,9 +961,9 @@ PerfData {
 9th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 74µs,
-        max: 74µs,
+        count: 2,
+        sum: 454.813ms,
+        max: 454.739ms,
         updated: true,
     },
     rtt_1: TimeStats {
@@ -1003,7 +1003,7 @@ PerfData {
         updated: true,
     },
     retrans_sum: 0,
-    rtt_full: 825µs,
+    rtt_full: 455.49ms,
     retrans_0: 0,
     retrans_1: 0,
     retrans_syn_0: 0,
@@ -1148,8 +1148,8 @@ PerfData {
     },
     rtt_1: TimeStats {
         count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        sum: 316.3ms,
+        max: 316.3ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1208,8 +1208,8 @@ PerfData {
     },
     rtt_1: TimeStats {
         count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        sum: 316.3ms,
+        max: 316.3ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1261,15 +1261,15 @@ PerfData {
 4th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        sum: 316.3ms,
+        max: 316.3ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1303,7 +1303,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 1,
-    rtt_full: 325.4ms,
+    rtt_full: 625.4ms,
     retrans_0: 1,
     retrans_1: 0,
     retrans_syn_0: 1,
@@ -1321,15 +1321,15 @@ PerfData {
 5th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        sum: 316.3ms,
+        max: 316.3ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1363,7 +1363,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 1,
-    rtt_full: 325.4ms,
+    rtt_full: 625.4ms,
     retrans_0: 1,
     retrans_1: 0,
     retrans_syn_0: 1,
@@ -1381,15 +1381,15 @@ PerfData {
 6th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        sum: 316.3ms,
+        max: 316.3ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1423,7 +1423,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 1,
-    rtt_full: 325.4ms,
+    rtt_full: 625.4ms,
     retrans_0: 1,
     retrans_1: 0,
     retrans_syn_0: 1,
@@ -1441,15 +1441,15 @@ PerfData {
 7th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 318.2ms,
+        max: 309.1ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        sum: 316.3ms,
+        max: 316.3ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1483,7 +1483,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 1,
-    rtt_full: 325.4ms,
+    rtt_full: 625.4ms,
     retrans_0: 1,
     retrans_1: 0,
     retrans_syn_0: 1,
@@ -1628,8 +1628,8 @@ PerfData {
     },
     rtt_1: TimeStats {
         count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        sum: 316.3ms,
+        max: 316.3ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1687,9 +1687,9 @@ PerfData {
         updated: false,
     },
     rtt_1: TimeStats {
-        count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        count: 2,
+        sum: 848.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1742,14 +1742,14 @@ PerfData {
 PerfData {
     rtt_0: TimeStats {
         count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        sum: 225.4ms,
+        max: 225.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
-        count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        count: 2,
+        sum: 848.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1801,15 +1801,15 @@ PerfData {
 5th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 750.8ms,
+        max: 525.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
-        count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        count: 2,
+        sum: 848.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1843,7 +1843,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -1861,15 +1861,15 @@ PerfData {
 6th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 750.8ms,
+        max: 525.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
-        count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        count: 2,
+        sum: 848.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1903,7 +1903,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -1921,15 +1921,15 @@ PerfData {
 7th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 750.8ms,
+        max: 525.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
-        count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        count: 2,
+        sum: 848.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -1963,7 +1963,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -1981,15 +1981,15 @@ PerfData {
 8th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 750.8ms,
+        max: 525.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
-        count: 1,
-        sum: 216.3ms,
-        max: 216.3ms,
+        count: 2,
+        sum: 848.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -2023,7 +2023,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -2228,8 +2228,8 @@ PerfData {
     },
     rtt_1: TimeStats {
         count: 2,
-        sum: 432.6ms,
-        max: 216.3ms,
+        sum: 748.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -2282,14 +2282,14 @@ PerfData {
 PerfData {
     rtt_0: TimeStats {
         count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        sum: 325.4ms,
+        max: 325.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 2,
-        sum: 432.6ms,
-        max: 216.3ms,
+        sum: 748.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -2341,15 +2341,15 @@ PerfData {
 5th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 950.8ms,
+        max: 625.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 2,
-        sum: 432.6ms,
-        max: 216.3ms,
+        sum: 748.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -2383,7 +2383,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -2401,15 +2401,15 @@ PerfData {
 6th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 950.8ms,
+        max: 625.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 2,
-        sum: 432.6ms,
-        max: 216.3ms,
+        sum: 748.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -2443,7 +2443,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -2461,15 +2461,15 @@ PerfData {
 7th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 950.8ms,
+        max: 625.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 2,
-        sum: 432.6ms,
-        max: 216.3ms,
+        sum: 748.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -2503,7 +2503,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -2521,15 +2521,15 @@ PerfData {
 8th perf data:
 PerfData {
     rtt_0: TimeStats {
-        count: 1,
-        sum: 9.1ms,
-        max: 9.1ms,
+        count: 2,
+        sum: 950.8ms,
+        max: 625.4ms,
         updated: true,
     },
     rtt_1: TimeStats {
         count: 2,
-        sum: 432.6ms,
-        max: 216.3ms,
+        sum: 748.9ms,
+        max: 532.6ms,
         updated: true,
     },
     art_0: TimeStats {
@@ -2563,7 +2563,7 @@ PerfData {
         updated: false,
     },
     retrans_sum: 2,
-    rtt_full: 541.7ms,
+    rtt_full: 841.7ms,
     retrans_0: 1,
     retrans_1: 1,
     retrans_syn_0: 1,
@@ -3259,10 +3259,10 @@ PerfData {
         updated: false,
     },
     art_1: TimeStats {
-        count: 0,
-        sum: 0ns,
-        max: 0ns,
-        updated: false,
+        count: 1,
+        sum: 990µs,
+        max: 990µs,
+        updated: true,
     },
     srt_0: TimeStats {
         count: 0,
@@ -3319,16 +3319,16 @@ PerfData {
         updated: false,
     },
     art_1: TimeStats {
+        count: 1,
+        sum: 990µs,
+        max: 990µs,
+        updated: true,
+    },
+    srt_0: TimeStats {
         count: 0,
         sum: 0ns,
         max: 0ns,
         updated: false,
-    },
-    srt_0: TimeStats {
-        count: 1,
-        sum: 9µs,
-        max: 9µs,
-        updated: true,
     },
     srt_1: TimeStats {
         count: 0,
@@ -3379,16 +3379,16 @@ PerfData {
         updated: false,
     },
     art_1: TimeStats {
+        count: 1,
+        sum: 990µs,
+        max: 990µs,
+        updated: true,
+    },
+    srt_0: TimeStats {
         count: 0,
         sum: 0ns,
         max: 0ns,
         updated: false,
-    },
-    srt_0: TimeStats {
-        count: 1,
-        sum: 9µs,
-        max: 9µs,
-        updated: true,
     },
     srt_1: TimeStats {
         count: 0,
@@ -3439,16 +3439,16 @@ PerfData {
         updated: false,
     },
     art_1: TimeStats {
+        count: 1,
+        sum: 990µs,
+        max: 990µs,
+        updated: true,
+    },
+    srt_0: TimeStats {
         count: 0,
         sum: 0ns,
         max: 0ns,
         updated: false,
-    },
-    srt_0: TimeStats {
-        count: 1,
-        sum: 9µs,
-        max: 9µs,
-        updated: true,
     },
     srt_1: TimeStats {
         count: 0,
@@ -3499,16 +3499,16 @@ PerfData {
         updated: false,
     },
     art_1: TimeStats {
+        count: 1,
+        sum: 990µs,
+        max: 990µs,
+        updated: true,
+    },
+    srt_0: TimeStats {
         count: 0,
         sum: 0ns,
         max: 0ns,
         updated: false,
-    },
-    srt_0: TimeStats {
-        count: 1,
-        sum: 9µs,
-        max: 9µs,
-        updated: true,
     },
     srt_1: TimeStats {
         count: 0,
@@ -3559,16 +3559,16 @@ PerfData {
         updated: false,
     },
     art_1: TimeStats {
+        count: 1,
+        sum: 990µs,
+        max: 990µs,
+        updated: true,
+    },
+    srt_0: TimeStats {
         count: 0,
         sum: 0ns,
         max: 0ns,
         updated: false,
-    },
-    srt_0: TimeStats {
-        count: 1,
-        sum: 9µs,
-        max: 9µs,
-        updated: true,
     },
     srt_1: TimeStats {
         count: 0,
