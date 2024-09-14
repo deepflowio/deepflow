@@ -1422,8 +1422,8 @@ entries:
     - https://github.com/deepflowio/deepflow-charts/releases/download/deepflow-6.3.010/deepflow-6.3.010.tgz
     version: 6.3.010
   - apiVersion: v2
-    appVersion: 6.3.6
-    created: "2023-08-31T06:12:42.193231583Z"
+    appVersion: 6.3.9
+    created: "2024-09-14T07:47:51.747383349Z"
     dependencies:
     - condition: clickhouse.enabled
       name: clickhouse
@@ -1440,9 +1440,9 @@ entries:
     - condition: grafana.enabled
       name: grafana
       repository: https://grafana.github.io/helm-charts
-      version: 6.*.*
+      version: 7.*.*
     description: An automated observability platform for cloud-native developers.
-    digest: 7df673d715335f771a5e9ef2491b16ba8a13eab6ba969ef40f078b11aeb557ae
+    digest: 5f84a6548884d9a97f16fe3ab210b72d40212be3115caf4f53ae6faa236f7425
     home: https://github.com/deepflowio/deepflow
     icon: https://raw.githubusercontent.com/deepflowio/deepflow-charts/main/deepflow.svg
     keywords:
@@ -1456,8 +1456,8 @@ entries:
     - https://github.com/deepflowio/deepflow
     type: application
     urls:
-    - https://github.com/deepflowio/deepflow-charts/releases/download/deepflow-6.3.009/deepflow-6.3.009.tgz
-    version: 6.3.009
+    - https://github.com/deepflowio/deepflow-charts/releases/download/deepflow-6.3.9/deepflow-6.3.9.tgz
+    version: 6.3.9
   - apiVersion: v2
     appVersion: 6.3.6
     created: "2023-08-25T02:10:35.496960151Z"
@@ -5730,10 +5730,10 @@ entries:
     - https://github.com/deepflowio/deepflow-charts/releases/download/deepflow-agent-6.3.010/deepflow-agent-6.3.010.tgz
     version: 6.3.010
   - apiVersion: v2
-    appVersion: 6.3.6
-    created: "2023-08-31T06:12:42.364417949Z"
+    appVersion: 6.3.9
+    created: "2024-09-14T07:47:51.867503855Z"
     description: An automated observability platform for cloud-native developers.
-    digest: 0961c1a648fbec9edce7a0b20a56233b2de7aa0b58fd76a2566e7eae47c8f1c3
+    digest: f38b84e6556e3e33cd1b226372532fe50ad503452a7d2a8382f29cae78920775
     home: https://github.com/deepflowio/deepflow
     icon: https://raw.githubusercontent.com/deepflowio/deepflow-charts/main/deepflow.svg
     keywords:
@@ -5747,8 +5747,8 @@ entries:
     - https://github.com/deepflowio/deepflow
     type: application
     urls:
-    - https://github.com/deepflowio/deepflow-charts/releases/download/deepflow-agent-6.3.009/deepflow-agent-6.3.009.tgz
-    version: 6.3.009
+    - https://github.com/deepflowio/deepflow-charts/releases/download/deepflow-agent-6.3.9/deepflow-agent-6.3.9.tgz
+    version: 6.3.9
   - apiVersion: v2
     appVersion: 6.3.6
     created: "2023-08-25T02:10:35.731944932Z"
@@ -7666,4 +7666,4 @@ entries:
     urls:
     - https://github.com/deepflowys/deepflow-charts/releases/download/deepflow-agent-0.1.030/deepflow-agent-0.1.030.tgz
     version: 0.1.030
-generated: "2024-09-14T07:47:20.446536609Z"
+generated: "2024-09-14T07:47:51.866766019Z"
