@@ -744,6 +744,8 @@ extern "C" {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_profile")] {
+            pub fn set_offcpu_profiler_regex(pattern: *const c_char) -> c_int;
+
             pub fn enable_offcpu_profiler() -> c_int;
 
             pub fn disable_offcpu_profiler() -> c_int;
@@ -753,6 +755,8 @@ extern "C" {
             pub fn set_offcpu_minblock_time(
                 block_time: c_uint,
             ) -> c_int;
+
+            pub fn set_memory_profiler_regex(pattern: *const c_char) -> c_int;
 
             pub fn enable_memory_profiler() -> c_int;
 
