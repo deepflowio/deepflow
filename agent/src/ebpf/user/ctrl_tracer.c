@@ -39,6 +39,7 @@ typedef enum df_bpf_cmd_e {
 	DF_BPF_CMD_SHOW,
 	DF_BPF_CMD_REPLACE,
 	DF_BPF_CMD_FLUSH,
+	DF_BPF_CMD_PRINT,
 	DF_BPF_CMD_FIND,
 	DF_BPF_CMD_HELP,
 } df_bpf_cmd_t;
@@ -85,6 +86,14 @@ static void tracer_help(void)
 static void socktrace_help(void)
 {
 	fprintf(stderr, "Usage:\n" "    %s tracer show\n", DF_BPF_NAME);
+}
+
+static void match_pids_help(void)
+{
+	fprintf(stderr, "Print match pids to log\n");
+	fprintf(stderr, "Usage:\n" "    %s match_pids print\n", DF_BPF_NAME);
+	fprintf(stderr, "For example:\n");
+	fprintf(stderr, "    %s match_pids print\n", DF_BPF_NAME);
 }
 
 static void cpdbg_help(void)
@@ -567,6 +576,25 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 	}
 }
 
+static int match_pids_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			     struct df_bpf_conf *conf)
+{
+	switch (conf->cmd) {
+	case DF_BPF_CMD_PRINT:
+		if (df_bpf_setsockopt(SOCKOPT_PRINT_MATCH_PIDS, NULL, 0) == 0) {
+			printf("Success.\n");
+		} else {
+			printf("Failed.\n");
+		}
+		break;
+
+	default:
+		return ETR_NOTSUPP;
+	}
+
+	return ETR_OK;
+}
+
 static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			   struct df_bpf_conf *conf)
 {
@@ -819,14 +847,20 @@ struct df_bpf_obj cpdbg_obj = {
 	.do_cmd = cpdbg_do_cmd,
 };
 
+struct df_bpf_obj match_pids_obj = {
+	.name = "match_pids",
+	.help = match_pids_help,
+	.do_cmd = match_pids_do_cmd,
+};
+
 static void usage(void)
 {
 	fprintf(stderr,
 		"Usage:\n"
 		"    " DF_BPF_NAME " [OPTIONS] OBJECT { COMMAND | help }\n"
 		"Parameters:\n"
-		"    OBJECT  := { tracer socktrace datadump cpdbg }\n"
-		"    COMMAND := { show list set }\n"
+		"    OBJECT  := { tracer socktrace datadump cpdbg match_pids}\n"
+		"    COMMAND := { show list set print}\n"
 		"Options:\n"
 		"    -v, --verbose\n"
 		"    -h, --help\n" "    -V, --version\n" "    -C, --color\n");
@@ -842,6 +876,8 @@ static struct df_bpf_obj *df_bpf_obj_get(const char *name)
 		return &datadump_obj;
 	} else if (strcmp(name, "cpdbg") == 0) {
 		return &cpdbg_obj;
+	} else if (strcmp(name, "match_pids") == 0) {
+		return &match_pids_obj;
 	}
 
 	return NULL;
@@ -1001,6 +1037,9 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 	} else if (strcmp(argv[1], "off") == 0) {
 		conf->cmd = DF_BPF_CMD_OFF;
 		goto show_exit;
+	} else if (strcmp(argv[1], "print") == 0) {
+		conf->cmd = DF_BPF_CMD_PRINT;
+    goto show_exit;
 	} else if (strcmp(argv[1], "ls") == 0) {
 		conf->cmd = DF_BPF_CMD_SHOW;
 		goto show_exit;

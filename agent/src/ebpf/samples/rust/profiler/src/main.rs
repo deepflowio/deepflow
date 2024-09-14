@@ -17,6 +17,7 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
+use std::env;
 use std::ffi::CString;
 use profiler::ebpf::*;
 use std::ptr;
@@ -154,6 +155,9 @@ fn get_counter(counter_type: u32) -> u32 {
 }
 
 fn main() {
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info")
+    }
     env_logger::builder()
       .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
       .init();
@@ -194,12 +198,12 @@ fn main() {
             ::std::process::exit(1);
         }
 
-        set_profiler_regex(
-            CString::new("^(socket_tracer|java|deepflow-.*|python3.*)$".as_bytes())
-                .unwrap()
-                .as_c_str()
-                .as_ptr(),
-        );
+        let feature: c_int = FEATURE_PROFILE_ONCPU;
+        let pids: [c_int; 1] = [11200];
+        let num: c_int = pids.len() as c_int;
+        let result = set_feature_pids(feature, pids.as_ptr(), num);
+        println!("Result {}", result);
+
         // set_dwarf_regex(
         //     CString::new("^(socket_tracer|java|deepflow-.*|python3.*)$".as_bytes())
         //         .unwrap()
@@ -212,7 +216,7 @@ fn main() {
 
         bpf_tracer_finish();
 
-        //if cpdbg_set_config(60, debug_callback) != 0 {
+        //if cpdbg_set_config(600, debug_callback) != 0 {
         //    println!("cpdbg_set_config() error");
         //    ::std::process::exit(1);
         //}

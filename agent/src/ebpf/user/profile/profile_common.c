@@ -75,6 +75,26 @@ extern struct profiler_context *g_ctx_array[PROFILER_CTX_NUM];
 
 static bool java_installed;
 
+static bool match_pid(u8 type, int pid)
+{
+	int feat = FEATURE_UNKNOWN;
+	switch(type) {
+	case PROFILER_TYPE_ONCPU:
+		feat = FEATURE_PROFILE_ONCPU;
+		break;
+	case PROFILER_TYPE_OFFCPU:
+		feat = FEATURE_PROFILE_OFFCPU;
+		break;
+	case PROFILER_TYPE_MEMORY:
+		feat = FEATURE_PROFILE_MEMORY;
+		break;
+	default:
+		return false;
+	}
+
+	return is_pid_match(feat, pid);
+}
+
 int profiler_context_init(struct profiler_context *ctx,
 			  const char *name,
 			  const char *tag, u8 type,
@@ -900,11 +920,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		/* If it is a process, match operation will be performed immediately. */
 		if (v->pid == v->tgid) {
 			is_match_finish = true;
-			profile_regex_lock(ctx);
-			matched =
-			    (regexec(&ctx->profiler_regex, v->comm, 0, NULL, 0)
-			     == 0);
-			profile_regex_unlock(ctx);
+			matched = match_pid(ctx->type, v->tgid);
 			if (!matched) {
 				if (ctx->only_matched_data) {
 					continue;
@@ -939,13 +955,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				process_name = name;
 
 			if (!is_match_finish) {
-				profile_regex_lock(ctx);
-				matched =
-				    (regexec
-				     (&ctx->profiler_regex, process_name, 0,
-				      NULL, 0)
-				     == 0);
-				profile_regex_unlock(ctx);
+				matched = match_pid(ctx->type, v->tgid);
 			}
 
 			if (matched) {
