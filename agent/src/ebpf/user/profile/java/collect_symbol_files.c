@@ -40,6 +40,7 @@ static pthread_mutex_t list_lock;
 
 /* For Java symbols update task. */
 static struct list_head java_syms_update_tasks_head;
+static u64 tasks_list_init_done;
 
 /** Collect Java symbols.
  *
@@ -107,6 +108,10 @@ void clean_local_java_symbols_files(int pid)
 /* Called by 'cp_reader' thread */
 void add_java_syms_update_task(struct symbolizer_proc_info *p_info)
 {
+	// To ensure that 'java_syms_update_tasks_head' has been initialized.
+	while (!AO_GET(&tasks_list_init_done))
+		CLIB_PAUSE();
+	
 	struct java_syms_update_task *task;
 	task =
 	    clib_mem_alloc_aligned("java_update_task", sizeof(*task), 0, NULL);
@@ -130,6 +135,8 @@ void java_syms_update_main(void *arg)
 
 	pthread_mutex_init(&list_lock, NULL);
 	init_list_head(&java_syms_update_tasks_head);
+	AO_SET(&tasks_list_init_done, 1);
+
 	struct java_syms_update_task *task;
 
 	for (;;) {
