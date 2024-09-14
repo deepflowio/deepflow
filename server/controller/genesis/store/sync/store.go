@@ -14,25 +14,21 @@
  * limitations under the License.
  */
 
-package genesis
+package sync
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
 	"gorm.io/gorm/clause"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
+	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mcommon "github.com/deepflowio/deepflow/server/controller/db/mysql/common"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
-	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
@@ -40,20 +36,20 @@ import (
 
 type SyncStorage struct {
 	cfg             config.GenesisConfig
-	vCtx            context.Context
-	vCancel         context.CancelFunc
-	channel         chan GenesisSyncData
+	sCtx            context.Context
+	sCancel         context.CancelFunc
+	channel         chan common.GenesisSyncData
 	dirty           bool
 	mutex           sync.Mutex
 	genesisSyncInfo GenesisSyncDataOperation
 }
 
-func NewSyncStorage(cfg config.GenesisConfig, sChan chan GenesisSyncData, ctx context.Context) *SyncStorage {
-	vCtx, vCancel := context.WithCancel(ctx)
+func NewSyncStorage(ctx context.Context, cfg config.GenesisConfig, sChan chan common.GenesisSyncData) *SyncStorage {
+	sCtx, sCancel := context.WithCancel(ctx)
 	return &SyncStorage{
 		cfg:             cfg,
-		vCtx:            vCtx,
-		vCancel:         vCancel,
+		sCtx:            sCtx,
+		sCancel:         sCancel,
 		channel:         sChan,
 		dirty:           false,
 		mutex:           sync.Mutex{},
@@ -61,103 +57,84 @@ func NewSyncStorage(cfg config.GenesisConfig, sChan chan GenesisSyncData, ctx co
 	}
 }
 
-func (s *SyncStorage) Renew(data GenesisSyncDataOperation) {
+func (s *SyncStorage) Renew(info common.VIFRPCMessage, data common.GenesisSyncDataResponse) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	if data.VIPs != nil {
-		s.genesisSyncInfo.VIPs.Renew(data.VIPs.Fetch(), now)
-	}
-	if data.VMs != nil {
-		s.genesisSyncInfo.VMs.Renew(data.VMs.Fetch(), now)
-	}
-	if data.VPCs != nil {
-		s.genesisSyncInfo.VPCs.Renew(data.VPCs.Fetch(), now)
-	}
-	if data.Hosts != nil {
-		s.genesisSyncInfo.Hosts.Renew(data.Hosts.Fetch(), now)
-	}
-	if data.Lldps != nil {
-		s.genesisSyncInfo.Lldps.Renew(data.Lldps.Fetch(), now)
-	}
-	if data.Ports != nil {
-		s.genesisSyncInfo.Ports.Renew(data.Ports.Fetch(), now)
-	}
-	if data.Networks != nil {
-		s.genesisSyncInfo.Networks.Renew(data.Networks.Fetch(), now)
-	}
-	if data.IPlastseens != nil {
-		s.genesisSyncInfo.IPlastseens.Renew(data.IPlastseens.Fetch(), now)
-	}
-	if data.Vinterfaces != nil {
-		s.genesisSyncInfo.Vinterfaces.Renew(data.Vinterfaces.Fetch(), now)
-	}
-	if data.Processes != nil {
-		s.genesisSyncInfo.Processes.Renew(data.Processes.Fetch(), now)
-	}
+
+	s.genesisSyncInfo.VIPs.Renew(info.ORGID, now, data.VIPs)
+	s.genesisSyncInfo.VMs.Renew(info.ORGID, now, data.VMs)
+	s.genesisSyncInfo.VPCs.Renew(info.ORGID, now, data.VPCs)
+	s.genesisSyncInfo.Hosts.Renew(info.ORGID, now, data.Hosts)
+	s.genesisSyncInfo.Lldps.Renew(info.ORGID, now, data.Lldps)
+	s.genesisSyncInfo.Ports.Renew(info.ORGID, now, data.Ports)
+	s.genesisSyncInfo.Networks.Renew(info.ORGID, now, data.Networks)
+	s.genesisSyncInfo.IPlastseens.Renew(info.ORGID, now, data.IPLastSeens)
+	s.genesisSyncInfo.Vinterfaces.Renew(info.ORGID, now, data.Vinterfaces)
+	s.genesisSyncInfo.Processes.Renew(info.ORGID, now, data.Processes)
 }
 
-func (s *SyncStorage) Update(data GenesisSyncDataOperation, info VIFRPCMessage) {
+func (s *SyncStorage) Update(info common.VIFRPCMessage, data common.GenesisSyncDataResponse) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	updateFlag := false
-	if data.VIPs != nil {
+	if len(data.VIPs) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.VIPs.Update(data.VIPs.Fetch(), now)
+		s.genesisSyncInfo.VIPs.Update(info.ORGID, now, data.VIPs)
 	}
-	if data.VMs != nil {
+	if len(data.VMs) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.VMs.Update(data.VMs.Fetch(), now)
+		s.genesisSyncInfo.VMs.Update(info.ORGID, now, data.VMs)
 	}
-	if data.VPCs != nil {
+	if len(data.VPCs) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.VPCs.Update(data.VPCs.Fetch(), now)
+		s.genesisSyncInfo.VPCs.Update(info.ORGID, now, data.VPCs)
 	}
-	if data.Hosts != nil {
+	if len(data.Hosts) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Hosts.Update(data.Hosts.Fetch(), now)
+		s.genesisSyncInfo.Hosts.Update(info.ORGID, now, data.Hosts)
 	}
-	if data.Lldps != nil {
+	if len(data.Lldps) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Lldps.Update(data.Lldps.Fetch(), now)
+		s.genesisSyncInfo.Lldps.Update(info.ORGID, now, data.Lldps)
 	}
-	if data.Ports != nil {
+	if len(data.Ports) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Ports.Update(data.Ports.Fetch(), now)
+		s.genesisSyncInfo.Ports.Update(info.ORGID, now, data.Ports)
 	}
-	if data.Networks != nil {
+	if len(data.Networks) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Networks.Update(data.Networks.Fetch(), now)
+		s.genesisSyncInfo.Networks.Update(info.ORGID, now, data.Networks)
 	}
-	if data.IPlastseens != nil {
+	if len(data.IPLastSeens) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.IPlastseens.Update(data.IPlastseens.Fetch(), now)
+		s.genesisSyncInfo.IPlastseens.Update(info.ORGID, now, data.IPLastSeens)
 	}
-	if data.Vinterfaces != nil {
+	if len(data.Vinterfaces) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Vinterfaces.Update(data.Vinterfaces.Fetch(), now)
+		s.genesisSyncInfo.Vinterfaces.Update(info.ORGID, now, data.Vinterfaces)
 	}
-	if data.Processes != nil {
+	if len(data.Processes) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Processes.Update(data.Processes.Fetch(), now)
+		s.genesisSyncInfo.Processes.Update(info.ORGID, now, data.Processes)
 	}
-	if updateFlag && info.vtapID != 0 {
+	if updateFlag && info.VtapID != 0 {
 		// push immediately after update
 		s.fetch()
 
-		db, err := mysql.GetDB(info.orgID)
+		db, err := mysql.GetDB(info.ORGID)
 		if err != nil {
-			log.Error("get mysql session failed", logger.NewORGPrefix(info.orgID))
+			log.Error("get mysql session failed", logger.NewORGPrefix(info.ORGID))
 			return
 		}
-		nodeIP := os.Getenv(common.NODE_IP_KEY)
+		nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 		db.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "vtap_id"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
 		}).Create(&model.GenesisStorage{
-			VtapID: info.vtapID,
+			VtapID: info.VtapID,
 			NodeIP: nodeIP,
 		})
 	}
@@ -165,7 +142,7 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, info VIFRPCMessage) 
 }
 
 func (s *SyncStorage) fetch() {
-	s.channel <- GenesisSyncData{
+	s.channel <- common.GenesisSyncData{
 		VIPs:        s.genesisSyncInfo.VIPs.Fetch(),
 		VMs:         s.genesisSyncInfo.VMs.Fetch(),
 		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
@@ -256,7 +233,7 @@ func (s *SyncStorage) refreshDatabase() {
 			log.Error("get org ids failed")
 			return
 		}
-		nodeIP := os.Getenv(common.NODE_IP_KEY)
+		nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 		for _, orgID := range orgIDs {
 			db, err := mysql.GetDB(orgID)
 			if err != nil {
@@ -325,165 +302,7 @@ func (s *SyncStorage) Start() {
 }
 
 func (s *SyncStorage) Stop() {
-	if s.vCancel != nil {
-		s.vCancel()
-	}
-}
-
-type KubernetesStorage struct {
-	listenPort     int
-	listenNodePort int
-	cfg            config.GenesisConfig
-	kCtx           context.Context
-	kCancel        context.CancelFunc
-	channel        chan KubernetesInfo
-	kubernetesData map[int]map[string]KubernetesInfo
-	mutex          sync.Mutex
-}
-
-func NewKubernetesStorage(port, nPort int, cfg config.GenesisConfig, kChan chan KubernetesInfo, ctx context.Context) *KubernetesStorage {
-	kCtx, kCancel := context.WithCancel(ctx)
-	return &KubernetesStorage{
-		listenPort:     port,
-		listenNodePort: nPort,
-		cfg:            cfg,
-		kCtx:           kCtx,
-		kCancel:        kCancel,
-		channel:        kChan,
-		kubernetesData: map[int]map[string]KubernetesInfo{},
-		mutex:          sync.Mutex{},
-	}
-}
-
-func (k *KubernetesStorage) Clear() {
-	k.mutex.Lock()
-	defer k.mutex.Unlock()
-
-	k.kubernetesData = map[int]map[string]KubernetesInfo{}
-}
-
-func (k *KubernetesStorage) Add(orgID int, newInfo KubernetesInfo) {
-	k.mutex.Lock()
-	unTriggerFlag := false
-	kubernetesData, ok := k.kubernetesData[orgID]
-	if ok {
-		// 上报消息中version未变化时，只更新epoch和error_msg
-		if oldInfo, ok := kubernetesData[newInfo.ClusterID]; ok && oldInfo.Version == newInfo.Version {
-			unTriggerFlag = true
-			oldInfo.Epoch = newInfo.Epoch
-			oldInfo.ErrorMSG = newInfo.ErrorMSG
-			kubernetesData[newInfo.ClusterID] = oldInfo
-		} else {
-			kubernetesData[newInfo.ClusterID] = newInfo
-		}
-	} else {
-		k.kubernetesData[orgID] = map[string]KubernetesInfo{
-			newInfo.ClusterID: newInfo,
-		}
-	}
-	k.fetch()
-	k.mutex.Unlock()
-
-	if !unTriggerFlag {
-		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
-		if err != nil {
-			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()), logger.NewORGPrefix(orgID))
-		}
-	}
-}
-
-func (k *KubernetesStorage) fetch() {
-	for _, k8sDatas := range k.kubernetesData {
-		for _, kData := range k8sDatas {
-			k.channel <- kData
-		}
-	}
-}
-
-func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, version uint64) error {
-	var controllerIP, domainLcuuid, subDomainLcuuid string
-
-	db, err := mysql.GetDB(orgID)
-	if err != nil {
-		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
-		return err
-	}
-
-	var subDomains []mysqlmodel.SubDomain
-	err = db.Where("cluster_id = ?", clusterID).Find(&subDomains).Error
-	if err != nil {
-		return err
-	}
-	var domain mysqlmodel.Domain
-	switch len(subDomains) {
-	case 0:
-		err = db.Where("cluster_id = ? AND type = ?", clusterID, common.KUBERNETES).First(&domain).Error
-		if err != nil {
-			return err
-		}
-		controllerIP = domain.ControllerIP
-		domainLcuuid = domain.Lcuuid
-		subDomainLcuuid = domain.Lcuuid
-	case 1:
-		err = db.Where("lcuuid = ? AND type = ?", subDomains[0].Domain, common.KUBERNETES).First(&domain).Error
-		if err != nil {
-			return err
-		}
-		controllerIP = domain.ControllerIP
-		domainLcuuid = domain.Lcuuid
-		subDomainLcuuid = subDomains[0].Lcuuid
-	default:
-		return errors.New(fmt.Sprintf("cluster_id (%s) is not unique in mysql table sub_domain", clusterID))
-	}
-
-	var controller mysqlmodel.Controller
-	err = db.Where("ip = ? AND state <> ?", controllerIP, common.CONTROLLER_STATE_EXCEPTION).First(&controller).Error
-	if err != nil {
-		return err
-	}
-	requestIP := controllerIP
-	requestPort := k.listenNodePort
-	if controller.PodIP != "" {
-		requestIP = controller.PodIP
-		requestPort = k.listenPort
-	}
-
-	requestUrl := "http://" + net.JoinHostPort(requestIP, strconv.Itoa(requestPort)) + "/v1/kubernetes-refresh/"
-	queryStrings := map[string]string{
-		"domain_lcuuid":     domainLcuuid,
-		"sub_domain_lcuuid": subDomainLcuuid,
-		"version":           strconv.Itoa(int(version)),
-	}
-
-	log.Debugf("trigger cloud (%s) kubernetes (%s) refresh version (%d)", requestUrl, clusterID, version, logger.NewORGPrefix(orgID))
-
-	return gcommon.RequestGet(requestUrl, 30, queryStrings)
-}
-
-func (k *KubernetesStorage) run() {
-	for {
-		time.Sleep(time.Duration(k.cfg.DataPersistenceInterval) * time.Second)
-		now := time.Now()
-		k.mutex.Lock()
-		for _, kubernetesData := range k.kubernetesData {
-			for key, s := range kubernetesData {
-				if now.Sub(s.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
-					continue
-				}
-				delete(kubernetesData, key)
-			}
-		}
-		k.fetch()
-		k.mutex.Unlock()
-	}
-}
-
-func (k *KubernetesStorage) Start() {
-	go k.run()
-}
-
-func (k *KubernetesStorage) Stop() {
-	if k.kCancel != nil {
-		k.kCancel()
+	if s.sCancel != nil {
+		s.sCancel()
 	}
 }

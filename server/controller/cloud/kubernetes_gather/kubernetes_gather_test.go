@@ -17,6 +17,7 @@
 package kubernetes_gather
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -32,6 +33,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 )
 
 func TestKubernetes(t *testing.T) {
@@ -83,11 +85,11 @@ func TestKubernetes(t *testing.T) {
 		})
 		defer k8sInfoPatch.Reset()
 
-		g := genesis.NewGenesis(&config.ControllerConfig{})
+		g := genesis.NewGenesis(context.Background(), &config.ControllerConfig{})
 		vJsonData, _ := os.ReadFile("./testfiles/vinterfaces.json")
-		var vData genesis.GenesisSyncDataResponse
+		var vData gcommon.GenesisSyncDataResponse
 		json.Unmarshal(vJsonData, &vData)
-		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis, _ int) (genesis.GenesisSyncDataResponse, error) {
+		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis, _ int) (gcommon.GenesisSyncDataResponse, error) {
 			return vData, nil
 		})
 		defer vinterfacesInfoPatch.Reset()

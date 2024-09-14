@@ -58,11 +58,11 @@ func (s *service) GetEncryptKey(ctx context.Context, in *api.EncryptKeyRequest) 
 }
 
 func (s *service) GenesisSharingK8S(ctx context.Context, in *api.GenesisSharingK8SRequest) (*api.GenesisSharingK8SResponse, error) {
-	return genesis.Synchronizer.GenesisSharingK8S(ctx, in)
+	return genesis.GenesisService.Synchronizer.GenesisSharingK8S(ctx, in)
 }
 
 func (s *service) GenesisSharingSync(ctx context.Context, in *api.GenesisSharingSyncRequest) (*api.GenesisSharingSyncResponse, error) {
-	return genesis.Synchronizer.GenesisSharingSync(ctx, in)
+	return genesis.GenesisService.Synchronizer.GenesisSharingSync(ctx, in)
 }
 
 func (s *service) GetResourceID(ctx context.Context, in *api.GetResourceIDRequest) (*api.GetResourceIDResponse, error) {
