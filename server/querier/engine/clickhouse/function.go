@@ -197,7 +197,19 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 		}
 
 		if condition == "" && metricStruct.TagType != "int" {
-			condition = dbFields[i] + " != ''"
+			if metricStruct.TagType == "string" || metricStruct.TagType == "ip" {
+				condition = dbFields[i] + " != ''"
+			} else if metricStruct.TagType == "int" || metricStruct.TagType == "id" {
+				condition = dbFields[i] + " != 0"
+			} else if metricStruct.TagType == "resource" && strings.Contains(metricStruct.DisplayName, "_id") {
+				if strings.Contains(metricStruct.DisplayName, "epc") {
+					condition = dbFields[i] + " != -2"
+				} else {
+					condition = dbFields[i] + " != 0"
+				}
+			} else {
+				condition = dbFields[i] + " != ''"
+			}
 			conditions = append(conditions, condition)
 		}
 

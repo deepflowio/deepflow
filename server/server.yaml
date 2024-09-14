@@ -18,6 +18,11 @@ log-level: info
 #  block-rate: 5 # valid when ProfileTypes contains 'block_count' or 'block_duration'
 #  log-enabled: true # whether record profile debug logs
 
+## every `interval`, call debug.FreeOSMemory()(https://pkg.go.dev/runtime/debug#FreeOSMemory) to release OS memory.
+#free-os-memory-manager:
+#  enabled: false
+#  interval: 3600  # uint: second
+
 ## extract an integer (generally used timestamp) from traceId as an additional index to speed up traceId queries.
 #trace-id-with-index:
 #  disabled: false
@@ -504,7 +509,7 @@ ingester:
   #  vtap-app-1m: 168      # vtap_app[_edge]_port.1m
   #  vtap-app-1s: 24      # vtap_app[_edge]_port.1s
 
-  ## flow_metrics database data retention time(unit: hour)
+  ## flow_log database data retention time(unit: hour)
   ## Note: This configuration is only valid when DeepFlow is run for the first time or the ClickHouse tables have not yet been created
   #flow-log-ttl-hour:
   #  l4-flow-log: 72

@@ -2756,7 +2756,7 @@ inputs:
         #     发送数据之前压缩函数调用栈。压缩能够有效降低 agent 的内存开销、数据传输的带宽消耗、以及
         #     ingester 的 CPU 开销，但是 Agent 也会因此消耗更多的 CPU。测试表明，将deepflow-agent 自身的
         #     on-cpu 函数调用栈压缩，可以将带宽消耗降低 `x` 倍，但会使得 agent 额外消耗 `y%` 的 CPU。
-        # TODO: 6.6 新增能力
+        # upgrade_from: static_config.ebpf.preprocess.stack-compression
         stack_compression: true
     # type: section
     # name:
@@ -3398,7 +3398,7 @@ inputs:
       #   ch: |-
       #     开启后，deepflow-agent 将对集成的剖析数据进行压缩处理，压缩比例在 5:1~10:1 之间。注意：
       #     开启此特性将增加 deepflow-agent 的 CPU 消耗。
-      # upgrade_from: static_config.external-agent-http-proxy-compressed
+      # upgrade_from: static_config.external-agent-http-proxy-profile-compressed
       profile: true
     # type: section
     # name:

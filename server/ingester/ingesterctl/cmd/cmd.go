@@ -88,6 +88,17 @@ func RegisterIngesterCommand(root *cobra.Command) {
 		},
 	))
 	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
+		ingesterctl.CMD_FREE_OS_MEMORY,
+		debug.CmdHelper{Cmd: "free-os-memory", Helper: "free os memory commands"},
+		[]debug.CmdHelper{
+			{Cmd: "on", Helper: "start free os memory at intervals"},
+			{Cmd: "off", Helper: "stop free os memory"},
+			{Cmd: "once", Helper: "start free os memory once"},
+			{Cmd: "status", Helper: "free os memory status"},
+			{Cmd: "set-interval [second]", Helper: "set free os memory interval"},
+		},
+	))
+	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
 		ingesterctl.CMD_ORG_SWITCH,
 		debug.CmdHelper{Cmd: "switch-to-debug-org [org-id]", Helper: "the debugging command switches to the specified organization"},
 		nil,

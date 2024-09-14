@@ -1263,6 +1263,12 @@ static_config:
   #   Turning on this feature will result in higher CPU consumption of deepflow-agent.
   external-agent-http-proxy-compressed: false
 
+  # Compress Integration Profile Data
+  # Note: Whether to compress the integrated profile data received by deepflow-agent. The compression
+  #   ratio is about 5:1~10:1. Turning on this feature will result in higher CPU consumption
+  #   of deepflow-agent.
+  external-agent-http-proxy-profile-compressed: true
+
   # Prometheus Extra Labels
   # Note: Support for getting extra labels from headers in http requests from remoteWrite.
   prometheus-extra-config:
@@ -1553,6 +1559,11 @@ static_config:
       # Default: 10s
       # Note: Memory profiler will aggregate profile data by window and report according to this setting.
       report-interval: 10s
+
+    preprocess:
+      # Stack Compression Switch
+      # Default: true
+      stack-compression: true
 
     # eBPF OOOR (Out-Of-Order-Reassembly) Cache Size
     # Default: 16. Range: [8, 1024]

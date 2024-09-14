@@ -94,6 +94,7 @@ func main() {
 	}
 
 	NewContinuousProfiler(&cfg.ContinuousProfile).Start(false)
+	NewFreeOSMemoryHandler(&cfg.FreeOSMemoryManager).Start(false)
 
 	ctx, cancel := utils.NewWaitGroupCtx()
 	defer func() {

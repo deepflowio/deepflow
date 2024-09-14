@@ -252,11 +252,20 @@ func GetMetrics(field, db, table, orgID string) (*Metrics, bool) {
 	if ok {
 		return metric, ok
 	} else {
-		// xx_id is not a metric
+		// resource type xx_id is a metric
 		if strings.Contains(field, "_id") {
 			noIDField := strings.ReplaceAll(field, "_id", "")
-			_, ok = newAllMetrics[noIDField]
+			noIDMetric, ok := newAllMetrics[noIDField]
 			if ok {
+				idMetric := noIDMetric
+				idMetric.DisplayName = field
+				idMetric.DBField, err = GetTagDBField(field, db, table, orgID)
+				if err != nil {
+					log.Error("Failed to get tag db field")
+					return nil, false
+				}
+				return idMetric, ok
+			} else {
 				return nil, false
 			}
 		}

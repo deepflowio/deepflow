@@ -194,7 +194,7 @@ func (t *Table) MakeOrgLocalTableCreateSQL(orgID uint16) string {
 func (t *Table) makeGlobalTableCreateSQL(database string) string {
 	if t.DBType == CKDBTypeByconity {
 		t.LocalName = t.GlobalName
-		return t.makeLocalTableCreateSQL(t.Database)
+		return t.makeLocalTableCreateSQL(database)
 	}
 	engine := fmt.Sprintf(Distributed.String(), t.Cluster, database, t.LocalName)
 	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`%s` AS %s.`%s` ENGINE=%s",

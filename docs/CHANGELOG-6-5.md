@@ -11,6 +11,11 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: incorrect request resource in kafka logs [#8142](https://github.com/deepflowio/deepflow/pull/8142) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: specify the go mod version when cli verify [#8136](https://github.com/deepflowio/deepflow/pull/8136) by [jiumos](https://github.com/jiumos)
+* fix:  specify the go mod version when building the cli [#8123](https://github.com/deepflowio/deepflow/pull/8123) by [jiumos](https://github.com/jiumos)
+* fix: agent - eBPF Fix the calculation of total process time [#8116](https://github.com/deepflowio/deepflow/pull/8116) by [yinjiping](https://github.com/yinjiping)
+* fix: querier last function add order by time [#8113](https://github.com/deepflowio/deepflow/pull/8113) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent desensitizes the content in backticks [#8073](https://github.com/deepflowio/deepflow/pull/8073) by [TomatoMr](https://github.com/TomatoMr)
 * fix: agent command panic [#8070](https://github.com/deepflowio/deepflow/pull/8070) by [roryye](https://github.com/roryye)
 * fix: add timeout to receive agent command heart beat [#8048](https://github.com/deepflowio/deepflow/pull/8048) by [roryye](https://github.com/roryye)
@@ -131,6 +136,10 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: querier support simple sql [#8121](https://github.com/deepflowio/deepflow/pull/8121) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8103](https://github.com/deepflowio/deepflow/pull/8103) by [yinjiping](https://github.com/yinjiping)
+* feat: Change opengauss api group [#8099](https://github.com/deepflowio/deepflow/pull/8099) by [rvql](https://github.com/rvql)
+* feat: improves performance of recorder synchronization when there are a large number of process data [#8086](https://github.com/deepflowio/deepflow/pull/8086) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: support multi target port [#8032](https://github.com/deepflowio/deepflow/pull/8032) by [askyrie](https://github.com/askyrie)
 * feat: trace tree support store PseudoLink field [#7952](https://github.com/deepflowio/deepflow/pull/7952) by [lzf575](https://github.com/lzf575)
 * feat: add enable features to agent group [#7945](https://github.com/deepflowio/deepflow/pull/7945) by [roryye](https://github.com/roryye)

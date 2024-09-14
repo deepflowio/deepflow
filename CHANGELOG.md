@@ -8,6 +8,15 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: incorrect request resource in kafka logs [#8141](https://github.com/deepflowio/deepflow/pull/8141) by [yuanchaoa](https://github.com/yuanchaoa)
+* fix: specify the go mod version when cli verify [#8135](https://github.com/deepflowio/deepflow/pull/8135) by [jiumos](https://github.com/jiumos)
+* fix: Memory profile not outputing data [#8129](https://github.com/deepflowio/deepflow/pull/8129) by [rvql](https://github.com/rvql)
+* fix: Crash caused by UnwindEntryShard on stack [#8125](https://github.com/deepflowio/deepflow/pull/8125) by [rvql](https://github.com/rvql)
+* fix:  specify the go mod version when building the cli [#8122](https://github.com/deepflowio/deepflow/pull/8122) by [jiumos](https://github.com/jiumos)
+* fix: Fix DWARF config on unsupported systems and tracer restart [#8118](https://github.com/deepflowio/deepflow/pull/8118) by [rvql](https://github.com/rvql)
+* fix: agent - eBPF Fix the calculation of total process time [#8117](https://github.com/deepflowio/deepflow/pull/8117) by [yinjiping](https://github.com/yinjiping)
+* fix: querier TopK supporrt resource_id [#8104](https://github.com/deepflowio/deepflow/pull/8104) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: remove unnecessary restart for ebpf collector [#8101](https://github.com/deepflowio/deepflow/pull/8101) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: Bad event type for offcpu profile [#8078](https://github.com/deepflowio/deepflow/pull/8078) by [rvql](https://github.com/rvql)
 * fix: agent command panic [#8071](https://github.com/deepflowio/deepflow/pull/8071) by [roryye](https://github.com/roryye)
 * fix: clickhouse disk monitoring failure [#8069](https://github.com/deepflowio/deepflow/pull/8069) by [lzf575](https://github.com/lzf575)
@@ -182,6 +191,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: support free OS memory at intervals [#8091](https://github.com/deepflowio/deepflow/pull/8091) by [lzf575](https://github.com/lzf575)
+* feat: support profile data compressed by agent [#8088](https://github.com/deepflowio/deepflow/pull/8088) by [taloric](https://github.com/taloric)
+* feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8102](https://github.com/deepflowio/deepflow/pull/8102) by [yinjiping](https://github.com/yinjiping)
+* feat: support profile data compression when sending [#8094](https://github.com/deepflowio/deepflow/pull/8094) by [lzf575](https://github.com/lzf575)
 * feat: Allow changing memory profile report interval [#8076](https://github.com/deepflowio/deepflow/pull/8076) by [rvql](https://github.com/rvql)
 * feat: Rust memory profile support [#8049](https://github.com/deepflowio/deepflow/pull/8049) by [rvql](https://github.com/rvql)
 * feat: reduce clickhouse connection memory [#8045](https://github.com/deepflowio/deepflow/pull/8045) by [lzf575](https://github.com/lzf575)
@@ -378,6 +391,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: update cli [#8134](https://github.com/deepflowio/deepflow/pull/8134) by [lzf575](https://github.com/lzf575)
 * refactor: remove unused sql [#7656](https://github.com/deepflowio/deepflow/pull/7656) by [roryye](https://github.com/roryye)
 * refactor: Adjust agent profile configurations [#7918](https://github.com/deepflowio/deepflow/pull/7918) by [rvql](https://github.com/rvql)
 * refactor: update trace_tree debug info [#7915](https://github.com/deepflowio/deepflow/pull/7915) by [lzf575](https://github.com/lzf575)
@@ -422,6 +436,8 @@
 
 
 #### OTHER
+* Update typo in comments [#8127](https://github.com/deepflowio/deepflow/pull/8127) by [Hyzhou](https://github.com/Hyzhou)
+* Cmbc [#8098](https://github.com/deepflowio/deepflow/pull/8098) by [rvql](https://github.com/rvql)
 * Update the description of `status` in l4_flow_log. [#8036](https://github.com/deepflowio/deepflow/pull/8036) by [deepflow-lifei](https://github.com/deepflow-lifei)
 * Relaxing regular expression restrictions for the ClusterID [#7907](https://github.com/deepflowio/deepflow/pull/7907) by [Hyzhou](https://github.com/Hyzhou)
 * use .env to config docker-compose.yaml [#7729](https://github.com/deepflowio/deepflow/pull/7729) by [asdfsx](https://github.com/asdfsx)
