@@ -7,6 +7,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF fix errors caused by java_syms_update_tasks_head [#8147](https://github.com/deepflowio/deepflow/pull/8147) by [yinjiping](https://github.com/yinjiping)
+* fix: dispatcher pipelines is empty [#8001](https://github.com/deepflowio/deepflow/pull/8001) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: add log to agent remote command [#7521](https://github.com/deepflowio/deepflow/pull/7521) by [roryye](https://github.com/roryye)
 * fix: Do not verify dynamic tags [#7505](https://github.com/deepflowio/deepflow/pull/7505) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - eBPF Continuous Java profiling support for linux 3.10 [#7485](https://github.com/deepflowio/deepflow/pull/7485) by [yinjiping](https://github.com/yinjiping)
@@ -57,6 +59,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: default genesis sync vpc name [#8133](https://github.com/deepflowio/deepflow/pull/8133) by [askyrie](https://github.com/askyrie)
 * feat: agent - support server port [#7518](https://github.com/deepflowio/deepflow/pull/7518) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent adds the CommandParam fields, modifies the param validation method [#7516](https://github.com/deepflowio/deepflow/pull/7516) by [TomatoMr](https://github.com/TomatoMr)
 * feat: agent - eBPF Persist Java symbol table [#7325](https://github.com/deepflowio/deepflow/pull/7325) by [yinjiping](https://github.com/yinjiping)
