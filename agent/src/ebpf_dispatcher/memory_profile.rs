@@ -15,7 +15,7 @@
  */
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     ffi::CStr,
     slice,
     sync::{
@@ -37,15 +37,21 @@ use crate::integration_collector::Profile;
 
 const QUEUE_BATCH_SIZE: usize = 1024;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq)]
 struct AllocInfo {
     stack_id: u32,
     size: u64,
 }
 
 #[derive(Debug, Default)]
+struct AddressRecord {
+    allocs: VecDeque<AllocInfo>,
+    frees: usize,
+}
+
+#[derive(Debug, Default)]
 struct ProcessAllocInfo {
-    allocated_addrs: HashMap<u64, AllocInfo>, // map of allocated address and stack id
+    allocated_addrs: HashMap<u64, AddressRecord>,
 
     alloc: HashMap<u32, metric::Profile>, // allocs between report interval
     in_use: HashMap<u32, metric::Profile>,
@@ -67,7 +73,7 @@ impl ProcessAllocInfo {
             profile.process_name = string_from_null_terminated_c_str(data.process_name.as_ptr());
             profile.u_stack_id = data.u_stack_id;
             profile.cpu = data.cpu;
-            profile.wide_count = data.count;
+            profile.wide_count = 0;
             profile.data =
                 slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
                     .to_vec();
@@ -89,37 +95,74 @@ impl ProcessAllocInfo {
     }
 
     unsafe fn update(&mut self, data: &ebpf::stack_profile_data) {
+        // Memory allocations and frees may come in any order in a multi-core envrionment.
+        // Make best effort to handle such situation.
         if data.count == 0 {
             // frees
-            if let Some(info) = self.allocated_addrs.remove(&data.mem_addr) {
-                if let Some(p) = self.in_use.get_mut(&info.stack_id) {
-                    if p.wide_count > info.size as u64 {
-                        p.wide_count -= info.size as u64;
-                    } else {
-                        self.in_use.remove(&info.stack_id);
+            if let Some(info) = self.allocated_addrs.get_mut(&data.mem_addr) {
+                if let Some(allocated) = info.allocs.pop_front() {
+                    if let Some(p) = self.in_use.get_mut(&allocated.stack_id) {
+                        if p.wide_count > allocated.size as u64 {
+                            p.wide_count -= allocated.size as u64;
+                        } else {
+                            self.in_use.remove(&allocated.stack_id);
+                        }
                     }
+                    if info.allocs.is_empty() {
+                        assert_eq!(info.frees, 0);
+                        self.allocated_addrs.remove(&data.mem_addr);
+                    }
+                } else {
+                    // out of order free without corresponding alloc, add free count
+                    info.frees += 1;
                 }
             } else {
-                debug!("allocated addr {} not found, ignored", data.mem_addr);
+                self.allocated_addrs.insert(
+                    data.mem_addr,
+                    AddressRecord {
+                        allocs: VecDeque::new(),
+                        frees: 1,
+                    },
+                );
             }
         } else {
             // allocs
-            if self.allocated_addrs.get(&data.mem_addr).is_some() {
-                debug!("allocated addr {} already exists, ignored", data.mem_addr);
+            Self::update_stack(&mut self.alloc, data, false);
+            // for languages without free (i.e. JAVA), not recording in_use info, only allocs
+            if data.mem_addr == 0 {
                 return;
             }
-            // for languages without free (i.e. JAVA), not recording in_use info, only allocs
-            if data.mem_addr != 0 {
-                self.allocated_addrs.insert(
-                    data.mem_addr,
-                    AllocInfo {
+
+            if let Some(info) = self.allocated_addrs.get_mut(&data.mem_addr) {
+                if info.frees != 0 {
+                    // recorded free before any allocs, decrease free count
+                    info.frees -= 1;
+                    if info.frees == 0 {
+                        assert!(info.allocs.is_empty());
+                        self.allocated_addrs.remove(&data.mem_addr);
+                    }
+                } else {
+                    // multiple allocs without frees
+                    // unordered allocations will make in_use value inaccurate, but there's no easy fix at the moment
+                    info.allocs.push_back(AllocInfo {
                         stack_id: data.u_stack_id,
                         size: data.count,
+                    });
+                    Self::update_stack(&mut self.in_use, data, true);
+                }
+            } else {
+                self.allocated_addrs.insert(
+                    data.mem_addr,
+                    AddressRecord {
+                        allocs: VecDeque::from([AllocInfo {
+                            stack_id: data.u_stack_id,
+                            size: data.count,
+                        }]),
+                        frees: 0,
                     },
                 );
                 Self::update_stack(&mut self.in_use, data, true);
             }
-            Self::update_stack(&mut self.alloc, data, false);
         }
     }
 }
@@ -252,5 +295,179 @@ impl MemoryContextSettings {
     pub fn set_report_interval(&self, interval: Duration) {
         self.report_interval_secs
             .store(interval.as_secs() as u8, Ordering::Relaxed);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::ebpf;
+
+    struct AllocData {
+        stack_id: u32,
+        addr: u64,
+        size: u64,
+    }
+
+    impl ProcessAllocInfo {
+        fn update_alloc_data(&mut self, data: AllocData) {
+            let mut buf = [0u8; 0];
+            unsafe {
+                self.update(&ebpf::stack_profile_data {
+                    u_stack_id: data.stack_id,
+                    mem_addr: data.addr,
+                    count: data.size,
+
+                    profiler_type: 0,
+                    timestamp: 0,
+                    pid: 0,
+                    tid: 0,
+                    stime: 0,
+                    netns_id: 0,
+                    k_stack_id: 0,
+                    cpu: 0,
+                    comm: [0; ebpf::PACKET_KNAME_MAX_PADDING + 1],
+                    process_name: [0; ebpf::PACKET_KNAME_MAX_PADDING + 1],
+                    container_id: [0; ebpf::CONTAINER_ID_SIZE],
+                    stack_data_len: 0,
+                    stack_data: buf.as_mut_ptr() as *mut libc::c_char,
+                });
+            }
+        }
+    }
+
+    #[test]
+    fn normal_alloc_free() {
+        let mut info = ProcessAllocInfo::default();
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdead,
+            size: 0xc0de,
+        });
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xbeef,
+            size: 0xc0de,
+        });
+
+        assert_eq!(
+            info.allocated_addrs
+                .get(&0xdead)
+                .and_then(|r| r.allocs.front())
+                .unwrap(),
+            &AllocInfo {
+                stack_id: 0x1234,
+                size: 0xc0de
+            }
+        );
+        assert_eq!(info.in_use.get(&0x1234).unwrap().wide_count, 2 * 0xc0de);
+
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdead,
+            size: 0,
+        });
+
+        assert!(info.allocated_addrs.get(&0xdead).is_none());
+        assert_eq!(info.in_use.get(&0x1234).unwrap().wide_count, 0xc0de);
+
+        info.update_alloc_data(AllocData {
+            stack_id: 0x4321,
+            addr: 0xbeef,
+            size: 0,
+        });
+
+        assert!(info.allocated_addrs.get(&0xbeef).is_none());
+        assert_eq!(info.in_use.get(&0x1234), None);
+    }
+
+    #[test]
+    fn unordered_alloc_free() {
+        let mut info = ProcessAllocInfo::default();
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdeadbeef,
+            size: 0xc0de,
+        });
+        // alloc at same address
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdeadbeef,
+            size: 0xc0dec0de,
+        });
+
+        assert_eq!(
+            info.allocated_addrs
+                .get(&0xdeadbeef)
+                .and_then(|r| r.allocs.get(0))
+                .unwrap(),
+            &AllocInfo {
+                stack_id: 0x1234,
+                size: 0xc0de
+            }
+        );
+        assert_eq!(
+            info.allocated_addrs
+                .get(&0xdeadbeef)
+                .and_then(|r| r.allocs.get(1))
+                .unwrap(),
+            &AllocInfo {
+                stack_id: 0x1234,
+                size: 0xc0dec0de
+            }
+        );
+        assert_eq!(
+            info.in_use.get(&0x1234).unwrap().wide_count,
+            0xc0de + 0xc0dec0de
+        );
+
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdeadbeef,
+            size: 0,
+        });
+
+        assert_eq!(
+            info.allocated_addrs
+                .get(&0xdeadbeef)
+                .and_then(|r| r.allocs.get(0))
+                .unwrap(),
+            &AllocInfo {
+                stack_id: 0x1234,
+                size: 0xc0dec0de
+            }
+        );
+        assert_eq!(info.in_use.get(&0x1234).unwrap().wide_count, 0xc0dec0de);
+
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdeadbeef,
+            size: 0,
+        });
+        // one more free
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdeadbeef,
+            size: 0,
+        });
+
+        assert!(info
+            .allocated_addrs
+            .get(&0xdeadbeef)
+            .unwrap()
+            .allocs
+            .is_empty());
+        assert_eq!(info.allocated_addrs.get(&0xdeadbeef).unwrap().frees, 1);
+        assert_eq!(info.in_use.get(&0x1234), None);
+
+        info.update_alloc_data(AllocData {
+            stack_id: 0x1234,
+            addr: 0xdeadbeef,
+            size: 0xc0dec0de,
+        });
+
+        assert!(info.allocated_addrs.get(&0xdeadbeef).is_none());
+        assert_eq!(info.in_use.get(&0x1234), None);
     }
 }
