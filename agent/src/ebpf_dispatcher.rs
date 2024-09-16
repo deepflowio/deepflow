@@ -534,7 +534,7 @@ impl EbpfCollector {
                 let Some(m_ctx) = (ctx as *mut memory_profile::MemoryContext).as_mut() else {
                     return;
                 };
-                m_ctx.update(data);
+                m_ctx.update(data, PROFILE_STACK_COMPRESSION);
                 m_ctx.report(
                     Duration::from_nanos(ts_nanos),
                     EBPF_PROFILE_SENDER.as_mut().unwrap(),
