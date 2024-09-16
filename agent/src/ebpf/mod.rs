@@ -489,7 +489,7 @@ extern "C" {
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
     /*
      * @brief Add regex-matched process list for feature.
-     * 
+     *
      * @param feature Refers to a specific feature module, value: FEATURE_*
      * @param pids Address of the process list
      * @param num Number of elements in the process list
