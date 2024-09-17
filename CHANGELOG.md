@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: memory profile data cannot be compressed [#8155](https://github.com/deepflowio/deepflow/pull/8155) by [lzf575](https://github.com/lzf575)
 * fix: dispatcher pipelines is empty [#8146](https://github.com/deepflowio/deepflow/pull/8146) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - eBPF fix errors caused by java_syms_update_tasks_head [#8145](https://github.com/deepflowio/deepflow/pull/8145) by [yinjiping](https://github.com/yinjiping)
 * fix: querier data visibility filter error [#8139](https://github.com/deepflowio/deepflow/pull/8139) by [xiaochaoren1](https://github.com/xiaochaoren1)
