@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: memory profile feature compile failed [#8157](https://github.com/deepflowio/deepflow/pull/8157) by [lzf575](https://github.com/lzf575)
 * fix: memory profile data cannot be compressed [#8155](https://github.com/deepflowio/deepflow/pull/8155) by [lzf575](https://github.com/lzf575)
 * fix: dispatcher pipelines is empty [#8146](https://github.com/deepflowio/deepflow/pull/8146) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent - eBPF fix errors caused by java_syms_update_tasks_head [#8145](https://github.com/deepflowio/deepflow/pull/8145) by [yinjiping](https://github.com/yinjiping)
@@ -398,6 +399,9 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: Remove extended proc event handler [#8161](https://github.com/deepflowio/deepflow/pull/8161) by [rvql](https://github.com/rvql)
+* refactor: Remove old profiler regex [#8158](https://github.com/deepflowio/deepflow/pull/8158) by [rvql](https://github.com/rvql)
+* refactor: agent adds a disable_cgroups option [#8140](https://github.com/deepflowio/deepflow/pull/8140) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: update cli [#8134](https://github.com/deepflowio/deepflow/pull/8134) by [lzf575](https://github.com/lzf575)
 * refactor: remove unused sql [#7656](https://github.com/deepflowio/deepflow/pull/7656) by [roryye](https://github.com/roryye)
 * refactor: Adjust agent profile configurations [#7918](https://github.com/deepflowio/deepflow/pull/7918) by [rvql](https://github.com/rvql)
