@@ -39,13 +39,6 @@ int __attribute__ ((weak)) extended_maps_set(struct bpf_tracer *tracer)
 void __attribute__ ((weak)) extended_prog_jump_tables(struct bpf_tracer *tracer) {
 }
 
-int __attribute__ ((weak)) extended_proc_event_handler(int pid,
-						       const char *name,
-						       enum proc_act_type type)
-{
-	return 0;
-}
-
 int __attribute__ ((weak)) collect_extended_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 {
 	return 0;
