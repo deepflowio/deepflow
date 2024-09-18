@@ -99,3 +99,7 @@
 
 #### Testing
 * chore: use the latest go version to build server/cli [#7235](https://github.com/deepflowio/deepflow/pull/7235) by [zhangzujian](https://github.com/zhangzujian)
+
+
+#### Refactoring
+* refactor: agent adds a disable_cgroups option [#8159](https://github.com/deepflowio/deepflow/pull/8159) by [TomatoMr](https://github.com/TomatoMr)
