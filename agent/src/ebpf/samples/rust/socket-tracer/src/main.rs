@@ -637,7 +637,8 @@ fn main() {
         //    ::std::process::exit(1);
         //}
 
-        //set_profiler_regex(
+        //set_feature_regex(
+        //    ebpf::FEATURE_PROFILE_ONCPU,
         //    CString::new(
         //        "^(java|nginx|profiler|telegraf|mysqld|.*deepflow.*|socket_tracer)$".as_bytes(),
         //    )

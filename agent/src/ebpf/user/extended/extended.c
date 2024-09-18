@@ -59,7 +59,7 @@ void __attribute__ ((weak)) extended_process_exit(int pid) {}
 
 void __attribute__ ((weak)) extended_match_pid_handle(int feat, int pid, enum match_pids_act act) {}
 
-bool __attribute__ ((weak)) extended_require_dwarf(int pid, const char *name)
+bool __attribute__ ((weak)) extended_require_dwarf(int pid, const char *path)
 {
 	return false;
 }

@@ -83,8 +83,8 @@ void extended_match_pid_handle(int feat, int pid, enum match_pids_act act);
 /**
  * @brief **extended_requires_dwarf()** whether extended profilers require DWARF unwinding
  * @param pid Process ID
- * @param name Process executable name
+ * @param name Process executable path
  */
-bool extended_require_dwarf(int pid, const char *name);
+bool extended_require_dwarf(int pid, const char *path);
 
 #endif /* DF_EXTENDED_H */

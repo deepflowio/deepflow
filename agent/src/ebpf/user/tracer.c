@@ -38,6 +38,7 @@
 #include "elf.h"
 #include "load.h"
 #include "mem.h"
+#include "unwind_tracer.h"
 #include "extended/extended.h"
 
 uint32_t k_version;
@@ -1707,6 +1708,10 @@ int set_feature_regex(int feature, const char *pattern)
 	}
 
 	cfg_feature_regex_array[feature].ok = true;
+
+	if (feature == FEATURE_PROFILE_ONCPU || feature == FEATURE_PROFILE_OFFCPU || feature == FEATURE_PROFILE_MEMORY) {
+		unwind_process_reload();
+	}
 	return 0;
 }
 

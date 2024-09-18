@@ -842,7 +842,8 @@ impl EbpfCollector {
             }
 
             if !on_cpu.disabled {
-                ebpf::set_profiler_regex(
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_PROFILE_ONCPU,
                     CString::new(on_cpu.regex.as_bytes())
                         .unwrap()
                         .as_c_str()
@@ -856,7 +857,8 @@ impl EbpfCollector {
             #[cfg(feature = "extended_profile")]
             {
                 if !off_cpu.disabled {
-                    ebpf::set_offcpu_profiler_regex(
+                    ebpf::set_feature_regex(
+                        ebpf::FEATURE_PROFILE_OFFCPU,
                         CString::new(off_cpu.regex.as_bytes())
                             .unwrap()
                             .as_c_str()
@@ -868,7 +870,8 @@ impl EbpfCollector {
                 }
 
                 if !memory.disabled {
-                    ebpf::set_memory_profiler_regex(
+                    ebpf::set_feature_regex(
+                        ebpf::FEATURE_PROFILE_MEMORY,
                         CString::new(memory.regex.as_bytes())
                             .unwrap()
                             .as_c_str()

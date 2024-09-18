@@ -523,10 +523,6 @@ int stop_continuous_profiler(void *cb_ctx[PROFILER_CTX_NUM])
 
 	u64 alloc_b, free_b;
 	get_mem_stat(&alloc_b, &free_b);
-	if (oncpu_ctx.regex_existed) {
-		regfree(&oncpu_ctx.profiler_regex);
-		oncpu_ctx.regex_existed = false;
-	}
 
 	ebpf_info(LOG_CP_TAG "== alloc_b %lu bytes, free_b %lu bytes, "
 		  "use %lu bytes ==\n", alloc_b, free_b, alloc_b - free_b);
@@ -876,48 +872,6 @@ void release_flame_graph_hash(void)
 		  flame_graph_start_time, flame_graph_end_time);
 }
 
-/*
- * To set the regex matching for the profiler. 
- *
- * @pattern : Regular expression pattern. e.g. "^(java|nginx|.*ser.*)$"
- * @returns 0 on success, < 0 on error
- */
-int set_profiler_regex(const char *pattern)
-{
-	if (profiler_tracer == NULL) {
-		ebpf_warning(LOG_CP_TAG
-			     "The 'profiler_tracer' has not been created yet."
-			     " Please use start_continuous_profiler() to create it first.\n");
-		return (-1);
-	}
-
-	if (!g_enable_oncpu) {
-		ebpf_warning(LOG_CP_TAG
-			     "'profiler_regex' cannot be set while on-CPU is currently disabled.\n");
-		return (-1);
-	}
-
-	/*
-	 * During the data processing, the thread responsible for matching reads the
-	 * regular expression, while the thread handling the regular expression upd-
-	 * ates is different. Synchronization is implemented to ensure protection and
-	 * coordination between these two threads.
-	 */
-	profile_regex_lock(&oncpu_ctx);
-	do_profiler_regex_config(pattern, &oncpu_ctx);
-	profile_regex_unlock(&oncpu_ctx);
-
-	unwind_process_reload();
-
-	ebpf_info(LOG_CP_TAG "Set 'profiler_regex' successful, pattern : '%s'",
-		  pattern);
-	return (0);
-}
-
-bool check_oncpu_profiler_regex(const char *name) {
-	return check_profiler_regex(&oncpu_ctx, name);
-}
-
 int set_profiler_cpu_aggregation(int flag)
 {
 	if (flag != 0 && flag != 1) {
@@ -1026,18 +980,9 @@ void release_flame_graph_hash(void)
 	return;
 }
 
-int set_profiler_regex(const char *pattern)
-{
-	return (-1);
-}
-
 int set_profiler_cpu_aggregation(int flag)
 {
 	return (-1);
-}
-
-bool check_oncpu_profiler_regex(const char *name) {
-	return false;
 }
 
 struct bpf_tracer *get_profiler_tracer(void)
