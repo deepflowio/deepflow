@@ -174,16 +174,17 @@ static bool requires_dwarf_unwind_table(int pid) {
     if (path == NULL) {
         return false;
     }
-    char *exe_name = basename(path);
-    // Java has JIT compiled code without DWARF info, not supported at the moment
-    if (strcmp(exe_name, "java") == 0) {
+
+    // TBD: offcpu
+    bool need_unwind = is_feature_matched(FEATURE_PROFILE_ONCPU, pid, path) || extended_require_dwarf(pid, path);
+    if (!need_unwind) {
         free(path);
         return false;
     }
 
-    // TBD: offcpu
-    bool need_unwind = (oncpu_profiler_enabled() && check_oncpu_profiler_regex(exe_name)) || extended_require_dwarf(pid, exe_name);
-    if (!need_unwind) {
+    char *exe_name = basename(path);
+    // Java has JIT compiled code without DWARF info, not supported at the moment
+    if (strcmp(exe_name, "java") == 0) {
         free(path);
         return false;
     }

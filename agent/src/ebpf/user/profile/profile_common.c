@@ -131,7 +131,6 @@ int profiler_context_init(struct profiler_context *ctx,
 	snprintf(ctx->custom_stack_map_b.name, sizeof(ctx->custom_stack_map_b.name), "%s",
 		 custom_stack_map_name_b);
 
-	ctx->regex_existed = false;
 	ctx->only_matched_data = only_matched;
 	ctx->use_delta_time = use_delta_time;
 	ctx->type = type;
@@ -160,37 +159,6 @@ void set_bpf_run_enabled(struct bpf_tracer *t, struct profiler_context *ctx,
 
 	ebpf_info("%s%s() success, enable_flag:%d\n", ctx->tag, __func__,
 		  enable_flag);
-}
-
-int do_profiler_regex_config(const char *pattern, struct profiler_context *ctx)
-{
-	if (*pattern == '\0') {
-		ctx->regex_existed = false;
-		ebpf_warning("%sSet 'profiler_regex' pattern : '', an empty"
-			     " regular expression will not generate any stack data."
-			     "Please configure the regular expression for profiler.\n",
-			     ctx->tag);
-		return (0);
-	}
-
-	if (ctx->regex_existed) {
-		regfree(&ctx->profiler_regex);
-	}
-
-	int ret = regcomp(&ctx->profiler_regex, pattern, REG_EXTENDED);
-	if (ret != 0) {
-		char error_buffer[100];
-		regerror(ret, &ctx->profiler_regex, error_buffer,
-			 sizeof(error_buffer));
-		ebpf_warning("%sPattern %s failed to compile the regular "
-			     "expression: %s\n", ctx->tag, pattern,
-			     error_buffer);
-		ctx->regex_existed = false;
-		return (-1);
-	}
-
-	ctx->regex_existed = true;
-	return 0;
 }
 
 static bool check_kallsyms_addr_is_zero(void)
@@ -1266,34 +1234,6 @@ release_iter:
 
 	/* Push messages and free stack_trace_msg_hash */
 	push_and_release_stack_trace_msg(ctx, &ctx->msg_hash, false);
-}
-
-bool check_profiler_regex(struct profiler_context *ctx, const char *name)
-{
-	bool matched = false;
-	for (int i = 0; i < ARRAY_SIZE(g_ctx_array); i++) {
-		if (g_ctx_array[i] == NULL)
-			continue;
-
-		if (ctx != NULL && ctx->name != NULL) {
-			if (strcmp(g_ctx_array[i]->name, ctx->name))
-				continue;
-		}
-
-		if (g_ctx_array[i]->regex_existed) {
-			profile_regex_lock(g_ctx_array[i]);
-			matched =
-			    (regexec
-			     (&g_ctx_array[i]->profiler_regex, name, 0, NULL, 0)
-			     == 0);
-			profile_regex_unlock(g_ctx_array[i]);
-			if (matched) {
-				return true;
-			}
-		}
-	}
-
-	return false;
 }
 
 bool profiler_is_running(void)
