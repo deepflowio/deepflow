@@ -34,21 +34,6 @@ int extended_maps_set(struct bpf_tracer *tracer);
 void extended_prog_jump_tables(struct bpf_tracer *tracer);
 
 /**
- * @brief **extended_proc_event_handler()** extend the handling of process
- * execution and exit events.
- * @param pid Process ID
- * @param name Process name
- * @param PROC_EXEC or PROC_EXIT
- * @return 0 on success, non-zero on error
- *
- * For example, you might want to notify an eBPF program of these events
- * so that eBPF can perform the corresponding handling. Extend the handling
- * based on your own requirements.
- */
-int extended_proc_event_handler(int pid, const char *name,
-				enum proc_act_type type);
-
-/**
  * @brief **collect_extended_uprobe_syms_from_procfs()** extend the handling of uprobe
  * @param conf Tracer probes config
  * @return 0 on success, non-zero on error
