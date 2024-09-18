@@ -76,17 +76,21 @@ impl ProcessAllocInfo {
             profile.u_stack_id = data.u_stack_id;
             profile.cpu = data.cpu;
             profile.wide_count = 0;
-            profile.data =
-                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
-                    .to_vec();
+            let profile_data =
+                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize);
             if stack_compression {
-                match compress(&profile.data, 0) {
+                match compress(&profile_data, 0) {
                     Ok(compressed_data) => {
                         profile.data_compressed = true;
                         profile.data = compressed_data;
                     }
-                    Err(e) => debug!("failed to compress ebpf memory profile: {:?}", e),
+                    Err(e) => {
+                        profile_data.to_vec();
+                        debug!("failed to compress ebpf memory profile: {:?}", e);
+                    }
                 }
+            } else {
+                profile.data = profile_data.to_vec();
             }
 
             let container_id =
@@ -184,6 +188,7 @@ pub struct MemoryContext {
 
     report_interval_secs: Arc<AtomicU8>,
     last_report: Duration,
+    stack_compression: bool,
 }
 
 impl MemoryContext {
@@ -191,11 +196,12 @@ impl MemoryContext {
     // If cached stime from profiler plus THRESHOLD is smaller than start time from procfs, it's a process restart
     const PROCESS_RESTART_THRESHOLD: Duration = Duration::from_secs(3);
 
-    pub fn new(report_interval: Duration) -> Self {
+    pub fn new(report_interval: Duration, stack_compression: bool) -> Self {
         Self {
             processes: Default::default(),
             report_interval_secs: Arc::new(AtomicU8::new(report_interval.as_secs() as u8)),
             last_report: Default::default(),
+            stack_compression: stack_compression,
         }
     }
 
@@ -210,7 +216,7 @@ impl MemoryContext {
         self.processes
             .entry(data.pid)
             .or_insert(Default::default())
-            .update(data);
+            .update(data, self.stack_compression);
     }
 
     pub fn report(&mut self, timestamp: Duration, sender: &mut DebugSender<Profile>) {

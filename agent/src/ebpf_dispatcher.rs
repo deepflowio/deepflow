@@ -534,7 +534,7 @@ impl EbpfCollector {
                 let Some(m_ctx) = (ctx as *mut memory_profile::MemoryContext).as_mut() else {
                     return;
                 };
-                m_ctx.update(data, PROFILE_STACK_COMPRESSION);
+                m_ctx.update(data);
                 m_ctx.report(
                     Duration::from_nanos(ts_nanos),
                     EBPF_PROFILE_SENDER.as_mut().unwrap(),
@@ -568,20 +568,24 @@ impl EbpfCollector {
             profile.cpu = data.cpu;
             profile.count = data.count as u32;
             profile.wide_count = data.count;
-            profile.data =
-                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
-                    .to_vec();
-            let container_id =
-                CStr::from_ptr(data.container_id.as_ptr() as *const libc::c_char).to_string_lossy();
+            let profile_data =
+                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize);
             if PROFILE_STACK_COMPRESSION {
-                match compress(&profile.data, 0) {
+                match compress(&profile_data, 0) {
                     Ok(compressed_data) => {
                         profile.data_compressed = true;
                         profile.data = compressed_data;
                     }
-                    Err(e) => debug!("failed to compress ebpf profile: {:?}", e),
+                    Err(e) => {
+                        profile.data = profile_data.to_vec();
+                        debug!("failed to compress ebpf profile: {:?}", e);
+                    }
                 }
+            } else {
+                profile.data = profile_data.to_vec();
             }
+            let container_id =
+                CStr::from_ptr(data.container_id.as_ptr() as *const libc::c_char).to_string_lossy();
             if let Some(policy_getter) = POLICY_GETTER.as_ref() {
                 profile.pod_id = policy_getter.lookup_pod_id(&container_id);
             }
@@ -824,7 +828,10 @@ impl EbpfCollector {
             let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
             #[cfg(feature = "extended_profile")]
             {
-                let mp_ctx = memory_profile::MemoryContext::new(memory.report_interval);
+                let mp_ctx = memory_profile::MemoryContext::new(
+                    memory.report_interval,
+                    ebpf_conf.preprocess.stack_compression,
+                );
                 handle.memory_profile_settings = Some(mp_ctx.settings());
                 contexts[ebpf::PROFILER_CTX_MEMORY_IDX] =
                     Box::into_raw(Box::new(mp_ctx)) as *mut c_void;
