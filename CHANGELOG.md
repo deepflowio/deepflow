@@ -399,6 +399,7 @@
 * feat: server directly reports metrics of load1_by_cpu_num that can be used for alert [#7088](https://github.com/deepflowio/deepflow/pull/7088) by [lzf575](https://github.com/lzf575)
 
 #### Refactoring
+* refactor: agent adds the 'disabled-cgroups' configuration. [#8164](https://github.com/deepflowio/deepflow/pull/8164) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: Remove extended proc event handler [#8161](https://github.com/deepflowio/deepflow/pull/8161) by [rvql](https://github.com/rvql)
 * refactor: Remove old profiler regex [#8158](https://github.com/deepflowio/deepflow/pull/8158) by [rvql](https://github.com/rvql)
 * refactor: agent adds a disable_cgroups option [#8140](https://github.com/deepflowio/deepflow/pull/8140) by [TomatoMr](https://github.com/TomatoMr)
