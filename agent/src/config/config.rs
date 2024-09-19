@@ -124,6 +124,7 @@ pub struct Config {
     #[cfg(target_os = "linux")]
     pub pid_file: String,
     pub team_id: String,
+    pub cgroups_disabled: bool,
 }
 
 impl Config {
@@ -274,6 +275,7 @@ impl Default for Config {
             #[cfg(target_os = "linux")]
             pid_file: Default::default(),
             team_id: "".into(),
+            cgroups_disabled: false,
         }
     }
 }

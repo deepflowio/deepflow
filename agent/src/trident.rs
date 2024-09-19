@@ -242,7 +242,7 @@ impl Trident {
         version_info: &'static VersionInfo,
         agent_mode: RunningMode,
         sidecar_mode: bool,
-        disable_cgroups: bool,
+        cgroups_disabled: bool,
     ) -> Result<Trident> {
         let config = match agent_mode {
             RunningMode::Managed => {
@@ -290,6 +290,7 @@ impl Trident {
         let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac);
 
         let config = &config_handler.static_config;
+        let cgroups_disabled = cgroups_disabled || config.cgroups_disabled;
         let hostname = match config.override_os_hostname.as_ref() {
             Some(name) => name.to_owned(),
             None => get_hostname().unwrap_or("Unknown".to_string()),
@@ -405,7 +406,7 @@ impl Trident {
                 exception_handler,
                 config_path,
                 sidecar_mode,
-                disable_cgroups,
+                cgroups_disabled,
                 ntp_diff,
             ) {
                 warn!(
@@ -434,7 +435,7 @@ impl Trident {
         exception_handler: ExceptionHandler,
         config_path: Option<PathBuf>,
         sidecar_mode: bool,
-        disable_cgroups: bool,
+        cgroups_disabled: bool,
         ntp_diff: Arc<AtomicI64>,
     ) -> Result<()> {
         info!("==================== Launching DeepFlow-Agent ====================");
@@ -586,7 +587,7 @@ impl Trident {
         } else if !is_kernel_available_for_cgroups() {
             // fixme: Linux after kernel version 2.6.24 can use cgroups
             info!("don't initialize cgroups controller, because kernel version < 3 or agent is in Windows");
-        } else if disable_cgroups {
+        } else if cgroups_disabled {
             info!("don't initialize cgroups controller, disable cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits");
         } else {
             match Cgroups::new(process::id() as u64, config_handler.environment()) {
@@ -615,7 +616,7 @@ impl Trident {
                 .candidate_config
                 .yaml_config
                 .memory_trim_disabled,
-            disable_cgroups,
+            cgroups_disabled,
         ) {
             Ok(g) => g,
             Err(e) => {
