@@ -140,7 +140,7 @@ pub struct Guard {
     memory_trim_disabled: bool,
     system: Arc<Mutex<System>>,
     pid: Pid,
-    disable_cgroups: bool,
+    cgroups_disabled: bool,
 }
 
 impl Guard {
@@ -151,7 +151,7 @@ impl Guard {
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
         memory_trim_disabled: bool,
-        disable_cgroups: bool,
+        cgroups_disabled: bool,
     ) -> Result<Self, &'static str> {
         let Ok(pid) = get_current_pid() else {
             return Err("get the process' pid failed: {}, deepflow-agent restart...");
@@ -167,7 +167,7 @@ impl Guard {
             memory_trim_disabled,
             system: Arc::new(Mutex::new(System::new())),
             pid,
-            disable_cgroups,
+            cgroups_disabled,
         })
     }
 
@@ -293,7 +293,7 @@ impl Guard {
         let pid: Pid = self.pid.clone();
         let cgroups_available = is_kernel_available_for_cgroups();
         let in_container = running_in_container();
-        let disable_cgroups = self.disable_cgroups;
+        let cgroups_disabled = self.cgroups_disabled;
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
@@ -331,7 +331,7 @@ impl Guard {
                 }
                 // If it is in a container or tap_mode is Analyzer, there is no need to limit resource, so there is no need to check cgroups
                 if !in_container && config.tap_mode != TapMode::Analyzer {
-                    if cgroups_available && !disable_cgroups {
+                    if cgroups_available && !cgroups_disabled {
                         if check_cgroup_result {
                             check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
                             if !check_cgroup_result {
