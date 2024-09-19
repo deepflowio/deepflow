@@ -123,6 +123,7 @@ pub struct Config {
     pub agent_unique_identifier: AgentIdType,
     #[cfg(target_os = "linux")]
     pub pid_file: String,
+    pub cgroups_disabled: bool,
 }
 
 impl Config {
@@ -277,6 +278,7 @@ impl Default for Config {
             agent_unique_identifier: Default::default(),
             #[cfg(target_os = "linux")]
             pid_file: Default::default(),
+            cgroups_disabled: false,
         }
     }
 }

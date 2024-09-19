@@ -45,3 +45,6 @@ controller-ips:
 ## Pid file path, defaults to ""
 ## Will create pid file in the path if specified.
 #pid-file:
+
+## Disabled cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits
+#cgroups-disabled: false
