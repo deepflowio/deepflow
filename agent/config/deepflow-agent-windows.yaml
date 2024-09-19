@@ -43,3 +43,6 @@ controller-ips:
 
 ## Type of agent identifier, choose from [ip-and-mac, ip], defaults to "ip-and-mac"
 #agent-unique-identifier: ip-and-mac
+
+## Disabled cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits
+#cgroups-disabled: false
