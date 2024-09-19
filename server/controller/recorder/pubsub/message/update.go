@@ -47,18 +47,27 @@ func (k *Key) GetLcuuid() string {
 }
 
 type Fields[T any] struct {
-	data *T
+	structData *T
+	mapData    map[string]interface{}
 }
 
 func (f *Fields[T]) SetFields(data interface{}) {
-	f.data = data.(*T)
+	f.structData = data.(*T)
 }
 
 func (f *Fields[T]) GetFields() interface{} {
-	return f.data
+	return f.structData
 }
 
-type fieldDetail[T any] struct {
+func (f *Fields[T]) SetFieldsMap(data map[string]interface{}) {
+	f.mapData = data
+}
+
+func (f *Fields[T]) GetFieldsMap() map[string]interface{} {
+	return f.mapData
+}
+
+type fieldDetail[T any] struct { // TODO add name
 	different bool
 	new       T
 	old       T
@@ -102,20 +111,20 @@ type MySQLData[MT constraint.MySQLModel] struct {
 	old *MT
 }
 
-func (m *MySQLData[MT]) GetNewMySQL() *MT {
+func (m *MySQLData[MT]) GetNewMySQL() interface{} {
 	return m.new
 }
 
-func (m *MySQLData[MT]) SetNewMySQL(new *MT) {
-	m.new = new
+func (m *MySQLData[MT]) SetNewMySQL(new interface{}) {
+	m.new = new.(*MT)
 }
 
-func (m *MySQLData[MT]) GetOldMySQL() *MT {
+func (m *MySQLData[MT]) GetOldMySQL() interface{} {
 	return m.old
 }
 
-func (m *MySQLData[MT]) SetOldMySQL(old *MT) {
-	m.old = old
+func (m *MySQLData[MT]) SetOldMySQL(old interface{}) {
+	m.old = old.(*MT)
 }
 
 type DiffBase[DT constraint.DiffBase] struct {
@@ -338,6 +347,7 @@ type VInterfaceFieldsUpdate struct {
 	Name          fieldDetail[string]
 	TapMac        fieldDetail[string]
 	Type          fieldDetail[int]
+	DeviceID      fieldDetail[int]
 	NetnsID       fieldDetail[uint32]
 	VTapID        fieldDetail[uint32]
 	NetworkID     fieldDetail[int]
@@ -743,6 +753,8 @@ type ProcessFieldsUpdate struct {
 	Key
 	Name        fieldDetail[string]
 	ContainerID fieldDetail[string]
+	DeviceType  fieldDetail[int]
+	DeviceID    fieldDetail[int]
 	OSAPPTags   fieldDetail[string]
 	VMID        fieldDetail[int]
 	VPCID       fieldDetail[int]

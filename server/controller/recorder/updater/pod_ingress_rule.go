@@ -59,12 +59,13 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			wholeCache,
-			db.NewPodIngressRule().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodIngressRule(),
 			wholeCache.DiffBaseDataSet.PodIngressRules,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -96,6 +97,15 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 }
 
 // 保留接口
+func (r *PodIngressRule) getUpdateableFields() []string {
+	return nil
+}
+
+// 保留接口
 func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (*message.PodIngressRuleFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
+}
+
+// 保留接口
+func (r *PodIngressRule) setUpdatedFields(dbItem *mysqlmodel.PodIngressRule, updateInfo *message.PodIngressRuleFieldsUpdate) {
 }

@@ -60,12 +60,13 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 		](
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			wholeCache,
-			db.NewVRouter().SetMetadata(wholeCache.GetMetadata()),
+			db.NewVRouter(),
 			wholeCache.DiffBaseDataSet.VRouters,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -94,6 +95,10 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysqlmode
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
+}
+
+func (r *VRouter) getUpdateableFields() []string {
+	return []string{"epc_id", "name", "label", "region"}
 }
 
 func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (*message.VRouterFieldsUpdate, map[string]interface{}, bool) {
@@ -126,4 +131,19 @@ func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *clou
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (r *VRouter) setUpdatedFields(dbItem *mysqlmodel.VRouter, updateInfo *message.VRouterFieldsUpdate) {
+	if updateInfo.VPCID.IsDifferent() {
+		dbItem.VPCID = updateInfo.VPCID.GetNew()
+	}
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
 }

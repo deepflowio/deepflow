@@ -59,12 +59,13 @@ func NewRegion(wholeCache *cache.Cache, cloudData []cloudmodel.Region) *Region {
 		](
 			ctrlrcommon.RESOURCE_TYPE_REGION_EN,
 			wholeCache,
-			db.NewRegion().SetMetadata(wholeCache.GetMetadata()),
+			db.NewRegion(),
 			wholeCache.DiffBaseDataSet.Regions,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -82,6 +83,10 @@ func (r *Region) generateDBItemToAdd(cloudItem *cloudmodel.Region) (*mysqlmodel.
 	return dbItem, true
 }
 
+func (r *Region) getUpdateableFields() []string {
+	return []string{"name", "label"}
+}
+
 func (r *Region) generateUpdateInfo(diffBase *diffbase.Region, cloudItem *cloudmodel.Region) (*message.RegionFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RegionFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -95,4 +100,13 @@ func (r *Region) generateUpdateInfo(diffBase *diffbase.Region, cloudItem *cloudm
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (r *Region) setUpdatedFields(dbItem *mysqlmodel.Region, updateInfo *message.RegionFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
 }

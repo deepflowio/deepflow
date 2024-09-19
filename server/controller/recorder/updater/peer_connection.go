@@ -59,12 +59,13 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		](
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			wholeCache,
-			db.NewPeerConnection().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPeerConnection(),
 			wholeCache.DiffBaseDataSet.PeerConnections,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -119,6 +120,10 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	return dbItem, true
 }
 
+func (c *PeerConnection) getUpdateableFields() []string {
+	return []string{"name", "remote_region_id", "local_region_id"}
+}
+
 func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (*message.PeerConnectionFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PeerConnectionFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -154,4 +159,16 @@ func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, c
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (c *PeerConnection) setUpdatedFields(dbItem *mysqlmodel.PeerConnection, updateInfo *message.PeerConnectionFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.RemoteRegionID.IsDifferent() {
+		dbItem.RemoteRegionID = updateInfo.RemoteRegionID.GetNew()
+	}
+	if updateInfo.LocalRegionID.IsDifferent() {
+		dbItem.LocalRegionID = updateInfo.LocalRegionID.GetNew()
+	}
 }

@@ -59,12 +59,13 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			wholeCache,
-			db.NewPodNode().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodNode(),
 			wholeCache.DiffBaseDataSet.PodNodes,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -110,6 +111,10 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*mysqlmode
 	return dbItem, true
 }
 
+func (n *PodNode) getUpdateableFields() []string {
+	return []string{"type", "hostname", "ip", "state", "region", "az", "vcpu_num", "mem_total"}
+}
+
 func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *cloudmodel.PodNode) (*message.PodNodeFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodNodeFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -147,4 +152,31 @@ func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *clou
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (n *PodNode) setUpdatedFields(dbItem *mysqlmodel.PodNode, updateInfo *message.PodNodeFieldsUpdate) {
+	if updateInfo.Type.IsDifferent() {
+		dbItem.Type = updateInfo.Type.GetNew()
+	}
+	if updateInfo.Hostname.IsDifferent() {
+		dbItem.Hostname = updateInfo.Hostname.GetNew()
+	}
+	if updateInfo.IP.IsDifferent() {
+		dbItem.IP = updateInfo.IP.GetNew()
+	}
+	if updateInfo.State.IsDifferent() {
+		dbItem.State = updateInfo.State.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
+	if updateInfo.VCPUNum.IsDifferent() {
+		dbItem.VCPUNum = updateInfo.VCPUNum.GetNew()
+	}
+	if updateInfo.MemTotal.IsDifferent() {
+		dbItem.MemTotal = updateInfo.MemTotal.GetNew()
+	}
 }

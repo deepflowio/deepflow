@@ -62,12 +62,13 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,
-			db.NewVM().SetMetadata(wholeCache.GetMetadata()),
+			db.NewVM(),
 			wholeCache.DiffBaseDataSet.VMs,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -114,6 +115,10 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool
 		dbItem.CreatedAt = cloudItem.CreatedAt
 	}
 	return dbItem, true
+}
+
+func (m *VM) getUpdateableFields() []string {
+	return []string{"epc_id", "name", "label", "ip", "hostname", "state", "htype", "launch_server", "host_id", "region", "az", "cloud_tags"}
 }
 
 func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (*message.VMFieldsUpdate, map[string]interface{}, bool) {
@@ -186,4 +191,43 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (m *VM) setUpdatedFields(dbItem *mysqlmodel.VM, updateInfo *message.VMFieldsUpdate) {
+	if updateInfo.VPCID.IsDifferent() {
+		dbItem.VPCID = updateInfo.VPCID.GetNew()
+	}
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.IP.IsDifferent() {
+		dbItem.IP = updateInfo.IP.GetNew()
+	}
+	if updateInfo.Hostname.IsDifferent() {
+		dbItem.Hostname = updateInfo.Hostname.GetNew()
+	}
+	if updateInfo.State.IsDifferent() {
+		dbItem.State = updateInfo.State.GetNew()
+	}
+	if updateInfo.HType.IsDifferent() {
+		dbItem.HType = updateInfo.HType.GetNew()
+	}
+	if updateInfo.LaunchServer.IsDifferent() {
+		dbItem.LaunchServer = updateInfo.LaunchServer.GetNew()
+	}
+	if updateInfo.HostID.IsDifferent() {
+		dbItem.HostID = updateInfo.HostID.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
+	if updateInfo.CloudTags.IsDifferent() {
+		dbItem.CloudTags = updateInfo.CloudTags.GetNew()
+	}
 }

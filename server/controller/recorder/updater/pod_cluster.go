@@ -59,12 +59,13 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN,
 			wholeCache,
-			db.NewPodCluster().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodCluster(),
 			wholeCache.DiffBaseDataSet.PodClusters,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -96,6 +97,10 @@ func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*mys
 	return dbItem, true
 }
 
+func (c *PodCluster) getUpdateableFields() []string {
+	return []string{"name", "cluster_name", "region"}
+}
+
 func (c *PodCluster) generateUpdateInfo(diffBase *diffbase.PodCluster, cloudItem *cloudmodel.PodCluster) (*message.PodClusterFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodClusterFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -117,4 +122,19 @@ func (c *PodCluster) generateUpdateInfo(diffBase *diffbase.PodCluster, cloudItem
 	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (c *PodCluster) setUpdatedFields(dbItem *mysqlmodel.PodCluster, updateInfo *message.PodClusterFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.ClusterName.IsDifferent() {
+		dbItem.ClusterName = updateInfo.ClusterName.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	// if updateInfo.AZLcuuid.IsDifferent() {
+	// 	dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	// }
 }

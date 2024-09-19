@@ -59,12 +59,13 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 		](
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			wholeCache,
-			db.NewNATRule().SetMetadata(wholeCache.GetMetadata()),
+			db.NewNATRule(),
 			wholeCache.DiffBaseDataSet.NATRules,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -114,6 +115,15 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*mysqlmode
 }
 
 // 保留接口
+func (r *NATRule) getUpdateableFields() []string {
+	return nil
+}
+
+// 保留接口
 func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (*message.NATRuleFieldsUpdate, map[string]interface{}, bool) {
 	return nil, nil, false
+}
+
+// 保留接口
+func (r *NATRule) setUpdatedFields(dbItem *mysqlmodel.NATRule, updateInfo *message.NATRuleFieldsUpdate) {
 }

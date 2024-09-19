@@ -59,12 +59,13 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			wholeCache,
-			db.NewPodServicePort().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodServicePort(),
 			wholeCache.DiffBaseDataSet.PodServicePorts,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -97,6 +98,10 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 	return dbItem, true
 }
 
+func (p *PodServicePort) getUpdateableFields() []string {
+	return []string{"name"}
+}
+
 func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (*message.PodServicePortFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodServicePortFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -106,4 +111,10 @@ func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, c
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *PodServicePort) setUpdatedFields(dbItem *mysqlmodel.PodServicePort, updateInfo *message.PodServicePortFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
 }

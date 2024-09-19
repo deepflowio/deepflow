@@ -51,8 +51,12 @@ type DataGenerator[CT constraint.CloudModel, MT constraint.MySQLModel, BT constr
 	getDiffBaseByCloudItem(*CT) (BT, bool)
 	// 生成插入 DB 所需的数据
 	generateDBItemToAdd(*CT) (*MT, bool)
+	// 获取可更新字段
+	getUpdateableFields() []string
 	// 生产更新 DB 所需的数据
 	generateUpdateInfo(BT, *CT) (MFUPT, map[string]interface{}, bool)
+	// 设置 db 数据更新字段
+	setUpdatedFields(*MT, MFUPT)
 }
 
 type UpdaterBase[
@@ -128,6 +132,11 @@ func newUpdaterBase[
 	return u
 }
 
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) initDBOperator() {
+	u.dbOperator.SetMetadata(u.metadata)
+	u.dbOperator.SetFieldsToUpdate(u.dataGenerator.getUpdateableFields())
+}
+
 func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) initPubSub() {
 	ps := pubsub.GetPubSub(u.resourceType)
 	if ps == nil {
@@ -152,6 +161,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 
 func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) HandleAddAndUpdate() {
 	dbItemsToAdd := []*MT{}
+	lcuuidToMessageUpdate := make(map[string]MUPT)
 	logDebug := logDebugResourceTypeEnabled(u.resourceType)
 	for _, cloudItem := range u.cloudData {
 		if logDebug {
@@ -169,12 +179,16 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 			structInfo, mapInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
 				log.Infof("to %s (cloud item: %#v, diff base item: %#v)", common.LogUpdate(u.resourceType), cloudItem, diffBase, u.metadata.LogPrefixes)
-				u.update(&cloudItem, diffBase, mapInfo, structInfo)
+				lcuuidToMessageUpdate[diffBase.GetLcuuid()] = u.newMessageUpdate(cloudItem, diffBase, structInfo, mapInfo)
+				// u.oldUpdate(&cloudItem, diffBase, mapInfo, structInfo)
 			}
 		}
 	}
 	if len(dbItemsToAdd) > 0 {
 		u.add(dbItemsToAdd)
+	}
+	if len(lcuuidToMessageUpdate) > 0 {
+		u.update(lcuuidToMessageUpdate)
 	}
 }
 
@@ -227,7 +241,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 	}
 }
 
-func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) update(cloudItem *CT, diffBase BT, mapInfo map[string]interface{}, structInfo MFUPT) {
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) oldUpdate(cloudItem *CT, diffBase BT, mapInfo map[string]interface{}, structInfo MFUPT) {
 	if dbItem, ok := u.dbOperator.Update(diffBase.GetLcuuid(), mapInfo); ok {
 		u.notifyOnUpdated(cloudItem, diffBase)
 
@@ -238,6 +252,78 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, M
 		msgData.SetDiffBase(diffBase)
 		msgData.SetCloudItem(cloudItem)
 		u.pubsub.PublishUpdated(u.msgMetadata, msgData)
+		u.Changed = true
+	}
+}
+
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) newMessageUpdate(cloudItem CT, diffBase BT, structInfo MFUPT, mapInfo map[string]interface{}) MUPT {
+	msgData := MUPT(new(MUT))
+	msgData.SetFields(structInfo)
+	msgData.SetFieldsMap(mapInfo)
+	msgData.SetDiffBase(diffBase)
+	msgData.SetCloudItem(&cloudItem)
+	return msgData
+}
+
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) update(lcuuidToMessageUpdate map[string]MUPT) {
+	lcuuids := make([]string, 0)
+	for lcuuid := range lcuuidToMessageUpdate {
+		lcuuids = append(lcuuids, lcuuid)
+	}
+	dbItemsToUpdate := make([]*MT, 0)
+	if err := u.metadata.GetDB().Where("lcuuid IN ?", lcuuids).Find(&dbItemsToUpdate).Error; err != nil {
+		log.Errorf("get %s by lcuuids: %+v failed: %s", u.resourceType, lcuuids, err.Error(), u.metadata.LogPrefixes)
+		return
+	}
+	if len(dbItemsToUpdate) == 0 {
+		return
+	}
+
+	lcuuidToDBItem := make(map[string]*MT)
+	lcuuidToFilledMessageUpdate := make(map[string]MUPT)
+	for _, dbItem := range dbItemsToUpdate {
+		lcuuid := MPT(dbItem).GetLcuuid()
+		log.Infof("tmp old mysql item: %#v", dbItem, u.metadata.LogPrefixes)
+		u.dataGenerator.setUpdatedFields(dbItem, lcuuidToMessageUpdate[lcuuid].GetFields().(MFUPT))
+		log.Infof("tmp new mysql item: %#v", dbItem, u.metadata.LogPrefixes)
+		lcuuidToDBItem[lcuuid] = dbItem
+		msgData := lcuuidToMessageUpdate[lcuuid]
+		msgData.GetFields().(MFUPT).SetID(MPT(dbItem).GetID())
+		msgData.GetFields().(MFUPT).SetLcuuid(lcuuid)
+		lcuuidToFilledMessageUpdate[lcuuid] = msgData
+	}
+
+	count := len(dbItemsToUpdate) // TODO abstract common
+	offset := 1000
+	pages := count/offset + 1
+	if count%offset == 0 {
+		pages = count / offset
+	}
+	for i := 0; i < pages; i++ {
+		start := i * offset
+		end := (i + 1) * offset
+		if end > count {
+			end = count
+		}
+		u.updatePage(dbItemsToUpdate[start:end], lcuuidToFilledMessageUpdate)
+	}
+}
+
+func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MUPT, MUT, MFUPT, MFUT, MDPT, MDT]) updatePage(dbItems []*MT, lcuuidToFilledMessageUpdate map[string]MUPT) {
+	lcuuidToMapInfo := make(map[string]map[string]interface{})
+	for _, dbItem := range dbItems {
+		lcuuidToMapInfo[MPT(dbItem).GetLcuuid()] = lcuuidToFilledMessageUpdate[MPT(dbItem).GetLcuuid()].GetFieldsMap()
+	}
+
+	if dbItems, ok := u.dbOperator.UpdateBatch(dbItems, lcuuidToMapInfo); ok {
+		for _, dbItem := range dbItems { // TODO publish batch
+			lcuuid := MPT(dbItem).GetLcuuid()
+			msgData := lcuuidToFilledMessageUpdate[lcuuid]
+			log.Infof("tmp old cloudItem: %#v, diffBase: %#v, dbItem: %#v", msgData.GetCloudItem(), u.diffBaseData[lcuuid], dbItem)
+			u.notifyOnUpdated(msgData.GetCloudItem().(*CT), u.diffBaseData[lcuuid])
+			log.Infof("tmp new cloudItem: %#v, diffBase: %#v, dbItem: %#v", msgData.GetCloudItem(), u.diffBaseData[lcuuid], dbItem)
+			u.pubsub.PublishUpdated(u.msgMetadata, msgData)
+		}
 		u.Changed = true
 	}
 }

@@ -59,12 +59,13 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 		](
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			wholeCache,
-			db.NewPodGroup().SetMetadata(wholeCache.GetMetadata()),
+			db.NewPodGroup(),
 			wholeCache.DiffBaseDataSet.PodGroups,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -106,6 +107,10 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 	return dbItem, true
 }
 
+func (p *PodGroup) getUpdateableFields() []string {
+	return []string{"name", "type", "pod_num", "label", "region"}
+}
+
 func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cloudmodel.PodGroup) (*message.PodGroupFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.PodGroupFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -136,4 +141,25 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *PodGroup) setUpdatedFields(dbItem *mysqlmodel.PodGroup, updateInfo *message.PodGroupFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Type.IsDifferent() {
+		dbItem.Type = updateInfo.Type.GetNew()
+	}
+	if updateInfo.PodNum.IsDifferent() {
+		dbItem.PodNum = updateInfo.PodNum.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	// if updateInfo.AZLcuuid.IsDifferent() {
+	// 	dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	// }
 }
