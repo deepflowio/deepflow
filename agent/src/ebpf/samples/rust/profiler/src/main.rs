@@ -200,18 +200,19 @@ fn main() {
             ::std::process::exit(1);
         }
 
-        let feature: c_int = FEATURE_PROFILE_ONCPU;
-        let pids: [c_int; 1] = [11200];
+        let pids: [c_int; 6] = [5346, 6963, 19966, 23117, 24412, 26611];
         let num: c_int = pids.len() as c_int;
-        let result = set_feature_pids(feature, pids.as_ptr(), num);
+        let result = set_feature_pids(FEATURE_PROFILE_ONCPU, pids.as_ptr(), num);
+        println!("Result {}", result);
+        let result = set_feature_pids(FEATURE_DWARF_UNWINDING, pids.as_ptr(), num);
         println!("Result {}", result);
 
-        // set_dwarf_regex(
-        //     CString::new("^(socket_tracer|java|deepflow-.*|python3.*)$".as_bytes())
-        //         .unwrap()
-        //         .as_c_str()
-        //         .as_ptr(),
-        // );
+        set_dwarf_regex(
+            CString::new("^(python.*)$".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
+        );
 
         // CPUID will not be included in the aggregation of stack trace data.
         set_profiler_cpu_aggregation(0);

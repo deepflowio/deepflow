@@ -24,6 +24,7 @@ use log::trace;
 #[derive(Debug)]
 pub struct MemoryArea {
     pub m_start: u64,
+    pub mx_start: u64, // start address of executable section
     pub m_end: u64,
     pub path: String,
 }
@@ -63,7 +64,10 @@ pub fn get_memory_mappings(pid: u32) -> io::Result<Vec<MemoryArea>> {
         let perms = perms.unwrap();
         match last_area.as_mut() {
             Some(area) if area.path == path => {
-                last_executable |= perms.contains('x');
+                if perms.contains('x') {
+                    area.mx_start = m_start;
+                    last_executable = true;
+                }
                 area.m_start = area.m_start.min(m_start);
                 area.m_end = area.m_end.max(m_end);
             }
@@ -75,6 +79,7 @@ pub fn get_memory_mappings(pid: u32) -> io::Result<Vec<MemoryArea>> {
                 }
                 last_area.replace(MemoryArea {
                     m_start,
+                    mx_start: if perms.contains('x') { m_start } else { 0 },
                     m_end,
                     path: path.to_owned(),
                 });

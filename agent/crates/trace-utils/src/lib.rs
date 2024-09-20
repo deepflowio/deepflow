@@ -16,11 +16,13 @@
 
 pub mod btf;
 pub mod error;
+pub mod maps;
 pub mod unwind;
+pub(crate) mod utils;
 
 use std::io::Write;
 
-use unwind::UnwindTable;
+use unwind::{python::PythonUnwindTable, UnwindTable};
 
 #[no_mangle]
 pub unsafe extern "C" fn unwind_table_create(
@@ -60,6 +62,32 @@ pub unsafe extern "C" fn unwind_table_unload_all(table: *mut UnwindTable) {
 #[no_mangle]
 pub unsafe extern "C" fn frame_pointer_heuristic_check(pid: u32) -> bool {
     unwind::dwarf::frame_pointer_heuristic_check(pid)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn python_unwind_table_create(
+    unwind_info_map_fd: i32,
+    offsets_map_fd: i32,
+) -> *mut PythonUnwindTable {
+    let table = Box::new(PythonUnwindTable::new(unwind_info_map_fd, offsets_map_fd));
+    Box::into_raw(table)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn python_unwind_table_destroy(table: *mut PythonUnwindTable) {
+    if !table.is_null() {
+        std::mem::drop(Box::from_raw(table));
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn python_unwind_table_load(table: *mut PythonUnwindTable, pid: u32) {
+    (*table).load(pid);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn python_unwind_table_unload(table: *mut PythonUnwindTable, pid: u32) {
+    (*table).unload(pid);
 }
 
 // forwards rust demangle to C api

@@ -15,10 +15,10 @@
  */
 
 pub mod dwarf;
-pub mod maps;
+pub mod python;
 
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
-use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 use std::fs;
 use std::hash::Hasher;
 use std::mem;
@@ -27,7 +27,7 @@ use std::ptr::NonNull;
 use std::slice;
 
 use ahash::AHasher;
-use libc::{__u64, c_int, c_void};
+use libc::c_void;
 use log::{debug, trace, warn};
 use object::{
     elf::{self, FileHeader64},
@@ -35,7 +35,11 @@ use object::{
 };
 
 use dwarf::UnwindEntry;
-use maps::MemoryArea;
+
+use crate::{
+    maps::{get_memory_mappings, MemoryArea},
+    utils::{bpf_delete_elem, bpf_update_elem, IdGenerator, BPF_ANY},
+};
 
 #[derive(Default)]
 pub struct UnwindTable {
@@ -61,7 +65,7 @@ impl UnwindTable {
     }
 
     pub fn load(&mut self, pid: u32) {
-        let mm = match maps::get_memory_mappings(pid) {
+        let mm = match get_memory_mappings(pid) {
             Ok(m) => m,
             Err(e) => {
                 debug!("failed loading maps for process#{pid}: {e}");
@@ -487,32 +491,6 @@ impl UnwindTable {
                 }
             }
         }
-    }
-}
-
-const BPF_ANY: __u64 = 0;
-extern "C" {
-    fn bpf_update_elem(fd: c_int, key: *const c_void, value: *const c_void, flags: __u64) -> c_int;
-    fn bpf_delete_elem(fd: c_int, key: *const c_void) -> c_int;
-}
-
-#[derive(Default)]
-struct IdGenerator {
-    max_id: u32,
-    available: VecDeque<u32>,
-}
-
-impl IdGenerator {
-    fn acquire(&mut self) -> u32 {
-        if let Some(id) = self.available.pop_front() {
-            return id;
-        }
-        self.max_id += 1;
-        self.max_id - 1
-    }
-
-    fn release(&mut self, id: u32) {
-        self.available.push_back(id);
     }
 }
 

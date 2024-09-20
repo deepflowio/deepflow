@@ -1022,13 +1022,24 @@ impl Default for EbpfProfilePreprocess {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct Unwinding {
     pub dwarf_disabled: bool,
     pub dwarf_regex: String,
     pub dwarf_process_map_size: u32,
     pub dwarf_shard_map_size: u32,
+}
+
+impl Default for Unwinding {
+    fn default() -> Self {
+        Self {
+            dwarf_disabled: true,
+            dwarf_regex: Default::default(),
+            dwarf_process_map_size: 1024,
+            dwarf_shard_map_size: 128,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]

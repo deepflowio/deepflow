@@ -17,6 +17,7 @@ exclude = [
 k8s-openapi = { version = "0.16", features = ["v1_19", "schemars"] }
 kube = { version = "0.77", default-features = false }
 prost = "0.11"
+regex = "1"
 
 [dependencies]
 ahash = "0.8"
@@ -79,7 +80,7 @@ pnet = "^0.29"
 prost.workspace = true
 public = { path = "crates/public" }
 rand = "0.8.5"
-regex = "1"
+regex.workspace = true
 reqwest = { version = "0.11", default-features = false, features = [
     "blocking",
     "json",
@@ -106,6 +107,8 @@ zstd = "0.13.2"
 cgroups-rs = "0.2.9"
 nix = "0.23"
 pcap = "0.9.1"
+# As of procfs 0.16.0, Process::fd().iter() still not giving correct results on kernel 2.6.32
+# ref: https://github.com/eminence/procfs/pull/241
 procfs = { git = "https://github.com/deepflowio/procfs/" }
 reorder = { path = "plugins/reorder" }
 
