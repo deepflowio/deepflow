@@ -126,6 +126,7 @@ var unsummableMaxFieldsMap = map[string]struct{}{
 	"srt_max":        {},
 	"art_max":        {},
 	"rrt_max":        {},
+	"cit_max":        {},
 }
 
 // 对于unsumable的sum列使用max,min聚合时, count列取相应的max,min列的值
@@ -136,6 +137,7 @@ var unsummableFieldsMap = map[string]struct{}{
 	"srt_sum":        {},
 	"art_sum":        {},
 	"rrt_sum":        {},
+	"cit_sum":        {},
 
 	"rtt_count":        {},
 	"rtt_client_count": {},
@@ -143,6 +145,7 @@ var unsummableFieldsMap = map[string]struct{}{
 	"srt_count":        {},
 	"art_count":        {},
 	"rrt_count":        {},
+	"cit_count":        {},
 }
 
 func getColumnString(column *ckdb.Column, aggrSummable, aggrUnsummable string, t TableType) string {
@@ -150,7 +153,7 @@ func getColumnString(column *ckdb.Column, aggrSummable, aggrUnsummable string, t
 	isMaxMinAggr := (aggrUnsummable == aggrStrings[MAX]) || (aggrUnsummable == aggrStrings[MIN])
 	_, isUnsummableMax := unsummableMaxFieldsMap[column.Name]
 
-	// count字段的max,min聚合
+	// 'max', 'min' aggregation of 'xxx_count', 'xxx_sum' fields, use 'argMax', 'argMin' aggregation
 	if isUnsummable && isMaxMinAggr {
 		aggrFunc := "argMax"
 		if aggrUnsummable == aggrStrings[MIN] {
@@ -172,11 +175,18 @@ func getColumnString(column *ckdb.Column, aggrSummable, aggrUnsummable string, t
 			return fmt.Sprintf("%sMerge(%s__%s) AS %s", aggrFunc, column.Name, AGG.String(), column.Name)
 		}
 	} else {
-		// 普通的非累加和聚合和count字段的非max,min聚合和可累加的字段的聚合
-		aggr := aggrSummable
-		if isUnsummableMax || isUnsummable {
+		var aggr string
+		if isUnsummable {
+			// 'avg' aggregation of 'xxx_count', 'xxx_sum' fields, using 'sum' aggregation
+			aggr = aggrStrings[SUM]
+		} else if isUnsummableMax {
+			// 'max', 'min', 'avg' aggregation of 'xxx_max' fields, use 'max', 'min', 'avg' aggregation
 			aggr = aggrUnsummable
+		} else {
+			// summable aggregation
+			aggr = aggrSummable
 		}
+
 		switch t {
 		case AGG:
 			return fmt.Sprintf("%s__%s AggregateFunction(%s, %s)", column.Name, t.String(), aggr, column.Type.String())
