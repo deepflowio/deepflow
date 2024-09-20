@@ -184,6 +184,34 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 		return err
 	}
 
+	if t.Aggr1H1D {
+		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1H(orgID)); err != nil {
+			return err
+		}
+		if err := ExecSQL(conn, t.MakeAggrMVTableCreateSQL1H(orgID)); err != nil {
+			return err
+		}
+		if err := ExecSQL(conn, t.MakeAggrLocalTableCreateSQL1H(orgID)); err != nil {
+			return err
+		}
+		if err := ExecSQL(conn, t.MakeAggrGlobalTableCreateSQL1H(orgID)); err != nil {
+			return err
+		}
+
+		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1D(orgID)); err != nil {
+			return err
+		}
+		if err := ExecSQL(conn, t.MakeAggrMVTableCreateSQL1D(orgID)); err != nil {
+			return err
+		}
+		if err := ExecSQL(conn, t.MakeAggrLocalTableCreateSQL1D(orgID)); err != nil {
+			return err
+		}
+		if err := ExecSQL(conn, t.MakeAggrGlobalTableCreateSQL1D(orgID)); err != nil {
+			return err
+		}
+	}
+
 	// ByConity not support modify timezone
 	if t.DBType == ckdb.CKDBTypeByconity {
 		return nil
