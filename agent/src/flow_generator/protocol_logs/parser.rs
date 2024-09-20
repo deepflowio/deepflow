@@ -152,7 +152,7 @@ impl MetaAppProto {
             start_time: meta_packet.lookup_key.timestamp,
             end_time: meta_packet.lookup_key.timestamp,
             flow_id: flow.flow.flow_id,
-            vtap_id: flow.flow.flow_key.vtap_id,
+            agent_id: flow.flow.flow_key.agent_id,
             tap_type: flow.flow.flow_key.tap_type,
             tap_port: flow.flow.flow_key.tap_port,
             signal_source: flow.flow.signal_source,

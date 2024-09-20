@@ -16,16 +16,16 @@
 
 use std::fmt;
 
-use crate::common::enums::TapType;
+use crate::common::enums::CaptureNetworkType;
 use crate::common::policy::{NpbAction, PolicyData};
-use public::proto::trident::FlowAcl;
+use public::proto::agent::FlowAcl;
 
 use super::port_range::{PortRange, PortRangeList};
 
 #[derive(Default)]
 pub struct Acl {
     pub id: u32,
-    pub tap_type: TapType,
+    pub tap_type: CaptureNetworkType,
     pub src_groups: Vec<u32>,
     pub dst_groups: Vec<u32>,
     pub src_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
@@ -76,7 +76,7 @@ impl TryFrom<FlowAcl> for Acl {
     type Error = String;
 
     fn try_from(a: FlowAcl) -> Result<Self, Self::Error> {
-        let tap_type = TapType::try_from((a.tap_type.unwrap_or_default() & 0xff) as u16);
+        let tap_type = CaptureNetworkType::try_from((a.tap_type.unwrap_or_default() & 0xff) as u16);
         if tap_type.is_err() {
             return Err(format!(
                 "Acl tap_type parse error: {:?}.\n",
@@ -120,7 +120,7 @@ impl TryFrom<FlowAcl> for Acl {
 
 impl fmt::Display for Acl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Id:{} TapType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:{:?} DstPortRange:{:?} Proto:{} NpbActions:{:?}",
+        write!(f, "Id:{} CaptureNetworkType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:{:?} DstPortRange:{:?} Proto:{} NpbActions:{:?}",
             self.id, self.tap_type, self.src_groups, self.dst_groups, self.src_port_ranges, self.dst_port_ranges, self.proto, self.npb_actions)
     }
 }

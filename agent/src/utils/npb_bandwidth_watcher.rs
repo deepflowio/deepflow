@@ -31,7 +31,7 @@ use crate::common::{FlowAclListener, FlowAclListenerId};
 use crate::exception::ExceptionHandler;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use npb_pcap_policy::{NpbTunnelType, NOT_SUPPORT};
-use public::proto::{common::TridentType, trident::Exception};
+use public::proto::agent::{AgentType, Exception};
 use public::utils::net::get_route_src_ip_interface_name;
 use public::LeakyBucket;
 
@@ -323,7 +323,7 @@ impl NpbBandwidthWatcher {
 impl FlowAclListener for Arc<NpbBandwidthWatcher> {
     fn flow_acl_change(
         &mut self,
-        _trident_type: TridentType,
+        _agent_type: AgentType,
         _local_epc: i32,
         _ip_groups: &Vec<Arc<IpGroupData>>,
         _platform_data: &Vec<Arc<PlatformData>>,

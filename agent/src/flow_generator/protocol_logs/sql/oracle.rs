@@ -223,7 +223,7 @@ impl L7ProtocolParserInterface for OracleLog {
             payload,
             &OracleParseConfig {
                 is_be: param.oracle_parse_conf.is_be,
-                int_compress: param.oracle_parse_conf.int_compress,
+                int_compress: param.oracle_parse_conf.int_compressed,
                 resp_0x04_extra_byte: param.oracle_parse_conf.resp_0x04_extra_byte,
                 buf_size: param.buf_size,
             },
@@ -236,7 +236,7 @@ impl L7ProtocolParserInterface for OracleLog {
             param.direction == PacketDirection::ClientToServer,
             &OracleParseConfig {
                 is_be: param.oracle_parse_conf.is_be,
-                int_compress: param.oracle_parse_conf.int_compress,
+                int_compress: param.oracle_parse_conf.int_compressed,
                 resp_0x04_extra_byte: param.oracle_parse_conf.resp_0x04_extra_byte,
                 buf_size: param.buf_size,
             },

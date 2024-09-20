@@ -53,6 +53,19 @@ impl From<DecapType> for TunnelType {
     }
 }
 
+impl From<i32> for TunnelType {
+    fn from(t: i32) -> Self {
+        match t {
+            0 => TunnelType::None,
+            1 => TunnelType::Vxlan,
+            2 => TunnelType::Ipip,
+            3 => TunnelType::TencentGre,
+            4 => TunnelType::Geneve,
+            _ => TunnelType::None,
+        }
+    }
+}
+
 impl fmt::Display for TunnelType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -90,6 +103,14 @@ pub struct TunnelTypeBitmap(u16);
 
 impl TunnelTypeBitmap {
     pub fn new(tunnel_types: &Vec<TunnelType>) -> Self {
+        let mut bitmap = TunnelTypeBitmap(0);
+        for tunnel_type in tunnel_types.iter() {
+            bitmap.0 |= 1 << *tunnel_type as u16;
+        }
+        bitmap
+    }
+
+    pub fn from_slice(tunnel_types: &Vec<usize>) -> Self {
         let mut bitmap = TunnelTypeBitmap(0);
         for tunnel_type in tunnel_types.iter() {
             bitmap.0 |= 1 << *tunnel_type as u16;

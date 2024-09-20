@@ -33,7 +33,7 @@ use super::consts::*;
 use crate::collector::types::U16Set;
 use crate::common::Timestamp;
 use crate::common::{
-    enums::TapType,
+    enums::CaptureNetworkType,
     flow::CloseType,
     tagged_flow::{BoxedTaggedFlow, TaggedFlow},
 };
@@ -345,7 +345,8 @@ impl FlowAggr {
                         {
                             continue;
                         }
-                        if config.l4_log_store_tap_types[u16::from(TapType::Any) as usize]
+                        if config.l4_log_store_tap_types
+                            [u16::from(CaptureNetworkType::Any) as usize]
                             || config.l4_log_store_tap_types
                                 [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]
                             || tagged_flow.flow.need_to_store

@@ -55,7 +55,7 @@ use crate::{
     common::{
         ebpf::EbpfType,
         endpoint::{EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET},
-        enums::{EthernetType, HeaderType, IpProtocol, TapType, TcpFlags},
+        enums::{CaptureNetworkType, EthernetType, HeaderType, IpProtocol, TcpFlags},
         flow::{
             CloseType, Flow, FlowKey, FlowMetricsPeer, FlowPerfStats, L4Protocol, L7PerfStatsKey,
             L7Protocol, L7Stats, PacketDirection, SignalSource, TunnelField,
@@ -72,7 +72,7 @@ use crate::{
     },
     config::{
         handler::{CollectorConfig, LogParserConfig, PluginConfig},
-        FlowConfig, ModuleConfig, RuntimeConfig,
+        FlowConfig, ModuleConfig, UserConfig,
     },
     flow_generator::{protocol_logs::PseudoAppProto, LogMessageType},
     metric::document::TapSide,
@@ -89,7 +89,7 @@ use public::{
     debug::QueueDebugger,
     l7_protocol::L7ProtocolEnum,
     packet::SECONDS_IN_MINUTE,
-    proto::common::TridentType,
+    proto::agent::{AgentType, DynamicConfig},
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
 };
@@ -700,14 +700,14 @@ impl FlowMap {
                 let ignore_l2_end = flow_config.ignore_l2_end;
                 let ignore_tor_mac = flow_config.ignore_tor_mac;
                 let ignore_idc_vlan = flow_config.ignore_idc_vlan;
-                let trident_type = flow_config.trident_type;
+                let agent_type = flow_config.agent_type;
                 let index = nodes.iter().position(|node| {
                     node.match_node(
                         meta_packet,
                         ignore_l2_end,
                         ignore_tor_mac,
                         ignore_idc_vlan,
-                        trident_type,
+                        agent_type,
                     )
                 });
                 let Some(index) = index else {
@@ -1132,8 +1132,8 @@ impl FlowMap {
         // parse tap_type any or tap_type in config
         config.app_proto_log_enabled
             && (lookup_key.proto == IpProtocol::TCP || lookup_key.proto == IpProtocol::UDP)
-            && (config.l7_log_tap_types[u16::from(TapType::Any) as usize]
-                || lookup_key.tap_type <= TapType::Max
+            && (config.l7_log_tap_types[u16::from(CaptureNetworkType::Any) as usize]
+                || lookup_key.tap_type <= CaptureNetworkType::Max
                     && config.l7_log_tap_types[u16::from(lookup_key.tap_type) as usize])
     }
 
@@ -1182,7 +1182,7 @@ impl FlowMap {
         };
         let flow = Flow {
             flow_key: FlowKey {
-                vtap_id: flow_config.vtap_id,
+                agent_id: flow_config.agent_id,
                 mac_src: lookup_key.src_mac,
                 mac_dst: lookup_key.dst_mac,
                 ip_src: lookup_key.src_ip,
@@ -1294,7 +1294,7 @@ impl FlowMap {
         // Currently, only virtual traffic's tap_side is counted
         node.tagged_flow
             .flow
-            .set_tap_side(flow_config.trident_type, flow_config.cloud_gateway_traffic);
+            .set_tap_side(flow_config.agent_type, flow_config.cloud_gateway_traffic);
 
         Self::init_nat_info(&mut node.tagged_flow.flow, meta_packet);
 
@@ -1477,7 +1477,7 @@ impl FlowMap {
             // Currently, only virtual traffic's tap_side is counted
             node.tagged_flow
                 .flow
-                .set_tap_side(config.flow.trident_type, config.flow.cloud_gateway_traffic);
+                .set_tap_side(config.flow.agent_type, config.flow.cloud_gateway_traffic);
             node.tagged_flow.flow.need_to_store = (self.packet_sequence_enabled
                 && meta_packet.lookup_key.proto == IpProtocol::TCP)
                 || node.contain_pcap_policy();
@@ -2071,7 +2071,7 @@ impl FlowMap {
             if !config.collector_enabled {
                 return;
             }
-            flow.set_tap_side(config.trident_type, config.cloud_gateway_traffic);
+            flow.set_tap_side(config.agent_type, config.cloud_gateway_traffic);
 
             let mut collect_stats = false;
             if flow.flow_key.proto == IpProtocol::TCP
@@ -2138,7 +2138,7 @@ impl FlowMap {
         if let Some(head) = l7_info.app_proto_head() {
             node.tagged_flow
                 .flow
-                .set_tap_side(config.trident_type, config.cloud_gateway_traffic);
+                .set_tap_side(config.agent_type, config.cloud_gateway_traffic);
 
             if let Some(app_proto) =
                 MetaAppProto::new(&node.tagged_flow, meta_packet, l7_info, head)
@@ -2543,7 +2543,7 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 }
 
 pub fn _new_flow_map_and_receiver(
-    trident_type: TridentType,
+    agent_type: AgentType,
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
 ) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
@@ -2557,20 +2557,33 @@ pub fn _new_flow_map_and_receiver(
     let (packet_sequence_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger); // Enterprise Edition Feature: packet-sequence
     let mut config = ModuleConfig {
         flow: FlowConfig {
-            trident_type,
+            agent_type,
             collector_enabled: true,
             l4_performance_enabled: true,
             l7_metrics_enabled: true,
             app_proto_log_enabled: true,
             ignore_idc_vlan: ignore_idc_vlan,
             flow_timeout: flow_timeout.unwrap_or(super::TcpTimeout::default().into()),
-            ..(&RuntimeConfig::default()).into()
+            ..((
+                &UserConfig::standalone_default(),
+                &DynamicConfig {
+                    kubernetes_api_enabled: None,
+                    region_id: None,
+                    pod_cluster_id: None,
+                    vpc_id: None,
+                    agent_id: None,
+                    team_id: None,
+                    organize_id: None,
+                    secret_key: None,
+                },
+            ))
+                .into()
         },
         ..Default::default()
     };
     // Any
     config.flow.l7_log_tap_types[0] = true;
-    config.flow.trident_type = trident_type;
+    config.flow.agent_type = agent_type;
     let flow_map = FlowMap::new(
         0,
         Some(output_queue_sender),
@@ -2602,7 +2615,7 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
         dst_ip: Ipv4Addr::new(114, 114, 114, 114).into(),
         src_port: 12345,
         dst_port: 22,
-        tap_type: TapType::Idc(1),
+        tap_type: CaptureNetworkType::Idc(1),
         ..Default::default()
     };
     packet.header_type = HeaderType::Ipv4Tcp;
@@ -2672,7 +2685,7 @@ mod tests {
     #[test]
     fn syn_rst() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2710,7 +2723,7 @@ mod tests {
     #[test]
     fn syn_fin() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2754,7 +2767,7 @@ mod tests {
     #[test]
     fn platform_data() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2783,7 +2796,7 @@ mod tests {
     #[test]
     fn handshake_perf() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2845,7 +2858,7 @@ mod tests {
     #[test]
     fn reverse_new_cycle() {
         let (module_config, mut flow_map, _) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2905,7 +2918,7 @@ mod tests {
     #[test]
     fn force_report() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2949,7 +2962,7 @@ mod tests {
     #[test]
     fn udp_arp_short_flow() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2985,7 +2998,7 @@ mod tests {
     #[test]
     fn port_equal_tor() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtHyperVCompute, None, false);
+            _new_flow_map_and_receiver(AgentType::TtHyperVCompute, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -2994,11 +3007,11 @@ mod tests {
             ebpf: None,
         };
         let mut packet0 = _new_meta_packet();
-        packet0.lookup_key.tap_type = TapType::Cloud;
+        packet0.lookup_key.tap_type = CaptureNetworkType::Cloud;
         flow_map.inject_meta_packet(&config, &mut packet0);
 
         let mut packet1 = _new_meta_packet();
-        packet1.lookup_key.tap_type = TapType::Cloud;
+        packet1.lookup_key.tap_type = CaptureNetworkType::Cloud;
         if let ProtocolData::TcpHeader(tcp_data) = &mut packet1.protocol_data {
             tcp_data.flags = TcpFlags::RST;
         }
@@ -3018,14 +3031,14 @@ mod tests {
 
         let mut packet2 = _new_meta_packet();
         packet2.lookup_key.src_ip = Ipv4Addr::new(192, 168, 1, 2).into();
-        packet2.lookup_key.tap_type = TapType::Cloud;
+        packet2.lookup_key.tap_type = CaptureNetworkType::Cloud;
         packet2.tap_port = TapPort(0x1234);
         flow_map.inject_meta_packet(&config, &mut packet2);
 
         let mut packet3 = _new_meta_packet();
         packet3.lookup_key.src_ip = Ipv4Addr::new(192, 168, 1, 3).into();
         packet3.lookup_key.dst_mac = MacAddr::from([0x21, 0x43, 0x65, 0xaa, 0xaa, 0xaa]);
-        packet3.lookup_key.tap_type = TapType::Cloud;
+        packet3.lookup_key.tap_type = CaptureNetworkType::Cloud;
         packet3.tap_port = TapPort(0x1234);
         packet3.lookup_key.l2_end_0 = true;
         packet3.lookup_key.l2_end_1 = false;
@@ -3050,7 +3063,7 @@ mod tests {
     #[test]
     fn flow_state_machine() {
         let (module_config, mut flow_map, _) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -3118,7 +3131,7 @@ mod tests {
     #[test]
     fn double_fin_from_server() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -3192,7 +3205,7 @@ mod tests {
     #[test]
     fn l3_l4_payload() {
         let (module_config, mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver(
-            TridentType::TtProcess,
+            AgentType::TtProcess,
             Some(FlowTimeout {
                 opening: Timestamp::ZERO,
                 established: Timestamp::from_secs(300),
@@ -3250,7 +3263,7 @@ mod tests {
     #[test]
     fn ignore_vlan() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -3277,7 +3290,7 @@ mod tests {
         assert_eq!(tagged_flow.flow.flow_metrics_peers[0].packet_count, 1);
 
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, true);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, true);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -3305,7 +3318,7 @@ mod tests {
     #[test]
     fn tcp_perf() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -3348,7 +3361,7 @@ mod tests {
     #[test]
     fn tcp_syn_ack_zerowin() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,
@@ -3442,7 +3455,7 @@ mod tests {
     #[test]
     fn test_handshake_retrans() {
         let (module_config, mut flow_map, output_queue_receiver) =
-            _new_flow_map_and_receiver(TridentType::TtProcess, None, false);
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
         let config = Config {
             flow: &module_config.flow,
             log_parser: &module_config.log_parser,

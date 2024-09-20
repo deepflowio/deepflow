@@ -27,6 +27,7 @@ use crate::{
     trident::AgentId,
 };
 use public::debug::{Error, Result};
+use public::proto::agent;
 use public::proto::trident::SyncResponse;
 
 pub struct RpcDebugger {
@@ -52,7 +53,7 @@ pub struct ConfigResp {
 pub enum RpcMessage {
     Config(Option<String>),
     PlatformData(Option<String>),
-    TapTypes(Option<String>),
+    CaptureNetworkTypes(Option<String>),
     Cidr(Option<String>),
     Groups(Option<String>),
     Acls(Option<String>),
@@ -93,6 +94,9 @@ impl RpcDebugger {
     }
 
     pub(super) fn basic_config(&self) -> Result<Vec<RpcMessage>> {
+        if self.config.new_rpc {
+            return self.agent_basic_config();
+        }
         let mut resp = self
             .runtime
             .block_on(self.get_rpc_response())
@@ -122,6 +126,9 @@ impl RpcDebugger {
     }
 
     pub(super) fn tap_types(&self) -> Result<Vec<RpcMessage>> {
+        if self.config.new_rpc {
+            return self.agent_tap_types();
+        }
         let resp = self
             .runtime
             .block_on(self.get_rpc_response())
@@ -130,14 +137,14 @@ impl RpcDebugger {
 
         if resp.tap_types.is_empty() {
             return Err(Error::NotFound(String::from(
-                "sync response's tap_types is empty",
+                "sync response's capture_network_types is empty",
             )));
         }
 
         let mut res = resp
             .tap_types
             .into_iter()
-            .map(|t| RpcMessage::TapTypes(Some(format!("{:?}", t))))
+            .map(|t| RpcMessage::CaptureNetworkTypes(Some(format!("{:?}", t))))
             .collect::<Vec<_>>();
 
         res.push(RpcMessage::Fin);
@@ -145,6 +152,9 @@ impl RpcDebugger {
     }
 
     pub(super) fn cidrs(&self) -> Result<Vec<RpcMessage>> {
+        if self.config.new_rpc {
+            return self.agent_cidrs();
+        }
         let resp = self
             .runtime
             .block_on(self.get_rpc_response())
@@ -169,6 +179,9 @@ impl RpcDebugger {
     }
 
     pub(super) fn platform_data(&self) -> Result<Vec<RpcMessage>> {
+        if self.config.new_rpc {
+            return self.agent_platform_data();
+        }
         let resp = self
             .runtime
             .block_on(self.get_rpc_response())
@@ -202,6 +215,9 @@ impl RpcDebugger {
     }
 
     pub(super) fn ip_groups(&self) -> Result<Vec<RpcMessage>> {
+        if self.config.new_rpc {
+            return self.agent_ip_groups();
+        }
         let resp = self
             .runtime
             .block_on(self.get_rpc_response())
@@ -228,6 +244,9 @@ impl RpcDebugger {
     }
 
     pub(super) fn flow_acls(&self) -> Result<Vec<RpcMessage>> {
+        if self.config.new_rpc {
+            return self.agent_flow_acls();
+        }
         let resp = self
             .runtime
             .block_on(self.get_rpc_response())
@@ -254,6 +273,9 @@ impl RpcDebugger {
     }
 
     pub(super) fn local_segments(&self) -> Result<Vec<RpcMessage>> {
+        if self.config.new_rpc {
+            return self.agent_local_segments();
+        }
         let resp = self
             .runtime
             .block_on(self.get_rpc_response())
@@ -286,5 +308,208 @@ impl RpcDebugger {
         );
 
         Ok(vec![RpcMessage::Version(Some(version)), RpcMessage::Fin])
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl RpcDebugger {
+    async fn agent_get_rpc_response(
+        &self,
+    ) -> Result<tonic::Response<agent::SyncResponse>, tonic::Status> {
+        let exception_handler = ExceptionHandler::default();
+        let req = Synchronizer::agent_generate_sync_request(
+            &self.agent_id,
+            &self.config,
+            &self.status,
+            0,
+            &exception_handler,
+        );
+        let resp = self.session.agent_grpc_sync(req).await?;
+        Ok(resp)
+    }
+
+    pub(super) fn agent_basic_config(&self) -> Result<Vec<RpcMessage>> {
+        let mut resp = self
+            .runtime
+            .block_on(self.agent_get_rpc_response())
+            .map_err(|e| Error::Tonic(e))?
+            .into_inner();
+
+        if resp.user_config.is_none() {
+            return Err(Error::NotFound(String::from(
+                "sync response's config is empty",
+            )));
+        }
+
+        let config = ConfigResp {
+            status: resp.status() as i32,
+            version_platform_data: resp.version_platform_data(),
+            version_groups: resp.version_groups(),
+            revision: resp.revision.take().unwrap_or_default(),
+            config: resp.user_config.take().unwrap(),
+            version_acls: resp.version_acls(),
+            self_update_url: resp.self_update_url.take().unwrap_or_default(),
+        };
+
+        let c = format!("{:?}", config);
+
+        Ok(vec![RpcMessage::Config(Some(c)), RpcMessage::Fin])
+    }
+
+    pub(super) fn agent_tap_types(&self) -> Result<Vec<RpcMessage>> {
+        let resp = self
+            .runtime
+            .block_on(self.agent_get_rpc_response())
+            .map_err(|e| Error::Tonic(e))?
+            .into_inner();
+
+        if resp.capture_network_types.is_empty() {
+            return Err(Error::NotFound(String::from(
+                "sync response's capture_network_types is empty",
+            )));
+        }
+
+        let mut res = resp
+            .capture_network_types
+            .into_iter()
+            .map(|t| RpcMessage::CaptureNetworkTypes(Some(format!("{:?}", t))))
+            .collect::<Vec<_>>();
+
+        res.push(RpcMessage::Fin);
+        Ok(res)
+    }
+
+    pub(super) fn agent_cidrs(&self) -> Result<Vec<RpcMessage>> {
+        let resp = self
+            .runtime
+            .block_on(self.agent_get_rpc_response())
+            .map_err(|e| Error::Tonic(e))?
+            .into_inner();
+
+        if resp.version_platform_data() == 0 {
+            return Err(Error::NotFound(String::from("cidrs data in preparation")));
+        }
+
+        self.status.write().agent_get_platform_data(&resp);
+        let mut res = self
+            .status
+            .read()
+            .cidrs
+            .iter()
+            .map(|c| RpcMessage::Cidr(Some(format!("{:?}", c))))
+            .collect::<Vec<_>>();
+
+        res.push(RpcMessage::Fin);
+        Ok(res)
+    }
+
+    pub(super) fn agent_platform_data(&self) -> Result<Vec<RpcMessage>> {
+        let resp = self
+            .runtime
+            .block_on(self.agent_get_rpc_response())
+            .map_err(|e| Error::Tonic(e))?
+            .into_inner();
+
+        if resp.version_platform_data() == 0 {
+            return Err(Error::NotFound(String::from(
+                "platform data in preparation",
+            )));
+        }
+
+        self.status.write().agent_get_platform_data(&resp);
+        let mut res = {
+            let status_guard = self.status.read();
+            status_guard
+                .interfaces
+                .iter()
+                .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p))))
+                .chain(
+                    status_guard
+                        .peers
+                        .iter()
+                        .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p)))),
+                )
+                .collect::<Vec<_>>()
+        };
+
+        res.push(RpcMessage::Fin);
+        Ok(res)
+    }
+
+    pub(super) fn agent_ip_groups(&self) -> Result<Vec<RpcMessage>> {
+        let resp = self
+            .runtime
+            .block_on(self.agent_get_rpc_response())
+            .map_err(|e| Error::Tonic(e))?
+            .into_inner();
+
+        if resp.version_groups() == 0 {
+            return Err(Error::NotFound(String::from(
+                "ip groups data in preparation",
+            )));
+        }
+
+        self.status.write().agent_get_ip_groups(&resp);
+        let mut res = self
+            .status
+            .read()
+            .ip_groups
+            .iter()
+            .map(|g| RpcMessage::Groups(Some(format!("{:?}", g))))
+            .collect::<Vec<_>>();
+
+        res.push(RpcMessage::Fin);
+        Ok(res)
+    }
+
+    pub(super) fn agent_flow_acls(&self) -> Result<Vec<RpcMessage>> {
+        let resp = self
+            .runtime
+            .block_on(self.agent_get_rpc_response())
+            .map_err(|e| Error::Tonic(e))?
+            .into_inner();
+
+        if resp.version_acls() == 0 {
+            return Err(Error::NotFound(String::from(
+                "flow acls data in preparation",
+            )));
+        }
+
+        self.status.write().agent_get_flow_acls(&resp);
+        let mut res = self
+            .status
+            .read()
+            .acls
+            .iter()
+            .map(|a| RpcMessage::Acls(Some(format!("{:?}", a))))
+            .collect::<Vec<_>>();
+
+        res.push(RpcMessage::Fin);
+        Ok(res)
+    }
+
+    pub(super) fn agent_local_segments(&self) -> Result<Vec<RpcMessage>> {
+        let resp = self
+            .runtime
+            .block_on(self.agent_get_rpc_response())
+            .map_err(|e| Error::Tonic(e))?
+            .into_inner();
+
+        if resp.local_segments.is_empty() {
+            return Err(Error::NotFound(
+                "local segments data is empty, maybe deepflow-agent is not properly configured"
+                    .into(),
+            ));
+        }
+
+        let mut segments = resp
+            .local_segments
+            .into_iter()
+            .map(|s| RpcMessage::Segments(Some(format!("{:?}", s))))
+            .collect::<Vec<_>>();
+
+        segments.push(RpcMessage::Fin);
+
+        Ok(segments)
     }
 }

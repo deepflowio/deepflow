@@ -54,7 +54,7 @@ use crate::{
         lookup_key::LookupKey,
         TaggedFlow, Timestamp,
     },
-    config::{handler::LogParserConfig, PrometheusExtraConfig},
+    config::{handler::LogParserConfig, PrometheusExtraLabels},
     exception::ExceptionHandler,
     flow_generator::protocol_logs::{http::handle_endpoint, L7ResponseStatus},
     metric::document::{Direction, TapSide},
@@ -63,9 +63,10 @@ use crate::{
 
 use public::{
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
-    enums::{EthernetType, L4Protocol, TapType},
+    enums::{CaptureNetworkType, EthernetType, L4Protocol},
     l7_protocol::L7Protocol,
     proto::{
+        agent::Exception,
         integration::opentelemetry::proto::{
             common::v1::{
                 any_value::Value::{IntValue, StringValue},
@@ -74,7 +75,6 @@ use public::{
             trace::v1::{span::SpanKind, Span, TracesData},
         },
         metric,
-        trident::Exception,
     },
     queue::DebugSender,
     utils::net::ipv6_enabled,
@@ -538,7 +538,7 @@ fn fill_l7_stats(
     let peer_dst = &mut flow.flow_metrics_peers[1];
     peer_dst.l3_epc_id = dst_info.l3_epc_id;
     peer_dst.nat_real_ip = flow.flow_key.ip_dst;
-    flow.flow_key.tap_type = TapType::Cloud;
+    flow.flow_key.tap_type = CaptureNetworkType::Cloud;
     let flow_stat_time = flow.flow_stat_time;
     let flow_endpoint = flow.last_endpoint.clone();
     let mut tagged_flow = TaggedFlow::default();
@@ -602,7 +602,7 @@ async fn handler(
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
-    prometheus_extra_config: Arc<PrometheusExtraConfig>,
+    prometheus_extra_config: Arc<PrometheusExtraLabels>,
     log_parser_config: Arc<LogParserConfig>,
     flow_id: Arc<AtomicU64>,
     external_profile_integration_disabled: bool,
@@ -680,9 +680,9 @@ async fn handler(
                 return Ok(Response::builder().body(Body::empty()).unwrap());
             }
             let headers = req.headers();
-            let labels = &prometheus_extra_config.labels;
-            let labels_limit = prometheus_extra_config.labels_limit;
-            let values_limit = prometheus_extra_config.values_limit;
+            let labels = &prometheus_extra_config.extra_labels;
+            let labels_limit = prometheus_extra_config.label_length;
+            let values_limit = prometheus_extra_config.value_length;
             let mut labels_count = 0;
             let mut values_count = 0;
             let mut extra_label_names = vec![];
@@ -697,8 +697,8 @@ async fn handler(
                             .to_str()
                             .unwrap_or_default()
                             .to_string();
-                        labels_count += label.len() as u32;
-                        values_count += value.len() as u32;
+                        labels_count += label.len();
+                        values_count += value.len();
                         if labels_count > labels_limit || values_count > values_limit {
                             debug!("labels_count exceeds the labels limit:{} or values_count exceeds the values limit:{} ", labels_limit, values_limit);
                             break;
@@ -934,7 +934,7 @@ pub struct MetricServer {
     local_epc_id: u32,
     policy_getter: Arc<PolicyGetter>,
     time_diff: Arc<AtomicI64>,
-    prometheus_extra_config: Arc<PrometheusExtraConfig>,
+    prometheus_extra_config: Arc<PrometheusExtraLabels>,
     log_parser_config: Arc<LogParserConfig>,
     external_profile_integration_disabled: bool,
     external_trace_integration_disabled: bool,
@@ -959,7 +959,7 @@ impl MetricServer {
         local_epc_id: u32,
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
-        prometheus_extra_config: PrometheusExtraConfig,
+        prometheus_extra_config: PrometheusExtraLabels,
         log_parser_config: LogParserConfig,
         external_profile_integration_disabled: bool,
         external_trace_integration_disabled: bool,

@@ -35,7 +35,7 @@ use crate::{
     utils::lru::Lru,
 };
 use public::{
-    proto::trident::{GpidSyncRequest, GpidSyncResponse},
+    proto::{agent, trident::{GpidSyncRequest, GpidSyncResponse}},
     queue::Receiver,
 };
 
@@ -70,7 +70,7 @@ impl SocketSynchronizer {
         // toa info cache, Lru<LocalAddr, RealAddr>
         lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
     ) -> Self {
-        if process_info_enabled(config.load().trident_type) {
+        if process_info_enabled(config.load().agent_type) {
             let lru_toa_info_clone = lru_toa_info.clone();
             thread::Builder::new()
                 .name("socket-synchronizer-toa-recv".to_string())
@@ -95,7 +95,7 @@ impl SocketSynchronizer {
 
     pub fn start(&mut self) {
         let conf_guard = self.config.load();
-        if !process_info_enabled(conf_guard.trident_type) {
+        if !process_info_enabled(conf_guard.agent_type) {
             return;
         }
 
@@ -224,42 +224,84 @@ impl SocketSynchronizer {
                     }
                 };
 
-                match runtime.block_on(
-                    session.gpid_sync(GpidSyncRequest {
-                        ctrl_ip: Some(ctrl_ip),
-                        ctrl_mac: Some(ctrl_mac),
-                        team_id: Some(team_id),
-                        vtap_id: Some(conf_guard.vtap_id as u32),
-                        entries: sock_entries
-                            .into_iter()
-                            .filter_map(|sock| {
-                                if let Ok(e) = sock.try_into() {
-                                    Some(e)
-                                } else {
-                                    None
+                if session.get_new_rpc() {
+                    match runtime.block_on(
+                        session.agent_gpid_sync(agent::GpidSyncRequest {
+                            ctrl_ip: Some(ctrl_ip),
+                            ctrl_mac: Some(ctrl_mac),
+                            team_id: Some(team_id),
+                            agent_id: Some(conf_guard.agent_id as u32),
+                            entries: sock_entries
+                                .into_iter()
+                                .filter_map(|sock| {
+                                    if let Ok(e) = sock.try_into() {
+                                        Some(e)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect(),
+                            // TODO compress_algorithm
+                            ..Default::default()
+                        }),
+                    ) {
+                        Err(e) => error!("gpid sync fail: {}", e),
+                        Ok(response) => {
+                            let response: agent::GpidSyncResponse = response.into_inner();
+                            let mut current_entries = vec![];
+                            for entry in response.entries.iter() {
+                                let e = GpidEntry::try_from(entry);
+                                if e.is_err() {
+                                    warn!("{:?}", e);
+                                    continue;
                                 }
-                            })
-                            .collect(),
-                        // TODO compress_algorithm
-                        ..Default::default()
-                    }),
-                ) {
-                    Err(e) => error!("gpid sync fail: {}", e),
-                    Ok(response) => {
-                        let response: GpidSyncResponse = response.into_inner();
-                        let mut current_entries = vec![];
-                        for entry in response.entries.iter() {
-                            let e = GpidEntry::try_from(entry);
-                            if e.is_err() {
-                                warn!("{:?}", e);
-                                continue;
+                                current_entries.push(e.unwrap());
                             }
-                            current_entries.push(e.unwrap());
-                        }
 
-                        if current_entries != last_entries {
-                            policy_setter.update_gpids(&current_entries);
-                            last_entries = current_entries
+                            if current_entries != last_entries {
+                                policy_setter.update_gpids(&current_entries);
+                                last_entries = current_entries
+                            }
+                        }
+                    }
+                } else {
+                    match runtime.block_on(
+                        session.gpid_sync(GpidSyncRequest {
+                            ctrl_ip: Some(ctrl_ip),
+                            ctrl_mac: Some(ctrl_mac),
+                            team_id: Some(team_id),
+                            vtap_id: Some(conf_guard.agent_id as u32),
+                            entries: sock_entries
+                                .into_iter()
+                                .filter_map(|sock| {
+                                    if let Ok(e) = sock.try_into() {
+                                        Some(e)
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect(),
+                            // TODO compress_algorithm
+                            ..Default::default()
+                        }),
+                    ) {
+                        Err(e) => error!("gpid sync fail: {}", e),
+                        Ok(response) => {
+                            let response: GpidSyncResponse = response.into_inner();
+                            let mut current_entries = vec![];
+                            for entry in response.entries.iter() {
+                                let e = GpidEntry::try_from(entry);
+                                if e.is_err() {
+                                    warn!("{:?}", e);
+                                    continue;
+                                }
+                                current_entries.push(e.unwrap());
+                            }
+
+                            if current_entries != last_entries {
+                                policy_setter.update_gpids(&current_entries);
+                                last_entries = current_entries
+                            }
                         }
                     }
                 }
@@ -273,7 +315,7 @@ impl SocketSynchronizer {
 
     pub fn stop(&mut self) {
         let conf_guard = self.config.load();
-        if !process_info_enabled(conf_guard.trident_type) {
+        if !process_info_enabled(conf_guard.agent_type) {
             return;
         }
 
@@ -305,10 +347,10 @@ impl SocketSynchronizer {
 }
 
 mod config {
-    use public::proto::common;
+    use public::proto::agent;
     pub struct StaticConfig;
     impl StaticConfig {
-        pub fn get_trident_type(&self) -> common::TridentType {
+        pub fn get_agent_type(&self) -> agent::AgentType {
             todo!()
         }
 

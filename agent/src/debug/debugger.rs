@@ -166,7 +166,7 @@ impl Debugger {
                             };
 
                             let beacon = Beacon {
-                                vtap_id: conf.load().vtap_id,
+                                agent_id: conf.load().agent_id,
                                 hostname,
                             };
 
@@ -321,7 +321,7 @@ impl Debugger {
                             };
 
                             let beacon = Beacon {
-                                vtap_id: conf.load().vtap_id,
+                                agent_id: conf.load().agent_id,
                                 hostname,
                             };
 
@@ -479,7 +479,7 @@ impl Debugger {
                     RpcMessage::Config(_) => debugger.basic_config(),
                     RpcMessage::Groups(_) => debugger.ip_groups(),
                     RpcMessage::Segments(_) => debugger.local_segments(),
-                    RpcMessage::TapTypes(_) => debugger.tap_types(),
+                    RpcMessage::CaptureNetworkTypes(_) => debugger.tap_types(),
                     RpcMessage::Version(_) => debugger.current_version(),
                     RpcMessage::PlatformData(_) => debugger.platform_data(),
                     _ => unreachable!(),

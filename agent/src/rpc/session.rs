@@ -33,10 +33,11 @@ use crate::{
     utils::stats::{self, AtomicTimeStats},
 };
 use grpc::dial as grpc_dial;
-use public::proto::trident::{self, Exception, Status};
+
 use public::{
     counter::{Countable, Counter, CounterType, CounterValue, RefCountable},
-    proto::trident::PluginType,
+    proto::agent::{self, Exception, PluginType, Status},
+    proto::trident,
 };
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -119,6 +120,7 @@ pub struct Session {
     client: RwLock<Option<Channel>>,
     exception_handler: ExceptionHandler,
     counters: Vec<Arc<GrpcCallCounter>>,
+    new_rpc: bool,
 }
 
 macro_rules! response_size {
@@ -142,6 +144,7 @@ macro_rules! response_size {
     };
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
 macro_rules! sync_grpc_call {
     ($self:ident, $func:ident, $request:ident, $enpoint:ident) => {{
         use prost::Message;
@@ -179,6 +182,43 @@ macro_rules! sync_grpc_call {
     }};
 }
 
+macro_rules! agent_sync_grpc_call {
+    ($self:ident, $func:ident, $request:ident, $enpoint:ident) => {{
+        use prost::Message;
+
+        let prefix = std::concat!("grpc ", stringify!($func));
+
+        log::trace!("{} prepare client", prefix);
+        $self.update_current_server().await;
+        let client = match $self.get_client() {
+            Some(c) => c,
+            None => {
+                $self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = agent::synchronizer_client::SynchronizerClient::new(client);
+
+        let request_len = $request.encoded_len();
+        let now = Instant::now();
+        log::trace!("{} send request", prefix);
+        let response = client.$func($request).await;
+        log::trace!("{} receive response", prefix);
+        let now_elapsed = now.elapsed();
+        $self.counters[$enpoint].delay.update(now_elapsed);
+        if log::log_enabled!(log::Level::Debug) {
+            debug!(
+                "{} latency {:?}ms request {}B response {}",
+                prefix,
+                now_elapsed.as_millis(),
+                request_len,
+                response_size!($func, response),
+            );
+        }
+        response
+    }};
+}
+
 impl Session {
     pub fn new(
         port: u16,
@@ -188,6 +228,7 @@ impl Session {
         controller_ips: Vec<String>,
         exception_handler: ExceptionHandler,
         stats_collector: &stats::Collector,
+        new_rpc: bool,
     ) -> Session {
         let counters = (0..GRPC_CALL_ENDPOINTS.len())
             .into_iter()
@@ -218,6 +259,7 @@ impl Session {
             exception_handler,
             counters,
             controller_cert_file_prefix,
+            new_rpc,
         }
     }
 
@@ -283,6 +325,10 @@ impl Session {
             self.server_dispatcher.read().get_proxy_ip(),
             self.config.read().get_proxy_port(),
         )
+    }
+
+    pub fn get_new_rpc(&self) -> bool {
+        self.new_rpc
     }
 
     pub fn set_proxy_server(&self, ip: Option<String>, port: u16) {
@@ -369,6 +415,13 @@ impl Session {
         sync_grpc_call!(self, genesis_sync, request, GENESIS_SYNC_ENDPOINT)
     }
 
+    pub async fn agent_grpc_genesis_sync_with_statsd(
+        &self,
+        request: agent::GenesisSyncRequest,
+    ) -> Result<tonic::Response<agent::GenesisSyncResponse>, tonic::Status> {
+        agent_sync_grpc_call!(self, genesis_sync, request, GENESIS_SYNC_ENDPOINT)
+    }
+
     pub async fn grpc_kubernetes_api_sync_with_statsd(
         &self,
         request: trident::KubernetesApiSyncRequest,
@@ -416,6 +469,172 @@ impl Session {
     ) -> Result<Vec<u8>> {
         let s = self
             .plugin(trident::PluginRequest {
+                ctrl_ip: Some(agent_id.ip.to_string()),
+                ctrl_mac: Some(agent_id.mac.to_string()),
+                plugin_type: Some(plugin_type as i32),
+                plugin_name: Some(name.into()),
+                team_id: Some(agent_id.team_id.clone()),
+            })
+            .await?;
+
+        let mut data = vec![];
+        let mut msg = s.into_inner();
+        let mut total_len = 0u64;
+        let mut msg_md5 = String::new();
+        while let Some(message) = msg.message().await? {
+            if message.status.unwrap_or_default() != trident::Status::Success as i32 {
+                return Err(anyhow!("fetch wasm prog fail, server return non success"));
+            }
+            if let Some(d) = message.content {
+                data.extend(d);
+            }
+            total_len = message.total_len.unwrap_or_default();
+            if msg_md5.is_empty() {
+                msg_md5 = message.md5.unwrap_or_default();
+            }
+        }
+        if data.is_empty() || data.len() != total_len as usize {
+            return Err(anyhow!("fetch wasm prog fail, length incorrect"));
+        }
+        let md5_digest = Md5::new().chain_update(&data[..]).finalize();
+        match hex::decode(msg_md5.as_bytes()) {
+            Ok(bs) if &bs[..] != md5_digest.as_slice() => {
+                return Err(anyhow!("fetch wasm prog fail, md5 checksum incorrect"))
+            }
+            Err(_) => {
+                return Err(anyhow!(
+                    "fetch wasm prog fail, invalid md5 checksum in message"
+                ))
+            }
+            _ => (),
+        }
+        debug!(
+            "pulled {:?} plugin {} with len {} checksum {}",
+            plugin_type, name, total_len, msg_md5
+        );
+        Ok(data)
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl Session {
+    pub async fn agent_grpc_push_with_statsd(
+        &self,
+        request: agent::SyncRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<agent::SyncResponse>>, tonic::Status> {
+        agent_sync_grpc_call!(self, push, request, PUSH_ENDPOINT)
+    }
+
+    async fn agent_grpc_sync_inner(
+        &self,
+        request: agent::SyncRequest,
+        with_statsd: bool,
+    ) -> Result<tonic::Response<agent::SyncResponse>, tonic::Status> {
+        log::trace!("grpc sync prepare client");
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = agent::synchronizer_client::SynchronizerClient::new(client);
+
+        if !with_statsd {
+            log::trace!("grpc sync send request");
+            let response = client.sync(request).await;
+            log::trace!("grpc sync receive response");
+            response
+        } else {
+            let now = Instant::now();
+            log::trace!("grpc sync send request");
+            let response = client.sync(request).await;
+            log::trace!("grpc sync receive response");
+            let now_elapsed = now.elapsed();
+            self.counters[SYNC_ENDPOINT].delay.update(now_elapsed);
+            debug!("grpc sync latency {:?}ms", now_elapsed.as_millis());
+            response
+        }
+    }
+
+    pub async fn agent_grpc_sync(
+        &self,
+        request: agent::SyncRequest,
+    ) -> Result<tonic::Response<agent::SyncResponse>, tonic::Status> {
+        self.agent_grpc_sync_inner(request, false).await
+    }
+
+    pub async fn agent_grpc_sync_with_statsd(
+        &self,
+        request: agent::SyncRequest,
+    ) -> Result<tonic::Response<agent::SyncResponse>, tonic::Status> {
+        self.agent_grpc_sync_inner(request, true).await
+    }
+
+    pub async fn agent_grpc_upgrade_with_statsd(
+        &self,
+        request: agent::UpgradeRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<agent::UpgradeResponse>>, tonic::Status>
+    {
+        agent_sync_grpc_call!(self, upgrade, request, UPGRADE_ENDPOINT)
+    }
+
+    pub async fn agent_grpc_ntp_with_statsd(
+        &self,
+        request: agent::NtpRequest,
+    ) -> Result<tonic::Response<agent::NtpResponse>, tonic::Status> {
+        // Ntp rpc name is `query`
+        agent_sync_grpc_call!(self, query, request, NTP_ENDPOINT)
+    }
+
+    pub async fn agent_grpc_kubernetes_api_sync_with_statsd(
+        &self,
+        request: agent::KubernetesApiSyncRequest,
+    ) -> Result<tonic::Response<agent::KubernetesApiSyncResponse>, tonic::Status> {
+        agent_sync_grpc_call!(
+            self,
+            kubernetes_api_sync,
+            request,
+            KUBERNETES_API_SYNC_ENDPOINT
+        )
+    }
+
+    pub async fn agent_grpc_get_kubernetes_cluster_id_with_statsd(
+        &self,
+        request: agent::KubernetesClusterIdRequest,
+    ) -> Result<tonic::Response<agent::KubernetesClusterIdResponse>, tonic::Status> {
+        agent_sync_grpc_call!(
+            self,
+            get_kubernetes_cluster_id,
+            request,
+            GET_KUBERNETES_CLUSTER_ID_ENDPOINT
+        )
+    }
+
+    pub async fn agent_gpid_sync(
+        &self,
+        request: agent::GpidSyncRequest,
+    ) -> Result<tonic::Response<agent::GpidSyncResponse>, tonic::Status> {
+        agent_sync_grpc_call!(self, gpid_sync, request, GPID_SYNC_ENDPOINT)
+    }
+
+    pub async fn agent_plugin(
+        &self,
+        request: agent::PluginRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<agent::PluginResponse>>, tonic::Status>
+    {
+        agent_sync_grpc_call!(self, plugin, request, PLUGIN_ENDPOINT)
+    }
+
+    pub async fn agent_get_plugin(
+        &self,
+        name: &str,
+        plugin_type: PluginType,
+        agent_id: &AgentId,
+    ) -> Result<Vec<u8>> {
+        let s = self
+            .agent_plugin(agent::PluginRequest {
                 ctrl_ip: Some(agent_id.ip.to_string()),
                 ctrl_mac: Some(agent_id.mac.to_string()),
                 plugin_type: Some(plugin_type as i32),
