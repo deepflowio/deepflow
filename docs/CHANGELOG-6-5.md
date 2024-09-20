@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: applicaition log decode failed causes subsequent data anomalies [#8178](https://github.com/deepflowio/deepflow/pull/8178) by [lzf575](https://github.com/lzf575)
+* fix: Bad cstr passed into pcap_compile_nopcap [#8175](https://github.com/deepflowio/deepflow/pull/8175) by [rvql](https://github.com/rvql)
 * fix: agent - eBPF fix errors caused by java_syms_update_tasks_head [#8147](https://github.com/deepflowio/deepflow/pull/8147) by [yinjiping](https://github.com/yinjiping)
 * fix: dispatcher pipelines is empty [#8001](https://github.com/deepflowio/deepflow/pull/8001) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: incorrect request resource in kafka logs [#8142](https://github.com/deepflowio/deepflow/pull/8142) by [yuanchaoa](https://github.com/yuanchaoa)
