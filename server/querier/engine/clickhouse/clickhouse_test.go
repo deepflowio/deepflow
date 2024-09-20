@@ -224,8 +224,8 @@ var (
 		output: []string{"SELECT region_0, AVGIf(`_div__sum_rtt_sum__sum_rtt_count`, `_div__sum_rtt_sum__sum_rtt_count` > 0) AS `Avg(rtt)`, MAX(`_sum_byte`) AS `Max(byte)` FROM (WITH if(SUM(rtt_count)>0, divide(SUM(rtt_sum), SUM(rtt_count)), null) AS `divide_0diveider_as_null_sum_rtt_sum_sum_rtt_count` SELECT dictGet('flow_tag.region_map', 'name', (toUInt64(region_id_0))) AS `region_0`, `divide_0diveider_as_null_sum_rtt_sum_sum_rtt_count` AS `_div__sum_rtt_sum__sum_rtt_count`, SUM(byte) AS `_sum_byte` FROM flow_metrics.`network_map` WHERE `time` >= 60 AND `time` <= 180 GROUP BY dictGet('flow_tag.region_map', 'name', (toUInt64(region_id_0))) AS `region_0`) GROUP BY `region_0` LIMIT 1"},
 		db:     "flow_metrics",
 	}, {
-		input:  "select request from l7_flow_log where Enum(tap_side)='xxx' limit 0, 50",
-		output: []string{"SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name = 'xxx' and tag_name='observation_point') OR observation_point = 'xxx') LIMIT 0, 50"},
+		input:  "select request from l7_flow_log where Enum(tap_side)='xxx' OR Enum(tap_side)!='xxx' OR Enum(app_service)='xxx' OR Enum(app_instance)!='xxx' limit 0, 50",
+		output: []string{"SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name = 'xxx' and tag_name='observation_point') OR observation_point = 'xxx') OR (observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name != 'xxx' and tag_name='observation_point') AND observation_point != 'xxx') OR (app_service = 'xxx' ) OR (app_instance != 'xxx' ) LIMIT 0, 50},
 	}, {
 		input:  "select request from l7_flow_log where Enum(tap_side) like 'xxx' limit 0, 50",
 		output: []string{"SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (observation_point GLOBAL IN (SELECT value FROM flow_tag.string_enum_map WHERE name ilike 'xxx' and tag_name='observation_point')) LIMIT 0, 50"},
@@ -333,12 +333,12 @@ var (
 	}, {
 		name:   "topk_1",
 		db:     "flow_metrics",
-		input:  "select pod_ns, topK(pod, 10) from `vtap_app_port.1h` WHERE time>=1687315761 AND time<=1687316661 group by pod_ns limit 10",
+		input:  "select pod_ns, TopK(pod, 10) from `vtap_app_port.1h` WHERE time>=1687315761 AND time<=1687316661 group by pod_ns limit 10",
 		output: []string{"SELECT dictGet('flow_tag.pod_ns_map', 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(10)(dictGet('flow_tag.pod_map', 'name', (toUInt64(pod_id)))) FROM flow_metrics.`application.1h` WHERE `time` >= 1687315761 AND `time` <= 1687316661 AND (pod_ns_id!=0) GROUP BY dictGet('flow_tag.pod_ns_map', 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10"},
 	}, {
 		name:   "topk_2",
 		db:     "flow_metrics",
-		input:  "select pod_ns, topK(pod, pod_cluster_id, service_id, 10) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
+		input:  "select pod_ns, TopK(pod, pod_cluster_id, service_id, 10) from `vtap_app_port.1h` WHERE time>=1694069050 AND time<=1694990640 group by pod_ns limit 10",
 		output: []string{"SELECT dictGet('flow_tag.pod_ns_map', 'name', (toUInt64(pod_ns_id))) AS `pod_ns`, topK(10)((dictGet('flow_tag.pod_map', 'name', (toUInt64(pod_id))),pod_cluster_id,service_id)) FROM flow_metrics.`application.1h` WHERE `time` >= 1694069050 AND `time` <= 1694990640 AND (pod_ns_id!=0) GROUP BY dictGet('flow_tag.pod_ns_map', 'name', (toUInt64(pod_ns_id))) AS `pod_ns` LIMIT 10"},
 	}, {
 		name:   "topk_enum",
@@ -437,7 +437,7 @@ var (
 		db:     "flow_metrics",
 	}, {
 		name:   "exist_trans_support_tag_0",
-		input:  "SELECT pod from l4_flow_log WHERE exist(pod_0) AND exist(host_1) AND exist(vpc_0) AND exist(auto_instance_1) AND exist(auto_service_0) LIMIT 1",
+		input:  "SELECT pod from l4_flow_log WHERE exist(pod_0) AND exist(host_1) AND exist(vpc_0) AND exist(auto_instance_1) AND exist(auto_service_0) AND exist(pod_service_0) LIMIT 1",
 		output: []string{"SELECT dictGet('flow_tag.pod_map', 'name', (toUInt64(pod_id))) AS `pod` FROM flow_log.`l4_flow_log` PREWHERE (pod_id_0!=0) AND (host_id_1!=0) AND (l3_epc_id_0!=-2) AND (auto_instance_type_1 not in (101,102)) AND (auto_service_type_0 not in (10)) LIMIT 1"},
 	}, {
 		name:   "exist_trans_support_tag_1",
