@@ -436,16 +436,17 @@ func UpdateController(
 		return nil, err
 	}
 
+	if err = tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
 	// if state equal to maintaince/exception, trigger realloc controller
 	// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配控制器
 	if state == common.HOST_STATE_MAINTENANCE || state == common.HOST_STATE_EXCEPTION {
 		m.TriggerReallocController(controller.IP)
 	}
 
-	if err = tx.Commit().Error; err != nil {
-		tx.Rollback()
-		return nil, err
-	}
 	response, _ := GetControllers(map[string]string{"lcuuid": lcuuid})
 	return &response[0], nil
 }
