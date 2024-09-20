@@ -483,10 +483,12 @@ func (d *Decoder) handleAppLog(agentId uint16, decoder *codec.SimpleDecoder) {
 		err := json.UnmarshalString(utils.String(bytes), &d.appLogEntrysCache)
 		if err != nil {
 			if d.counter.ErrorCount == 0 {
-				log.Errorf("application log json decode failed: %s", err)
+				log.Errorf("application log (%s) json decode (%d) failed: %s", utils.String(bytes), len(d.appLogEntrysCache), err)
 			}
 			d.counter.ErrorCount++
-			return
+			// since it is batch parsing, even if it fails in the end,
+			//   but some data may have been successfully parsed and returned in 'd.appLogEntrysCache',
+			//   so it needs to continue and should not be returned.
 		}
 		for i, appLogEntry := range d.appLogEntrysCache {
 			if err := d.WriteAppLog(agentId, &appLogEntry); err != nil {
