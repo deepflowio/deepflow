@@ -355,6 +355,7 @@ type Field struct {
 func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 
+	aggr1H1DTable := true
 	var orderKeys []string
 	code := metricsTableCodes[id]
 	if code&L3EpcID != 0 {
@@ -363,6 +364,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 		orderKeys = []string{timeKey, "l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0"}
 	} else if code&ACLGID != 0 {
 		orderKeys = []string{timeKey, "acl_gid"}
+		aggr1H1DTable = false
 	}
 	if code&ServerPort != 0 {
 		orderKeys = append(orderKeys, "server_port")
@@ -395,6 +397,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 		ColdStorage:     *coldStorage,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
+		Aggr1H1D:        aggr1H1DTable,
 	}
 }
 
@@ -408,6 +411,7 @@ func newMetricsSecondTable(minuteTable *ckdb.Table, ttl int, coldStorages *ckdb.
 	t.ColdStorage = *coldStorages
 	t.PartitionFunc = ckdb.TimeFuncFourHour
 	t.Engine = ckdb.MergeTree // 秒级数据不用支持使用replica
+	t.Aggr1H1D = false
 
 	return &t
 }
