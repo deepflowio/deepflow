@@ -442,21 +442,14 @@ impl BpfOptions {
             bf_insns: std::ptr::null_mut(),
         };
         unsafe {
-            #[cfg(target_arch = "x86_64")]
             let ret = pcap_sys::pcap_compile_nopcap(
                 0xffff as libc::c_int,
                 1,
                 &mut prog,
-                self.capture_bpf.as_ptr() as *const i8,
-                1,
-                0xffffffff,
-            );
-            #[cfg(target_arch = "aarch64")]
-            let ret = pcap_sys::pcap_compile_nopcap(
-                0xffff as libc::c_int,
-                1,
-                &mut prog,
-                self.capture_bpf.as_ptr() as *const u8,
+                std::ffi::CString::new(self.capture_bpf.clone())
+                    .unwrap()
+                    .as_c_str()
+                    .as_ptr() as *const libc::c_char,
                 1,
                 0xffffffff,
             );
