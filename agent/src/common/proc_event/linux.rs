@@ -150,12 +150,8 @@ impl ProcEvent {
         let data = &mut (*data);
         let cap_len = data.cap_len as usize;
         let mut raw_data = vec![0u8; cap_len as usize]; // Copy from data.cap_data where stores event's data
-        #[cfg(target_arch = "aarch64")]
         data.cap_data
-            .copy_to_nonoverlapping(raw_data.as_mut_ptr() as *mut u8, cap_len);
-        #[cfg(target_arch = "x86_64")]
-        data.cap_data
-            .copy_to_nonoverlapping(raw_data.as_mut_ptr() as *mut i8, cap_len);
+            .copy_to_nonoverlapping(raw_data.as_mut_ptr() as *mut libc::c_char, cap_len);
 
         let mut event_data: EventData = EventData::OtherEvent;
         let start_time = data.timestamp * 1000; // The unit of data.timestamp is microsecond, and the unit of start_time is nanosecond
