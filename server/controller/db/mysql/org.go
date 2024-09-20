@@ -104,35 +104,75 @@ func CheckORGNumberAndLog() ([]int, error) {
 	return orgIDs, nil
 }
 
+type SyncORGConfig struct {
+	HardDelete     bool
+	WhereCondition []interface{}
+	ExcludeFields  []string
+}
+
+type SyncORGConfigOption func(opts *SyncORGConfig)
+
+func WithHardDelete() SyncORGConfigOption {
+	return func(opts *SyncORGConfig) {
+		opts.HardDelete = true
+	}
+}
+
+func WithWhereCondition(condition ...interface{}) SyncORGConfigOption {
+	return func(opts *SyncORGConfig) {
+		opts.WhereCondition = condition
+	}
+}
+
+func WithExcludeFields(fields []string) SyncORGConfigOption {
+	return func(opts *SyncORGConfig) {
+		opts.ExcludeFields = fields
+	}
+}
+
 // SyncDefaultOrgData synchronizes a slice of data items of any type T to all organization databases except the default one.
 // It assumes each data item has an "ID" field (with a json tag "ID") serving as the primary key. During upsertion,
 // fields are updated based on their "gorm" tags, and empty string values are converted to null in the database.
 //
 // Parameters:
+// - uniqueKey: A unique identifier for the data items.
 // - data: A slice of data items of any type T to be synchronized. The type T must have an "ID" field tagged as the primary key.
-func SyncDefaultOrgData[T any](data []T, excludeFields []string) error {
+func SyncDefaultORGData[T any](uniqueKey string, data []T, options ...SyncORGConfigOption) error {
 	if len(data) == 0 {
 		return nil
 	}
 
+	cfg := &SyncORGConfig{}
+	for _, option := range options {
+		option(cfg)
+	}
+
 	excludeFieldsMap := make(map[string]bool)
-	for _, field := range excludeFields {
+	for _, field := range cfg.ExcludeFields {
 		excludeFieldsMap[field] = true
 	}
 
 	// get fields to update
 	dataType := reflect.TypeOf(data[0])
 	var fields []string
+	var structFieldName string
 	for i := 0; i < dataType.NumField(); i++ {
 		field := dataType.Field(i)
 		dbTag := field.Tag.Get("gorm")
 		if dbTag != "" {
 			columnName := GetColumnNameFromTag(dbTag)
+			if columnName == uniqueKey {
+				structFieldName = field.Name
+			}
 			if columnName != "" && !excludeFieldsMap[columnName] {
 				fields = append(fields, columnName)
 			}
 		}
 	}
+	if structFieldName == "" {
+		return fmt.Errorf("no struct field found for unique key: %s", uniqueKey)
+	}
+	log.Infof("weiqiang fields to update: %v", fields)
 
 	orgIDs, err := GetORGIDs()
 	if err != nil {
@@ -152,26 +192,56 @@ func SyncDefaultOrgData[T any](data []T, excludeFields []string) error {
 		db := dbInfo.DB
 		err = db.Transaction(func(tx *gorm.DB) error {
 			// delete
-			var existingIDs []int
+			var existingKeys []interface{}
 			var t T
-			if err := tx.Model(&t).Pluck("id", &existingIDs).Error; err != nil {
+			query := tx.Model(&t)
+			if len(cfg.WhereCondition) == 1 {
+				query = query.Where(cfg.WhereCondition[0])
+			} else if len(cfg.WhereCondition) > 1 {
+				query = query.Where(cfg.WhereCondition[0], cfg.WhereCondition[1:]...)
+			}
+			if err := query.Model(&t).Pluck(uniqueKey, &existingKeys).Error; err != nil {
 				return err
 			}
-			existingIDMap := make(map[int]bool)
-			for _, id := range existingIDs {
-				existingIDMap[id] = true
+			existingKeyMap := make(map[interface{}]bool)
+			for _, key := range existingKeys {
+				switch v := key.(type) {
+				case []byte:
+					existingKeyMap[string(v)] = true
+				default:
+					existingKeyMap[v] = true
+				}
 			}
+			log.Infof("weiqiang org(%v) existingKeyMap: %v", orgID, existingKeyMap)
 			for _, item := range data {
-				id := reflect.ValueOf(item).FieldByName("ID").Int()
-				existingIDMap[int(id)] = false
+				val := reflect.ValueOf(item)
+				field := val.FieldByName(structFieldName)
+				if !field.IsValid() {
+					return fmt.Errorf("field %s not found in the struct", structFieldName)
+				}
+				key := field.Interface()
+				switch v := key.(type) {
+				case []byte:
+					existingKeyMap[string(v)] = false
+				default:
+					existingKeyMap[v] = false
+				}
 			}
-			for id, exists := range existingIDMap {
+			log.Infof("weiqiang org(%v) existingKeyMap: %v", orgID, existingKeyMap)
+			for key, exists := range existingKeyMap {
 				if exists {
-					if err := tx.Where("id = ?", id).Delete(&t).Error; err != nil {
+					if cfg.HardDelete {
+						err = tx.Unscoped().Where(fmt.Sprintf("%s = ?", uniqueKey), key).Delete(&t).Error
+					} else {
+						err = tx.Where(fmt.Sprintf("%s = ?", uniqueKey), key).Delete(&t).Error
+					}
+					if err != nil {
 						return err
 					}
 				}
 			}
+
+			log.Infof("weiqiang org(%v) save data: %v", orgID, data)
 
 			// add or update
 			if err := tx.Clauses(clause.OnConflict{

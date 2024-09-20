@@ -94,6 +94,7 @@ func checkAndStartMasterFunctions(
 		return
 	}
 
+	regionCheck := monitor.NewRegionCheck(cfg)
 	vtapCheck := vtap.NewVTapCheck(cfg.MonitorCfg, ctx)
 	vtapRebalanceCheck := vtap.NewRebalanceCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
@@ -143,6 +144,9 @@ func checkAndStartMasterFunctions(
 
 				// 数据节点检查
 				analyzerCheck.Start(sCtx)
+
+				// region check
+				regionCheck.Start(sCtx)
 
 				// vtap check
 				vtapCheck.Start(sCtx)
