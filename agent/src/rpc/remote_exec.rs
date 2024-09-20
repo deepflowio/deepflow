@@ -1157,10 +1157,7 @@ fn username_by_uid(uid: u32) -> Result<String> {
     } else {
         conf as usize
     };
-    #[cfg(target_arch = "x86_64")]
-    let mut buffer: Vec<i8> = Vec::with_capacity(buf_size);
-    #[cfg(target_arch = "aarch64")]
-    let mut buffer: Vec<u8> = Vec::with_capacity(buf_size);
+    let mut buffer: Vec<libc::c_char> = Vec::with_capacity(buf_size);
     let mut passwd = libc::passwd {
         pw_name: ptr::null_mut(),
         pw_passwd: ptr::null_mut(),

@@ -314,13 +314,7 @@ impl fmt::Display for SK_BPF_DATA {
             (self.tuple.rport, self.tuple.lport)
         };
         unsafe {
-            #[cfg(target_arch = "aarch64")]
-            let process_kname = CStr::from_ptr(self.process_kname.as_ptr() as *const u8)
-                .to_str()
-                .unwrap();
-
-            #[cfg(target_arch = "x86_64")]
-            let process_kname = CStr::from_ptr(self.process_kname.as_ptr() as *const i8)
+            let process_kname = CStr::from_ptr(self.process_kname.as_ptr() as *const c_char)
                 .to_str()
                 .unwrap();
 
@@ -534,10 +528,7 @@ extern "C" {
     //   is_stdout 日志是否输出到标准输出，true 写到标准输出，false 不写到标准输出。
     // 返回值：
     //   成功返回0，否则返回非0
-    #[cfg(target_arch = "x86_64")]
-    pub fn bpf_tracer_init(log_file: *const i8, is_stdout: bool) -> c_int;
-    #[cfg(target_arch = "aarch64")]
-    pub fn bpf_tracer_init(log_file: *const u8, is_stdout: bool) -> c_int;
+    pub fn bpf_tracer_init(log_file: *const c_char, is_stdout: bool) -> c_int;
 
     // 所有tracer启动完毕后，最后显示调用bpf_tracer_finish()来通知主程序
     pub fn bpf_tracer_finish();
