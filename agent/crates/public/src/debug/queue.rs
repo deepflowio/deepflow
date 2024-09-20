@@ -17,7 +17,7 @@
 use std::{
     collections::HashMap,
     io::{self, ErrorKind},
-    net::{IpAddr, Ipv6Addr, Ipv4Addr, SocketAddr, ToSocketAddrs, UdpSocket},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
     str,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -151,16 +151,14 @@ impl QueueDebugger {
         let name = name.into();
         let sock = match UdpSocket::bind((IpAddr::from(Ipv6Addr::UNSPECIFIED), 0)) {
             Ok(s) => s,
-            Err(last_error) => {
-                match UdpSocket::bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 0)) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        warn!("UdpSocket::bind with ipv6 address error: {}", last_error);
-                        warn!("UdpSocket::bind with ipv4 address error: {}", e);
-                        return
-                    }
+            Err(last_error) => match UdpSocket::bind((IpAddr::from(Ipv4Addr::UNSPECIFIED), 0)) {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!("UdpSocket::bind with ipv6 address error: {}", last_error);
+                    warn!("UdpSocket::bind with ipv4 address error: {}", e);
+                    return;
                 }
-            }
+            },
         };
         let ctx = {
             let guard = self.queues.lock().unwrap();

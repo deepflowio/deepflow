@@ -871,12 +871,10 @@ impl<'a> MetaPacket<'a> {
         let cap_len = data.cap_len as usize;
 
         packet.raw_from_ebpf = vec![0u8; cap_len as usize];
-        #[cfg(target_arch = "aarch64")]
-        data.cap_data
-            .copy_to_nonoverlapping(packet.raw_from_ebpf.as_mut_ptr() as *mut u8, cap_len);
-        #[cfg(target_arch = "x86_64")]
-        data.cap_data
-            .copy_to_nonoverlapping(packet.raw_from_ebpf.as_mut_ptr() as *mut i8, cap_len);
+        data.cap_data.copy_to_nonoverlapping(
+            packet.raw_from_ebpf.as_mut_ptr() as *mut libc::c_char,
+            cap_len,
+        );
         packet.packet_len = data.syscall_len as u32 + 54; // 目前仅支持TCP
         packet.payload_len = data.cap_len as u16;
         packet.l4_payload_len = data.cap_len as u16;
@@ -886,16 +884,9 @@ impl<'a> MetaPacket<'a> {
         packet.process_id = data.process_id;
         packet.thread_id = data.thread_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
-        #[cfg(target_arch = "aarch64")]
         ptr::copy(
-            data.process_kname.as_ptr() as *const u8,
-            packet.process_kname.as_mut_ptr() as *mut u8,
-            PACKET_KNAME_MAX_PADDING,
-        );
-        #[cfg(target_arch = "x86_64")]
-        ptr::copy(
-            data.process_kname.as_ptr() as *const i8,
-            packet.process_kname.as_mut_ptr() as *mut i8,
+            data.process_kname.as_ptr() as *const libc::c_char,
+            packet.process_kname.as_mut_ptr() as *mut libc::c_char,
             PACKET_KNAME_MAX_PADDING,
         );
         packet.socket_id = data.socket_id;
