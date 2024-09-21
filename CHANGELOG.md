@@ -8,6 +8,7 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: the aggregation method of unsummable fields of custom data_source is wrong [#8181](https://github.com/deepflowio/deepflow/pull/8181) by [lzf575](https://github.com/lzf575)
 * fix: applicaition log decode failed causes subsequent data anomalies [#8179](https://github.com/deepflowio/deepflow/pull/8179) by [lzf575](https://github.com/lzf575)
 * fix: Bad cstr passed into pcap_compile_nopcap [#8171](https://github.com/deepflowio/deepflow/pull/8171) by [rvql](https://github.com/rvql)
 * fix: memory profile feature compile failed [#8157](https://github.com/deepflowio/deepflow/pull/8157) by [lzf575](https://github.com/lzf575)
