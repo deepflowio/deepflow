@@ -38,10 +38,8 @@ use crate::dispatcher::DEFAULT_BLOCK_SIZE;
 use crate::flow_generator::{DnsLog, OracleLog, TlsLog};
 use crate::{
     common::{
-        decapsulate::TunnelType,
-        enums::CaptureNetworkType,
-        l7_protocol_log::{get_all_protocol, L7ProtocolParserInterface},
-        DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL,
+        decapsulate::TunnelType, enums::CaptureNetworkType, DEFAULT_LOG_FILE,
+        L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL,
     },
     flow_generator::protocol_logs::SLOT_WIDTH,
     metric::document::TapSide,
@@ -3499,6 +3497,8 @@ impl YamlConfig {
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
     const DEFAULT_ORACLE_PORTS: &'static str = "1521";
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
+    const DEFAULT_L7_PROTOCOL_ENABLED: [&'static str; 7] =
+        ["HTTP", "HTTP2", "MySQL", "Redis", "Kafka", "DNS", "TLS"];
 
     pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
@@ -3859,15 +3859,10 @@ impl Default for YamlConfig {
             packet_sequence_queue_count: 1,  // Enterprise Edition Feature: packet-sequence
             packet_sequence_flag: 0,         // Enterprise Edition Feature: packet-sequence
             feature_flags: vec![],
-            l7_protocol_enabled: {
-                let mut protos = vec![];
-                for i in get_all_protocol() {
-                    if i.parse_default() {
-                        protos.push(i.as_str().to_owned());
-                    }
-                }
-                protos
-            },
+            l7_protocol_enabled: Self::DEFAULT_L7_PROTOCOL_ENABLED
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             external_agent_http_proxy_compressed: false,
             external_agent_http_proxy_profile_compressed: true,
             standalone_data_file_size: 200,
