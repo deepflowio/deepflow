@@ -155,7 +155,7 @@ func (t *Tencent) getResponse(service, version, action, region, resultKey string
 
 	startTime := time.Now()
 	// tencent api 3.0 limit max 100
-	offset, limit := 0, 100
+	offset, limit := 0, 50
 	// simple config
 	cpf := profile.NewClientProfile()
 	// sdk debug
