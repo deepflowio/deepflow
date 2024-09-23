@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -35,11 +34,6 @@ func (g *Genesis) getSubnets() ([]model.Subnet, error) {
 			log.Debug("network lcuuid not found", logger.NewORGPrefix(g.orgID))
 			continue
 		}
-		vpcLcuuid := s.VPCLcuuid
-		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUIDByOrgID(g.orgID, g.defaultVpcName)
-			g.defaultVpc = true
-		}
 		subnetName := s.Name
 		if subnetName == "" {
 			subnetName = "subnet_" + s.Lcuuid[:11]
@@ -48,7 +42,7 @@ func (g *Genesis) getSubnets() ([]model.Subnet, error) {
 			Lcuuid:        s.Lcuuid,
 			Name:          subnetName,
 			CIDR:          s.CIDR,
-			VPCLcuuid:     vpcLcuuid,
+			VPCLcuuid:     s.VPCLcuuid,
 			NetworkLcuuid: s.NetworkLcuuid,
 		}
 		subnets = append(subnets, subnet)
