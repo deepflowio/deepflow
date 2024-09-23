@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: incorrect tcp rrt [#8190](https://github.com/deepflowio/deepflow/pull/8190) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: the aggregation method of unsummable fields of custom data_source is wrong [#8182](https://github.com/deepflowio/deepflow/pull/8182) by [lzf575](https://github.com/lzf575)
 * fix: applicaition log decode failed causes subsequent data anomalies [#8178](https://github.com/deepflowio/deepflow/pull/8178) by [lzf575](https://github.com/lzf575)
 * fix: Bad cstr passed into pcap_compile_nopcap [#8175](https://github.com/deepflowio/deepflow/pull/8175) by [rvql](https://github.com/rvql)
