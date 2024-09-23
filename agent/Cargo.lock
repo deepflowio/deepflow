@@ -3177,6 +3177,7 @@ dependencies = [
  "pcap 0.10.1",
  "pnet",
  "prost",
+ "prost-build",
  "regex",
  "serde",
  "serde_json",
