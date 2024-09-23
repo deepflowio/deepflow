@@ -3920,25 +3920,11 @@ processors:
       enabled_protocols:
         - HTTP
         - HTTP2
-        - Dubbo
-        - SofaRPC
-        - FastCGI
-        - bRPC
         - MySQL
-        - PostgreSQL
-        - Oracle
         - Redis
-        - MongoDB
         - Kafka
-        - MQTT
-        - AMQP
-        - OpenWire
-        - NATS
-        - Pulsar
-        - ZMTP
         - DNS
         - TLS
-        - Custom
       # type: section
       # name:
       #   en: Protocol Special Config
@@ -4043,6 +4029,8 @@ processors:
         SofaRPC: 1-65535
         FastCGI: 1-65535
         bRPC: 1-65535
+        Tars: 1-65535
+        SomeIP: 1-65535
         MySQL: 1-65535
         PostgreSQL: 1-65535
         Oracle: 1521
@@ -4186,6 +4174,8 @@ processors:
         SOFARPC: []
         FastCGI: []
         bRPC: []
+        Tars: []
+        SomeIP: []
         MySQL: []
         PostgreSQL: []
         Oracle: []
