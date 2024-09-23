@@ -878,7 +878,10 @@ impl EbpfCollector {
             let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
             #[cfg(feature = "extended_profile")]
             {
-                let mp_ctx = memory_profile::MemoryContext::new(memory.report_interval);
+                let mp_ctx = memory_profile::MemoryContext::new(
+                    memory.report_interval,
+                    ebpf_conf.profile.preprocess.stack_compression,
+                );
                 handle.memory_profile_settings = Some(mp_ctx.settings());
                 contexts[ebpf::PROFILER_CTX_MEMORY_IDX] =
                     Box::into_raw(Box::new(mp_ctx)) as *mut c_void;
@@ -949,7 +952,12 @@ impl EbpfCollector {
                     let memory_cpu_regexp = config
                         .process_matcher
                         .iter()
-                        .find(|p| p.enabled_features.contains("ebpf.profile.memory"))
+                        .find(|p| {
+                            p.enabled_features
+                                .iter()
+                                .find(|f| f.eq_ignore_ascii_case("ebpf.profile.memory"))
+                                .is_some()
+                        })
                         .map(|p| p.match_regex.to_owned())
                         .unwrap_or_default();
                     ebpf::set_feature_regex(
