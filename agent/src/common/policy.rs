@@ -24,13 +24,14 @@ use log::warn;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use super::endpoint::{EPC_ANY, EPC_DEEPFLOW};
-use super::enums::{IpProtocol, TapType};
+use super::enums::{CaptureNetworkType, IpProtocol};
 use super::error::Error;
 use super::matched_field::{MatchedFieldv4, MatchedFieldv6, MatchedFlag};
 use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
 use npb_pcap_policy::{DirectionType, NpbAction, NpbTunnelType, PolicyData, TapSide};
 
+use public::proto::agent::{self, RoleType};
 use public::proto::trident;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -39,11 +40,11 @@ pub enum GroupType {
     Anonymous = 1,
 }
 
-impl From<trident::GroupType> for GroupType {
-    fn from(t: trident::GroupType) -> Self {
+impl From<agent::GroupType> for GroupType {
+    fn from(t: agent::GroupType) -> Self {
         match t {
-            trident::GroupType::Named => Self::Named,
-            trident::GroupType::Anonymous => Self::Anonymous,
+            agent::GroupType::Named => Self::Named,
+            agent::GroupType::Anonymous => Self::Anonymous,
         }
     }
 }
@@ -65,6 +66,54 @@ impl IpGroupData {
     }
 }
 
+impl TryFrom<&agent::Group> for IpGroupData {
+    type Error = Error;
+    fn try_from(g: &agent::Group) -> Result<Self, Self::Error> {
+        if g.ips.is_empty() && g.ip_ranges.is_empty() {
+            return Err(Error::ParseIpGroupData(format!(
+                "IpGroup({:?}) is invalid, ips and ip-range is none",
+                g
+            )));
+        }
+
+        let mut ips = vec![];
+        for s in g.ips.iter() {
+            let ip = s.parse::<IpNet>().map_err(|e| {
+                Error::ParseIpGroupData(format!("IpGroup({}) parse ip string failed: {}", s, e))
+            })?;
+            ips.push(ip);
+        }
+        for ip_range in g.ip_ranges.iter() {
+            let ip_peers = match ip_range.split_once('-') {
+                Some(p) => p,
+                None => {
+                    return Err(Error::ParseIpGroupData(format!(
+                        "IpGroup ({}) split ip string failed",
+                        ip_range
+                    )));
+                }
+            };
+            let (start, end) = match (ip_peers.0.parse::<IpAddr>(), ip_peers.1.parse::<IpAddr>()) {
+                (Ok(s), Ok(e)) => (s, e),
+                _ => {
+                    return Err(Error::ParseIpGroupData(format!(
+                        "IpGroup ({}, {}) parse ip string failed",
+                        ip_peers.0, ip_peers.1
+                    )));
+                }
+            };
+            ips.append(&mut ip_range_convert_to_cidr(start, end));
+        }
+
+        Ok(IpGroupData {
+            epc_id: (g.epc_id() & 0xffff) as u16,
+            ips,
+            id: (g.id() & 0xffff) as u16,
+        })
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
 impl TryFrom<&trident::Group> for IpGroupData {
     type Error = Error;
     fn try_from(g: &trident::Group) -> Result<Self, Self::Error> {
@@ -394,7 +443,7 @@ impl fmt::Display for Fieldv4 {
             self.field.get(MatchedFlag::SrcEpc),
             self.field.get(MatchedFlag::DstEpc),
             self.field.get(MatchedFlag::Proto),
-            self.field.get(MatchedFlag::TapType),
+            self.field.get(MatchedFlag::CaptureNetworkType),
             self.mask.get_ip(MatchedFlag::SrcIp),
             self.mask.get(MatchedFlag::SrcPort),
             self.mask.get_ip(MatchedFlag::DstIp),
@@ -402,7 +451,7 @@ impl fmt::Display for Fieldv4 {
             self.mask.get(MatchedFlag::SrcEpc),
             self.mask.get(MatchedFlag::DstEpc),
             self.mask.get(MatchedFlag::Proto),
-            self.mask.get(MatchedFlag::TapType)
+            self.mask.get(MatchedFlag::CaptureNetworkType)
         )
     }
 }
@@ -440,7 +489,7 @@ impl fmt::Display for Fieldv6 {
             self.field.get(MatchedFlag::SrcEpc),
             self.field.get(MatchedFlag::DstEpc),
             self.field.get(MatchedFlag::Proto),
-            self.field.get(MatchedFlag::TapType),
+            self.field.get(MatchedFlag::CaptureNetworkType),
             self.mask.get_ip(MatchedFlag::SrcIp),
             self.mask.get(MatchedFlag::SrcPort),
             self.mask.get_ip(MatchedFlag::DstIp),
@@ -448,7 +497,7 @@ impl fmt::Display for Fieldv6 {
             self.mask.get(MatchedFlag::SrcEpc),
             self.mask.get(MatchedFlag::DstEpc),
             self.mask.get(MatchedFlag::Proto),
-            self.mask.get(MatchedFlag::TapType)
+            self.mask.get(MatchedFlag::CaptureNetworkType)
         )
     }
 }
@@ -456,7 +505,7 @@ impl fmt::Display for Fieldv6 {
 #[derive(Clone, Debug, Default)]
 pub struct Acl {
     pub id: u32,
-    pub tap_type: TapType,
+    pub tap_type: CaptureNetworkType,
     pub src_groups: Vec<u32>,
     pub dst_groups: Vec<u32>,
     pub src_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
@@ -484,7 +533,7 @@ impl Acl {
     ) -> Self {
         Acl {
             id,
-            tap_type: TapType::Cloud,
+            tap_type: CaptureNetworkType::Cloud,
             src_groups,
             dst_groups,
             src_port_ranges,
@@ -573,7 +622,7 @@ impl Acl {
                     let mut item = Fieldv4::default();
 
                     let field = &mut item.field;
-                    field.set(MatchedFlag::TapType, u16::from(self.tap_type));
+                    field.set(MatchedFlag::CaptureNetworkType, u16::from(self.tap_type));
                     field.set_ip(MatchedFlag::SrcIp, src_ip4);
                     let src_epc = src_ip.get_epc_id();
                     if src_epc == (EPC_ANY & 0xffff) as u16 {
@@ -592,7 +641,10 @@ impl Acl {
                     field.set(MatchedFlag::DstPort, dst_port.port);
 
                     let mask = &mut item.mask;
-                    mask.set_mask(MatchedFlag::TapType, self.tap_type != TapType::Any);
+                    mask.set_mask(
+                        MatchedFlag::CaptureNetworkType,
+                        self.tap_type != CaptureNetworkType::Any,
+                    );
                     mask.set_ip(MatchedFlag::SrcIp, src_mask4);
                     mask.set_mask(
                         MatchedFlag::SrcEpc,
@@ -643,7 +695,7 @@ impl Acl {
                     let mut item = Fieldv6::default();
 
                     let field = &mut item.field;
-                    field.set(MatchedFlag::TapType, u16::from(self.tap_type));
+                    field.set(MatchedFlag::CaptureNetworkType, u16::from(self.tap_type));
                     field.set_ip(MatchedFlag::SrcIp, src_ip6);
                     let src_epc = src_ip.get_epc_id();
                     if src_epc == (EPC_ANY & 0xffff) as u16 {
@@ -662,7 +714,10 @@ impl Acl {
                     field.set(MatchedFlag::DstPort, dst_port.port);
 
                     let mask = &mut item.mask;
-                    mask.set_mask(MatchedFlag::TapType, self.tap_type != TapType::Any);
+                    mask.set_mask(
+                        MatchedFlag::CaptureNetworkType,
+                        self.tap_type != CaptureNetworkType::Any,
+                    );
                     mask.set_ip(MatchedFlag::SrcIp, src_mask6);
                     mask.set_mask(
                         MatchedFlag::SrcEpc,
@@ -708,11 +763,81 @@ impl Acl {
     }
 }
 
+impl TryFrom<agent::FlowAcl> for Acl {
+    type Error = String;
+
+    fn try_from(a: agent::FlowAcl) -> Result<Self, Self::Error> {
+        let tap_type = CaptureNetworkType::try_from(
+            (a.capture_network_type.unwrap_or_default() & 0xff) as u16,
+        );
+        if tap_type.is_err() {
+            return Err(format!(
+                "Acl tap_type parse error: {:?}.\n",
+                tap_type.unwrap_err()
+            ));
+        }
+        let src_ports = PortRangeList::try_from(a.src_ports.unwrap_or_default());
+        if src_ports.is_err() {
+            return Err(format!(
+                "Acl src port parse error: {:?}.\n",
+                src_ports.unwrap_err()
+            ));
+        }
+        let dst_ports = PortRangeList::try_from(a.dst_ports.unwrap_or_default());
+        if dst_ports.is_err() {
+            return Err(format!(
+                "Acl dst port parse error: {:?}.\n",
+                dst_ports.unwrap_err()
+            ));
+        }
+        let npb_actions: Vec<NpbAction> = a
+            .npb_actions
+            .iter()
+            .map(|n| {
+                NpbAction::new(
+                    n.npb_acl_group_id(),
+                    n.tunnel_id(),
+                    n.tunnel_ip()
+                        .parse::<IpAddr>()
+                        .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+                    n.tunnel_ip_id.unwrap_or_default() as u16,
+                    NpbTunnelType::new(n.tunnel_type.unwrap() as u8),
+                    TapSide::new(n.packet_capture_side.unwrap() as u8),
+                    DirectionType::new(n.direction.unwrap_or(1) as u8),
+                    n.payload_slice() as u16,
+                )
+            })
+            .collect();
+
+        Ok(Acl {
+            id: a.id.unwrap_or_default(),
+            tap_type: tap_type.unwrap(),
+            src_groups: a
+                .src_group_ids
+                .iter()
+                .map(|x| (x & 0xffff) as u32)
+                .collect(),
+            dst_groups: a
+                .dst_group_ids
+                .iter()
+                .map(|x| (x & 0xffff) as u32)
+                .collect(),
+            src_port_ranges: src_ports.unwrap().element().to_vec(),
+            dst_port_ranges: dst_ports.unwrap().element().to_vec(),
+            proto: (a.protocol.unwrap_or_default() & 0xffff) as u16,
+            npb_actions: npb_actions.clone(),
+            policy: Arc::new(PolicyData::new(npb_actions, a.id.unwrap_or_default())),
+            ..Default::default()
+        })
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
 impl TryFrom<trident::FlowAcl> for Acl {
     type Error = String;
 
     fn try_from(a: trident::FlowAcl) -> Result<Self, Self::Error> {
-        let tap_type = TapType::try_from((a.tap_type.unwrap_or_default() & 0xff) as u16);
+        let tap_type = CaptureNetworkType::try_from((a.tap_type.unwrap_or_default() & 0xff) as u16);
         if tap_type.is_err() {
             return Err(format!(
                 "Acl tap_type parse error: {:?}.\n",
@@ -777,7 +902,7 @@ impl TryFrom<trident::FlowAcl> for Acl {
 
 impl fmt::Display for Acl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Id:{} TapType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:[{}] DstPortRange:[{}] Proto:{} NpbActions:{}",
+        write!(f, "Id:{} CaptureNetworkType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:[{}] DstPortRange:[{}] Proto:{} NpbActions:{}",
             self.id, self.tap_type, self.src_groups, self.dst_groups,
             self.src_port_ranges.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", "),
             self.dst_port_ranges.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", "),
@@ -803,6 +928,44 @@ pub enum CidrType {
     Lan = 2,
 }
 
+impl From<agent::CidrType> for CidrType {
+    fn from(t: agent::CidrType) -> Self {
+        match t {
+            agent::CidrType::Lan => CidrType::Lan,
+            agent::CidrType::Wan => CidrType::Wan,
+        }
+    }
+}
+
+impl TryFrom<&agent::Cidr> for Cidr {
+    type Error = Error;
+    fn try_from(c: &agent::Cidr) -> Result<Self, Self::Error> {
+        if c.prefix.is_none() {
+            return Err(Error::ParseCidr(format!("Cidr({:?}) is invalid", &c)));
+        }
+        let ip: IpNet = c.prefix().parse().map_err(|_| {
+            Error::ParseCidr(format!("Cidr({:?}) has invalid prefix({})", c, c.prefix()))
+        })?;
+
+        let mut epc_id = c.epc_id();
+        if epc_id > 0 {
+            epc_id &= 0xffff;
+        } else if epc_id == 0 {
+            epc_id = EPC_DEEPFLOW;
+        }
+
+        Ok(Cidr {
+            ip,
+            tunnel_id: c.tunnel_id(),
+            epc_id,
+            cidr_type: c.r#type().into(),
+            is_vip: c.is_vip(),
+            region_id: c.region_id(),
+        })
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
 impl From<trident::CidrType> for CidrType {
     fn from(t: trident::CidrType) -> Self {
         match t {
@@ -812,6 +975,7 @@ impl From<trident::CidrType> for CidrType {
     }
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
 impl TryFrom<&trident::Cidr> for Cidr {
     type Error = Error;
     fn try_from(c: &trident::Cidr) -> Result<Self, Self::Error> {
@@ -869,6 +1033,16 @@ pub struct PeerConnection {
     pub remote_epc: i32,
 }
 
+impl From<&agent::PeerConnection> for PeerConnection {
+    fn from(p: &agent::PeerConnection) -> Self {
+        Self {
+            id: p.id(),
+            local_epc: (p.local_epc_id() & 0xffff) as i32,
+            remote_epc: (p.remote_epc_id() & 0xffff) as i32,
+        }
+    }
+}
+
 impl From<&trident::PeerConnection> for PeerConnection {
     fn from(p: &trident::PeerConnection) -> Self {
         Self {
@@ -887,6 +1061,22 @@ pub enum GpidProtocol {
     Max = 2,
 }
 
+impl TryFrom<agent::ServiceProtocol> for GpidProtocol {
+    type Error = Error;
+
+    fn try_from(value: agent::ServiceProtocol) -> Result<Self, Self::Error> {
+        match value {
+            agent::ServiceProtocol::Any => Err(Error::ParseGpid(format!(
+                "Parse GPIDEntry error: {:?}",
+                value
+            ))),
+            agent::ServiceProtocol::TcpService => Ok(GpidProtocol::Tcp),
+            agent::ServiceProtocol::UdpService => Ok(GpidProtocol::Udp),
+        }
+    }
+}
+
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
 impl TryFrom<trident::ServiceProtocol> for GpidProtocol {
     type Error = Error;
 
@@ -931,7 +1121,7 @@ pub struct GpidEntry {
     pub port_0: u16,
     pub pid_0: u32, // PID or GPID
     // Real ip
-    pub role_real: trident::RoleType,
+    pub role_real: agent::RoleType,
     pub epc_id_real: i32,
     pub ip_real: u32, // Only support IPV4.
     pub port_real: u16,
@@ -941,7 +1131,7 @@ pub struct GpidEntry {
 impl Default for GpidEntry {
     fn default() -> Self {
         Self {
-            role_real: trident::RoleType::RoleNone,
+            role_real: agent::RoleType::RoleNone,
             protocol: GpidProtocol::Udp,
             epc_id_1: 0,
             ip_1: 0,
@@ -978,9 +1168,9 @@ impl GpidEntry {
     }
 }
 
-impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
+impl TryFrom<&agent::GpidSyncEntry> for GpidEntry {
     type Error = Error;
-    fn try_from(value: &trident::GpidSyncEntry) -> Result<Self, Self::Error> {
+    fn try_from(value: &agent::GpidSyncEntry) -> Result<Self, Self::Error> {
         let protocol = GpidProtocol::try_from(value.protocol())?;
         // FIXME: Support epc id
         // let mut epc_id_0 = value.epc_id_0() as i32;
@@ -1020,10 +1210,65 @@ impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
     }
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl TryFrom<&trident::GpidSyncEntry> for GpidEntry {
+    type Error = Error;
+    fn try_from(value: &trident::GpidSyncEntry) -> Result<Self, Self::Error> {
+        let protocol = GpidProtocol::try_from(value.protocol())?;
+        // FIXME: Support epc id
+        // let mut epc_id_0 = value.epc_id_0() as i32;
+        // if epc_id_0 > 0 {
+        //     epc_id_0 &= 0xffff;
+        // } else if epc_id_0 == 0 {
+        //     epc_id_0 = EPC_FROM_DEEPFLOW;
+        // }
+        // let mut epc_id_1 = value.epc_id_1() as i32;
+        // if epc_id_1 > 0 {
+        //     epc_id_1 &= 0xffff;
+        // } else if epc_id_1 == 0 {
+        //     epc_id_1 = EPC_FROM_DEEPFLOW;
+        // }
+        // let mut epc_id_real = value.epc_id_real() as i32;
+        // if epc_id_real > 0 {
+        //     epc_id_real &= 0xffff;
+        // } else if epc_id_real == 0 {
+        //     epc_id_real = EPC_FROM_DEEPFLOW;
+        // }
+        Ok(GpidEntry {
+            epc_id_0: 0,
+            ip_0: value.ipv4_0(),
+            port_0: (value.port_0() & 0xffff) as u16,
+            pid_0: (value.pid_0() & 0xffffffff) as u32,
+            epc_id_1: 0,
+            ip_1: value.ipv4_1(),
+            port_1: (value.port_1() & 0xffff) as u16,
+            pid_1: (value.pid_1() & 0xffffffff) as u32,
+            epc_id_real: 0,
+            ip_real: value.ipv4_real(),
+            port_real: (value.port_real() & 0xffff) as u16,
+            pid_real: (value.pid_real() & 0xffffffff) as u32,
+            protocol,
+            role_real: RoleType::from_str_name(
+                (value.role_real() as trident::RoleType).as_str_name(),
+            )
+            .unwrap_or(RoleType::RoleNone),
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Container {
     pub pod_id: u32,
     pub container_id: String,
+}
+
+impl From<&agent::Container> for Container {
+    fn from(value: &agent::Container) -> Self {
+        Self {
+            pod_id: value.pod_id(),
+            container_id: value.container_id().to_string(),
+        }
+    }
 }
 
 impl From<&trident::Container> for Container {

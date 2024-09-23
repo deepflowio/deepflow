@@ -343,7 +343,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 	// not be 0. try GoReSym
 	if (uprobe_sym->name && uprobe_sym->entry == 0x0 &&
 	    is_feature_matched(FEATURE_UPROBE_GOLANG_SYMBOL,
-			       uprobe_sym->binary_path)) {
+			       pid, uprobe_sym->binary_path)) {
 		struct function_address_return func = {};
 		func = function_address((char *)uprobe_sym->binary_path,
 					(char *)uprobe_sym->name);
@@ -439,7 +439,7 @@ void *nd_memset(void *s, int c, ND_SIZET n)
 }
 #endif
 
-uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
+uint64_t get_symbol_addr_from_binary(int pid, const char *bin, const char *symname)
 {
 	if (!bin && !symname) {
 		return 0;
@@ -452,7 +452,7 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 	bcc_elf_foreach_sym(bin, find_sym, &default_option, &tmp);
 
-	if (!tmp.entry && is_feature_matched(FEATURE_UPROBE_GOLANG_SYMBOL, bin)) {
+	if (!tmp.entry && is_feature_matched(FEATURE_UPROBE_GOLANG_SYMBOL, pid, bin)) {
 		// The function address is used to set the hook point.
 		// itab is used for http2 to obtain fd. Currently only
 		// net_TCPConn_itab can be obtained for HTTPS.

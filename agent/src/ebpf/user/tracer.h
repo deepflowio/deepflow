@@ -117,15 +117,45 @@ enum probe_type {
 	UPROBE
 };
 
+struct thread_index_entry {
+	pthread_t thread;
+	int index;
+};
+
+struct thread_index_array {
+    struct thread_index_entry *entries;
+    pthread_mutex_t lock;
+};
+
+// PID management for feature-matching processes
+#define pids_match_hash_t        clib_bihash_8_8_t
+#define pids_match_hash_init     clib_bihash_init_8_8
+#define pids_match_hash_kv       clib_bihash_kv_8_8_t
+#define print_hash_pids_match    print_bihash_8_8
+#define pids_match_hash_search   clib_bihash_search_8_8
+#define pids_match_hash_add_del  clib_bihash_add_del_8_8
+#define pids_match_hash_free     clib_bihash_free_8_8
+#define pids_match_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
+#define pids_match_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
+
 // index number of feature.
 enum cfg_feature_idx {
+	FEATURE_UNKNOWN,
 	// Analyze go binary to get symbol address without symbol table
 	FEATURE_UPROBE_GOLANG_SYMBOL,
 	// openssl uprobe
 	FEATURE_UPROBE_OPENSSL,
 	// golang uprobe
 	FEATURE_UPROBE_GOLANG,
+	FEATURE_PROFILE_ONCPU,
+	FEATURE_PROFILE_OFFCPU,
+	FEATURE_PROFILE_MEMORY,
 	FEATURE_MAX,
+};
+
+enum match_pids_act {
+	MATCH_PID_ADD,
+	MATCH_PID_DEL,
 };
 
 struct cfg_feature_regex {
@@ -253,7 +283,9 @@ enum {
 	SOCKOPT_SET_CPDBG_ON,
 	SOCKOPT_SET_CPDBG_OFF,
 	/* get */
-	SOCKOPT_GET_CPDBG_SHOW
+	SOCKOPT_GET_CPDBG_SHOW,
+
+	SOCKOPT_PRINT_MATCH_PIDS = 800,
 };
 
 struct mem_block_head {
@@ -585,7 +617,7 @@ int set_bypass_port_bitmap(void *bitmap);
 int enable_ebpf_protocol(int protocol);
 int set_feature_regex(int feature, const char *pattern);
 bool is_feature_enabled(int feature);
-bool is_feature_matched(int feature, const char *path);
+bool is_feature_matched(int feature, int pid, const char *path);
 int bpf_tracer_init(const char *log_file, bool is_stdout);
 int tracer_bpf_load(struct bpf_tracer *tracer);
 int tracer_probes_init(struct bpf_tracer *tracer);
@@ -669,4 +701,15 @@ int enable_tracer_reader_work(const char *name, int idx,
  */
 int enable_ebpf_seg_reasm_protocol(int protocol);
 
+/**
+ * @brief Add regex-matched process list for feature.
+ * 
+ * @param feature Refers to a specific feature module, value: FEATURE_*
+ * @param pids Address of the process list
+ * @param num Number of elements in the process list
+ * @return 0 on success, non-zero on error
+ */ 
+int set_feature_pids(int feature, const int *pids, int num);
+int init_match_pids_hash(void);
+bool is_pid_match(int feature, int pid);
 #endif /* DF_USER_TRACER_H */

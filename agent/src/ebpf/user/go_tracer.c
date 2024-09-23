@@ -619,7 +619,7 @@ static int resolve_bin_file(const char *path, int pid,
 		}
 
 		p_info->info.net_TCPConn_itab =
-		    get_symbol_addr_from_binary(binary_path, tcp_conn_sym);
+		    get_symbol_addr_from_binary(pid, binary_path, tcp_conn_sym);
 		if (p_info->info.net_TCPConn_itab == 0)
 			ebpf_warning
 			    ("'%s' does not exist. Since eBPF uprobe relies on it to retrieve "
@@ -633,10 +633,10 @@ static int resolve_bin_file(const char *path, int pid,
 			     binary_path);
 
 		p_info->info.crypto_tls_Conn_itab =
-		    get_symbol_addr_from_binary(binary_path, tls_conn_sym);
+		    get_symbol_addr_from_binary(pid, binary_path, tls_conn_sym);
 
 		p_info->info.credentials_syscallConn_itab =
-		    get_symbol_addr_from_binary(binary_path, syscall_conn_sym);
+		    get_symbol_addr_from_binary(pid, binary_path, syscall_conn_sym);
 
 		p_info->has_updated = false;
 
@@ -680,7 +680,7 @@ static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
 	if (path == NULL)
 		return syms_count;
 
-	if (!is_feature_matched(FEATURE_UPROBE_GOLANG, path))
+	if (!is_feature_matched(FEATURE_UPROBE_GOLANG, pid, path))
 		goto out;
 
 	struct version_info go_version;
@@ -1002,7 +1002,7 @@ static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
 		return;
 	}
 
-	if (!is_feature_matched(FEATURE_UPROBE_GOLANG, path)) {
+	if (!is_feature_matched(FEATURE_UPROBE_GOLANG, pid, path)) {
 		free(path);
 		return;
 	}

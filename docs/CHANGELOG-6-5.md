@@ -11,6 +11,11 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: the aggregation method of unsummable fields of custom data_source is wrong [#8182](https://github.com/deepflowio/deepflow/pull/8182) by [lzf575](https://github.com/lzf575)
+* fix: applicaition log decode failed causes subsequent data anomalies [#8178](https://github.com/deepflowio/deepflow/pull/8178) by [lzf575](https://github.com/lzf575)
+* fix: Bad cstr passed into pcap_compile_nopcap [#8175](https://github.com/deepflowio/deepflow/pull/8175) by [rvql](https://github.com/rvql)
+* fix: agent - eBPF fix errors caused by java_syms_update_tasks_head [#8147](https://github.com/deepflowio/deepflow/pull/8147) by [yinjiping](https://github.com/yinjiping)
+* fix: dispatcher pipelines is empty [#8001](https://github.com/deepflowio/deepflow/pull/8001) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: incorrect request resource in kafka logs [#8142](https://github.com/deepflowio/deepflow/pull/8142) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: specify the go mod version when cli verify [#8136](https://github.com/deepflowio/deepflow/pull/8136) by [jiumos](https://github.com/jiumos)
 * fix:  specify the go mod version when building the cli [#8123](https://github.com/deepflowio/deepflow/pull/8123) by [jiumos](https://github.com/jiumos)
@@ -136,6 +141,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: default genesis sync vpc name [#8133](https://github.com/deepflowio/deepflow/pull/8133) by [askyrie](https://github.com/askyrie)
 * feat: querier support simple sql [#8121](https://github.com/deepflowio/deepflow/pull/8121) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8103](https://github.com/deepflowio/deepflow/pull/8103) by [yinjiping](https://github.com/yinjiping)
 * feat: Change opengauss api group [#8099](https://github.com/deepflowio/deepflow/pull/8099) by [rvql](https://github.com/rvql)
@@ -212,6 +218,8 @@
 * feat: add change log [#7095](https://github.com/deepflowio/deepflow/pull/7095) by [Nick-0314](https://github.com/Nick-0314)
 
 #### Refactoring
+* refactor: agent adds the 'disabled-cgroups' configuration. [#8165](https://github.com/deepflowio/deepflow/pull/8165) by [TomatoMr](https://github.com/TomatoMr)
+* refactor: agent adds a disable_cgroups option [#8159](https://github.com/deepflowio/deepflow/pull/8159) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: agent remove prometheus api sync [#7577](https://github.com/deepflowio/deepflow/pull/7577) by [TomatoMr](https://github.com/TomatoMr)
 * refactor: Change crate name [#7158](https://github.com/deepflowio/deepflow/pull/7158) by [rvql](https://github.com/rvql)
 

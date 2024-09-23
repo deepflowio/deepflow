@@ -6,7 +6,8 @@ pub mod remote_exec {
     use futures::future::BoxFuture;
     use thiserror::Error;
 
-    use crate::proto::trident as pb;
+    use crate::proto::agent as pb;
+    use crate::proto::trident;
 
     pub const DEFAULT_PARAM_REGEX: &'static str = "^[A-Za-z0-9-_]+$";
 
@@ -173,6 +174,17 @@ pub mod remote_exec {
             }
             write!(f, "}}")
         }
+    }
+
+    // FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+    pub fn get_params_from_trident(params: &[trident::Parameter]) -> Vec<pb::Parameter> {
+        params
+            .iter()
+            .map(|p| pb::Parameter {
+                key: p.key.clone(),
+                value: p.value.clone(),
+            })
+            .collect::<Vec<_>>()
     }
 
     #[cfg(test)]

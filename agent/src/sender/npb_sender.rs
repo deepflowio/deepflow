@@ -55,7 +55,7 @@ use crate::exception::ExceptionHandler;
 use crate::utils::stats;
 use npb_handler::{NpbHeader, NOT_SUPPORT};
 use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
-use public::proto::trident::{Exception, SocketType};
+use public::proto::agent::{Exception, SocketType};
 use public::queue::Receiver;
 #[cfg(unix)]
 use public::utils::net::MAC_ADDR_LEN;

@@ -20,7 +20,7 @@ use std::{
 };
 
 use crate::common::Timestamp;
-use public::proto::common::TridentType;
+use public::proto::agent::AgentType;
 
 pub const TIMEOUT_OTHERS: Timestamp = Timestamp::from_secs(5);
 pub const TIMEOUT_ESTABLISHED: Timestamp = Timestamp::from_secs(300);
@@ -112,8 +112,8 @@ pub struct FlowMapRuntimeConfig {
 
 #[derive(Clone)]
 pub struct FlowMapConfig {
-    pub vtap_id: u16,
-    pub trident_type: TridentType,
+    pub agent_id: u16,
+    pub agent_type: AgentType,
     pub cloud_gateway_traffic: bool,
     pub collector_enabled: bool,
     pub tap_types: [bool; 256],

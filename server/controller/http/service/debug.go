@@ -17,14 +17,24 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
+
+	"github.com/bytedance/sonic"
+	"github.com/go-redis/redis/v9"
 
 	gathermodel "github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/model"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
+	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
+	dbredis "github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis/grpc"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/service/common"
 	"github.com/deepflowio/deepflow/server/controller/manager"
@@ -137,11 +147,11 @@ func GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field string, m *m
 	}
 }
 
-func GetGenesisData(orgID int, g *genesis.Genesis) (genesis.GenesisSyncDataResponse, error) {
+func GetGenesisData(orgID int, g *genesis.Genesis) (gcommon.GenesisSyncDataResponse, error) {
 	return g.GetGenesisSyncData(orgID), nil
 }
 
-func GetGenesisSyncData(orgID int, g *genesis.Genesis) (genesis.GenesisSyncDataResponse, error) {
+func GetGenesisSyncData(orgID int, g *genesis.Genesis) (gcommon.GenesisSyncDataResponse, error) {
 	return g.GetGenesisSyncResponse(orgID)
 }
 
@@ -149,8 +159,8 @@ func GetGenesisKubernetesData(g *genesis.Genesis, orgID int, clusterID string) (
 	return g.GetKubernetesResponse(orgID, clusterID)
 }
 
-func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (genesis.TridentStats, error) {
-	return genesis.Synchronizer.GetAgentStats(orgID, vtapID)
+func GetAgentStats(g *genesis.Genesis, orgID, vtapID string) (grpc.TridentStats, error) {
+	return genesis.GenesisService.Synchronizer.GetAgentStats(orgID, vtapID)
 }
 
 func GetGenesisAgentStorage(vtapIDString string, orgDB *mysql.DB) (model.GenesisStorage, error) {
@@ -159,6 +169,38 @@ func GetGenesisAgentStorage(vtapIDString string, orgDB *mysql.DB) (model.Genesis
 	if err != nil {
 		return gStorage, errors.New(fmt.Sprintf("invalid vtap id (%s)", vtapIDString))
 	}
-	err = orgDB.Where("vtap_id = ?", vtapID).First(&gStorage).Error
+
+	redisCli := dbredis.GetClient()
+	if redisCli != nil {
+		var azControllerConn mysqlmodel.AZControllerConnection
+		err = orgDB.Where("controller_ip = ?", os.Getenv(ccommon.NODE_IP_KEY)).First(&azControllerConn).Error
+		if err != nil {
+			return gStorage, err
+		}
+		key := fmt.Sprintf(gcommon.SYNC_TYPE_FORMAT, azControllerConn.Region, orgDB.ORGID, "vinterface", vtapID)
+		val, err := redisCli.GenesisSync.Get(context.Background(), key).Result()
+		if err != nil {
+			if err == redis.Nil {
+				return gStorage, fmt.Errorf("not found vtap id (%d) info", vtapID)
+			}
+			return gStorage, err
+		}
+		items := []model.GenesisVinterface{}
+		err = sonic.Unmarshal([]byte(val), &items)
+		if err != nil {
+			return gStorage, err
+		}
+		for _, item := range items {
+			if item.NodeIP == "" {
+				continue
+			}
+			return model.GenesisStorage{
+				NodeIP: item.NodeIP,
+				VtapID: uint32(vtapID),
+			}, nil
+		}
+	} else {
+		err = orgDB.Where("vtap_id = ?", vtapID).First(&gStorage).Error
+	}
 	return gStorage, err
 }

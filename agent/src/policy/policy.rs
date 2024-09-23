@@ -32,7 +32,7 @@ use super::{
     Result as PResult,
 };
 use crate::common::endpoint::{EndpointData, EndpointDataPov};
-use crate::common::enums::TapType;
+use crate::common::enums::CaptureNetworkType;
 use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
@@ -43,8 +43,7 @@ use crate::common::MetaPacket;
 use crate::common::TapPort;
 use crate::common::{FlowAclListener, FlowAclListenerId};
 use npb_pcap_policy::PolicyData;
-use public::proto::common::TridentType;
-use public::proto::trident::RoleType;
+use public::proto::agent::{AgentType, RoleType};
 use public::queue::Sender;
 
 pub struct PolicyMonitor {
@@ -131,7 +130,7 @@ impl Policy {
     pub fn lookup_l3(&mut self, packet: &mut MetaPacket) {
         let key = &mut packet.lookup_key;
         let index = key.fast_index;
-        if key.tap_type != TapType::Cloud {
+        if key.tap_type != CaptureNetworkType::Cloud {
             return;
         }
         if key.src_ip.is_loopback() {
@@ -434,18 +433,14 @@ impl Policy {
         self.labeler.lookup_pod_id(container_id)
     }
 
-    pub fn update_interfaces(
-        &mut self,
-        trident_type: TridentType,
-        ifaces: &Vec<Arc<PlatformData>>,
-    ) {
+    pub fn update_interfaces(&mut self, agent_type: AgentType, ifaces: &Vec<Arc<PlatformData>>) {
         self.labeler.update_interface_table(ifaces);
         self.table.update_interfaces(ifaces);
 
         // TODO: 后续需要添加监控本地网卡，如果网卡配置有变化应该也需要出发表更新
         let local_interfaces = datalink::interfaces();
         self.forward
-            .update_from_config(trident_type, ifaces, &local_interfaces);
+            .update_from_config(agent_type, ifaces, &local_interfaces);
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
@@ -631,7 +626,7 @@ impl From<*mut Policy> for PolicySetter {
 impl FlowAclListener for PolicySetter {
     fn flow_acl_change(
         &mut self,
-        trident_type: TridentType,
+        agent_type: AgentType,
         local_epc: i32,
         ip_groups: &Vec<Arc<IpGroupData>>,
         platform_data: &Vec<Arc<PlatformData>>,
@@ -640,7 +635,7 @@ impl FlowAclListener for PolicySetter {
         acls: &Vec<Arc<Acl>>,
     ) -> Result<(), String> {
         self.update_local_epc(local_epc);
-        self.update_interfaces(trident_type, platform_data);
+        self.update_interfaces(agent_type, platform_data);
         self.update_ip_group(ip_groups);
         self.update_peer_connections(peers);
         self.update_cidr(cidrs);
@@ -670,12 +665,8 @@ impl PolicySetter {
         self.policy().labeler.update_local_epc(local_epc);
     }
 
-    pub fn update_interfaces(
-        &mut self,
-        trident_type: TridentType,
-        ifaces: &Vec<Arc<PlatformData>>,
-    ) {
-        self.policy().update_interfaces(trident_type, ifaces);
+    pub fn update_interfaces(&mut self, agent_type: AgentType, ifaces: &Vec<Arc<PlatformData>>) {
+        self.policy().update_interfaces(agent_type, ifaces);
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
@@ -763,7 +754,7 @@ mod test {
             cidr_type: CidrType::Wan,
             ..Default::default()
         };
-        setter.update_interfaces(TridentType::TtHostPod, &vec![Arc::new(interface)]);
+        setter.update_interfaces(AgentType::TtHostPod, &vec![Arc::new(interface)]);
         setter.update_cidr(&vec![Arc::new(cidr)]);
         setter.flush();
 

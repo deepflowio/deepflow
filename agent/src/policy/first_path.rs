@@ -762,7 +762,7 @@ mod tests {
 
     use super::*;
     use crate::common::endpoint::EndpointInfo;
-    use crate::common::enums::TapType;
+    use crate::common::enums::CaptureNetworkType;
     use crate::common::port_range::PortRange;
 
     use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
@@ -854,7 +854,7 @@ mod tests {
             src_port: 80,
             dst_port: 100,
             feature_flag: FeatureFlags::NONE,
-            tap_type: TapType::Cloud,
+            tap_type: CaptureNetworkType::Cloud,
             ..Default::default()
         };
 
@@ -889,7 +889,7 @@ mod tests {
             src_port: 80,
             dst_port: 100,
             feature_flag: FeatureFlags::DEDUP,
-            tap_type: TapType::Cloud,
+            tap_type: CaptureNetworkType::Cloud,
             ..Default::default()
         };
         let (policy, _) = first_get(&mut first, &mut key, endpotins).unwrap();

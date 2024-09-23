@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package genesis
+package updater
 
 import (
-	"context"
 	"fmt"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,13 +27,11 @@ import (
 
 	"inet.af/netaddr"
 
-	tridentcommon "github.com/deepflowio/deepflow/message/common"
-	"github.com/deepflowio/deepflow/server/controller/common"
-	genesiscommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
+	ccommon "github.com/deepflowio/deepflow/server/controller/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
-	"github.com/deepflowio/deepflow/server/libs/queue"
 )
 
 type bridge struct {
@@ -43,21 +41,17 @@ type bridge struct {
 }
 
 type GenesisSyncRpcUpdater struct {
-	vCtx                  context.Context
-	vCancel               context.CancelFunc
-	storage               *SyncStorage
-	outputQueue           queue.QueueReader
-	hostIPsRanges         []netaddr.IPPrefix
-	localIPRanges         []netaddr.IPPrefix
-	excludeIPRanges       []netaddr.IPPrefix
-	multiNSMode           bool
-	singleVPCMode         bool
-	vmNameField           string
-	ignoreNICRegex        *regexp.Regexp
-	genesisSyncDataByVtap map[string]GenesisSyncDataOperation
+	hostIPsRanges   []netaddr.IPPrefix
+	localIPRanges   []netaddr.IPPrefix
+	excludeIPRanges []netaddr.IPPrefix
+	multiNSMode     bool
+	singleVPCMode   bool
+	nodeIP          string
+	vmNameField     string
+	ignoreNICRegex  *regexp.Regexp
 }
 
-func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg config.GenesisConfig, ctx context.Context) *GenesisSyncRpcUpdater {
+func NewGenesisSyncRpcUpdater(cfg config.GenesisConfig) *GenesisSyncRpcUpdater {
 	hostIPRanges := []netaddr.IPPrefix{}
 	for _, h := range cfg.HostIPs {
 		ipObj, err := netaddr.ParseIP(h)
@@ -128,52 +122,47 @@ func NewGenesisSyncRpcUpdater(storage *SyncStorage, queue queue.QueueReader, cfg
 		log.Errorf("config ignore NIC regex (%s) complie failed", cfg.IgnoreNICRegex)
 	}
 
-	vCtx, vCancel := context.WithCancel(ctx)
 	return &GenesisSyncRpcUpdater{
-		vCtx:                  vCtx,
-		vCancel:               vCancel,
-		storage:               storage,
-		outputQueue:           queue,
-		hostIPsRanges:         hostIPRanges,
-		localIPRanges:         localIPRanges,
-		excludeIPRanges:       excludeIPRanges,
-		multiNSMode:           cfg.MultiNSMode,
-		singleVPCMode:         cfg.SingleVPCMode,
-		vmNameField:           cfg.VMNameField,
-		ignoreNICRegex:        ignoreNICRegex,
-		genesisSyncDataByVtap: map[string]GenesisSyncDataOperation{},
+		nodeIP:          os.Getenv(ccommon.NODE_IP_KEY),
+		hostIPsRanges:   hostIPRanges,
+		localIPRanges:   localIPRanges,
+		excludeIPRanges: excludeIPRanges,
+		multiNSMode:     cfg.MultiNSMode,
+		singleVPCMode:   cfg.SingleVPCMode,
+		vmNameField:     cfg.VMNameField,
+		ignoreNICRegex:  ignoreNICRegex,
 	}
 }
 
-func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer string, vtapID uint32, k8sClusterID, deviceType string) []model.GenesisVinterface {
+func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info common.VIFRPCMessage, peer string, vtapID uint32, k8sClusterID, deviceType string) []model.GenesisVinterface {
 	var isContainer bool
-	if deviceType == genesiscommon.DEVICE_TYPE_DOCKER_HOST {
+	if deviceType == common.DEVICE_TYPE_DOCKER_HOST {
 		isContainer = true
 	}
 	epoch := time.Now()
 	VIFs := []model.GenesisVinterface{}
-	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
+	ipAddrs := info.Message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
-		log.Errorf("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.orgID))
+		log.Errorf("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.ORGID))
 		return []model.GenesisVinterface{}
 	}
-	netNSs := info.message.GetPlatformData().GetRawIpNetns()
+	netNSs := info.Message.GetPlatformData().GetRawIpNetns()
 	if len(netNSs) == 0 {
 		netNSs = []string{""}
 		ipAddrs = ipAddrs[:1]
 	}
 	if len(ipAddrs) != len(netNSs) {
-		log.Error("the quantities of (raw ip addrs) and (raw ip netns) do not match", logger.NewORGPrefix(info.orgID))
+		log.Error("the quantities of (raw ip addrs) and (raw ip netns) do not match", logger.NewORGPrefix(info.ORGID))
 		return []model.GenesisVinterface{}
 	}
 	rootNSMacs := map[string]bool{}
-	ifIndexToInterface := map[string]genesiscommon.Iface{}
-	ifNameToInterface := map[string]genesiscommon.Iface{}
+	ifIndexToInterface := map[string]common.Iface{}
+	ifNameToInterface := map[string]common.Iface{}
 	for i, ipAddr := range ipAddrs {
 		nsName := netNSs[i]
-		parsedGlobalIPs, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddr, " "))
+		parsedGlobalIPs, err := common.ParseIPOutput(strings.Trim(ipAddr, " "))
 		if err != nil {
-			log.Errorf("parse ip output error: (%s)", err, logger.NewORGPrefix(info.orgID))
+			log.Errorf("parse ip output error: (%s)", err, logger.NewORGPrefix(info.ORGID))
 			return []model.GenesisVinterface{}
 		}
 
@@ -212,20 +201,21 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 				ipSlice = append(ipSlice, fmt.Sprintf("%s/%v", ip.Address, ip.MaskLen))
 			}
 			vIF.IPs = strings.Join(ipSlice, ",")
-			vIF.Lcuuid = common.GetUUIDByOrgID(info.orgID, vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)))
-			vIF.DeviceLcuuid = common.GetUUIDByOrgID(info.orgID, vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)))
+			vIF.Lcuuid = ccommon.GetUUIDByOrgID(info.ORGID, vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)))
+			vIF.DeviceLcuuid = ccommon.GetUUIDByOrgID(info.ORGID, vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)))
 			vIF.DeviceType = deviceType
 			vIF.HostIP = peer
 			vIF.LastSeen = epoch
 			vIF.VtapID = vtapID
+			vIF.NodeIP = v.nodeIP
 			vIF.KubernetesClusterID = k8sClusterID
-			vIF.TeamID = info.teamID
+			vIF.TeamID = info.TeamID
 			VIFs = append(VIFs, vIF)
 		}
 	}
 
 	deviceIDToMinMAC := map[string]uint64{}
-	for _, iface := range info.message.GetPlatformData().Interfaces {
+	for _, iface := range info.Message.GetPlatformData().Interfaces {
 		ifaceMAC := iface.GetMac()
 		ifaceDeviceID := iface.GetDeviceId()
 		if iMac, ok := deviceIDToMinMAC[ifaceDeviceID]; ok {
@@ -238,12 +228,12 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 	}
 	deviceIDToUUID := map[string]string{}
 	for key, value := range deviceIDToMinMAC {
-		deviceIDToUUID[key] = common.GetUUIDByOrgID(info.orgID, key+fmt.Sprintf("%d", value))
+		deviceIDToUUID[key] = ccommon.GetUUIDByOrgID(info.ORGID, key+fmt.Sprintf("%d", value))
 	}
-	for _, iface := range info.message.GetPlatformData().Interfaces {
+	for _, iface := range info.Message.GetPlatformData().Interfaces {
 		vIF := model.GenesisVinterface{
 			Name: iface.GetName(),
-			Mac:  genesiscommon.Uint64ToMac(iface.GetMac()).String(),
+			Mac:  common.Uint64ToMac(iface.GetMac()).String(),
 		}
 		var hasNetMask bool
 		var validIPs []string
@@ -253,14 +243,14 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			if hasNetMask {
 				ipPrefix, err := netaddr.ParseIPPrefix(addr)
 				if err != nil {
-					log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
+					log.Error(err.Error(), logger.NewORGPrefix(info.ORGID))
 					continue
 				}
 				netIP = ipPrefix.IP()
 			} else {
 				ipAddr, err := netaddr.ParseIP(addr)
 				if err != nil {
-					log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
+					log.Error(err.Error(), logger.NewORGPrefix(info.ORGID))
 					continue
 				}
 				netIP = ipAddr
@@ -279,7 +269,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 			validIPs = append(validIPs, addr)
 		}
 		vIF.IPs = strings.Join(validIPs, ",")
-		vIF.Lcuuid = common.GetUUIDByOrgID(info.orgID, vIF.Name+vIF.Mac+vIF.IPs+strconv.Itoa(int(vtapID)))
+		vIF.Lcuuid = ccommon.GetUUIDByOrgID(info.ORGID, vIF.Name+vIF.Mac+vIF.IPs+strconv.Itoa(int(vtapID)))
 		ifaceNSName := iface.GetNetns()
 		if len(ipAddrs) == 1 {
 			ifaceNSName = netNSs[0]
@@ -297,14 +287,14 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 				vIF.DeviceLcuuid = deviceIDToUUID[iface.GetDeviceId()]
 			}
 			vIF.DeviceName = fmt.Sprintf("namespace-%s", iface.GetDeviceId())
-			vIF.DeviceType = genesiscommon.DEVICE_TYPE_DOCKER_CONTAINER
+			vIF.DeviceType = common.DEVICE_TYPE_DOCKER_CONTAINER
 			if _, ok := rootNSMacs[vIF.Mac]; ok && v.multiNSMode {
-				vIF.DeviceType = genesiscommon.DEVICE_TYPE_DOCKER_HOST
+				vIF.DeviceType = common.DEVICE_TYPE_DOCKER_HOST
 			}
-		} else if deviceType == genesiscommon.DEVICE_TYPE_KVM_HOST {
+		} else if deviceType == common.DEVICE_TYPE_KVM_HOST {
 			vIF.DeviceLcuuid = iface.GetDeviceId()
 			vIF.DeviceName = iface.GetDeviceName()
-			vIF.DeviceType = genesiscommon.DEVICE_TYPE_KVM_VM
+			vIF.DeviceType = common.DEVICE_TYPE_KVM_VM
 		} else {
 			// 忽略workload类型
 			continue
@@ -314,25 +304,26 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info VIFRPCMessage, peer str
 		vIF.HostIP = peer
 		vIF.LastSeen = epoch
 		vIF.VtapID = vtapID
+		vIF.NodeIP = v.nodeIP
 		vIF.KubernetesClusterID = k8sClusterID
-		vIF.TeamID = info.teamID
+		vIF.TeamID = info.TeamID
 		VIFs = append(VIFs, vIF)
 	}
 	return VIFs
 }
 
-func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []model.GenesisVIP {
+func (v *GenesisSyncRpcUpdater) ParseVIP(info common.VIFRPCMessage, vtapID uint32) []model.GenesisVIP {
 	var vips []model.GenesisVIP
 
-	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
+	ipAddrs := info.Message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
-		log.Errorf("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.orgID))
+		log.Errorf("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.ORGID))
 		return []model.GenesisVIP{}
 	}
 	for _, ipAddr := range ipAddrs {
-		parsedGlobalIPs, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddr, " "))
+		parsedGlobalIPs, err := common.ParseIPOutput(strings.Trim(ipAddr, " "))
 		if err != nil {
-			log.Errorf("parse ip output error: (%s)", err, logger.NewORGPrefix(info.orgID))
+			log.Errorf("parse ip output error: (%s)", err, logger.NewORGPrefix(info.ORGID))
 			return []model.GenesisVIP{}
 		}
 
@@ -343,16 +334,17 @@ func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []mo
 			for _, ip := range item.IPs {
 				ipObj, err := netaddr.ParseIP(ip.Address)
 				if err != nil {
-					log.Warningf("parse lo vip (%s) field: (%s)", ip.Address, err, logger.NewORGPrefix(info.orgID))
+					log.Warningf("parse lo vip (%s) field: (%s)", ip.Address, err, logger.NewORGPrefix(info.ORGID))
 					continue
 				}
 				if ipObj.IsLoopback() {
 					continue
 				}
 				vips = append(vips, model.GenesisVIP{
-					Lcuuid: common.GetUUIDByOrgID(info.orgID, ip.Address+strconv.Itoa(int(vtapID))),
+					Lcuuid: ccommon.GetUUIDByOrgID(info.ORGID, ip.Address+strconv.Itoa(int(vtapID))),
 					IP:     ip.Address,
 					VtapID: vtapID,
+					NodeIP: v.nodeIP,
 				})
 			}
 		}
@@ -360,35 +352,37 @@ func (v *GenesisSyncRpcUpdater) ParseVIP(info VIFRPCMessage, vtapID uint32) []mo
 	return vips
 }
 
-func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, peer, natIP string, vtapID uint32) GenesisSyncDataOperation {
-	hostName := strings.Trim(info.message.GetPlatformData().GetRawHostname(), " \n")
+func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info common.VIFRPCMessage, peer, natIP string, vtapID uint32) common.GenesisSyncDataResponse {
+	hostName := strings.Trim(info.Message.GetPlatformData().GetRawHostname(), " \n")
 	if hostName == "" {
-		log.Error("get sync data (raw hostname) empty", logger.NewORGPrefix(info.orgID))
-		return GenesisSyncDataOperation{}
+		log.Error("get sync data (raw hostname) empty", logger.NewORGPrefix(info.ORGID))
+		return common.GenesisSyncDataResponse{}
 	}
-	ipAddrs := info.message.GetPlatformData().GetRawIpAddrs()
+	ipAddrs := info.Message.GetPlatformData().GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
-		log.Error("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.orgID))
-		return GenesisSyncDataOperation{}
+		log.Error("get sync data (raw ip addrs) empty", logger.NewORGPrefix(info.ORGID))
+		return common.GenesisSyncDataResponse{}
 	}
-	interfaces, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddrs[0], " "))
+	interfaces, err := common.ParseIPOutput(strings.Trim(ipAddrs[0], " "))
 	if err != nil {
-		log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
-		return GenesisSyncDataOperation{}
+		log.Error(err.Error(), logger.NewORGPrefix(info.ORGID))
+		return common.GenesisSyncDataResponse{}
 	}
 	// check if vm is behind NAT
 	behindNat := peer != natIP
-	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode, logger.NewORGPrefix(info.orgID))
+	log.Infof("host (%s) nat ip is (%s) peer ip is (%s), behind nat: (%t), single vpc mode: (%t)", hostName, natIP, peer, behindNat, v.singleVPCMode, logger.NewORGPrefix(info.ORGID))
 	vpc := model.GenesisVpc{
 		Name:   "default-public-cloud-vpc",
-		Lcuuid: common.GetUUIDByOrgID(info.orgID, "default-public-cloud-vpc"),
+		Lcuuid: ccommon.GetUUIDByOrgID(info.ORGID, "default-public-cloud-vpc"),
 		VtapID: vtapID,
+		NodeIP: v.nodeIP,
 	}
 	if behindNat && !v.singleVPCMode {
 		vpc = model.GenesisVpc{
 			Name:   "VPC-" + peer,
-			Lcuuid: common.GetUUIDByOrgID(info.orgID, "VPC-"+peer),
+			Lcuuid: ccommon.GetUUIDByOrgID(info.ORGID, "VPC-"+peer),
 			VtapID: vtapID,
+			NodeIP: v.nodeIP,
 		}
 	}
 	vpcs := []model.GenesisVpc{vpc}
@@ -396,12 +390,13 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	vm := model.GenesisVM{
 		Name:         hostName,
 		Label:        hostName,
-		Lcuuid:       common.GetUUIDByOrgID(info.orgID, hostName),
+		Lcuuid:       ccommon.GetUUIDByOrgID(info.ORGID, hostName),
 		VPCLcuuid:    vpc.Lcuuid,
 		LaunchServer: "127.0.0.1",
-		State:        common.VM_STATE_RUNNING,
+		State:        ccommon.VM_STATE_RUNNING,
 		CreatedAt:    time.Now(),
 		VtapID:       vtapID,
+		NodeIP:       v.nodeIP,
 	}
 	vms := []model.GenesisVM{vm}
 
@@ -410,11 +405,11 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 	ipLastSeens := []model.GenesisIP{}
 	for _, iface := range interfaces {
 		if iface.MAC == "" || iface.Name == "lo" {
-			log.Debugf("not found mac or netcard is loopback (%#v)", iface, logger.NewORGPrefix(info.orgID))
+			log.Debugf("not found mac or netcard is loopback (%#v)", iface, logger.NewORGPrefix(info.ORGID))
 			continue
 		}
 		ips := iface.IPs
-		firstIP := genesiscommon.VifInfo{}
+		firstIP := common.VifInfo{}
 		ipFlag := false
 		for _, sIP := range ips {
 			if sIP.Scope == "global" {
@@ -430,8 +425,8 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 		for _, ipItem := range ips {
 			pIP, err := netaddr.ParseIP(ipItem.Address)
 			if err != nil {
-				log.Error(err.Error(), logger.NewORGPrefix(info.orgID))
-				return GenesisSyncDataOperation{}
+				log.Error(err.Error(), logger.NewORGPrefix(info.ORGID))
+				return common.GenesisSyncDataResponse{}
 			}
 
 			localFlag := false
@@ -448,18 +443,19 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 		}
 		networkName := fmt.Sprintf("Network-%s/%v", firstIP.Address, firstIP.MaskLen)
 		network, ok := nameToNetwork[networkName]
-		vType := common.VIF_TYPE_LAN
-		netType := common.NETWORK_TYPE_LAN
+		vType := ccommon.VIF_TYPE_LAN
+		netType := ccommon.NETWORK_TYPE_LAN
 		if isExternal {
-			vType = common.VIF_TYPE_WAN
-			netType = common.NETWORK_TYPE_WAN
+			vType = ccommon.VIF_TYPE_WAN
+			netType = ccommon.NETWORK_TYPE_WAN
 		}
 		if !ok {
 			network = model.GenesisNetwork{
-				Lcuuid:         common.GetUUIDByOrgID(info.orgID, networkName),
+				Lcuuid:         ccommon.GetUUIDByOrgID(info.ORGID, networkName),
 				Name:           networkName,
 				SegmentationID: 1,
 				VtapID:         vtapID,
+				NodeIP:         v.nodeIP,
 				VPCLcuuid:      vpc.Lcuuid,
 				External:       isExternal,
 				NetType:        uint32(netType),
@@ -467,14 +463,15 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 			nameToNetwork[networkName] = network
 		}
 		port := model.GenesisPort{
-			Lcuuid:        common.GetUUIDByOrgID(info.orgID, hostName+iface.MAC),
+			Lcuuid:        ccommon.GetUUIDByOrgID(info.ORGID, hostName+iface.MAC),
 			Type:          uint32(vType),
 			VtapID:        vtapID,
+			NodeIP:        v.nodeIP,
 			Mac:           iface.MAC,
 			DeviceLcuuid:  vm.Lcuuid,
 			NetworkLcuuid: network.Lcuuid,
 			VPCLcuuid:     vm.VPCLcuuid,
-			DeviceType:    common.VIF_DEVICE_TYPE_VM,
+			DeviceType:    ccommon.VIF_DEVICE_TYPE_VM,
 		}
 		ports = append(ports, port)
 		for _, p := range ips {
@@ -484,15 +481,16 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 			}
 			oIP, err := netaddr.ParseIP(p.Address)
 			if err != nil {
-				log.Warning(err.Error(), logger.NewORGPrefix(info.orgID))
+				log.Warning(err.Error(), logger.NewORGPrefix(info.ORGID))
 				continue
 			}
 			ipLastSeen := model.GenesisIP{
-				Lcuuid:           common.GetUUIDByOrgID(info.orgID, hostName+oIP.String()+port.Lcuuid),
+				Lcuuid:           ccommon.GetUUIDByOrgID(info.ORGID, hostName+oIP.String()+port.Lcuuid),
 				VinterfaceLcuuid: port.Lcuuid,
 				IP:               p.Address,
 				Masklen:          p.MaskLen,
 				VtapID:           vtapID,
+				NodeIP:           v.nodeIP,
 				LastSeen:         time.Now(),
 			}
 			ipLastSeens = append(ipLastSeens, ipLastSeen)
@@ -503,22 +501,22 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info VIFRPCMessage, pe
 		networks = append(networks, n)
 	}
 
-	return GenesisSyncDataOperation{
-		VMs:         NewVMPlatformDataOperation(info.orgID, vms),
-		VPCs:        NewVpcPlatformDataOperation(info.orgID, vpcs),
-		Ports:       NewPortPlatformDataOperation(info.orgID, ports),
-		Networks:    NewNetworkPlatformDataOperation(info.orgID, networks),
-		IPlastseens: NewIPLastSeenPlatformDataOperation(info.orgID, ipLastSeens),
+	return common.GenesisSyncDataResponse{
+		VMs:         vms,
+		VPCs:        vpcs,
+		Ports:       ports,
+		Networks:    networks,
+		IPLastSeens: ipLastSeens,
 	}
 }
 
-func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint32) []model.GenesisProcess {
+func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info common.VIFRPCMessage, vtapID uint32) []model.GenesisProcess {
 	processes := []model.GenesisProcess{}
 	if vtapID == 0 {
 		return processes
 	}
 
-	for _, p := range info.message.GetProcessData().GetProcessEntries() {
+	for _, p := range info.Message.GetProcessData().GetProcessEntries() {
 		var osAppTagSlice []string
 		for _, tag := range p.GetOsAppTags() {
 			osAppTagSlice = append(osAppTagSlice, tag.GetKey()+":"+tag.GetValue())
@@ -527,7 +525,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 		startTime := time.Unix(int64(p.GetStartTime()), 0)
 		pID := p.GetPid()
 		processes = append(processes, model.GenesisProcess{
-			Lcuuid:      common.GetUUIDByOrgID(info.orgID, strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID))),
+			Lcuuid:      ccommon.GetUUIDByOrgID(info.ORGID, strconv.Itoa(int(pID))+strconv.Itoa(int(vtapID))),
 			PID:         pID,
 			NetnsID:     p.GetNetnsId(),
 			Name:        p.GetName(),
@@ -536,6 +534,7 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 			User:        p.GetUser(),
 			ContainerID: p.GetContainerId(),
 			VtapID:      vtapID,
+			NodeIP:      v.nodeIP,
 			OSAPPTags:   osAppTagString,
 			StartTime:   startTime,
 		})
@@ -543,19 +542,19 @@ func (v *GenesisSyncRpcUpdater) ParseProcessInfo(info VIFRPCMessage, vtapID uint
 	return processes
 }
 
-func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer string, vtapID uint32) GenesisSyncDataOperation {
-	rawVM := strings.Trim(info.message.GetPlatformData().GetRawAllVmXml(), " ")
-	rawOVSInterface := strings.Trim(info.message.GetPlatformData().GetRawOvsInterfaces(), " ")
-	rawOVSPorts := strings.Trim(info.message.GetPlatformData().GetRawOvsPorts(), " ")
+func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info common.VIFRPCMessage, peer string, vtapID uint32) common.GenesisSyncDataResponse {
+	rawVM := strings.Trim(info.Message.GetPlatformData().GetRawAllVmXml(), " ")
+	rawOVSInterface := strings.Trim(info.Message.GetPlatformData().GetRawOvsInterfaces(), " ")
+	rawOVSPorts := strings.Trim(info.Message.GetPlatformData().GetRawOvsPorts(), " ")
 	ovsMode := false
 	if rawOVSPorts != "" {
 		ovsMode = true
 	}
-	rawHostName := strings.Trim(info.message.GetPlatformData().GetRawHostname(), " \n")
-	rawVMStates := strings.Trim(info.message.GetPlatformData().GetRawVmStates(), " ")
-	rawBrctlShow := strings.Trim(info.message.GetPlatformData().GetRawBrctlShow(), " ")
-	rawVlanConfig := strings.Trim(info.message.GetPlatformData().GetRawVlanConfig(), " ")
-	tIPs := info.message.GetPlatformData().GetIps()
+	rawHostName := strings.Trim(info.Message.GetPlatformData().GetRawHostname(), " \n")
+	rawVMStates := strings.Trim(info.Message.GetPlatformData().GetRawVmStates(), " ")
+	rawBrctlShow := strings.Trim(info.Message.GetPlatformData().GetRawBrctlShow(), " ")
+	rawVlanConfig := strings.Trim(info.Message.GetPlatformData().GetRawVlanConfig(), " ")
+	tIPs := info.Message.GetPlatformData().GetIps()
 	if ovsMode {
 		rawBrctlShow = ""
 		rawVlanConfig = ""
@@ -564,9 +563,10 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	hosts := []model.GenesisHost{
 		model.GenesisHost{
 			Hostname: rawHostName,
-			Lcuuid:   common.GetUUIDByOrgID(info.orgID, rawHostName),
+			Lcuuid:   ccommon.GetUUIDByOrgID(info.ORGID, rawHostName),
 			IP:       peer,
 			VtapID:   vtapID,
+			NodeIP:   v.nodeIP,
 		},
 	}
 
@@ -580,27 +580,27 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	networks := []model.GenesisNetwork{}
 
 	pCSVkeys := []string{"_uuid", "other_config", "tag"}
-	nameToOvsPort, err := genesiscommon.ParseCSVWithKey(rawOVSPorts, "name", pCSVkeys...)
+	nameToOvsPort, err := common.ParseCSVWithKey(rawOVSPorts, "name", pCSVkeys...)
 	if err != nil {
-		log.Warning("parse csv with key failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
+		log.Warning("parse csv with key failed: "+err.Error(), logger.NewORGPrefix(info.ORGID))
 	}
 	pCSVs := []string{"name", "external_ids"}
-	nameToOvsIfs, err := genesiscommon.ParseCSV(rawOVSInterface, pCSVs...)
+	nameToOvsIfs, err := common.ParseCSV(rawOVSInterface, pCSVs...)
 	if err != nil {
-		log.Warning("parse csv failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
+		log.Warning("parse csv failed: "+err.Error(), logger.NewORGPrefix(info.ORGID))
 	}
 	for _, nameToOvsIf := range nameToOvsIfs {
 		name, ok := nameToOvsIf["name"]
 		if !ok {
 			continue
 		}
-		eIDs, err := genesiscommon.ParseKVString(nameToOvsIf["external_ids"])
+		eIDs, err := common.ParseKVString(nameToOvsIf["external_ids"])
 		if err != nil {
-			log.Warning("parse kvstring failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
+			log.Warning("parse kvstring failed: "+err.Error(), logger.NewORGPrefix(info.ORGID))
 		}
 		mac, ok := eIDs["attached-mac"]
 		if !ok {
-			log.Debugf("ovs interface %s does not have external_ids:attached-mac", name, logger.NewORGPrefix(info.orgID))
+			log.Debugf("ovs interface %s does not have external_ids:attached-mac", name, logger.NewORGPrefix(info.ORGID))
 			continue
 		}
 		if ovsPort, ok := nameToOvsPort[name]; ok {
@@ -608,13 +608,13 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 		}
 	}
 	if !ovsMode {
-		bridges, err := genesiscommon.ParseBrctlShow(rawBrctlShow)
+		bridges, err := common.ParseBrctlShow(rawBrctlShow)
 		if err != nil {
 			log.Warning("parse brctl show failed: " + err.Error())
 		}
-		vlanConfig, err := genesiscommon.ParseVLANConfig(rawVlanConfig)
+		vlanConfig, err := common.ParseVLANConfig(rawVlanConfig)
 		if err != nil {
-			log.Warning("parse vlan config failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
+			log.Warning("parse vlan config failed: "+err.Error(), logger.NewORGPrefix(info.ORGID))
 		}
 		for br, ifaces := range bridges {
 			vlan := 1
@@ -626,7 +626,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 			}
 			bge := bridge{
 				name: br,
-				uuid: common.GetUUIDByOrgID(info.orgID, fmt.Sprintf("%d,%s", vlan, br)),
+				uuid: ccommon.GetUUIDByOrgID(info.ORGID, fmt.Sprintf("%d,%s", vlan, br)),
 				vlan: vlan,
 			}
 			for _, iface := range ifaces {
@@ -642,14 +642,15 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 		ipObj := net.IP(tIP.GetIp())
 		nIPObj, ok := netaddr.FromStdIP(ipObj)
 		if !ok {
-			log.Warningf("ip (%s) invalid", ipObj.String(), logger.NewORGPrefix(info.orgID))
+			log.Warningf("ip (%s) invalid", ipObj.String(), logger.NewORGPrefix(info.ORGID))
 			continue
 		}
 		ip.IP = ipObj.String()
 		tIPLastSeen := tIP.GetLastSeen()
 		ip.LastSeen = time.Unix(int64(tIPLastSeen), 0).Local()
 		ip.VtapID = vtapID
-		macStr := genesiscommon.Uint64ToMac(tIP.GetMac()).String()
+		ip.NodeIP = v.nodeIP
+		macStr := common.Uint64ToMac(tIP.GetMac()).String()
 		macToIPs[macStr] = append(macToIPs[macStr], ip)
 		cFlag := true
 		for _, l := range v.localIPRanges {
@@ -662,17 +663,18 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	}
 
 	ips := []model.GenesisIP{}
-	vmStates, err := genesiscommon.ParseVMStates(rawVMStates)
+	vmStates, err := common.ParseVMStates(rawVMStates)
 	if err != nil {
-		log.Warning("parse vm states failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
+		log.Warning("parse vm states failed: "+err.Error(), logger.NewORGPrefix(info.ORGID))
 	}
-	xmlVMs, err := genesiscommon.ParseVMXml(rawVM, v.vmNameField)
+	xmlVMs, err := common.ParseVMXml(rawVM, v.vmNameField)
 	if err != nil {
-		log.Warning("parse vm xml failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
+		log.Warning("parse vm xml failed: "+err.Error(), logger.NewORGPrefix(info.ORGID))
 	}
 	for _, xmlVM := range xmlVMs {
 		vm := model.GenesisVM{}
 		vm.VtapID = vtapID
+		vm.NodeIP = v.nodeIP
 		vm.Lcuuid = xmlVM.UUID
 		vm.Name = xmlVM.Name
 		vm.Label = xmlVM.Label
@@ -686,11 +688,11 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 		if ok {
 			vm.State = uint32(state)
 		} else {
-			vm.State = uint32(common.VM_STATE_EXCEPTION)
+			vm.State = uint32(ccommon.VM_STATE_EXCEPTION)
 		}
 		vms = append(vms, vm)
 
-		if vm.State != uint32(common.VM_STATE_RUNNING) {
+		if vm.State != uint32(ccommon.VM_STATE_RUNNING) {
 			// 不处理非运行状态虚拟机的接口
 			continue
 		}
@@ -707,13 +709,13 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 				} else if oP, ok := nameToOvsPort[ifName]; ok {
 					portMap = oP
 				} else {
-					log.Debugf("vm %s interface %s mac %s not found in ovs ports", vm.Label, ifName, mac, logger.NewORGPrefix(info.orgID))
+					log.Debugf("vm %s interface %s mac %s not found in ovs ports", vm.Label, ifName, mac, logger.NewORGPrefix(info.ORGID))
 					continue
 				}
 				port.Lcuuid = portMap["_uuid"]
-				options, err := genesiscommon.ParseKVString(portMap["other_config"])
+				options, err := common.ParseKVString(portMap["other_config"])
 				if err != nil {
-					log.Warning("parse kv string failed: "+err.Error(), logger.NewORGPrefix(info.orgID))
+					log.Warning("parse kv string failed: "+err.Error(), logger.NewORGPrefix(info.ORGID))
 				}
 				if nLcuuid, ok := options["net_uuid"]; ok {
 					network.Lcuuid = nLcuuid
@@ -723,7 +725,7 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 					if err != nil {
 						tagInt = 1
 					}
-					network.Lcuuid = common.GetUUIDByOrgID(info.orgID, strconv.Itoa(tagInt))
+					network.Lcuuid = ccommon.GetUUIDByOrgID(info.ORGID, strconv.Itoa(tagInt))
 				}
 				if sID, ok := options["segmentation_id"]; ok {
 					sIDInt, err := strconv.Atoi(sID)
@@ -742,11 +744,11 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 				br, ok := portToBridge[ifName]
 				if !ok {
 					br = bridge{
-						uuid: common.GetUUIDByOrgID(info.orgID, "yunshan-temp"),
+						uuid: ccommon.GetUUIDByOrgID(info.ORGID, "yunshan-temp"),
 						vlan: 1,
 					}
 				}
-				port.Lcuuid = common.GetUUIDByOrgID(info.orgID, mac)
+				port.Lcuuid = ccommon.GetUUIDByOrgID(info.ORGID, mac)
 				network.Lcuuid = br.uuid
 				network.SegmentationID = uint32(br.vlan)
 			}
@@ -755,15 +757,16 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 			if isE, ok := macToIsExternalIP[mac]; ok {
 				isExternal = isE
 			}
-			network.NetType = uint32(common.NETWORK_TYPE_LAN)
-			port.Type = uint32(common.VIF_TYPE_LAN)
+			network.NetType = uint32(ccommon.NETWORK_TYPE_LAN)
+			port.Type = uint32(ccommon.VIF_TYPE_LAN)
 			if isExternal {
-				network.NetType = uint32(common.NETWORK_TYPE_WAN)
-				port.Type = uint32(common.VIF_TYPE_WAN)
+				network.NetType = uint32(ccommon.NETWORK_TYPE_WAN)
+				port.Type = uint32(ccommon.VIF_TYPE_WAN)
 			}
 			network.External = isExternal
 			network.VPCLcuuid = vm.VPCLcuuid
 			network.VtapID = vtapID
+			network.NodeIP = v.nodeIP
 			network.Name = "subnet_vni_" + strconv.Itoa(int(network.SegmentationID))
 			networkIDToNetwork[network.Lcuuid] = network
 			port.Mac = mac
@@ -771,11 +774,12 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 			port.NetworkLcuuid = network.Lcuuid
 			port.VPCLcuuid = vm.VPCLcuuid
 			port.VtapID = vtapID
-			port.DeviceType = common.VIF_DEVICE_TYPE_VM
+			port.NodeIP = v.nodeIP
+			port.DeviceType = ccommon.VIF_DEVICE_TYPE_VM
 			ports = append(ports, port)
 			for _, ip := range macToIPs[mac] {
 				ip.VinterfaceLcuuid = port.Lcuuid
-				ip.Lcuuid = common.GetUUIDByOrgID(info.orgID, ip.IP+ip.VinterfaceLcuuid)
+				ip.Lcuuid = ccommon.GetUUIDByOrgID(info.ORGID, ip.IP+ip.VinterfaceLcuuid)
 				ips = append(ips, ip)
 			}
 		}
@@ -787,17 +791,19 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 	for id, name := range vpcIDToName {
 		vpc := model.GenesisVpc{}
 		vpc.VtapID = vtapID
+		vpc.NodeIP = v.nodeIP
 		vpc.Lcuuid = id
 		vpc.Name = name
 		vpcs = append(vpcs, vpc)
 	}
 
 	lldps := []model.GenesisLldp{}
-	for _, l := range info.message.GetPlatformData().GetLldpInfo() {
+	for _, l := range info.Message.GetPlatformData().GetLldpInfo() {
 		lldp := model.GenesisLldp{}
-		lldp.Lcuuid = common.GetUUIDByOrgID(info.orgID, peer+l.GetManagementAddress()+l.GetPortId())
+		lldp.Lcuuid = ccommon.GetUUIDByOrgID(info.ORGID, peer+l.GetManagementAddress()+l.GetPortId())
 		lldp.HostIP = peer
 		lldp.VtapID = vtapID
+		lldp.NodeIP = v.nodeIP
 		lldp.HostInterface = l.GetInterface()
 		lldp.SystemName = l.GetSystemName()
 		lldp.ManagementAddress = l.GetManagementAddress()
@@ -807,163 +813,50 @@ func (v *GenesisSyncRpcUpdater) ParseKVMPlatformInfo(info VIFRPCMessage, peer st
 		lldps = append(lldps, lldp)
 	}
 
-	return GenesisSyncDataOperation{
-		Hosts:       NewHostPlatformDataOperation(info.orgID, hosts),
-		VMs:         NewVMPlatformDataOperation(info.orgID, vms),
-		VPCs:        NewVpcPlatformDataOperation(info.orgID, vpcs),
-		Networks:    NewNetworkPlatformDataOperation(info.orgID, networks),
-		Ports:       NewPortPlatformDataOperation(info.orgID, ports),
-		IPlastseens: NewIPLastSeenPlatformDataOperation(info.orgID, ips),
-		Lldps:       NewLldpInfoPlatformDataOperation(info.orgID, lldps),
+	return common.GenesisSyncDataResponse{
+		Hosts:       hosts,
+		VMs:         vms,
+		VPCs:        vpcs,
+		Networks:    networks,
+		Ports:       ports,
+		IPLastSeens: ips,
+		Lldps:       lldps,
 	}
 }
 
-func (v *GenesisSyncRpcUpdater) UnmarshalProtobuf(info VIFRPCMessage) GenesisSyncDataOperation {
-	genesisSyncDataOper := GenesisSyncDataOperation{}
-	vifs := v.ParseVinterfaceInfo(info, info.peer, info.vtapID, info.message.GetKubernetesClusterId(), genesiscommon.DEVICE_TYPE_KVM_HOST)
-	vinterfaces := NewVinterfacePlatformDataOperation(info.orgID, vifs)
-	pProcess := v.ParseProcessInfo(info, info.vtapID)
-	processes := NewProcessPlatformDataOperation(info.orgID, pProcess)
-
-	if genesiscommon.IPInRanges(info.peer, v.hostIPsRanges...) && info.message.GetPlatformData().GetPlatformEnabled() {
-		genesisSyncDataOper = v.ParseKVMPlatformInfo(info, info.peer, info.vtapID)
+func (v *GenesisSyncRpcUpdater) UnmarshalProtobuf(info common.VIFRPCMessage) common.GenesisSyncDataResponse {
+	genesisSyncData := common.GenesisSyncDataResponse{}
+	if common.IPInRanges(info.Peer, v.hostIPsRanges...) && info.Message.GetPlatformData().GetPlatformEnabled() {
+		genesisSyncData = v.ParseKVMPlatformInfo(info, info.Peer, info.VtapID)
 	}
 
-	genesisSyncDataOper.Vinterfaces = vinterfaces
-	genesisSyncDataOper.Processes = processes
+	genesisSyncData.Processes = v.ParseProcessInfo(info, info.VtapID)
+	genesisSyncData.Vinterfaces = v.ParseVinterfaceInfo(info, info.Peer, info.VtapID, info.Message.GetKubernetesClusterId(), common.DEVICE_TYPE_KVM_HOST)
 
-	return genesisSyncDataOper
+	return genesisSyncData
 }
 
-func (v *GenesisSyncRpcUpdater) UnmarshalKubernetesProtobuf(info VIFRPCMessage) GenesisSyncDataOperation {
-	genesisSyncDataOper := GenesisSyncDataOperation{}
-	vifs := v.ParseVinterfaceInfo(info, info.peer, info.vtapID, info.message.GetKubernetesClusterId(), genesiscommon.DEVICE_TYPE_DOCKER_HOST)
-	vinterfaces := NewVinterfacePlatformDataOperation(info.orgID, vifs)
-	pProcess := v.ParseProcessInfo(info, info.vtapID)
-	processes := NewProcessPlatformDataOperation(info.orgID, pProcess)
-
-	if info.message.GetPlatformData().GetPlatformEnabled() {
-		genesisSyncDataOper = v.ParseHostAsVmPlatformInfo(info, info.peer, info.message.GetNatIp(), info.vtapID)
+func (v *GenesisSyncRpcUpdater) UnmarshalKubernetesProtobuf(info common.VIFRPCMessage) common.GenesisSyncDataResponse {
+	genesisSyncData := common.GenesisSyncDataResponse{}
+	if info.Message.GetPlatformData().GetPlatformEnabled() {
+		genesisSyncData = v.ParseHostAsVmPlatformInfo(info, info.Peer, info.Message.GetNatIp(), info.VtapID)
 	}
 
-	genesisSyncDataOper.Vinterfaces = vinterfaces
-	genesisSyncDataOper.Processes = processes
+	genesisSyncData.Processes = v.ParseProcessInfo(info, info.VtapID)
+	genesisSyncData.Vinterfaces = v.ParseVinterfaceInfo(info, info.Peer, info.VtapID, info.Message.GetKubernetesClusterId(), common.DEVICE_TYPE_DOCKER_HOST)
 
-	return genesisSyncDataOper
+	return genesisSyncData
 }
 
-func (v *GenesisSyncRpcUpdater) UnmarshalWorkloadProtobuf(info VIFRPCMessage, tridentType string) GenesisSyncDataOperation {
-	genesisSyncDataOper := GenesisSyncDataOperation{}
-	vifs := v.ParseVinterfaceInfo(info, info.peer, info.vtapID, info.message.GetKubernetesClusterId(), tridentType)
-	vinterfaces := NewVinterfacePlatformDataOperation(info.orgID, vifs)
-	pvips := v.ParseVIP(info, info.vtapID)
-	vips := NewVIPPlatformDataOperation(info.orgID, pvips)
-	pProcess := v.ParseProcessInfo(info, info.vtapID)
-	processes := NewProcessPlatformDataOperation(info.orgID, pProcess)
-
-	if info.message.GetPlatformData().GetPlatformEnabled() {
-		genesisSyncDataOper = v.ParseHostAsVmPlatformInfo(info, info.peer, info.message.GetNatIp(), info.vtapID)
+func (v *GenesisSyncRpcUpdater) UnmarshalWorkloadProtobuf(info common.VIFRPCMessage, tridentType string) common.GenesisSyncDataResponse {
+	genesisSyncData := common.GenesisSyncDataResponse{}
+	if info.Message.GetPlatformData().GetPlatformEnabled() {
+		genesisSyncData = v.ParseHostAsVmPlatformInfo(info, info.Peer, info.Message.GetNatIp(), info.VtapID)
 	}
 
-	genesisSyncDataOper.Vinterfaces = vinterfaces
-	genesisSyncDataOper.Processes = processes
-	genesisSyncDataOper.VIPs = vips
+	genesisSyncData.VIPs = v.ParseVIP(info, info.VtapID)
+	genesisSyncData.Processes = v.ParseProcessInfo(info, info.VtapID)
+	genesisSyncData.Vinterfaces = v.ParseVinterfaceInfo(info, info.Peer, info.VtapID, info.Message.GetKubernetesClusterId(), tridentType)
 
-	return genesisSyncDataOper
-}
-
-func (v *GenesisSyncRpcUpdater) run() {
-	for {
-		genesisSyncDataOper := GenesisSyncDataOperation{}
-		info := v.outputQueue.Get().(VIFRPCMessage)
-		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("sync from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType, logger.NewORGPrefix(info.orgID))
-			continue
-		}
-
-		log.Debugf("sync received (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message, logger.NewORGPrefix(info.orgID))
-
-		vtap := fmt.Sprintf("%d%d", info.orgID, info.vtapID)
-		if info.msgType == genesiscommon.TYPE_RENEW {
-			if info.vtapID != 0 {
-				peerInfo, ok := v.genesisSyncDataByVtap[vtap]
-				if ok {
-					v.storage.Renew(peerInfo)
-				}
-			}
-		} else if info.msgType == genesiscommon.TYPE_UPDATE {
-			tridentType := info.message.GetTridentType()
-			switch tridentType {
-			case tridentcommon.TridentType_TT_PHYSICAL_MACHINE:
-				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(info, genesiscommon.DEVICE_TYPE_PHYSICAL_MACHINE)
-			case tridentcommon.TridentType_TT_PUBLIC_CLOUD:
-				genesisSyncDataOper = v.UnmarshalWorkloadProtobuf(info, genesiscommon.DEVICE_TYPE_PUBLIC_CLOUD)
-			case tridentcommon.TridentType_TT_HOST_POD, tridentcommon.TridentType_TT_VM_POD, tridentcommon.TridentType_TT_K8S_SIDECAR:
-				genesisSyncDataOper = v.UnmarshalKubernetesProtobuf(info)
-			default:
-				genesisSyncDataOper = v.UnmarshalProtobuf(info)
-			}
-			if info.vtapID != 0 {
-				v.genesisSyncDataByVtap[vtap] = genesisSyncDataOper
-			}
-			v.storage.Update(genesisSyncDataOper, info)
-		}
-	}
-}
-
-func (v *GenesisSyncRpcUpdater) Start() {
-	go v.run()
-}
-
-func (v *GenesisSyncRpcUpdater) Stop() {
-	if v.vCancel != nil {
-		v.vCancel()
-	}
-}
-
-type KubernetesRpcUpdater struct {
-	kCtx        context.Context
-	kCancel     context.CancelFunc
-	storage     *KubernetesStorage
-	outputQueue queue.QueueReader
-}
-
-func NewKubernetesRpcUpdater(storage *KubernetesStorage, queue queue.QueueReader, ctx context.Context) *KubernetesRpcUpdater {
-	kCtx, kCancel := context.WithCancel(ctx)
-	return &KubernetesRpcUpdater{
-		kCtx:        kCtx,
-		kCancel:     kCancel,
-		storage:     storage,
-		outputQueue: queue,
-	}
-}
-
-func (k *KubernetesRpcUpdater) run() {
-	for {
-		info := k.outputQueue.Get().(K8SRPCMessage)
-		if info.msgType == genesiscommon.TYPE_EXIT {
-			log.Warningf("k8s from (%s) vtap_id (%v) type (%v) exit", info.peer, info.vtapID, info.msgType, logger.NewORGPrefix(info.orgID))
-			break
-		}
-		log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.peer, info.vtapID, info.message.GetClusterId(), info.message.GetVersion(), logger.NewORGPrefix(info.orgID))
-		// 更新和保存内存数据
-		k.storage.Add(info.orgID, KubernetesInfo{
-			ORGID:     info.orgID,
-			Epoch:     time.Now(),
-			ClusterID: info.message.GetClusterId(),
-			ErrorMSG:  info.message.GetErrorMsg(),
-			Version:   info.message.GetVersion(),
-			Entries:   info.message.GetEntries(),
-		})
-	}
-}
-
-func (k *KubernetesRpcUpdater) Start() {
-	go k.run()
-}
-
-func (k *KubernetesRpcUpdater) Stop() {
-	if k.kCancel != nil {
-		k.kCancel()
-	}
+	return genesisSyncData
 }

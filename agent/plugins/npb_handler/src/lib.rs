@@ -21,7 +21,7 @@ use npb_pcap_policy::{NpbTunnelType, PolicyData};
 use public::{
     counter::{CounterType, CounterValue, OwnedCountable},
     leaky_bucket::LeakyBucket,
-    proto::trident::VlanMode,
+    proto::agent::VlanMode,
     queue::DebugSender,
 };
 

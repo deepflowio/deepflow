@@ -24,7 +24,7 @@ use crate::{
     utils::command::{get_hostname, get_ip_address},
 };
 
-use public::proto::trident as pb;
+use public::proto::agent as pb;
 
 pub struct Querier {
     override_os_hostname: Option<String>,

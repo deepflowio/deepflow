@@ -29,7 +29,8 @@ use log::{debug, error};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
 use public::bytes::write_u64_be;
-use public::proto::trident::{ProcessInfo, Tag};
+use public::proto::agent::{ProcessInfo, Tag};
+use public::proto::trident;
 use public::pwd::PasswordInfo;
 use regex::Regex;
 use ring::digest;
@@ -40,7 +41,7 @@ use super::proc_scan_hook::proc_scan_hook;
 
 use crate::config::handler::OsProcScanConfig;
 use crate::config::{
-    OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
+    ProcessMatcher, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
     OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
     OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
@@ -187,6 +188,32 @@ impl From<&ProcessData> for ProcessInfo {
     }
 }
 
+// FIXME: In order to be compatible with the old and new interfaces, this code should be deleted later
+impl From<&ProcessData> for trident::ProcessInfo {
+    fn from(p: &ProcessData) -> Self {
+        Self {
+            name: Some(p.name.clone()),
+            pid: Some(p.pid),
+            process_name: Some(p.process_name.clone()),
+            cmdline: Some(p.cmd.join(" ")),
+            user: Some(p.user.clone()),
+            start_time: Some(u32::try_from(p.start_time.as_secs()).unwrap_or_default()),
+            os_app_tags: {
+                let mut tags = vec![];
+                for t in p.os_app_tags.iter() {
+                    tags.push(trident::Tag {
+                        key: Some(t.key.clone()),
+                        value: Some(t.value.clone()),
+                    })
+                }
+                tags
+            },
+            netns_id: Some(p.netns_id),
+            container_id: Some(p.container_id.clone()),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 pub enum RegExpAction {
     Accept,
@@ -241,10 +268,10 @@ impl PartialEq for ProcRegRewrite {
 
 impl Eq for ProcRegRewrite {}
 
-impl TryFrom<&OsProcRegexp> for ProcRegRewrite {
+impl TryFrom<&ProcessMatcher> for ProcRegRewrite {
     type Error = regex::Error;
 
-    fn try_from(value: &OsProcRegexp) -> Result<Self, Self::Error> {
+    fn try_from(value: &ProcessMatcher) -> Result<Self, Self::Error> {
         let re = Regex::new(value.match_regex.as_str())?;
         let action = match value.action.as_str() {
             "" | OS_PROC_REGEXP_MATCH_ACTION_ACCEPT => RegExpAction::Accept,

@@ -416,19 +416,18 @@ func (e *CHEngine) ParseShowSql(sql string, args *common.QuerierParams, DebugInf
 		if err != nil {
 			return nil, []string{}, true, err
 		}
-		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
-			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
-		}
+
 		// tag metrics
 		tagDescriptions, err := tag.GetTagDescriptions(e.DB, table, sql, args.QueryCacheTTL, e.ORGID, args.UseQueryCache, e.Context, DebugInfo)
 		if err != nil {
 			log.Error("Failed to get tag type metrics")
 			return nil, []string{}, true, err
 		}
-		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
-			tagDescriptions.Values = dataVisibilityfiltering(visibilityFilterRegexp, tagDescriptions.Values)
-		}
 		ShowTagTypeMetrics(tagDescriptions, result, e.DB, table)
+
+		if len(visibilityFilter) > 0 && e.DB != chCommon.DB_NAME_DEEPFLOW_TENANT {
+			result.Values = dataVisibilityfiltering(visibilityFilterRegexp, result.Values)
+		}
 		return result, []string{}, true, err
 	case 4: // show tag X values from Y  X, Y not nil
 		result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql, args.QueryCacheTTL, args.ORGID, args.UseQueryCache)

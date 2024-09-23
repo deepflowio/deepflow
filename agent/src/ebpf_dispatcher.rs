@@ -79,7 +79,10 @@ use public::{
     debug::QueueDebugger,
     l7_protocol::{L7Protocol, L7ProtocolChecker},
     leaky_bucket::LeakyBucket,
-    proto::{common::TridentType, metric, trident::Exception},
+    proto::{
+        agent::{AgentType, Exception},
+        metric,
+    },
     queue::{bounded_with_debug, DebugSender, Receiver},
     utils::bitmap::parse_u16_range_list_to_bitmap,
 };
@@ -343,8 +346,13 @@ impl EbpfDispatcher {
 
     fn run(&self, counter: Arc<EbpfCounter>, exception_handler: ExceptionHandler) {
         let ebpf_config = self.config.load();
-        let out_of_order_reassembly_bitmap =
-            L7ProtocolBitmap::from(&ebpf_config.ebpf.syscall_out_of_order_reassembly);
+        let out_of_order_reassembly_bitmap = L7ProtocolBitmap::from(
+            &ebpf_config
+                .ebpf
+                .socket
+                .preprocess
+                .out_of_order_reassembly_protocols,
+        );
         let reorder_counter = Arc::new(ReorderCounter::default());
         self.stats_collector.register_countable(
             &stats::NoTagModule("ebpf-collector-reorder"),
@@ -353,7 +361,11 @@ impl EbpfDispatcher {
         let mut reorder = Reorder::new(
             Box::new(out_of_order_reassembly_bitmap),
             reorder_counter,
-            ebpf_config.ebpf.syscall_out_of_order_cache_size,
+            ebpf_config
+                .ebpf
+                .socket
+                .preprocess
+                .out_of_order_reassembly_cache_size,
         );
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
@@ -367,7 +379,7 @@ impl EbpfDispatcher {
             self.stats_collector.clone(),
             true, // from_ebpf
         );
-        let leaky_bucket = LeakyBucket::new(Some(ebpf_config.ebpf.global_ebpf_pps_threshold));
+        let leaky_bucket = LeakyBucket::new(Some(ebpf_config.ebpf.socket.tunning.max_capture_rate));
         const QUEUE_BATCH_SIZE: usize = 1024;
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
         while unsafe { SWITCH } {
@@ -419,7 +431,7 @@ pub struct SyncEbpfDispatcher {
 impl FlowAclListener for SyncEbpfDispatcher {
     fn flow_acl_change(
         &mut self,
-        _: TridentType,
+        _: AgentType,
         _: i32,
         _: &Vec<Arc<crate::_IpGroupData>>,
         _: &Vec<Arc<crate::_PlatformData>>,
@@ -568,20 +580,24 @@ impl EbpfCollector {
             profile.cpu = data.cpu;
             profile.count = data.count as u32;
             profile.wide_count = data.count;
-            profile.data =
-                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize)
-                    .to_vec();
-            let container_id =
-                CStr::from_ptr(data.container_id.as_ptr() as *const libc::c_char).to_string_lossy();
+            let profile_data =
+                slice::from_raw_parts(data.stack_data as *mut u8, data.stack_data_len as usize);
             if PROFILE_STACK_COMPRESSION {
-                match compress(&profile.data, 0) {
+                match compress(&profile_data, 0) {
                     Ok(compressed_data) => {
                         profile.data_compressed = true;
                         profile.data = compressed_data;
                     }
-                    Err(e) => debug!("failed to compress ebpf profile: {:?}", e),
+                    Err(e) => {
+                        profile.data = profile_data.to_vec();
+                        debug!("failed to compress ebpf profile: {:?}", e);
+                    }
                 }
+            } else {
+                profile.data = profile_data.to_vec();
             }
+            let container_id =
+                CStr::from_ptr(data.container_id.as_ptr() as *const libc::c_char).to_string_lossy();
             if let Some(policy_getter) = POLICY_GETTER.as_ref() {
                 profile.pod_id = policy_getter.lookup_pod_id(&container_id);
             }
@@ -608,8 +624,8 @@ impl EbpfCollector {
             PROC_EVENT_SENDER = Some(proc_event_sender);
             EBPF_PROFILE_SENDER = Some(ebpf_profile_sender);
             POLICY_GETTER = Some(policy_getter);
-            ON_CPU_PROFILE_FREQUENCY = config.ebpf.on_cpu_profile.frequency as u32;
-            PROFILE_STACK_COMPRESSION = config.ebpf.preprocess.stack_compression;
+            ON_CPU_PROFILE_FREQUENCY = config.ebpf.profile.on_cpu.sampling_frequency as u32;
+            PROFILE_STACK_COMPRESSION = config.ebpf.profile.preprocess.stack_compression;
             TIME_DIFF = Some(time_diff);
             handle
         }
@@ -619,14 +635,25 @@ impl EbpfCollector {
         // ebpf core modules init
         #[allow(unused_mut)]
         let mut handle = ConfigHandle::default();
-        if !config.ebpf.uprobe_proc_regexp.golang.is_empty() {
+        if config.ebpf.socket.uprobe.golang.enabled {
+            let uprobe_proc_regexp = config
+                .process_matcher
+                .iter()
+                .find(|p| {
+                    p.enabled_features
+                        .iter()
+                        .find(|f| f.eq_ignore_ascii_case("ebpf.socket.uprobe.golang"))
+                        .is_some()
+                })
+                .map(|p| p.match_regex.to_owned())
+                .unwrap_or_default();
             info!(
                 "ebpf set golang uprobe proc regexp: {}",
-                config.ebpf.uprobe_proc_regexp.golang.as_str()
+                uprobe_proc_regexp.as_str()
             );
             ebpf::set_feature_regex(
                 ebpf::FEATURE_UPROBE_GOLANG,
-                CString::new(config.ebpf.uprobe_proc_regexp.golang.as_str().as_bytes())
+                CString::new(uprobe_proc_regexp.as_bytes())
                     .unwrap()
                     .as_c_str()
                     .as_ptr(),
@@ -635,14 +662,25 @@ impl EbpfCollector {
             info!("ebpf golang uprobe proc regexp is empty, skip set")
         }
 
-        if !config.ebpf.uprobe_proc_regexp.openssl.is_empty() {
+        if config.ebpf.socket.uprobe.tls.enabled {
+            let uprobe_proc_regexp = config
+                .process_matcher
+                .iter()
+                .find(|p| {
+                    p.enabled_features
+                        .iter()
+                        .find(|f| f.eq_ignore_ascii_case("ebpf.socket.uprobe.tls"))
+                        .is_some()
+                })
+                .map(|p| p.match_regex.to_owned())
+                .unwrap_or_default();
             info!(
                 "ebpf set openssl uprobe proc regexp: {}",
-                config.ebpf.uprobe_proc_regexp.openssl.as_str()
+                uprobe_proc_regexp.as_str()
             );
             ebpf::set_feature_regex(
                 ebpf::FEATURE_UPROBE_OPENSSL,
-                CString::new(config.ebpf.uprobe_proc_regexp.openssl.as_str().as_bytes())
+                CString::new(uprobe_proc_regexp.as_bytes())
                     .unwrap()
                     .as_c_str()
                     .as_ptr(),
@@ -651,24 +689,28 @@ impl EbpfCollector {
             info!("ebpf openssl uprobe proc regexp is empty, skip set")
         }
 
-        if !config.ebpf.uprobe_proc_regexp.golang_symbol.is_empty() {
+        if config.symbol_table.golang_specific.enabled {
+            let uprobe_proc_regexp = config
+                .process_matcher
+                .iter()
+                .find(|p| {
+                    p.enabled_features
+                        .iter()
+                        .find(|f| f.eq_ignore_ascii_case("input.proc.symbol_table.golang_specific"))
+                        .is_some()
+                })
+                .map(|p| p.match_regex.to_owned())
+                .unwrap_or_default();
             info!(
                 "ebpf set golang symbol uprobe proc regexp: {}",
-                config.ebpf.uprobe_proc_regexp.golang_symbol.as_str()
+                uprobe_proc_regexp.as_str()
             );
             ebpf::set_feature_regex(
                 ebpf::FEATURE_UPROBE_GOLANG_SYMBOL,
-                CString::new(
-                    config
-                        .ebpf
-                        .uprobe_proc_regexp
-                        .golang_symbol
-                        .as_str()
-                        .as_bytes(),
-                )
-                .unwrap()
-                .as_c_str()
-                .as_ptr(),
+                CString::new(uprobe_proc_regexp.as_str().as_bytes())
+                    .unwrap()
+                    .as_c_str()
+                    .as_ptr(),
             );
         } else {
             info!("ebpf golang symbol proc regexp is empty, skip set")
@@ -681,8 +723,13 @@ impl EbpfCollector {
             }
         }
 
-        let segmentation_reassembly_bitmap =
-            L7ProtocolBitmap::from(&config.ebpf.syscall_segmentation_reassembly);
+        let segmentation_reassembly_bitmap = L7ProtocolBitmap::from(
+            &config
+                .ebpf
+                .socket
+                .preprocess
+                .segmentation_reassembly_protocols,
+        );
         for i in get_all_protocol().into_iter() {
             if segmentation_reassembly_bitmap.is_enabled(i.protocol()) {
                 info!(
@@ -693,16 +740,16 @@ impl EbpfCollector {
             }
         }
 
-        let white_list = &config.ebpf.kprobe_whitelist;
-        if !white_list.port_list.is_empty() {
-            if let Some(b) = parse_u16_range_list_to_bitmap(&white_list.port_list, false) {
+        let white_list = &config.ebpf.socket.kprobe.whitelist;
+        if !white_list.ports.is_empty() {
+            if let Some(b) = parse_u16_range_list_to_bitmap(&white_list.ports, false) {
                 ebpf::set_allow_port_bitmap(b.get_raw_ptr());
             }
         }
 
-        let black_list = &config.ebpf.kprobe_blacklist;
-        if !black_list.port_list.is_empty() {
-            if let Some(b) = parse_u16_range_list_to_bitmap(&black_list.port_list, false) {
+        let black_list = &config.ebpf.socket.kprobe.blacklist;
+        if !black_list.ports.is_empty() {
+            if let Some(b) = parse_u16_range_list_to_bitmap(&black_list.ports, false) {
                 ebpf::set_bypass_port_bitmap(b.get_raw_ptr());
             }
         }
@@ -712,26 +759,29 @@ impl EbpfCollector {
             return Err(Error::EbpfInitError);
         }
 
-        if ebpf::set_go_tracing_timeout(config.ebpf.go_tracing_timeout as c_int) != 0 {
+        if ebpf::set_go_tracing_timeout(
+            config.ebpf.socket.uprobe.golang.tracing_timeout.as_secs() as c_int
+        ) != 0
+        {
             info!("ebpf set_go_tracing_timeout error.",);
             return Err(Error::EbpfInitError);
         }
 
-        if ebpf::set_io_event_collect_mode(config.ebpf.io_event_collect_mode as c_int) != 0 {
+        if ebpf::set_io_event_collect_mode(config.ebpf.file.io_event.collect_mode as c_int) != 0 {
             info!(
                 "ebpf set_io_event_collect_mode error: {}",
-                config.ebpf.io_event_collect_mode
+                config.ebpf.file.io_event.collect_mode
             );
             return Err(Error::EbpfInitError);
         }
 
         if ebpf::set_io_event_minimal_duration(
-            config.ebpf.io_event_minimal_duration.as_nanos() as c_ulonglong
+            config.ebpf.file.io_event.minimal_duration.as_nanos() as c_ulonglong,
         ) != 0
         {
             info!(
                 "ebpf set_io_event_minimal_duration error: {:?}",
-                config.ebpf.io_event_minimal_duration
+                config.ebpf.file.io_event.minimal_duration
             );
             return Err(Error::EbpfInitError);
         }
@@ -765,27 +815,27 @@ impl EbpfCollector {
             }
         }
 
-        if config.ebpf.syscall_trace_id_disabled {
+        if config.ebpf.socket.tunning.syscall_trace_id_disabled {
             ebpf::disable_syscall_trace_id();
         }
 
         if ebpf::running_socket_tracer(
-            Self::ebpf_l7_callback,                    /* 回调接口 rust -> C */
-            config.ebpf.thread_num as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
-            config.ebpf.perf_pages_count as u32, /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
-            config.ebpf.ring_size as u32, /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
-            config.ebpf.max_socket_entries as u32, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
-            config.ebpf.max_trace_entries as u32, /* 设置用于线程追踪会话的hash表项最大值，SK_BPF_DATA结构的syscall_trace_id_session关联这个哈希表 */
-            config.ebpf.socket_map_max_reclaim as u32, /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
+            Self::ebpf_l7_callback,                              /* 回调接口 rust -> C */
+            config.ebpf.tunning.userspace_worker_threads as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
+            config.ebpf.tunning.perf_pages_count as u32, /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
+            config.ebpf.tunning.kernel_ring_size as u32, /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
+            config.ebpf.tunning.max_socket_entries as u32, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
+            config.ebpf.tunning.max_trace_entries as u32, /* 设置用于线程追踪会话的hash表项最大值，SK_BPF_DATA结构的syscall_trace_id_session关联这个哈希表 */
+            config.ebpf.tunning.socket_map_reclaim_threshold as u32, /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
         ) != 0
         {
             return Err(Error::EbpfRunningError);
         }
 
         let ebpf_conf = &config.ebpf;
-        let on_cpu = &ebpf_conf.on_cpu_profile;
-        let off_cpu = &ebpf_conf.off_cpu_profile;
-        let memory = &ebpf_conf.memory_profile;
+        let on_cpu = &ebpf_conf.profile.on_cpu;
+        let off_cpu = &ebpf_conf.profile.off_cpu;
+        let memory = &ebpf_conf.profile.memory;
 
         let profiler_enabled = !on_cpu.disabled
             || (cfg!(feature = "extended_profile") && (!off_cpu.disabled || !memory.disabled));
@@ -795,15 +845,19 @@ impl EbpfCollector {
             } else {
                 ebpf::disable_oncpu_profiler();
             }
-            ebpf::set_dwarf_enabled(!config.ebpf.dwarf_disabled);
+            ebpf::set_dwarf_enabled(!config.ebpf.profile.unwinding.dwarf_disabled);
             ebpf::set_dwarf_regex(
-                CString::new(config.ebpf.dwarf_regex.as_bytes())
+                CString::new(config.ebpf.profile.unwinding.dwarf_regex.as_bytes())
                     .unwrap()
                     .as_c_str()
                     .as_ptr(),
             );
-            ebpf::set_dwarf_process_map_size(config.ebpf.dwarf_process_map_size as i32);
-            ebpf::set_dwarf_shard_map_size(config.ebpf.dwarf_shard_map_size as i32);
+            ebpf::set_dwarf_process_map_size(
+                config.ebpf.profile.unwinding.dwarf_process_map_size as i32,
+            );
+            ebpf::set_dwarf_shard_map_size(
+                config.ebpf.profile.unwinding.dwarf_shard_map_size as i32,
+            );
 
             #[cfg(feature = "extended_profile")]
             {
@@ -831,8 +885,8 @@ impl EbpfCollector {
             }
 
             if ebpf::start_continuous_profiler(
-                on_cpu.frequency as i32,
-                ebpf_conf.java_symbol_file_refresh_defer_interval.as_secs() as i32,
+                on_cpu.sampling_frequency as i32,
+                ebpf_conf.java_symbol_file_refresh_defer_interval,
                 Self::ebpf_profiler_callback,
                 &contexts as *const [*mut c_void; ebpf::PROFILER_CTX_NUM],
             ) != 0
@@ -842,34 +896,65 @@ impl EbpfCollector {
             }
 
             if !on_cpu.disabled {
-                ebpf::set_profiler_regex(
-                    CString::new(on_cpu.regex.as_bytes())
+                let on_cpu_regexp = config
+                    .process_matcher
+                    .iter()
+                    .find(|p| {
+                        p.enabled_features
+                            .iter()
+                            .find(|f| f.eq_ignore_ascii_case("ebpf.profile.on_cpu"))
+                            .is_some()
+                    })
+                    .map(|p| p.match_regex.to_owned())
+                    .unwrap_or_default();
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_PROFILE_ONCPU,
+                    CString::new(on_cpu_regexp.as_bytes())
                         .unwrap()
                         .as_c_str()
                         .as_ptr(),
                 );
 
                 // CPUID will not be included in the aggregation of stack trace data.
-                ebpf::set_profiler_cpu_aggregation(on_cpu.cpu as i32);
+                ebpf::set_profiler_cpu_aggregation(on_cpu.aggregate_by_cpu as i32);
             }
 
             #[cfg(feature = "extended_profile")]
             {
+                let off_cpu_regexp = config
+                    .process_matcher
+                    .iter()
+                    .find(|p| {
+                        p.enabled_features
+                            .iter()
+                            .find(|f| f.eq_ignore_ascii_case("ebpf.profile.off_cpu"))
+                            .is_some()
+                    })
+                    .map(|p| p.match_regex.to_owned())
+                    .unwrap_or_default();
                 if !off_cpu.disabled {
-                    ebpf::set_offcpu_profiler_regex(
-                        CString::new(off_cpu.regex.as_bytes())
+                    ebpf::set_feature_regex(
+                        ebpf::FEATURE_PROFILE_ONCPU,
+                        CString::new(off_cpu_regexp.as_bytes())
                             .unwrap()
                             .as_c_str()
                             .as_ptr(),
                     );
 
-                    ebpf::set_offcpu_cpuid_aggregation(off_cpu.cpu as i32);
-                    ebpf::set_offcpu_minblock_time(off_cpu.min_block.as_micros() as u32);
+                    ebpf::set_offcpu_cpuid_aggregation(off_cpu.aggregate_by_cpu as i32);
+                    ebpf::set_offcpu_minblock_time(off_cpu.min_blocking_time.as_micros() as u32);
                 }
 
                 if !memory.disabled {
-                    ebpf::set_memory_profiler_regex(
-                        CString::new(memory.regex.as_bytes())
+                    let memory_cpu_regexp = config
+                        .process_matcher
+                        .iter()
+                        .find(|p| p.enabled_features.contains("ebpf.profile.memory"))
+                        .map(|p| p.match_regex.to_owned())
+                        .unwrap_or_default();
+                    ebpf::set_feature_regex(
+                        ebpf::FEATURE_PROFILE_MEMORY,
+                        CString::new(memory_cpu_regexp.as_bytes())
                             .unwrap()
                             .as_c_str()
                             .as_ptr(),
@@ -917,14 +1002,14 @@ impl EbpfCollector {
                 if retry_count >= RETRY_MAX {
                     error!(
                         "[eBPF Kernel Adapt] The socket_tracer_start() \
-                            error. Kernel offset adapt failed. \
-                            Please ensure that BTF is enabled (kernel built \
-                            with CONFIG_DEBUG_INFO_BTF=y option). If the current \
-                            kernel version is low (<5.2), upgrading the Linux kernel \
-                            to 5.2+ (kernel built with CONFIG_DEBUG_INFO_BTF=y option) \
-                            can solve the problem. If it is not possible to upgrade \
-                            the kernel, the kernel-devel package can be provided for \
-                            developers to adapt and solve the problem."
+                             error. Kernel offset adapt failed. \
+                             Please ensure that BTF is enabled (kernel built \
+                             with CONFIG_DEBUG_INFO_BTF=y option). If the current \
+                             kernel version is low (<5.2), upgrading the Linux kernel \
+                             to 5.2+ (kernel built with CONFIG_DEBUG_INFO_BTF=y option) \
+                             can solve the problem. If it is not possible to upgrade \
+                             the kernel, the kernel-devel package can be provided for \
+                             developers to adapt and solve the problem."
                     );
                 }
             }
@@ -1021,21 +1106,23 @@ impl EbpfCollector {
 
     pub fn on_config_change(&mut self, config: &EbpfConfig) {
         unsafe {
-            let ecfg = &config.ebpf;
+            let ecfg = &config.ebpf.profile;
             let restart_cprofiler = ebpf::dwarf_available()
                 && ebpf::continuous_profiler_running()
-                && (ebpf::get_dwarf_enabled() != !ecfg.dwarf_disabled
-                    || ebpf::get_dwarf_process_map_size() as usize != ecfg.dwarf_process_map_size
-                    || ebpf::get_dwarf_shard_map_size() as usize != ecfg.dwarf_shard_map_size);
-            ebpf::set_dwarf_enabled(!ecfg.dwarf_disabled);
+                && (ebpf::get_dwarf_enabled() != !ecfg.unwinding.dwarf_disabled
+                    || ebpf::get_dwarf_process_map_size() as u32
+                        != ecfg.unwinding.dwarf_process_map_size
+                    || ebpf::get_dwarf_shard_map_size() as u32
+                        != ecfg.unwinding.dwarf_shard_map_size);
+            ebpf::set_dwarf_enabled(!ecfg.unwinding.dwarf_disabled);
             ebpf::set_dwarf_regex(
-                CString::new(ecfg.dwarf_regex.as_bytes())
+                CString::new(ecfg.unwinding.dwarf_regex.as_bytes())
                     .unwrap()
                     .as_c_str()
                     .as_ptr(),
             );
-            ebpf::set_dwarf_process_map_size(ecfg.dwarf_process_map_size as i32);
-            ebpf::set_dwarf_shard_map_size(ecfg.dwarf_shard_map_size as i32);
+            ebpf::set_dwarf_process_map_size(ecfg.unwinding.dwarf_process_map_size as i32);
+            ebpf::set_dwarf_shard_map_size(ecfg.unwinding.dwarf_shard_map_size as i32);
             if restart_cprofiler {
                 let mut contexts: [*mut c_void; 3] = [ptr::null_mut(); 3];
                 ebpf::stop_continuous_profiler(
@@ -1058,7 +1145,7 @@ impl EbpfCollector {
             }
             #[cfg(feature = "extended_profile")]
             if let Some(s) = self.config_handle.memory_profile_settings.as_ref() {
-                s.set_report_interval(ecfg.memory_profile.report_interval);
+                s.set_report_interval(ecfg.memory.report_interval);
             }
         }
         if config.l7_log_enabled() {

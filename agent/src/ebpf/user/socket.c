@@ -69,6 +69,7 @@ static bool g_disable_syscall_tracing;
  */
 static volatile uint64_t probes_act;
 
+extern u64 thread_index_max;
 extern __thread uword thread_index;	// for symbol pid caches hash
 extern int sys_cpus_count;
 extern bool *cpu_online;
@@ -1907,6 +1908,8 @@ static void perf_buffer_read(void *arg)
 	 */
 	uint64_t epoll_id = (uint64_t) arg;
 	thread_index = THREAD_SOCK_READER_IDX_BASE + epoll_id;	// for bihash
+	if (thread_index > thread_index_max)
+		thread_index_max = thread_index;
 	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL) {
 		ebpf_warning("find_bpf_tracer() error\n");

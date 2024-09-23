@@ -32,7 +32,7 @@ use serde::{Serialize, Serializer};
 use super::super::ebpf::{MSG_REQUEST, MSG_REQUEST_END, MSG_RESPONSE, MSG_RESPONSE_END};
 use super::{
     decapsulate::TunnelType,
-    enums::{EthernetType, IpProtocol, TapType, TcpFlags},
+    enums::{CaptureNetworkType, EthernetType, IpProtocol, TcpFlags},
     tap_port::TapPort,
     TaggedFlow,
 };
@@ -51,7 +51,7 @@ use public::utils::net::MacAddr;
 use public::{
     buffer::BatchedBox,
     packet::SECONDS_IN_MINUTE,
-    proto::{common::TridentType, flow_log},
+    proto::{agent::AgentType, flow_log},
 };
 
 pub use public::enums::L4Protocol;
@@ -109,8 +109,8 @@ impl Default for CloseType {
 
 #[derive(Serialize, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub struct FlowKey {
-    pub vtap_id: u16,
-    pub tap_type: TapType,
+    pub agent_id: u16,
+    pub tap_type: CaptureNetworkType,
     #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
     /* L2 */
@@ -141,8 +141,8 @@ impl Default for FlowKey {
         FlowKey {
             ip_src: Ipv4Addr::UNSPECIFIED.into(),
             ip_dst: Ipv4Addr::UNSPECIFIED.into(),
-            vtap_id: 0,
-            tap_type: TapType::default(),
+            agent_id: 0,
+            tap_type: CaptureNetworkType::default(),
             tap_port: TapPort::default(),
             mac_src: MacAddr::default(),
             mac_dst: MacAddr::default(),
@@ -157,8 +157,8 @@ impl fmt::Display for FlowKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "vtap_id:{} tap_type:{} tap_port:{} mac_src:{} mac_dst:{} ip_src:{} ip_dst:{} proto:{:?} port_src:{} port_dst:{}",
-            self.vtap_id,
+            "agent_id:{} tap_type:{} tap_port:{} mac_src:{} mac_dst:{} ip_src:{} ip_dst:{} proto:{:?} port_src:{} port_dst:{}",
+            self.agent_id,
             self.tap_type,
             self.tap_port,
             self.mac_src,
@@ -184,7 +184,7 @@ impl From<FlowKey> for flow_log::FlowKey {
             _ => panic!("FlowKey({:?}) ip_src,ip_dst type mismatch", &f),
         };
         flow_log::FlowKey {
-            vtap_id: f.vtap_id as u32,
+            vtap_id: f.agent_id as u32,
             tap_type: u16::from(f.tap_type) as u32,
             tap_port: f.tap_port.0,
             mac_src: f.mac_src.into(),
@@ -1169,14 +1169,14 @@ impl Flow {
 
     pub fn set_tap_side(
         &mut self,
-        trident_type: TridentType,
+        agent_type: AgentType,
         cloud_gateway_traffic: bool, // 从static config 获取
     ) {
         if self.tap_side != TapSide::Rest {
             return;
         }
         // 链路追踪统计位置
-        self.directions = get_direction(&*self, trident_type, cloud_gateway_traffic);
+        self.directions = get_direction(&*self, agent_type, cloud_gateway_traffic);
 
         if self.directions[0] != Direction::None && self.directions[1] == Direction::None {
             self.tap_side = self.directions[0].into();
@@ -1256,7 +1256,7 @@ impl From<Flow> for flow_log::Flow {
 
 pub fn get_direction(
     flow: &Flow,
-    trident_type: TridentType,
+    agent_type: AgentType,
     cloud_gateway_traffic: bool, // 从static config 获取
 ) -> [Direction; 2] {
     let src_ep = &flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
@@ -1284,7 +1284,7 @@ pub fn get_direction(
         _ => {
             // workload and container collector need to collect loopback port flow
             if flow.flow_key.mac_src == flow.flow_key.mac_dst
-                && (is_tt_pod(trident_type) || is_tt_workload(trident_type))
+                && (is_tt_pod(agent_type) || is_tt_workload(agent_type))
             {
                 return [Direction::None, Direction::LocalToLocal];
             }
@@ -1295,7 +1295,7 @@ pub fn get_direction(
     // 云MUX场景中，云内和云外通过VIP通信，在MUX和宿主机中采集到的流量IP地址为VIP，添加追
     // 踪数据后会将VIP替换为实际虚拟机的IP。
     fn inner(
-        tap_type: TapType,
+        tap_type: CaptureNetworkType,
         tunnel: &TunnelField,
         l2_end: bool,
         l3_end: bool,
@@ -1304,15 +1304,15 @@ pub fn get_direction(
         is_local_ip: bool,
         l3_epc_id: i32,
         cloud_gateway_traffic: bool, // 从static config 获取
-        trident_type: TridentType,
+        agent_type: AgentType,
     ) -> (Direction, Direction) {
         let is_ep = l2_end && l3_end;
         let tunnel_tier = tunnel.tier;
 
-        match trident_type {
-            TridentType::TtDedicatedPhysicalMachine => {
+        match agent_type {
+            AgentType::TtDedicatedPhysicalMachine => {
                 //  接入网络
-                if tap_type != TapType::Cloud {
+                if tap_type != CaptureNetworkType::Cloud {
                     if l3_epc_id != EPC_INTERNET {
                         return (Direction::ClientToServer, Direction::ServerToClient);
                     }
@@ -1350,7 +1350,7 @@ pub fn get_direction(
                     }
                 }
             }
-            TridentType::TtHyperVCompute => {
+            AgentType::TtHyperVCompute => {
                 // 仅采集宿主机物理口
                 if l2_end {
                     // SNAT、LB Backend
@@ -1361,7 +1361,7 @@ pub fn get_direction(
                     );
                 }
             }
-            TridentType::TtHyperVNetwork => {
+            AgentType::TtHyperVNetwork => {
                 // 仅采集宿主机物理口
                 if is_ep {
                     return (
@@ -1380,7 +1380,7 @@ pub fn get_direction(
                     );
                 }
             }
-            TridentType::TtPublicCloud | TridentType::TtPhysicalMachine => {
+            AgentType::TtPublicCloud | AgentType::TtPhysicalMachine => {
                 // 该采集器类型中统计位置为客户端网关/服务端网关或存在VIP时，会使用VIP创建Doc和Log.
                 // VIP：
                 //     微软ACS云内SLB通信场景，在VM内采集的流量无隧道IP地址使用VIP,
@@ -1396,7 +1396,7 @@ pub fn get_direction(
                     }
                 }
             }
-            TridentType::TtHostPod | TridentType::TtVmPod | TridentType::TtK8sSidecar => {
+            AgentType::TtHostPod | AgentType::TtVmPod | AgentType::TtK8sSidecar => {
                 if is_ep {
                     if tunnel_tier == 0 {
                         return (Direction::ClientToServer, Direction::ServerToClient);
@@ -1439,7 +1439,7 @@ pub fn get_direction(
                     }
                 }
             }
-            TridentType::TtProcess => {
+            AgentType::TtProcess => {
                 if cloud_gateway_traffic {
                     if l2_end {
                         // 云网关镜像（腾讯TCE等）
@@ -1555,14 +1555,14 @@ pub fn get_direction(
                     //其他情况: BUM流量
                 }
             }
-            TridentType::TtVm => {
+            AgentType::TtVm => {
                 if tunnel_tier == 0 && is_ep {
                     return (Direction::ClientToServer, Direction::ServerToClient);
                 }
             }
             _ => {
                 // 采集器类型不正确，不应该发生
-                error!("invalid trident type, deepflow-agent restart...");
+                error!("invalid agent type, deepflow-agent restart...");
                 thread::sleep(Duration::from_secs(1));
                 process::exit(1)
             }
@@ -1587,7 +1587,7 @@ pub fn get_direction(
         src_ep.is_local_ip,
         src_ep.l3_epc_id,
         cloud_gateway_traffic,
-        trident_type,
+        agent_type,
     );
     let (_, mut dst_direct) = inner(
         flow_key.tap_type,
@@ -1599,11 +1599,11 @@ pub fn get_direction(
         dst_ep.is_local_ip,
         dst_ep.l3_epc_id,
         cloud_gateway_traffic,
-        trident_type,
+        agent_type,
     );
     // 双方向都有统计位置优先级为：client/server侧 > L2End侧 > IsLocalMac侧 > 其他
     if src_direct != Direction::None && dst_direct != Direction::None {
-        if let TapType::Idc(_) = flow_key.tap_type {
+        if let CaptureNetworkType::Idc(_) = flow_key.tap_type {
             // When the IDC traffic collected by the dedicated deepflow-agent cannot distinguish between Directions,
             // the Direction is set to None and Doc data to count a Rest record.
             // ======================================================================================================

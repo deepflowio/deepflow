@@ -34,21 +34,6 @@ int extended_maps_set(struct bpf_tracer *tracer);
 void extended_prog_jump_tables(struct bpf_tracer *tracer);
 
 /**
- * @brief **extended_proc_event_handler()** extend the handling of process
- * execution and exit events.
- * @param pid Process ID
- * @param name Process name
- * @param PROC_EXEC or PROC_EXIT
- * @return 0 on success, non-zero on error
- *
- * For example, you might want to notify an eBPF program of these events
- * so that eBPF can perform the corresponding handling. Extend the handling
- * based on your own requirements.
- */
-int extended_proc_event_handler(int pid, const char *name,
-				enum proc_act_type type);
-
-/**
  * @brief **collect_extended_uprobe_syms_from_procfs()** extend the handling of uprobe
  * @param conf Tracer probes config
  * @return 0 on success, non-zero on error
@@ -73,10 +58,18 @@ void extended_events_handle(void);
 void extended_process_exit(int pid);
 
 /**
+ * @brief **extended_match_pid_handle()** Perform extended processing on matching PIDs
+ * @param feat Feature identifiers, such as: off-cpu/memory profiler
+ * @param pid Matching process ID
+ * @param act Is MATCH_PID_ADD or MATCH_PID_DEL 
+ */
+void extended_match_pid_handle(int feat, int pid, enum match_pids_act act);
+
+/**
  * @brief **extended_requires_dwarf()** whether extended profilers require DWARF unwinding
  * @param pid Process ID
- * @param name Process executable name
+ * @param name Process executable path
  */
-bool extended_require_dwarf(int pid, const char *name);
+bool extended_require_dwarf(int pid, const char *path);
 
 #endif /* DF_EXTENDED_H */

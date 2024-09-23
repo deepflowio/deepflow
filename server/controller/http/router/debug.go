@@ -25,6 +25,7 @@ import (
 
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/mysql/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	gcommon "github.com/deepflowio/deepflow/server/controller/genesis/common"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	. "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
@@ -218,6 +219,10 @@ func getGenesisStorage(g *genesis.Genesis) gin.HandlerFunc {
 			return
 		}
 		data, err := service.GetGenesisAgentStorage(c.Param("vtapID"), db)
+		if err != nil {
+			JsonResponse(c, nil, err)
+			return
+		}
 		JsonResponse(c, data, err)
 	})
 }
@@ -230,7 +235,7 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 			return
 		}
 		dataType := c.Param("type")
-		var ret genesis.GenesisSyncDataResponse
+		var ret gcommon.GenesisSyncDataResponse
 
 		if isLocal {
 			ret, err = service.GetGenesisData(orgID, g)
@@ -239,7 +244,6 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 		}
 
 		var data interface{}
-
 		switch dataType {
 		case "vm":
 			data = ret.VMs

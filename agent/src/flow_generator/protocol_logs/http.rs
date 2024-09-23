@@ -1696,7 +1696,7 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 mod tests {
     use crate::config::{
         handler::{LogParserConfig, TraceType},
-        ExtraLogFields, HttpEndpointExtraction, HttpEndpointTrie, MatchRule,
+        ExtraLogFields, HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
     };
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::utils::test::Capture;
@@ -1705,7 +1705,7 @@ mod tests {
             l7_protocol_log::{EbpfParam, L7PerfCache},
             MetaPacket,
         },
-        config::OracleParseConfig,
+        config::OracleConfig,
     };
 
     use std::cell::RefCell;
@@ -1916,7 +1916,7 @@ mod tests {
             rrt_timeout: Duration::from_secs(10).as_micros() as usize,
             buf_size: 0,
             captured_byte: 1000,
-            oracle_parse_conf: OracleParseConfig::default(),
+            oracle_parse_conf: OracleConfig::default(),
         };
 
         //测试长度不正确
@@ -2155,10 +2155,10 @@ mod tests {
         let path = String::from("///././/api/v1//.//./users/123?query=456");
         let expected_output = "///././/api/v1"; // appear continuous "/" or appear "."
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
-        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
-            disabled: false,
-            match_rules: vec![MatchRule {
-                prefix: "/api".to_string(),
+        let trie = HttpEndpointTrie::from(&HttpEndpoint {
+            extraction_disabled: false,
+            match_rules: vec![HttpEndpointMatchRule {
+                url_prefix: "/api".to_string(),
                 keep_segments: 1,
             }],
         });
@@ -2169,15 +2169,15 @@ mod tests {
         let path = String::from("/app/v1/users/123?query=456");
         let expected_output = ""; // prefixes do not match, endpoint is ""
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
-        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
-            disabled: false,
+        let trie = HttpEndpointTrie::from(&HttpEndpoint {
+            extraction_disabled: false,
             match_rules: vec![
-                MatchRule {
-                    prefix: "/api".to_string(),
+                HttpEndpointMatchRule {
+                    url_prefix: "/api".to_string(),
                     keep_segments: 1,
                 },
-                MatchRule {
-                    prefix: "/api/v1/users".to_string(),
+                HttpEndpointMatchRule {
+                    url_prefix: "/api/v1/users".to_string(),
                     keep_segments: 4,
                 },
             ],
@@ -2192,10 +2192,10 @@ mod tests {
         let path = String::from("/api/v1/123?query=456");
         let expected_output = "/api"; // longest prefix match: /api, take 1 segment
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
-        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
-            disabled: false,
-            match_rules: vec![MatchRule {
-                prefix: "".to_string(),
+        let trie = HttpEndpointTrie::from(&HttpEndpoint {
+            extraction_disabled: false,
+            match_rules: vec![HttpEndpointMatchRule {
+                url_prefix: "".to_string(),
                 keep_segments: 3,
             }],
         });
@@ -2203,10 +2203,10 @@ mod tests {
         let path = String::from("/api/v1/users/123?query=456");
         let expected_output = "/api/v1/users"; // the default value is changed to 3 segments
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
-        let trie = HttpEndpointTrie::from(&HttpEndpointExtraction {
-            disabled: false,
-            match_rules: vec![MatchRule {
-                prefix: "/api/v1".to_string(),
+        let trie = HttpEndpointTrie::from(&HttpEndpoint {
+            extraction_disabled: false,
+            match_rules: vec![HttpEndpointMatchRule {
+                url_prefix: "/api/v1".to_string(),
                 keep_segments: 0,
             }],
         });

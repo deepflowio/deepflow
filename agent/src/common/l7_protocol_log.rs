@@ -31,7 +31,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::config::handler::LogParserConfig;
-use crate::config::OracleParseConfig;
+use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
 use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
 use crate::flow_generator::protocol_logs::plugin::custom_wrap::CustomWrapLog;
@@ -373,7 +373,7 @@ pub struct ParseParam<'a> {
     pub buf_size: u16,
     pub captured_byte: u16,
 
-    pub oracle_parse_conf: OracleParseConfig,
+    pub oracle_parse_conf: OracleConfig,
 }
 
 impl<'a> ParseParam<'a> {
@@ -423,7 +423,7 @@ impl<'a> ParseParam<'a> {
             buf_size: 0,
             captured_byte: 0,
 
-            oracle_parse_conf: OracleParseConfig::default(),
+            oracle_parse_conf: OracleConfig::default(),
         };
         if packet.ebpf_type != EbpfType::None {
             param.ebpf_param = Some(EbpfParam {
@@ -469,7 +469,7 @@ impl<'a> ParseParam<'a> {
         self.parse_config = Some(conf);
     }
 
-    pub fn set_oracle_conf(&mut self, conf: OracleParseConfig) {
+    pub fn set_oracle_conf(&mut self, conf: OracleConfig) {
         self.oracle_parse_conf = conf;
     }
 }

@@ -38,7 +38,7 @@ use super::{
 use crate::common::flow::L7PerfStats;
 use crate::common::{
     endpoint::EPC_INTERNET,
-    enums::{EthernetType, IpProtocol, TapType},
+    enums::{CaptureNetworkType, EthernetType, IpProtocol},
     flow::{CloseType, L7Protocol, SignalSource},
     tagged_flow::TaggedFlow,
 };
@@ -642,7 +642,7 @@ impl QuadrupleGeneratorThread {
             self.second_output.clone(),
             self.minute_output.clone(),
             self.toa_info_output.clone(),
-            process_info_enabled(self.config.load().trident_type),
+            process_info_enabled(self.config.load().agent_type),
             self.flow_output.clone(),
             self.connection_lru_capacity,
             self.metrics_type,
@@ -870,8 +870,8 @@ impl QuadrupleGenerator {
         for i in 0..2 {
             let side = &tagged_flow.flow.flow_metrics_peers[i];
             let is_l2_and_l3_end = side.is_l3_end && side.is_l2_end;
-            if (tagged_flow.flow.flow_key.tap_type == TapType::Cloud && is_l2_and_l3_end)
-                || (tagged_flow.flow.flow_key.tap_type != TapType::Cloud
+            if (tagged_flow.flow.flow_key.tap_type == CaptureNetworkType::Cloud && is_l2_and_l3_end)
+                || (tagged_flow.flow.flow_key.tap_type != CaptureNetworkType::Cloud
                     && side.l3_epc_id != EPC_INTERNET)
             {
                 no_endpoint_flag = false;

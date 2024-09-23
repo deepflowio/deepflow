@@ -33,7 +33,7 @@ use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
 
 use crate::config::handler::LogParserConfig;
-use crate::config::OracleParseConfig;
+use crate::config::OracleConfig;
 use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
 use crate::flow_generator::protocol_logs::{get_wasm_parser, L7ResponseStatus, WasmLog};
 use crate::{
@@ -76,7 +76,7 @@ fn get_req_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
         captured_byte: 999,
-        oracle_parse_conf: OracleParseConfig::default(),
+        oracle_parse_conf: OracleConfig::default(),
     }
 }
 
@@ -114,7 +114,7 @@ fn get_resq_param<'a>(
         rrt_timeout: Duration::from_secs(10).as_micros() as usize,
         buf_size: 999,
         captured_byte: 999,
-        oracle_parse_conf: OracleParseConfig::default(),
+        oracle_parse_conf: OracleConfig::default(),
     }
 }
 

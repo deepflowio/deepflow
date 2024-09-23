@@ -18,7 +18,7 @@ use page_size;
 
 pub use public::error::af_packet::{Error, Result};
 
-use public::proto::trident::CaptureSocketType;
+use public::proto::agent::CaptureSocketType;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
 pub enum OptTpacketVersion {

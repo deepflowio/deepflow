@@ -18,21 +18,20 @@ mod config;
 pub mod handler;
 
 pub use config::{
-    AgentIdType, Config, ConfigError, KubernetesPollerType, OracleParseConfig, PcapConfig,
-    PrometheusExtraConfig, RuntimeConfig, YamlConfig, K8S_CA_CRT_PATH,
+    AgentIdType, Config, ConfigError, KubernetesPollerType, OracleConfig, PcapStream,
+    ProcessMatcher, PrometheusExtraLabels, RuntimeConfig, UserConfig, K8S_CA_CRT_PATH,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use config::{
-    KubernetesResourceConfig, OsProcRegexp, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT,
-    OS_PROC_REGEXP_MATCH_ACTION_DROP, OS_PROC_REGEXP_MATCH_TYPE_CMD,
-    OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
-    OS_PROC_REGEXP_MATCH_TYPE_TAG,
+    ApiResources, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
+    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
+    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use handler::FlowAccess;
 pub use handler::{DispatcherConfig, FlowConfig, ModuleConfig, NpbConfig};
 
 #[cfg(test)]
-pub use config::{ExtraLogFields, HttpEndpointExtraction, MatchRule};
+pub use config::{ExtraLogFields, HttpEndpoint, HttpEndpointMatchRule};
 #[cfg(test)]
 pub use handler::HttpEndpointTrie;

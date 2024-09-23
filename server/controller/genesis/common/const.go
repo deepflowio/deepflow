@@ -17,9 +17,16 @@
 package common
 
 const (
-	TYPE_UPDATE                  = 1
-	TYPE_RENEW                   = 2
-	TYPE_EXIT                    = 3
+	SYNC_TYPE_FORMAT = "%v-%v-%v-%v" // region-orgID-type-vtapID
+)
+
+const (
+	TYPE_UPDATE = 1
+	TYPE_RENEW  = 2
+	TYPE_EXIT   = 3
+)
+
+const (
 	DEVICE_TYPE_KVM_HOST         = "kvm-host"
 	DEVICE_TYPE_KVM_VM           = "kvm-vm"
 	DEVICE_TYPE_DOCKER_HOST      = "docker-host"
