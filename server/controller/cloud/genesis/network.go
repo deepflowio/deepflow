@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
@@ -37,11 +36,6 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 			log.Debug("segmentation id not found", logger.NewORGPrefix(g.orgID))
 			continue
 		}
-		vpcLcuuid := n.VPCLcuuid
-		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUIDByOrgID(g.orgID, g.defaultVpcName)
-			g.defaultVpc = true
-		}
 		networkName := n.Name
 		if networkName == "" {
 			networkName = "subnet_vni_" + strconv.Itoa(int(n.SegmentationID))
@@ -50,7 +44,7 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 			Lcuuid:         n.Lcuuid,
 			Name:           networkName,
 			SegmentationID: int(n.SegmentationID),
-			VPCLcuuid:      vpcLcuuid,
+			VPCLcuuid:      n.VPCLcuuid,
 			Shared:         false,
 			External:       n.External,
 			NetType:        int(n.NetType),

@@ -42,13 +42,11 @@ type Genesis struct {
 	teamID          int
 	ipV4CIDRMaxMask int
 	ipV6CIDRMaxMask int
-	defaultVpc      bool
 	Name            string
 	Lcuuid          string
 	UuidGenerate    string
 	regionLcuuid    string
 	azLcuuid        string
-	defaultVpcName  string
 	ips             []cloudmodel.IP
 	subnets         []cloudmodel.Subnet
 	genesisData     gcommon.GenesisSyncDataResponse
@@ -81,7 +79,6 @@ func NewGenesis(orgID int, domain mysqlmodel.Domain, cfg config.CloudConfig) (*G
 		Name:            domain.Name,
 		Lcuuid:          domain.Lcuuid,
 		UuidGenerate:    domain.DisplayName,
-		defaultVpcName:  cfg.GenesisDefaultVpcName,
 		regionLcuuid:    regionLcuuid,
 		genesisData:     gcommon.GenesisSyncDataResponse{},
 		cloudStatsd:     statsd.NewCloudStatsd(),
@@ -268,7 +265,6 @@ func (g *Genesis) generateIPsAndSubnets() {
 
 func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	g.azLcuuid = ""
-	g.defaultVpc = false
 	g.cloudStatsd = statsd.NewCloudStatsd()
 
 	if genesis.GenesisService == nil {
@@ -321,14 +317,6 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	ips, err := g.getIPs()
 	if err != nil {
 		return cloudmodel.Resource{}, err
-	}
-	if g.defaultVpc {
-		vpc := cloudmodel.VPC{
-			Lcuuid:       common.GetUUIDByOrgID(g.orgID, g.defaultVpcName),
-			Name:         g.defaultVpcName,
-			RegionLcuuid: g.regionLcuuid,
-		}
-		vpcs = append(vpcs, vpc)
 	}
 
 	resource := cloudmodel.Resource{

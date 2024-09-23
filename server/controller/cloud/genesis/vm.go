@@ -32,11 +32,6 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 	g.cloudStatsd.RefreshAPIMoniter("vms", len(vmsData), time.Time{})
 
 	for _, v := range vmsData {
-		vpcLcuuid := v.VPCLcuuid
-		if vpcLcuuid == "" {
-			vpcLcuuid = common.GetUUIDByOrgID(g.orgID, g.defaultVpcName)
-			g.defaultVpc = true
-		}
 		launchServer := v.LaunchServer
 		if launchServer == "127.0.0.1" {
 			launchServer = ""
@@ -46,7 +41,7 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 			Name:         v.Name,
 			Label:        v.Label,
 			HType:        common.VM_HTYPE_VM_C,
-			VPCLcuuid:    vpcLcuuid,
+			VPCLcuuid:    v.VPCLcuuid,
 			State:        int(v.State),
 			LaunchServer: launchServer,
 			CreatedAt:    v.CreatedAt,
