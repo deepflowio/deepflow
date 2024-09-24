@@ -810,10 +810,11 @@ static int ebpf_obj__maps_collect(struct ebpf_object *obj)
 		memcpy(&new_map->def, def, cp_sz);
 		ebpf_debug
 		    ("map_name %s\tmaps_cnt:%d\toffset %zd\ttype %u\tkey_size "
-		     "%u\tvalue_size %u\tmax_entries %u\n",
+		     "%u\tvalue_size %u\tmax_entries %u feat %u\n",
 		     map_name, obj->maps_cnt, new_map->elf_offset,
 		     new_map->def.type, new_map->def.key_size,
-		     new_map->def.value_size, new_map->def.max_entries);
+		     new_map->def.value_size, new_map->def.max_entries,
+		     new_map->def.feat);
 	}
 
 	return ETR_OK;
@@ -917,6 +918,10 @@ int ebpf_obj_load(struct ebpf_object *obj)
 	struct ebpf_map *map;
 	for (i = 0; i < obj->maps_cnt; i++) {
 		map = &obj->maps[i];
+		// TODO
+		if (map->def.feat == FEATURE_UPROBE_GOLANG) {
+		}
+
 		int map_flags = 0;
 		if (map->def.type == BPF_MAP_TYPE_HASH && map_no_prealloc) {
 			map_flags = BPF_F_NO_PREALLOC;
