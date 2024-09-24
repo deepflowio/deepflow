@@ -8,9 +8,10 @@ FROM centos:centos7.9.2009
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
-RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo && \
-    sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo && \
-    sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+
+RUN sed -i -e 's/mirror.centos.org/vault.centos.org/g' \
+           -e 's/^#.*baseurl=http/baseurl=http/g' \
+           -e 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/*.repo
 # 安装自定义软件
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq patch
 
