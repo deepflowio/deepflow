@@ -17,15 +17,11 @@
 mod config;
 pub mod handler;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub use config::ApiResources;
 pub use config::{
     AgentIdType, Config, ConfigError, KubernetesPollerType, OracleConfig, PcapStream,
     ProcessMatcher, PrometheusExtraLabels, RuntimeConfig, UserConfig, K8S_CA_CRT_PATH,
-};
-#[cfg(any(target_os = "linux", target_os = "android"))]
-pub use config::{
-    ApiResources, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
-    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
-    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use handler::FlowAccess;

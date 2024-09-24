@@ -71,7 +71,7 @@ use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
 use crate::policy::PolicyGetter;
 use crate::rpc::get_timestamp;
-use crate::utils::stats;
+use crate::utils::{process::ProcessListener, stats};
 
 use public::{
     buffer::BatchedBox,
@@ -463,6 +463,7 @@ pub struct EbpfCollector {
     counter: Arc<EbpfCounter>,
 
     exception_handler: ExceptionHandler,
+    process_listener: Arc<ProcessListener>,
 }
 
 static mut SWITCH: bool = false;
@@ -614,10 +615,11 @@ impl EbpfCollector {
         ebpf_profile_sender: DebugSender<Profile>,
         policy_getter: PolicyGetter,
         time_diff: Arc<AtomicI64>,
+        process_listener: &ProcessListener,
     ) -> Result<ConfigHandle> {
         // ebpf和ebpf collector通信配置初始化
         unsafe {
-            let handle = Self::ebpf_core_init(config);
+            let handle = Self::ebpf_core_init(process_listener, config);
             // initialize communication between core and ebpf collector
             SWITCH = false;
             SENDER = Some(sender);
@@ -631,27 +633,30 @@ impl EbpfCollector {
         }
     }
 
-    unsafe fn ebpf_core_init(config: &EbpfConfig) -> Result<ConfigHandle> {
+    unsafe fn ebpf_core_init(
+        process_listener: &ProcessListener,
+        config: &EbpfConfig,
+    ) -> Result<ConfigHandle> {
         // ebpf core modules init
         #[allow(unused_mut)]
         let mut handle = ConfigHandle::default();
         ebpf::set_uprobe_golang_enabled(config.ebpf.socket.uprobe.golang.enabled);
         if config.ebpf.socket.uprobe.golang.enabled {
+            let feature = "ebpf.socket.uprobe.golang";
+            process_listener.register(feature, ebpf::set_feature_uprobe_golang);
+
             let uprobe_proc_regexp = config
                 .process_matcher
                 .iter()
                 .find(|p| {
                     p.enabled_features
                         .iter()
-                        .find(|f| f.eq_ignore_ascii_case("ebpf.socket.uprobe.golang"))
+                        .find(|f| f.eq_ignore_ascii_case(feature))
                         .is_some()
                 })
-                .map(|p| p.match_regex.to_owned())
+                .map(|p| p.match_regex.as_str())
                 .unwrap_or_default();
-            info!(
-                "ebpf set golang uprobe proc regexp: {}",
-                uprobe_proc_regexp.as_str()
-            );
+            info!("ebpf set golang uprobe proc regexp: {}", uprobe_proc_regexp);
             ebpf::set_feature_regex(
                 ebpf::FEATURE_UPROBE_GOLANG,
                 CString::new(uprobe_proc_regexp.as_bytes())
@@ -665,20 +670,23 @@ impl EbpfCollector {
 
         ebpf::set_uprobe_openssl_enabled(config.ebpf.socket.uprobe.tls.enabled);
         if config.ebpf.socket.uprobe.tls.enabled {
+            let feature = "ebpf.socket.uprobe.tls";
+            process_listener.register(feature, ebpf::set_feature_uprobe_tls);
+
             let uprobe_proc_regexp = config
                 .process_matcher
                 .iter()
                 .find(|p| {
                     p.enabled_features
                         .iter()
-                        .find(|f| f.eq_ignore_ascii_case("ebpf.socket.uprobe.tls"))
+                        .find(|f| f.eq_ignore_ascii_case(feature))
                         .is_some()
                 })
-                .map(|p| p.match_regex.to_owned())
+                .map(|p| p.match_regex.as_str())
                 .unwrap_or_default();
             info!(
                 "ebpf set openssl uprobe proc regexp: {}",
-                uprobe_proc_regexp.as_str()
+                uprobe_proc_regexp
             );
             ebpf::set_feature_regex(
                 ebpf::FEATURE_UPROBE_OPENSSL,
@@ -692,24 +700,27 @@ impl EbpfCollector {
         }
 
         if config.symbol_table.golang_specific.enabled {
+            let feature = "proc.golang_symbol_table";
+            process_listener.register(feature, ebpf::set_feature_uprobe_golang_symbol);
+
             let uprobe_proc_regexp = config
                 .process_matcher
                 .iter()
                 .find(|p| {
                     p.enabled_features
                         .iter()
-                        .find(|f| f.eq_ignore_ascii_case("input.proc.symbol_table.golang_specific"))
+                        .find(|f| f.eq_ignore_ascii_case(feature))
                         .is_some()
                 })
-                .map(|p| p.match_regex.to_owned())
+                .map(|p| p.match_regex.as_str())
                 .unwrap_or_default();
             info!(
                 "ebpf set golang symbol uprobe proc regexp: {}",
-                uprobe_proc_regexp.as_str()
+                uprobe_proc_regexp
             );
             ebpf::set_feature_regex(
                 ebpf::FEATURE_UPROBE_GOLANG_SYMBOL,
-                CString::new(uprobe_proc_regexp.as_str().as_bytes())
+                CString::new(uprobe_proc_regexp.as_bytes())
                     .unwrap()
                     .as_c_str()
                     .as_ptr(),
@@ -903,16 +914,19 @@ impl EbpfCollector {
             }
 
             if !on_cpu.disabled {
+                let feature = "ebpf.profile.on_cpu";
+                process_listener.register(feature, ebpf::set_feature_on_cpu);
+
                 let on_cpu_regexp = config
                     .process_matcher
                     .iter()
                     .find(|p| {
                         p.enabled_features
                             .iter()
-                            .find(|f| f.eq_ignore_ascii_case("ebpf.profile.on_cpu"))
+                            .find(|f| f.eq_ignore_ascii_case(feature))
                             .is_some()
                     })
-                    .map(|p| p.match_regex.to_owned())
+                    .map(|p| p.match_regex.as_str())
                     .unwrap_or_default();
                 ebpf::set_feature_regex(
                     ebpf::FEATURE_PROFILE_ONCPU,
@@ -928,18 +942,21 @@ impl EbpfCollector {
 
             #[cfg(feature = "extended_profile")]
             {
+                let feature = "ebpf.profile.off_cpu";
                 let off_cpu_regexp = config
                     .process_matcher
                     .iter()
                     .find(|p| {
                         p.enabled_features
                             .iter()
-                            .find(|f| f.eq_ignore_ascii_case("ebpf.profile.off_cpu"))
+                            .find(|f| f.eq_ignore_ascii_case(feature))
                             .is_some()
                     })
                     .map(|p| p.match_regex.to_owned())
                     .unwrap_or_default();
                 if !off_cpu.disabled {
+                    process_listener.register(feature, ebpf::set_feature_off_cpu);
+
                     ebpf::set_feature_regex(
                         ebpf::FEATURE_PROFILE_ONCPU,
                         CString::new(off_cpu_regexp.as_bytes())
@@ -953,6 +970,9 @@ impl EbpfCollector {
                 }
 
                 if !memory.disabled {
+                    let feature = "ebpf.profile.memory";
+                    process_listener.register(feature, ebpf::set_feature_memory);
+
                     let memory_cpu_regexp = config
                         .process_matcher
                         .iter()
@@ -1050,6 +1070,7 @@ impl EbpfCollector {
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
         exception_handler: ExceptionHandler,
+        process_listener: &Arc<ProcessListener>,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
         if ebpf_config.ebpf.disabled {
@@ -1075,6 +1096,7 @@ impl EbpfCollector {
             ebpf_profile_sender,
             policy_getter,
             time_diff.clone(),
+            process_listener,
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 
@@ -1101,6 +1123,7 @@ impl EbpfCollector {
                 get_token_failed: AtomicU64::new(0),
             }),
             exception_handler,
+            process_listener: process_listener.clone(),
         }))
     }
 
@@ -1147,7 +1170,7 @@ impl EbpfCollector {
                             as *mut memory_profile::MemoryContext,
                     ));
                 }
-                if let Ok(handle) = Self::ebpf_core_init(config) {
+                if let Ok(handle) = Self::ebpf_core_init(&self.process_listener, config) {
                     self.config_handle = handle;
                 } else {
                     warn!("ebpf start_continuous_profiler error.");

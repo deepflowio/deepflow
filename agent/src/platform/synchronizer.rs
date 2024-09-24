@@ -29,10 +29,16 @@ use parking_lot::RwLock;
 
 use tokio::runtime::Runtime;
 
-#[cfg(target_os = "linux")]
-use crate::platform::{kubernetes::GenericPoller, LibvirtXmlExtractor};
 use crate::{
     config::handler::PlatformAccess, exception::ExceptionHandler, rpc::Session, trident::AgentId,
+};
+#[cfg(target_os = "linux")]
+use crate::{
+    platform::{
+        kubernetes::GenericPoller,
+        platform_synchronizer::linux_process::set_proc_scan_process_datas, LibvirtXmlExtractor,
+    },
+    utils::process::ProcessListener,
 };
 
 use public::proto::agent::{self, Exception};
@@ -83,6 +89,8 @@ pub struct Synchronizer {
 
     #[cfg(target_os = "linux")]
     xml_extractor: Arc<LibvirtXmlExtractor>,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    process_listener: Option<Arc<ProcessListener>>,
 }
 
 impl Synchronizer {
@@ -113,7 +121,14 @@ impl Synchronizer {
             kubernetes_poller: Default::default(),
             #[cfg(target_os = "linux")]
             xml_extractor,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            process_listener: None,
         }
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn set_process_listener(&self, process_listener: &Arc<ProcessListener>) {
+        process_listener.register("proc.gprocess_info", set_proc_scan_process_datas);
     }
 
     #[cfg(target_os = "linux")]

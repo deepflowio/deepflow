@@ -25,7 +25,10 @@ cfg_if::cfg_if! {
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-pub use platform_synchronizer::{ProcRegRewrite, SocketSynchronizer};
+pub use platform_synchronizer::{
+    get_container_id, get_os_app_tag_by_exec, OsAppTag, ProcessData, ProcessDataOp,
+    SocketSynchronizer,
+};
 
 mod platform_synchronizer;
 

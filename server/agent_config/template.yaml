@@ -1291,20 +1291,20 @@ inputs:
     # unit:
     # range: []
     # enum_options:
-    #   - input.proc.symbol_table.golang_specific
+    #   - proc.gprocess_info
+    #   - proc.golang_symbol_table
     #   - proc.socket_list
-    #   - proc.symbol_table
-    #   - proc.proc_event # XXX
+    #   #- proc.proc_event
     #   - ebpf.socket.uprobe.golang
     #   - ebpf.socket.uprobe.tls
-    #   - ebpf.socket.uprobe.rdma # XXX
-    #   - ebpf.file.io_event
-    #   - ebpf.file.management_event # XXX
+    #   #- ebpf.socket.uprobe.rdma
+    #   #- ebpf.file.io_event
+    #   #- ebpf.file.management_event
     #   - ebpf.profile.on_cpu
     #   - ebpf.profile.off_cpu
     #   - ebpf.profile.memory
-    #   - ebpf.profile.cuda # XXX
-    #   - ebpf.profile.hbm # XXX
+    #   #- ebpf.profile.cuda
+    #   #- ebpf.profile.hbm
     # modification: agent_restart
     # ee_feature: false
     # description:
@@ -1317,7 +1317,7 @@ inputs:
     process_matcher:
       - match_regex: deepflow-*
         only_in_container: false
-        enabled_features: [ebpf.profile.on_cpu, ebpf.profile.off_cpu, os.proc.scan]
+        enabled_features: [ebpf.profile.on_cpu, ebpf.profile.off_cpu, proc.gprocess_info]
     # type: section
     # name:
     #   en: Symbol Table

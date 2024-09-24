@@ -102,7 +102,7 @@ use crate::{
 use crate::{
     ebpf_dispatcher::EbpfCollector,
     platform::SocketSynchronizer,
-    utils::{environment::core_file_check, lru::Lru},
+    utils::{environment::core_file_check, lru::Lru, process::ProcessListener},
 };
 #[cfg(target_os = "linux")]
 use crate::{
@@ -1574,6 +1574,8 @@ pub struct AgentComponents {
     pub tap_interfaces: Vec<Link>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
     pub last_dispatcher_component_id: usize,
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub process_listener: Arc<ProcessListener>,
 
     max_memory: u64,
     capture_mode: PacketCaptureType,
@@ -2058,6 +2060,32 @@ impl AgentComponents {
         };
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        let process_listener = Arc::new(ProcessListener::new(
+            &candidate_config.user_config.inputs.proc.process_matcher,
+            candidate_config
+                .user_config
+                .inputs
+                .proc
+                .proc_dir_path
+                .clone(),
+            candidate_config
+                .user_config
+                .inputs
+                .proc
+                .tag_extraction
+                .exec_username
+                .clone(),
+            candidate_config
+                .user_config
+                .inputs
+                .proc
+                .tag_extraction
+                .script_command
+                .clone(),
+        ));
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        platform_synchronizer.set_process_listener(&process_listener);
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
@@ -2084,6 +2112,7 @@ impl AgentComponents {
                 user_config.processors.packet.toa.cache_size >> 5,
                 user_config.processors.packet.toa.cache_size,
             ))),
+            process_listener.clone(),
         );
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.capture_mode {
@@ -2477,6 +2506,7 @@ impl AgentComponents {
                 &queue_debugger,
                 stats_collector.clone(),
                 exception_handler.clone(),
+                &process_listener,
             ) {
                 Ok(ebpf_collector) => {
                     synchronizer
@@ -2748,6 +2778,8 @@ impl AgentComponents {
             tap_interfaces,
             last_dispatcher_component_id: otel_dispatcher_id,
             bpf_options,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            process_listener,
         })
     }
 
@@ -2820,6 +2852,8 @@ impl AgentComponents {
 
         self.npb_bandwidth_watcher.start();
         self.npb_arp_table.start();
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        self.process_listener.start();
         info!("Started agent components.");
     }
 
@@ -2895,6 +2929,10 @@ impl AgentComponents {
             join_handles.push(h);
         }
         if let Some(h) = self.stats_collector.notify_stop() {
+            join_handles.push(h);
+        }
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if let Some(h) = self.process_listener.notify_stop() {
             join_handles.push(h);
         }
 

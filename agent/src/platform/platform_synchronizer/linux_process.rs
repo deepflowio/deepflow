@@ -18,13 +18,14 @@
 use std::os::android::fs::MetadataExt;
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::sync::{Arc, RwLock};
 
 use std::collections::HashSet;
 use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
-use envmnt::{ExpandOptions, ExpansionType};
 use log::{debug, error};
 use nom::AsBytes;
 use procfs::{process::Process, ProcError, ProcResult};
@@ -32,7 +33,6 @@ use public::bytes::write_u64_be;
 use public::proto::agent::{ProcessInfo, Tag};
 use public::proto::trident;
 use public::pwd::PasswordInfo;
-use regex::Regex;
 use ring::digest;
 use serde::Deserialize;
 
@@ -40,16 +40,15 @@ use super::linux_socket::get_proc_netns;
 use super::proc_scan_hook::proc_scan_hook;
 
 use crate::config::handler::OsProcScanConfig;
-use crate::config::{
-    ProcessMatcher, OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_ACTION_DROP,
-    OS_PROC_REGEXP_MATCH_TYPE_CMD, OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME,
-    OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME, OS_PROC_REGEXP_MATCH_TYPE_TAG,
-};
 
 const CONTAINER_ID_LEN: usize = 64;
 const SHA1_DIGEST_LEN: usize = 20;
 
-#[derive(Debug, Clone)]
+pub trait ProcessDataOp {
+    fn merge_and_dedup(&mut self);
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProcessData {
     pub name: String, // the replaced name
     pub pid: u64,
@@ -67,7 +66,36 @@ pub struct ProcessData {
     pub container_id: String,
 }
 
+impl ProcessDataOp for Vec<ProcessData> {
+    // NOTICE: the arrry must be ordered.
+    fn merge_and_dedup(&mut self) {
+        let mut dest: Vec<ProcessData> = vec![];
+
+        for p in self.into_iter() {
+            let Some(last) = dest.last_mut() else {
+                dest.push(p.clone());
+                continue;
+            };
+
+            if p.pid != last.pid {
+                dest.push(p.clone());
+                continue;
+            }
+
+            last.merge(p);
+        }
+        *self = dest;
+    }
+}
+
 impl ProcessData {
+    fn merge(&mut self, other: &Self) {
+        if self.name != other.name && other.name != other.process_name {
+            self.name = other.name.clone();
+        }
+        self.os_app_tags.extend_from_slice(&other.os_app_tags);
+    }
+
     // proc data only hash the pid and tag
     pub fn digest(&self, dist_ctx: &mut digest::Context) {
         let mut pid = [0u8; 8];
@@ -214,173 +242,7 @@ impl From<&ProcessData> for trident::ProcessInfo {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
-pub enum RegExpAction {
-    Accept,
-    Drop,
-}
-
-impl Default for RegExpAction {
-    fn default() -> Self {
-        Self::Accept
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum ProcRegRewrite {
-    // (match reg, action, rewrite string)
-    Cmd(Regex, RegExpAction, String),
-    ProcessName(Regex, RegExpAction, String),
-    ParentProcessName(Regex, RegExpAction),
-    Tag(Regex, RegExpAction),
-}
-
-impl ProcRegRewrite {
-    pub fn action(&self) -> RegExpAction {
-        match self {
-            ProcRegRewrite::Cmd(_, act, _) => *act,
-            ProcRegRewrite::ProcessName(_, act, _) => *act,
-            ProcRegRewrite::ParentProcessName(_, act) => *act,
-            ProcRegRewrite::Tag(_, act) => *act,
-        }
-    }
-}
-
-impl PartialEq for ProcRegRewrite {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Cmd(lr, lact, ls), Self::Cmd(rr, ract, rs)) => {
-                lr.as_str() == rr.as_str() && lact == ract && ls == rs
-            }
-            (Self::ProcessName(lr, lact, ls), Self::ProcessName(rr, ract, rs)) => {
-                lr.as_str() == rr.as_str() && lact == ract && ls == rs
-            }
-            (Self::ParentProcessName(lr, lact), Self::ParentProcessName(rr, ract)) => {
-                lr.as_str() == rr.as_str() && lact == ract
-            }
-            (Self::Tag(lr, lact), Self::Tag(rr, ract)) => {
-                lr.as_str() == rr.as_str() && lact == ract
-            }
-            _ => false,
-        }
-    }
-}
-
-impl Eq for ProcRegRewrite {}
-
-impl TryFrom<&ProcessMatcher> for ProcRegRewrite {
-    type Error = regex::Error;
-
-    fn try_from(value: &ProcessMatcher) -> Result<Self, Self::Error> {
-        let re = Regex::new(value.match_regex.as_str())?;
-        let action = match value.action.as_str() {
-            "" | OS_PROC_REGEXP_MATCH_ACTION_ACCEPT => RegExpAction::Accept,
-            OS_PROC_REGEXP_MATCH_ACTION_DROP => RegExpAction::Drop,
-            _ => return Err(regex::Error::Syntax("action must accept or drop".into())),
-        };
-        let env_rewrite = |r: String| {
-            envmnt::expand(
-                r.as_str(),
-                Some(ExpandOptions {
-                    expansion_type: Some(ExpansionType::Windows),
-                    default_to_empty: true,
-                }),
-            )
-        };
-
-        match value.match_type.as_str() {
-            OS_PROC_REGEXP_MATCH_TYPE_CMD => Ok(Self::Cmd(
-                re,
-                action,
-                env_rewrite(value.rewrite_name.clone()),
-            )),
-            "" | OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME => Ok(Self::ProcessName(
-                re,
-                action,
-                env_rewrite(value.rewrite_name.clone()),
-            )),
-            OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME => Ok(Self::ParentProcessName(re, action)),
-            OS_PROC_REGEXP_MATCH_TYPE_TAG => Ok(Self::Tag(re, action)),
-            _ => Err(regex::Error::Syntax(
-                "regexp match type incorrect".to_string(),
-            )),
-        }
-    }
-}
-
-impl ProcRegRewrite {
-    pub(super) fn match_and_rewrite_proc(
-        &self,
-        proc: &mut ProcessData,
-        pid_process_map: &PidProcMap,
-        tags: &HashMap<u64, OsAppTag>,
-        match_only: bool,
-    ) -> bool {
-        let mut match_replace_fn =
-            |reg: &Regex, act: &RegExpAction, s: &String, replace: &String| {
-                if reg.is_match(s.as_str()) {
-                    if act == &RegExpAction::Accept && !replace.is_empty() && !match_only {
-                        proc.name = reg.replace_all(s.as_str(), replace).to_string();
-                    }
-                    true
-                } else {
-                    false
-                }
-            };
-
-        match self {
-            ProcRegRewrite::Cmd(reg, act, replace) => {
-                match_replace_fn(reg, act, &proc.cmd.join(" "), replace)
-            }
-            ProcRegRewrite::ProcessName(reg, act, replace) => {
-                match_replace_fn(reg, act, &proc.process_name, replace)
-            }
-            ProcRegRewrite::ParentProcessName(reg, _) => {
-                fn match_parent(
-                    proc: &ProcessData,
-                    pid_process_map: &PidProcMap,
-                    reg: &Regex,
-                ) -> bool {
-                    if proc.ppid == 0 {
-                        return false;
-                    }
-
-                    let Some(parent_proc) = pid_process_map.get(&(proc.ppid as u32)) else {
-                        error!(
-                            "pid {} have no parent proc with ppid: {}",
-                            proc.pid, proc.ppid
-                        );
-                        return false;
-                    };
-                    if reg.is_match(&parent_proc.process_name.as_str()) {
-                        return true;
-                    }
-                    // recursive match along the parent.
-                    match_parent(parent_proc, pid_process_map, reg)
-                }
-
-                match_parent(&*proc, pid_process_map, reg)
-            }
-            ProcRegRewrite::Tag(reg, _) => {
-                if let Some(tag) = tags.get(&proc.pid) {
-                    let mut found = false;
-                    for tag_kv in tag.tags.iter() {
-                        let composed = format!("{}:{}", &tag_kv.key, &tag_kv.value);
-                        if reg.is_match(&composed.as_str()) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    found
-                } else {
-                    false
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Deserialize)]
+#[derive(Debug, Default, PartialEq, Clone, Deserialize)]
 pub struct OsAppTagKV {
     pub key: String,
     pub value: String,
@@ -388,12 +250,13 @@ pub struct OsAppTagKV {
 
 #[derive(Default, Deserialize)]
 pub struct OsAppTag {
-    pid: u64,
+    pub pid: u64,
     // Vec<key, val>
-    tags: Vec<OsAppTagKV>,
+    pub tags: Vec<OsAppTagKV>,
 }
 
 pub(super) type PidProcMap = HashMap<u32, ProcessData>;
+static mut PIDS: Option<Arc<RwLock<Vec<ProcessData>>>> = None;
 
 // get the pid and process map
 // now only use for match parent proc name to filter proc, the proc data in map will not fill the tag and not set username
@@ -422,21 +285,38 @@ pub(crate) fn get_all_process(conf: &OsProcScanConfig) -> Vec<ProcessData> {
     ret
 }
 
+fn get_proc_scan_process_datas() -> Vec<ProcessData> {
+    unsafe {
+        if let Some(pids) = PIDS.as_ref() {
+            pids.read().unwrap().clone()
+        } else {
+            vec![]
+        }
+    }
+}
+
+pub fn set_proc_scan_process_datas(_: &Vec<u32>, process_datas: &Vec<ProcessData>) {
+    unsafe {
+        if let Some(last) = PIDS.as_ref() {
+            *last.write().unwrap() = process_datas.clone();
+        } else {
+            PIDS = Some(Arc::new(RwLock::new(process_datas.clone())));
+        }
+    }
+}
+
 pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessData>) {
-    // Hashmap<root_inode, PasswordInfo>
     let mut pwd_info = HashMap::new();
-    let (user, cmd, proc_root, proc_regexp, tagged_only, now_sec) = (
+    let (user, cmd, proc_root, now_sec) = (
         conf.os_app_tag_exec_user.as_str(),
         conf.os_app_tag_exec.as_slice(),
         conf.os_proc_root.as_str(),
-        conf.os_proc_regex.as_slice(),
-        conf.os_proc_sync_tagged_only,
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs(),
     );
-
+    let process_datas = get_proc_scan_process_datas();
     let mut tags_map = match get_os_app_tag_by_exec(user, cmd) {
         Ok(tags) => tags,
         Err(err) => {
@@ -446,76 +326,49 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
                 user,
                 err
             );
-            HashMap::new()
+            return;
         }
     };
 
-    let mut pid_proc_map = get_all_pid_process_map(conf.os_proc_root.as_str());
+    for mut process_data in process_datas {
+        let Ok(up_sec) = process_data.up_sec(now_sec) else {
+            continue;
+        };
 
-    if let Ok(procs) = procfs::process::all_processes_with_root(proc_root) {
-        for proc in procs {
-            if let Err(err) = proc {
-                error!("get process fail: {}", err);
-                continue;
-            }
-            let mut proc_data = {
-                let Some(proc_data) = pid_proc_map.get_mut(&(proc.unwrap().pid as u32)) else {
-                    continue;
-                };
-                proc_data.clone()
-            };
-            let Ok(up_sec) = proc_data.up_sec(now_sec) else {
-                continue;
-            };
+        // filter the short live proc
+        if up_sec < u64::from(conf.os_proc_socket_min_lifetime) {
+            continue;
+        }
 
-            // filter the short live proc
-            if up_sec < u64::from(conf.os_proc_socket_min_lifetime) {
-                continue;
-            }
-
-            for i in proc_regexp.iter() {
-                if i.match_and_rewrite_proc(&mut proc_data, &pid_proc_map, &tags_map, false) {
-                    if i.action() == RegExpAction::Drop {
-                        break;
+        match process_data.get_root_inode(proc_root) {
+            Err(e) => error!("pid {} get root inode fail: {}", process_data.pid, e),
+            Ok(inode) => {
+                if let Some(pwd) = pwd_info.get(&inode) {
+                    process_data.set_username(&pwd);
+                } else {
+                    // not in hashmap, parse from /proc/pid/root/etc/passwd
+                    let p = PathBuf::from_iter([
+                        proc_root,
+                        process_data.pid.to_string().as_str(),
+                        "root/etc/passwd",
+                    ]);
+                    if let Ok(pwd) = PasswordInfo::new(p) {
+                        process_data.set_username(&pwd);
+                        pwd_info.insert(inode, pwd);
                     }
-
-                    // get pwd info from hashmap or parse pwd file from /proc/pid/root/etc/passwd and insert to hashmap
-                    // and get the username from pwd info
-                    match proc_data.get_root_inode(proc_root) {
-                        Err(e) => error!("pid {} get root inode fail: {}", proc_data.pid, e),
-                        Ok(inode) => {
-                            if let Some(pwd) = pwd_info.get(&inode) {
-                                proc_data.set_username(&pwd);
-                            } else {
-                                // not in hashmap, parse from /proc/pid/root/etc/passwd
-                                let p = PathBuf::from_iter([
-                                    proc_root,
-                                    proc_data.pid.to_string().as_str(),
-                                    "root/etc/passwd",
-                                ]);
-                                if let Ok(pwd) = PasswordInfo::new(p) {
-                                    proc_data.set_username(&pwd);
-                                    pwd_info.insert(inode, pwd);
-                                }
-                            }
-                        }
-                    }
-
-                    // fill tags
-                    if let Some(tags) = tags_map.remove(&proc_data.pid) {
-                        proc_data.os_app_tags = tags.tags
-                    } else if tagged_only {
-                        break;
-                    }
-
-                    ret.push(proc_data);
-                    break;
                 }
             }
         }
-        fill_child_proc_tag_by_parent(ret.as_mut());
-        proc_scan_hook(ret);
+
+        // fill tags
+        if let Some(tags) = tags_map.remove(&process_data.pid) {
+            process_data.os_app_tags = tags.tags
+        }
+
+        ret.push(process_data);
     }
+    fill_child_proc_tag_by_parent(ret.as_mut());
+    proc_scan_hook(ret);
 }
 
 pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
@@ -529,7 +382,7 @@ pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
 }
 
 // return Hashmap<pid, OsAppTag>
-pub(super) fn get_os_app_tag_by_exec(
+pub fn get_os_app_tag_by_exec(
     username: &str,
     cmd: &[String],
 ) -> Result<HashMap<u64, OsAppTag>, String> {
@@ -636,7 +489,7 @@ fn merge_tag(child_tag: &mut Vec<OsAppTagKV>, parent_tag: &[OsAppTagKV]) {
     }
 }
 
-fn get_container_id(proc: &Process) -> Option<String> {
+pub fn get_container_id(proc: &Process) -> Option<String> {
     let Ok(cgruop) = proc.cgroups() else {
         return None;
     };
