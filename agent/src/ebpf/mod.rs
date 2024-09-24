@@ -545,6 +545,10 @@ extern "C" {
         callback: extern "C" fn(data: *mut PROCESS_EVENT),
     ) -> c_int;
 
+    // Set the creation of an eBPF hash map without preallocating memory.
+    // @return 0 is success, if not 0 is failed
+    pub fn set_map_no_prealloc() -> c_int;
+
     // 参数说明：
     // callback: 回调接口 rust -> C
     // thread_nr: 工作线程数，是指用户态有多少线程参与数据处理。
