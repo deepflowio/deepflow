@@ -79,6 +79,12 @@ message TsdbReportInfo {
     optional string pcap_data_mount_path = 4;
 }
 
+enum KubernetesWatchPolicy {
+    KWP_NORMAL = 0;
+    KWP_WATCH_ONLY = 1;
+    KWP_WATCH_DISABLED = 2;
+}
+
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
@@ -110,6 +116,8 @@ message SyncRequest {
     optional string arch = 34;
     optional string os = 35;
     optional string kernel_version = 36;
+
+    optional KubernetesWatchPolicy kubernetes_watch_policy = 41;
 
     optional TsdbReportInfo tsdb_report_info = 43;  // 仅对数据节点有意义
 
