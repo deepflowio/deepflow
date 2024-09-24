@@ -35,7 +35,10 @@ use crate::{
     utils::lru::Lru,
 };
 use public::{
-    proto::{agent, trident::{GpidSyncRequest, GpidSyncResponse}},
+    proto::{
+        agent,
+        trident::{GpidSyncRequest, GpidSyncResponse},
+    },
     queue::Receiver,
 };
 

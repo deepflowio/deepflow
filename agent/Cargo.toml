@@ -142,9 +142,11 @@ tempfile = "3.2.0"
 uluru = "3.0.0"
 
 [build-dependencies]
+anyhow = "1.0"
 chrono = "0.4"
 dunce = "1"
 tonic-build = "0.8.0"
+walkdir = "2"
 
 [features]
 enterprise = ["extended_profile", "enterprise-utils"]

@@ -1061,6 +1061,7 @@ dependencies = [
  "tonic-build",
  "trace-utils",
  "uluru",
+ "walkdir",
  "wasmtime",
  "wasmtime-wasi",
  "winapi",
