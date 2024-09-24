@@ -1074,7 +1074,7 @@ pub struct SynchronizerConfig {
     pub output_vlan: u16,
 }
 
-//#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Clone, PartialEq, Eq)]
 pub struct EbpfConfig {
     // 动态配置

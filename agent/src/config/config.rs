@@ -34,7 +34,7 @@ use thiserror::Error;
 use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::L7ProtocolParser;
-use crate::dispatcher::DEFAULT_BLOCK_SIZE;
+use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
 use crate::flow_generator::{DnsLog, OracleLog, TlsLog};
 use crate::{
     common::{
@@ -2287,6 +2287,7 @@ impl From<&RuntimeConfig> for UserConfig {
                                 slave_interfaces: g.tap_interfaces.clone(),
                             })
                             .collect(),
+                        #[cfg(target_os = "linux")]
                         extra_netns_regex: rc.extra_netns_regex.clone(),
                         extra_bpf_filter: rc.capture_bpf.clone(),
                         vlan_pcp_in_physical_mirror_traffic: rc.yaml_config.mirror_traffic_pcp,
@@ -2302,6 +2303,7 @@ impl From<&RuntimeConfig> for UserConfig {
                             packet_fanout_mode: rc.yaml_config.packet_fanout_mode,
                         },
                         src_interfaces: vec![],
+                        ..Default::default()
                     },
                     special_network: SpecialNetwork {
                         dpdk: Dpdk {
