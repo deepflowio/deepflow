@@ -98,7 +98,10 @@ struct bpf_load_map_def {
 	unsigned int key_size;
 	unsigned int value_size;
 	unsigned int max_entries;
-	unsigned int map_flags;
+	union {
+		unsigned int map_flags;
+		unsigned int feat;
+	};
 	unsigned int inner_map_idx;
 	unsigned int numa_node;
 };
