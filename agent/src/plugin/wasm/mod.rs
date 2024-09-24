@@ -106,6 +106,7 @@
 */
 
 #[path = "wasm_plugin.rs"]
+#[rustfmt::skip]
 pub mod wasm_plugin;
 
 mod abi_export;

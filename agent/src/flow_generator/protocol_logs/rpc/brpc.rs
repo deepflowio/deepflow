@@ -1,4 +1,5 @@
 #[path = "brpc/brpc.policy.rs"]
+#[rustfmt::skip]
 mod brpc_policy;
 
 use brpc_policy::RpcMeta;

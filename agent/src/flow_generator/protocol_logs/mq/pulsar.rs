@@ -1,4 +1,5 @@
 #[path = "pulsar.proto.rs"]
+#[rustfmt::skip]
 mod pulsar_proto;
 
 use prost::Message;
