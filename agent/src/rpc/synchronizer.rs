@@ -1031,7 +1031,7 @@ impl Synchronizer {
                         return;
                     }
                     ntp_diff.store(0, Ordering::Relaxed);
-                    time::sleep(sync_interval).await;
+                    time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
 
