@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: ebpf dispatcher build error [#8197](https://github.com/deepflowio/deepflow/pull/8197) by [TomatoMr](https://github.com/TomatoMr)
+* fix: peer connection api limit [#8194](https://github.com/deepflowio/deepflow/pull/8194) by [askyrie](https://github.com/askyrie)
+* fix: incorrect tcp rrt [#8152](https://github.com/deepflowio/deepflow/pull/8152) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: the aggregation method of unsummable fields of custom data_source is wrong [#8181](https://github.com/deepflowio/deepflow/pull/8181) by [lzf575](https://github.com/lzf575)
 * fix: applicaition log decode failed causes subsequent data anomalies [#8179](https://github.com/deepflowio/deepflow/pull/8179) by [lzf575](https://github.com/lzf575)
 * fix: Bad cstr passed into pcap_compile_nopcap [#8171](https://github.com/deepflowio/deepflow/pull/8171) by [rvql](https://github.com/rvql)
@@ -199,6 +202,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: Modify default l7 protocol enable [#8198](https://github.com/deepflowio/deepflow/pull/8198) by [yuanchaoa](https://github.com/yuanchaoa)
+* feat: reduce the application protocols parsed by default [#8196](https://github.com/deepflowio/deepflow/pull/8196) by [sharang](https://github.com/sharang)
+* feat: default genesis sync vpc name [#8192](https://github.com/deepflowio/deepflow/pull/8192) by [askyrie](https://github.com/askyrie)
+* feat: update cloud region filter [#8105](https://github.com/deepflowio/deepflow/pull/8105) by [askyrie](https://github.com/askyrie)
 * feat: agent - Retain the profiler_regex interface [#8150](https://github.com/deepflowio/deepflow/pull/8150) by [yinjiping](https://github.com/yinjiping)
 * feat: agent - eBPF Unified Process Matching Interface [#8033](https://github.com/deepflowio/deepflow/pull/8033) by [yinjiping](https://github.com/yinjiping)
 * feat: update genesis data store [#7964](https://github.com/deepflowio/deepflow/pull/7964) by [askyrie](https://github.com/askyrie)
