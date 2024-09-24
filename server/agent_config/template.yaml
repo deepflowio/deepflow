@@ -2865,7 +2865,7 @@ inputs:
       #   en: Maximum Socket Entries
       #   ch: 最大 Socket 条目数
       # unit:
-      # range: [100000, 2000000]
+      # range: [10000, 2000000]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false
@@ -2883,7 +2883,7 @@ inputs:
       #   en: Socket Map Reclaim Threshold
       #   ch: Socket Map 回收阈值
       # unit:
-      # range: [100000, 2000000]
+      # range: [8000, 2000000]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false
@@ -2900,7 +2900,7 @@ inputs:
       #   en: Maximum Trace Entries
       #   ch: 最大 Trace 条目数
       # unit:
-      # range: [100000, 2000000]
+      # range: [10000, 2000000]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false

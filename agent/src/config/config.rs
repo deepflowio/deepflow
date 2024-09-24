@@ -3644,13 +3644,13 @@ impl YamlConfig {
         if c.ebpf.ring_size < 8192 || c.ebpf.ring_size > 131072 {
             c.ebpf.ring_size = 65536;
         }
-        if c.ebpf.max_socket_entries < 100000 || c.ebpf.max_socket_entries > 2000000 {
+        if c.ebpf.max_socket_entries < 10000 || c.ebpf.max_socket_entries > 2000000 {
             c.ebpf.max_socket_entries = 131072;
         }
-        if c.ebpf.socket_map_max_reclaim < 100000 || c.ebpf.socket_map_max_reclaim > 2000000 {
+        if c.ebpf.socket_map_max_reclaim < 8000 || c.ebpf.socket_map_max_reclaim > 2000000 {
             c.ebpf.socket_map_max_reclaim = 120000;
         }
-        if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
+        if c.ebpf.max_trace_entries < 10000 || c.ebpf.max_trace_entries > 2000000 {
             c.ebpf.max_trace_entries = 131072;
         }
         if c.ebpf.java_symbol_file_refresh_defer_interval < Duration::from_secs(5)
