@@ -440,6 +440,7 @@ impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
     const MAX_TRACE_ID: usize = 255;
     const MAX_SESSION_PER_FLOW: usize = 32;
+    const MAX_VERSION: u16 = 12;
 
     fn decode_varint(buf: &[u8]) -> (usize, usize) {
         let mut shift = 0;
@@ -1496,6 +1497,9 @@ impl KafkaLog {
         info.msg_type = LogMessageType::Request;
         info.api_key = read_u16_be(&payload[4..]);
         info.api_version = read_u16_be(&payload[6..]);
+        if info.api_version > Self::MAX_VERSION {
+            return Err(Error::KafkaLogParseFailed);
+        }
         info.correlation_id = read_u32_be(&payload[8..]);
         info.client_id = String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
         if !info.client_id.is_ascii() {
