@@ -15,6 +15,7 @@
  */
 
 use std::{
+    cell::OnceCell,
     env::{self, VarError},
     fs,
     iter::Iterator,
@@ -37,7 +38,10 @@ use crate::{
 };
 
 use public::{
-    proto::agent::{AgentType, Exception},
+    proto::{
+        agent::{AgentType, Exception, KubernetesWatchPolicy},
+        trident::KubernetesWatchPolicy as OldKubernetesWatchPolicy,
+    },
     utils::net::{
         addr_list, get_mac_by_ip, get_route_src_ip_and_mac, is_global, link_by_name, link_list,
         LinkFlags, MacAddr,
@@ -55,14 +59,17 @@ pub use self::windows::*;
 
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
-const IN_CONTAINER: &str = "IN_CONTAINER";
+pub const IN_CONTAINER: &str = "IN_CONTAINER";
 // K8S environment node ip environment variable
 const K8S_NODE_IP_FOR_DEEPFLOW: &str = "K8S_NODE_IP_FOR_DEEPFLOW";
 const ENV_INTERFACE_NAME: &str = "CTRL_NETWORK_INTERFACE";
 const K8S_POD_IP_FOR_DEEPFLOW: &str = "K8S_POD_IP_FOR_DEEPFLOW";
 const K8S_NODE_NAME_FOR_DEEPFLOW: &str = "K8S_NODE_NAME_FOR_DEEPFLOW";
-const ONLY_WATCH_K8S_RESOURCE: &str = "ONLY_WATCH_K8S_RESOURCE";
+pub const K8S_WATCH_POLICY: &str = "K8S_WATCH_POLICY";
 const K8S_NAMESPACE_FOR_DEEPFLOW: &str = "K8S_NAMESPACE_FOR_DEEPFLOW";
+
+// no longer used
+const ONLY_WATCH_K8S_RESOURCE: &str = "ONLY_WATCH_K8S_RESOURCE";
 
 const DNS_HOST_IPV4: IpAddr = IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8));
 const DNS_HOST_IPV6: IpAddr = IpAddr::V6(Ipv6Addr::new(0x240c, 0, 0, 0, 0, 0, 0, 0x6666));
@@ -250,8 +257,64 @@ pub fn get_env() -> String {
         .join(" ")
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KubeWatchPolicy {
+    Normal,
+    WatchOnly,
+    WatchDisabled,
+}
+
+thread_local! {
+    // initialize once only to avoid inconsistency
+    // use LazyCell instead of OnceCell after upgrading rust to 1.80 or later
+    static KUBE_WATCH_POLICY: OnceCell<KubeWatchPolicy> = OnceCell::new();
+}
+
+impl KubeWatchPolicy {
+    pub fn get() -> Self {
+        KUBE_WATCH_POLICY.with(|p| *p.get_or_init(|| KubeWatchPolicy::from_env()))
+    }
+
+    pub fn from_env() -> Self {
+        // ONLY_WATCH_K8S_RESOURCE no longer supported
+        if env::var_os(ONLY_WATCH_K8S_RESOURCE).is_some() {
+            error!("Environment variable ONLY_WATCH_K8S_RESOURCE is not longer supported, use K8S_WATCH_POLICY instead!");
+            thread::sleep(Duration::from_secs(60));
+            error!("Environment variable ONLY_WATCH_K8S_RESOURCE is not longer supported, use K8S_WATCH_POLICY instead!");
+            crate::utils::notify_exit(-1);
+            return KubeWatchPolicy::Normal;
+        }
+
+        match env::var(K8S_WATCH_POLICY) {
+            Ok(policy) if policy == "watch-only" => Self::WatchOnly,
+            Ok(policy) if policy == "watch-disabled" => Self::WatchDisabled,
+            _ => Self::Normal,
+        }
+    }
+}
+
+impl From<KubeWatchPolicy> for KubernetesWatchPolicy {
+    fn from(p: KubeWatchPolicy) -> Self {
+        match p {
+            KubeWatchPolicy::Normal => Self::KwpNormal,
+            KubeWatchPolicy::WatchOnly => Self::KwpWatchOnly,
+            KubeWatchPolicy::WatchDisabled => Self::KwpWatchDisabled,
+        }
+    }
+}
+
+impl From<KubeWatchPolicy> for OldKubernetesWatchPolicy {
+    fn from(p: KubeWatchPolicy) -> Self {
+        match p {
+            KubeWatchPolicy::Normal => Self::KwpNormal,
+            KubeWatchPolicy::WatchOnly => Self::KwpWatchOnly,
+            KubeWatchPolicy::WatchDisabled => Self::KwpWatchDisabled,
+        }
+    }
+}
+
 pub fn running_in_only_watch_k8s_mode() -> bool {
-    running_in_container() && env::var_os(ONLY_WATCH_K8S_RESOURCE).is_some()
+    running_in_container() && KubeWatchPolicy::get() == KubeWatchPolicy::WatchOnly
 }
 
 pub fn get_k8s_namespace() -> String {

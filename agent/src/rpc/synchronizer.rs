@@ -72,7 +72,7 @@ use crate::utils::{
     command::get_hostname,
     environment::{
         get_executable_path, is_tt_pod, running_in_container, running_in_k8s,
-        running_in_only_watch_k8s_mode,
+        running_in_only_watch_k8s_mode, KubeWatchPolicy,
     },
     stats,
 };
@@ -813,6 +813,9 @@ impl Synchronizer {
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
             kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
             kubernetes_force_watch: Some(running_in_only_watch_k8s_mode()),
+            kubernetes_watch_policy: Some(
+                tp::KubernetesWatchPolicy::from(KubeWatchPolicy::get()).into(),
+            ),
             agent_unique_identifier: Some(
                 tp::AgentIdentifier::from_str_name(
                     static_config.agent_unique_identifier.as_str_name(),
@@ -1901,6 +1904,9 @@ impl Synchronizer {
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
             kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
             kubernetes_force_watch: Some(running_in_only_watch_k8s_mode()),
+            kubernetes_watch_policy: Some(
+                ap::KubernetesWatchPolicy::from(KubeWatchPolicy::get()).into(),
+            ),
             agent_unique_identifier: Some(AgentIdentifier::from(
                 static_config.agent_unique_identifier,
             ) as i32),

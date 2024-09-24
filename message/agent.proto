@@ -80,6 +80,12 @@ enum Exception {
     // 2^32及以上由控制器使用，顺序从后往前
 }
 
+enum KubernetesWatchPolicy {
+    KWP_NORMAL = 0;
+    KWP_WATCH_ONLY = 1;
+    KWP_WATCH_DISABLED = 2;
+}
+
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
@@ -110,6 +116,7 @@ message SyncRequest {
     optional string os = 35;
     optional string kernel_version = 36;
 
+    optional KubernetesWatchPolicy kubernetes_watch_policy = 41;
     optional string kubernetes_cluster_id = 45;    // 仅对容器类型的 agent 有意义
     optional string kubernetes_cluster_name = 46;  // 仅对容器类型的 agent 有意义
 }

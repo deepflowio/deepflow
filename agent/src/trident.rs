@@ -39,11 +39,6 @@ use log::{debug, info, warn};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
 
-#[cfg(target_os = "linux")]
-use crate::platform::{
-    kubernetes::{GenericPoller, Poller, SidecarPoller},
-    ApiWatcher, LibvirtXmlExtractor,
-};
 use crate::{
     collector::{
         flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread, CollectorThread,
@@ -108,6 +103,14 @@ use crate::{
     ebpf_dispatcher::EbpfCollector,
     platform::SocketSynchronizer,
     utils::{environment::core_file_check, lru::Lru},
+};
+#[cfg(target_os = "linux")]
+use crate::{
+    platform::{
+        kubernetes::{GenericPoller, Poller, SidecarPoller},
+        ApiWatcher, LibvirtXmlExtractor,
+    },
+    utils::environment::{IN_CONTAINER, K8S_WATCH_POLICY},
 };
 
 use packet_sequence_block::BoxedPacketSequenceBlock;
@@ -1417,7 +1420,7 @@ impl WatcherComponents {
         runtime: Arc<Runtime>,
     ) -> Result<Self> {
         let candidate_config = &config_handler.candidate_config;
-        info!("With ONLY_WATCH_K8S_RESOURCE and IN_CONTAINER environment variables set, the agent will only watch K8s resource");
+        info!("This agent will only watch K8s resource because IN_CONTAINER={} and K8S_WATCH_POLICY={}", env::var(IN_CONTAINER).unwrap_or_default(), env::var(K8S_WATCH_POLICY).unwrap_or_default());
         Ok(WatcherComponents {
             running: AtomicBool::new(false),
             capture_mode: candidate_config.capture_mode,

@@ -48,7 +48,7 @@ use crate::{
     rpc::Session,
     trident::AgentId,
     utils::{
-        environment::{running_in_container, running_in_only_watch_k8s_mode},
+        environment::{running_in_container, KubeWatchPolicy},
         stats,
     },
 };
@@ -198,9 +198,14 @@ impl ApiWatcher {
             return;
         }
 
-        if (!self.context.config.load().kubernetes_api_enabled && !running_in_only_watch_k8s_mode())
-            || !running_in_container()
-        {
+        let wp = KubeWatchPolicy::get();
+        debug!("kubernetes watch policy is {wp:?}");
+        let enabled = match wp {
+            KubeWatchPolicy::Normal => self.context.config.load().kubernetes_api_enabled,
+            KubeWatchPolicy::WatchOnly => true,
+            KubeWatchPolicy::WatchDisabled => false,
+        };
+        if !enabled || !running_in_container() {
             return;
         }
 
