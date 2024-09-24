@@ -28,7 +28,7 @@ use crate::{
     exception::ExceptionHandler,
     utils::process::get_memory_rss,
 };
-use public::proto::trident::Exception;
+use public::proto::agent::Exception;
 
 pub fn free_memory_check(required: u64, exception_handler: &ExceptionHandler) -> Result<()> {
     get_memory_rss()

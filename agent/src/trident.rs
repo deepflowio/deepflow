@@ -2059,7 +2059,7 @@ impl AgentComponents {
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
 
-        //#[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let (toa_sender, toa_recv, _) = queue::bounded_with_debug(
             user_config.processors.packet.toa.sender_queue_size,
             "1-socket-sync-toa-info-queue",
