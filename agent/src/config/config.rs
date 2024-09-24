@@ -23,8 +23,12 @@ use std::net::{IpAddr, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use envmnt::{ExpandOptions, ExpansionType};
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use procfs::process::Process;
 use regex::Regex;
 use serde::{
     de::{self, Unexpected},
@@ -36,6 +40,8 @@ use tokio::runtime::Runtime;
 use crate::common::l7_protocol_log::L7ProtocolParser;
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
 use crate::flow_generator::{DnsLog, OracleLog, TlsLog};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use crate::platform::{get_container_id, OsAppTag, ProcessData};
 use crate::{
     common::{
         decapsulate::TunnelType, enums::CaptureNetworkType, DEFAULT_LOG_FILE,
@@ -46,6 +52,7 @@ use crate::{
     rpc::Session,
     trident::RunningMode,
 };
+
 use public::{
     bitmap::Bitmap,
     consts::NPB_DEFAULT_PORT,
@@ -309,10 +316,45 @@ impl Default for TagExtraction {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub enum ProcessMatchType {
+    Cmd,
+    ProcessName,
+    ParentProcessName,
+    Tag,
+}
+
+impl From<&str> for ProcessMatchType {
+    fn from(value: &str) -> Self {
+        match value {
+            OS_PROC_REGEXP_MATCH_TYPE_CMD => Self::Cmd,
+            OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME => Self::ParentProcessName,
+            OS_PROC_REGEXP_MATCH_TYPE_TAG => Self::Tag,
+            _ => Self::ProcessName,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub enum ProcessMatchAction {
+    Accept,
+    Drop,
+}
+
+impl From<&str> for ProcessMatchAction {
+    fn from(value: &str) -> Self {
+        match value {
+            OS_PROC_REGEXP_MATCH_ACTION_DROP => ProcessMatchAction::Drop,
+            _ => ProcessMatchAction::Accept,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
 #[serde(default)]
 pub struct ProcessMatcher {
-    pub match_regex: String,
-    pub match_type: String,
+    #[serde(deserialize_with = "to_match_regex")]
+    pub match_regex: Regex,
+    pub match_type: ProcessMatchType,
     pub match_languages: Vec<String>,
     pub match_usernames: Vec<String>,
     pub only_in_container: bool,
@@ -320,14 +362,46 @@ pub struct ProcessMatcher {
     pub ignore: bool,
     pub rewrite_name: String,
     pub enabled_features: Vec<String>,
-    pub action: String,
+    pub action: ProcessMatchAction,
+}
+
+impl Eq for ProcessMatcher {}
+
+impl PartialEq for ProcessMatcher {
+    fn eq(&self, other: &Self) -> bool {
+        self.match_regex.as_str() == other.match_regex.as_str()
+            && self.match_type == other.match_type
+            && self.match_languages == other.match_languages
+            && self.match_usernames == other.match_usernames
+            && self.only_in_container == other.only_in_container
+            && self.only_with_tag == other.only_with_tag
+            && self.ignore == other.ignore
+            && self.rewrite_name == other.rewrite_name
+            && self.enabled_features == other.enabled_features
+            && self.action == other.action
+    }
+}
+
+fn to_match_regex<'de, D>(deserializer: D) -> Result<Regex, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw = String::deserialize(deserializer)?;
+    if let Ok(regex) = Regex::new(raw.as_str()) {
+        Ok(regex)
+    } else {
+        Err(de::Error::invalid_value(
+            Unexpected::Str(raw.as_str()),
+            &"See: https://regexr.com/",
+        ))
+    }
 }
 
 impl Default for ProcessMatcher {
     fn default() -> Self {
         Self {
-            match_regex: "deepflow-*".to_string(),
-            match_type: "cmdline".to_string(),
+            match_regex: Regex::new("deepflow-*").unwrap(),
+            match_type: ProcessMatchType::Cmd,
             match_languages: vec![],
             match_usernames: vec![],
             only_in_container: false,
@@ -338,7 +412,122 @@ impl Default for ProcessMatcher {
                 "ebpf.profile.on_cpu".to_string(),
                 "ebpf.profile.off_cpu".to_string(),
             ],
-            action: OS_PROC_REGEXP_MATCH_ACTION_ACCEPT.to_string(),
+            action: ProcessMatchAction::Accept,
+        }
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl ProcessMatcher {
+    // TODO: match_languages
+    pub fn get_process_data(
+        &self,
+        process: &Process,
+        tag_map: &HashMap<u64, OsAppTag>,
+    ) -> Option<ProcessData> {
+        if self.only_in_container && get_container_id(process).is_none() {
+            return None;
+        }
+        if self.only_with_tag && !tag_map.contains_key(&(process.pid as u64)) {
+            return None;
+        }
+
+        let env_rewrite = |r: String| {
+            envmnt::expand(
+                r.as_str(),
+                Some(ExpandOptions {
+                    expansion_type: Some(ExpansionType::Windows),
+                    default_to_empty: true,
+                }),
+            )
+        };
+        let Ok(mut process_data) = ProcessData::try_from(process) else {
+            return None;
+        };
+        let mut match_replace_fn =
+            |reg: &Regex, act: &ProcessMatchAction, s: &String, replace: &String| {
+                if reg.is_match(s.as_str()) {
+                    if act == &ProcessMatchAction::Accept && !replace.is_empty() {
+                        process_data.name = reg.replace_all(s.as_str(), replace).to_string();
+                    }
+                    true
+                } else {
+                    false
+                }
+            };
+        let replace = env_rewrite(self.rewrite_name.clone());
+
+        match self.match_type {
+            ProcessMatchType::Cmd => {
+                if match_replace_fn(
+                    &self.match_regex,
+                    &self.action,
+                    &process_data.cmd.join(" "),
+                    &replace,
+                ) {
+                    Some(process_data)
+                } else {
+                    None
+                }
+            }
+            ProcessMatchType::ProcessName => {
+                if match_replace_fn(
+                    &self.match_regex,
+                    &self.action,
+                    &process_data.process_name,
+                    &replace,
+                ) {
+                    Some(process_data)
+                } else {
+                    None
+                }
+            }
+            ProcessMatchType::ParentProcessName => {
+                fn match_parent(proc: &ProcessData, reg: &Regex) -> Option<ProcessData> {
+                    const MAX_DEPTH: usize = 10;
+                    let mut ppid = proc.ppid;
+                    let mut pid = proc.pid;
+                    for _ in 0..MAX_DEPTH {
+                        if ppid == 0 {
+                            return None;
+                        }
+
+                        let Ok(parent) = Process::new(ppid as i32) else {
+                            return None;
+                        };
+
+                        let Ok(parent_data) = ProcessData::try_from(&parent) else {
+                            error!("pid {} have no parent proc with ppid: {}", pid, ppid);
+                            return None;
+                        };
+
+                        if reg.is_match(&parent_data.process_name.as_str()) {
+                            return Some(parent_data);
+                        }
+                        ppid = parent_data.ppid;
+                        pid = parent_data.pid;
+                    }
+
+                    None
+                }
+
+                match_parent(&process_data, &self.match_regex)
+            }
+            ProcessMatchType::Tag => {
+                if let Some(tag) = tag_map.get(&process_data.pid) {
+                    let mut found = None;
+                    for tag_kv in tag.tags.iter() {
+                        let composed = format!("{}:{}", &tag_kv.key, &tag_kv.value);
+                        if self.match_regex.is_match(&composed.as_str()) {
+                            found = Some(process_data);
+                            break;
+                        }
+                    }
+                    found
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -2228,25 +2417,136 @@ impl From<&RuntimeConfig> for UserConfig {
                     process_matcher: {
                         let mut matchers = vec![];
                         if !rc.yaml_config.ebpf.on_cpu_profile.disabled {
-                            matchers.push(ProcessMatcher {
-                                match_regex: rc.yaml_config.ebpf.on_cpu_profile.regex.clone(),
-                                enabled_features: vec!["ebpf.profile.on_cpu".to_string()],
-                                ..Default::default()
-                            });
+                            if let Ok(regex) =
+                                Regex::new(rc.yaml_config.ebpf.on_cpu_profile.regex.as_str())
+                            {
+                                matchers.push(ProcessMatcher {
+                                    match_regex: regex,
+                                    match_type: ProcessMatchType::ProcessName,
+                                    enabled_features: vec!["ebpf.profile.on_cpu".to_string()],
+                                    ..Default::default()
+                                });
+                            } else {
+                                warn!(
+                                    "Invalid on_cpu_profile regex: {}",
+                                    rc.yaml_config.ebpf.on_cpu_profile.regex
+                                );
+                            }
                         }
                         if !rc.yaml_config.ebpf.off_cpu_profile.disabled {
+                            if let Ok(regex) =
+                                Regex::new(rc.yaml_config.ebpf.off_cpu_profile.regex.as_str())
+                            {
+                                matchers.push(ProcessMatcher {
+                                    match_regex: regex,
+                                    match_type: ProcessMatchType::ProcessName,
+                                    enabled_features: vec!["ebpf.profile.off_cpu".to_string()],
+                                    ..Default::default()
+                                });
+                            } else {
+                                warn!(
+                                    "Invalid off_cpu_profile regex: {}",
+                                    rc.yaml_config.ebpf.off_cpu_profile.regex
+                                );
+                            }
+                        }
+                        if !rc.yaml_config.ebpf.memory_profile.disabled {
+                            if let Ok(regex) =
+                                Regex::new(rc.yaml_config.ebpf.memory_profile.regex.as_str())
+                            {
+                                matchers.push(ProcessMatcher {
+                                    match_regex: regex,
+                                    match_type: ProcessMatchType::ProcessName,
+                                    enabled_features: vec!["ebpf.profile.memory".to_string()],
+                                    ..Default::default()
+                                });
+                            } else {
+                                warn!(
+                                    "Invalid memory_profile regex: {}",
+                                    rc.yaml_config.ebpf.memory_profile.regex
+                                );
+                            }
+                        }
+                        if rc.yaml_config.os_proc_socket_sync_interval > 0 {
                             matchers.push(ProcessMatcher {
-                                match_regex: rc.yaml_config.ebpf.off_cpu_profile.regex.clone(),
-                                enabled_features: vec!["ebpf.profile.off_cpu".to_string()],
+                                match_regex: Regex::new(".*").unwrap(),
+                                match_type: ProcessMatchType::ProcessName,
+                                enabled_features: vec!["proc.socket_list".to_string()],
                                 ..Default::default()
                             });
                         }
+                        if !rc.yaml_config.ebpf.uprobe_proc_regexp.golang.is_empty() {
+                            if let Ok(regex) =
+                                Regex::new(rc.yaml_config.ebpf.uprobe_proc_regexp.golang.as_str())
+                            {
+                                matchers.push(ProcessMatcher {
+                                    match_regex: regex,
+                                    match_type: ProcessMatchType::Cmd,
+                                    enabled_features: vec!["ebpf.socket.uprobe.golang".to_string()],
+                                    ..Default::default()
+                                });
+                            } else {
+                                warn!(
+                                    "Invalid golang uprobe regex: {}",
+                                    rc.yaml_config.ebpf.uprobe_proc_regexp.golang
+                                );
+                            }
+                        }
+                        if !rc
+                            .yaml_config
+                            .ebpf
+                            .uprobe_proc_regexp
+                            .golang_symbol
+                            .is_empty()
+                        {
+                            if let Ok(regex) = Regex::new(
+                                rc.yaml_config
+                                    .ebpf
+                                    .uprobe_proc_regexp
+                                    .golang_symbol
+                                    .as_str(),
+                            ) {
+                                matchers.push(ProcessMatcher {
+                                    match_regex: regex,
+                                    match_type: ProcessMatchType::Cmd,
+                                    enabled_features: vec!["proc.golang_symbol_table".to_string()],
+                                    ..Default::default()
+                                });
+                            } else {
+                                warn!(
+                                    "Invalid golang symbol_table uprobe regex: {}",
+                                    rc.yaml_config.ebpf.uprobe_proc_regexp.golang_symbol
+                                );
+                            }
+                        }
+                        if !rc.yaml_config.ebpf.uprobe_proc_regexp.openssl.is_empty() {
+                            if let Ok(regex) =
+                                Regex::new(rc.yaml_config.ebpf.uprobe_proc_regexp.openssl.as_str())
+                            {
+                                matchers.push(ProcessMatcher {
+                                    match_regex: regex,
+                                    match_type: ProcessMatchType::Cmd,
+                                    enabled_features: vec!["ebpf.socket.uprobe.tls".to_string()],
+                                    ..Default::default()
+                                });
+                            } else {
+                                warn!(
+                                    "Invalid tls uprobe regex: {}",
+                                    rc.yaml_config.ebpf.uprobe_proc_regexp.openssl
+                                );
+                            }
+                        }
                         for o in &rc.yaml_config.os_proc_regex {
+                            let Ok(regex) = Regex::new(o.match_regex.as_str()) else {
+                                warn!("Invalid gprocess info regex: {}", o.match_regex);
+                                continue;
+                            };
                             matchers.push(ProcessMatcher {
-                                match_regex: o.match_regex.clone(),
-                                match_type: o.match_type.clone(),
+                                match_regex: regex,
+                                match_type: ProcessMatchType::from(o.match_type.as_str()),
                                 rewrite_name: o.rewrite_name.clone(),
-                                action: o.action.clone(),
+                                action: ProcessMatchAction::from(o.action.as_str()),
+                                enabled_features: vec!["proc.gprocess_info".to_string()],
                                 ..Default::default()
                             });
                         }

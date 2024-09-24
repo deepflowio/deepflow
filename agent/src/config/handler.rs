@@ -43,18 +43,15 @@ use sysinfo::SystemExt;
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use tokio::runtime::Runtime;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
-        ApiResources, Config, EbpfFileIoEvent, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, SymbolTable,
-        TagFilterOperator, UserConfig, YamlConfig,
+        ApiResources, Config, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
+        HttpEndpointMatchRule, OracleConfig, PcapStream, PortConfig, TagFilterOperator, UserConfig,
+        YamlConfig,
     },
     ConfigError, KubernetesPollerType,
-};
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use super::{
-    config::{Ebpf, ProcessMatcher},
-    OS_PROC_REGEXP_MATCH_ACTION_ACCEPT, OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME,
 };
 use crate::common::decapsulate::TunnelType;
 use crate::dispatcher::recv_engine;
@@ -75,7 +72,6 @@ use crate::{
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    platform::ProcRegRewrite,
     utils::environment::{
         get_container_resource_limits, get_ctrl_ip_and_mac, is_tt_workload,
         set_container_resource_limit,
@@ -270,7 +266,6 @@ pub struct OsProcScanConfig {
     pub os_proc_root: String,
     pub os_proc_socket_sync_interval: u32, // for sec
     pub os_proc_socket_min_lifetime: u32,  // for sec
-    pub os_proc_regex: Vec<ProcRegRewrite>,
     pub os_app_tag_exec_user: String,
     pub os_app_tag_exec: Vec<String>,
     // whether to sync os socket and proc info
@@ -1814,34 +1809,6 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                     os_proc_root: conf.inputs.proc.proc_dir_path.clone(),
                     os_proc_socket_sync_interval: conf.inputs.proc.sync_interval.as_secs() as u32,
                     os_proc_socket_min_lifetime: conf.inputs.proc.min_lifetime.as_secs() as u32,
-                    os_proc_regex: {
-                        let mut v = vec![];
-                        for i in &conf.inputs.proc.process_matcher {
-                            if i.enabled_features
-                                .iter()
-                                .find(|s| s.as_str() == "os.proc.scan")
-                                .is_none()
-                            {
-                                continue;
-                            }
-                            if let Ok(r) = ProcRegRewrite::try_from(i) {
-                                v.push(r);
-                            }
-                        }
-
-                        // append the .* at the end for accept the proc whic not match any regexp
-                        v.push(
-                            ProcRegRewrite::try_from(&ProcessMatcher {
-                                match_regex: ".*".into(),
-                                match_type: OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME.into(),
-                                rewrite_name: "".into(),
-                                action: OS_PROC_REGEXP_MATCH_ACTION_ACCEPT.into(),
-                                ..Default::default()
-                            })
-                            .unwrap(),
-                        );
-                        v
-                    },
                     os_app_tag_exec_user: conf.inputs.proc.tag_extraction.exec_username.clone(),
                     os_app_tag_exec: conf.inputs.proc.tag_extraction.script_command.clone(),
                     os_proc_sync_enabled: conf.inputs.proc.enabled,
@@ -1853,7 +1820,7 @@ impl TryFrom<(Config, UserConfig, DynamicConfig)> for ModuleConfig {
                         .find(|m| {
                             m.enabled_features
                                 .iter()
-                                .find(|s| s.as_str() == "os.proc.scan")
+                                .find(|s| s.as_str() == "proc.gprocess_info")
                                 .is_some()
                                 && m.only_with_tag
                         })
@@ -2623,6 +2590,46 @@ impl ConfigHandler {
                     .feature_control
                     .log_integration_disabled
             );
+        }
+
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if config.inputs.proc.process_matcher != new_config.user_config.inputs.proc.process_matcher
+            || config.inputs.proc.tag_extraction.exec_username
+                != new_config
+                    .user_config
+                    .inputs
+                    .proc
+                    .tag_extraction
+                    .exec_username
+            || config.inputs.proc.tag_extraction.script_command
+                != new_config
+                    .user_config
+                    .inputs
+                    .proc
+                    .tag_extraction
+                    .script_command
+            || config.inputs.proc.proc_dir_path != new_config.user_config.inputs.proc.proc_dir_path
+        {
+            if let Some(c) = components.as_ref() {
+                c.process_listener.on_config_change(
+                    &new_config.user_config.inputs.proc.process_matcher,
+                    new_config.user_config.inputs.proc.proc_dir_path.clone(),
+                    new_config
+                        .user_config
+                        .inputs
+                        .proc
+                        .tag_extraction
+                        .exec_username
+                        .clone(),
+                    new_config
+                        .user_config
+                        .inputs
+                        .proc
+                        .tag_extraction
+                        .script_command
+                        .clone(),
+                );
+            }
         }
 
         if *config != new_config.user_config {

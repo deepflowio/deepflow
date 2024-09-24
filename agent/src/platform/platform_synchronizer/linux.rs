@@ -16,7 +16,7 @@
 
 use std::{
     net::{IpAddr, SocketAddr, SocketAddrV4},
-    sync::{Arc, Condvar, Mutex, MutexGuard},
+    sync::{Arc, Condvar, Mutex, MutexGuard, RwLock as SysRwLock},
     thread,
     time::Duration,
 };
@@ -29,10 +29,11 @@ use tokio::runtime::Runtime;
 use crate::{
     common::policy::GpidEntry,
     config::handler::PlatformAccess,
+    platform::ProcessData,
     policy::{PolicyGetter, PolicySetter},
     rpc::Session,
     trident::AgentId,
-    utils::lru::Lru,
+    utils::{lru::Lru, process::ProcessListener},
 };
 use public::{
     proto::{
@@ -57,6 +58,19 @@ pub struct SocketSynchronizer {
     policy_getter: Arc<Mutex<PolicyGetter>>,
     policy_setter: PolicySetter,
     lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
+    process_listener: Arc<ProcessListener>,
+}
+
+static mut PIDS: Option<Arc<SysRwLock<Vec<u32>>>> = None;
+
+pub fn get_socket_pids() -> Vec<u32> {
+    unsafe {
+        if let Some(pids) = PIDS.as_ref() {
+            pids.read().unwrap().clone()
+        } else {
+            vec![]
+        }
+    }
 }
 
 impl SocketSynchronizer {
@@ -72,6 +86,7 @@ impl SocketSynchronizer {
         receiver: Receiver<Box<(SocketAddr, SocketAddr)>>,
         // toa info cache, Lru<LocalAddr, RealAddr>
         lru_toa_info: Arc<Mutex<Lru<SocketAddr, SocketAddr>>>,
+        process_listener: Arc<ProcessListener>,
     ) -> Self {
         if process_info_enabled(config.load().agent_type) {
             let lru_toa_info_clone = lru_toa_info.clone();
@@ -93,6 +108,17 @@ impl SocketSynchronizer {
             session,
             running: Arc::new(Mutex::new(false)),
             lru_toa_info,
+            process_listener,
+        }
+    }
+
+    fn set_socket_pids(pids: &Vec<u32>, _: &Vec<ProcessData>) {
+        unsafe {
+            if let Some(last) = PIDS.as_ref() {
+                *last.write().unwrap() = pids.clone();
+            } else {
+                PIDS = Some(Arc::new(SysRwLock::new(pids.clone())));
+            }
         }
     }
 
@@ -107,6 +133,9 @@ impl SocketSynchronizer {
             warn!("socket sync is running");
             return;
         }
+
+        self.process_listener
+            .register("proc.socket_list", Self::set_socket_pids);
 
         let (
             runtime,
@@ -174,6 +203,11 @@ impl SocketSynchronizer {
                     conf_guard.os_proc_scan_conf.os_proc_socket_sync_interval as u64,
                 );
 
+                if sync_interval == Duration::ZERO {
+                    thread::sleep(Duration::from_secs(1));
+                    continue;
+                }
+
                 // wait for config from server
                 if !conf_guard.os_proc_scan_conf.os_proc_sync_enabled {
                     if !Self::wait_timeout(running_guard, stop_notify.clone(), sync_interval) {
@@ -187,11 +221,12 @@ impl SocketSynchronizer {
                     (id.ip.to_string(), id.mac.to_string(), id.team_id.clone())
                 };
                 let mut policy_getter = policy_getter.lock().unwrap();
-
+                let pids = get_socket_pids();
                 let sock_entries = match get_all_socket(
                     &conf_guard.os_proc_scan_conf,
                     &mut policy_getter,
                     conf_guard.epc_id,
+                    pids,
                 ) {
                     Err(e) => {
                         error!("fetch socket info fail: {}", e);
