@@ -123,7 +123,7 @@ extern "C" fn socket_trace_callback(_: *mut c_void, _sd: *mut SK_BPF_DATA) {}
 
 extern "C" fn continuous_profiler_callback(_: *mut c_void, cp: *mut stack_profile_data) {
     unsafe {
-        process_stack_trace_data_for_flame_graph(cp);
+        //process_stack_trace_data_for_flame_graph(cp);
         increment_counter((*cp).count as u32, 1);
         increment_counter(1, 0);
         //let data = sk_data_str_safe(cp);
@@ -172,6 +172,8 @@ fn main() {
             println!("bpf_tracer_init() file:{:?} error", log_file);
             ::std::process::exit(1);
         }
+
+	set_bpf_map_prealloc(false);
 
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
@@ -237,7 +239,7 @@ fn main() {
           get_counter(0),
           get_counter(1)
         );
-        release_flame_graph_hash();
+        //release_flame_graph_hash();
     }
 
     loop {

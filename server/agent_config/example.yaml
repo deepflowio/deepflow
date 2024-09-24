@@ -1477,6 +1477,14 @@ static_config:
     #   The configuration is only effective if DWARF is enabled.
     dwarf-shard-map-size: 128
 
+    # Disable the feature of pre-allocating memory during hash map creation
+    # Default: false
+    # Note:
+    #   When full map preallocation is too expensive, setting 'map_prealloc_disabled' to true will
+    #   prevent memory pre-allocation during map definition, but it may result in some performance
+    #   degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'.
+    map_prealloc_disabled: false
+
     # Java compliant update latency time
     # Default: 60s. Range: [5, 3600]s
     # Note:

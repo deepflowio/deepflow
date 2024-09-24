@@ -141,4 +141,5 @@ int df_prog_load(enum bpf_prog_type prog_type, const char *name,
 int suspend_stderr();
 void resume_stderr(int fd);
 int load_ebpf_prog(struct ebpf_prog *prog);
+void set_bpf_map_prealloc(bool enabled);
 #endif /* DF_BPF_LOAD_H */
