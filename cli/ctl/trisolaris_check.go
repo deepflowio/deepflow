@@ -41,17 +41,18 @@ import (
 )
 
 type ParamData struct {
-	CtrlIP     string
-	CtrlMac    string
-	GroupID    string
-	ClusterID  string
-	TeamID     string
-	RpcIP      string
-	RpcPort    string
-	Type       string
-	PluginType string
-	PluginName string
-	OrgID      uint32
+	CtrlIP                string
+	CtrlMac               string
+	GroupID               string
+	ClusterID             string
+	TeamID                string
+	KubernetesWatchPolicy string
+	RpcIP                 string
+	RpcPort               string
+	Type                  string
+	PluginType            string
+	PluginName            string
+	OrgID                 uint32
 }
 
 type SortedAcls []*trident.FlowAcl
@@ -227,6 +228,7 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "agent group ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.TeamID, "tid", "", "", "agent team ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "agent k8s cluster ID")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.KubernetesWatchPolicy, "kwp", "", "", "agent k8s watch policy")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginType, "ptype", "", "wasm", "request plugin type")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.PluginName, "pname", "", "", "request plugin name")
@@ -262,6 +264,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	defer conn.Close()
 	var name, groupID, clusterID, teamID string
 	var orgID uint32
+	var kubernetesWatchPolicy trident.KubernetesWatchPolicy
 	switch paramData.Type {
 	case "trident":
 		name = paramData.Type
@@ -276,16 +279,25 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		fmt.Printf("type(%s) muste be in [trident, analyzer]", paramData.Type)
 		return
 	}
+	switch paramData.KubernetesWatchPolicy {
+	case "disabled":
+		kubernetesWatchPolicy = trident.KubernetesWatchPolicy_KWP_WATCH_DISABLED
+	case "only":
+		kubernetesWatchPolicy = trident.KubernetesWatchPolicy_KWP_WATCH_ONLY
+	default:
+		kubernetesWatchPolicy = trident.KubernetesWatchPolicy_KWP_NORMAL
+	}
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), paramData)
 	c := trident.NewSynchronizerClient(conn)
 	reqData := &trident.SyncRequest{
-		CtrlIp:              &paramData.CtrlIP,
-		CtrlMac:             &paramData.CtrlMac,
-		VtapGroupIdRequest:  &groupID,
-		KubernetesClusterId: &clusterID,
-		ProcessName:         &name,
-		TeamId:              &teamID,
-		OrgId:               &orgID,
+		CtrlIp:                &paramData.CtrlIP,
+		CtrlMac:               &paramData.CtrlMac,
+		VtapGroupIdRequest:    &groupID,
+		KubernetesClusterId:   &clusterID,
+		KubernetesWatchPolicy: &kubernetesWatchPolicy,
+		ProcessName:           &name,
+		TeamId:                &teamID,
+		OrgId:                 &orgID,
 	}
 	var response *trident.SyncResponse
 	var err error
