@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: prometheus data writing fails when using ByConity database [#8222](https://github.com/deepflowio/deepflow/pull/8222) by [lzf575](https://github.com/lzf575)
+* fix: K8s watch env logs [#8217](https://github.com/deepflowio/deepflow/pull/8217) by [rvql](https://github.com/rvql)
 * fix: reduce kafka app misidentification [#8205](https://github.com/deepflowio/deepflow/pull/8205) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent build error [#8204](https://github.com/deepflowio/deepflow/pull/8204) by [TomatoMr](https://github.com/TomatoMr)
 * fix: ebpf dispatcher build error [#8197](https://github.com/deepflowio/deepflow/pull/8197) by [TomatoMr](https://github.com/TomatoMr)
@@ -204,6 +206,9 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: the application log table uses app_service as the primary key [#8220](https://github.com/deepflowio/deepflow/pull/8220) by [lzf575](https://github.com/lzf575)
+* feat: support k8s_watch_policy env [#8219](https://github.com/deepflowio/deepflow/pull/8219) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: tracemap supports multiple regions [#8075](https://github.com/deepflowio/deepflow/pull/8075) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Support K8S_WATCH_POLICY env [#8210](https://github.com/deepflowio/deepflow/pull/8210) by [rvql](https://github.com/rvql)
 * feat: trace tree support multi regions [#8209](https://github.com/deepflowio/deepflow/pull/8209) by [taloric](https://github.com/taloric)
 * feat: Modify default l7 protocol enable [#8198](https://github.com/deepflowio/deepflow/pull/8198) by [yuanchaoa](https://github.com/yuanchaoa)
