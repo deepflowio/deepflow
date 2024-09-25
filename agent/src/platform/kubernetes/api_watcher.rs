@@ -203,7 +203,12 @@ impl ApiWatcher {
         let enabled = match wp {
             KubeWatchPolicy::Normal => self.context.config.load().kubernetes_api_enabled,
             KubeWatchPolicy::WatchOnly => true,
-            KubeWatchPolicy::WatchDisabled => false,
+            KubeWatchPolicy::WatchDisabled => {
+                if self.context.config.load().kubernetes_api_enabled {
+                    warn!("kubernetes watcher is enabled but K8S_WATCH_POLICY=watch-disabled");
+                }
+                false
+            }
         };
         if !enabled || !running_in_container() {
             return;

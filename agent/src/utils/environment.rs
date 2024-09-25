@@ -247,7 +247,7 @@ pub fn get_env() -> String {
         ENV_INTERFACE_NAME,
         K8S_POD_IP_FOR_DEEPFLOW,
         IN_CONTAINER,
-        ONLY_WATCH_K8S_RESOURCE,
+        K8S_WATCH_POLICY,
         K8S_NAMESPACE_FOR_DEEPFLOW,
     ];
     items
@@ -278,9 +278,8 @@ impl KubeWatchPolicy {
     pub fn from_env() -> Self {
         // ONLY_WATCH_K8S_RESOURCE no longer supported
         if env::var_os(ONLY_WATCH_K8S_RESOURCE).is_some() {
-            error!("Environment variable ONLY_WATCH_K8S_RESOURCE is not longer supported, use K8S_WATCH_POLICY instead!");
+            error!("Environment variable ONLY_WATCH_K8S_RESOURCE is not longer supported, use K8S_WATCH_POLICY=watch-only instead!");
             thread::sleep(Duration::from_secs(60));
-            error!("Environment variable ONLY_WATCH_K8S_RESOURCE is not longer supported, use K8S_WATCH_POLICY instead!");
             crate::utils::notify_exit(-1);
             return KubeWatchPolicy::Normal;
         }
