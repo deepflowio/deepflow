@@ -113,6 +113,7 @@ type PrometheusWriter struct {
 	appLabelColumnIncrement int
 	metricsWriterCache      *ckwriter.CKWriter // the writer for prometheus.metrics table
 	flowTagWriter           *flow_tag.FlowTagWriter
+	systemColumnsTableName  string
 
 	counter *Counter
 	utils.Closable
@@ -270,7 +271,7 @@ func (w *PrometheusWriter) addAppLabelColumns(conn common.DBs, startIndex, endIn
 }
 
 func (w *PrometheusWriter) getCurrentAppLabelColumnCount(orgDatabase string) (int, error) {
-	sql := fmt.Sprintf("SELECT count(0) FROM system.columns where database='%s' and table='%s' and name like '%%app_label_value%%'", orgDatabase, PROMETHEUS_TABLE)
+	sql := fmt.Sprintf("SELECT count(0) FROM system.%s where database='%s' and table='%s' and name like '%%app_label_value%%'", w.systemColumnsTableName, orgDatabase, PROMETHEUS_TABLE)
 	log.Info(sql)
 	rows, err := w.ckdbConn.Query(sql)
 	if err != nil {
@@ -294,7 +295,7 @@ func (w *PrometheusWriter) getCurrentAppLabelColumnCount(orgDatabase string) (in
 
 func (w *PrometheusWriter) getMaxAppLabelColumnIndex(orgDatabase string) (int, error) {
 	var name, maxName string
-	sql := fmt.Sprintf("WITH (SELECT max(length(name)) FROM system.columns where database='%s' and  table='%s' and name like '%%app_label_value%%') as maxNameLength SELECT max(name) from system.columns where database='%s' and  table='%s' and name like '%%app_label_value%%' and length(name)=maxNameLength", orgDatabase, PROMETHEUS_TABLE, orgDatabase, PROMETHEUS_TABLE)
+	sql := fmt.Sprintf("WITH (SELECT max(length(name)) FROM system.%s where database='%s' and  table='%s' and name like '%%app_label_value%%') as maxNameLength SELECT max(name) from system.%s where database='%s' and  table='%s' and name like '%%app_label_value%%' and length(name)=maxNameLength", w.systemColumnsTableName, orgDatabase, PROMETHEUS_TABLE, w.systemColumnsTableName, orgDatabase, PROMETHEUS_TABLE)
 	log.Info(sql)
 	rows, err := w.ckdbConn.Query(sql)
 	if err != nil {
@@ -373,6 +374,10 @@ func NewPrometheusWriter(
 	if err != nil {
 		return nil, err
 	}
+	systemColumnsTableName := "columns"
+	if config.Base.CKDB.Type == ckdb.CKDBTypeByconity {
+		systemColumnsTableName = "cnch_columns"
+	}
 
 	// PrometheusWriter
 	writer := &PrometheusWriter{
@@ -392,6 +397,7 @@ func NewPrometheusWriter(
 		writerConfig:            ckWriterConfig,
 		flowTagWriter:           flowTagWriter,
 		appLabelColumnIncrement: config.AppLabelColumnIncrement,
+		systemColumnsTableName:  systemColumnsTableName,
 
 		counter: &Counter{},
 	}
