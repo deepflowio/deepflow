@@ -237,7 +237,7 @@ func LogColumns() []*ckdb.Column {
 func GenLogCKTable(cluster, storagePolicy, table string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 	engine := ckdb.MergeTree
-	orderKeys := []string{timeKey, "app_service", "timestamp"}
+	orderKeys := []string{"app_service", timeKey, "timestamp"}
 	partition := DefaultPartition
 
 	return &ckdb.Table{
