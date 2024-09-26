@@ -523,6 +523,11 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 	if (ret != 0) {
 		ebpf_warning("bpf load \"%s\" failed, error:%s (%d).\n",
 			     tracer->bpf_load_name, strerror(errno), errno);
+		if (!strcmp(tracer->bpf_load_name, "socket-trace-bpf-linux-kfunc")) {
+			ebpf_info("Try other eBPF bytecode binaries ...\n");
+			return ret;
+		}
+
 		if (errno == EACCES) {
 			ebpf_warning
 			    ("Check the selinux status, if found SELinux"
