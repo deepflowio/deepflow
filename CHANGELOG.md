@@ -8,6 +8,8 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - Other eBPF bin-file will be selected when kfunc loading fails [#8226](https://github.com/deepflowio/deepflow/pull/8226) by [yinjiping](https://github.com/yinjiping)
+* fix: prometheus.samples table init failed [#8225](https://github.com/deepflowio/deepflow/pull/8225) by [lzf575](https://github.com/lzf575)
 * fix: prometheus data writing fails when using ByConity database [#8222](https://github.com/deepflowio/deepflow/pull/8222) by [lzf575](https://github.com/lzf575)
 * fix: K8s watch env logs [#8217](https://github.com/deepflowio/deepflow/pull/8217) by [rvql](https://github.com/rvql)
 * fix: reduce kafka app misidentification [#8205](https://github.com/deepflowio/deepflow/pull/8205) by [yuanchaoa](https://github.com/yuanchaoa)
@@ -206,6 +208,7 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: querier uniq function supports multi params [#8218](https://github.com/deepflowio/deepflow/pull/8218) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: the application log table uses app_service as the primary key [#8220](https://github.com/deepflowio/deepflow/pull/8220) by [lzf575](https://github.com/lzf575)
 * feat: support k8s_watch_policy env [#8219](https://github.com/deepflowio/deepflow/pull/8219) by [SongZhen0704](https://github.com/SongZhen0704)
 * feat: tracemap supports multiple regions [#8075](https://github.com/deepflowio/deepflow/pull/8075) by [xiaochaoren1](https://github.com/xiaochaoren1)
