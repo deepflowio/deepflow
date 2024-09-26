@@ -42,11 +42,12 @@ impl TapPort {
 
     // The higher the nat source value, the higher the priority.
     // NAT_SOURCE_VIP and NAT_SOURCE_CONTROLLER is obtained through policy query,
-    // NAT_SOURCE_TOA is obtained through TCP Options Address.
+    // NAT_SOURCE_TOA and NAT_SOURCE_TOT is obtained through TCP Options Address.
     pub const NAT_SOURCE_NONE: u8 = 0;
     pub const NAT_SOURCE_VIP: u8 = 2;
     pub const NAT_SOURCE_RTOA: u8 = 4;
     pub const NAT_SOURCE_TOA: u8 = 6;
+    pub const NAT_SOURCE_TOT: u8 = 8;
 
     const TUNNEL_TYPE_OFFSET: u64 = 32;
     const TUNNEL_TYPE_MASK: u64 = 0xf;
