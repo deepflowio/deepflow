@@ -1041,12 +1041,12 @@ void add_event_to_proc_list(proc_event_list_t *list, struct bpf_tracer *tracer, 
 
 	event->tracer = tracer;
 	event->pid = pid;
+	event->stime = get_process_starttime(pid);
 	event->expire_time = get_sys_uptime() + PROC_EVENT_HANDLE_DELAY;
 
 	pthread_mutex_lock(&list->m);
 	list_add_tail(&event->list, &list->head);
 	pthread_mutex_unlock(&list->m);
-	return;
 }
 
 struct process_create_event *get_first_event(proc_event_list_t *list)

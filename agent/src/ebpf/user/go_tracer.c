@@ -58,6 +58,7 @@ struct process_event {
 	uint8_t type;		// EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
 	char *path;		// Full path "/proc/<pid>/root/..."
 	int pid;		// Process ID
+	uint64_t stime;		// The start time of the process
 	uint32_t expire_time;	// Expiration Date, the number of seconds since the system started.
 };
 /* *INDENT-ON* */
@@ -744,10 +745,6 @@ int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
 
-	init_list_head(&proc_events_head);
-	init_list_head(&proc_info_head);
-	pthread_mutex_init(&mutex_proc_events_lock, NULL);
-
 	if (!is_feature_enabled(FEATURE_UPROBE_GOLANG))
 		return ETR_OK;
 
@@ -1018,6 +1015,7 @@ static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid,
 	pe->path = path;
 	pe->pid = pid;
 	pe->type = type;
+	pe->stime = get_process_starttime(pid);
 	pe->expire_time = get_sys_uptime() + PROC_EVENT_DELAY_HANDLE_DEF;
 
 	pthread_mutex_lock(&mutex_proc_events_lock);
@@ -1034,9 +1032,6 @@ void go_process_exec(int pid)
 {
 	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL)
-		return;
-
-	if (tracer->state != TRACER_RUNNING)
 		return;
 
 	if (tracer->probes_count > OPEN_FILES_MAX) {
@@ -1060,9 +1055,6 @@ void go_process_exit(int pid)
 
 	tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL)
-		return;
-
-	if (tracer->state != TRACER_RUNNING)
 		return;
 
 	process_exit_handle(pid, tracer);
@@ -1098,6 +1090,12 @@ void go_process_events_handle(void)
 			free(pe->path);
 			free(pe);
 			pthread_mutex_unlock(&mutex_proc_events_lock);
+			// Confirm whether the process has changed?
+			if (pe->stime != get_process_starttime(pid)) {
+				free(path);
+				continue;
+			}
+
 			if (type == EVENT_TYPE_PROC_EXEC) {
 				if (access(path, F_OK) == 0) {
 					process_execute_handle(pid, tracer);
@@ -1110,4 +1108,20 @@ void go_process_events_handle(void)
 			break;
 		}
 	} while (true);
+}
+
+void golang_trace_handle(int pid, enum match_pids_act act)
+{
+	if (act == MATCH_PID_ADD) {
+		go_process_exec(pid);
+	} else {
+		go_process_exit(pid);
+	}
+}
+
+void golang_trace_init(void)
+{
+	init_list_head(&proc_events_head);
+	init_list_head(&proc_info_head);
+	pthread_mutex_init(&mutex_proc_events_lock, NULL);
 }

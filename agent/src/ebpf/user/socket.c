@@ -329,10 +329,6 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 		config_probes_for_kfunc(tps);
 	else
 		config_probes_for_kprobe_and_tracepoint(tps);
-
-	// 收集go可执行文件uprobe符号信息
-	collect_go_uprobe_syms_from_procfs(tps);
-	collect_ssl_uprobe_syms_from_procfs(tps);
 }
 
 /* ==========================================================
@@ -748,17 +744,11 @@ static void process_event(struct process_event_t *e)
 		if (e->maybe_thread && !is_user_process(e->pid))
 			return;
 		update_proc_info_cache(e->pid, PROC_EXEC);
-		go_process_exec(e->pid);
-		ssl_process_exec(e->pid);
-		extended_process_exec(e->pid);
 		unwind_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		/* Cache for updating process information used in
 		 * symbol resolution. */
 		update_proc_info_cache(e->pid, PROC_EXIT);
-		go_process_exit(e->pid);
-		ssl_process_exit(e->pid);
-		extended_process_exit(e->pid);
 		unwind_process_exit(e->pid);
 	}
 }
@@ -2119,10 +2109,7 @@ static void reconfig_load_resources(struct bpf_tracer *tracer, char *load_name,
 	for (i = 0; i < tps->kfuncs_nr; i++)
 		free(tps->kfuncs[i].name);
 	tps->kfuncs_nr = 0;
-	if (g_k_type == K_TYPE_KFUNC)
-		config_probes_for_kfunc(tps);
-	else
-		config_probes_for_kprobe_and_tracepoint(tps);
+	socket_tracer_set_probes(tps);
 }
 
 /**
@@ -2209,7 +2196,8 @@ int running_socket_tracer(tracer_callback_t handle,
 	memset(tps, 0, sizeof(*tps));
 	init_list_head(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
-
+	golang_trace_init();
+	openssl_trace_init();
 	create_and_init_proc_info_caches();
 
 	struct bpf_tracer *tracer =
@@ -2312,9 +2300,6 @@ retry_load:
 		return -EINVAL;
 
 	tracer->data_limit_max = socket_data_limit_max;
-
-	// Update go offsets to eBPF "proc_info_map"
-	update_proc_info_to_map(tracer);
 
 	// Insert prog of output data into map for using BPF Tail Calls.
 	insert_output_prog_to_map(tracer);
@@ -3145,4 +3130,12 @@ int disable_syscall_trace_id(void)
 	g_disable_syscall_tracing = true;
 	ebpf_info("Disable tracing feature.\n");
 	return 0;
+}
+
+void uprobe_match_pid_handle(int feat, int pid, enum match_pids_act act)
+{
+	if (feat == FEATURE_UPROBE_GOLANG)
+		golang_trace_handle(pid, act);
+	else if (feat == FEATURE_UPROBE_OPENSSL)
+		openssl_trace_handle(pid, act);
 }
