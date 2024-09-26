@@ -140,6 +140,10 @@ func (w *PrometheusWriter) updateAppLabelValueIdColumns(orgID uint16, appLabelCo
 	if err != nil {
 		return err
 	}
+	// the prometheus.samples table has not been created yet, so there is no need to update the columns.
+	if currentCount == 0 {
+		return nil
+	}
 	maxLabelColumnIndex, err := w.getMaxAppLabelColumnIndex(orgDatabase)
 	if err != nil {
 		log.Warning(err)
