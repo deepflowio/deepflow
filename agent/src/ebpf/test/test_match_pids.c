@@ -49,28 +49,31 @@ int main(void)
 	log_to_stdout = true;
 	init_match_pids_hash();
 	int pids[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-	int ret = set_feature_pids(FEATURE_PROFILE_ONCPU, pids,
-				   sizeof(pids) / sizeof(pids[0]));
-	printf("  FEATURE_PROFILE_ONCPU set_feature_pids ret : %d\n", ret);
+	int ret = exec_set_feature_pids(FEATURE_PROFILE_ONCPU, pids,
+					sizeof(pids) / sizeof(pids[0]));
+	printf("  FEATURE_PROFILE_ONCPU exec_set_feature_pids ret : %d\n", ret);
 	ret =
-	    set_feature_pids(FEATURE_PROFILE_OFFCPU, pids,
-			     sizeof(pids) / sizeof(pids[0]));
-	printf("  FEATURE_PROFILE_OFFCPU set_feature_pids ret : %d\n", ret);
+	    exec_set_feature_pids(FEATURE_PROFILE_OFFCPU, pids,
+				  sizeof(pids) / sizeof(pids[0]));
+	printf("  FEATURE_PROFILE_OFFCPU exec_set_feature_pids ret : %d\n",
+	       ret);
 	{
 		int pids[] = { 11, 12, 34, 2000 };
 		ret =
-		    set_feature_pids(FEATURE_PROFILE_ONCPU, pids,
-				     sizeof(pids) / sizeof(pids[0]));
-		printf("  FEATURE_PROFILE_ONCPU set_feature_pids ret : %d\n",
-		       ret);
+		    exec_set_feature_pids(FEATURE_PROFILE_ONCPU, pids,
+					  sizeof(pids) / sizeof(pids[0]));
+		printf
+		    ("  FEATURE_PROFILE_ONCPU exec_set_feature_pids ret : %d\n",
+		     ret);
 	}
 	{
 		int pids[] = { 1 };
 		ret =
-		    set_feature_pids(FEATURE_PROFILE_ONCPU, pids,
-				     sizeof(pids) / sizeof(pids[0]));
-		printf("  FEATURE_PROFILE_ONCPU set_feature_pids ret : %d\n",
-		       ret);
+		    exec_set_feature_pids(FEATURE_PROFILE_ONCPU, pids,
+					  sizeof(pids) / sizeof(pids[0]));
+		printf
+		    ("  FEATURE_PROFILE_ONCPU exec_set_feature_pids ret : %d\n",
+		     ret);
 		count = 0;
 		print_match_pids_hash();
 	}

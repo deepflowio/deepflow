@@ -700,7 +700,7 @@ int enable_tracer_reader_work(const char *name, int idx,
  * @return 0 on success, non-zero on error
  */
 int enable_ebpf_seg_reasm_protocol(int protocol);
-
+int exec_set_feature_pids(int feature, const int *pids, int num);
 /**
  * @brief Add regex-matched process list for feature.
  * 

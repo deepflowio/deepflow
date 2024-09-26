@@ -203,6 +203,7 @@ bool process_probing_check(int pid);
 struct process_create_event {
 	struct list_head list;
 	int pid;
+	uint64_t stime; // Process start time
 	uint32_t expire_time;
 	struct bpf_tracer *tracer;
 };

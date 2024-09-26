@@ -415,4 +415,5 @@ int disable_syscall_trace_id(void);
  */
 void config_probe(struct tracer_probes_conf *tps, int type, const char *fn,
 		  const char *tp_name, bool is_exit);
+void uprobe_match_pid_handle(int feat, int pid, enum match_pids_act act);
 #endif /* DF_USER_SOCKET_H */

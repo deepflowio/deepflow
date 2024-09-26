@@ -30,5 +30,6 @@ void ssl_events_handle(void);
 
 // Process exit, reclaim resources
 void ssl_process_exit(int pid);
-
+void openssl_trace_handle(int pid, enum match_pids_act act);
+void openssl_trace_init(void);
 #endif
