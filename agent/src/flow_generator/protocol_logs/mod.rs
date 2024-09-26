@@ -40,8 +40,8 @@ pub use rpc::{
     SofaRpcLog, SomeIpInfo, SomeIpLog, TarsInfo, TarsLog, SOFA_NEW_RPC_TRACE_CTX_KEY,
 };
 pub use sql::{
-    MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, OracleInfo, OracleLog, PostgreInfo,
-    PostgresqlLog, RedisInfo, RedisLog,
+    MemcachedInfo, MemcachedLog, MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, OracleInfo,
+    OracleLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
 };
 pub use tls::{TlsInfo, TlsLog};
 

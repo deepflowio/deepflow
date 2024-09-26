@@ -1,0 +1,6 @@
+MemcachedInfo { msg_type: Request request: set foo 0 0 3 req_size: 15 result:  err_msg:  res_size: 0 rtt: 0 } is_memcached: true
+parse failed Memcached log parse failed: Unhandled command `bar`
+MemcachedInfo { msg_type: Response request:  req_size: 0 result: STORED err_msg:  res_size: 8 rtt: 2197111 } is_memcached: true
+MemcachedInfo { msg_type: Request request: get foo req_size: 9 result:  err_msg:  res_size: 0 rtt: 0 } is_memcached: true
+MemcachedInfo { msg_type: Response request:  req_size: 0 result: VALUE foo 0 3 err_msg:  res_size: 25 rtt: 109 } is_memcached: true
+parse failed Memcached log parse failed: Unhandled command `quit`

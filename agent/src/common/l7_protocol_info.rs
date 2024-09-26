@@ -26,9 +26,9 @@ use crate::{
     flow_generator::{
         protocol_logs::{
             fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, BrpcInfo, DnsInfo,
-            DubboInfo, HttpInfo, KafkaInfo, MongoDBInfo, MqttInfo, MysqlInfo, NatsInfo,
-            OpenWireInfo, OracleInfo, PostgreInfo, PulsarInfo, RedisInfo, SofaRpcInfo, SomeIpInfo,
-            TarsInfo, TlsInfo, ZmtpInfo,
+            DubboInfo, HttpInfo, KafkaInfo, MemcachedInfo, MongoDBInfo, MqttInfo, MysqlInfo,
+            NatsInfo, OpenWireInfo, OracleInfo, PostgreInfo, PulsarInfo, RedisInfo, SofaRpcInfo,
+            SomeIpInfo, TarsInfo, TlsInfo, ZmtpInfo,
         },
         AppProtoHead, LogMessageType, Result,
     },
@@ -83,6 +83,7 @@ all_protocol_info!(
     SofaRpcInfo(SofaRpcInfo),
     TlsInfo(TlsInfo),
     SomeIpInfo(SomeIpInfo),
+    MemcachedInfo(MemcachedInfo),
     CustomInfo(CustomInfo),
     // add new protocol info below
 );

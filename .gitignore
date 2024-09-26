@@ -51,7 +51,7 @@ target/
 /agent/src/ebpf/samples/rust/socket-tracer/target
 /agent/src/ebpf/samples/rust/socket-tracer/src/ebpf.rs
 /agent/src/ebpf/.flamegraph.pl
-
+/agent/src/ebpf/kernel/*.tmp
 
 
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::str::Utf8Error;
+use std::{borrow::Cow, str::Utf8Error};
 
 use public::l7_protocol::L7Protocol;
 use thiserror::Error;
@@ -104,7 +104,10 @@ pub enum Error {
     #[error("so plugin parse fail")]
     SoParseFail,
     #[error("{proto:?} log parse failed: {reason}")]
-    L7LogParseFailed { proto: L7Protocol, reason: String },
+    L7LogParseFailed {
+        proto: L7Protocol,
+        reason: Cow<'static, str>,
+    },
     #[error("insufficient payload length")]
     InsufficientPayloadLength,
     #[error("unsupported SOME/IP message type")]
