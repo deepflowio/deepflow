@@ -4058,6 +4058,7 @@ processors:
         Oracle: 1521
         Redis: 1-65535
         MongoDB: 1-65535
+        Memcached: 11211
         Kafka: 1-65535
         MQTT: 1-65535
         AMQP: 1-65535
@@ -4203,6 +4204,7 @@ processors:
         Oracle: []
         Redis: []
         MongoDB: []
+        Memcached: []
         Kafka: []
         MQTT: []
         AMQP: []

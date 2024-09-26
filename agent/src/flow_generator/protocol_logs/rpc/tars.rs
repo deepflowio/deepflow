@@ -365,7 +365,7 @@ impl L7ProtocolParserInterface for TarsLog {
         let mut info = TarsInfo::parse(payload, param)
             .ok_or(Error::L7LogParseFailed {
                 proto: L7Protocol::Tars,
-                reason: "parse result empty".to_owned(),
+                reason: "parse result empty".into(),
             })?
             .1;
 

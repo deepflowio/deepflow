@@ -23,6 +23,7 @@ use std::{
 
 use lru::LruCache;
 
+mod memcached;
 mod mongo;
 mod mysql;
 mod oracle;
@@ -32,6 +33,7 @@ mod redis;
 mod sql_check;
 mod sql_obfuscate;
 
+pub use memcached::{MemcachedInfo, MemcachedLog};
 pub use mongo::{MongoDBInfo, MongoDBLog};
 pub use mysql::{MysqlInfo, MysqlLog};
 pub use oracle::{OracleInfo, OracleLog};
