@@ -370,7 +370,15 @@ func (c *Dictionary) update(clickHouseCfg *clickhouse.ClickHouseConfig) {
 		if updateDictError != nil {
 			return
 		}
-
+		// Get version
+		versions := []string{}
+		if err := ckDb.Select(&versions, "SELECT version()"); err != nil {
+			log.Error(err, logger.NewORGPrefix(orgID))
+			return
+		}
+		if versions[0] > common.CLICK_HOUSE_VERSION {
+			continue
+		}
 		// Get the current view in the database
 		views := []string{}
 		if err := ckDb.Select(&views, fmt.Sprintf("SHOW TABLES FROM %s LIKE '%%view'", ckDatabaseName)); err != nil {
