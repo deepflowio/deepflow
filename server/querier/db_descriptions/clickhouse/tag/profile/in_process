@@ -45,6 +45,7 @@ is_ipv4                    , is_ipv4                   , is_ipv4                
 
 app_service                , app_service               , app_service               , string_enum   ,                       , Service Info    , 111            , 0
 app_instance               , app_instance              , app_instance              , string_enum   ,                       , Service Info    , 111            , 0
+process_id                 , process_id                , process_id                , int           ,                       , Service Info    , 111            , 0
 
 trace_id                   , trace_id                  , trace_id                  , string        ,                       , Tracing Info    , 111            , 0
 span_name                  , span_name                 , span_name                 , string        ,                       , Tracing Info    , 111            , 0

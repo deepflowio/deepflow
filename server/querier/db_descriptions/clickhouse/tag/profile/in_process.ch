@@ -45,6 +45,7 @@ is_ipv4                    , IPv4 标志                  ,
 
 app_service                , 应用服务                    ,
 app_instance               , 应用实例                    ,
+process_id                 , 进程 ID                     ,
 
 trace_id                   , TraceID                    ,
 span_name                  , Span名称                    ,
