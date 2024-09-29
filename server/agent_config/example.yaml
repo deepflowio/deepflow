@@ -1483,6 +1483,7 @@ static_config:
     #   When full map preallocation is too expensive, setting 'map_prealloc_disabled' to true will
     #   prevent memory pre-allocation during map definition, but it may result in some performance
     #   degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'.
+    #   Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
     map_prealloc_disabled: false
 
     # Java compliant update latency time
