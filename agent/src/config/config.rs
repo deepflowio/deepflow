@@ -720,6 +720,7 @@ pub struct EbpfSocketKprobe {
 pub struct EbpfSocketTunning {
     pub max_capture_rate: u64,
     pub syscall_trace_id_disabled: bool,
+    pub map_prealloc_disabled: bool,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -2378,6 +2379,7 @@ impl From<&RuntimeConfig> for UserConfig {
                                 .yaml_config
                                 .ebpf
                                 .syscall_trace_id_disabled,
+                            map_prealloc_disabled: rc.yaml_config.ebpf.map_prealloc_disabled,
                         },
                         preprocess: EbpfSocketPreprocess {
                             out_of_order_reassembly_cache_size: rc
@@ -3186,6 +3188,7 @@ pub struct EbpfYamlConfig {
     pub syscall_out_of_order_reassembly: Vec<String>,
     pub syscall_segmentation_reassembly: Vec<String>,
     pub syscall_trace_id_disabled: bool,
+    pub map_prealloc_disabled: bool,
 }
 
 impl Default for EbpfYamlConfig {
@@ -3219,6 +3222,7 @@ impl Default for EbpfYamlConfig {
             syscall_segmentation_reassembly: vec![],
             syscall_out_of_order_cache_size: 16,
             syscall_trace_id_disabled: false,
+            map_prealloc_disabled: false,
         }
     }
 }
