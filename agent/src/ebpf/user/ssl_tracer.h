@@ -30,5 +30,6 @@ void ssl_events_handle(void);
 
 // Process exit, reclaim resources
 void ssl_process_exit(int pid);
-
+void set_uprobe_openssl_enabled(bool enabled);
+bool is_openssl_trace_enabled(void);
 #endif

@@ -579,6 +579,9 @@ extern "C" {
     // 注意：eBPF tracer初始化加载运行后进行内核适配，
     // 适配完成后马上进入stop状态，需调用socket_tracer_start()才开始工作。
 
+    pub fn set_uprobe_golang_enabled(enabled: bool) -> c_void;
+    pub fn set_uprobe_openssl_enabled(enabled: bool) -> c_void;
+
     /*
      * start continuous profiler
      * @freq sample frequency, Hertz. (e.g. 99 profile stack traces at 99 Hertz)

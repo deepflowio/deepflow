@@ -29,6 +29,7 @@
 #include <string.h>
 
 static proc_event_list_t proc_events;
+static bool ssl_trace_enabled;
 
 static struct symbol symbols[] = {
 	{
@@ -224,3 +225,14 @@ void ssl_events_handle(void)
 
 	} while (true);
 }
+
+void set_uprobe_openssl_enabled(bool enabled)
+{
+	ssl_trace_enabled = enabled;
+}
+
+bool is_openssl_trace_enabled(void)
+{
+	return ssl_trace_enabled;
+}
+

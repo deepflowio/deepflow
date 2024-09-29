@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include "config.h"
 #include "common.h"
 #include "log.h"
 #include "elf.h"
@@ -35,6 +36,11 @@
 #include "load.h"
 #include "btf_core.h"
 #include "../kernel/include/bpf_base.h"
+#include "../kernel/include/common.h"
+#include "symbol.h"
+#include "proc.h"
+#include "go_tracer.h"
+#include "ssl_tracer.h"
 
 /*
  * When full map preallocation is too expensive, the 'BPF_F_NO_PREALLOC'
@@ -236,11 +242,10 @@ static void ebpf_object__release_elf(struct ebpf_object *obj)
 	if (obj->elf_info.btf_ext_sec) {
 		zfree(obj->elf_info.btf_ext_sec);
 	}
-
 	//struct ebpf_prog *prog;
 	//for (i = 0; i < obj->progs_cnt; i++) {
-	//	prog = &obj->progs[i];
-	//	prog->insns = NULL;
+	//      prog = &obj->progs[i];
+	//      prog->insns = NULL;
 	//}
 }
 
@@ -918,18 +923,17 @@ int ebpf_obj_load(struct ebpf_object *obj)
 	struct ebpf_map *map;
 	for (i = 0; i < obj->maps_cnt; i++) {
 		map = &obj->maps[i];
-		// TODO
-		if (map->def.feat == FEATURE_UPROBE_GOLANG) {
+		if ((map->def.feat == FEATURE_UPROBE_GOLANG
+		     && !is_golang_trace_enabled())
+		    || (map->def.feat == FEATURE_UPROBE_OPENSSL
+			&& !is_openssl_trace_enabled())) {
+			map->def.max_entries = 1;
 		}
 
-		int map_flags = 0;
-		if (map->def.type == BPF_MAP_TYPE_HASH && map_no_prealloc) {
-			map_flags = BPF_F_NO_PREALLOC;
-		}
 		map->fd =
 		    bcc_create_map(map->def.type, map->name, map->def.key_size,
 				   map->def.value_size, map->def.max_entries,
-				   map_flags);
+				   0);
 		if (map->fd < 0) {
 			ebpf_warning
 			    ("bcc_create_map() failed, map name:%s - %s\n",
@@ -961,6 +965,6 @@ failed:
 
 int set_map_no_prealloc(void)
 {
-	map_no_prealloc = true;	
+	map_no_prealloc = true;
 	return 0;
 }
