@@ -308,6 +308,8 @@ type EbpfConfig struct {
 	SyscallOutOfOrderCacheSize         *int                               `yaml:"syscall-out-of-order-cache-size,omitempty"`
 	SyscallTraceIdDisabled             *bool                              `yaml:"syscall-trace-id-disabled,omitempty"`
 	MapPreallocDisabled                *bool                              `yaml:"map-prealloc-disabled,omitempty"`
+	UprobeGolangTraceEnabled           *bool                              `yaml:"uprobe-golang-trace-enabled,omitempty"`
+	UprobeOpensslTraceEnabled          *bool                              `yaml:"uprobe-openssl-trace-enabled,omitempty"`
 }
 
 type OsProcRegex struct {

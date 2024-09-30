@@ -2170,7 +2170,7 @@ inputs:
         # name: Golang
         # description:
         golang:
-          # type: string
+          # type: bool
           # name: Enabled
           # unit:
           # range: []
@@ -2208,7 +2208,7 @@ inputs:
         # name: TLS
         # description:
         tls:
-          # type: string
+          # type: bool
           # name: Enabled
           # unit:
           # range: []
