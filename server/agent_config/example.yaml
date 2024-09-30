@@ -1312,6 +1312,20 @@ static_config:
     # Default: 0. Range: [0, +oo]
     global-ebpf-pps-threshold: 0
 
+    # Enabled uprobe golang tracing
+    # Default: false
+    # Note: If this configuration option is set to false, the Golang application process will not
+    #   be traced, and the maximum number of entries in the associated BPF map will be set to 1 to
+    #   ensure minimal memory usage.
+    uprobe-golang-trace-enabled: false
+
+    # Enabled uprobe openssl library tracing
+    # Default: false
+    # Note: If this configuration option is set to false, the openssl library will not be traced,
+    #   and the maximum number of entries in the associated BPF map will be set to 1 to ensure
+    #   minimal memory usage.
+    uprobe-openssl-trace-enabled: false
+
     # Regex for Process Name
     # Note: The name of the process where each feature of ebpf uprobe takes effect,
     #   which is configured using regular expressions

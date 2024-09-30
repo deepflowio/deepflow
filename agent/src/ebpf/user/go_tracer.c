@@ -68,6 +68,7 @@ static char build_info_magic[] = "\xff Go buildinf:";
 static struct list_head proc_info_head;	// For pid-offsets correspondence lists.
 static struct list_head proc_events_head;	// For process execute/exit events list.
 static pthread_mutex_t mutex_proc_events_lock;
+static bool golang_trace_enabled;
 
 /* *INDENT-OFF* */
 /* ------------- offsets info -------------- */
@@ -1124,4 +1125,14 @@ void golang_trace_init(void)
 	init_list_head(&proc_events_head);
 	init_list_head(&proc_info_head);
 	pthread_mutex_init(&mutex_proc_events_lock, NULL);
+}
+
+void set_uprobe_golang_enabled(bool enabled)
+{
+	golang_trace_enabled = enabled;
+}
+
+bool is_golang_trace_enabled(void)
+{
+	return golang_trace_enabled;
 }

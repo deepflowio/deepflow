@@ -42,6 +42,7 @@ struct bpf_map_def SEC("maps") http2_tcp_seq_map = {
 	.key_size = sizeof(struct http2_tcp_seq_key),
 	.value_size = sizeof(__u32),
 	.max_entries = HASH_ENTRIES_MAX,
+	.feat = FEATURE_UPROBE_GOLANG, 
 };
 
 /*
@@ -54,6 +55,7 @@ struct bpf_map_def SEC("maps") proc_info_map = {
 	.key_size = sizeof(int),
 	.value_size = sizeof(struct ebpf_proc_info),
 	.max_entries = HASH_ENTRIES_MAX,
+	.feat = FEATURE_UPROBE_GOLANG,
 };
 
 // Process ID and coroutine ID, marking the coroutine in the system
@@ -71,6 +73,7 @@ struct bpf_map_def SEC("maps") go_ancerstor_map = {
 	.key_size = sizeof(struct go_key),
 	.value_size = sizeof(__u64),
 	.max_entries = HASH_ENTRIES_MAX,
+	.feat = FEATURE_UPROBE_GOLANG,
 };
 
 // Used to determine the timeout, as a termination condition for finding
@@ -82,6 +85,7 @@ struct bpf_map_def SEC("maps") go_rw_ts_map = {
 	.key_size = sizeof(struct go_key),
 	.value_size = sizeof(__u64),
 	.max_entries = HASH_ENTRIES_MAX,
+	.feat = FEATURE_UPROBE_GOLANG,
 };
 
 // Pass data between coroutine entry and exit functions
@@ -95,6 +99,7 @@ struct bpf_map_def SEC("maps") pid_tgid_callerid_map = {
 	.key_size = sizeof(__u64),
 	.value_size = sizeof(struct go_newproc_caller),
 	.max_entries = HASH_ENTRIES_MAX,
+	.feat = FEATURE_UPROBE_GOLANG,
 };
 
 /*
@@ -107,6 +112,7 @@ struct bpf_map_def SEC("maps") goroutines_map = {
 	.key_size = sizeof(__u64),
 	.value_size = sizeof(__u64),
 	.max_entries = MAX_SYSTEM_THREADS,
+	.feat = FEATURE_UPROBE_GOLANG,
 };
 /* *INDENT-ON* */
 
@@ -160,7 +166,7 @@ struct __http2_stack {
 	bool tls;
 } __attribute__ ((packed));
 
-MAP_PERARRAY(http2_stack, __u32, struct __http2_stack, 1)
+MAP_PERARRAY(http2_stack, __u32, struct __http2_stack, 1, FEATURE_UPROBE_GOLANG)
 
 static __inline struct __http2_stack *get_http2_stack()
 {
