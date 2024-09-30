@@ -533,6 +533,9 @@ extern "C" {
     // 所有tracer启动完毕后，最后显示调用bpf_tracer_finish()来通知主程序
     pub fn bpf_tracer_finish();
 
+    pub fn set_uprobe_golang_enabled(enabled: bool) -> c_void;
+    pub fn set_uprobe_openssl_enabled(enabled: bool) -> c_void;
+
     // 获取socket_tracer的这种统计数据的接口
     pub fn socket_tracer_stats() -> SK_TRACE_STATS;
 

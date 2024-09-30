@@ -2183,7 +2183,7 @@ inputs:
           #     and auto-tracing. go auto-tracing also dependent go-tracing-timeout.
           #   ch: |-
           #     Golang 程序 HTTP2/HTTPS 协议数据采集及零侵扰追踪特性的开启开关。
-          # upgrade_from: static_config.ebpf.uprobe-process-name-regexs.golang
+          # upgrade_from: static_config.ebpf.uprobe-golang-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.golang
           enabled: false
           # type: duration
           # name:
@@ -2238,7 +2238,7 @@ inputs:
           #     ```
           #     `cat /proc/<PID>/maps | grep "libssl.so"`
           #     ```
-          # upgrade_from: static_config.ebpf.uprobe-process-name-regexs.openssl
+          # upgrade_from: static_config.ebpf.uprobe-openssl-trace-enabled, static_config.ebpf.uprobe-process-name-regexs.openssl
           # TODO: 进程匹配要统一修改
           enabled: false
       # type: section

@@ -261,6 +261,7 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #define __stringify(x)  __stringify_1(x)
 
 #define NAME(N)  __##N
+#define MAP_MAX_ENTRIES_DEF 40960
 
 /*
  * DeepFlow eBPF program naming convention:
@@ -375,18 +376,20 @@ struct bpf_map_def {
 	unsigned int key_size;
 	unsigned int value_size;
 	unsigned int max_entries;
+	unsigned int feat;
 };
 
-#define __BPF_MAP_DEF(_kt, _vt, _ents) \
+#define __BPF_MAP_DEF(_kt, _vt, _ents, _f) \
 	.key_size = sizeof(_kt),       \
 	.value_size = sizeof(_vt),     \
-	.max_entries = (_ents)
+	.max_entries = (_ents),	\
+	.feat = (_f)
 
-#define MAP_ARRAY(name, key_type, value_type, max_entries) \
+#define MAP_ARRAY(name, key_type, value_type, max_entries, feat) \
 struct bpf_map_def SEC("maps") __##name = \
 {   \
     .type = BPF_MAP_TYPE_ARRAY, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+    __BPF_MAP_DEF(key_type, value_type, max_entries, feat), \
 }; \
 static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
@@ -402,11 +405,11 @@ static_always_inline __attribute__((unused)) int name ## __delete(key_type *key)
 }
 
 // BPF_MAP_TYPE_ARRAY define
-#define MAP_PERARRAY(name, key_type, value_type, max_entries) \
+#define MAP_PERARRAY(name, key_type, value_type, max_entries, feat) \
 struct bpf_map_def SEC("maps") __##name = \
 {   \
     .type = BPF_MAP_TYPE_PERCPU_ARRAY, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+    __BPF_MAP_DEF(key_type, value_type, max_entries, feat), \
 }; \
 static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
@@ -421,33 +424,34 @@ static_always_inline __attribute__((unused)) int name ## __delete(key_type *key)
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }
 
-#define MAP_PERF_EVENT(name, key_type, value_type, max_entries) \
+#define MAP_PERF_EVENT(name, key_type, value_type, max_entries, feat) \
 struct bpf_map_def SEC("maps") __ ## name = \
 {   \
     .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+    __BPF_MAP_DEF(key_type, value_type, max_entries, feat), \
 };
 
-#define MAP_PROG_ARRAY(name, key_type, value_type, max_entries) \
+#define MAP_PROG_ARRAY(name, key_type, value_type, max_entries, feat) \
 struct bpf_map_def SEC("maps") __ ## name = \
 {   \
     .type = BPF_MAP_TYPE_PROG_ARRAY, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+    __BPF_MAP_DEF(key_type, value_type, max_entries, feat), \
 };
 
-#define MAP_STACK_TRACE(name, max) \
+#define MAP_STACK_TRACE(name, max, f) \
 struct bpf_map_def SEC("maps") __ ## name = { \
   .type = BPF_MAP_TYPE_STACK_TRACE, \
   .key_size = sizeof(__u32), \
   .value_size = PERF_MAX_STACK_DEPTH * sizeof(__u64), \
   .max_entries = (max), \
+  .feat = (f), \
 };
 
-#define MAP_HASH(name, key_type, value_type, max_entries) \
+#define MAP_HASH(name, key_type, value_type, max_entries, feat) \
 struct bpf_map_def SEC("maps") __##name = \
 {   \
     .type = BPF_MAP_TYPE_HASH, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+    __BPF_MAP_DEF(key_type, value_type, max_entries, feat), \
 }; \
 static_always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
@@ -463,16 +467,19 @@ static_always_inline __attribute__((unused)) int name ## __delete(key_type *key)
 }
 
 #define BPF_HASH3(_name, _key_type, _leaf_type) \
-  MAP_HASH(_name, _key_type, _leaf_type, 40960)
+  MAP_HASH(_name, _key_type, _leaf_type, MAP_MAX_ENTRIES_DEF, 0)
 
 #define BPF_HASH4(_name, _key_type, _leaf_type, _size) \
-  MAP_HASH(_name, _key_type, _leaf_type, _size)
+  MAP_HASH(_name, _key_type, _leaf_type, _size, 0)
+
+#define BPF_HASH5(_name, _key_type, _leaf_type, _size, _feat) \
+  MAP_HASH(_name, _key_type, _leaf_type, _size, _feat)
 
 // helper for default-variable macro function
-#define BPF_HASHX(_1, _2, _3, _4, NAME, ...) NAME
+#define BPF_HASHX(_1, _2, _3, _4, _5, NAME, ...) NAME
 
 #define BPF_HASH(...) \
-  BPF_HASHX(__VA_ARGS__, BPF_HASH4, BPF_HASH3)(__VA_ARGS__)
+  BPF_HASHX(__VA_ARGS__, BPF_HASH5, BPF_HASH4, BPF_HASH3)(__VA_ARGS__)
 
 #define BPF_LEN_CAP(x, cap) (x < cap ? (x & (cap - 1)) : cap)
 

@@ -29,6 +29,7 @@
 #include <string.h>
 
 static proc_event_list_t proc_events;
+static bool ssl_trace_enabled;
 
 /* *INDENT-OFF* */
 static struct symbol symbols[] = {
@@ -237,4 +238,14 @@ void openssl_trace_init(void)
 {
 	init_list_head(&proc_events.head);
 	pthread_mutex_init(&proc_events.m, NULL);
+}
+
+void set_uprobe_openssl_enabled(bool enabled)
+{
+	ssl_trace_enabled = enabled;
+}
+
+bool is_openssl_trace_enabled(void)
+{
+	return ssl_trace_enabled;
 }

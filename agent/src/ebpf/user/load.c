@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include "config.h"
 #include "common.h"
 #include "log.h"
 #include "elf.h"
@@ -35,6 +36,14 @@
 #include "load.h"
 #include "btf_core.h"
 #include "../kernel/include/bpf_base.h"
+#include "../kernel/include/common.h"
+#include "tracer.h"
+#include "symbol.h"
+#include "proc.h"
+#include "go_tracer.h"
+#include "ssl_tracer.h"
+#include "profile/perf_profiler.h"
+#include "unwind_tracer.h"
 
 /*
  * When full map preallocation is too expensive, the 'BPF_F_NO_PREALLOC'
@@ -810,10 +819,11 @@ static int ebpf_obj__maps_collect(struct ebpf_object *obj)
 		memcpy(&new_map->def, def, cp_sz);
 		ebpf_debug
 		    ("map_name %s\tmaps_cnt:%d\toffset %zd\ttype %u\tkey_size "
-		     "%u\tvalue_size %u\tmax_entries %u\n",
+		     "%u\tvalue_size %u\tmax_entries %u feat %u\n",
 		     map_name, obj->maps_cnt, new_map->elf_offset,
 		     new_map->def.type, new_map->def.key_size,
-		     new_map->def.value_size, new_map->def.max_entries);
+		     new_map->def.value_size, new_map->def.max_entries,
+		     new_map->def.feat);
 	}
 
 	return ETR_OK;
@@ -924,6 +934,21 @@ int ebpf_obj_load(struct ebpf_object *obj)
 		    strstr(obj->name, "profiler") == NULL) {
 			map_flags = BPF_F_NO_PREALLOC;
 		}
+
+		if (map->def.type != BPF_MAP_TYPE_PROG_ARRAY &&
+		    ((map->def.feat == FEATURE_UPROBE_GOLANG
+		     && !is_golang_trace_enabled())
+		    || (map->def.feat == FEATURE_UPROBE_OPENSSL
+			&& !is_openssl_trace_enabled())
+		    || (map->def.feat == FEATURE_PROFILE_ONCPU
+			&& !oncpu_profiler_enabled())
+		    || (map->def.feat == FEATURE_DWARF_UNWINDING
+			&& !get_dwarf_enabled()))) {
+			map->def.max_entries = 1;
+		}
+
+		extended_map_preprocess(map);
+
 		map->fd =
 		    bcc_create_map(map->def.type, map->name, map->def.key_size,
 				   map->def.value_size, map->def.max_entries,
