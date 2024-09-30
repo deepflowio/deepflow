@@ -1655,6 +1655,16 @@ static_config:
     #   eBPF hook on the CPU consumption of the application process.
     syscall-trace-id-disabled: false
 
+    # Disable Pre-allocating Memory
+    # Default: false
+    # Note:
+    #   When full map preallocation is too expensive, setting 'map-prealloc-disabled' to true will
+    #   prevent memory pre-allocation during map definition, but it may result in some performance
+    #   degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'.
+    #   Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
+    #   Disabling memory preallocation will reduce memory usage by approximately 45MB.
+    map-prealloc-disabled: false
+
   ######################################
   ## Agent Running in Standalone Mode ##
   ######################################

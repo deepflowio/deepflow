@@ -3454,6 +3454,36 @@ inputs:
 当 trace_id 注入所有请求时，所有请求的 syscall_trace_id 计算逻辑可以关闭。这将大大减少
 eBPF hook 进程的 CPU 消耗。
 
+##### 禁用预分配内存 {#inputs.ebpf.socket.tunning.map_prealloc_disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.map_prealloc_disabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        map_prealloc_disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当完整的map预分配过于昂贵时，将 `map_prealloc_disabled` 设置为 true 可以防止在定义map时进行
+内存预分配，但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 ebpf map。
+目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
+
 #### 预处理 {#inputs.ebpf.socket.preprocess}
 
 ##### 乱序重排（OOOR）缓冲区大小 {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size}

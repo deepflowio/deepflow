@@ -548,6 +548,11 @@ extern "C" {
         callback: extern "C" fn(data: *mut PROCESS_EVENT),
     ) -> c_int;
 
+    // Set whether to pre-allocate memory when creating a map?
+    // @enabled : true Pre-allocate memory when defining a BPF hash map
+    //            false Define a map without preallocated memory
+    pub fn set_bpf_map_prealloc(enabled: bool) -> c_void;
+
     // 参数说明：
     // callback: 回调接口 rust -> C
     // thread_nr: 工作线程数，是指用户态有多少线程参与数据处理。
