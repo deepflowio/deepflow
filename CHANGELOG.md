@@ -211,6 +211,10 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Adapt 5.10.204-rt100-AD1000-PROTO [#8246](https://github.com/deepflowio/deepflow/pull/8246) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - Add a configuration option to enable go/tls trace [#8244](https://github.com/deepflowio/deepflow/pull/8244) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Create maps based on functional configuration [#8243](https://github.com/deepflowio/deepflow/pull/8243) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Add the BPF_F_NO_PREALLOC option to the hash map [#8236](https://github.com/deepflowio/deepflow/pull/8236) by [yinjiping](https://github.com/yinjiping)
 * feat: querier uniq function supports multi params [#8218](https://github.com/deepflowio/deepflow/pull/8218) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: the application log table uses app_service as the primary key [#8220](https://github.com/deepflowio/deepflow/pull/8220) by [lzf575](https://github.com/lzf575)
 * feat: support k8s_watch_policy env [#8219](https://github.com/deepflowio/deepflow/pull/8219) by [SongZhen0704](https://github.com/SongZhen0704)
