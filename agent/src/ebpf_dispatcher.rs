@@ -635,6 +635,7 @@ impl EbpfCollector {
         // ebpf core modules init
         #[allow(unused_mut)]
         let mut handle = ConfigHandle::default();
+        ebpf::set_uprobe_golang_enabled(config.ebpf.socket.uprobe.golang.enabled);
         if config.ebpf.socket.uprobe.golang.enabled {
             let uprobe_proc_regexp = config
                 .process_matcher
@@ -662,6 +663,7 @@ impl EbpfCollector {
             info!("ebpf golang uprobe proc regexp is empty, skip set")
         }
 
+        ebpf::set_uprobe_openssl_enabled(config.ebpf.socket.uprobe.tls.enabled);
         if config.ebpf.socket.uprobe.tls.enabled {
             let uprobe_proc_regexp = config
                 .process_matcher

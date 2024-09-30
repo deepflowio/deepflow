@@ -2356,13 +2356,13 @@ impl From<&RuntimeConfig> for UserConfig {
                     socket: EbpfSocket {
                         uprobe: EbpfSocketUprobe {
                             golang: EbpfSocketUprobeGolang {
-                                enabled: rc.yaml_config.ebpf.uprobe_proc_regexp.golang.is_empty(),
+                                enabled: rc.yaml_config.ebpf.uprobe_golang_trace_enabled,
                                 tracing_timeout: Duration::from_secs(
                                     rc.yaml_config.ebpf.go_tracing_timeout as u64,
                                 ),
                             },
                             tls: EbpfSocketUprobeTls {
-                                enabled: rc.yaml_config.ebpf.uprobe_proc_regexp.openssl.is_empty(),
+                                enabled: rc.yaml_config.ebpf.uprobe_openssl_trace_enabled,
                             },
                         },
                         kprobe: EbpfSocketKprobe {
@@ -3189,6 +3189,8 @@ pub struct EbpfYamlConfig {
     pub syscall_segmentation_reassembly: Vec<String>,
     pub syscall_trace_id_disabled: bool,
     pub map_prealloc_disabled: bool,
+    pub uprobe_golang_trace_enabled: bool,
+    pub uprobe_openssl_trace_enabled: bool,
 }
 
 impl Default for EbpfYamlConfig {
@@ -3223,6 +3225,8 @@ impl Default for EbpfYamlConfig {
             syscall_out_of_order_cache_size: 16,
             syscall_trace_id_disabled: false,
             map_prealloc_disabled: false,
+            uprobe_golang_trace_enabled: false,
+            uprobe_openssl_trace_enabled: false,
         }
     }
 }

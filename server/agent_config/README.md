@@ -3321,7 +3321,7 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **Description**:
 
@@ -3389,7 +3389,7 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **Description**:
 
@@ -4215,7 +4215,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [10000, 2000000] |
 
 **Description**:
 
@@ -4246,7 +4246,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [8000, 2000000] |
 
 **Description**:
 
@@ -4276,7 +4276,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [10000, 2000000] |
 
 **Description**:
 
