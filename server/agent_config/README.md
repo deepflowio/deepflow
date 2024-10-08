@@ -7652,6 +7652,8 @@ outputs:
 | ----- | ---------------------------- |
 | UDP | |
 | RAW_UDP | |
+| TCP | |
+| ZMQ | |
 
 **Schema**:
 | Key  | Value                        |

@@ -5053,7 +5053,7 @@ outputs:
     #   ch: NPB Socket 类型
     # unit:
     # range: []
-    # enum_options: [UDP, RAW_UDP]
+    # enum_options: [UDP, RAW_UDP, TCP, ZMQ]
     # modification: hot_update
     # ee_feature: true
     # description:

@@ -323,7 +323,7 @@ l7_log_collect_nps_threshold: 10000
 ## NPB Configuration ##
 #######################
 # NPB Socket Type
-# Default: RAW_UDP. Options: UDP, RAW_UDP
+# Default: RAW_UDP. Options: UDP, RAW_UDP, TCP, ZMQ
 # Note: RAW_UDP uses RawSocket to send UDP packets, which has the highest
 #   performance, but there may be compatibility issues in some environments.
 npb_socket_type: RAW_UDP
