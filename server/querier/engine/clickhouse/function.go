@@ -959,10 +959,10 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	}
 	var withValue string
 	if len(fields) > 1 {
-		if f.Name == "if" {
+		if f.Name == "if" || strings.HasPrefix(f.Name, "uniq") {
 			withValue = fmt.Sprintf("%s(%s)", f.Name, strings.Join(values, ","))
-		} else if strings.HasPrefix(f.Name, "topK") || strings.HasPrefix(f.Name, "any") || strings.HasPrefix(f.Name, "uniq") {
-			withValue = fmt.Sprintf("%s(%s)", f.Name, strings.Join(values, ","))
+		} else if strings.HasPrefix(f.Name, "topK") || strings.HasPrefix(f.Name, "any") {
+			withValue = fmt.Sprintf("%s((%s))", f.Name, strings.Join(values, ","))
 		} else {
 			withValue = fmt.Sprintf("%s([%s])", f.Name, strings.Join(values, ","))
 		}
