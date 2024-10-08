@@ -151,6 +151,7 @@ enum SocketType {
     TCP = 1;
     UDP = 2;
     FILE = 3;
+    ZMQ = 4;
 }
 
 enum PacketType {
@@ -353,7 +354,7 @@ message DynamicConfig {
 
     optional uint32 region_id = 10;       // Region ID of the deepflow-agent or Region ID of the data node
     optional uint32 pod_cluster_id = 11;  // Cluster ID of the container where the deepflow-agent is located
-    optional uint32 vpc_id = 12;  
+    optional uint32 vpc_id = 12;
     optional uint32 agent_id = 13;  // range: [0, 64000]
     optional uint32 team_id = 14;
     optional uint32 organize_id = 15;

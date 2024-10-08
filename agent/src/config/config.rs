@@ -2097,10 +2097,11 @@ where
         "TCP" => Ok(agent::SocketType::Tcp),
         "UDP" => Ok(agent::SocketType::Udp),
         "RAW_UDP" => Ok(agent::SocketType::RawUdp),
+        "ZMQ" => Ok(agent::SocketType::Zmq),
         "" => Ok(agent::SocketType::File),
         other => Err(de::Error::invalid_value(
             Unexpected::Str(other),
-            &"FILE|TCP|UDP|RAW_UDP",
+            &"FILE|TCP|UDP|RAW_UDP|ZMQ",
         )),
     }
 }
@@ -4913,23 +4914,6 @@ where
         "UDP" => Ok(trident::SocketType::Udp),
         "RAW_UDP" => Ok(trident::SocketType::RawUdp),
         "" => Ok(trident::SocketType::File),
-        other => Err(de::Error::invalid_value(
-            Unexpected::Str(other),
-            &"FILE|TCP|UDP|RAW_UDP",
-        )),
-    }
-}
-
-fn to_socket_type<'de, D>(deserializer: D) -> Result<agent::SocketType, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match String::deserialize(deserializer)?.as_str() {
-        "FILE" => Ok(agent::SocketType::File),
-        "TCP" => Ok(agent::SocketType::Tcp),
-        "UDP" => Ok(agent::SocketType::Udp),
-        "RAW_UDP" => Ok(agent::SocketType::RawUdp),
-        "" => Ok(agent::SocketType::File),
         other => Err(de::Error::invalid_value(
             Unexpected::Str(other),
             &"FILE|TCP|UDP|RAW_UDP",
