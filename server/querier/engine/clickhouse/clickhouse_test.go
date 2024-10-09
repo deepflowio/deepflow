@@ -280,6 +280,9 @@ var (
 		input:  "SELECT chost_id_0 from l4_flow_log WHERE NOT exist(chost_0) LIMIT 1",
 		output: "SELECT if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_id_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (l3_device_type_0=1) LIMIT 1",
 	}, {
+		input:  "SELECT response_code from l4_flow_log WHERE exist(response_code) LIMIT 1",
+		output: "SELECT response_code FROM flow_log.`l4_flow_log` PREWHERE ((isNotNull(response_code))) LIMIT 1",
+	}, {
 		input:  "SELECT `cloud.tag.xx_0` from l4_flow_log WHERE NOT exist(`cloud.tag.xx_0`) LIMIT 1",
 		output: "SELECT if(if(l3_device_type_0=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id_0),'xx')), '')!='',if(l3_device_type_0=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id_0),'xx')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(pod_ns_id_0),'xx')) ) AS `cloud.tag.xx_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (((toUInt64(l3_device_id_0) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='xx') AND l3_device_type_0=1) OR (toUInt64(pod_ns_id_0) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='xx')))) LIMIT 1",
 	}, {
