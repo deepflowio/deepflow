@@ -2245,6 +2245,1692 @@ impl ConfigHandler {
         })
     }
 
+    pub fn on_config_xx(
+        &mut self,
+        user_config: UserConfig,
+        dynamic_config: DynamicConfig,
+        exception_handler: &ExceptionHandler,
+        mut components: Option<&mut AgentComponents>,
+        #[cfg(target_os = "linux")] api_watcher: &Arc<ApiWatcher>,
+        runtime: &Runtime,
+        session: &Session,
+        agent_id: &AgentId,
+    ) -> Vec<fn(&ConfigHandler, &mut AgentComponents)> {
+        let candidate_config = &mut self.candidate_config;
+        let static_config = &self.static_config;
+        let config = &mut candidate_config.user_config;
+        let mut new_config: ModuleConfig = (static_config.clone(), user_config, dynamic_config)
+            .try_into()
+            .unwrap();
+        let mut callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = vec![];
+        let mut restart_dispatcher = false;
+
+        // inputs
+        let af_packet = &mut config.inputs.cbpf.af_packet;
+        let new_af_packet = &mut new_config.user_config.inputs.cbpf.af_packet;
+        if af_packet.bpf_filter_disabled != new_af_packet.bpf_filter_disabled {
+            info!(
+                "Update inputs.cbpf.af_packet.bpf_filter_disabled from {:?} to {:?}.",
+                af_packet.bpf_filter_disabled, new_af_packet.bpf_filter_disabled
+            );
+            af_packet.bpf_filter_disabled = new_af_packet.bpf_filter_disabled;
+        }
+        if af_packet.bond_interfaces != new_af_packet.bond_interfaces {
+            info!(
+                "Update inputs.cbpf.af_packet.bond_interfaces from {:?} to {:?}.",
+                af_packet.bond_interfaces, new_af_packet.bond_interfaces
+            );
+            af_packet.bond_interfaces = new_af_packet.bond_interfaces.clone();
+        }
+        if af_packet.extra_bpf_filter != new_af_packet.extra_bpf_filter {
+            info!(
+                "Update inputs.cbpf.af_packet.extra_bpf_filter from {:?} to {:?}.",
+                af_packet.extra_bpf_filter, new_af_packet.extra_bpf_filter
+            );
+            af_packet.extra_bpf_filter = new_af_packet.extra_bpf_filter.clone();
+        }
+        if af_packet.extra_netns_regex != new_af_packet.extra_netns_regex {
+            info!(
+                "Update inputs.cbpf.af_packet.extra_netns_regex from {:?} to {:?}.",
+                af_packet.extra_netns_regex, new_af_packet.extra_netns_regex
+            );
+            af_packet.extra_netns_regex = new_af_packet.extra_netns_regex.clone();
+        }
+        if af_packet.interface_regex != new_af_packet.interface_regex {
+            info!(
+                "Update inputs.cbpf.af_packet.interface_regex from {:?} to {:?}.",
+                af_packet.interface_regex, new_af_packet.interface_regex
+            );
+            af_packet.interface_regex = new_af_packet.interface_regex.clone();
+        }
+        if af_packet.src_interfaces != new_af_packet.src_interfaces {
+            info!(
+                "Update inputs.cbpf.af_packet.src_interfaces from {:?} to {:?}.",
+                af_packet.src_interfaces, new_af_packet.src_interfaces
+            );
+            af_packet.src_interfaces = new_af_packet.src_interfaces.clone();
+        }
+        if af_packet.vlan_pcp_in_physical_mirror_traffic
+            != new_af_packet.vlan_pcp_in_physical_mirror_traffic
+        {
+            info!("Update inputs.cbpf.af_packet.vlan_pcp_in_physical_mirror_traffic from {:?} to {:?}.", 
+                af_packet.vlan_pcp_in_physical_mirror_traffic, new_af_packet.vlan_pcp_in_physical_mirror_traffic);
+            af_packet.vlan_pcp_in_physical_mirror_traffic =
+                new_af_packet.vlan_pcp_in_physical_mirror_traffic;
+        }
+        let tunning = &mut af_packet.tunning;
+        let new_tunning = &mut new_af_packet.tunning;
+        if tunning.ring_blocks_enabled != new_tunning.ring_blocks_enabled {
+            info!(
+                "Update inputs.cbpf.af_packet.tunning.ring_blocks_enabled from {:?} to {:?}.",
+                tunning.ring_blocks_enabled, new_tunning.ring_blocks_enabled
+            );
+            tunning.ring_blocks_enabled = new_tunning.ring_blocks_enabled;
+        }
+        if tunning.packet_fanout_count != new_tunning.packet_fanout_count {
+            info!(
+                "Update inputs.cbpf.af_packet.tunning.packet_fanout_count from {:?} to {:?}.",
+                tunning.packet_fanout_count, new_tunning.packet_fanout_count
+            );
+            tunning.packet_fanout_count = new_tunning.packet_fanout_count;
+        }
+        if tunning.packet_fanout_mode != new_tunning.packet_fanout_mode {
+            info!(
+                "Update inputs.cbpf.af_packet.tunning.packet_fanout_mode from {:?} to {:?}.",
+                tunning.packet_fanout_mode, new_tunning.packet_fanout_mode
+            );
+            tunning.packet_fanout_mode = new_tunning.packet_fanout_mode;
+        }
+        if tunning.ring_blocks != new_tunning.ring_blocks {
+            info!(
+                "Update inputs.cbpf.af_packet.tunning.ring_blocks from {:?} to {:?}.",
+                tunning.ring_blocks, new_tunning.ring_blocks
+            );
+            tunning.ring_blocks = new_tunning.ring_blocks;
+        }
+        if tunning.socket_version != new_tunning.socket_version {
+            info!(
+                "Update inputs.cbpf.af_packet.tunning.socket_version from {:?} to {:?}.",
+                tunning.socket_version, new_tunning.socket_version
+            );
+            tunning.socket_version = new_tunning.socket_version;
+        }
+
+        let common = &mut config.inputs.cbpf.common;
+        let new_common = &mut new_config.user_config.inputs.cbpf.common;
+        if common.capture_mode != common.capture_mode {
+            info!(
+                "Update inputs.cbpf.common.capture_mode from {:?} to {:?}.",
+                common.capture_mode, new_common.capture_mode
+            );
+            common.capture_mode = new_common.capture_mode;
+        }
+
+        let physical_mirror = &mut config.inputs.cbpf.physical_mirror;
+        let new_physical_mirror = &mut new_config.user_config.inputs.cbpf.physical_mirror;
+        if physical_mirror.packet_dedup_disabled != new_physical_mirror.packet_dedup_disabled {
+            info!(
+                "Update inputs.cbpf.physical_mirror.packet_dedup_disabled from {:?} to {:?}.",
+                physical_mirror.packet_dedup_disabled, new_physical_mirror.packet_dedup_disabled
+            );
+            physical_mirror.packet_dedup_disabled = new_physical_mirror.packet_dedup_disabled;
+        }
+        if physical_mirror.private_cloud_gateway_traffic
+            != new_physical_mirror.private_cloud_gateway_traffic
+        {
+            info!("Update inputs.cbpf.physical_mirror.private_cloud_gateway_traffic from {:?} to {:?}.", 
+                physical_mirror.private_cloud_gateway_traffic, new_physical_mirror.private_cloud_gateway_traffic);
+            physical_mirror.private_cloud_gateway_traffic =
+                new_physical_mirror.private_cloud_gateway_traffic;
+        }
+        if physical_mirror.default_capture_network_type
+            != new_physical_mirror.default_capture_network_type
+        {
+            info!("Update inputs.cbpf.physical_mirror.default_capture_network_type from {:?} to {:?}.", 
+                physical_mirror.default_capture_network_type, new_physical_mirror.default_capture_network_type);
+            physical_mirror.default_capture_network_type =
+                new_physical_mirror.default_capture_network_type;
+        }
+
+        let preprocess = &mut config.inputs.cbpf.preprocess;
+        let new_preprocess = &mut new_config.user_config.inputs.cbpf.preprocess;
+        if preprocess.packet_segmentation_reassembly
+            != new_preprocess.packet_segmentation_reassembly
+        {
+            info!(
+                "Update inputs.cbpf.preprocess.packet_segmentation_reassembly from {:?} to {:?}.",
+                preprocess.packet_segmentation_reassembly,
+                new_preprocess.packet_segmentation_reassembly
+            );
+            preprocess.packet_segmentation_reassembly =
+                new_preprocess.packet_segmentation_reassembly.clone();
+        }
+        if preprocess.tunnel_decap_protocols != new_preprocess.tunnel_decap_protocols {
+            info!(
+                "Update inputs.cbpf.preprocess.tunnel_decap_protocols from {:?} to {:?}.",
+                preprocess.tunnel_decap_protocols, new_preprocess.tunnel_decap_protocols
+            );
+            preprocess.tunnel_decap_protocols = new_preprocess.tunnel_decap_protocols.clone();
+        }
+        if preprocess.tunnel_trim_protocols != new_preprocess.tunnel_trim_protocols {
+            info!(
+                "Update inputs.cbpf.preprocess.tunnel_trim_protocols from {:?} to {:?}.",
+                preprocess.tunnel_trim_protocols, new_preprocess.tunnel_trim_protocols
+            );
+            preprocess.tunnel_trim_protocols = new_preprocess.tunnel_trim_protocols.clone();
+        }
+
+        let special_network = &mut config.inputs.cbpf.special_network;
+        let new_special_network = &mut new_config.user_config.inputs.cbpf.special_network;
+        if special_network.dpdk.enabled != new_special_network.dpdk.enabled {
+            info!(
+                "Update inputs.cbpf.special_network.dpdk.enabled from {:?} to {:?}.",
+                special_network.dpdk.enabled, new_special_network.dpdk.enabled
+            );
+            special_network.dpdk.enabled = new_special_network.dpdk.enabled;
+        }
+        if special_network.libpcap.enabled != new_special_network.libpcap.enabled {
+            info!(
+                "Update inputs.cbpf.special_network.libpcap.enabled from {:?} to {:?}.",
+                special_network.libpcap.enabled, new_special_network.libpcap.enabled
+            );
+            special_network.libpcap.enabled = new_special_network.libpcap.enabled;
+        }
+
+        let physical_switch = &mut special_network.physical_switch;
+        let new_physical_switch = &mut new_special_network.physical_switch;
+        if physical_switch.netflow_ports != new_physical_switch.netflow_ports {
+            info!("Update inputs.cbpf.special_network.physical_switch.netflow_ports  from {:?} to {:?}.", 
+                physical_switch.netflow_ports , new_physical_switch.netflow_ports );
+            physical_switch.netflow_ports = new_physical_switch.netflow_ports.clone();
+        }
+        if physical_switch.sflow_ports != new_physical_switch.sflow_ports {
+            info!("Update inputs.cbpf.special_network.physical_switch.sflow_ports  from {:?} to {:?}.", 
+                physical_switch.sflow_ports , new_physical_switch.sflow_ports );
+            physical_switch.sflow_ports = new_physical_switch.sflow_ports.clone();
+        }
+        if special_network.vhost_user.vhost_socket_path
+            != new_special_network.vhost_user.vhost_socket_path
+        {
+            info!("Update inputs.cbpf.special_network.vhost_user.vhost_socket_path from {:?} to {:?}.", 
+                special_network.vhost_user.vhost_socket_path, new_special_network.vhost_user.vhost_socket_path);
+            special_network.vhost_user.vhost_socket_path =
+                new_special_network.vhost_user.vhost_socket_path.clone();
+        }
+
+        let tunning = &mut config.inputs.cbpf.tunning;
+        let new_tunning = &mut new_config.user_config.inputs.cbpf.tunning;
+        if tunning.dispatcher_queue_enabled != new_tunning.dispatcher_queue_enabled {
+            info!(
+                "Update inputs.cbpf.tunning.dispatcher_queue_enabled from {:?} to {:?}.",
+                tunning.dispatcher_queue_enabled, new_tunning.dispatcher_queue_enabled
+            );
+            tunning.dispatcher_queue_enabled = new_tunning.dispatcher_queue_enabled;
+        }
+        if tunning.max_capture_packet_size != new_tunning.max_capture_packet_size {
+            info!(
+                "Update inputs.cbpf.tunning.max_capture_packet_size from {:?} to {:?}.",
+                tunning.max_capture_packet_size, new_tunning.max_capture_packet_size
+            );
+            tunning.max_capture_packet_size = new_tunning.max_capture_packet_size;
+        }
+        if tunning.max_capture_pps != new_tunning.max_capture_pps {
+            info!(
+                "Update inputs.cbpf.tunning.max_capture_pps from {:?} to {:?}.",
+                tunning.max_capture_pps, new_tunning.max_capture_pps
+            );
+            tunning.max_capture_pps = new_tunning.max_capture_pps;
+        }
+        if tunning.raw_packet_buffer_block_size != new_tunning.raw_packet_buffer_block_size {
+            info!(
+                "Update inputs.cbpf.tunning.raw_packet_buffer_block_size from {:?} to {:?}.",
+                tunning.raw_packet_buffer_block_size, new_tunning.raw_packet_buffer_block_size
+            );
+            tunning.raw_packet_buffer_block_size = new_tunning.raw_packet_buffer_block_size;
+        }
+        if tunning.raw_packet_queue_size != new_tunning.raw_packet_queue_size {
+            info!(
+                "Update inputs.cbpf.tunning.raw_packet_queue_size from {:?} to {:?}.",
+                tunning.raw_packet_queue_size, new_tunning.raw_packet_queue_size
+            );
+            tunning.raw_packet_queue_size = new_tunning.raw_packet_queue_size;
+        }
+
+        let ebpf = &mut config.inputs.ebpf;
+        let new_ebpf = &mut new_config.user_config.inputs.ebpf;
+        if ebpf.disabled != new_ebpf.disabled {
+            info!(
+                "Update inputs.ebpf.disabled from {:?} to {:?}.",
+                ebpf.disabled, new_ebpf.disabled
+            );
+            ebpf.disabled = new_ebpf.disabled;
+        }
+
+        let io_event = &mut ebpf.file.io_event;
+        let new_io_event = &mut new_ebpf.file.io_event;
+        if io_event.collect_mode != new_io_event.collect_mode {
+            info!(
+                "Update inputs.ebpf.file.io_event.collect_mode from {:?} to {:?}.",
+                io_event.collect_mode, new_io_event.collect_mode
+            );
+            io_event.collect_mode = new_io_event.collect_mode;
+        }
+        if io_event.minimal_duration != new_io_event.minimal_duration {
+            info!(
+                "Update inputs.ebpf.file.io_event.minimal_duration from {:?} to {:?}.",
+                io_event.minimal_duration, new_io_event.minimal_duration
+            );
+            io_event.minimal_duration = new_io_event.minimal_duration;
+        }
+        if ebpf.java_symbol_file_refresh_defer_interval
+            != new_ebpf.java_symbol_file_refresh_defer_interval
+        {
+            info!(
+                "Update inputs.ebpf.java_symbol_file_refresh_defer_interval from {:?} to {:?}.",
+                ebpf.java_symbol_file_refresh_defer_interval,
+                new_ebpf.java_symbol_file_refresh_defer_interval
+            );
+            ebpf.java_symbol_file_refresh_defer_interval =
+                new_ebpf.java_symbol_file_refresh_defer_interval;
+        }
+
+        let on_cpu = &mut ebpf.profile.on_cpu;
+        let new_on_cpu = &mut new_ebpf.profile.on_cpu;
+        if on_cpu.aggregate_by_cpu != new_on_cpu.aggregate_by_cpu {
+            info!(
+                "Update inputs.ebpf.profile.on_cpu.aggregate_by_cpu from {:?} to {:?}.",
+                on_cpu.aggregate_by_cpu, new_on_cpu.aggregate_by_cpu
+            );
+            on_cpu.aggregate_by_cpu = new_on_cpu.aggregate_by_cpu;
+        }
+        if on_cpu.disabled != new_on_cpu.disabled {
+            info!(
+                "Update inputs.ebpf.profile.on_cpu.disabled from {:?} to {:?}.",
+                on_cpu.disabled, new_on_cpu.disabled
+            );
+            on_cpu.disabled = new_on_cpu.disabled;
+        }
+        if on_cpu.sampling_frequency != new_on_cpu.sampling_frequency {
+            info!(
+                "Update inputs.ebpf.profile.on_cpu.sampling_frequency from {:?} to {:?}.",
+                on_cpu.sampling_frequency, new_on_cpu.sampling_frequency
+            );
+            on_cpu.sampling_frequency = new_on_cpu.sampling_frequency;
+        }
+
+        let memory = &mut ebpf.profile.memory;
+        let new_memory = &mut new_ebpf.profile.memory;
+        if memory.disabled != new_memory.disabled {
+            info!(
+                "Update inputs.ebpf.profile.memory.disabled from {:?} to {:?}.",
+                memory.disabled, new_memory.disabled
+            );
+            memory.disabled = new_memory.disabled;
+        }
+        if memory.report_interval != new_memory.report_interval {
+            info!(
+                "Update inputs.ebpf.profile.memory.report_interval from {:?} to {:?}.",
+                memory.report_interval, new_memory.report_interval
+            );
+            memory.report_interval = new_memory.report_interval;
+        }
+
+        let off_cpu = &mut ebpf.profile.off_cpu;
+        let new_off_cpu = &mut new_ebpf.profile.off_cpu;
+        if off_cpu.aggregate_by_cpu != new_off_cpu.aggregate_by_cpu {
+            info!(
+                "Update inputs.ebpf.profile.off_cpu.aggregate_by_cpu from {:?} to {:?}.",
+                off_cpu.aggregate_by_cpu, new_off_cpu.aggregate_by_cpu
+            );
+            off_cpu.aggregate_by_cpu = new_off_cpu.aggregate_by_cpu;
+        }
+        if off_cpu.disabled != new_off_cpu.disabled {
+            info!(
+                "Update inputs.ebpf.profile.off_cpu.disabled from {:?} to {:?}.",
+                off_cpu.disabled, new_off_cpu.disabled
+            );
+            off_cpu.disabled = new_off_cpu.disabled;
+        }
+        if off_cpu.min_blocking_time != new_off_cpu.min_blocking_time {
+            info!(
+                "Update inputs.ebpf.profile.off_cpu.min_blocking_time from {:?} to {:?}.",
+                off_cpu.min_blocking_time, new_off_cpu.min_blocking_time
+            );
+            off_cpu.min_blocking_time = new_off_cpu.min_blocking_time;
+        }
+
+        if ebpf.profile.preprocess.stack_compression
+            != new_ebpf.profile.preprocess.stack_compression
+        {
+            info!(
+                "Update inputs.ebpf.profile.preprocess.stack_compression from {:?} to {:?}.",
+                ebpf.profile.preprocess.stack_compression,
+                new_ebpf.profile.preprocess.stack_compression
+            );
+            ebpf.profile.preprocess.stack_compression =
+                new_ebpf.profile.preprocess.stack_compression;
+        }
+
+        let unwinding = &mut ebpf.profile.unwinding;
+        let new_unwinding = &mut new_ebpf.profile.unwinding;
+        if unwinding.dwarf_disabled != new_unwinding.dwarf_disabled {
+            info!(
+                "Update inputs.ebpf.profile.unwinding.dwarf_disabled from {:?} to {:?}.",
+                unwinding.dwarf_disabled, new_unwinding.dwarf_disabled
+            );
+            unwinding.dwarf_disabled = new_unwinding.dwarf_disabled;
+        }
+        if unwinding.dwarf_process_map_size != new_unwinding.dwarf_process_map_size {
+            info!(
+                "Update inputs.ebpf.profile.unwinding.dwarf_process_map_size from {:?} to {:?}.",
+                unwinding.dwarf_process_map_size, new_unwinding.dwarf_process_map_size
+            );
+            unwinding.dwarf_process_map_size = new_unwinding.dwarf_process_map_size;
+        }
+        if unwinding.dwarf_regex != new_unwinding.dwarf_regex {
+            info!(
+                "Update inputs.ebpf.profile.unwinding.dwarf_regex from {:?} to {:?}.",
+                unwinding.dwarf_regex, new_unwinding.dwarf_regex
+            );
+            unwinding.dwarf_regex = new_unwinding.dwarf_regex.clone();
+        }
+        if unwinding.dwarf_shard_map_size != new_unwinding.dwarf_shard_map_size {
+            info!(
+                "Update inputs.ebpf.profile.unwinding.dwarf_shard_map_size from {:?} to {:?}.",
+                unwinding.dwarf_shard_map_size, new_unwinding.dwarf_shard_map_size
+            );
+            unwinding.dwarf_shard_map_size = new_unwinding.dwarf_shard_map_size;
+        }
+
+        let kprobe = &mut ebpf.socket.kprobe;
+        let new_kprobe = &mut new_ebpf.socket.kprobe;
+        if kprobe.blacklist.ports != new_kprobe.blacklist.ports {
+            info!(
+                "Update inputs.ebpf.socket.kprobe.blacklist.ports from {:?} to {:?}.",
+                kprobe.blacklist.ports, new_kprobe.blacklist.ports
+            );
+            kprobe.blacklist.ports = new_kprobe.blacklist.ports.clone();
+        }
+        if kprobe.whitelist.ports != new_kprobe.whitelist.ports {
+            info!(
+                "Update inputs.ebpf.socket.kprobe.whitelist.ports from {:?} to {:?}.",
+                kprobe.whitelist.ports, new_kprobe.whitelist.ports
+            );
+            kprobe.whitelist.ports = new_kprobe.whitelist.ports.clone();
+        }
+
+        let uprobe = &mut ebpf.socket.uprobe;
+        let new_uprobe = &mut new_ebpf.socket.uprobe;
+        if uprobe.tls.enabled != new_uprobe.tls.enabled {
+            info!(
+                "Update inputs.ebpf.socket.uprobe.tls.enabled from {:?} to {:?}.",
+                uprobe.tls.enabled, new_uprobe.tls.enabled
+            );
+            uprobe.tls.enabled = new_uprobe.tls.enabled;
+        }
+        let golang_uprobe = &mut uprobe.golang;
+        let new_golang_uprobe = &mut new_uprobe.golang;
+        if golang_uprobe.enabled != new_golang_uprobe.enabled {
+            info!(
+                "Update inputs.ebpf.socket.uprobe.golang.enabled from {:?} to {:?}.",
+                golang_uprobe.enabled, new_golang_uprobe.enabled
+            );
+            golang_uprobe.enabled = new_golang_uprobe.enabled;
+        }
+        if golang_uprobe.tracing_timeout != new_golang_uprobe.tracing_timeout {
+            info!(
+                "Update inputs.ebpf.socket.uprobe.golang.tracing_timeout from {:?} to {:?}.",
+                golang_uprobe.tracing_timeout, new_golang_uprobe.tracing_timeout
+            );
+            golang_uprobe.tracing_timeout = new_golang_uprobe.tracing_timeout;
+        }
+
+        let preprocess = &mut ebpf.socket.preprocess;
+        let new_preprocess = &mut new_ebpf.socket.preprocess;
+        if preprocess.out_of_order_reassembly_cache_size
+            != new_preprocess.out_of_order_reassembly_cache_size
+        {
+            info!("Update inputs.ebpf.socket.preprocess.out_of_order_reassembly_cache_size from {:?} to {:?}.", 
+                preprocess.out_of_order_reassembly_cache_size, new_preprocess.out_of_order_reassembly_cache_size);
+            preprocess.out_of_order_reassembly_cache_size =
+                new_preprocess.out_of_order_reassembly_cache_size;
+        }
+        if preprocess.out_of_order_reassembly_protocols
+            != new_preprocess.out_of_order_reassembly_protocols
+        {
+            info!("Update inputs.ebpf.socket.preprocess.out_of_order_reassembly_protocols from {:?} to {:?}.", 
+                preprocess.out_of_order_reassembly_protocols, new_preprocess.out_of_order_reassembly_protocols);
+            preprocess.out_of_order_reassembly_protocols =
+                new_preprocess.out_of_order_reassembly_protocols.clone();
+        }
+        if preprocess.segmentation_reassembly_protocols
+            != new_preprocess.segmentation_reassembly_protocols
+        {
+            info!("Update inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols from {:?} to {:?}.", 
+                preprocess.segmentation_reassembly_protocols, new_preprocess.segmentation_reassembly_protocols);
+            preprocess.segmentation_reassembly_protocols =
+                new_preprocess.segmentation_reassembly_protocols.clone();
+        }
+
+        let tunning = &mut ebpf.socket.tunning;
+        let new_tunning = &mut new_ebpf.socket.tunning;
+        if tunning.map_prealloc_disabled != new_tunning.map_prealloc_disabled {
+            info!(
+                "Update inputs.ebpf.socket.tunning.map_prealloc_disabled from {:?} to {:?}.",
+                tunning.map_prealloc_disabled, new_tunning.map_prealloc_disabled
+            );
+            tunning.map_prealloc_disabled = new_tunning.map_prealloc_disabled;
+        }
+        if tunning.syscall_trace_id_disabled != new_tunning.syscall_trace_id_disabled {
+            info!(
+                "Update inputs.ebpf.socket.tunning.syscall_trace_id_disabled from {:?} to {:?}.",
+                tunning.syscall_trace_id_disabled, new_tunning.syscall_trace_id_disabled
+            );
+            tunning.syscall_trace_id_disabled = new_tunning.syscall_trace_id_disabled;
+        }
+        if tunning.max_capture_rate != new_tunning.max_capture_rate {
+            info!(
+                "Update inputs.ebpf.socket.tunning.max_capture_rate from {:?} to {:?}.",
+                tunning.max_capture_rate, new_tunning.max_capture_rate
+            );
+            tunning.max_capture_rate = new_tunning.max_capture_rate;
+        }
+
+        let tunning = &mut ebpf.tunning;
+        let new_tunning = &mut new_ebpf.tunning;
+        if tunning.collector_queue_size != new_tunning.collector_queue_size {
+            info!(
+                "Update inputs.ebpf.tunning.collector_queue_size from {:?} to {:?}.",
+                tunning.collector_queue_size, new_tunning.collector_queue_size
+            );
+            tunning.collector_queue_size = new_tunning.collector_queue_size;
+        }
+        if tunning.kernel_ring_size != new_tunning.kernel_ring_size {
+            info!(
+                "Update inputs.ebpf.tunning.kernel_ring_size from {:?} to {:?}.",
+                tunning.kernel_ring_size, new_tunning.kernel_ring_size
+            );
+            tunning.kernel_ring_size = new_tunning.kernel_ring_size;
+        }
+        if tunning.max_socket_entries != new_tunning.max_socket_entries {
+            info!(
+                "Update inputs.ebpf.tunning.max_socket_entries from {:?} to {:?}.",
+                tunning.max_socket_entries, new_tunning.max_socket_entries
+            );
+            tunning.max_socket_entries = new_tunning.max_socket_entries;
+        }
+        if tunning.max_trace_entries != new_tunning.max_trace_entries {
+            info!(
+                "Update inputs.ebpf.tunning.max_trace_entries from {:?} to {:?}.",
+                tunning.max_trace_entries, new_tunning.max_trace_entries
+            );
+            tunning.max_trace_entries = new_tunning.max_trace_entries;
+        }
+        if tunning.perf_pages_count != new_tunning.perf_pages_count {
+            info!(
+                "Update inputs.ebpf.tunning.perf_pages_count from {:?} to {:?}.",
+                tunning.perf_pages_count, new_tunning.perf_pages_count
+            );
+            tunning.perf_pages_count = new_tunning.perf_pages_count;
+        }
+        if tunning.socket_map_reclaim_threshold != new_tunning.socket_map_reclaim_threshold {
+            info!(
+                "Update inputs.ebpf.tunning.socket_map_reclaim_threshold from {:?} to {:?}.",
+                tunning.socket_map_reclaim_threshold, new_tunning.socket_map_reclaim_threshold
+            );
+            tunning.socket_map_reclaim_threshold = new_tunning.socket_map_reclaim_threshold;
+        }
+        if tunning.userspace_worker_threads != new_tunning.userspace_worker_threads {
+            info!(
+                "Update inputs.ebpf.tunning.userspace_worker_threads from {:?} to {:?}.",
+                tunning.userspace_worker_threads, new_tunning.userspace_worker_threads
+            );
+            tunning.userspace_worker_threads = new_tunning.userspace_worker_threads;
+        }
+
+        let integration = &mut config.inputs.integration;
+        let new_integration = &mut new_config.user_config.inputs.integration;
+        if integration.enabled != new_integration.enabled {
+            info!(
+                "Update inputs.integration.enabled from {:?} to {:?}.",
+                integration.enabled, new_integration.enabled
+            );
+            integration.enabled = new_integration.enabled;
+        }
+        if integration.compression != new_integration.compression {
+            info!(
+                "Update inputs.integration.compression from {:?} to {:?}.",
+                integration.compression, new_integration.compression
+            );
+            integration.compression = new_integration.compression.clone();
+        }
+        if integration.feature_control != new_integration.feature_control {
+            info!(
+                "Update inputs.integration.feature_control from {:?} to {:?}.",
+                integration.feature_control, new_integration.feature_control
+            );
+            integration.feature_control = new_integration.feature_control;
+        }
+        if integration.listen_port != new_integration.listen_port {
+            info!(
+                "Update inputs.integration.listen_port from {:?} to {:?}.",
+                integration.listen_port, new_integration.listen_port
+            );
+            integration.listen_port = new_integration.listen_port;
+        }
+        if integration.prometheus_extra_labels != new_integration.prometheus_extra_labels {
+            info!(
+                "Update inputs.integration.prometheus_extra_labels from {:?} to {:?}.",
+                integration.prometheus_extra_labels, new_integration.prometheus_extra_labels
+            );
+            integration.prometheus_extra_labels = new_integration.prometheus_extra_labels.clone();
+        }
+
+        let resources = &mut config.inputs.resources;
+        let new_resources = &mut new_config.user_config.inputs.resources;
+        if resources.push_interval != new_resources.push_interval {
+            info!(
+                "Update inputs.resources.push_interval from {:?} to {:?}.",
+                resources.push_interval, new_resources.push_interval
+            );
+            resources.push_interval = new_resources.push_interval;
+        }
+
+        let kubernetes = &mut resources.kubernetes;
+        let new_kubernetes = &mut new_resources.kubernetes;
+        if kubernetes.api_list_max_interval != new_kubernetes.api_list_max_interval {
+            info!(
+                "Update inputs.resources.kubernetes.api_list_max_interval from {:?} to {:?}.",
+                kubernetes.api_list_max_interval, new_kubernetes.api_list_max_interval
+            );
+            kubernetes.api_list_max_interval = new_kubernetes.api_list_max_interval;
+        }
+        if kubernetes.api_list_page_size != new_kubernetes.api_list_page_size {
+            info!(
+                "Update inputs.resources.kubernetes.api_list_page_size from {:?} to {:?}.",
+                kubernetes.api_list_page_size, new_kubernetes.api_list_page_size
+            );
+            kubernetes.api_list_page_size = new_kubernetes.api_list_page_size;
+        }
+        if kubernetes.api_resources != new_kubernetes.api_resources {
+            info!(
+                "Update inputs.resources.kubernetes.api_resources from {:?} to {:?}.",
+                kubernetes.api_resources, new_kubernetes.api_resources
+            );
+            kubernetes.api_resources = new_kubernetes.api_resources.clone();
+        }
+        if kubernetes.ingress_flavour != new_kubernetes.ingress_flavour {
+            info!(
+                "Update inputs.resources.kubernetes.ingress_flavour from {:?} to {:?}.",
+                kubernetes.ingress_flavour, new_kubernetes.ingress_flavour
+            );
+            kubernetes.ingress_flavour = new_kubernetes.ingress_flavour.clone();
+        }
+        if kubernetes.kubernetes_namespace != new_kubernetes.kubernetes_namespace {
+            info!(
+                "Update inputs.resources.kubernetes.kubernetes_namespace from {:?} to {:?}.",
+                kubernetes.kubernetes_namespace, new_kubernetes.kubernetes_namespace
+            );
+            kubernetes.kubernetes_namespace = new_kubernetes.kubernetes_namespace.clone();
+        }
+        if kubernetes.pod_mac_collection_method != new_kubernetes.pod_mac_collection_method {
+            info!(
+                "Update inputs.resources.kubernetes.pod_mac_collection_method from {:?} to {:?}.",
+                kubernetes.pod_mac_collection_method, new_kubernetes.pod_mac_collection_method
+            );
+            kubernetes.pod_mac_collection_method = new_kubernetes.pod_mac_collection_method;
+        }
+
+        let private_cloud = &mut resources.private_cloud;
+        let new_private_cloud = &mut new_resources.private_cloud;
+        if private_cloud.hypervisor_resource_enabled
+            != new_private_cloud.hypervisor_resource_enabled
+        {
+            info!("Update inputs.resources.private_cloud.hypervisor_resource_enabled from {:?} to {:?}.", 
+                private_cloud.hypervisor_resource_enabled, new_private_cloud.hypervisor_resource_enabled);
+            private_cloud.hypervisor_resource_enabled =
+                new_private_cloud.hypervisor_resource_enabled;
+        }
+        if private_cloud.vm_mac_mapping_script != new_private_cloud.vm_mac_mapping_script {
+            info!(
+                "Update inputs.resources.private_cloud.vm_mac_mapping_script from {:?} to {:?}.",
+                private_cloud.vm_mac_mapping_script, new_private_cloud.vm_mac_mapping_script
+            );
+            private_cloud.vm_mac_mapping_script = new_private_cloud.vm_mac_mapping_script.clone();
+        }
+        if private_cloud.vm_mac_source != new_private_cloud.vm_mac_source {
+            info!(
+                "Update inputs.resources.private_cloud.vm_mac_source from {:?} to {:?}.",
+                private_cloud.vm_mac_source, new_private_cloud.vm_mac_source
+            );
+            private_cloud.vm_mac_source = new_private_cloud.vm_mac_source;
+        }
+        if private_cloud.vm_xml_directory != new_private_cloud.vm_xml_directory {
+            info!(
+                "Update inputs.resources.private_cloud.vm_xml_directory from {:?} to {:?}.",
+                private_cloud.vm_xml_directory, new_private_cloud.vm_xml_directory
+            );
+            private_cloud.vm_xml_directory = new_private_cloud.vm_xml_directory.clone();
+        }
+
+        let pull_resource = &mut resources.pull_resource_from_controller;
+        let new_pull_resource = &mut new_resources.pull_resource_from_controller;
+        if pull_resource.only_kubernetes_pod_ip_in_local_cluster
+            != new_pull_resource.only_kubernetes_pod_ip_in_local_cluster
+        {
+            info!("Update inputs.resources.pull_resource_from_controller.only_kubernetes_pod_ip_in_local_cluster from {:?} to {:?}.", 
+                pull_resource.only_kubernetes_pod_ip_in_local_cluster, new_pull_resource.only_kubernetes_pod_ip_in_local_cluster);
+            pull_resource.only_kubernetes_pod_ip_in_local_cluster =
+                new_pull_resource.only_kubernetes_pod_ip_in_local_cluster;
+        }
+        if pull_resource.domain_filter != new_pull_resource.domain_filter {
+            info!("Update inputs.resources.pull_resource_from_controller.domain_filter from {:?} to {:?}.", 
+                pull_resource.domain_filter, new_pull_resource.domain_filter);
+            pull_resource.domain_filter = new_pull_resource.domain_filter.clone();
+        }
+
+        let proc = &mut config.inputs.proc;
+        let new_proc = &mut new_config.user_config.inputs.proc;
+        if proc.enabled != new_proc.enabled {
+            info!(
+                "Update inputs.proc.enabled from {:?} to {:?}.",
+                proc.enabled, new_proc.enabled
+            );
+            proc.enabled = new_proc.enabled;
+        }
+        if proc.min_lifetime != new_proc.min_lifetime {
+            info!(
+                "Update inputs.proc.min_lifetime from {:?} to {:?}.",
+                proc.min_lifetime, new_proc.min_lifetime
+            );
+            proc.min_lifetime = new_proc.min_lifetime;
+        }
+        if proc.proc_dir_path != new_proc.proc_dir_path {
+            info!(
+                "Update inputs.proc.proc_dir_path from {:?} to {:?}.",
+                proc.proc_dir_path, new_proc.proc_dir_path
+            );
+            proc.proc_dir_path = new_proc.proc_dir_path.clone();
+        }
+        if proc.process_matcher != new_proc.process_matcher {
+            info!(
+                "Update inputs.proc.process_matcher from {:?} to {:?}.",
+                proc.process_matcher, new_proc.process_matcher
+            );
+            proc.process_matcher = new_proc.process_matcher.clone();
+        }
+        if proc.symbol_table != new_proc.symbol_table {
+            info!(
+                "Update inputs.proc.symbol_table from {:?} to {:?}.",
+                proc.symbol_table, new_proc.symbol_table
+            );
+            proc.symbol_table = new_proc.symbol_table;
+        }
+        if proc.sync_interval != new_proc.sync_interval {
+            info!(
+                "Update inputs.proc.sync_interval from {:?} to {:?}.",
+                proc.sync_interval, new_proc.sync_interval
+            );
+            proc.sync_interval = new_proc.sync_interval;
+        }
+
+        let tag = &mut proc.tag_extraction;
+        let new_tag = &mut new_proc.tag_extraction;
+        if tag.exec_username != new_tag.exec_username {
+            info!(
+                "Update inputs.proc.tag_extraction.exec_username from {:?} to {:?}.",
+                tag.exec_username, new_tag.exec_username
+            );
+            tag.exec_username = new_tag.exec_username.clone();
+        }
+        if tag.script_command != new_tag.script_command {
+            info!(
+                "Update inputs.proc.tag_extraction.script_command from {:?} to {:?}.",
+                tag.script_command, new_tag.script_command
+            );
+            tag.script_command = new_tag.script_command.clone();
+        }
+
+        // global
+        let alerts = &mut config.global.alerts;
+        let new_alerts = &mut new_config.user_config.global.alerts;
+        if alerts.check_core_file_disabled != new_alerts.check_core_file_disabled {
+            info!(
+                "Update global.alerts.check_core_file_disabled from {:?} to {:?}.",
+                alerts.check_core_file_disabled, new_alerts.check_core_file_disabled
+            );
+            alerts.check_core_file_disabled = new_alerts.check_core_file_disabled;
+        }
+        if alerts.process_threshold != new_alerts.process_threshold {
+            info!(
+                "Update global.alerts.process_threshold from {:?} to {:?}.",
+                alerts.process_threshold, new_alerts.process_threshold
+            );
+            alerts.process_threshold = new_alerts.process_threshold;
+        }
+        if alerts.thread_threshold != new_alerts.thread_threshold {
+            info!(
+                "Update global.alerts.thread_threshold from {:?} to {:?}.",
+                alerts.thread_threshold, new_alerts.thread_threshold
+            );
+            alerts.thread_threshold = new_alerts.thread_threshold;
+        }
+
+        let circuit_breakers = &mut config.global.circuit_breakers;
+        let new_circuit_breakers = &mut new_config.user_config.global.circuit_breakers;
+        let relative_sys_load = &mut circuit_breakers.relative_sys_load;
+        let new_relative_sys_load = &mut new_circuit_breakers.relative_sys_load;
+        if relative_sys_load.recovery_threshold != new_relative_sys_load.recovery_threshold {
+            info!("Update global.circuit_breakers.relative_sys_load.recovery_threshold from {:?} to {:?}.", 
+                relative_sys_load.recovery_threshold, new_relative_sys_load.recovery_threshold);
+            relative_sys_load.recovery_threshold = new_relative_sys_load.recovery_threshold;
+        }
+        if relative_sys_load.system_load_circuit_breaker_metric
+            != new_relative_sys_load.system_load_circuit_breaker_metric
+        {
+            info!("Update global.circuit_breakers.relative_sys_load.system_load_circuit_breaker_metric from {:?} to {:?}.", 
+                relative_sys_load.system_load_circuit_breaker_metric, new_relative_sys_load.system_load_circuit_breaker_metric);
+            relative_sys_load.system_load_circuit_breaker_metric =
+                new_relative_sys_load.system_load_circuit_breaker_metric;
+        }
+        if relative_sys_load.trigger_threshold != new_relative_sys_load.trigger_threshold {
+            info!("Update global.circuit_breakers.relative_sys_load.trigger_threshold from {:?} to {:?}.", 
+                relative_sys_load.trigger_threshold, new_relative_sys_load.trigger_threshold);
+            relative_sys_load.trigger_threshold = new_relative_sys_load.trigger_threshold;
+        }
+        let sys_free_memory_percentage = &mut circuit_breakers.sys_free_memory_percentage;
+        let new_sys_free_memory_percentage = &mut new_circuit_breakers.sys_free_memory_percentage;
+        if sys_free_memory_percentage.trigger_threshold
+            != new_sys_free_memory_percentage.trigger_threshold
+        {
+            info!("Update global.circuit_breakers.sys_free_memory_percentage.trigger_threshold from {:?} to {:?}.", 
+                sys_free_memory_percentage.trigger_threshold, new_sys_free_memory_percentage.trigger_threshold);
+            sys_free_memory_percentage.trigger_threshold =
+                new_sys_free_memory_percentage.trigger_threshold;
+        }
+        let tx_throughput = &mut circuit_breakers.tx_throughput;
+        let new_tx_throughput = &mut new_circuit_breakers.tx_throughput;
+        if tx_throughput.trigger_threshold != new_tx_throughput.trigger_threshold {
+            info!(
+                "Update global.circuit_breakers.tx_throughput.trigger_threshold from {:?} to {:?}.",
+                tx_throughput.trigger_threshold, new_tx_throughput.trigger_threshold
+            );
+            tx_throughput.trigger_threshold = new_tx_throughput.trigger_threshold;
+        }
+        if tx_throughput.throughput_monitoring_interval
+            != new_tx_throughput.throughput_monitoring_interval
+        {
+            info!("Update global.circuit_breakers.tx_throughput.throughput_monitoring_interval from {:?} to {:?}.", 
+                tx_throughput.throughput_monitoring_interval, new_tx_throughput.throughput_monitoring_interval);
+            tx_throughput.throughput_monitoring_interval =
+                new_tx_throughput.throughput_monitoring_interval;
+        }
+
+        let common = &mut config.global.common;
+        let new_common = &mut new_config.user_config.global.common;
+        if common.enabled != new_common.enabled {
+            info!(
+                "Update global.common.enabled from {:?} to {:?}.",
+                common.enabled, new_common.enabled
+            );
+            common.enabled = new_common.enabled;
+        }
+        if common.agent_type != new_common.agent_type {
+            info!(
+                "Update global.common.agent_type from {:?} to {:?}.",
+                common.agent_type, new_common.agent_type
+            );
+            common.agent_type = new_common.agent_type;
+        }
+
+        let communication = &mut config.global.communication;
+        let new_communication = &mut new_config.user_config.global.communication;
+        if communication.request_via_nat_ip != new_communication.request_via_nat_ip {
+            info!(
+                "Update global.communication.request_via_nat_ip from {:?} to {:?}.",
+                communication.request_via_nat_ip, new_communication.request_via_nat_ip
+            );
+            communication.request_via_nat_ip = new_communication.request_via_nat_ip;
+        }
+        if communication.grpc_buffer_size != new_communication.grpc_buffer_size {
+            info!(
+                "Update global.communication.grpc_buffer_size from {:?} to {:?}.",
+                communication.grpc_buffer_size, new_communication.grpc_buffer_size
+            );
+            communication.grpc_buffer_size = new_communication.grpc_buffer_size;
+        }
+        if communication.ingester_ip != new_communication.ingester_ip {
+            info!(
+                "Update global.communication.ingester_ip from {:?} to {:?}.",
+                communication.ingester_ip, new_communication.ingester_ip
+            );
+            communication.ingester_ip = new_communication.ingester_ip.clone();
+        }
+        if communication.ingester_port != new_communication.ingester_port {
+            info!(
+                "Update global.communication.ingester_port from {:?} to {:?}.",
+                communication.ingester_port, new_communication.ingester_port
+            );
+            communication.ingester_port = new_communication.ingester_port;
+        }
+        if communication.max_escape_duration != new_communication.max_escape_duration {
+            info!(
+                "Update global.communication.max_escape_duration from {:?} to {:?}.",
+                communication.max_escape_duration, new_communication.max_escape_duration
+            );
+            communication.max_escape_duration = new_communication.max_escape_duration;
+        }
+        if communication.proactive_request_interval != new_communication.proactive_request_interval
+        {
+            info!(
+                "Update global.communication.proactive_request_interval from {:?} to {:?}.",
+                communication.proactive_request_interval,
+                new_communication.proactive_request_interval
+            );
+            communication.proactive_request_interval = new_communication.proactive_request_interval;
+        }
+        if communication.proxy_controller_ip != new_communication.proxy_controller_ip {
+            info!(
+                "Update global.communication.proxy_controller_ip from {:?} to {:?}.",
+                communication.proxy_controller_ip, new_communication.proxy_controller_ip
+            );
+            communication.proxy_controller_ip = new_communication.proxy_controller_ip.clone();
+        }
+        if communication.proxy_controller_port != new_communication.proxy_controller_port {
+            info!(
+                "Update global.communication.proxy_controller_port from {:?} to {:?}.",
+                communication.proxy_controller_port, new_communication.proxy_controller_port
+            );
+            communication.proxy_controller_port = new_communication.proxy_controller_port;
+        }
+
+        let limits = &mut config.global.limits;
+        let new_limits = &mut new_config.user_config.global.limits;
+        if limits.local_log_retention != new_limits.local_log_retention {
+            info!(
+                "Update global.limits.local_log_retention from {:?} to {:?}.",
+                limits.local_log_retention, new_limits.local_log_retention
+            );
+            limits.local_log_retention = new_limits.local_log_retention;
+        }
+        if limits.max_local_log_file_size != new_limits.max_local_log_file_size {
+            info!(
+                "Update global.limits.max_local_log_file_size from {:?} to {:?}.",
+                limits.max_local_log_file_size, new_limits.max_local_log_file_size
+            );
+            limits.max_local_log_file_size = new_limits.max_local_log_file_size;
+        }
+        if limits.max_log_backhaul_rate != new_limits.max_log_backhaul_rate {
+            info!(
+                "Update global.limits.max_log_backhaul_rate from {:?} to {:?}.",
+                limits.max_log_backhaul_rate, new_limits.max_log_backhaul_rate
+            );
+            limits.max_log_backhaul_rate = new_limits.max_log_backhaul_rate;
+        }
+        if limits.max_memory != new_limits.max_memory {
+            info!(
+                "Update global.limits.max_memory from {:?} to {:?}.",
+                limits.max_memory, new_limits.max_memory
+            );
+            limits.max_memory = new_limits.max_memory;
+        }
+        if limits.max_millicpus != new_limits.max_millicpus {
+            info!(
+                "Update global.limits.max_millicpus from {:?} to {:?}.",
+                limits.max_millicpus, new_limits.max_millicpus
+            );
+            limits.max_millicpus = new_limits.max_millicpus;
+        }
+
+        let ntp = &mut config.global.ntp;
+        let new_ntp = &mut new_config.user_config.global.ntp;
+        if ntp.enabled != new_ntp.enabled {
+            info!(
+                "Update global.ntp.enabled from {:?} to {:?}.",
+                ntp.enabled, new_ntp.enabled
+            );
+            ntp.enabled = new_ntp.enabled;
+        }
+        if ntp.max_drift != new_ntp.max_drift {
+            info!(
+                "Update global.ntp.max_drift from {:?} to {:?}.",
+                ntp.max_drift, new_ntp.max_drift
+            );
+            ntp.max_drift = new_ntp.max_drift;
+        }
+        if ntp.min_drift != new_ntp.min_drift {
+            info!(
+                "Update global.ntp.min_drift from {:?} to {:?}.",
+                ntp.min_drift, new_ntp.min_drift
+            );
+            ntp.min_drift = new_ntp.min_drift;
+        }
+
+        let self_monitoring = &mut config.global.self_monitoring;
+        let new_self_monitoring = &mut new_config.user_config.global.self_monitoring;
+        let debug = &mut self_monitoring.debug;
+        let new_debug = &mut new_self_monitoring.debug;
+        if debug.enabled != new_debug.enabled {
+            info!(
+                "Update global.self_monitoring.debug.enabled from {:?} to {:?}.",
+                debug.enabled, new_debug.enabled
+            );
+            debug.enabled = debug.enabled;
+        }
+        if debug.debug_metrics_enabled != new_debug.debug_metrics_enabled {
+            info!(
+                "Update global.self_monitoring.debug.debug_metrics_enabled from {:?} to {:?}.",
+                debug.debug_metrics_enabled, new_debug.debug_metrics_enabled
+            );
+            debug.debug_metrics_enabled = debug.debug_metrics_enabled;
+        }
+        if debug.local_udp_port != new_debug.local_udp_port {
+            info!(
+                "Update global.self_monitoring.debug.local_udp_port from {:?} to {:?}.",
+                debug.local_udp_port, new_debug.local_udp_port
+            );
+            debug.local_udp_port = debug.local_udp_port;
+        }
+
+        if self_monitoring.hostname != new_self_monitoring.hostname {
+            info!(
+                "Update global.self_monitoring.hostname from {:?} to {:?}.",
+                self_monitoring.hostname, new_self_monitoring.hostname
+            );
+            self_monitoring.hostname = new_self_monitoring.hostname.clone();
+        }
+        if self_monitoring.interval != new_self_monitoring.interval {
+            info!(
+                "Update global.self_monitoring.interval from {:?} to {:?}.",
+                self_monitoring.interval, new_self_monitoring.interval
+            );
+            self_monitoring.interval = new_self_monitoring.interval;
+        }
+
+        let log = &mut self_monitoring.log;
+        let new_log = &mut new_self_monitoring.log;
+        if log.log_backhaul_enabled != new_log.log_backhaul_enabled {
+            info!(
+                "Update global.self_monitoring.log.log_backhaul_enabled from {:?} to {:?}.",
+                log.log_backhaul_enabled, new_log.log_backhaul_enabled
+            );
+            log.log_backhaul_enabled = new_log.log_backhaul_enabled;
+        }
+        if log.log_file != new_log.log_file {
+            info!(
+                "Update global.self_monitoring.log.log_file from {:?} to {:?}.",
+                log.log_file, new_log.log_file
+            );
+            log.log_file = new_log.log_file.clone();
+        }
+        if log.log_level != new_log.log_level {
+            info!(
+                "Update global.self_monitoring.log.log_level from {:?} to {:?}.",
+                log.log_level, new_log.log_level
+            );
+            log.log_level = new_log.log_level;
+        }
+        if self_monitoring.profile.enabled != new_self_monitoring.profile.enabled {
+            info!(
+                "Update global.self_monitoring.profile.enabled from {:?} to {:?}.",
+                self_monitoring.profile.enabled, new_self_monitoring.profile.enabled
+            );
+            self_monitoring.profile.enabled = new_self_monitoring.profile.enabled;
+        }
+
+        let standalone_mode = &mut config.global.standalone_mode;
+        let new_standalone_mode = &mut new_config.user_config.global.standalone_mode;
+        if standalone_mode.data_file_dir != new_standalone_mode.data_file_dir {
+            info!(
+                "Update global.standalone_mode.data_file_dir from {:?} to {:?}.",
+                standalone_mode.data_file_dir, new_standalone_mode.data_file_dir
+            );
+            standalone_mode.data_file_dir = new_standalone_mode.data_file_dir.clone();
+        }
+        if standalone_mode.max_data_file_size != new_standalone_mode.max_data_file_size {
+            info!(
+                "Update global.standalone_mode.max_data_file_size from {:?} to {:?}.",
+                standalone_mode.max_data_file_size, new_standalone_mode.max_data_file_size
+            );
+            standalone_mode.max_data_file_size = new_standalone_mode.max_data_file_size;
+        }
+
+        let tunning = &mut config.global.tunning;
+        let new_tunning = &mut new_config.user_config.global.tunning;
+        if tunning.idle_memory_trimming != new_tunning.idle_memory_trimming {
+            info!(
+                "Update global.tunning.idle_memory_trimming from {:?} to {:?}.",
+                tunning.idle_memory_trimming, new_tunning.idle_memory_trimming
+            );
+            tunning.idle_memory_trimming = new_tunning.idle_memory_trimming;
+        }
+        if tunning.cpu_affinity != new_tunning.cpu_affinity {
+            info!(
+                "Update global.tunning.cpu_affinity from {:?} to {:?}.",
+                tunning.cpu_affinity, new_tunning.cpu_affinity
+            );
+            tunning.cpu_affinity = new_tunning.cpu_affinity.clone();
+        }
+        if tunning.process_scheduling_priority != new_tunning.process_scheduling_priority {
+            info!(
+                "Update global.tunning.process_scheduling_priority from {:?} to {:?}.",
+                tunning.process_scheduling_priority, new_tunning.process_scheduling_priority
+            );
+            tunning.process_scheduling_priority = new_tunning.process_scheduling_priority;
+        }
+        if tunning.resource_monitoring_interval != new_tunning.resource_monitoring_interval {
+            info!(
+                "Update global.tunning.resource_monitoring_interval from {:?} to {:?}.",
+                tunning.resource_monitoring_interval, new_tunning.resource_monitoring_interval
+            );
+            tunning.resource_monitoring_interval = new_tunning.resource_monitoring_interval;
+        }
+
+        // dev
+        let dev = &mut config.dev;
+        let new_dev = &mut new_config.user_config.dev;
+        if dev.feature_flags != new_dev.feature_flags {
+            info!(
+                "Update dev.feature_flags from {:?} to {:?}.",
+                dev.feature_flags, new_dev.feature_flags
+            );
+            dev.feature_flags = new_dev.feature_flags.clone();
+        }
+
+        // output
+        let outputs = &mut config.outputs;
+        let new_outputs = &mut new_config.user_config.outputs;
+        let socket = &mut outputs.socket;
+        let new_socket = &mut new_outputs.socket;
+        if socket.multiple_sockets_to_ingester != new_socket.multiple_sockets_to_ingester {
+            info!(
+                "Update outputs.socket.multiple_sockets_to_ingester from {:?} to {:?}.",
+                socket.multiple_sockets_to_ingester, new_socket.multiple_sockets_to_ingester
+            );
+            socket.multiple_sockets_to_ingester = new_socket.multiple_sockets_to_ingester;
+        }
+        if socket.raw_udp_qos_bypass != new_socket.raw_udp_qos_bypass {
+            info!(
+                "Update outputs.socket.raw_udp_qos_bypass from {:?} to {:?}.",
+                socket.raw_udp_qos_bypass, new_socket.raw_udp_qos_bypass
+            );
+            socket.raw_udp_qos_bypass = new_socket.raw_udp_qos_bypass;
+        }
+        if socket.data_socket_type != new_socket.data_socket_type {
+            info!(
+                "Update outputs.socket.data_socket_type from {:?} to {:?}.",
+                socket.data_socket_type, new_socket.data_socket_type
+            );
+            socket.data_socket_type = new_socket.data_socket_type;
+        }
+        if socket.npb_socket_type != new_socket.npb_socket_type {
+            info!(
+                "Update outputs.socket.npb_socket_type from {:?} to {:?}.",
+                socket.npb_socket_type, new_socket.npb_socket_type
+            );
+            socket.npb_socket_type = new_socket.npb_socket_type;
+        }
+
+        let flow_log = &mut outputs.flow_log;
+        let new_flow_log = &mut new_outputs.flow_log;
+        let filters = &mut flow_log.filters;
+        let new_filters = &mut new_flow_log.filters;
+        if filters.l4_capture_network_types != new_filters.l4_capture_network_types {
+            info!(
+                "Update outputs.flow_log.filters.l4_capture_network_types from {:?} to {:?}.",
+                filters.l4_capture_network_types, new_filters.l4_capture_network_types
+            );
+            filters.l4_capture_network_types = new_filters.l4_capture_network_types.clone();
+        }
+        if filters.l4_ignored_observation_points != new_filters.l4_ignored_observation_points {
+            info!(
+                "Update outputs.flow_log.filters.l4_ignored_observation_points from {:?} to {:?}.",
+                filters.l4_ignored_observation_points, new_filters.l4_ignored_observation_points
+            );
+            filters.l4_ignored_observation_points = new_filters.l4_ignored_observation_points.clone();
+        }
+        if filters.l7_capture_network_types != new_filters.l7_capture_network_types {
+            info!(
+                "Update outputs.flow_log.filters.l7_capture_network_types from {:?} to {:?}.",
+                filters.l7_capture_network_types, new_filters.l7_capture_network_types
+            );
+            filters.l7_capture_network_types = new_filters.l7_capture_network_types.clone();
+        }
+        if filters.l7_ignored_observation_points != new_filters.l7_ignored_observation_points {
+            info!(
+                "Update outputs.flow_log.filters.l7_ignored_observation_points from {:?} to {:?}.",
+                filters.l7_ignored_observation_points, new_filters.l7_ignored_observation_points
+            );
+            filters.l7_ignored_observation_points = new_filters.l7_ignored_observation_points.clone();
+        }
+
+        let throttles = &mut flow_log.throttles;
+        let new_throttles = &mut new_flow_log.throttles;
+        if throttles.l4_throttle != new_throttles.l4_throttle {
+            info!(
+                "Update outputs.flow_log.throttles.l4_throttle from {:?} to {:?}.",
+                throttles.l4_throttle, new_throttles.l4_throttle
+            );
+            throttles.l4_throttle = new_throttles.l4_throttle;
+        }
+        if throttles.l7_throttle != new_throttles.l7_throttle {
+            info!(
+                "Update outputs.flow_log.throttles.l7_throttle from {:?} to {:?}.",
+                throttles.l7_throttle, new_throttles.l7_throttle
+            );
+            throttles.l7_throttle = new_throttles.l7_throttle;
+        }
+
+        let tunning = &mut flow_log.tunning;
+        let new_tunning = &mut new_flow_log.tunning;
+        if tunning.collector_queue_count != new_tunning.collector_queue_count {
+            info!(
+                "Update outputs.flow_log.tunning.collector_queue_count from {:?} to {:?}.",
+                tunning.collector_queue_count, new_tunning.collector_queue_count
+            );
+            tunning.collector_queue_count = new_tunning.collector_queue_count;
+        }
+        if tunning.collector_queue_size != new_tunning.collector_queue_size {
+            info!(
+                "Update outputs.flow_log.tunning.collector_queue_size from {:?} to {:?}.",
+                tunning.collector_queue_size, new_tunning.collector_queue_size
+            );
+            tunning.collector_queue_size = new_tunning.collector_queue_size;
+        }
+
+        let flow_metrics = &mut outputs.flow_metrics;
+        let new_flow_metrics = &mut new_outputs.flow_metrics;
+        if flow_metrics.enabled != new_flow_metrics.enabled {
+            info!(
+                "Update outputs.flow_metrics.enabled from {:?} to {:?}.",
+                flow_metrics.enabled, new_flow_metrics.enabled
+            );
+            flow_metrics.enabled = new_flow_metrics.enabled;
+        }
+        let filters = &mut outputs.flow_metrics.filters;
+        let new_filters = &mut new_outputs.flow_metrics.filters;
+        if filters.apm_metrics != new_filters.apm_metrics {
+            info!(
+                "Update outputs.flow_metrics.filters.apm_metrics from {:?} to {:?}.",
+                filters.apm_metrics, new_filters.apm_metrics
+            );
+            filters.apm_metrics = new_filters.apm_metrics;
+        }
+        if filters.inactive_ip_aggregation != new_filters.inactive_ip_aggregation {
+            info!(
+                "Update outputs.flow_metrics.filters.inactive_ip_aggregation from {:?} to {:?}.",
+                filters.inactive_ip_aggregation, new_filters.inactive_ip_aggregation
+            );
+            filters.inactive_ip_aggregation = new_filters.inactive_ip_aggregation;
+        }
+        if filters.inactive_server_port_aggregation != new_filters.inactive_server_port_aggregation
+        {
+            info!("Update outputs.flow_metrics.filters.inactive_server_port_aggregation from {:?} to {:?}.", 
+                filters.inactive_server_port_aggregation, new_filters.inactive_server_port_aggregation);
+            filters.inactive_server_port_aggregation = new_filters.inactive_server_port_aggregation;
+        }
+        if filters.npm_metrics != new_filters.npm_metrics {
+            info!(
+                "Update outputs.flow_metrics.filters.npm_metrics from {:?} to {:?}.",
+                filters.npm_metrics, new_filters.npm_metrics
+            );
+            filters.npm_metrics = new_filters.npm_metrics;
+        }
+        if filters.second_metrics != new_filters.second_metrics {
+            info!(
+                "Update outputs.flow_metrics.filters.second_metrics from {:?} to {:?}.",
+                filters.second_metrics, new_filters.second_metrics
+            );
+            filters.second_metrics = new_filters.second_metrics;
+        }
+        let tunning = &mut outputs.flow_metrics.tunning;
+        let new_tunning = &mut new_outputs.flow_metrics.tunning;
+        if tunning.sender_queue_count != new_tunning.sender_queue_count {
+            info!(
+                "Update outputs.flow_metrics.tunning.sender_queue_count from {:?} to {:?}.",
+                tunning.sender_queue_count, new_tunning.sender_queue_count
+            );
+            tunning.sender_queue_count = new_tunning.sender_queue_count;
+        }
+        if tunning.sender_queue_size != new_tunning.sender_queue_size {
+            info!(
+                "Update outputs.flow_metrics.tunning.sender_queue_size from {:?} to {:?}.",
+                tunning.sender_queue_size, new_tunning.sender_queue_size
+            );
+            tunning.sender_queue_size = new_tunning.sender_queue_size;
+        }
+
+        let npb = &mut outputs.npb;
+        let new_npb = &mut new_outputs.npb;
+        if npb.overlay_vlan_header_trimming != new_npb.overlay_vlan_header_trimming {
+            info!(
+                "Update outputs.npb.overlay_vlan_header_trimming from {:?} to {:?}.",
+                npb.overlay_vlan_header_trimming, new_npb.overlay_vlan_header_trimming
+            );
+            npb.overlay_vlan_header_trimming = new_npb.overlay_vlan_header_trimming;
+        }
+        if npb.traffic_global_dedup != new_npb.traffic_global_dedup {
+            info!(
+                "Update outputs.npb.traffic_global_dedup from {:?} to {:?}.",
+                npb.traffic_global_dedup, new_npb.traffic_global_dedup
+            );
+            npb.traffic_global_dedup = new_npb.traffic_global_dedup;
+        }
+        if npb.custom_vxlan_flags != new_npb.custom_vxlan_flags {
+            info!(
+                "Update outputs.npb.custom_vxlan_flags from {:?} to {:?}.",
+                npb.custom_vxlan_flags, new_npb.custom_vxlan_flags
+            );
+            npb.custom_vxlan_flags = new_npb.custom_vxlan_flags;
+        }
+        if npb.extra_vlan_header != new_npb.extra_vlan_header {
+            info!(
+                "Update outputs.npb.extra_vlan_header from {:?} to {:?}.",
+                npb.extra_vlan_header, new_npb.extra_vlan_header
+            );
+            npb.extra_vlan_header = new_npb.extra_vlan_header;
+        }
+        if npb.max_mtu != new_npb.max_mtu {
+            info!(
+                "Update outputs.npb.max_mtu from {:?} to {:?}.",
+                npb.max_mtu, new_npb.max_mtu
+            );
+            npb.max_mtu = new_npb.max_mtu;
+        }
+        if npb.max_tx_throughput != new_npb.max_tx_throughput {
+            info!(
+                "Update outputs.npb.max_tx_throughput from {:?} to {:?}.",
+                npb.max_tx_throughput, new_npb.max_tx_throughput
+            );
+            npb.max_tx_throughput = new_npb.max_tx_throughput;
+        }
+        if npb.raw_udp_vlan_tag != new_npb.raw_udp_vlan_tag {
+            info!(
+                "Update outputs.npb.raw_udp_vlan_tag from {:?} to {:?}.",
+                npb.raw_udp_vlan_tag, new_npb.raw_udp_vlan_tag
+            );
+            npb.raw_udp_vlan_tag = new_npb.raw_udp_vlan_tag;
+        }
+        if npb.target_port != new_npb.target_port {
+            info!(
+                "Update outputs.npb.target_port from {:?} to {:?}.",
+                npb.target_port, new_npb.target_port
+            );
+            npb.target_port = new_npb.target_port;
+        }
+
+        // plugins
+        let plugins = &mut config.plugins;
+        let new_plugins = &mut new_config.user_config.plugins;
+        if plugins.so_plugins != new_plugins.so_plugins {
+            info!(
+                "Update plugins.so_plugins from {:?} to {:?}.",
+                plugins.so_plugins, new_plugins.so_plugins
+            );
+            plugins.so_plugins = new_plugins.so_plugins.clone();
+        }
+        if plugins.update_time != new_plugins.update_time {
+            info!(
+                "Update plugins.update_time from {:?} to {:?}.",
+                plugins.update_time, new_plugins.update_time
+            );
+            plugins.update_time = new_plugins.update_time;
+        }
+        if plugins.wasm_plugins != new_plugins.wasm_plugins {
+            info!(
+                "Update plugins.wasm_plugins from {:?} to {:?}.",
+                plugins.wasm_plugins, new_plugins.wasm_plugins
+            );
+            plugins.wasm_plugins = new_plugins.wasm_plugins.clone();
+        }
+
+        // processors
+        let processors = &mut config.processors;
+        let new_processors = &mut new_config.user_config.processors;
+        let packet = &mut processors.packet;
+        let new_packet = &mut new_processors.packet;
+        let pcap = &mut packet.pcap_stream;
+        let new_pcap = &mut new_packet.pcap_stream;
+        if pcap.buffer_size_per_flow != new_pcap.buffer_size_per_flow {
+            info!(
+                "Update processors.packet.pcap_stream.buffer_size_per_flow from {:?} to {:?}.",
+                pcap.buffer_size_per_flow, new_pcap.buffer_size_per_flow
+            );
+            pcap.buffer_size_per_flow = new_pcap.buffer_size_per_flow;
+        }
+        if pcap.flush_interval != new_pcap.flush_interval {
+            info!(
+                "Update processors.packet.pcap_stream.flush_interval from {:?} to {:?}.",
+                pcap.flush_interval, new_pcap.flush_interval
+            );
+            pcap.flush_interval = new_pcap.flush_interval;
+        }
+        if pcap.receiver_queue_size != new_pcap.receiver_queue_size {
+            info!(
+                "Update processors.packet.pcap_stream.receiver_queue_size from {:?} to {:?}.",
+                pcap.receiver_queue_size, new_pcap.receiver_queue_size
+            );
+            pcap.receiver_queue_size = new_pcap.receiver_queue_size;
+        }
+        if pcap.total_buffer_size != new_pcap.total_buffer_size {
+            info!(
+                "Update processors.packet.pcap_stream.total_buffer_size from {:?} to {:?}.",
+                pcap.total_buffer_size, new_pcap.total_buffer_size
+            );
+            pcap.total_buffer_size = new_pcap.total_buffer_size;
+        }
+
+        let policy = &mut packet.policy;
+        let new_policy = &mut new_packet.policy;
+        if policy.fast_path_disabled != new_policy.fast_path_disabled {
+            info!(
+                "Update processors.packet.policy.fast_path_disabled from {:?} to {:?}.",
+                policy.fast_path_disabled, new_policy.fast_path_disabled
+            );
+            policy.fast_path_disabled = new_policy.fast_path_disabled;
+        }
+        if policy.fast_path_map_size != new_policy.fast_path_map_size {
+            info!(
+                "Update processors.packet.policy.fast_path_map_size from {:?} to {:?}.",
+                policy.fast_path_map_size, new_policy.fast_path_map_size
+            );
+            policy.fast_path_map_size = new_policy.fast_path_map_size;
+        }
+        if policy.forward_table_capacity != new_policy.forward_table_capacity {
+            info!(
+                "Update processors.packet.policy.forward_table_capacity from {:?} to {:?}.",
+                policy.forward_table_capacity, new_policy.forward_table_capacity
+            );
+            policy.forward_table_capacity = new_policy.forward_table_capacity;
+        }
+        if policy.max_first_path_level != new_policy.max_first_path_level {
+            info!(
+                "Update processors.packet.policy.max_first_path_level from {:?} to {:?}.",
+                policy.max_first_path_level, new_policy.max_first_path_level
+            );
+            policy.max_first_path_level = new_policy.max_first_path_level;
+        }
+
+        let tcp_header = &mut packet.tcp_header;
+        let new_tcp_header = &mut new_packet.tcp_header;
+        if tcp_header.block_size != new_tcp_header.block_size {
+            info!(
+                "Update processors.packet.tcp_header.block_size from {:?} to {:?}.",
+                tcp_header.block_size, new_tcp_header.block_size
+            );
+            tcp_header.block_size = new_tcp_header.block_size;
+        }
+        if tcp_header.header_fields_flag != new_tcp_header.header_fields_flag {
+            info!(
+                "Update processors.packet.tcp_header.header_fields_flag from {:?} to {:?}.",
+                tcp_header.header_fields_flag, new_tcp_header.header_fields_flag
+            );
+            tcp_header.header_fields_flag = new_tcp_header.header_fields_flag;
+        }
+        if tcp_header.sender_queue_count != new_tcp_header.sender_queue_count {
+            info!(
+                "Update processors.packet.tcp_header.sender_queue_count from {:?} to {:?}.",
+                tcp_header.sender_queue_count, new_tcp_header.sender_queue_count
+            );
+            tcp_header.sender_queue_count = new_tcp_header.sender_queue_count;
+        }
+        if tcp_header.sender_queue_size != new_tcp_header.sender_queue_size {
+            info!(
+                "Update processors.packet.tcp_header.sender_queue_size from {:?} to {:?}.",
+                tcp_header.sender_queue_size, new_tcp_header.sender_queue_size
+            );
+            tcp_header.sender_queue_size = new_tcp_header.sender_queue_size;
+        }
+
+        let toa = &mut packet.toa;
+        let new_toa = &mut new_packet.toa;
+        if toa.cache_size != new_toa.cache_size {
+            info!(
+                "Update processors.packet.toa.cache_size from {:?} to {:?}.",
+                toa.cache_size, new_toa.cache_size
+            );
+            toa.cache_size = new_toa.cache_size;
+        }
+        if toa.sender_queue_size != new_toa.sender_queue_size {
+            info!(
+                "Update processors.packet.toa.sender_queue_size from {:?} to {:?}.",
+                toa.sender_queue_size, new_toa.sender_queue_size
+            );
+            toa.sender_queue_size = new_toa.sender_queue_size;
+        }
+
+        let flow_log = &mut processors.flow_log;
+        let new_flow_log = &mut new_processors.flow_log;
+        let conntrack = &mut flow_log.conntrack;
+        let new_conntrack = &mut new_flow_log.conntrack;
+        if conntrack.flow_flush_interval != new_conntrack.flow_flush_interval {
+            info!(
+                "Update processors.flow_log.conntrack.flow_flush_interval from {:?} to {:?}.",
+                conntrack.flow_flush_interval, new_conntrack.flow_flush_interval
+            );
+            conntrack.flow_flush_interval = new_conntrack.flow_flush_interval;
+        }
+        let flow_generation = &mut conntrack.flow_generation;
+        let new_flow_generation = &mut new_conntrack.flow_generation;
+        if flow_generation.cloud_traffic_ignore_mac != new_flow_generation.cloud_traffic_ignore_mac
+        {
+            info!("Update processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac from {:?} to {:?}.", 
+                flow_generation.cloud_traffic_ignore_mac, new_flow_generation.cloud_traffic_ignore_mac);
+            flow_generation.cloud_traffic_ignore_mac = new_flow_generation.cloud_traffic_ignore_mac;
+        }
+        if flow_generation.idc_traffic_ignore_vlan != new_flow_generation.idc_traffic_ignore_vlan {
+            info!("Update processors.flow_log.conntrack.flow_generation.idc_traffic_ignore_vlan from {:?} to {:?}.", 
+                flow_generation.idc_traffic_ignore_vlan, new_flow_generation.idc_traffic_ignore_vlan);
+            flow_generation.idc_traffic_ignore_vlan = new_flow_generation.idc_traffic_ignore_vlan;
+        }
+        if flow_generation.ignore_l2_end != new_flow_generation.ignore_l2_end {
+            info!("Update processors.flow_log.conntrack.flow_generation.ignore_l2_end from {:?} to {:?}.", 
+                flow_generation.ignore_l2_end, new_flow_generation.ignore_l2_end);
+            flow_generation.ignore_l2_end = new_flow_generation.ignore_l2_end;
+        }
+        if flow_generation.server_ports != new_flow_generation.server_ports {
+            info!("Update processors.flow_log.conntrack.flow_generation.server_ports from {:?} to {:?}.", 
+                flow_generation.server_ports, new_flow_generation.server_ports);
+            flow_generation.server_ports = new_flow_generation.server_ports.clone();
+        }
+
+        let timeouts = &mut conntrack.timeouts;
+        let new_timeouts = &mut new_conntrack.timeouts;
+        if timeouts.closing_rst != new_timeouts.closing_rst {
+            info!(
+                "Update processors.flow_log.conntrack.timeouts.closing_rst from {:?} to {:?}.",
+                timeouts.closing_rst, new_timeouts.closing_rst
+            );
+            timeouts.closing_rst = new_timeouts.closing_rst;
+        }
+        if timeouts.established != new_timeouts.established {
+            info!(
+                "Update processors.flow_log.conntrack.timeouts.established from {:?} to {:?}.",
+                timeouts.established, new_timeouts.established
+            );
+            timeouts.established = new_timeouts.established;
+        }
+        if timeouts.opening_rst != new_timeouts.opening_rst {
+            info!(
+                "Update processors.flow_log.conntrack.timeouts.opening_rst from {:?} to {:?}.",
+                timeouts.opening_rst, new_timeouts.opening_rst
+            );
+            timeouts.opening_rst = new_timeouts.opening_rst;
+        }
+        if timeouts.others != new_timeouts.others {
+            info!(
+                "Update processors.flow_log.conntrack.timeouts.others from {:?} to {:?}.",
+                timeouts.others, new_timeouts.others
+            );
+            timeouts.others = new_timeouts.others;
+        }
+
+        let time_window = &mut flow_log.time_window;
+        let new_time_window = &mut new_flow_log.time_window;
+        if time_window.extra_tolerable_flow_delay != new_time_window.extra_tolerable_flow_delay {
+            info!("Update processors.flow_log.time_window.extra_tolerable_flow_delay from {:?} to {:?}.", 
+                time_window.extra_tolerable_flow_delay, new_time_window.extra_tolerable_flow_delay);
+            time_window.extra_tolerable_flow_delay = new_time_window.extra_tolerable_flow_delay;
+        }
+        if time_window.max_tolerable_packet_delay != new_time_window.max_tolerable_packet_delay {
+            info!("Update processors.flow_log.time_window.max_tolerable_packet_delay from {:?} to {:?}.", 
+                time_window.max_tolerable_packet_delay, new_time_window.max_tolerable_packet_delay);
+            time_window.max_tolerable_packet_delay = new_time_window.max_tolerable_packet_delay;
+        }
+
+        let tunning = &mut flow_log.tunning;
+        let new_tunning = &mut new_flow_log.tunning;
+        if tunning.concurrent_flow_limit != new_tunning.concurrent_flow_limit {
+            info!(
+                "Update processors.flow_log.tunning.concurrent_flow_limit from {:?} to {:?}.",
+                tunning.concurrent_flow_limit, new_tunning.concurrent_flow_limit
+            );
+            tunning.concurrent_flow_limit = new_tunning.concurrent_flow_limit;
+        }
+        if tunning.flow_aggregator_queue_size != new_tunning.flow_aggregator_queue_size {
+            info!(
+                "Update processors.flow_log.tunning.flow_aggregator_queue_size from {:?} to {:?}.",
+                tunning.flow_aggregator_queue_size, new_tunning.flow_aggregator_queue_size
+            );
+            tunning.flow_aggregator_queue_size = new_tunning.flow_aggregator_queue_size;
+        }
+        if tunning.flow_generator_queue_size != new_tunning.flow_generator_queue_size {
+            info!(
+                "Update processors.flow_log.tunning.flow_generator_queue_size from {:?} to {:?}.",
+                tunning.flow_generator_queue_size, new_tunning.flow_generator_queue_size
+            );
+            tunning.flow_generator_queue_size = new_tunning.flow_generator_queue_size;
+        }
+        if tunning.flow_map_hash_slots != new_tunning.flow_map_hash_slots {
+            info!(
+                "Update processors.flow_log.tunning.flow_map_hash_slots from {:?} to {:?}.",
+                tunning.flow_map_hash_slots, new_tunning.flow_map_hash_slots
+            );
+            tunning.flow_map_hash_slots = new_tunning.flow_map_hash_slots;
+        }
+        if tunning.max_batched_buffer_size != new_tunning.max_batched_buffer_size {
+            info!(
+                "Update processors.flow_log.tunning.max_batched_buffer_size from {:?} to {:?}.",
+                tunning.max_batched_buffer_size, new_tunning.max_batched_buffer_size
+            );
+            tunning.max_batched_buffer_size = new_tunning.max_batched_buffer_size;
+        }
+        if tunning.memory_pool_size != new_tunning.memory_pool_size {
+            info!(
+                "Update processors.flow_log.tunning.memory_pool_size from {:?} to {:?}.",
+                tunning.memory_pool_size, new_tunning.memory_pool_size
+            );
+            tunning.memory_pool_size = new_tunning.memory_pool_size;
+        }
+        if tunning.quadruple_generator_queue_size != new_tunning.quadruple_generator_queue_size {
+            info!("Update processors.flow_log.tunning.quadruple_generator_queue_size from {:?} to {:?}.", 
+                tunning.quadruple_generator_queue_size, new_tunning.quadruple_generator_queue_size);
+            tunning.quadruple_generator_queue_size = new_tunning.quadruple_generator_queue_size;
+        }
+
+        let request_log = &mut processors.request_log;
+        let new_request_log = &mut new_processors.request_log;
+        let app = &mut request_log.application_protocol_inference;
+        let new_app = &mut new_request_log.application_protocol_inference;
+        if app.enabled_protocols != new_app.enabled_protocols {
+            info!("Update processors.request_log.application_protocol_inference.enabled_protocols from {:?} to {:?}.", 
+                app.enabled_protocols, new_app.enabled_protocols);
+            app.enabled_protocols = new_app.enabled_protocols.clone();
+        }
+        if app.inference_max_retries != new_app.inference_max_retries {
+            info!("Update processors.request_log.application_protocol_inference.inference_max_retries from {:?} to {:?}.", 
+                app.inference_max_retries, new_app.inference_max_retries);
+            app.inference_max_retries = new_app.inference_max_retries;
+        }
+        if app.inference_result_ttl != new_app.inference_result_ttl {
+            info!("Update processors.request_log.application_protocol_inference.inference_result_ttl from {:?} to {:?}.", 
+                app.inference_result_ttl, new_app.inference_result_ttl);
+            app.inference_result_ttl = new_app.inference_result_ttl;
+        }
+        if app.protocol_special_config != new_app.protocol_special_config {
+            info!("Update processors.request_log.application_protocol_inference.protocol_special_config from {:?} to {:?}.", 
+                app.protocol_special_config, new_app.protocol_special_config);
+            app.protocol_special_config = new_app.protocol_special_config;
+        }
+        let filters = &mut request_log.filters;
+        let new_filters = &mut new_request_log.filters;
+        if filters.port_number_prefilters != new_filters.port_number_prefilters {
+            info!(
+                "Update processors.request_log.filters.port_number_prefilters from {:?} to {:?}.",
+                filters.port_number_prefilters, new_filters.port_number_prefilters
+            );
+            filters.port_number_prefilters = new_filters.port_number_prefilters.clone();
+        }
+        if filters.tag_filters != new_filters.tag_filters {
+            info!(
+                "Update processors.request_log.filters.tag_filters from {:?} to {:?}.",
+                filters.tag_filters, new_filters.tag_filters
+            );
+            filters.tag_filters = new_filters.tag_filters.clone();
+        }
+        if filters.unconcerned_dns_nxdomain_response_suffixes
+            != new_filters.unconcerned_dns_nxdomain_response_suffixes
+        {
+            info!("Update processors.request_log.filters.unconcerned_dns_nxdomain_response_suffixes from {:?} to {:?}.", 
+                filters.unconcerned_dns_nxdomain_response_suffixes, new_filters.unconcerned_dns_nxdomain_response_suffixes);
+            filters.unconcerned_dns_nxdomain_response_suffixes =
+                new_filters.unconcerned_dns_nxdomain_response_suffixes.clone();
+        }
+        let tag_extraction = &mut request_log.tag_extraction;
+        let new_tag_extraction = &mut new_request_log.tag_extraction;
+        if tag_extraction.custom_fields != new_tag_extraction.custom_fields {
+            info!(
+                "Update processors.request_log.tag_extraction.custom_fields from {:?} to {:?}.",
+                tag_extraction.custom_fields, new_tag_extraction.custom_fields
+            );
+            tag_extraction.custom_fields = new_tag_extraction.custom_fields.clone();
+        }
+        if tag_extraction.http_endpoint != new_tag_extraction.http_endpoint {
+            info!(
+                "Update processors.request_log.tag_extraction.http_endpoint from {:?} to {:?}.",
+                tag_extraction.http_endpoint, new_tag_extraction.http_endpoint
+            );
+            tag_extraction.http_endpoint = new_tag_extraction.http_endpoint.clone();
+        }
+        if tag_extraction.obfuscate_protocols != new_tag_extraction.obfuscate_protocols {
+            info!("Update processors.request_log.tag_extraction.obfuscate_protocols from {:?} to {:?}.", 
+                tag_extraction.obfuscate_protocols, new_tag_extraction.obfuscate_protocols);
+            tag_extraction.obfuscate_protocols = new_tag_extraction.obfuscate_protocols.clone();
+        }
+        if tag_extraction.tracing_tag != new_tag_extraction.tracing_tag {
+            info!(
+                "Update processors.request_log.tag_extraction.tracing_tag from {:?} to {:?}.",
+                tag_extraction.tracing_tag, new_tag_extraction.tracing_tag
+            );
+            tag_extraction.tracing_tag = new_tag_extraction.tracing_tag.clone();
+        }
+
+        let tunning = &mut request_log.tunning;
+        let new_tunning = &mut new_request_log.tunning;
+        if tunning.consistent_timestamp_in_l7_metrics
+            != new_tunning.consistent_timestamp_in_l7_metrics
+        {
+            info!("Update processors.request_log.tunning.consistent_timestamp_in_l7_metrics from {:?} to {:?}.", 
+                tunning.consistent_timestamp_in_l7_metrics, new_tunning.consistent_timestamp_in_l7_metrics);
+            tunning.consistent_timestamp_in_l7_metrics =
+                new_tunning.consistent_timestamp_in_l7_metrics;
+        }
+        if tunning.payload_truncation != new_tunning.payload_truncation {
+            info!(
+                "Update processors.request_log.tunning.payload_truncation from {:?} to {:?}.",
+                tunning.payload_truncation, new_tunning.payload_truncation
+            );
+            tunning.payload_truncation = new_tunning.payload_truncation;
+        }
+        if tunning.session_aggregate_slot_capacity != new_tunning.session_aggregate_slot_capacity {
+            info!("Update processors.request_log.tunning.session_aggregate_slot_capacity from {:?} to {:?}.", 
+                tunning.session_aggregate_slot_capacity, new_tunning.session_aggregate_slot_capacity);
+            tunning.session_aggregate_slot_capacity = new_tunning.session_aggregate_slot_capacity;
+        }
+
+        callbacks
+    }
+
     pub fn on_config(
         &mut self,
         user_config: UserConfig,
