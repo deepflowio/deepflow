@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/pushmanager"
+	. "github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/vtap"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -52,14 +53,6 @@ type VTapEvent struct{}
 
 func NewVTapEvent() *VTapEvent {
 	return &VTapEvent{}
-}
-
-func Int2Bool(i int) bool {
-	if i == 0 {
-		return false
-	}
-
-	return true
 }
 
 func (e *VTapEvent) getPlugins(vConfig *vtap.VTapConfig) *api.PluginConfig {
