@@ -1,0 +1,12 @@
+[package]
+name = "integration_skywalking"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hyper = { version = "0.14", features = ["full"] }
+bytes = "1.0"
+tokio = { version = "1.20.1", features = ["full"] }
+public = { path = "../../crates/public" }
+prost = "0.11"
+log = "0.4"

@@ -55,6 +55,7 @@ pub enum SendMessageType {
     // K8sEvent = 16,
     ApplicationLog = 17,
     SyslogDetail = 18,
+    SkyWalking = 19,
 }
 
 impl fmt::Display for SendMessageType {
@@ -78,6 +79,7 @@ impl fmt::Display for SendMessageType {
             Self::AlarmEvent => write!(f, "alarm_event"),
             Self::ApplicationLog => write!(f, "application_log"),
             Self::SyslogDetail => write!(f, "syslog_detail"),
+            Self::SkyWalking => write!(f, "skywalking"),
         }
     }
 }

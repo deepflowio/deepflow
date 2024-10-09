@@ -35,6 +35,7 @@ use dns_lookup::lookup_host;
 use flexi_logger::{
     colored_opt_format, writers::LogWriter, Age, Cleanup, Criterion, FileSpec, Logger, Naming,
 };
+use integration_skywalking::SkyWalkingExtra;
 use log::{debug, info, warn};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
@@ -1557,6 +1558,7 @@ pub struct AgentComponents {
     pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
     pub proc_event_uniform_sender: UniformSenderThread<BoxedProcEvents>,
     pub application_log_uniform_sender: UniformSenderThread<ApplicationLog>,
+    pub skywalking_uniform_sender: UniformSenderThread<SkyWalkingExtra>,
     pub exception_handler: ExceptionHandler,
     pub proto_log_sender: DebugSender<BoxAppProtoLogsData>,
     pub pcap_batch_sender: DebugSender<BoxedPcapBatch>,
@@ -2429,6 +2431,31 @@ impl AgentComponents {
             exception_handler.clone(),
             None,
         );
+        let skywalking_queue_name = "1-skywalking-to-sender";
+        let (skywalking_sender, skywalking_receiver, counter) = queue::bounded_with_debug(
+            user_config
+                .processors
+                .flow_log
+                .tunning
+                .flow_aggregator_queue_size,
+            skywalking_queue_name,
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            &QueueStats {
+                module: skywalking_queue_name,
+                ..Default::default()
+            },
+            Countable::Owned(Box::new(counter)),
+        );
+        let skywalking_uniform_sender = UniformSenderThread::new(
+            skywalking_queue_name,
+            Arc::new(skywalking_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+            None,
+        );
 
         let ebpf_dispatcher_id = dispatcher_components.len();
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2672,6 +2699,7 @@ impl AgentComponents {
             telegraf_sender,
             profile_sender,
             application_log_sender,
+            skywalking_sender,
             candidate_config.metric_server.port,
             exception_handler.clone(),
             candidate_config.metric_server.compressed,
@@ -2756,6 +2784,7 @@ impl AgentComponents {
             profile_uniform_sender,
             proc_event_uniform_sender,
             application_log_uniform_sender,
+            skywalking_uniform_sender,
             capture_mode: candidate_config.capture_mode,
             packet_sequence_uniform_output, // Enterprise Edition Feature: packet-sequence
             packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
@@ -2844,6 +2873,7 @@ impl AgentComponents {
             self.profile_uniform_sender.start();
             self.proc_event_uniform_sender.start();
             self.application_log_uniform_sender.start();
+            self.skywalking_uniform_sender.start();
             if self.config.metric_server.enabled {
                 self.metrics_server_component.start();
             }
@@ -2914,6 +2944,9 @@ impl AgentComponents {
             join_handles.push(h);
         }
         if let Some(h) = self.application_log_uniform_sender.notify_stop() {
+            join_handles.push(h);
+        }
+        if let Some(h) = self.skywalking_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
         // Enterprise Edition Feature: packet-sequence

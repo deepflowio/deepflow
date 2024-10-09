@@ -265,3 +265,8 @@ message PrometheusMetric {
     repeated string extra_label_names = 2;
     repeated string extra_label_values = 3;
 }
+
+message SkyWalkingExtra {
+    bytes data = 1;
+    bytes peer_ip = 2;
+}
