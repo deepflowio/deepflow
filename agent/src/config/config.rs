@@ -641,6 +641,7 @@ pub struct YamlConfig {
     pub oracle_parse_config: OracleParseConfig,
     pub server_ports: Vec<u16>,
     pub consistent_timestamp_in_l7_metrics: bool,
+    pub packet_segmentation_reassembly: bool,
 }
 
 impl YamlConfig {
@@ -1065,6 +1066,7 @@ impl Default for YamlConfig {
             ebpf_collector_queue_size: 65535,
             server_ports: vec![],
             consistent_timestamp_in_l7_metrics: false,
+            packet_segmentation_reassembly: false,
         }
     }
 }

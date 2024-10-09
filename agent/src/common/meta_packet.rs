@@ -71,6 +71,7 @@ use reorder::{CacheItem, Downcast};
 pub enum RawPacket<'a> {
     Borrowed(&'a [u8]),
     Owned(BatchedBuffer<u8>),
+    OwnedVec(Vec<u8>),
 }
 
 impl<'a> RawPacket<'a> {
@@ -78,6 +79,30 @@ impl<'a> RawPacket<'a> {
         match self {
             Self::Borrowed(b) => b.len(),
             Self::Owned(o) => o.len(),
+            Self::OwnedVec(v) => v.len(),
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        match self {
+            Self::Borrowed(b) => b.to_vec(),
+            Self::Owned(o) => o.to_vec(),
+            Self::OwnedVec(v) => v.clone(),
+        }
+    }
+
+    pub fn to_owned_vec(&mut self) {
+        match self {
+            Self::Borrowed(b) => *self = Self::OwnedVec(b.to_vec()),
+            Self::Owned(o) => *self = Self::OwnedVec(o.to_vec()),
+            _ => {}
+        }
+    }
+
+    pub fn append(&mut self, payload: &[u8]) {
+        match self {
+            Self::OwnedVec(v) => v.append(&mut payload.to_vec()),
+            _ => {}
         }
     }
 }
@@ -89,6 +114,7 @@ impl<'a> Deref for RawPacket<'a> {
         match self {
             Self::Borrowed(b) => b,
             Self::Owned(o) => &o,
+            Self::OwnedVec(v) => v.as_slice(),
         }
     }
 }
@@ -96,6 +122,12 @@ impl<'a> Deref for RawPacket<'a> {
 impl<'a> From<&'a [u8]> for RawPacket<'a> {
     fn from(b: &'a [u8]) -> Self {
         Self::Borrowed(b)
+    }
+}
+
+impl<'a> From<Vec<u8>> for RawPacket<'a> {
+    fn from(b: Vec<u8>) -> Self {
+        Self::OwnedVec(b)
     }
 }
 
@@ -953,24 +985,56 @@ impl<'a> MetaPacket<'a> {
         0
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn to_owned_vec_packet(&mut self) -> MetaPacket<'static> {
+        let raw = self.raw.as_ref().unwrap().to_vec();
+
+        MetaPacket {
+            lookup_key: self.lookup_key.clone(),
+            raw: Some(RawPacket::from(raw)),
+            packet_len: self.packet_len,
+            l3_payload_len: self.l3_payload_len,
+            l4_payload_len: self.l4_payload_len,
+            tcp_options_flag: self.tcp_options_flag,
+            protocol_data: self.protocol_data.clone(),
+            tap_port: self.tap_port,
+            signal_source: self.signal_source,
+            payload_len: self.payload_len,
+            sub_packets: self.sub_packets.clone(),
+            header_type: self.header_type,
+            l2_l3_opt_size: self.l2_l3_opt_size,
+            l4_opt_size: self.l4_opt_size,
+            ..Default::default()
+        }
+    }
+
     pub fn merge(&mut self, packet: &mut MetaPacket) {
-        self.raw_from_ebpf.append(&mut packet.raw_from_ebpf);
-        self.sub_packets.push(SubPacket {
-            cap_seq: packet.cap_start_seq,
-            syscall_trace_id: packet.syscall_trace_id,
-            raw_from_ebpf_offset: self.l4_payload_len as usize,
-            timestamp: packet.lookup_key.timestamp,
-            tcp_seq: if let ProtocolData::TcpHeader(tcp_data) = &mut packet.protocol_data {
-                tcp_data.seq
-            } else {
-                0
-            },
-        });
-        self.packet_len += packet.packet_len - 54;
-        self.payload_len += packet.payload_len;
-        self.l4_payload_len += packet.l4_payload_len;
-        self.cap_end_seq = packet.cap_start_seq;
+        if self.ebpf_type != EbpfType::None {
+            self.raw_from_ebpf.append(&mut packet.raw_from_ebpf);
+            self.sub_packets.push(SubPacket {
+                cap_seq: packet.cap_start_seq,
+                syscall_trace_id: packet.syscall_trace_id,
+                raw_from_ebpf_offset: self.l4_payload_len as usize,
+                timestamp: packet.lookup_key.timestamp,
+                tcp_seq: if let ProtocolData::TcpHeader(tcp_data) = &mut packet.protocol_data {
+                    tcp_data.seq
+                } else {
+                    0
+                },
+            });
+            self.packet_len += packet.packet_len - 54;
+            self.payload_len += packet.payload_len;
+            self.l4_payload_len += packet.l4_payload_len;
+            self.cap_end_seq = packet.cap_start_seq;
+        } else {
+            if let Some(payload) = packet.get_l4_payload() {
+                if let Some(raw) = self.raw.as_mut() {
+                    raw.append(payload);
+                    self.packet_len += packet.payload_len as u32;
+                    self.payload_len += packet.payload_len;
+                    self.l4_payload_len += packet.l4_payload_len;
+                }
+            }
+        }
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]

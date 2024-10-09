@@ -109,6 +109,7 @@ impl<'a> MiniPacket<'a> {
         match &self.packet {
             RawPacket::Borrowed(r) => *r,
             RawPacket::Owned(r) => r.as_ref(),
+            RawPacket::OwnedVec(r) => r.as_slice(),
         }
     }
 }
