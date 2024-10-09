@@ -157,6 +157,14 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 			} else {
 				filter = resourceInfo.ResourceName + "_id" + suffix + "!=0"
 			}
+		} else {
+			// non-resource tags
+			engine := &CHEngine{DB: db, Table: table}
+			notNullExpr, ok := GetNotNullFilter(resource, engine)
+			if !ok {
+				return
+			}
+			filter = notNullExpr.(*view.Expr).Value
 		}
 	}
 	return
