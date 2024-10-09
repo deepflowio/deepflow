@@ -66,6 +66,9 @@ var (
 		input:  "select Uniq(ip_0) as uniq_ip_0 from l4_flow_log limit 1",
 		output: []string{"SELECT uniq(if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0))) AS `uniq_ip_0` FROM flow_log.`l4_flow_log` LIMIT 1"},
 	}, {
+		input:  "select Uniq(ip_0, region_0, region_id_0) as uniq_0 from l4_flow_log limit 1",
+		output: []string{"SELECT uniq((if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)), dictGet('flow_tag.region_map', 'name', (toUInt64(region_id_0))), region_id_0)) AS `uniq_0` FROM flow_log.`l4_flow_log` LIMIT 1"},
+	}, {
 		input:  "select Max(byte) as max_byte, Sum(log_count) as sum_log_count from l4_flow_log having Sum(byte)>=0 limit 1",
 		output: []string{"SELECT MAX(byte_tx+byte_rx) AS `max_byte`, SUM(1) AS `sum_log_count` FROM flow_log.`l4_flow_log` HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 1"},
 	}, {

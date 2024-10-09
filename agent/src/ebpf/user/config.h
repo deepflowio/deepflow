@@ -103,6 +103,23 @@ enum {
 	THREAD_SOCK_READER_IDX_BASE = 4,
 };
 
+// index number of feature.
+enum cfg_feature_idx {
+	FEATURE_UNKNOWN,
+	// Analyze go binary to get symbol address without symbol table
+	FEATURE_UPROBE_GOLANG_SYMBOL,
+	// openssl uprobe
+	FEATURE_UPROBE_OPENSSL,
+	// golang uprobe
+	FEATURE_UPROBE_GOLANG,
+	FEATURE_PROFILE_ONCPU,
+	FEATURE_PROFILE_OFFCPU,
+	FEATURE_PROFILE_MEMORY,
+	FEATURE_SOCKET_TRACER,
+	FEATURE_DWARF_UNWINDING,
+	FEATURE_MAX,
+};
+
 /*
  * When the socket map is recycled, each socket message is recycled without sending
  * and receiving actions for more than 10 seconds.
@@ -178,7 +195,7 @@ enum {
 #define STACK_TRACE_MSG_HASH_MEM_SZ		(1ULL << 32)	// 4Gbytes
 
 #define PIDS_MATCH_HASH_BUCKETS_NUM		8192
-#define PIDS_MATCH_HASH_MEM_SZ			(1ULL << 30)    // 1Gbytes
+#define PIDS_MATCH_HASH_MEM_SZ			(1ULL << 30)	// 1Gbytes
 
 #define PROFILER_READER_EPOLL_TIMEOUT		500	//msecs
 #define EPOLL_SHORT_TIMEOUT			100	//mescs
@@ -244,7 +261,7 @@ enum {
 /*
  * Trigger kernel adaptation.
  */
-#define TRIG_KERN_ADAPT_PERIOD 10 // 10 ticks(100 millisecond)
+#define TRIG_KERN_ADAPT_PERIOD 10	// 10 ticks(100 millisecond)
 
 /*
  * System boot time update cycle time, unit is milliseconds.
@@ -321,7 +338,7 @@ enum {
  * Scaling factor is sized to avoid hash table collisions and timing variations.
  */
 #define STACKMAP_SCALING_FACTOR 3.0
-#define STACKMAP_CAPACITY_THRESHOLD 32768 // The capacity limit of the Stack trace map, power of two. 
+#define STACKMAP_CAPACITY_THRESHOLD 32768	// The capacity limit of the Stack trace map, power of two.
 
 /*
  * eBPF utilizes perf event's periodic events to push all data residing in the kernel
@@ -339,6 +356,6 @@ enum {
  * approximately in the range of 30 to 60 milliseconds. Therefore, it is appropriate to set the
  * threshold for the system call phase check to 60 milliseconds.
  */
-#define PERIODIC_PUSH_DELAY_THRESHOLD_NS 60000000ULL // 60 milliseconds 
+#define PERIODIC_PUSH_DELAY_THRESHOLD_NS 60000000ULL	// 60 milliseconds
 
 #endif /* DF_EBPF_CONFIG_H */

@@ -329,10 +329,6 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 		config_probes_for_kfunc(tps);
 	else
 		config_probes_for_kprobe_and_tracepoint(tps);
-
-	// 收集go可执行文件uprobe符号信息
-	collect_go_uprobe_syms_from_procfs(tps);
-	collect_ssl_uprobe_syms_from_procfs(tps);
 }
 
 /* ==========================================================
@@ -748,17 +744,11 @@ static void process_event(struct process_event_t *e)
 		if (e->maybe_thread && !is_user_process(e->pid))
 			return;
 		update_proc_info_cache(e->pid, PROC_EXEC);
-		go_process_exec(e->pid);
-		ssl_process_exec(e->pid);
-		extended_process_exec(e->pid);
 		unwind_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		/* Cache for updating process information used in
 		 * symbol resolution. */
 		update_proc_info_cache(e->pid, PROC_EXIT);
-		go_process_exit(e->pid);
-		ssl_process_exit(e->pid);
-		extended_process_exit(e->pid);
 		unwind_process_exit(e->pid);
 	}
 }
@@ -1822,35 +1812,32 @@ static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 {
 	// jmp for tracepoints
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_PROTO_INFER_FOR_TP,
-				    PROG_PROTO_INFER_TP_IDX);
+			   MAP_PROGS_JMP_TP_NAME,
+			   PROG_PROTO_INFER_FOR_TP, PROG_PROTO_INFER_TP_IDX);
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_DATA_SUBMIT_NAME_FOR_TP,
-				    PROG_DATA_SUBMIT_TP_IDX);
+			   MAP_PROGS_JMP_TP_NAME,
+			   PROG_DATA_SUBMIT_NAME_FOR_TP,
+			   PROG_DATA_SUBMIT_TP_IDX);
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_OUTPUT_DATA_NAME_FOR_TP,
-				    PROG_OUTPUT_DATA_TP_IDX);
+			   MAP_PROGS_JMP_TP_NAME,
+			   PROG_OUTPUT_DATA_NAME_FOR_TP,
+			   PROG_OUTPUT_DATA_TP_IDX);
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_TP_NAME,
-				    PROG_IO_EVENT_NAME_FOR_TP,
-				    PROG_IO_EVENT_TP_IDX);
+			   MAP_PROGS_JMP_TP_NAME,
+			   PROG_IO_EVENT_NAME_FOR_TP, PROG_IO_EVENT_TP_IDX);
 
 	// jmp for kprobe/uprobe
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_KP_NAME,
-				    PROG_PROTO_INFER_FOR_KP,
-				    PROG_PROTO_INFER_KP_IDX);
+			   MAP_PROGS_JMP_KP_NAME,
+			   PROG_PROTO_INFER_FOR_KP, PROG_PROTO_INFER_KP_IDX);
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_KP_NAME,
-				    PROG_DATA_SUBMIT_NAME_FOR_KP,
-				    PROG_DATA_SUBMIT_KP_IDX);
+			   MAP_PROGS_JMP_KP_NAME,
+			   PROG_DATA_SUBMIT_NAME_FOR_KP,
+			   PROG_DATA_SUBMIT_KP_IDX);
 	insert_prog_to_map(tracer,
-				    MAP_PROGS_JMP_KP_NAME,
-				    PROG_OUTPUT_DATA_NAME_FOR_KP,
-				    PROG_OUTPUT_DATA_KP_IDX);
+			   MAP_PROGS_JMP_KP_NAME,
+			   PROG_OUTPUT_DATA_NAME_FOR_KP,
+			   PROG_OUTPUT_DATA_KP_IDX);
 }
 
 /*
@@ -2058,6 +2045,73 @@ static int check_dependencies(void)
 	return 0;
 }
 
+static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
+			     int *bin_buf_size, bool skip_kfunc)
+{
+	void *bpf_bin_buffer;
+	int buffer_sz;
+	char sys_type_str[16];
+	memset(sys_type_str, 0, sizeof(sys_type_str));
+	if (fetch_system_type(sys_type_str, sizeof(sys_type_str) - 1) != ETR_OK) {
+		ebpf_warning("Fetch system type faild.\n");
+	}
+
+	if (!skip_kfunc && fentry_can_attach(TEST_KFUNC_NAME)
+	    && get_kfunc_params_num(TEST_KFUNC_NAME) == TEST_KFUNC_PARAMS_NUM) {
+		g_k_type = K_TYPE_KFUNC;
+		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-kfunc");
+		bpf_bin_buffer = (void *)socket_trace_kfunc_ebpf_data;
+		buffer_sz = sizeof(socket_trace_kfunc_ebpf_data);
+	} else if (strcmp(sys_type_str, "ky10") == 0) {
+		g_k_type = K_TYPE_KYLIN;
+		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-kylin");
+		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
+		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
+	} else if (major > 5 || (major == 5 && minor >= 2)) {
+		g_k_type = K_TYPE_VER_5_2_PLUS;
+		snprintf(load_name, NAME_LEN,
+			 "socket-trace-bpf-linux-5.2_plus");
+		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
+		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
+	} else if (major == 3 && minor == 10) {
+		g_k_type = K_TYPE_VER_3_10;
+		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-3.10.0");
+		bpf_bin_buffer = (void *)socket_trace_3_10_0_ebpf_data;
+		buffer_sz = sizeof(socket_trace_3_10_0_ebpf_data);
+	} else {
+		g_k_type = K_TYPE_COMM;
+		snprintf(load_name, NAME_LEN, "socket-trace-bpf-linux-common");
+		bpf_bin_buffer = (void *)socket_trace_common_ebpf_data;
+		buffer_sz = sizeof(socket_trace_common_ebpf_data);
+	}
+
+	*bin_buffer = bpf_bin_buffer;
+	*bin_buf_size = buffer_sz;
+	return 0;
+}
+
+static void reconfig_load_resources(struct bpf_tracer *tracer, char *load_name,
+				    void *bin_buffer, int buffer_sz,
+				    struct tracer_probes_conf *tps)
+{
+	int i;
+	snprintf(tracer->bpf_load_name,
+		 sizeof(tracer->bpf_load_name), "%s", load_name);
+	tracer->bpf_load_name[sizeof(tracer->bpf_load_name) - 1] = '\0';
+	tracer->buffer_ptr = bin_buffer;
+	tracer->buffer_sz = buffer_sz;
+	for (i = 0; i < tps->kprobes_nr; i++)
+		free(tps->ksymbols[i].func);
+	tps->kprobes_nr = 0;
+	for (i = 0; i < tps->tps_nr; i++)
+		free(tps->tps[i].name);
+	tps->tps_nr = 0;
+	for (i = 0; i < tps->kfuncs_nr; i++)
+		free(tps->kfuncs[i].name);
+	tps->kfuncs_nr = 0;
+	socket_tracer_set_probes(tps);
+}
+
 /**
  * Start socket tracer
  *
@@ -2116,44 +2170,8 @@ int running_socket_tracer(tracer_callback_t handle,
 		return -EINVAL;
 	}
 
-	char sys_type_str[16];
-	memset(sys_type_str, 0, sizeof(sys_type_str));
-	if (fetch_system_type(sys_type_str, sizeof(sys_type_str) - 1) != ETR_OK) {
-		ebpf_warning("Fetch system type faild.\n");
-	}
-
-	if (fentry_can_attach(TEST_KFUNC_NAME)
-	    && get_kfunc_params_num(TEST_KFUNC_NAME) == TEST_KFUNC_PARAMS_NUM) {
-		g_k_type = K_TYPE_KFUNC;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-kfunc");
-		bpf_bin_buffer = (void *)socket_trace_kfunc_ebpf_data;
-		buffer_sz = sizeof(socket_trace_kfunc_ebpf_data);
-	} else if (strcmp(sys_type_str, "ky10") == 0) {
-		g_k_type = K_TYPE_KYLIN;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-kylin");
-		bpf_bin_buffer = (void *)socket_trace_kylin_ebpf_data;
-		buffer_sz = sizeof(socket_trace_kylin_ebpf_data);
-	} else if (major > 5 || (major == 5 && minor >= 2)) {
-		g_k_type = K_TYPE_VER_5_2_PLUS;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-5.2_plus");
-		bpf_bin_buffer = (void *)socket_trace_5_2_plus_ebpf_data;
-		buffer_sz = sizeof(socket_trace_5_2_plus_ebpf_data);
-	} else if (major == 3 && minor == 10) {
-		g_k_type = K_TYPE_VER_3_10;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-3.10.0");
-		bpf_bin_buffer = (void *)socket_trace_3_10_0_ebpf_data;
-		buffer_sz = sizeof(socket_trace_3_10_0_ebpf_data);
-	} else {
-		g_k_type = K_TYPE_COMM;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-common");
-		bpf_bin_buffer = (void *)socket_trace_common_ebpf_data;
-		buffer_sz = sizeof(socket_trace_common_ebpf_data);
-	}
+	select_bpf_binary(bpf_load_buffer_name, &bpf_bin_buffer, &buffer_sz,
+			  false);
 
 	/*
 	 * Initialize datadump
@@ -2178,7 +2196,8 @@ int running_socket_tracer(tracer_callback_t handle,
 	memset(tps, 0, sizeof(*tps));
 	init_list_head(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
-
+	golang_trace_init();
+	openssl_trace_init();
 	create_and_init_proc_info_caches();
 
 	struct bpf_tracer *tracer =
@@ -2208,8 +2227,19 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	conf_max_trace_entries = max_trace_entries;
 
-	if (tracer_bpf_load(tracer))
+	bool has_attempted = false;
+retry_load:
+	if (tracer_bpf_load(tracer)) {
+		if (!has_attempted && g_k_type == K_TYPE_KFUNC) {
+			has_attempted = true;
+			select_bpf_binary(bpf_load_buffer_name, &bpf_bin_buffer,
+					  &buffer_sz, true);
+			reconfig_load_resources(tracer, bpf_load_buffer_name,
+						bpf_bin_buffer, buffer_sz, tps);
+			goto retry_load;
+		}
 		return -EINVAL;
+	}
 
 	/*
 	 * create reader for read perf buffer data. 
@@ -2270,9 +2300,6 @@ int running_socket_tracer(tracer_callback_t handle,
 		return -EINVAL;
 
 	tracer->data_limit_max = socket_data_limit_max;
-
-	// Update go offsets to eBPF "proc_info_map"
-	update_proc_info_to_map(tracer);
 
 	// Insert prog of output data into map for using BPF Tail Calls.
 	insert_output_prog_to_map(tracer);
@@ -3105,3 +3132,10 @@ int disable_syscall_trace_id(void)
 	return 0;
 }
 
+void uprobe_match_pid_handle(int feat, int pid, enum match_pids_act act)
+{
+	if (feat == FEATURE_UPROBE_GOLANG)
+		golang_trace_handle(pid, act);
+	else if (feat == FEATURE_UPROBE_OPENSSL)
+		openssl_trace_handle(pid, act);
+}

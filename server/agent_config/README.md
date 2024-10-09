@@ -3321,7 +3321,7 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **Description**:
 
@@ -3389,7 +3389,7 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | string |
+| Type | bool |
 
 **Description**:
 
@@ -3543,6 +3543,38 @@ inputs:
 When the trace_id is injected into all requests, the computation logic for all
 syscall_trace_id can be turned off. This will significantly reduce the impact of the
 eBPF hook on the CPU consumption of the application process.
+
+##### Disable Pre-allocating Memory {#inputs.ebpf.socket.tunning.map_prealloc_disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.map_prealloc_disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        map_prealloc_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When full map preallocation is too expensive, setting 'map_prealloc_disabled' to true will
+prevent memory pre-allocation during map definition, but it may result in some performance
+degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'.
+Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
+Disabling memory preallocation will approximately reduce memory usage by 45MB.
 
 #### Preprocess {#inputs.ebpf.socket.preprocess}
 
@@ -4183,7 +4215,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [10000, 2000000] |
 
 **Description**:
 
@@ -4214,7 +4246,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [8000, 2000000] |
 
 **Description**:
 
@@ -4244,7 +4276,7 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [100000, 2000000] |
+| Range | [10000, 2000000] |
 
 **Description**:
 

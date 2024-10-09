@@ -16,6 +16,10 @@
 
 package common
 
+import (
+	api "github.com/deepflowio/deepflow/message/trident"
+)
+
 const (
 	// VTAP
 	VTAP_CONTROLLER_EXCEPTIONS_MASK = 0xFFFFFFFF00000000
@@ -110,4 +114,10 @@ const (
 
 	DISABLED = 0
 	ENABLED  = 1
+)
+
+var (
+	KWP_NORMAL         = api.KubernetesWatchPolicy_KWP_NORMAL
+	KWP_WATCH_ONLY     = api.KubernetesWatchPolicy_KWP_WATCH_ONLY
+	KWP_WATCH_DISABLED = api.KubernetesWatchPolicy_KWP_WATCH_DISABLED
 )

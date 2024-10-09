@@ -91,6 +91,8 @@ func GetAggFunc(name string, args []string, alias string, derivativeArgs []strin
 	derivativeGroupBy := e.DerivativeGroupBy
 	if name == view.FUNCTION_TOPK || name == view.FUNCTION_ANY {
 		return GetTopKTrans(name, args, alias, e)
+	} else if name == view.FUNCTION_UNIQ || name == view.FUNCTION_UNIQ_EXACT {
+		return GetUniqTrans(name, args, alias, e)
 	}
 
 	var levelFlag int
@@ -230,6 +232,53 @@ func GetTopKTrans(name string, args []string, alias string, e *CHEngine) (Statem
 		if metricStructCopy.Condition != "" {
 			metricStructCopy.Condition = "(" + strings.Join(conditions, " AND ") + ")"
 		}
+	}
+
+	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
+
+	return &AggFunction{
+		Metrics: &metricStructCopy,
+		Name:    name,
+		Args:    args,
+		Alias:   alias,
+	}, levelFlag, unit, nil
+}
+
+func GetUniqTrans(name string, args []string, alias string, e *CHEngine) (Statement, int, string, error) {
+	db := e.DB
+	fields := args
+
+	function, ok := metrics.METRICS_FUNCTIONS_MAP[name]
+	if !ok {
+		return nil, 0, "", nil
+	}
+
+	levelFlag := view.MODEL_METRICS_LEVEL_FLAG_UNLAY
+	fieldsLen := len(fields)
+	dbFields := make([]string, fieldsLen)
+
+	var metricStruct *metrics.Metrics
+	for i, field := range fields {
+		field = strings.Trim(field, "`")
+		metricStruct, ok = metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID)
+		if !ok || metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
+			return nil, 0, "", nil
+		}
+		dbFields[i] = metricStruct.DBField
+
+		// judge whether the operator supports single layer
+		if levelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY && db != chCommon.DB_NAME_FLOW_LOG {
+			unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
+			if !common.IsValueInSliceString(name, unlayFuns) {
+				levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
+			}
+		}
+	}
+
+	metricStructCopy := *metricStruct
+	metricStructCopy.DBField = strings.Join(dbFields, ", ")
+	if fieldsLen > 1 {
+		metricStructCopy.DBField = "(" + metricStructCopy.DBField + ")"
 	}
 
 	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
@@ -913,7 +962,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 	}
 	var withValue string
 	if len(fields) > 1 {
-		if f.Name == "if" {
+		if f.Name == "if" || strings.HasPrefix(f.Name, "uniq") {
 			withValue = fmt.Sprintf("%s(%s)", f.Name, strings.Join(values, ","))
 		} else if strings.HasPrefix(f.Name, "topK") || strings.HasPrefix(f.Name, "any") {
 			withValue = fmt.Sprintf("%s((%s))", f.Name, strings.Join(values, ","))

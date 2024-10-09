@@ -1312,6 +1312,20 @@ static_config:
     # Default: 0. Range: [0, +oo]
     global-ebpf-pps-threshold: 0
 
+    # Enabled uprobe golang tracing
+    # Default: false
+    # Note: If this configuration option is set to false, the Golang application process will not
+    #   be traced, and the maximum number of entries in the associated BPF map will be set to 1 to
+    #   ensure minimal memory usage.
+    uprobe-golang-trace-enabled: false
+
+    # Enabled uprobe openssl library tracing
+    # Default: false
+    # Note: If this configuration option is set to false, the openssl library will not be traced,
+    #   and the maximum number of entries in the associated BPF map will be set to 1 to ensure
+    #   minimal memory usage.
+    uprobe-openssl-trace-enabled: false
+
     # Regex for Process Name
     # Note: The name of the process where each feature of ebpf uprobe takes effect,
     #   which is configured using regular expressions
@@ -1412,17 +1426,17 @@ static_config:
     ring-size: 65536
 
     # eBPF max socket entries
-    # Default: 131072. Range: [100000, 2000000]
+    # Default: 131072. Range: [10000, 2000000]
     # Note: Set the maximum value of hash table entries for socket tracking, depending on the number of concurrent requests in the actual scenario
     max-socket-entries: 131072
 
     # eBPF socket map max reclaim
-    # Default: 120000. Range: [100000, 2000000]
+    # Default: 120000. Range: [8000, 2000000]
     # Note: The maximum threshold for cleaning socket map table entries.
     socket-map-max-reclaim: 120000
 
     # eBPF max trace entries
-    # Default: 131072. Range: [100000, 2000000]
+    # Default: 131072. Range: [10000, 2000000]
     # Note: Set the maximum value of hash table entries for thread/coroutine tracking sessions.
     max-trace-entries: 131072
 
@@ -1640,6 +1654,16 @@ static_config:
     #   syscall_trace_id can be turned off. This will significantly reduce the impact of the
     #   eBPF hook on the CPU consumption of the application process.
     syscall-trace-id-disabled: false
+
+    # Disable Pre-allocating Memory
+    # Default: false
+    # Note:
+    #   When full map preallocation is too expensive, setting 'map-prealloc-disabled' to true will
+    #   prevent memory pre-allocation during map definition, but it may result in some performance
+    #   degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'.
+    #   Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
+    #   Disabling memory preallocation will reduce memory usage by approximately 45MB.
+    map-prealloc-disabled: false
 
   ######################################
   ## Agent Running in Standalone Mode ##

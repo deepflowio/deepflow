@@ -535,6 +535,9 @@ extern "C" {
     // 所有tracer启动完毕后，最后显示调用bpf_tracer_finish()来通知主程序
     pub fn bpf_tracer_finish();
 
+    pub fn set_uprobe_golang_enabled(enabled: bool) -> c_void;
+    pub fn set_uprobe_openssl_enabled(enabled: bool) -> c_void;
+
     // 获取socket_tracer的这种统计数据的接口
     pub fn socket_tracer_stats() -> SK_TRACE_STATS;
 
@@ -546,6 +549,11 @@ extern "C" {
         event_type: c_uint,
         callback: extern "C" fn(data: *mut PROCESS_EVENT),
     ) -> c_int;
+
+    // Set whether to pre-allocate memory when creating a map?
+    // @enabled : true Pre-allocate memory when defining a BPF hash map
+    //            false Define a map without preallocated memory
+    pub fn set_bpf_map_prealloc(enabled: bool) -> c_void;
 
     // 参数说明：
     // callback: 回调接口 rust -> C

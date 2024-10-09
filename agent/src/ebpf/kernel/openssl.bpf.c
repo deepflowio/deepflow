@@ -35,7 +35,7 @@ struct ssl_ctx_struct {
 // Save function arguments and use them when the function returns
 // key: pid_tgid
 // value: SSL_* arguments
-BPF_HASH(ssl_ctx_map, __u64, struct ssl_ctx_struct)
+BPF_HASH(ssl_ctx_map, __u64, struct ssl_ctx_struct, MAP_MAX_ENTRIES_DEF, FEATURE_UPROBE_OPENSSL)
 /* *INDENT-ON* */
 
 static int get_fd_from_openssl_ssl(void *ssl)

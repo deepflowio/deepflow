@@ -405,7 +405,7 @@ func MakeMVTableCreateSQL(t *ckdb.Table, db, dstTable, aggrSummable, aggrUnsumma
 	return fmt.Sprintf(`CREATE MATERIALIZED VIEW IF NOT EXISTS %s TO %s
 			AS SELECT %s
 	                FROM %s
-			GROUP BY (%s)
+			GROUP BY %s
 			ORDER BY (%s)`,
 		tableMv, tableAgg,
 		strings.Join(columns, ",\n"),

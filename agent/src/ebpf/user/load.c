@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include "config.h"
 #include "common.h"
 #include "log.h"
 #include "elf.h"
@@ -35,7 +36,22 @@
 #include "load.h"
 #include "btf_core.h"
 #include "../kernel/include/bpf_base.h"
+#include "../kernel/include/common.h"
+#include "tracer.h"
+#include "symbol.h"
+#include "proc.h"
+#include "go_tracer.h"
+#include "ssl_tracer.h"
+#include "profile/perf_profiler.h"
+#include "unwind_tracer.h"
 
+/*
+ * When full map preallocation is too expensive, the 'BPF_F_NO_PREALLOC'
+ * flag can be used to define a map without preallocated memory. By
+ * default, bpf_map_no_prealloc is set to false, meaning memory preallocation
+ * is enabled.
+ */
+static bool bpf_map_no_prealloc;
 extern struct btf_ext *btf_ext__new(const uint8_t * data, uint32_t size);
 extern struct btf *btf__new(const void *data, uint32_t size);
 extern void btf__free(struct btf *btf);
@@ -803,10 +819,11 @@ static int ebpf_obj__maps_collect(struct ebpf_object *obj)
 		memcpy(&new_map->def, def, cp_sz);
 		ebpf_debug
 		    ("map_name %s\tmaps_cnt:%d\toffset %zd\ttype %u\tkey_size "
-		     "%u\tvalue_size %u\tmax_entries %u\n",
+		     "%u\tvalue_size %u\tmax_entries %u feat %u\n",
 		     map_name, obj->maps_cnt, new_map->elf_offset,
 		     new_map->def.type, new_map->def.key_size,
-		     new_map->def.value_size, new_map->def.max_entries);
+		     new_map->def.value_size, new_map->def.max_entries,
+		     new_map->def.feat);
 	}
 
 	return ETR_OK;
@@ -910,10 +927,32 @@ int ebpf_obj_load(struct ebpf_object *obj)
 	struct ebpf_map *map;
 	for (i = 0; i < obj->maps_cnt; i++) {
 		map = &obj->maps[i];
+		int map_flags = 0;
+		// Note : perf_event programs can only use preallocated hash map
+		if (map->def.type == BPF_MAP_TYPE_HASH &&
+		    bpf_map_no_prealloc &&
+		    strstr(obj->name, "profiler") == NULL) {
+			map_flags = BPF_F_NO_PREALLOC;
+		}
+
+		if (map->def.type != BPF_MAP_TYPE_PROG_ARRAY &&
+		    ((map->def.feat == FEATURE_UPROBE_GOLANG
+		     && !is_golang_trace_enabled())
+		    || (map->def.feat == FEATURE_UPROBE_OPENSSL
+			&& !is_openssl_trace_enabled())
+		    || (map->def.feat == FEATURE_PROFILE_ONCPU
+			&& !oncpu_profiler_enabled())
+		    || (map->def.feat == FEATURE_DWARF_UNWINDING
+			&& !get_dwarf_enabled()))) {
+			map->def.max_entries = 1;
+		}
+
+		extended_map_preprocess(map);
+
 		map->fd =
 		    bcc_create_map(map->def.type, map->name, map->def.key_size,
 				   map->def.value_size, map->def.max_entries,
-				   0);
+				   map_flags);
 		if (map->fd < 0) {
 			ebpf_warning
 			    ("bcc_create_map() failed, map name:%s - %s\n",
@@ -922,9 +961,9 @@ int ebpf_obj_load(struct ebpf_object *obj)
 		}
 		ebpf_debug
 		    ("map->fd:%d map->def.type:%d, map->name:%s, map->def.key_size:%d,"
-		     "map->def.value_size:%d, map->def.max_entries:%d\n",
+		     "map->def.value_size:%d, map->def.max_entries:%d, map_flags %d\n",
 		     map->fd, map->def.type, map->name, map->def.key_size,
-		     map->def.value_size, map->def.max_entries);
+		     map->def.value_size, map->def.max_entries, map_flags);
 	}
 
 	ebpf_obj__load_vmlinux_btf(obj);
@@ -941,4 +980,9 @@ failed:
 	ebpf_warning("eBPF load programs failed. (errno %d)\n", errno);
 	release_object(obj);
 	return ETR_INVAL;
+}
+
+void set_bpf_map_prealloc(bool enabled)
+{
+	bpf_map_no_prealloc = !enabled;
 }

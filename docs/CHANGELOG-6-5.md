@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: topK multiple parameter query error [#8250](https://github.com/deepflowio/deepflow/pull/8250) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: querier TopK supporrt resource_id [#8234](https://github.com/deepflowio/deepflow/pull/8234) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: agent - Other eBPF bin-file will be selected when kfunc loading fails [#8227](https://github.com/deepflowio/deepflow/pull/8227) by [yinjiping](https://github.com/yinjiping)
 * fix: reduce kafka app misidentification [#8206](https://github.com/deepflowio/deepflow/pull/8206) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: incorrect tcp rrt [#8190](https://github.com/deepflowio/deepflow/pull/8190) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: the aggregation method of unsummable fields of custom data_source is wrong [#8182](https://github.com/deepflowio/deepflow/pull/8182) by [lzf575](https://github.com/lzf575)
@@ -143,6 +146,9 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Adapt 5.10.204-rt100-AD1000-PROTO [#8245](https://github.com/deepflowio/deepflow/pull/8245) by [yinjiping](https://github.com/yinjiping)
+* feat: querier uniq function supports multi params [#8229](https://github.com/deepflowio/deepflow/pull/8229) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: the application log table uses app_service as the primary key [#8221](https://github.com/deepflowio/deepflow/pull/8221) by [lzf575](https://github.com/lzf575)
 * feat: default genesis sync vpc name [#8133](https://github.com/deepflowio/deepflow/pull/8133) by [askyrie](https://github.com/askyrie)
 * feat: querier support simple sql [#8121](https://github.com/deepflowio/deepflow/pull/8121) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Optimize interface 'java_syms_update_main' [#8103](https://github.com/deepflowio/deepflow/pull/8103) by [yinjiping](https://github.com/yinjiping)

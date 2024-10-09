@@ -47,4 +47,8 @@ void update_proc_info_to_map(struct bpf_tracer *tracer);
 void go_process_exec(int pid);
 void go_process_exit(int pid);
 void go_process_events_handle(void);
+void golang_trace_handle(int pid, enum match_pids_act act);
+void golang_trace_init(void);
+void set_uprobe_golang_enabled(bool enabled);
+bool is_golang_trace_enabled(void);
 #endif

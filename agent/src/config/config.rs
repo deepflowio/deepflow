@@ -909,6 +909,7 @@ pub struct EbpfSocketKprobe {
 pub struct EbpfSocketTunning {
     pub max_capture_rate: u64,
     pub syscall_trace_id_disabled: bool,
+    pub map_prealloc_disabled: bool,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -2655,13 +2656,13 @@ impl From<&RuntimeConfig> for UserConfig {
                     socket: EbpfSocket {
                         uprobe: EbpfSocketUprobe {
                             golang: EbpfSocketUprobeGolang {
-                                enabled: rc.yaml_config.ebpf.uprobe_proc_regexp.golang.is_empty(),
+                                enabled: rc.yaml_config.ebpf.uprobe_golang_trace_enabled,
                                 tracing_timeout: Duration::from_secs(
                                     rc.yaml_config.ebpf.go_tracing_timeout as u64,
                                 ),
                             },
                             tls: EbpfSocketUprobeTls {
-                                enabled: rc.yaml_config.ebpf.uprobe_proc_regexp.openssl.is_empty(),
+                                enabled: rc.yaml_config.ebpf.uprobe_openssl_trace_enabled,
                             },
                         },
                         kprobe: EbpfSocketKprobe {
@@ -2678,6 +2679,7 @@ impl From<&RuntimeConfig> for UserConfig {
                                 .yaml_config
                                 .ebpf
                                 .syscall_trace_id_disabled,
+                            map_prealloc_disabled: rc.yaml_config.ebpf.map_prealloc_disabled,
                         },
                         preprocess: EbpfSocketPreprocess {
                             out_of_order_reassembly_cache_size: rc
@@ -3486,6 +3488,9 @@ pub struct EbpfYamlConfig {
     pub syscall_out_of_order_reassembly: Vec<String>,
     pub syscall_segmentation_reassembly: Vec<String>,
     pub syscall_trace_id_disabled: bool,
+    pub map_prealloc_disabled: bool,
+    pub uprobe_golang_trace_enabled: bool,
+    pub uprobe_openssl_trace_enabled: bool,
 }
 
 impl Default for EbpfYamlConfig {
@@ -3519,6 +3524,9 @@ impl Default for EbpfYamlConfig {
             syscall_segmentation_reassembly: vec![],
             syscall_out_of_order_cache_size: 16,
             syscall_trace_id_disabled: false,
+            map_prealloc_disabled: false,
+            uprobe_golang_trace_enabled: false,
+            uprobe_openssl_trace_enabled: false,
         }
     }
 }
@@ -3944,13 +3952,13 @@ impl YamlConfig {
         if c.ebpf.ring_size < 8192 || c.ebpf.ring_size > 131072 {
             c.ebpf.ring_size = 65536;
         }
-        if c.ebpf.max_socket_entries < 100000 || c.ebpf.max_socket_entries > 2000000 {
+        if c.ebpf.max_socket_entries < 10000 || c.ebpf.max_socket_entries > 2000000 {
             c.ebpf.max_socket_entries = 131072;
         }
-        if c.ebpf.socket_map_max_reclaim < 100000 || c.ebpf.socket_map_max_reclaim > 2000000 {
+        if c.ebpf.socket_map_max_reclaim < 8000 || c.ebpf.socket_map_max_reclaim > 2000000 {
             c.ebpf.socket_map_max_reclaim = 120000;
         }
-        if c.ebpf.max_trace_entries < 100000 || c.ebpf.max_trace_entries > 2000000 {
+        if c.ebpf.max_trace_entries < 10000 || c.ebpf.max_trace_entries > 2000000 {
             c.ebpf.max_trace_entries = 131072;
         }
         if c.ebpf.java_symbol_file_refresh_defer_interval < Duration::from_secs(5)

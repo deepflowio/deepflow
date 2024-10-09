@@ -17,6 +17,7 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <sched.h>
+#include <signal.h>
 #include <sys/utsname.h>
 #include <sys/prctl.h>
 #include <linux/version.h>
@@ -38,6 +39,7 @@
 #include "elf.h"
 #include "load.h"
 #include "mem.h"
+#include "socket.h"
 #include "unwind_tracer.h"
 #include "extended/extended.h"
 
@@ -115,7 +117,8 @@ struct match_pid_s {
 	int *pids;
 	int count;
 };
-static struct match_pid_s prev_match_pids[FEATURE_MAX];
+static struct match_pid_s last_match_pids[FEATURE_MAX];
+pthread_mutex_t match_pids_lock;
 // Used to store process IDs for matching various features
 pids_match_hash_t pids_match_hash;
 
@@ -330,7 +333,8 @@ struct bpf_tracer *setup_bpf_tracer(const char *name,
 				    tracer_op_fun_t free_cb,
 				    tracer_op_fun_t create_cb,
 				    void *handle,
-				    void *profiler_callback_ctx[PROFILER_CTX_NUM],
+				    void
+				    *profiler_callback_ctx[PROFILER_CTX_NUM],
 				    int sample_freq)
 {
 	int ret;
@@ -550,6 +554,12 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 	if (ret != 0) {
 		ebpf_warning("bpf load \"%s\" failed, error:%s (%d).\n",
 			     tracer->bpf_load_name, strerror(errno), errno);
+		if (!strcmp
+		    (tracer->bpf_load_name, "socket-trace-bpf-linux-kfunc")) {
+			ebpf_info("Try other eBPF bytecode binaries ...\n");
+			return ret;
+		}
+
 		if (errno == EACCES) {
 			ebpf_warning
 			    ("Check the selinux status, if found SELinux"
@@ -994,9 +1004,9 @@ static int kfunc_detach(struct kfunc *p)
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
-	int (*probe_handle) (struct probe *p) = NULL;
-	int (*tracepoint_handle) (struct tracepoint *p) = NULL;
-	int (*kfunc_handle) (struct kfunc *p) = NULL;
+	int (*probe_handle) (struct probe * p) = NULL;
+	int (*tracepoint_handle) (struct tracepoint * p) = NULL;
+	int (*kfunc_handle) (struct kfunc * p) = NULL;
 
 	if (type == HOOK_ATTACH) {
 		probe_handle = probe_attach;
@@ -1125,18 +1135,21 @@ perf_event:
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
 				errno = 0;
 				int ret =
-				    program__attach_perf_event(obj->
-							       progs[i].prog_fd,
+				    program__attach_perf_event(obj->progs[i].
+							       prog_fd,
 							       PERF_TYPE_SOFTWARE,
 							       PERF_COUNT_SW_CPU_CLOCK,
 							       0,	/* sample_period */
-							       tracer->sample_freq,
+							       tracer->
+							       sample_freq,
 							       -1,	/* pid, current process */
 							       -1,	/* cpu, no binding */
 							       -1,	/* new event group is created */
-							       tracer->per_cpu_fds,
+							       tracer->
+							       per_cpu_fds,
 							       ARRAY_SIZE
-							       (tracer->per_cpu_fds));
+							       (tracer->
+								per_cpu_fds));
 				if (!ret) {
 					ebpf_info
 					    ("tracer \"%s\" attach perf event prog successful.\n",
@@ -1709,7 +1722,9 @@ int set_feature_regex(int feature, const char *pattern)
 
 	cfg_feature_regex_array[feature].ok = true;
 
-	if (feature == FEATURE_PROFILE_ONCPU || feature == FEATURE_PROFILE_OFFCPU || feature == FEATURE_PROFILE_MEMORY) {
+	if (feature == FEATURE_PROFILE_ONCPU
+	    || feature == FEATURE_PROFILE_OFFCPU
+	    || feature == FEATURE_PROFILE_MEMORY) {
 		unwind_process_reload();
 	}
 	return 0;
@@ -1717,18 +1732,21 @@ int set_feature_regex(int feature, const char *pattern)
 
 bool is_feature_enabled(int feature)
 {
-	if (feature < 0 || feature >= FEATURE_MAX) {
-		return false;
-	}
+	bool enabled = false;
+	pthread_mutex_lock(&match_pids_lock);
+	if (last_match_pids[feature].pids != NULL
+	    && last_match_pids[feature].count > 0)
+		enabled = true;
+	pthread_mutex_unlock(&match_pids_lock);
 
-	return cfg_feature_regex_array[feature].ok;
+	return enabled;
 }
 
 bool is_feature_matched(int feature, int pid, const char *path)
 {
 	if (pid > 0)
 		return is_pid_match(feature, pid);
-	
+
 	int error = 0;
 	char *path_for_basename = NULL;
 	char *process_name = NULL;
@@ -1764,9 +1782,8 @@ static int print_match_pids_kvp_cb(pids_match_hash_kv * kv, void *arg)
 {
 	ebpf_info("  PID %lu flags 0x%lx (%s %s %s %s %s %s %s)\n",
 		  kv->key, kv->value,
-		  (kv->
-		   value & (1 << FEATURE_UPROBE_GOLANG_SYMBOL)) ? "GOSYMBOL" :
-		  "",
+		  (kv->value & (1 << FEATURE_UPROBE_GOLANG_SYMBOL)) ? "GOSYMBOL"
+		  : "",
 		  (kv->value & (1 << FEATURE_UPROBE_GOLANG)) ? "GOLANG" : "",
 		  (kv->value & (1 << FEATURE_UPROBE_OPENSSL)) ? "OPENSSL" : "",
 		  (kv->value & (1 << FEATURE_PROFILE_ONCPU)) ? "ONCPU" : "",
@@ -1811,6 +1828,7 @@ static int add_pid_to_match_hash(int feature, int pid)
 		ret = -1;
 	}
 
+	uprobe_match_pid_handle(feature, pid, MATCH_PID_ADD);
 	extended_match_pid_handle(feature, pid, MATCH_PID_ADD);
 	return ret;
 }
@@ -1845,6 +1863,7 @@ static int clear_pid_from_match_hash(int feature, int pid)
 		}
 	}
 
+	uprobe_match_pid_handle(feature, pid, MATCH_PID_DEL);
 	extended_match_pid_handle(feature, pid, MATCH_PID_DEL);
 	return ret;
 }
@@ -1853,7 +1872,7 @@ static void del_stale_match_pids(int feature, const int *pids, int num)
 {
 	int i, j;
 	bool existed;
-	struct match_pid_s *prev_pids = &prev_match_pids[feature];
+	struct match_pid_s *prev_pids = &last_match_pids[feature];
 	for (i = 0; i < prev_pids->count; i++) {
 		existed = false;
 		for (j = 0; j < num; j++) {
@@ -1874,7 +1893,7 @@ static void add_new_match_pids(int feature, const int *pids, int num)
 {
 	int i, j;
 	bool existed;
-	struct match_pid_s *prev_pids = &prev_match_pids[feature];
+	struct match_pid_s *prev_pids = &last_match_pids[feature];
 	for (i = 0; i < num; i++) {
 		existed = false;
 		for (j = 0; j < prev_pids->count; j++) {
@@ -1891,11 +1910,54 @@ static void add_new_match_pids(int feature, const int *pids, int num)
 	}
 }
 
-int set_feature_pids(int feature, const int *pids, int num)
+int exec_set_feature_pids(int feature, const int *pids, int num)
+{
+	del_stale_match_pids(feature, pids, num);
+	add_new_match_pids(feature, pids, num);
+
+	pthread_mutex_lock(&match_pids_lock);
+	if (last_match_pids[feature].pids != NULL) {
+		free(last_match_pids[feature].pids);
+		last_match_pids[feature].pids = NULL;
+		last_match_pids[feature].count = 0;
+	}
+
+	last_match_pids[feature].pids = malloc(sizeof(int) * num);
+	if (last_match_pids[feature].pids == NULL) {
+		ebpf_warning("last_match_pids[%d].pids malloc failed.\n",
+			     feature);
+		pthread_mutex_unlock(&match_pids_lock);
+		return -1;
+	}
+	memcpy(last_match_pids[feature].pids, pids, sizeof(int) * num);
+	last_match_pids[feature].count = num;
+	pthread_mutex_unlock(&match_pids_lock);
+	return 0;
+}
+
+int set_feature_pids(int feature, const int *match_pids, int num)
 {
 	if (feature < 0 || feature >= FEATURE_MAX) {
 		return -1;
 	}
+
+	int i, j = 0;
+	int pids[num];
+	memset(pids, 0, sizeof(pids));
+	for (i = 0; i < num; i++) {
+		//Check if the process exists
+		if (kill(match_pids[i], 0) == -1 && errno == ESRCH) {
+			ebpf_warning("The process with PID %d does not exist\n",
+				     match_pids[i]);
+		} else if (!is_user_process(match_pids[i])) {
+			ebpf_warning("PID %d is not a user process.\n",
+				     match_pids[i]);
+		} else {
+			pids[j++] = match_pids[i];
+		}	
+	}
+
+	num = j;
 	// Set the thread ID, which will be used in `pids_match_hash`.
 	pthread_t tid = pthread_self();
 	struct thread_index_entry *v;
@@ -1913,19 +1975,12 @@ int set_feature_pids(int feature, const int *pids, int num)
 		ebpf_info("thread %ld index %ld\n", tid, thread_index);
 	}
 
-	del_stale_match_pids(feature, pids, num);
-	add_new_match_pids(feature, pids, num);
-
-	if (prev_match_pids[feature].pids != NULL)
-		free(prev_match_pids[feature].pids);
-	prev_match_pids[feature].pids = malloc(sizeof(int) * num);
-	memcpy(prev_match_pids[feature].pids, pids, sizeof(int) * num);
-	prev_match_pids[feature].count = num;
-	return 0;
+	return exec_set_feature_pids(feature, pids, num);
 }
 
 int init_match_pids_hash(void)
 {
+	pthread_mutex_init(&match_pids_lock, NULL);
 	pids_match_hash_t *h = &pids_match_hash;
 	memset(h, 0, sizeof(*h));
 	u32 nbuckets = PIDS_MATCH_HASH_BUCKETS_NUM;

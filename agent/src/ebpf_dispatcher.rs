@@ -640,6 +640,7 @@ impl EbpfCollector {
         // ebpf core modules init
         #[allow(unused_mut)]
         let mut handle = ConfigHandle::default();
+        ebpf::set_uprobe_golang_enabled(config.ebpf.socket.uprobe.golang.enabled);
         if config.ebpf.socket.uprobe.golang.enabled {
             let feature = "ebpf.socket.uprobe.golang";
             process_listener.register(feature, ebpf::set_feature_uprobe_golang);
@@ -667,6 +668,7 @@ impl EbpfCollector {
             info!("ebpf golang uprobe proc regexp is empty, skip set")
         }
 
+        ebpf::set_uprobe_openssl_enabled(config.ebpf.socket.uprobe.tls.enabled);
         if config.ebpf.socket.uprobe.tls.enabled {
             let feature = "ebpf.socket.uprobe.tls";
             process_listener.register(feature, ebpf::set_feature_uprobe_tls);
@@ -829,6 +831,8 @@ impl EbpfCollector {
         if config.ebpf.socket.tunning.syscall_trace_id_disabled {
             ebpf::disable_syscall_trace_id();
         }
+
+        ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
 
         if ebpf::running_socket_tracer(
             Self::ebpf_l7_callback,                              /* 回调接口 rust -> C */

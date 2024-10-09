@@ -8,6 +8,14 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: topK multiple parameter query error [#8249](https://github.com/deepflowio/deepflow/pull/8249) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: add process_id in profile data query [#8238](https://github.com/deepflowio/deepflow/pull/8238) by [taloric](https://github.com/taloric)
+* fix: custom data source creation failed in enterprise ClickHouse [#8233](https://github.com/deepflowio/deepflow/pull/8233) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Fix the process matcher handling for UPROBE [#8230](https://github.com/deepflowio/deepflow/pull/8230) by [yinjiping](https://github.com/yinjiping)
+* fix: agent - Other eBPF bin-file will be selected when kfunc loading fails [#8226](https://github.com/deepflowio/deepflow/pull/8226) by [yinjiping](https://github.com/yinjiping)
+* fix: prometheus.samples table init failed [#8225](https://github.com/deepflowio/deepflow/pull/8225) by [lzf575](https://github.com/lzf575)
+* fix: prometheus data writing fails when using ByConity database [#8222](https://github.com/deepflowio/deepflow/pull/8222) by [lzf575](https://github.com/lzf575)
+* fix: K8s watch env logs [#8217](https://github.com/deepflowio/deepflow/pull/8217) by [rvql](https://github.com/rvql)
 * fix: reduce kafka app misidentification [#8205](https://github.com/deepflowio/deepflow/pull/8205) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: agent build error [#8204](https://github.com/deepflowio/deepflow/pull/8204) by [TomatoMr](https://github.com/TomatoMr)
 * fix: ebpf dispatcher build error [#8197](https://github.com/deepflowio/deepflow/pull/8197) by [TomatoMr](https://github.com/TomatoMr)
@@ -204,6 +212,14 @@
 * Fix prometheus data cannot be labeled with universal tags，if slow-decoder is used. [#7100](https://github.com/deepflowio/deepflow/pull/7100)
 
 #### NEW FEATURE
+* feat: agent - eBPF Adapt 5.10.204-rt100-AD1000-PROTO [#8246](https://github.com/deepflowio/deepflow/pull/8246) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - Add a configuration option to enable go/tls trace [#8244](https://github.com/deepflowio/deepflow/pull/8244) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Create maps based on functional configuration [#8243](https://github.com/deepflowio/deepflow/pull/8243) by [yinjiping](https://github.com/yinjiping)
+* feat: agent - eBPF Add the BPF_F_NO_PREALLOC option to the hash map [#8236](https://github.com/deepflowio/deepflow/pull/8236) by [yinjiping](https://github.com/yinjiping)
+* feat: querier uniq function supports multi params [#8218](https://github.com/deepflowio/deepflow/pull/8218) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* feat: the application log table uses app_service as the primary key [#8220](https://github.com/deepflowio/deepflow/pull/8220) by [lzf575](https://github.com/lzf575)
+* feat: support k8s_watch_policy env [#8219](https://github.com/deepflowio/deepflow/pull/8219) by [SongZhen0704](https://github.com/SongZhen0704)
+* feat: tracemap supports multiple regions [#8075](https://github.com/deepflowio/deepflow/pull/8075) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: Support K8S_WATCH_POLICY env [#8210](https://github.com/deepflowio/deepflow/pull/8210) by [rvql](https://github.com/rvql)
 * feat: trace tree support multi regions [#8209](https://github.com/deepflowio/deepflow/pull/8209) by [taloric](https://github.com/taloric)
 * feat: Modify default l7 protocol enable [#8198](https://github.com/deepflowio/deepflow/pull/8198) by [yuanchaoa](https://github.com/yuanchaoa)

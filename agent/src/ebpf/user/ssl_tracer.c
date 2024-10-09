@@ -29,7 +29,9 @@
 #include <string.h>
 
 static proc_event_list_t proc_events;
+static bool ssl_trace_enabled;
 
+/* *INDENT-OFF* */
 static struct symbol symbols[] = {
 	{
 		.type = OPENSSL_UPROBE,
@@ -56,6 +58,7 @@ static struct symbol symbols[] = {
 		.is_probe_ret = true,
 	},
 };
+/* *INDENT-ON* */
 
 static void openssl_parse_and_register(int pid, struct tracer_probes_conf *conf)
 {
@@ -72,7 +75,8 @@ static void openssl_parse_and_register(int pid, struct tracer_probes_conf *conf)
 		goto out;
 
 	ebpf_info("openssl uprobe, pid:%d, path:%s\n", pid, path);
-	add_probe_sym_to_tracer_probes(pid, path, conf, symbols, NELEMS(symbols));
+	add_probe_sym_to_tracer_probes(pid, path, conf, symbols,
+				       NELEMS(symbols));
 
 out:
 	free(path);
@@ -85,7 +89,7 @@ static void clear_ssl_probes_by_pid(struct bpf_tracer *tracer, int pid)
 	struct list_head *p, *n;
 	struct symbol_uprobe *sym_uprobe;
 
-	list_for_each_safe (p, n, &tracer->probes_head) {
+	list_for_each_safe(p, n, &tracer->probes_head) {
 		probe = container_of(p, struct probe, list);
 		if (!(probe->type == UPROBE && probe->private_data != NULL))
 			continue;
@@ -116,12 +120,10 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 		return ETR_OK;
 
 	if (!kernel_version_check()) {
-		ebpf_warning("Uprobe openssl requires Linux version 4.17+ or Linux 3.10.0\n");
+		ebpf_warning
+		    ("Uprobe openssl requires Linux version 4.17+ or Linux 3.10.0\n");
 		return ETR_OK;
 	}
-
-	init_list_head(&proc_events.head);
-	pthread_mutex_init(&proc_events.m, NULL);
 
 	fddir = opendir("/proc/");
 	if (!fddir) {
@@ -163,9 +165,6 @@ void ssl_process_exec(int pid)
 	if (tracer == NULL)
 		return;
 
-	if (tracer->state != TRACER_RUNNING)
-		return;
-
 	if (tracer->probes_count > OPEN_FILES_MAX) {
 		ebpf_warning("Probes count too many. The maximum is %d\n",
 			     OPEN_FILES_MAX);
@@ -189,9 +188,6 @@ void ssl_process_exit(int pid)
 	if (tracer == NULL)
 		return;
 
-	if (tracer->state != TRACER_RUNNING)
-		return;
-
 	pthread_mutex_lock(&tracer->mutex_probes_lock);
 	clear_ssl_probes_by_pid(tracer, pid);
 	pthread_mutex_unlock(&tracer->mutex_probes_lock);
@@ -210,6 +206,9 @@ void ssl_events_handle(void)
 		if (get_sys_uptime() < event->expire_time)
 			break;
 
+		if (event->stime != get_process_starttime(event->pid))
+			goto next;
+
 		tracer = event->tracer;
 		if (tracer) {
 			pthread_mutex_lock(&tracer->mutex_probes_lock);
@@ -219,8 +218,34 @@ void ssl_events_handle(void)
 			pthread_mutex_unlock(&tracer->mutex_probes_lock);
 		}
 
+	next:
 		remove_event(&proc_events, event);
 		free(event);
 
 	} while (true);
+}
+
+void openssl_trace_handle(int pid, enum match_pids_act act)
+{
+	if (act == MATCH_PID_ADD) {
+		ssl_process_exec(pid);
+	} else {
+		ssl_process_exit(pid);
+	}
+}
+
+void openssl_trace_init(void)
+{
+	init_list_head(&proc_events.head);
+	pthread_mutex_init(&proc_events.m, NULL);
+}
+
+void set_uprobe_openssl_enabled(bool enabled)
+{
+	ssl_trace_enabled = enabled;
+}
+
+bool is_openssl_trace_enabled(void)
+{
+	return ssl_trace_enabled;
 }

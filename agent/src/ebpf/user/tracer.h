@@ -138,21 +138,6 @@ struct thread_index_array {
 #define pids_match_hash_key_value_pair_cb        clib_bihash_foreach_key_value_pair_cb_8_8
 #define pids_match_hash_foreach_key_value_pair   clib_bihash_foreach_key_value_pair_8_8
 
-// index number of feature.
-enum cfg_feature_idx {
-	FEATURE_UNKNOWN,
-	// Analyze go binary to get symbol address without symbol table
-	FEATURE_UPROBE_GOLANG_SYMBOL,
-	// openssl uprobe
-	FEATURE_UPROBE_OPENSSL,
-	// golang uprobe
-	FEATURE_UPROBE_GOLANG,
-	FEATURE_PROFILE_ONCPU,
-	FEATURE_PROFILE_OFFCPU,
-	FEATURE_PROFILE_MEMORY,
-	FEATURE_MAX,
-};
-
 enum match_pids_act {
 	MATCH_PID_ADD,
 	MATCH_PID_DEL,
@@ -700,7 +685,7 @@ int enable_tracer_reader_work(const char *name, int idx,
  * @return 0 on success, non-zero on error
  */
 int enable_ebpf_seg_reasm_protocol(int protocol);
-
+int exec_set_feature_pids(int feature, const int *pids, int num);
 /**
  * @brief Add regex-matched process list for feature.
  * 

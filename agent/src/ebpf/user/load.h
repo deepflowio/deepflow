@@ -98,7 +98,10 @@ struct bpf_load_map_def {
 	unsigned int key_size;
 	unsigned int value_size;
 	unsigned int max_entries;
-	unsigned int map_flags;
+	union {
+		unsigned int map_flags;
+		unsigned int feat;
+	};
 	unsigned int inner_map_idx;
 	unsigned int numa_node;
 };
@@ -141,4 +144,5 @@ int df_prog_load(enum bpf_prog_type prog_type, const char *name,
 int suspend_stderr();
 void resume_stderr(int fd);
 int load_ebpf_prog(struct ebpf_prog *prog);
+void set_bpf_map_prealloc(bool enabled);
 #endif /* DF_BPF_LOAD_H */

@@ -173,6 +173,8 @@ fn main() {
             ::std::process::exit(1);
         }
 
+	set_bpf_map_prealloc(false);
+
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
