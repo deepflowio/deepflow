@@ -280,7 +280,7 @@ pub struct ProcessListener {
 }
 
 impl ProcessListener {
-    const INTERVAL: Duration = Duration::from_secs(10);
+    const INTERVAL: usize = 10;
 
     pub fn new(
         process_matcher: &Vec<ProcessMatcher>,
@@ -446,8 +446,14 @@ impl ProcessListener {
             thread::Builder::new()
                 .name("process-listener".to_owned())
                 .spawn(move || {
+                    let mut count = 0;
                     while running.load(Relaxed) {
-                        thread::sleep(Self::INTERVAL);
+                        thread::sleep(Duration::from_secs(1));
+                        count += 1;
+                        if count < Self::INTERVAL {
+                            continue;
+                        }
+                        count = 0;
                         let proc = proc_root.read().unwrap().clone();
                         let user = user.read().unwrap().clone();
                         let command = command.read().unwrap().clone();
