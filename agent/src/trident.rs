@@ -711,6 +711,7 @@ impl Trident {
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
         let mut components: Option<Components> = None;
+        let mut first_run = true;
 
         loop {
             match &mut *state_guard {
@@ -764,7 +765,9 @@ impl Trident {
                             &runtime,
                             &session,
                             &agent_id,
+                            first_run,
                         );
+                        first_run = false;
 
                         #[cfg(target_os = "linux")]
                         if config_handler
@@ -840,7 +843,9 @@ impl Trident {
                         &runtime,
                         &session,
                         &agent_id,
+                        first_run,
                     );
+                    first_run = false;
 
                     #[cfg(target_os = "linux")]
                     if config_handler
@@ -901,7 +906,9 @@ impl Trident {
                             &runtime,
                             &session,
                             &agent_id,
+                            first_run,
                         );
+                    first_run = false;
 
                     #[cfg(target_os = "linux")]
                     if config_handler
@@ -948,7 +955,9 @@ impl Trident {
                         &runtime,
                         &session,
                         &agent_id,
+                        first_run,
                     );
+                    first_run = false;
 
                     #[cfg(target_os = "linux")]
                     if config_handler
