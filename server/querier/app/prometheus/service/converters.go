@@ -362,6 +362,9 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 	if len(p.blockTeamID) > 0 {
 		filters = append(filters, fmt.Sprintf("team_id not in (%s)", strings.Join(p.blockTeamID, ",")))
 	}
+	if len(p.extraFilters) > 0 {
+		filters = append(filters, fmt.Sprintf("(%s)", p.extraFilters))
+	}
 
 	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy, orderBy)
 	return ctx, sql, db, dataPrecision, queryMetric, err
@@ -839,7 +842,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			continue
 		}
 
-		if metricsType != "Int" && metricsType != "Float64" {
+		if metricsType != "Int" && metricsType != "Float64" && metricsType != "UInt64" {
 			return nil, fmt.Errorf("unknown metrics type %s, value = %v ", metricsType, values[columnIndexes[METRICS_INDEX]])
 		}
 
@@ -917,7 +920,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	return resp, nil
 }
 
-func convertTo[T int | float64](val interface{}) (v T, b bool) {
+func convertTo[T int | float64 | uint64](val interface{}) (v T, b bool) {
 	v, b = val.(T)
 	return
 }
@@ -935,6 +938,9 @@ func parseValue(valueType string, val interface{}) (v float64, b bool) {
 			return float64(metricsValueInt), ok
 		}
 		return metricsValueFloat, ok
+	case "UInt64":
+		metricsValueUint, ok := convertTo[uint64](val)
+		return float64(metricsValueUint), ok
 	default:
 		return 0, false
 	}
@@ -1093,6 +1099,9 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 	}
 	if len(p.blockTeamID) > 0 {
 		filters = append(filters, fmt.Sprintf("team_id not in (%s)", strings.Join(p.blockTeamID, ",")))
+	}
+	if len(p.extraFilters) > 0 {
+		filters = append(filters, fmt.Sprintf("(%s)", p.extraFilters))
 	}
 	sql := parseToQuerierSQL(ctx, chCommon.DB_NAME_PROMETHEUS, queryReq.GetMetric(), selection, filters, groupBy, orderBy)
 	return sql
