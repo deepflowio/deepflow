@@ -952,7 +952,7 @@ impl EbpfCollector {
                             .find(|f| f.eq_ignore_ascii_case(feature))
                             .is_some()
                     })
-                    .map(|p| p.match_regex.to_owned())
+                    .map(|p| p.match_regex.as_str())
                     .unwrap_or_default();
                 if !off_cpu.disabled {
                     process_listener.register(feature, ebpf::set_feature_off_cpu);
@@ -982,7 +982,7 @@ impl EbpfCollector {
                                 .find(|f| f.eq_ignore_ascii_case("ebpf.profile.memory"))
                                 .is_some()
                         })
-                        .map(|p| p.match_regex.to_owned())
+                        .map(|p| p.match_regex.as_str())
                         .unwrap_or_default();
                     ebpf::set_feature_regex(
                         ebpf::FEATURE_PROFILE_MEMORY,
