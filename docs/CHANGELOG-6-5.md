@@ -146,6 +146,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: exist function supports non-resource tags [#8256](https://github.com/deepflowio/deepflow/pull/8256) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Adapt 5.10.204-rt100-AD1000-PROTO [#8245](https://github.com/deepflowio/deepflow/pull/8245) by [yinjiping](https://github.com/yinjiping)
 * feat: querier uniq function supports multi params [#8229](https://github.com/deepflowio/deepflow/pull/8229) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: the application log table uses app_service as the primary key [#8221](https://github.com/deepflowio/deepflow/pull/8221) by [lzf575](https://github.com/lzf575)
