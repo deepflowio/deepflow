@@ -61,7 +61,7 @@ func createVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 		err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
 		if err == nil {
 
-			data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).CreateVTapGroupConfig(common.GetUserInfo(c).ORGID, vTapGroupConfig)
+			data, err := service.NewVTapGroupConfig(common.GetUserInfo(c), cfg).CreateVTapGroupConfig(common.GetUserInfo(c).ORGID, vTapGroupConfig)
 			JsonResponse(c, data, err)
 		} else {
 			JsonResponse(c, nil, err)
@@ -72,7 +72,7 @@ func createVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 func deleteVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		lcuuid := c.Param("lcuuid")
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).DeleteVTapGroupConfig(common.GetUserInfo(c).ORGID, lcuuid)
+		data, err := service.NewVTapGroupConfig(common.GetUserInfo(c), cfg).DeleteVTapGroupConfig(common.GetUserInfo(c).ORGID, lcuuid)
 		JsonResponse(c, data, err)
 	}
 }
@@ -84,7 +84,7 @@ func updateVTapGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 			BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
 			return
 		}
-		data, err := service.NewAgentGroupConfig(common.GetUserInfo(c), cfg).
+		data, err := service.NewVTapGroupConfig(common.GetUserInfo(c), cfg).
 			UpdateVTapGroupConfig(common.GetUserInfo(c).ORGID, c.Param("lcuuid"), vTapGroupConfig)
 		JsonResponse(c, data, err)
 	}
