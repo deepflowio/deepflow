@@ -54,7 +54,8 @@ pub struct ProcessData {
     pub pid: u64,
     pub ppid: u64,
     pub process_name: String, // raw process name
-    pub cmd: Vec<String>,
+    pub cmd: String,
+    pub cmd_with_args: Vec<String>,
     pub user_id: u32,
     pub user: String,
     pub start_time: Duration, // the process start timestamp
@@ -150,39 +151,31 @@ impl TryFrom<&Process> for ProcessData {
     type Error = ProcError;
     // will not set the username
     fn try_from(proc: &Process) -> Result<Self, Self::Error> {
-        let (cmd, uid) = (proc.cmdline()?, proc.uid()?);
-        let proc_name = if cmd.len() == 0 {
-            return Err(ProcError::Other(format!("pid {} cmd is nil", proc.pid)));
+        let (cmd, cmd_with_args, uid, status) =
+            (proc.exe()?, proc.cmdline()?, proc.uid()?, proc.status()?);
+        let command = if let Some(f) = cmd.file_name() {
+            f.to_string_lossy().to_string()
         } else {
-            let buf = PathBuf::from(&cmd[0]);
-            if let Some(f) = buf.file_name() {
-                f.to_string_lossy().to_string()
-            } else {
-                return Err(ProcError::Other(format!("pid {} cmd parse fail", proc.pid)));
-            }
+            return Err(ProcError::Other(format!("pid {} cmd parse fail", proc.pid)));
+        };
+        let (ppid, start_time) = if let Ok(stat) = proc.stat().as_ref() {
+            let z = stat.starttime().unwrap_or_default();
+            (stat.ppid as u64, Duration::from_secs(z.timestamp() as u64))
+        } else {
+            error!("pid {} get stat fail", proc.pid);
+            (0, Duration::ZERO)
         };
 
         Ok(ProcessData {
-            name: proc_name.clone(),
+            name: status.name.clone(),
             pid: proc.pid as u64,
-            ppid: if let Ok(stat) = proc.stat().as_ref() {
-                stat.ppid as u64
-            } else {
-                error!("pid {} get stat fail", proc.pid);
-                0
-            },
-            process_name: proc_name,
-            cmd,
+            ppid,
+            process_name: status.name.clone(),
+            cmd: command,
+            cmd_with_args,
             user_id: uid,
             user: "".to_string(),
-            start_time: {
-                if let Ok(stat) = proc.stat() {
-                    let z = stat.starttime().unwrap_or_default();
-                    Duration::from_secs(z.timestamp() as u64)
-                } else {
-                    Duration::ZERO
-                }
-            },
+            start_time,
             os_app_tags: vec![],
             netns_id: get_proc_netns(proc)? as u32,
             container_id: get_container_id(proc).unwrap_or("".to_string()),
@@ -197,7 +190,7 @@ impl From<&ProcessData> for ProcessInfo {
             name: Some(p.name.clone()),
             pid: Some(p.pid),
             process_name: Some(p.process_name.clone()),
-            cmdline: Some(p.cmd.join(" ")),
+            cmdline: Some(p.cmd_with_args.join(" ")),
             user: Some(p.user.clone()),
             start_time: Some(u32::try_from(p.start_time.as_secs()).unwrap_or_default()),
             os_app_tags: {
@@ -223,7 +216,7 @@ impl From<&ProcessData> for trident::ProcessInfo {
             name: Some(p.name.clone()),
             pid: Some(p.pid),
             process_name: Some(p.process_name.clone()),
-            cmdline: Some(p.cmd.join(" ")),
+            cmdline: Some(p.cmd_with_args.join(" ")),
             user: Some(p.user.clone()),
             start_time: Some(u32::try_from(p.start_time.as_secs()).unwrap_or_default()),
             os_app_tags: {
@@ -558,7 +551,8 @@ mod test {
                     pid: 999,
                     ppid: 0,
                     process_name: "root".into(),
-                    cmd: vec!["root".into()],
+                    cmd: "root".into(),
+                    cmd_with_args: vec!["root".into()],
                     user_id: 0,
                     user: "u".into(),
                     start_time: Duration::ZERO,
@@ -574,7 +568,8 @@ mod test {
                     pid: 99,
                     ppid: 999,
                     process_name: "parent".into(),
-                    cmd: vec!["parent".into()],
+                    cmd: "parent".into(),
+                    cmd_with_args: vec!["parent".into()],
                     user_id: 0,
                     user: "u".into(),
                     start_time: Duration::ZERO,
@@ -590,7 +585,8 @@ mod test {
                     pid: 9999,
                     ppid: 99,
                     process_name: "child".into(),
-                    cmd: vec!["child".into()],
+                    cmd: "child".into(),
+                    cmd_with_args: vec!["child".into()],
                     user_id: 0,
                     user: "u".into(),
                     start_time: Duration::ZERO,
@@ -606,7 +602,8 @@ mod test {
                     pid: 777,
                     ppid: 98,
                     process_name: "other".into(),
-                    cmd: vec!["other".into()],
+                    cmd: "other".into(),
+                    cmd_with_args: vec!["other".into()],
                     user_id: 0,
                     user: "u".into(),
                     start_time: Duration::ZERO,
