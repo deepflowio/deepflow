@@ -41,6 +41,7 @@ import (
 type prometheusReader struct {
 	slimit                  int
 	orgID                   string
+	extraFilters            string
 	blockTeamID             []string
 	interceptPrometheusExpr func(func(e *parser.AggregateExpr) error) error
 	getExternalTagFromCache func(string, string) string
@@ -62,7 +63,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		// when error occurs, means query not finished yet, remove the first query placeholder
 		// if error is nil, means query finished, don't clean key
 		if err != nil || response == nil {
-			cache.PromReadResponseCache().Remove(r, cacheOrgFilterKey)
+			cache.PromReadResponseCache().Remove(r, cacheOrgFilterKey, p.extraFilters)
 		}
 	}(req)
 
@@ -72,7 +73,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	if cacheAvailable {
 		var hit cache.CacheHit
 		var cacheItem *cache.CacheItem
-		cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, cacheOrgFilterKey)
+		cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, cacheOrgFilterKey, p.extraFilters)
 		if cacheItem != nil {
 			response = cacheItem.Data()
 		}
@@ -86,7 +87,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 				log.Infof("req [%s:%d-%d] wait 10 seconds to get cache result", metricName, start, end)
 				return response, "", "", 0, errors.New("query timeout, retry to get response! ")
 			case <-loadCompleted:
-				cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, cacheOrgFilterKey)
+				cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, cacheOrgFilterKey, p.extraFilters)
 				if cacheItem != nil {
 					response = cacheItem.Data()
 				}
@@ -182,7 +183,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 
 	if cacheAvailable {
 		// merge result into cache
-		response = cache.PromReadResponseCache().AddOrMerge(req, resp, cacheOrgFilterKey)
+		response = cache.PromReadResponseCache().AddOrMerge(req, resp, cacheOrgFilterKey, p.extraFilters)
 	} else {
 		// not using cache, query result would be real result
 		response = resp
