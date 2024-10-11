@@ -98,6 +98,12 @@ func RegisterIngesterCommand(root *cobra.Command) {
 			{Cmd: "set-interval [second]", Helper: "set free os memory interval"},
 		},
 	))
+
+	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
+		ingesterctl.CMD_WRITE_MULTIPLE,
+		debug.CmdHelper{Cmd: "write-mul [times]", Helper: "write multiple commands"},
+		nil,
+	))
 	ingesterCmd.AddCommand(debug.ClientRegisterSimple(
 		ingesterctl.CMD_ORG_SWITCH,
 		debug.CmdHelper{Cmd: "switch-to-debug-org [org-id]", Helper: "the debugging command switches to the specified organization"},

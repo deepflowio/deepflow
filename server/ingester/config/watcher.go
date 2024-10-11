@@ -22,13 +22,17 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
+	"github.com/deepflowio/deepflow/server/ingester/ingesterctl"
+	debugcmd "github.com/deepflowio/deepflow/server/libs/debug"
 	libs "github.com/deepflowio/deepflow/server/libs/kubernetes"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -127,6 +131,7 @@ func NewWatcher(cfg *Config, myNodeName, myPodName, myPodNamespace string) (*Wat
 		lastNodePodNames:              make(map[string][]string),
 		lastServerEndpointsMap:        make(map[string][]Endpoint),
 	}
+	debugcmd.ServerRegisterSimple(ingesterctl.CMD_WRITE_MULTIPLE, watcher)
 
 	go watcher.Run()
 
@@ -501,4 +506,15 @@ func getServerEndpointMap(nodePodNamesMap map[string][]string, nodeEndpointsMap 
 	}
 
 	return serverEndpointMap
+}
+
+func (f *Watcher) HandleSimpleCommand(op uint16, arg string) string {
+	writeMultiple, err := strconv.Atoi(arg)
+	if err == nil {
+		str := fmt.Sprintf("writer muliple change from %d to %d", WriteMultiple, writeMultiple)
+		WriteMultiple = writeMultiple
+		receiver.MultiWriteTimes = writeMultiple
+		return str
+	}
+	return fmt.Sprint(err)
 }
