@@ -39,7 +39,7 @@ use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::L7ProtocolParser;
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
-use crate::flow_generator::{DnsLog, OracleLog, TlsLog};
+use crate::flow_generator::{DnsLog, MemcachedLog, OracleLog, TlsLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::platform::{get_container_id, OsAppTag, ProcessData};
 use crate::{
@@ -1502,6 +1502,7 @@ impl Default for ApplicationProtocolInference {
                 "Oracle".to_string(),
                 "Redis".to_string(),
                 "MongoDB".to_string(),
+                "Memcached".to_string(),
                 "Kafka".to_string(),
                 "MQTT".to_string(),
                 "AMQP".to_string(),
@@ -3087,6 +3088,7 @@ impl UserConfig {
     const DEFAULT_DNS_PORTS: &'static str = "53,5353";
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
     const DEFAULT_ORACLE_PORTS: &'static str = "1521";
+    const DEFAULT_MEMCACHED_PORTS: &'static str = "11211";
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
     pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
@@ -3153,6 +3155,20 @@ impl UserConfig {
             new.insert(
                 oracle_str.to_string(),
                 Self::DEFAULT_ORACLE_PORTS.to_string(),
+            );
+        }
+        let memcached_str = L7ProtocolParser::Memcached(MemcachedLog::default()).as_str();
+        // memcached default only parse 11211 port. when l7_protocol_ports config without MEMCACHED, need to reserve the memcached default config.
+        if !self
+            .processors
+            .request_log
+            .filters
+            .port_number_prefilters
+            .contains_key(memcached_str)
+        {
+            new.insert(
+                memcached_str.to_string(),
+                Self::DEFAULT_MEMCACHED_PORTS.to_string(),
             );
         }
 
@@ -3816,6 +3832,7 @@ impl YamlConfig {
     const DEFAULT_DNS_PORTS: &'static str = "53,5353";
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
     const DEFAULT_ORACLE_PORTS: &'static str = "1521";
+    const DEFAULT_MEMCACHED_PORTS: &'static str = "11211";
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
     const DEFAULT_L7_PROTOCOL_ENABLED: [&'static str; 7] =
         ["HTTP", "HTTP2", "MySQL", "Redis", "Kafka", "DNS", "TLS"];
@@ -4085,6 +4102,14 @@ impl YamlConfig {
             new.insert(
                 oracle_str.to_string(),
                 Self::DEFAULT_ORACLE_PORTS.to_string(),
+            );
+        }
+        let memcached_str = L7ProtocolParser::Memcached(MemcachedLog::default()).as_str();
+        // memcached default only parse 11211 port. when l7_protocol_ports config without MEMCACHED, need to reserve the memcached default config.
+        if !self.l7_protocol_ports.contains_key(memcached_str) {
+            new.insert(
+                memcached_str.to_string(),
+                Self::DEFAULT_MEMCACHED_PORTS.to_string(),
             );
         }
 

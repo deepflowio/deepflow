@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-use crate::platform::ProcessData;
-
 extern crate libc;
 extern crate trace_utils;
 
@@ -76,6 +74,8 @@ pub const SOCK_DATA_ORACLE: u16 = 62;
 pub const SOCK_DATA_REDIS: u16 = 80;
 #[allow(dead_code)]
 pub const SOCK_DATA_MONGO: u16 = 81;
+#[allow(dead_code)]
+pub const SOCK_DATA_MEMCACHED: u16 = 82;
 #[allow(dead_code)]
 pub const SOCK_DATA_KAFKA: u16 = 100;
 #[allow(dead_code)]
@@ -720,66 +720,6 @@ extern "C" {
 
             pub fn disable_memory_profiler() -> c_int;
         }
-    }
-}
-
-pub fn set_feature_uprobe_golang(pids: &Vec<u32>, _: &Vec<ProcessData>) {
-    unsafe {
-        set_feature_pids(
-            FEATURE_UPROBE_GOLANG,
-            pids.as_ptr() as *const i32,
-            pids.len() as i32,
-        );
-    }
-}
-
-pub fn set_feature_uprobe_golang_symbol(pids: &Vec<u32>, _: &Vec<ProcessData>) {
-    unsafe {
-        set_feature_pids(
-            FEATURE_UPROBE_GOLANG_SYMBOL,
-            pids.as_ptr() as *const i32,
-            pids.len() as i32,
-        );
-    }
-}
-
-pub fn set_feature_uprobe_tls(pids: &Vec<u32>, _: &Vec<ProcessData>) {
-    unsafe {
-        set_feature_pids(
-            FEATURE_UPROBE_OPENSSL,
-            pids.as_ptr() as *const i32,
-            pids.len() as i32,
-        );
-    }
-}
-
-pub fn set_feature_on_cpu(pids: &Vec<u32>, _: &Vec<ProcessData>) {
-    unsafe {
-        set_feature_pids(
-            FEATURE_PROFILE_ONCPU,
-            pids.as_ptr() as *const i32,
-            pids.len() as i32,
-        );
-    }
-}
-
-pub fn set_feature_off_cpu(pids: &Vec<u32>, _: &Vec<ProcessData>) {
-    unsafe {
-        set_feature_pids(
-            FEATURE_PROFILE_OFFCPU,
-            pids.as_ptr() as *const i32,
-            pids.len() as i32,
-        );
-    }
-}
-
-pub fn set_feature_memory(pids: &Vec<u32>, _: &Vec<ProcessData>) {
-    unsafe {
-        set_feature_pids(
-            FEATURE_PROFILE_MEMORY,
-            pids.as_ptr() as *const i32,
-            pids.len() as i32,
-        );
     }
 }
 

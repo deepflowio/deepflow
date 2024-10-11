@@ -170,6 +170,7 @@ impl_protocol_parser! {
         Kafka(KafkaLog),
         Redis(RedisLog),
         MongoDB(MongoDBLog),
+        Memcached(MemcachedLog),
         PostgreSQL(PostgresqlLog),
         Dubbo(DubboLog),
         FastCGI(FastCGILog),
@@ -184,7 +185,6 @@ impl_protocol_parser! {
         OpenWire(OpenWireLog),
         TLS(TlsLog),
         SomeIp(SomeIpLog),
-        Memcached(MemcachedLog),
         // add protocol below
     }
 }
@@ -532,8 +532,8 @@ impl L7ProtocolChecker for L7ProtocolBitmap {
     }
 }
 
-impl From<&Vec<String>> for L7ProtocolBitmap {
-    fn from(vs: &Vec<String>) -> Self {
+impl From<&[String]> for L7ProtocolBitmap {
+    fn from(vs: &[String]) -> Self {
         let mut bitmap = L7ProtocolBitmap(0);
         for v in vs.iter() {
             if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {
