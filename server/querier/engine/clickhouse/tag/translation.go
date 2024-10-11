@@ -758,7 +758,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap["tag."] = map[string]*Tag{
 		"default": NewTag(
 			"tag_values[indexOf(tag_names,'%s')]",
-			"%s != ''",
+			"tag_values[indexOf(tag_names,'%s')] != ''",
 			"tag_values[indexOf(tag_names,'%s')] %s %v",
 			"%s(tag_values[indexOf(tag_names,'%s')],%v)",
 		),
@@ -767,7 +767,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap["attribute."] = map[string]*Tag{
 		"default": NewTag(
 			"attribute_values[indexOf(attribute_names,'%s')]",
-			"%s != ''",
+			"attribute_values[indexOf(attribute_names,'%s')] != ''",
 			"attribute_values[indexOf(attribute_names,'%s')] %s %v",
 			"%s(attribute_values[indexOf(attribute_names,'%s')],%v)",
 		),
