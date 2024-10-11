@@ -159,7 +159,7 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 		} else {
 			// non-resource tags
 			engine := &CHEngine{DB: db, Table: table}
-			notNullExpr, ok := GetNotNullFilter(resource, engine)
+			notNullExpr, ok := GetNotNullFilter(args[0], engine)
 			if !ok {
 				return
 			}
