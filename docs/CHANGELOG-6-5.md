@@ -11,6 +11,8 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: modify exist attribute tag translation [#8273](https://github.com/deepflowio/deepflow/pull/8273) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: fix exist attribute tag error [#8268](https://github.com/deepflowio/deepflow/pull/8268) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: topK multiple parameter query error [#8250](https://github.com/deepflowio/deepflow/pull/8250) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: querier TopK supporrt resource_id [#8234](https://github.com/deepflowio/deepflow/pull/8234) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - Other eBPF bin-file will be selected when kfunc loading fails [#8227](https://github.com/deepflowio/deepflow/pull/8227) by [yinjiping](https://github.com/yinjiping)

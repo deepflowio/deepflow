@@ -8,6 +8,10 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: modify exist attribute tag translation [#8272](https://github.com/deepflowio/deepflow/pull/8272) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: fix exist attribute tag error [#8269](https://github.com/deepflowio/deepflow/pull/8269) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: fix exist attribute tag error [#8267](https://github.com/deepflowio/deepflow/pull/8267) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: process matcher error [#8264](https://github.com/deepflowio/deepflow/pull/8264) by [yuanchaoa](https://github.com/yuanchaoa)
 * fix: topK multiple parameter query error [#8249](https://github.com/deepflowio/deepflow/pull/8249) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: add process_id in profile data query [#8238](https://github.com/deepflowio/deepflow/pull/8238) by [taloric](https://github.com/taloric)
 * fix: custom data source creation failed in enterprise ClickHouse [#8233](https://github.com/deepflowio/deepflow/pull/8233) by [lzf575](https://github.com/lzf575)
