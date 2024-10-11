@@ -175,10 +175,10 @@ var (
 		output: "SELECT if(dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name'))!='', dictGet(flow_tag.pod_service_k8s_label_map, 'value', (toUInt64(service_id_0),'statefulset.kubernetes.io/pod-name')), dictGet(flow_tag.pod_k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) ) AS `k8s.label.abc` FROM flow_log.`l4_flow_log` PREWHERE ((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name'))) AND (((toUInt64(service_id_0) IN (SELECT id FROM flow_tag.pod_service_k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name')) OR (toUInt64(pod_id_0) IN (SELECT id FROM flow_tag.pod_k8s_label_map WHERE key='statefulset.kubernetes.io/pod-name')))) GROUP BY `k8s.label.abc` LIMIT 10000",
 	}, {
 		input:  "select `attribute.cc` as `attribute.abc` from l7_flow_log where `attribute.abc`='opensource-loki-0' group by `attribute.abc`",
-		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.`l7_flow_log` PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' AND (`attribute.abc` != '') GROUP BY `attribute.abc` LIMIT 10000",
+		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.`l7_flow_log` PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' AND (attribute_values[indexOf(attribute_names,'attribute.cc')] != '') GROUP BY `attribute.abc` LIMIT 10000",
 	}, {
 		input:  "select `tag.cc` as `tag.abc` from cpu where `tag.abc`='opensource-loki-0' group by `tag.abc`",
-		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu') AND tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' AND (`tag.abc` != '') GROUP BY `tag.abc` LIMIT 10000",
+		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.`metrics` PREWHERE (virtual_table_name='cpu') AND tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' AND (tag_values[indexOf(tag_names,'tag.cc')] != '') GROUP BY `tag.abc` LIMIT 10000",
 		db:     "ext_metrics",
 	}, {
 		input:  "select `metrics.storageclass_annotations` AS `job_info` from prometheus_kube",
@@ -280,8 +280,8 @@ var (
 		input:  "SELECT chost_id_0 from l4_flow_log WHERE NOT exist(chost_0) LIMIT 1",
 		output: "SELECT if(l3_device_type_0=1,l3_device_id_0, 0) AS `chost_id_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (l3_device_type_0=1) LIMIT 1",
 	}, {
-		input:  "SELECT response_code from l4_flow_log WHERE exist(response_code) LIMIT 1",
-		output: "SELECT response_code FROM flow_log.`l4_flow_log` PREWHERE ((isNotNull(response_code))) LIMIT 1",
+		input:  "SELECT response_code, `attribute.a.b`, `attribute.c.d` AS attr_c_d from l7_flow_log WHERE exist(response_code) AND exist(`attribute.a.b`) AND exist(`attribute.c.d`) LIMIT 1",
+		output: "SELECT response_code, attribute_values[indexOf(attribute_names,'a.b')] AS `attribute.a.b`, attribute_values[indexOf(attribute_names,'c.d')] AS `attr_c_d` FROM flow_log.`l7_flow_log` PREWHERE ((isNotNull(response_code))) AND ((attribute_values[indexOf(attribute_names,'attribute.a.b')] != '')) AND ((attribute_values[indexOf(attribute_names,'attribute.c.d')] != '')) LIMIT 1",
 	}, {
 		input:  "SELECT `cloud.tag.xx_0` from l4_flow_log WHERE NOT exist(`cloud.tag.xx_0`) LIMIT 1",
 		output: "SELECT if(if(l3_device_type_0=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id_0),'xx')), '')!='',if(l3_device_type_0=1, dictGet(flow_tag.chost_cloud_tag_map, 'value', (toUInt64(l3_device_id_0),'xx')), ''), dictGet(flow_tag.pod_ns_cloud_tag_map, 'value', (toUInt64(pod_ns_id_0),'xx')) ) AS `cloud.tag.xx_0` FROM flow_log.`l4_flow_log` PREWHERE NOT (((toUInt64(l3_device_id_0) IN (SELECT id FROM flow_tag.chost_cloud_tag_map WHERE key='xx') AND l3_device_type_0=1) OR (toUInt64(pod_ns_id_0) IN (SELECT id FROM flow_tag.pod_ns_cloud_tag_map WHERE key='xx')))) LIMIT 1",

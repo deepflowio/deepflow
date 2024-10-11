@@ -208,15 +208,19 @@ func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
 						filter = fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 					}
 					return &view.Expr{Value: "(" + filter + ")"}, true
-				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
+				} else if strings.HasPrefix(preAsTag, "tag.") {
 					if db == chCommon.DB_NAME_PROMETHEUS {
 						return &view.Expr{}, false
 					}
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
-					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+					filter := fmt.Sprintf(tagItem.NotNullFilter, preAsTag)
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if strings.HasPrefix(preAsTag, "attribute.") {
+					tagItem, ok = tag.GetTag("attribute.", db, table, "default")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, preAsTag)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if common.IsValueInSliceString(preAsTag, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
-					filter := fmt.Sprintf("%s is not null", name)
+					filter := fmt.Sprintf("%s is not null", preAsTag)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				}
 				return &view.Expr{}, false
@@ -239,11 +243,15 @@ func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
 					filter = fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				}
 				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else if strings.HasPrefix(noBackQuoteName, "tag.") || strings.HasPrefix(noBackQuoteName, "attribute.") {
+			} else if strings.HasPrefix(noBackQuoteName, "tag.") {
 				if db == chCommon.DB_NAME_PROMETHEUS {
 					return &view.Expr{}, false
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if strings.HasPrefix(noBackQuoteName, "attribute.") {
+				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if common.IsValueInSliceString(noBackQuoteName, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
