@@ -344,6 +344,11 @@ pub struct MemcachedLog {
 }
 
 impl MemcachedLog {
+    fn reset(&mut self) {
+        self.perf_stats = None;
+        self.was_on_blacklist = false;
+    }
+
     fn parse_commands(mut payload: &[u8]) -> Result<Vec<MemcachedInfo>> {
         let mut mis = vec![];
         while !payload.is_empty() {

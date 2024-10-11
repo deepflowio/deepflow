@@ -67,6 +67,7 @@ all_protocol_info!(
     MysqlInfo(MysqlInfo),
     RedisInfo(RedisInfo),
     MongoDBInfo(MongoDBInfo),
+    MemcachedInfo(MemcachedInfo),
     DubboInfo(DubboInfo),
     FastCGIInfo(FastCGIInfo),
     BrpcInfo(BrpcInfo),
@@ -83,7 +84,6 @@ all_protocol_info!(
     SofaRpcInfo(SofaRpcInfo),
     TlsInfo(TlsInfo),
     SomeIpInfo(SomeIpInfo),
-    MemcachedInfo(MemcachedInfo),
     CustomInfo(CustomInfo),
     // add new protocol info below
 );
