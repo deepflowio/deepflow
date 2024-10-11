@@ -30,6 +30,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
+	"github.com/deepflowio/deepflow/server/libs/receiver"
 )
 
 var log = logging.MustGetLogger("config")
@@ -163,8 +164,11 @@ func (c *CKDB) updateActualAddrs(endpoints []Endpoint) {
 	c.ActualAddrs = &c.actualAddrsValue
 }
 
+var WriteMultiple = 1
+
 type Config struct {
 	IsRunningModeStandalone  bool
+	WriteMultiple            int             `yaml:"write-multiple"`
 	StorageDisabled          bool            `yaml:"storage-disabled"`
 	ListenPort               uint16          `yaml:"listen-port"`
 	CKDB                     CKDB            `yaml:"ckdb"`
@@ -245,6 +249,13 @@ func (c *Config) Validate() error {
 			}
 			c.TraceIdWithIndex.FormatIsHex = c.TraceIdWithIndex.IncrementalIdLocation.Format == FormatHex
 		}
+	}
+
+	if c.WriteMultiple > 0 {
+		WriteMultiple = c.WriteMultiple
+		receiver.MultiWriteTimes = c.WriteMultiple
+
+		log.Infof("========= write multiple is %d", WriteMultiple)
 	}
 
 	if len(c.ControllerIPs) == 0 {
@@ -533,6 +544,7 @@ func Load(path string) *Config {
 			StatsInterval:            DefaultStatsInterval,
 			FlowTagCacheFlushTimeout: DefaultFlowTagCacheFlushTimeout,
 			FlowTagCacheMaxSize:      DefaultFlowTagCacheMaxSize,
+			WriteMultiple:            1,
 		},
 	}
 	if err != nil {

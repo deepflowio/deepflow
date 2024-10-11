@@ -42,6 +42,8 @@ import (
 	. "github.com/deepflowio/deepflow/server/libs/utils"
 )
 
+var MultiWriteTimes int = 1
+
 const (
 	RECV_BUFSIZE_2K           = 1 << 11       // 2k for UDP
 	RECV_BUFSIZE_8K           = 1 << 13       // 8k
@@ -930,6 +932,17 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 			recvBuffer.TeamID = teamID
 			recvBuffer.OrgID = orgID
 			r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
+			for i := 1; i < MultiWriteTimes; i++ {
+				buffer, _ := AcquireRecvBuffer(dataLen, TCP)
+				buffer.Begin = 0
+				buffer.End = int(baseHeader.FrameSize) - headerLen
+				copy(buffer.Buffer, recvBuffer.Buffer[:recvBuffer.End])
+				buffer.IP = ip
+				buffer.VtapID = vtapID
+				buffer.TeamID = teamID
+				buffer.OrgID = orgID
+				r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], buffer)
+			}
 		}
 	}
 }
