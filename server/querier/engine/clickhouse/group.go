@@ -213,11 +213,13 @@ func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
 						return &view.Expr{}, false
 					}
 					tagItem, ok = tag.GetTag("tag.", db, table, "default")
-					filter := fmt.Sprintf(tagItem.NotNullFilter, preAsTag)
+					filterName := strings.TrimPrefix(strings.Trim(preAsTag, "`"), "tag.")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "attribute.") {
 					tagItem, ok = tag.GetTag("attribute.", db, table, "default")
-					filter := fmt.Sprintf(tagItem.NotNullFilter, preAsTag)
+					filterName := strings.TrimPrefix(strings.Trim(preAsTag, "`"), "attribute.")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if common.IsValueInSliceString(preAsTag, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
 					filter := fmt.Sprintf("%s is not null", preAsTag)
@@ -248,11 +250,13 @@ func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
 					return &view.Expr{}, false
 				}
 				tagItem, ok = tag.GetTag("tag.", db, table, "default")
-				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+				filterName := strings.TrimPrefix(strings.Trim(name, "`"), "tag.")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if strings.HasPrefix(noBackQuoteName, "attribute.") {
 				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
-				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+				filterName := strings.TrimPrefix(strings.Trim(name, "`"), "attribute.")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, filterName)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			} else if common.IsValueInSliceString(noBackQuoteName, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
 				filter := fmt.Sprintf("%s is not null", name)
