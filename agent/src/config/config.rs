@@ -321,6 +321,7 @@ pub enum ProcessMatchType {
     ProcessName,
     ParentProcessName,
     Tag,
+    CmdWithArgs,
 }
 
 impl From<&str> for ProcessMatchType {
@@ -329,6 +330,7 @@ impl From<&str> for ProcessMatchType {
             OS_PROC_REGEXP_MATCH_TYPE_CMD => Self::Cmd,
             OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME => Self::ParentProcessName,
             OS_PROC_REGEXP_MATCH_TYPE_TAG => Self::Tag,
+            OS_PROC_REGEXP_MATCH_TYPE_CMD_WITH_ARGS => Self::CmdWithArgs,
             _ => Self::ProcessName,
         }
     }
@@ -459,10 +461,17 @@ impl ProcessMatcher {
 
         match self.match_type {
             ProcessMatchType::Cmd => {
+                if match_replace_fn(&self.match_regex, &self.action, &process_data.cmd, &replace) {
+                    Some(process_data)
+                } else {
+                    None
+                }
+            }
+            ProcessMatchType::CmdWithArgs => {
                 if match_replace_fn(
                     &self.match_regex,
                     &self.action,
-                    &process_data.cmd.join(" "),
+                    &process_data.cmd_with_args.join(" "),
                     &replace,
                 ) {
                     Some(process_data)
@@ -3353,6 +3362,7 @@ pub const OS_PROC_REGEXP_MATCH_TYPE_CMD: &'static str = "cmdline";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
+pub const OS_PROC_REGEXP_MATCH_TYPE_CMD_WITH_ARGS: &'static str = "cmdline_with_args";
 
 pub const OS_PROC_REGEXP_MATCH_ACTION_ACCEPT: &'static str = "accept";
 pub const OS_PROC_REGEXP_MATCH_ACTION_DROP: &'static str = "drop";
