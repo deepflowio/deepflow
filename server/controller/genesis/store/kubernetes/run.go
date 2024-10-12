@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	mcommon "github.com/deepflowio/deepflow/message/common"
 	api "github.com/deepflowio/deepflow/message/controller"
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -188,16 +189,33 @@ func (g *GenesisKubernetes) Start() {
 				log.Warningf("k8s from (%s) vtap_id (%v) type (%v) exit", info.Peer, info.VtapID, info.MessageType, logger.NewORGPrefix(info.ORGID))
 				break
 			}
-			clusterID := info.Message.GetClusterId()
-			log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %v", info.Peer, info.VtapID, clusterID, info.Message.GetVersion(), logger.NewORGPrefix(info.ORGID))
+			var version uint64
+			var clusterID, errMsg string
+			var entries []*mcommon.KubernetesAPIInfo
+			if info.Message != nil {
+				clusterID = info.Message.GetClusterId()
+				version = info.Message.GetVersion()
+				errMsg = info.Message.GetErrorMsg()
+				entries = info.Message.GetEntries()
+			} else if info.AgentMessage != nil {
+				clusterID = info.AgentMessage.GetClusterId()
+				version = info.AgentMessage.GetVersion()
+				errMsg = info.AgentMessage.GetErrorMsg()
+				entries = info.AgentMessage.GetEntries()
+			} else {
+				log.Errorf("k8s message is nil, vtap_id (%d)", info.VtapID, logger.NewORGPrefix(info.ORGID))
+				continue
+			}
+
+			log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %d", info.Peer, info.VtapID, clusterID, version, logger.NewORGPrefix(info.ORGID))
 			// 更新和保存内存数据
 			kStorage.Add(info.ORGID, common.KubernetesInfo{
 				ORGID:     info.ORGID,
 				ClusterID: clusterID,
 				Epoch:     time.Now(),
-				ErrorMSG:  info.Message.GetErrorMsg(),
-				Version:   info.Message.GetVersion(),
-				Entries:   info.Message.GetEntries(),
+				ErrorMSG:  errMsg,
+				Version:   version,
+				Entries:   entries,
 			})
 		}
 	}()

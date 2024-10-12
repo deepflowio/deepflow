@@ -25,6 +25,7 @@ import (
 
 	"google.golang.org/grpc/peer"
 
+	"github.com/deepflowio/deepflow/message/agent"
 	tridentcommon "github.com/deepflowio/deepflow/message/common"
 	"github.com/deepflowio/deepflow/message/controller"
 	"github.com/deepflowio/deepflow/message/trident"
@@ -51,20 +52,23 @@ func isInterestedHost(tType tridentcommon.TridentType) bool {
 }
 
 type TridentStats struct {
-	OrgID                           int
-	TeamID                          int
-	VtapID                          uint32
-	TeamShortLcuuid                 string
-	IP                              string
-	Proxy                           string
-	K8sVersion                      uint64
-	SyncVersion                     uint64
-	K8sLastSeen                     time.Time
-	SyncLastSeen                    time.Time
-	K8sClusterID                    string
-	SyncTridentType                 tridentcommon.TridentType
-	GenesisSyncDataOperation        *trident.GenesisPlatformData
-	GenesisSyncProcessDataOperation *trident.GenesisProcessData
+	OrgID                                int
+	TeamID                               int
+	VtapID                               uint32
+	TeamShortLcuuid                      string
+	IP                                   string
+	Proxy                                string
+	K8sVersion                           uint64
+	SyncVersion                          uint64
+	K8sLastSeen                          time.Time
+	SyncLastSeen                         time.Time
+	K8sClusterID                         string
+	SyncAgentType                        agent.AgentType
+	SyncTridentType                      tridentcommon.TridentType
+	GenesisSyncDataOperation             *trident.GenesisPlatformData
+	GenesisSyncProcessDataOperation      *trident.GenesisProcessData
+	AgentGenesisSyncDataOperation        *agent.GenesisPlatformData
+	AgentGenesisSyncProcessDataOperation *agent.GenesisProcessData
 }
 
 type SynchronizerServer struct {
