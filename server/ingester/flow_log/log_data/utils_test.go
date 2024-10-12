@@ -37,7 +37,7 @@ func TestParseUrlPath(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		result, err := parseUrlPath(testCase.url)
+		result, err := ParseUrlPath(testCase.url)
 		if (err != nil) != testCase.err {
 			t.Errorf("URL: %s\nExpected error: %v\nGot error: %v\n", testCase.url, testCase.err, err != nil)
 		}
