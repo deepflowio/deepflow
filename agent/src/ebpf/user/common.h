@@ -281,6 +281,7 @@ u64 get_process_starttime_and_comm(pid_t pid,
 				   int len);
 u32 legacy_fetch_log2_page_size(void);
 u64 get_netns_id_from_pid(pid_t pid);
+bool check_netns_enabled(void);
 int get_nspid(int pid);
 int get_target_uid_and_gid(int target_pid, int *uid, int *gid);
 int copy_file(const char *src_file, const char *dest_file);

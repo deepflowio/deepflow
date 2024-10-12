@@ -537,12 +537,17 @@ u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 	unsigned long long etime_ticks = 0;
 
 	snprintf(file, sizeof(file), "/proc/%d/stat", pid);
-	if (access(file, F_OK))
+	if (access(file, F_OK)) {
+		ebpf_warning("file %s is not exited\n", file);
 		return 0;
+	}
 
 	fd = open(file, O_RDONLY);
-	if (fd <= 2)
+	if (fd <= 2) {
+		ebpf_warning("open %s failed with %s(%d)\n", file,
+			     strerror(errno), errno);
 		return 0;
+	}
 
 	read(fd, buff, sizeof(buff));
 	close(fd);
@@ -551,6 +556,7 @@ u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 	if (sscanf(buff, "%*s %ms %*s %*s %*s %*s %*s %*s %*s %*s %*s"
 		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
 		   &start, &etime_ticks) != 2) {
+		ebpf_warning("sscanf() failed. pid %d buff %s\n", pid, buff);
 		return 0;
 	}
 
@@ -911,6 +917,21 @@ u64 get_netns_id_from_pid(pid_t pid)
 	return strtoull(netns_id_str, NULL, 10);
 }
 
+bool check_netns_enabled(void)
+{
+	char netns_path[MAX_PATH_LENGTH];
+	snprintf(netns_path, sizeof(netns_path), "/proc/1/ns/net");
+
+	char target_path[MAX_PATH_LENGTH];
+	ssize_t len =
+	    readlink(netns_path, target_path, sizeof(target_path) - 1);
+	if (len == -1) {
+		return false;
+	}
+
+	return true;
+}
+	
 // Function to retrieve the host PID from the first line of /proc/pid/sched
 // The expected format is "java (1234, #threads: 12)"
 // where 1234 is the host PID (before Linux 4.1)

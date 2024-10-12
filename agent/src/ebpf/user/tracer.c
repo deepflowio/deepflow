@@ -1777,6 +1777,11 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	prev_sys_boot_time_ns = sys_boot_time_ns;
 	ebpf_info("sys_boot_time_ns : %llu\n", sys_boot_time_ns);
 
+	if (!check_netns_enabled())
+		ebpf_warning("If the system has not enabled the 'CONFIG_NET_NS'"
+			     " option, the 'netns_id' for continuously profiling"
+			     " data will be 0.\n");
+
 	/*
 	 * Set up the lock now, so we can use it to make the first add
 	 * thread-safe for tracer alloc.

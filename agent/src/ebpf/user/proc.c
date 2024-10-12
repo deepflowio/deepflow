@@ -545,8 +545,6 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->thread_names = NULL;
 	p->thread_names_lock = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
-	if (p->netns_id == 0)
-		return ETR_INVAL;
 
 	fetch_container_id(pid, p->container_id, sizeof(p->container_id));
 
