@@ -57,24 +57,24 @@ func NewSyncStorage(ctx context.Context, cfg config.GenesisConfig, sChan chan co
 	}
 }
 
-func (s *SyncStorage) Renew(info common.VIFRPCMessage, data common.GenesisSyncDataResponse) {
+func (s *SyncStorage) Renew(orgID int, data common.GenesisSyncDataResponse) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.genesisSyncInfo.VIPs.Renew(info.ORGID, now, data.VIPs)
-	s.genesisSyncInfo.VMs.Renew(info.ORGID, now, data.VMs)
-	s.genesisSyncInfo.VPCs.Renew(info.ORGID, now, data.VPCs)
-	s.genesisSyncInfo.Hosts.Renew(info.ORGID, now, data.Hosts)
-	s.genesisSyncInfo.Lldps.Renew(info.ORGID, now, data.Lldps)
-	s.genesisSyncInfo.Ports.Renew(info.ORGID, now, data.Ports)
-	s.genesisSyncInfo.Networks.Renew(info.ORGID, now, data.Networks)
-	s.genesisSyncInfo.IPlastseens.Renew(info.ORGID, now, data.IPLastSeens)
-	s.genesisSyncInfo.Vinterfaces.Renew(info.ORGID, now, data.Vinterfaces)
-	s.genesisSyncInfo.Processes.Renew(info.ORGID, now, data.Processes)
+	s.genesisSyncInfo.VIPs.Renew(orgID, now, data.VIPs)
+	s.genesisSyncInfo.VMs.Renew(orgID, now, data.VMs)
+	s.genesisSyncInfo.VPCs.Renew(orgID, now, data.VPCs)
+	s.genesisSyncInfo.Hosts.Renew(orgID, now, data.Hosts)
+	s.genesisSyncInfo.Lldps.Renew(orgID, now, data.Lldps)
+	s.genesisSyncInfo.Ports.Renew(orgID, now, data.Ports)
+	s.genesisSyncInfo.Networks.Renew(orgID, now, data.Networks)
+	s.genesisSyncInfo.IPlastseens.Renew(orgID, now, data.IPLastSeens)
+	s.genesisSyncInfo.Vinterfaces.Renew(orgID, now, data.Vinterfaces)
+	s.genesisSyncInfo.Processes.Renew(orgID, now, data.Processes)
 }
 
-func (s *SyncStorage) Update(info common.VIFRPCMessage, data common.GenesisSyncDataResponse) {
+func (s *SyncStorage) Update(orgID int, vtapID uint32, data common.GenesisSyncDataResponse) {
 	now := time.Now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -82,51 +82,51 @@ func (s *SyncStorage) Update(info common.VIFRPCMessage, data common.GenesisSyncD
 	updateFlag := false
 	if len(data.VIPs) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.VIPs.Update(info.ORGID, now, data.VIPs)
+		s.genesisSyncInfo.VIPs.Update(orgID, now, data.VIPs)
 	}
 	if len(data.VMs) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.VMs.Update(info.ORGID, now, data.VMs)
+		s.genesisSyncInfo.VMs.Update(orgID, now, data.VMs)
 	}
 	if len(data.VPCs) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.VPCs.Update(info.ORGID, now, data.VPCs)
+		s.genesisSyncInfo.VPCs.Update(orgID, now, data.VPCs)
 	}
 	if len(data.Hosts) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Hosts.Update(info.ORGID, now, data.Hosts)
+		s.genesisSyncInfo.Hosts.Update(orgID, now, data.Hosts)
 	}
 	if len(data.Lldps) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Lldps.Update(info.ORGID, now, data.Lldps)
+		s.genesisSyncInfo.Lldps.Update(orgID, now, data.Lldps)
 	}
 	if len(data.Ports) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Ports.Update(info.ORGID, now, data.Ports)
+		s.genesisSyncInfo.Ports.Update(orgID, now, data.Ports)
 	}
 	if len(data.Networks) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Networks.Update(info.ORGID, now, data.Networks)
+		s.genesisSyncInfo.Networks.Update(orgID, now, data.Networks)
 	}
 	if len(data.IPLastSeens) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.IPlastseens.Update(info.ORGID, now, data.IPLastSeens)
+		s.genesisSyncInfo.IPlastseens.Update(orgID, now, data.IPLastSeens)
 	}
 	if len(data.Vinterfaces) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Vinterfaces.Update(info.ORGID, now, data.Vinterfaces)
+		s.genesisSyncInfo.Vinterfaces.Update(orgID, now, data.Vinterfaces)
 	}
 	if len(data.Processes) != 0 {
 		updateFlag = true
-		s.genesisSyncInfo.Processes.Update(info.ORGID, now, data.Processes)
+		s.genesisSyncInfo.Processes.Update(orgID, now, data.Processes)
 	}
-	if updateFlag && info.VtapID != 0 {
+	if updateFlag && vtapID != 0 {
 		// push immediately after update
 		s.fetch()
 
-		db, err := mysql.GetDB(info.ORGID)
+		db, err := mysql.GetDB(orgID)
 		if err != nil {
-			log.Error("get mysql session failed", logger.NewORGPrefix(info.ORGID))
+			log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
 			return
 		}
 		nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
@@ -134,7 +134,7 @@ func (s *SyncStorage) Update(info common.VIFRPCMessage, data common.GenesisSyncD
 			Columns:   []clause.Column{{Name: "vtap_id"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{"node_ip": nodeIP}),
 		}).Create(&model.GenesisStorage{
-			VtapID: info.VtapID,
+			VtapID: vtapID,
 			NodeIP: nodeIP,
 		})
 	}
