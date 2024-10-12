@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/dbwriter"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data"
+	"github.com/deepflowio/deepflow/server/ingester/flow_log/log_data/sw_import"
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/throttler"
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowio/deepflow/server/libs/codec"
@@ -153,6 +154,7 @@ func (d *Decoder) Run() {
 	decoder := &codec.SimpleDecoder{}
 	pbTaggedFlow := pb.NewTaggedFlow()
 	pbTracesData := &v1.TracesData{}
+	pbSkywalkingData := &pb.SkyWalkingExtra{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		start := time.Now()
@@ -181,6 +183,8 @@ func (d *Decoder) Run() {
 				d.handleOpenTelemetry(decoder, pbTracesData, true)
 			case datatype.MESSAGE_TYPE_PACKETSEQUENCE:
 				d.handleL4Packet(decoder)
+			case datatype.MESSAGE_TYPE_SKYWALKING:
+				d.handleSkyWalking(decoder, pbSkywalkingData, false)
 			default:
 				log.Warningf("unknown msg type: %d", d.msgType)
 
@@ -264,6 +268,51 @@ func (d *Decoder) sendOpenMetetry(tracesData *v1.TracesData) {
 	}
 	d.counter.Count++
 	ls := log_data.OTelTracesDataToL7FlowLogs(d.agentId, d.orgId, d.teamId, tracesData, d.platformData, d.cfg)
+	for _, l := range ls {
+		l.AddReferenceCount()
+		if !d.throttler.SendWithThrottling(l) {
+			d.counter.DropCount++
+		} else {
+			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
+			l.GenerateNewFlowTags(d.flowTagWriter.Cache)
+			d.flowTagWriter.WriteFieldsAndFieldValuesInCache()
+			d.appServiceTagWrite(l)
+			d.spanWrite(l)
+		}
+		l.Release()
+	}
+}
+
+func (d *Decoder) handleSkyWalking(decoder *codec.SimpleDecoder, pbSkyWalkingData *pb.SkyWalkingExtra, compressed bool) {
+	var err error
+	for !decoder.IsEnd() {
+		pbSkyWalkingData.Reset()
+		bytes := decoder.ReadBytes()
+		if len(bytes) > 0 {
+			// universal compression
+			if compressed {
+				bytes, err = decompressOpenTelemetry(bytes)
+			}
+			if err == nil {
+				err = proto.Unmarshal(bytes, pbSkyWalkingData)
+			}
+		}
+		if decoder.Failed() || err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("skywalking data decode failed, offset=%d len=%d err: %s", decoder.Offset(), len(decoder.Bytes()), err)
+			}
+			d.counter.ErrorCount++
+			continue
+		}
+		d.sendSkyWalking(pbSkyWalkingData.Data, pbSkyWalkingData.PeerIp)
+	}
+}
+func (d *Decoder) sendSkyWalking(segmentData, peerIP []byte) {
+	if d.debugEnabled {
+		log.Debugf("decoder %d vtap %d recv skywalking data length: %d", d.index, d.agentId, len(segmentData))
+	}
+	d.counter.Count++
+	ls := sw_import.SkyWalkingDataToL7FlowLogs(d.agentId, d.orgId, d.teamId, segmentData, peerIP, d.platformData, d.cfg)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.SendWithThrottling(l) {

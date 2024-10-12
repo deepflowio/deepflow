@@ -369,7 +369,7 @@ func base64ToHexString(str string) string {
 // when the traceId-index data is stored in CK, the generated minmax index will have min non-zero, which improves the filtering performance of the minmax index
 var lastTraceIdIndex uint64
 
-func parseTraceIdIndex(traceId string, traceIdIndexCfg *config.TraceIdWithIndex) uint64 {
+func ParseTraceIdIndex(traceId string, traceIdIndexCfg *config.TraceIdWithIndex) uint64 {
 	if traceIdIndexCfg.Disabled {
 		return 0
 	}
@@ -474,7 +474,7 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData, cfg *flowlogCfg.Config
 		h.TraceId = l.TraceInfo.TraceId
 		h.ParentSpanId = l.TraceInfo.ParentSpanId
 	}
-	h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
+	h.TraceIdIndex = ParseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 
 	// 处理内置协议特殊情况
 	switch datatype.L7Protocol(h.L7Protocol) {
@@ -546,6 +546,10 @@ func (h *L7FlowLog) String() string {
 
 func (h *L7FlowLog) ID() uint64 {
 	return h._id
+}
+
+func (h *L7FlowLog) SetID(id uint64) {
+	h._id = id
 }
 
 func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {

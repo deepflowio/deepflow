@@ -87,7 +87,7 @@ func spanStatusToResponseStatus(status *v1.Status) datatype.LogMessageStatus {
 	return datatype.STATUS_NOT_EXIST
 }
 
-func httpCodeToResponseStatus(code int32) datatype.LogMessageStatus {
+func HttpCodeToResponseStatus(code int32) datatype.LogMessageStatus {
 	if code >= 400 && code <= 499 {
 		return datatype.STATUS_CLIENT_ERROR
 	} else if code >= 500 && code <= 600 {
@@ -197,7 +197,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 				}
 			case "sw8.trace_id":
 				h.TraceId = getValueString(value)
-				h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
+				h.TraceIdIndex = ParseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 			}
 
 		} else {
@@ -297,7 +297,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 	// If http.target exists, read it for RequestResource. If not exist, read the part after the domain name from http.url.
 	// eg. http.url = http://nacos:8848/nacos/v1/ns/instance/list, mapped to request_resource is /nacos/v1/ns/instance/list
 	if h.RequestResource == "" && httpURL != "" {
-		parsedURLPath, err := parseUrlPath(httpURL)
+		parsedURLPath, err := ParseUrlPath(httpURL)
 		if err != nil {
 			log.Debugf("http.url (%s) parse failed: %s", httpURL, err)
 		} else {
@@ -340,7 +340,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.TapPortType = datatype.TAPPORT_FROM_OTEL
 	h.SignalSource = uint16(datatype.SIGNAL_SOURCE_OTEL)
 	h.TraceId = hex.EncodeToString(l.TraceId)
-	h.TraceIdIndex = parseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
+	h.TraceIdIndex = ParseTraceIdIndex(h.TraceId, &cfg.Base.TraceIdWithIndex)
 	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
 	h.TapSideEnum = uint8(spanKindToTapSide(l.Kind))
@@ -362,7 +362,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks(), cfg)
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {
-		h.ResponseStatus = uint8(httpCodeToResponseStatus(h.responseCode))
+		h.ResponseStatus = uint8(HttpCodeToResponseStatus(h.responseCode))
 		if h.ResponseStatus == uint8(datatype.STATUS_CLIENT_ERROR) ||
 			h.ResponseStatus == uint8(datatype.STATUS_SERVER_ERROR) {
 			h.ResponseException = GetHTTPExceptionDesc(uint16(h.responseCode))

@@ -61,6 +61,7 @@ use crate::{
     policy::PolicyGetter,
 };
 
+use integration_skywalking::{handle_skywalking_request, SkyWalkingExtra};
 use public::{
     counter::{Counter, CounterType, CounterValue, OwnedCountable},
     enums::{CaptureNetworkType, EthernetType, L4Protocol},
@@ -595,6 +596,7 @@ async fn handler(
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
     application_log_sender: DebugSender<ApplicationLog>,
+    skywalking_sender: DebugSender<SkyWalkingExtra>,
     exception_handler: ExceptionHandler,
     compressed: bool,
     profile_compressed: bool,
@@ -825,6 +827,28 @@ async fn handler(
 
             Ok(Response::builder().body(Body::empty()).unwrap())
         }
+        (
+            &Method::POST,
+            "/v3/segments"
+            | "/skywalking.v3.TraceSegmentReportService/collect"
+            | "/skywalking.v3.TraceSegmentReportService/collectInSync",
+        ) => {
+            if external_trace_integration_disabled {
+                return Ok(Response::builder().body(Body::empty()).unwrap());
+            }
+            let (part, body) = req.into_parts();
+            let whole_body = match aggregate_with_catch_exception(body, &exception_handler).await {
+                Ok(b) => b,
+                Err(e) => {
+                    return Ok(e);
+                }
+            };
+            let data = decode_metric(whole_body, &part.headers)?;
+            Ok(
+                handle_skywalking_request(peer_addr, data, part.uri.path(), skywalking_sender)
+                    .await,
+            )
+        }
         // Return the 404 Not Found for other routes.
         _ => Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
@@ -925,6 +949,7 @@ pub struct MetricServer {
     telegraf_sender: DebugSender<TelegrafMetric>,
     profile_sender: DebugSender<Profile>,
     application_log_sender: DebugSender<ApplicationLog>,
+    skywalking_sender: DebugSender<SkyWalkingExtra>,
     port: Arc<AtomicU16>,
     exception_handler: ExceptionHandler,
     server_shutdown_tx: Mutex<Option<mpsc::Sender<()>>>,
@@ -952,6 +977,7 @@ impl MetricServer {
         telegraf_sender: DebugSender<TelegrafMetric>,
         profile_sender: DebugSender<Profile>,
         application_log_sender: DebugSender<ApplicationLog>,
+        skywalking_sender: DebugSender<SkyWalkingExtra>,
         port: u16,
         exception_handler: ExceptionHandler,
         compressed: bool,
@@ -980,6 +1006,7 @@ impl MetricServer {
                 telegraf_sender,
                 profile_sender,
                 application_log_sender,
+                skywalking_sender,
                 port: Arc::new(AtomicU16::new(port)),
                 exception_handler,
                 server_shutdown_tx: Default::default(),
@@ -1029,6 +1056,7 @@ impl MetricServer {
         let telegraf_sender = self.telegraf_sender.clone();
         let profile_sender = self.profile_sender.clone();
         let application_log_sender = self.application_log_sender.clone();
+        let skywalking_sender = self.skywalking_sender.clone();
         let port = self.port.clone();
         let monitor_port = Arc::new(AtomicU16::new(port.load(Ordering::Acquire)));
         let (mon_tx, mon_rx) = oneshot::channel();
@@ -1101,6 +1129,7 @@ impl MetricServer {
                     let telegraf_sender = telegraf_sender.clone();
                     let profile_sender = profile_sender.clone();
                     let application_log_sender = application_log_sender.clone();
+                    let skywalking_sender = skywalking_sender.clone();
                     let exception_handler_inner = exception_handler.clone();
                     let counter = counter.clone();
                     let compressed = compressed.clone();
@@ -1118,6 +1147,7 @@ impl MetricServer {
                         let telegraf_sender = telegraf_sender.clone();
                         let profile_sender = profile_sender.clone();
                         let application_log_sender = application_log_sender.clone();
+                        let skywalking_sender = skywalking_sender.clone();
                         let exception_handler = exception_handler_inner.clone();
                         let peer_addr = conn.remote_addr();
                         let counter = counter.clone();
@@ -1141,6 +1171,7 @@ impl MetricServer {
                                     telegraf_sender.clone(),
                                     profile_sender.clone(),
                                     application_log_sender.clone(),
+                                    skywalking_sender.clone(),
                                     exception_handler.clone(),
                                     compressed.load(Ordering::Relaxed),
                                     profile_compressed.load(Ordering::Relaxed),
