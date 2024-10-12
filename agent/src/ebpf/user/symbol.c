@@ -991,18 +991,20 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 					p->update_syms_table_time =
 					    curr_time +
 					    get_java_syms_fetch_delay();
+				} else {
+					p->update_syms_table_time = curr_time;
 				}
 
 				/*
 				 * When the deepflow-agent is started, to avoid the sudden
 				 * generation of Java symbol tables, additional random value
 				 * for each java process's delay.
+				 * The same applies to non-Java processes, which also perform
+				 * random symbol table loading within one minute.
 				 */
-				if (kv.v.cache == 0 && !p->gen_java_syms_file_err) {
-					p->update_syms_table_time =
-					    generate_random_integer
-					    (PROFILER_DEFER_RANDOM_MAX);
-				}
+				p->update_syms_table_time +=
+				    generate_random_integer
+				    (PROFILER_DEFER_RANDOM_MAX);
 			}
 
 			if (p->update_syms_table_time > 0
