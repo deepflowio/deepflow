@@ -216,8 +216,8 @@ static inline bool is_existed_in_exit_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exit_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->v.
-			    proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->
+			    v.proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			ebpf_warning
@@ -247,8 +247,8 @@ static inline bool is_existed_in_exec_cache(struct symbolizer_cache_kvp *kv)
 	vec_foreach(kv_tmp, pids_cache.exec_pids_cache) {
 		if ((int)kv_tmp->k.pid == kv->k.pid) {
 			struct symbolizer_proc_info *list_p =
-			    (struct symbolizer_proc_info *)kv_tmp->v.
-			    proc_info_p;
+			    (struct symbolizer_proc_info *)kv_tmp->
+			    v.proc_info_p;
 			struct symbolizer_proc_info *curr_p =
 			    (struct symbolizer_proc_info *)kv->v.proc_info_p;
 			if (curr_p != 0 && list_p != 0) {
@@ -777,19 +777,20 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 					p->update_syms_table_time =
 					    curr_time +
 					    get_java_syms_fetch_delay();
+				} else {
+					p->update_syms_table_time = curr_time;
 				}
 
 				/*
 				 * When the deepflow-agent is started, to avoid the sudden
 				 * generation of Java symbol tables, additional random value
 				 * for each java process's delay.
+				 * The same applies to non-Java processes, which also perform
+				 * random symbol table loading within one minute.
 				 */
-				if (p->syms_cache == 0
-				    && !p->gen_java_syms_file_err) {
-					p->update_syms_table_time =
-					    generate_random_integer
-					    (PROFILER_DEFER_RANDOM_MAX);
-				}
+				p->update_syms_table_time +=
+				    generate_random_integer
+				    (PROFILER_DEFER_RANDOM_MAX);
 			}
 
 			if (p->update_syms_table_time > 0
