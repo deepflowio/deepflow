@@ -1232,7 +1232,6 @@ static int check_kern_adapt_and_state_update(void)
 			  "Set the status to TRACER_RUNNING\n", linux_release);
 		t->state = TRACER_RUNNING;
 		CLIB_MEMORY_BARRIER();
-		add_probes_act(ACT_DETACH);
 		set_period_event_invalid("check-kern-adapt");
 		set_period_event_invalid("trigger_kern_adapt");
 		t->adapt_success = true;
