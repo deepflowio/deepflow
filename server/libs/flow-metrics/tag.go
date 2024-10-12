@@ -256,7 +256,7 @@ type Field struct {
 	// 用于区分不同的trident及其不同的pipeline，用于如下场景：
 	//   - agent和ingester之间的数据传输
 	//   - ingester写入clickhouse，作用类似_id，序列化为_tid
-	GlobalThreadID uint8
+	GlobalThreadID uint8 `json:"thread_id" category:"$tag"`
 
 	// structTag  "datasource":"n|nm|a|am" means datasource: network, network_map, application, application_map
 	IP6              net.IP `json:"ip6" map_json:"ip6_0" category:"$tag" sub:"network_layer" to_string:"IPv6String" ` // FIXME: 合并IP6和IP
@@ -1342,6 +1342,7 @@ func (t *Tag) String() string {
 
 func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.Code = Code(p.Code)
+	t.GlobalThreadID = uint8(p.Field.GlobalThreadId)
 	t.IsIPv4 = 1 - uint8(p.Field.IsIpv6)
 	if t.IsIPv4 == 0 {
 		if t.IP6 == nil {
