@@ -63,13 +63,14 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 		](
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			wholeCache,
-			db.NewVInterface().SetMetadata(wholeCache.GetMetadata()),
+			db.NewVInterface(),
 			wholeCache.DiffBaseDataSet.VInterfaces,
 			cloudData,
 		),
 	}
 	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -126,6 +127,10 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 	return dbItem, true
 }
 
+func (i *VInterface) getUpdateableFields() []string {
+	return []string{"subnetid", "deviceid", "name", "tap_mac", "region", "iftype", "netns_id", "vtap_id"}
+}
+
 func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (*message.VInterfaceFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.VInterfaceFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -161,6 +166,7 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 			return nil, nil, false
 		}
 		mapInfo["deviceid"] = deviceID
+		structInfo.DeviceID.SetNew(deviceID)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -187,4 +193,31 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 		structInfo.VTapID.Set(diffBase.VtapID, cloudItem.VTapID)
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (i *VInterface) setUpdatedFields(dbItem *mysqlmodel.VInterface, updateInfo *message.VInterfaceFieldsUpdate) {
+	if updateInfo.NetworkID.IsDifferent() {
+		dbItem.NetworkID = updateInfo.NetworkID.GetNew()
+	}
+	if updateInfo.DeviceID.IsDifferent() {
+		dbItem.DeviceID = updateInfo.DeviceID.GetNew()
+	}
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.TapMac.IsDifferent() {
+		dbItem.TapMac = updateInfo.TapMac.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.Type.IsDifferent() {
+		dbItem.Type = updateInfo.Type.GetNew()
+	}
+	if updateInfo.NetnsID.IsDifferent() {
+		dbItem.NetnsID = updateInfo.NetnsID.GetNew()
+	}
+	if updateInfo.VTapID.IsDifferent() {
+		dbItem.VtapID = updateInfo.VTapID.GetNew()
+	}
 }

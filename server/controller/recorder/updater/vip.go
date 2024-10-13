@@ -59,12 +59,13 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 		](
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			wholeCache,
-			db.NewVIP().SetMetadata(wholeCache.GetMetadata()),
+			db.NewVIP(),
 			wholeCache.DiffBaseDataSet.VIP,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -84,6 +85,10 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*mysqlmodel.VIP, b
 	return dbItem, true
 }
 
+func (p *VIP) getUpdateableFields() []string {
+	return []string{"ip", "vtap_id"}
+}
+
 func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (*message.VIPFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.VIPFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -97,4 +102,13 @@ func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.V
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (p *VIP) setUpdatedFields(dbItem *mysqlmodel.VIP, updateInfo *message.VIPFieldsUpdate) {
+	if updateInfo.IP.IsDifferent() {
+		dbItem.IP = updateInfo.IP.GetNew()
+	}
+	if updateInfo.VTapID.IsDifferent() {
+		dbItem.VTapID = updateInfo.VTapID.GetNew()
+	}
 }

@@ -59,12 +59,13 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			wholeCache,
-			db.NewLBTargetServer().SetMetadata(wholeCache.GetMetadata()),
+			db.NewLBTargetServer(),
 			wholeCache.DiffBaseDataSet.LBTargetServers,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -124,6 +125,10 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	return dbItem, true
 }
 
+func (s *LBTargetServer) getUpdateableFields() []string {
+	return []string{"ip", "port", "protocol"}
+}
+
 func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (*message.LBTargetServerFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LBTargetServerFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -141,4 +146,16 @@ func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, c
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (s *LBTargetServer) setUpdatedFields(dbItem *mysqlmodel.LBTargetServer, updateInfo *message.LBTargetServerFieldsUpdate) {
+	if updateInfo.IP.IsDifferent() {
+		dbItem.IP = updateInfo.IP.GetNew()
+	}
+	if updateInfo.Port.IsDifferent() {
+		dbItem.Port = updateInfo.Port.GetNew()
+	}
+	if updateInfo.Protocol.IsDifferent() {
+		dbItem.Protocol = updateInfo.Protocol.GetNew()
+	}
 }

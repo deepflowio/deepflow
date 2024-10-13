@@ -59,12 +59,13 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 		](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			wholeCache,
-			db.NewLBListener().SetMetadata(wholeCache.GetMetadata()),
+			db.NewLBListener(),
 			wholeCache.DiffBaseDataSet.LBListeners,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -97,6 +98,10 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*mys
 	return dbItem, true
 }
 
+func (l *LBListener) getUpdateableFields() []string {
+	return []string{"name", "ips", "snat_ips", "port", "protocol"}
+}
+
 func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (*message.LBListenerFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.LBListenerFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -122,4 +127,22 @@ func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (l *LBListener) setUpdatedFields(dbItem *mysqlmodel.LBListener, updateInfo *message.LBListenerFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.IPs.IsDifferent() {
+		dbItem.IPs = updateInfo.IPs.GetNew()
+	}
+	if updateInfo.SNATIPs.IsDifferent() {
+		dbItem.SNATIPs = updateInfo.SNATIPs.GetNew()
+	}
+	if updateInfo.Port.IsDifferent() {
+		dbItem.Port = updateInfo.Port.GetNew()
+	}
+	if updateInfo.Protocol.IsDifferent() {
+		dbItem.Protocol = updateInfo.Protocol.GetNew()
+	}
 }

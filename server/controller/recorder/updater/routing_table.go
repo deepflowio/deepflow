@@ -59,12 +59,13 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		](
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			wholeCache,
-			db.NewRoutingTable().SetMetadata(wholeCache.GetMetadata()),
+			db.NewRoutingTable(),
 			wholeCache.DiffBaseDataSet.RoutingTables,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -93,6 +94,10 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 	return dbItem, true
 }
 
+func (t *RoutingTable) getUpdateableFields() []string {
+	return []string{"destination", "nexthop_type", "nexthop"}
+}
+
 func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (*message.RoutingTableFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.RoutingTableFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -110,4 +115,16 @@ func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloud
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (t *RoutingTable) setUpdatedFields(dbItem *mysqlmodel.RoutingTable, updateInfo *message.RoutingTableFieldsUpdate) {
+	if updateInfo.Destination.IsDifferent() {
+		dbItem.Destination = updateInfo.Destination.GetNew()
+	}
+	if updateInfo.NexthopType.IsDifferent() {
+		dbItem.NexthopType = updateInfo.NexthopType.GetNew()
+	}
+	if updateInfo.Nexthop.IsDifferent() {
+		dbItem.Nexthop = updateInfo.Nexthop.GetNew()
+	}
 }

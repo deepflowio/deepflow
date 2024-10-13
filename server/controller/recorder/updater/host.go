@@ -59,12 +59,13 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 		](
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			wholeCache,
-			db.NewHost().SetMetadata(wholeCache.GetMetadata()),
+			db.NewHost(),
 			wholeCache.DiffBaseDataSet.Hosts,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -92,6 +93,10 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysqlmodel.Host
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
+}
+
+func (h *Host) getUpdateableFields() []string {
+	return []string{"name", "ip", "hostname", "htype", "vcpu_num", "mem_total", "extra_info", "region", "az"}
 }
 
 func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (*message.HostFieldsUpdate, map[string]interface{}, bool) {
@@ -135,4 +140,34 @@ func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (h *Host) setUpdatedFields(dbItem *mysqlmodel.Host, updateInfo *message.HostFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.IP.IsDifferent() {
+		dbItem.IP = updateInfo.IP.GetNew()
+	}
+	if updateInfo.Hostname.IsDifferent() {
+		dbItem.Hostname = updateInfo.Hostname.GetNew()
+	}
+	if updateInfo.HType.IsDifferent() {
+		dbItem.HType = updateInfo.HType.GetNew()
+	}
+	if updateInfo.VCPUNum.IsDifferent() {
+		dbItem.VCPUNum = updateInfo.VCPUNum.GetNew()
+	}
+	if updateInfo.MemTotal.IsDifferent() {
+		dbItem.MemTotal = updateInfo.MemTotal.GetNew()
+	}
+	if updateInfo.ExtraInfo.IsDifferent() {
+		dbItem.ExtraInfo = updateInfo.ExtraInfo.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
+	if updateInfo.AZLcuuid.IsDifferent() {
+		dbItem.AZ = updateInfo.AZLcuuid.GetNew()
+	}
 }

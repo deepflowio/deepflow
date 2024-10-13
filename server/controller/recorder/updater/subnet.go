@@ -60,12 +60,13 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 		](
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			wholeCache,
-			db.NewSubnet().SetMetadata(wholeCache.GetMetadata()),
+			db.NewSubnet(),
 			wholeCache.DiffBaseDataSet.Subnets,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator() // TODO refactor
 	return updater
 }
 
@@ -102,6 +103,10 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*mysqlmodel.
 	return dbItem, true
 }
 
+func (s *Subnet) getUpdateableFields() []string {
+	return []string{"name", "label"}
+}
+
 func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (*message.SubnetFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.SubnetFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -115,4 +120,13 @@ func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudm
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (s *Subnet) setUpdatedFields(dbItem *mysqlmodel.Subnet, updateInfo *message.SubnetFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
 }

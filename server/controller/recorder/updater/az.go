@@ -59,12 +59,13 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 		](
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,
-			db.NewAZ().SetMetadata(wholeCache.GetMetadata()),
+			db.NewAZ(),
 			wholeCache.DiffBaseDataSet.AZs,
 			cloudData,
 		),
 	}
 	updater.dataGenerator = updater
+	updater.initDBOperator()
 	return updater
 }
 
@@ -84,6 +85,10 @@ func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*mysqlmodel.AZ, bool
 	return dbItem, true
 }
 
+func (z *AZ) getUpdateableFields() []string {
+	return []string{"name", "label", "region"}
+}
+
 func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ) (*message.AZFieldsUpdate, map[string]interface{}, bool) {
 	structInfo := new(message.AZFieldsUpdate)
 	mapInfo := make(map[string]interface{})
@@ -101,4 +106,16 @@ func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
+}
+
+func (z *AZ) setUpdatedFields(dbItem *mysqlmodel.AZ, updateInfo *message.AZFieldsUpdate) {
+	if updateInfo.Name.IsDifferent() {
+		dbItem.Name = updateInfo.Name.GetNew()
+	}
+	if updateInfo.Label.IsDifferent() {
+		dbItem.Label = updateInfo.Label.GetNew()
+	}
+	if updateInfo.RegionLcuuid.IsDifferent() {
+		dbItem.Region = updateInfo.RegionLcuuid.GetNew()
+	}
 }
