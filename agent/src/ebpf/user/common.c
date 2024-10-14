@@ -538,7 +538,7 @@ u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 
 	snprintf(file, sizeof(file), "/proc/%d/stat", pid);
 	if (access(file, F_OK)) {
-		ebpf_warning("file %s is not exited\n", file);
+		ebpf_debug("file %s is not exited\n", file);
 		return 0;
 	}
 
