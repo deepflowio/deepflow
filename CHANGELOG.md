@@ -8,6 +8,9 @@
 ### <a id="main"></a>DeepFlow release main
 
 #### Bug Fix
+* fix: agent - eBPF Random time to process symbol table creation [#8283](https://github.com/deepflowio/deepflow/pull/8283) by [yinjiping](https://github.com/yinjiping)
+* fix: agent - eBPF Handle the scenario where CONFIG_NET_NS is disabled [#8282](https://github.com/deepflowio/deepflow/pull/8282) by [yinjiping](https://github.com/yinjiping)
+* fix: add export thread id [#8278](https://github.com/deepflowio/deepflow/pull/8278) by [lzf575](https://github.com/lzf575)
 * fix: topK multiple parameter query error [#8249](https://github.com/deepflowio/deepflow/pull/8249) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: add process_id in profile data query [#8238](https://github.com/deepflowio/deepflow/pull/8238) by [taloric](https://github.com/taloric)
 * fix: custom data source creation failed in enterprise ClickHouse [#8233](https://github.com/deepflowio/deepflow/pull/8233) by [lzf575](https://github.com/lzf575)
