@@ -149,6 +149,7 @@
 **[Changelog for v6.5](https://www.deepflow.io/docs/release-notes/release-6.5-ce)**<br/>
 
 #### NEW FEATURE
+* feat: agent - eBPF Adjust log output for get_process_starttime_and_comm [#8294](https://github.com/deepflowio/deepflow/pull/8294) by [yinjiping](https://github.com/yinjiping)
 * feat: exist function supports non-resource tags [#8256](https://github.com/deepflowio/deepflow/pull/8256) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * feat: agent - eBPF Adapt 5.10.204-rt100-AD1000-PROTO [#8245](https://github.com/deepflowio/deepflow/pull/8245) by [yinjiping](https://github.com/yinjiping)
 * feat: querier uniq function supports multi params [#8229](https://github.com/deepflowio/deepflow/pull/8229) by [xiaochaoren1](https://github.com/xiaochaoren1)
