@@ -11,6 +11,9 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix: agent - eBPF Random time to process symbol table creation [#8281](https://github.com/deepflowio/deepflow/pull/8281) by [yinjiping](https://github.com/yinjiping)
+* fix: add export thread id [#8279](https://github.com/deepflowio/deepflow/pull/8279) by [lzf575](https://github.com/lzf575)
+* fix: agent - eBPF Handle the scenario where CONFIG_NET_NS is disabled [#8277](https://github.com/deepflowio/deepflow/pull/8277) by [yinjiping](https://github.com/yinjiping)
 * fix: topK multiple parameter query error [#8250](https://github.com/deepflowio/deepflow/pull/8250) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: querier TopK supporrt resource_id [#8234](https://github.com/deepflowio/deepflow/pull/8234) by [xiaochaoren1](https://github.com/xiaochaoren1)
 * fix: agent - Other eBPF bin-file will be selected when kfunc loading fails [#8227](https://github.com/deepflowio/deepflow/pull/8227) by [yinjiping](https://github.com/yinjiping)
