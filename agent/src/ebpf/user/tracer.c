@@ -2138,6 +2138,11 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	return ETR_OK;
 }
 
+bool is_rt_kernel(void)
+{       
+	return (strstr(linux_release, ".rt") || strstr(linux_release, "-rt"));
+}
+
 void bpf_tracer_finish(void)
 {
 	all_probes_ready = 1;
