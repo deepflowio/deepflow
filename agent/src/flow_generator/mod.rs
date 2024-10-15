@@ -33,7 +33,8 @@ use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
 pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: packet-sequence
 pub use protocol_logs::{
-    AppProto, AppProtoHead, DnsLog, HttpLog, LogMessageType, MetaAppProto, OracleLog, TlsLog,
+    AppProto, AppProtoHead, DnsLog, HttpLog, LogMessageType, MemcachedLog, MetaAppProto, OracleLog,
+    TlsLog,
 };
 
 use std::time::Duration;

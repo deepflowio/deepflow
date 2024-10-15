@@ -14,6 +14,7 @@
 62      , Oracle          ,
 80      , Redis           ,
 81      , MongoDB         ,
+82      , Memcached       ,
 100     , Kafka           ,
 101     , MQTT            ,
 102     , AMQP            , RabbitMQ

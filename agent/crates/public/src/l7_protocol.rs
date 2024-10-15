@@ -55,11 +55,11 @@ pub enum L7Protocol {
     MySQL = 60,
     PostgreSQL = 61,
     Oracle = 62,
-    Memcached = 63,
 
     // NoSQL
     Redis = 80,
     MongoDB = 81,
+    Memcached = 82,
 
     // MQ
     Kafka = 100,
