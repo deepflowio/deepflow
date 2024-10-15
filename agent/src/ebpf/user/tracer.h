@@ -678,6 +678,7 @@ void free_all_readers(struct bpf_tracer *t);
 int enable_tracer_reader_work(const char *name, int idx,
 			      struct bpf_tracer *tracer,
 			      void *fn);
+bool is_rt_kernel(void);
 /**
  * @brief Enable eBPF segmentation reassembly for the specified protocol.
  * 

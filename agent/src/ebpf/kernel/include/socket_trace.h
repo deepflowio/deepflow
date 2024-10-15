@@ -181,14 +181,14 @@ struct conn_info_s {
 	// The protocol of traffic on the connection (HTTP, MySQL, etc.).
 	enum traffic_protocol protocol;
 	// MSG_UNKNOWN, MSG_REQUEST, MSG_RESPONSE
-	__u32 message_type: 4;
+	__u32 message_type:4;
 	// Is this segment of data reassembled?
-	__u32 is_reasm_seg: 1;
-	__u32 no_trace: 1;    /* When set to 1 (or true), tracing will not be performed. */
-	__u32 reserved: 26;
+	__u32 is_reasm_seg:1;
+	__u32 no_trace:1;	/* When set to 1 (or true), tracing will not be performed. */
+	__u32 reserved:26;
 
 	union {
-		__u8  encoding_type;    // Currently used for OpenWire encoding inference
+		__u8 encoding_type;	// Currently used for OpenWire encoding inference
 		__s32 correlation_id;	// Currently used for Kafka determination
 	};
 	__u32 prev_count;	// Prestored data length
@@ -229,12 +229,12 @@ struct tail_calls_context {
 	 * private data.
 	 */
 	char private_data[sizeof(struct infer_data_s)];
-	int max_size_limit;		// The maximum size of the socket data that can be transferred.
+	int max_size_limit;	// The maximum size of the socket data that can be transferred.
 	__u32 push_reassembly_bytes;	// The number of bytes pushed after enabling data reassembly.
 	enum traffic_direction dir;	// Data flow direction.
-	__u8 vecs: 1;			// Whether a memory vector is used ? (for specific syscall)
-	__u8 is_close: 1;		// Is it a close() systemcall ?
-	__u8 reserve: 6;
+	__u8 vecs:1;		// Whether a memory vector is used ? (for specific syscall)
+	__u8 is_close:1;	// Is it a close() systemcall ?
+	__u8 reserve:6;
 	struct conn_info_s conn_info;
 	struct process_data_extra extra;
 	__u32 bytes_count;
@@ -283,8 +283,8 @@ struct data_args_t {
 	};
 
 	union {
-		__u64 socket_id; // Use for socket close
-		__u64 enter_ts;  // Timestamp for enter syscall function.
+		__u64 socket_id;	// Use for socket close
+		__u64 enter_ts;	// Timestamp for enter syscall function.
 	};
 
 	__u32 tcp_seq;		// Used to record the entry of syscalls
@@ -298,6 +298,26 @@ struct data_args_t {
 } __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*  9     1 */
+	int __syscall_nr;	/*    offset:12     4 */
+	union {
+		struct {
+			__u64 fd;	/*  offset:16   8  */
+			char *buf;	/*  offset:24   8  */
+		};
+
+		// For clock_gettime()
+		struct {
+			clockid_t which_clock;	/*   offset:16   4  */
+			struct timespec *tp;	/*   offset:24   8  */
+		};
+	};
+	size_t count;		/*    32     8 */
+	unsigned int flags;
+#else
 	__u64 __pad_0;		/*     0     8 */
 	int __syscall_nr;	/*    offset:8     4 */
 	__u32 __pad_1;		/*    12     4 */
@@ -309,53 +329,110 @@ struct syscall_comm_enter_ctx {
 
 		// For clock_gettime()
 		struct {
-			clockid_t which_clock;	/*   offset:16   8  */
+			clockid_t which_clock;	/*   offset:16   4  */
 			struct timespec *tp;	/*   offset:24   8  */
 		};
 	};
 	size_t count;		/*    32     8 */
 	unsigned int flags;
+#endif
 };
 
 struct sched_comm_exit_ctx {
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*     9     1 */
+	unsigned short padding;
+	char comm[16];		/*    12    16 */
+
+	pid_t pid;		/*    28     4 */
+	int prio;		/*    32     4 */
+#else
 	__u64 __pad_0;		/*     0     8 */
 	char comm[16];		/*     offset:8;       size:16 */
 	pid_t pid;		/*     offset:24;      size:4  */
 	int prio;		/*     offset:28;      size:4  */
+#endif
 };
 
 struct syscall_sendto_enter_ctx {
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*     9     1 */
+
+	int __syscall_nr;	/*    12     4 */
+	int fd;			/*    16     4 */
+
+	void *buff;		/*    24     8 */
+	size_t len;		/*    32     8 */
+	unsigned int flags;	/*    40     4 */
+
+	struct sockaddr *addr;	/*    48     8 */
+	int addr_len;		/*    56     4 */
+#else
 	__u64 __pad_0;
-	int __syscall_nr;  // offset:8     size:4 
-	__u32 __pad_1;     // offset:12    size:4
-	int fd;   	   //offset:16;      size:8; signed:0;
-	void * buff;       //offset:24;      size:8; signed:0;
-	size_t len;        //offset:32;      size:8; signed:0;
-	unsigned int flags;       //offset:40;      size:8; signed:0;
-	struct sockaddr * addr;   //offset:48;      size:8; signed:0;
-	int addr_len;     //offset:56;      size:8; signed:0;
+	int __syscall_nr;	// offset:8     size:4 
+	__u32 __pad_1;		// offset:12    size:4
+	int fd;			//offset:16;      size:8; signed:0;
+	void *buff;		//offset:24;      size:8; signed:0;
+	size_t len;		//offset:32;      size:8; signed:0;
+	unsigned int flags;	//offset:40;      size:8; signed:0;
+	struct sockaddr *addr;	//offset:48;      size:8; signed:0;
+	int addr_len;		//offset:56;      size:8; signed:0;
+#endif
 };
 
 struct sched_comm_fork_ctx {
-	__u64 __pad_0;
-	char parent_comm[16];
-	__u32 parent_pid;
-	char child_comm[16];
-	__u32 child_pid;
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*     9     1 */
+	unsigned short padding;
+	char parent_comm[16];	/*    12    16 */
+
+	__u32 parent_pid;	/*    28     4 */
+	char child_comm[16];	/*    32    16 */
+	__u32 child_pid;	/*    48     4 */
+#else
+	__u64 __pad_0;		/*     0     8 */
+	char parent_comm[16];	/*     8    16 */
+	__u32 parent_pid;	/*    24     4 */
+	char child_comm[16];	/*    28    16 */
+	__u32 child_pid;	/*    44     4 */
+#endif
 };
 
 struct sched_comm_exec_ctx {
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*  9     1 */
+	int __data_loc;		/*    offset:12    4 */
+	__u32 pid;		/*    offset:16    4 */
+	__u32 old_pid;		/*    offset:20    4 */
+#else
 	__u64 __pad_0;		/*     0     8 */
 	int __data_loc;		/*    offset:8     4 */
 	__u32 pid;		/*    offset:12    4 */
 	__u32 old_pid;		/*    offset:16    4 */
+#endif
 };
 
 struct syscall_comm_exit_ctx {
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*  9     1 */
+	int __syscall_nr;	/*    offset:12     4 */
+	__u64 ret;		/*    offset:16    8 */
+#else
 	__u64 __pad_0;		/*     0     8 */
 	int __syscall_nr;	/*    offset:8     4 */
 	__u32 __pad_1;		/*    12     4 */
 	__u64 ret;		/*    offset:16    8 */
+#endif
 };
 
 static __inline __u64 gen_conn_key_id(__u64 param_1, __u64 param_2)
