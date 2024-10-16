@@ -631,6 +631,13 @@ func (t *PlatformInfoTable) baseInfoMissStat(orgId uint16, epcID int32) {
 }
 
 func (t *PlatformInfoTable) queryEpcIDBaseInfo(orgId uint16, epcID int32) *BaseInfo {
+	// when the IP belongs to the 10/8、172.16/12、192.168/16、169.254/16 network segment,
+	// EPC_ID may be EPC_UNKNOWN, and the RegionID should be the RegionID to which the Organization belongs
+	if epcID == datatype.EPC_UNKNOWN {
+		return &BaseInfo{
+			RegionID: t.QueryRegionID(orgId),
+		}
+	}
 	baseInfo, ok := t.epcIDBaseInfos[orgId][epcID]
 	if !ok {
 		t.baseInfoMissStat(orgId, epcID)
