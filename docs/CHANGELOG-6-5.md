@@ -11,6 +11,7 @@
 * feat: CK’s username and password support the use of special characters [#7229](https://github.com/deepflowio/deepflow/pull/7119)
 
 #### Bug Fix
+* fix agent - eBPF Fix the parsing of the kernel version (#8311) [#8312](https://github.com/deepflowio/deepflow/pull/8312) by [yinjiping](https://github.com/yinjiping)
 * fix: update mirror ci [#8300](https://github.com/deepflowio/deepflow/pull/8300) by [jiumos](https://github.com/jiumos)
 * fix: agent - eBPF Random time to process symbol table creation [#8281](https://github.com/deepflowio/deepflow/pull/8281) by [yinjiping](https://github.com/yinjiping)
 * fix: add export thread id [#8279](https://github.com/deepflowio/deepflow/pull/8279) by [lzf575](https://github.com/lzf575)
