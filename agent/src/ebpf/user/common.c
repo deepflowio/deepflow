@@ -601,13 +601,16 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 
 	bool has_error = false;
 	uname(&sys_info);
-
+	int match_num = 0;
+	*num = 0;
 	// e.g.: 3.10.0-940.el7.centos.x86_64, 4.19.17-1.el7.x86_64
-	if (sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev, num) !=
-	    4) {
-		// uname -r (4.19.117.bsk.7-business-amd64)
+	match_num = sscanf(sys_info.release, "%u.%u.%u-%u", major, minor, rev, num);
+	if (match_num == 4 || match_num == 3) {
+		return ETR_OK;
+	} else {
 		has_error = true;
 	}
+		
 	// Get the real version of Debian
 	// #1 SMP Debian 4.19.289-2 (2023-08-08)
 	// e.g.:
@@ -621,24 +624,6 @@ int fetch_kernel_version(int *major, int *minor, int *rev, int *num)
 		    (sscanf(sys_info.version, "%*s %*s %*s %*s %u.%u.%u-%u %*s",
 			    major, minor, rev, num) != 4)
 		    )
-			has_error = true;
-		else
-			has_error = false;
-	}
-
-	// 5.10.204-rt100-AD1000-PROTO-0.7-00001-g3e358b7cb222
-	if (strstr(sys_info.release, "rt100")) {
-		*num = 0;
-		if (sscanf(sys_info.release, "%u.%u.%u-%*s", major, minor, rev) != 3)
-			has_error = true;
-		else
-			has_error = false;
-	}
-
-	// 4.19.90-vhulk2211.3.0.h1542r10.aarch64
-	if (strstr(sys_info.release, "vhulk")) {
-		*num = 0;
-		if (sscanf(sys_info.release, "%u.%u.%u-%*s", major, minor, rev) != 3)
 			has_error = true;
 		else
 			has_error = false;
